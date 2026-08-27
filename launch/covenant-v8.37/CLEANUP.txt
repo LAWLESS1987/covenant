@@ -1,6 +1,6 @@
 ==== cleanup Sat 08/22/2026 21:37:37.38 ====
 --- before ---
-FreePhysicalMemory=2731704
+FreePhysicalMemory=2731704
 
 --- closing leftover launcher consoles ---
 found 14 leftover launcher console(s)
@@ -29,7 +29,7 @@ closed 14 of 14
 --- removing the junk file a broken one-liner created ---
 
 --- after ---
-FreePhysicalMemory=2978796
+FreePhysicalMemory=2978796
 
 --- nodes still up? ---
 
