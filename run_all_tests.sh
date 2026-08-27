@@ -3,7 +3,37 @@
 cd "$(dirname "$0")"
 export COVENANT_JUDGE_PROVIDERS="${COVENANT_JUDGE_PROVIDERS:-mock}"
 export COVENANT_INSECURE_MOCK_JUDGE="${COVENANT_INSECURE_MOCK_JUDGE:-1}"
-rm -f covenant_unified_*.db* *.db.key 2>/dev/null; rm -rf __pycache__ 2>/dev/null
+# A PRE-EXISTING KEY IS A NODE IDENTITY, NEVER A TEST ARTEFACT (added 2026-08-27).
+#
+# The cleanup here, and the identical line at the end of `run`, used to be
+#     rm -f covenant_unified_*.db* *.db.key
+# The second glob is unanchored. The suites create short-named databases
+# (a.db, m.db, exporter.db ...) whose keys it was meant to reap -- but it
+# matches EVERY *.db.key in the directory, and on an operator's machine that
+# set includes covenant_A.db.key and the six node keys nodeA/B/C_{prod,run}.
+# Those decrypt the persisted ledger. Deleting one does not fail a test, it
+# strands an encrypted database with no key.
+#
+# It fired twice over: once here, and once at the tail of `run`, so a full
+# sweep executed it 47 times. The documented instruction is to run this
+# script before any launch and after any change.
+#
+# Fix: snapshot the keys present BEFORE the sweep and never delete those.
+# Only keys that appear DURING the run are reaped. This fails safe -- a key
+# this script did not create is a key this script does not remove -- and it
+# needs no list of node names to maintain.
+PRESERVE_KEYS="$(ls -1 -- *.db.key 2>/dev/null | sort)"
+
+clean_test_dbs () {
+  rm -f -- covenant_unified_*.db* 2>/dev/null
+  for k in *.db.key; do
+    [ -e "$k" ] || continue
+    printf '%s\n' "$PRESERVE_KEYS" | grep -qxF -- "$k" && continue
+    rm -f -- "$k" 2>/dev/null
+  done
+}
+
+clean_test_dbs; rm -rf __pycache__ 2>/dev/null
 TOTAL=0; FAILED=0
 # ABSENT IS NOT ZERO (added 2026-08-27).
 #
@@ -35,7 +65,7 @@ run () {
   n=${p:-${c:-0}}; f=${f:-0}
   TOTAL=$((TOTAL+n)); FAILED=$((FAILED+f))
   printf "  %-30s %s\n" "$1" "${line:-NO RESULT}"
-  rm -f covenant_unified_*.db* *.db.key 2>/dev/null
+  clean_test_dbs
 }
 echo "=== INTEGRITY ==="
 python3 verify_bundle.py 2>&1 | tail -1
@@ -323,6 +353,12 @@ echo "=== THE DEPLOYMENT ITSELF, AND THE RADIO BEARER ==="
 run test_r1_lora_frame.py 120
 run test_backtest_guardrails.py 180
 run test_3node_config.py 120
+echo "=== THIS RUNNER'S OWN CLEANUP (K1) ==="
+# Added 2026-08-27 with the key-preservation fix at the top of this file.
+# It is registered HERE, in the same change that introduced it, because an
+# unregistered suite is the orphan problem this script already documents
+# twice. It runs in temporary directories only and touches nothing beside it.
+run test_k1_runner_key_preservation.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.
