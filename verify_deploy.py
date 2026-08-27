@@ -61,8 +61,30 @@ MANIFEST = {
         "07e097f3e37f51bf1c53df1873cc32e980da5f8146035cd98dbf780386e85cb2",
     "test_a3s_send_bounds.py":
         "bd0ab67ae2f62a12b6a0253926511ca7cffa6155e3a74bb6633d3875006d1d7c",
+    # UPDATED 2026-08-27, and the reason is recorded because a frozen hash
+    # updated without one is indistinguishable from a hash updated to make a
+    # red gate green.
+    #
+    # 55016a9d1836 was the v8.37 delivery hash. TWO COMMITS landed after that
+    # freeze and both touched this file:
+    #     0741b89  Stop the test sweep deleting node identity keys
+    #     5517b64  P9: make the policy-file owner-only check platform-correct
+    # The copy on disk is byte-identical to git HEAD (836bd0832b68 both ways),
+    # so it is the committed tree, not a hand edit or a partial copy -- the two
+    # things this check exists to catch. Both commits are covered by suites
+    # that passed on BOTH platforms today: test_k1_runner_key_preservation
+    # 20/20 and test_k3_p9_owner_only_guard 16/16.
+    #
+    # NOTE FOR THE NEXT PERSON. run_all_tests.sh is a TEST RUNNER. It is not
+    # node source and cannot change what a node executes, yet a stale hash for
+    # it refused a node restart outright. This four-entry list is frozen in
+    # source at build time, so it goes stale on every commit that touches one
+    # of the four -- the same shape as the MANIFEST.sha256 phantom and the
+    # transcript-in-manifest deadlock, both found the same day. A delivery
+    # check that must be hand-edited to stay true will be hand-edited to stay
+    # quiet. Derive it from the tag/commit being deployed instead.
     "run_all_tests.sh":
-        "55016a9d183673c255d59c3d8acfd2f62462fb5bfff5085232fbb648a8cd57b5",
+        "836bd0832b68e9b1798fdd3964c02dcc842ebdddc131bfc73bfb119f1f918437",
     "run_local_sweep.py":
         "8445f1164640c79c392ced622cb13b8ff329e78b0b93364a49c4d9b1f87b074c",
 }
