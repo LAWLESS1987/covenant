@@ -1,0 +1,80 @@
+# The Linux half of ONE.bat, on every push and every pull request.
+#
+# WHAT THIS IS AND IS NOT. It runs `covenant_one.py --ci`, which is the SAME
+# FILE that runs on the Windows box -- so a CI result and a PC result are the
+# same task list executed by the same bytes, and a difference between them is a
+# difference in the machine. That is the whole point, and it is why this
+# workflow deliberately does NOT have its own list of suites to run: a second
+# list is a second thing to go stale, which is how run_all_tests.sh came to
+# name eleven suites that were not on disk.
+#
+# WHAT IT CANNOT COVER, and no green tick here should ever be read as covering:
+#   * win32. Production runs on Windows and three suites behave differently
+#     there -- a refused TCP connect costs 0.0 ms here and 2045 ms on the PC.
+#     Run ONE.bat on the box before any launch. CI does not replace it.
+#   * The launch gates. A runner has no ethics judge, no nodes, no identity
+#     keys and no delivery manifest, so G1/G5/G8/G9/G10 cannot pass here.
+#     --ci prints them in full and does not let them decide the exit code:
+#     a check that is always red teaches people to skim past it.
+#   * test_xrp_live.py (needs a funded testnet account) and
+#     test_covenant_app.py (needs the chain stopped). Both are on the runner's
+#     switched-off record, with reasons, printed on every run.
+name: covenant
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: covenant-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: sweep (ubuntu, python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is what the production box runs; 3.11 is the cloud mirror. Both,
+        # because "it passed on my interpreter" is the same class of claim as
+        # "it passed on my platform".
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # covenant_one prints git HEAD and worktree state
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Declare what this run is
+        run: |
+          echo "This is the LINUX half of ONE.bat. It does not cover win32,"
+          echo "and it does not cover the launch gates. See the header of"
+          echo ".github/workflows/covenant.yml before trusting a green tick."
+          python --version
+          git log --oneline -1
+
+      - name: covenant_one.py --ci
+        run: python covenant_one.py --ci --out ONE_RUN_ci.txt
+
+      - name: Upload the transcript
+        if: always()   # the transcript matters MOST when the run failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: covenant-transcript-py${{ matrix.python }}
+          path: ONE_RUN_ci.txt
+          retention-days: 30

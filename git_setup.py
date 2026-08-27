@@ -136,6 +136,40 @@ deliberately, like a lockfile, not a report written on every run.
 The files are untouched on disk.
 """
 
+CI_MSG = """Run the Linux half of ONE.bat on every push
+
+.github/workflows/covenant.yml calls `covenant_one.py --ci` -- the SAME file
+that runs on the Windows box -- on 3.11 and 3.12. A CI result and a PC result
+are therefore the same task list executed by the same bytes, and a difference
+between them is a difference in the machine.
+
+The workflow deliberately has NO list of suites of its own. A second list is a
+second thing to go stale, which is exactly how run_all_tests.sh came to name
+eleven suites that were not on disk.
+
+--ci reports the launch gates in full and does not let them decide the exit
+code. A runner has no ethics judge, no nodes, no identity keys and no delivery
+manifest, so G1/G5/G8/G9/G10 cannot pass there; wiring the exit code to them
+would make every run red for reasons true of the runner rather than of the
+code, and a check that is always red is one people learn to skim (M34). The
+suites decide the exit code, because the suites are what CI can observe.
+
+A GREEN TICK IS NOT A LAUNCH, and the workflow header says so: it cannot cover
+win32, where three suites behave differently and a refused TCP connect costs
+2045 ms against 0.0 ms here.
+
+test_k2_tally_arithmetic.py is wired into SUITES. It arrived on main today from
+a branch where it had been sitting unmerged, and it pins the sweep's own
+arithmetic -- a runner that counts a failure as a pass reports coverage it does
+not have. Measured 25/25 before wiring.
+
+probe_win_connect.py goes on the switched-off record as a MEASUREMENT rather
+than a suite: nothing about it can fail.
+
+UNISON.md is the convention for two people building here, and its first rule is
+the one today earned: unmerged work is invisible work.
+"""
+
 WORK_MSG = """Add ONE.bat: one command, both platforms, nothing silent
 
 There were twenty-two launchers in this folder and two sweep runners that
@@ -278,10 +312,17 @@ def main():
               "test_p18_version_collision.py", "verify_bundle.py",
               "verify_deploy.py", ".gitignore",
               "git_setup.py", "GIT_SETUP.bat",
-              "github_push.py", "GITHUB_PUSH.bat"):
+              "github_push.py", "GITHUB_PUSH.bat",
+              "UNISON.md", ".github/workflows/covenant.yml"):
         if os.path.exists(os.path.join(HERE, f)):
             git("add", "--", f, check=False, quiet=True)
     commit_if_staged(WORK_MSG, "the ONE-command work")
+
+    step("3b", "Commit the CI setup and the working convention")
+    for f in ("UNISON.md", ".github/workflows/covenant.yml", "covenant_one.py"):
+        if os.path.exists(os.path.join(HERE, f)):
+            git("add", "--", f, check=False, quiet=True)
+    commit_if_staged(CI_MSG, "the CI setup")
 
     step(4, "Merge into main -- each branch tried on its own")
     git("switch", "main")

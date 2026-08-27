@@ -88,6 +88,12 @@ SUITES = [
     ("test_security_audit.py",           300,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
+    # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
+    # where it had been sitting unmerged. It pins the sweep's own arithmetic:
+    # a runner that counts a failure as a pass reports coverage it does not
+    # have, which is this project's whole disease in one function. Measured
+    # 25/25 before wiring, so it is not turning the sweep red on arrival.
+    ("test_k2_tally_arithmetic.py",      120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
@@ -140,6 +146,11 @@ DELIBERATELY_OFF = {
     "probe_mainnet_review.py": "one-off investigation probe, not a pass/fail suite",
     "probe_power.py":       "one-off investigation probe, not a pass/fail suite",
     "probe_scaling.py":     "one-off investigation probe, not a pass/fail suite",
+    "probe_win_connect.py":
+        "a MEASUREMENT, not a pass/fail suite -- it reports what a refused and "
+        "a dead TCP connect cost on THIS machine (Linux ~0.0 ms, win32 ~2045 ms). "
+        "Run it by hand, or ONE_PROBE.bat, when A12/A23 backoff numbers are in "
+        "question. Nothing about it can fail.",
     "verify_csv.py":        "data utility, run against realdata by hand",
     "verify_deploy.py":     "an ACTION (restarts nodes) -- runs under --restart",
     "trace_runner.py":      "helper, not a suite",
@@ -693,6 +704,10 @@ def main():
     ap.add_argument("--daily", action="store_true", help="ACTION: run daily.py")
     ap.add_argument("--console", action="store_true", help="ACTION: serve the console")
     ap.add_argument("--all", action="store_true", help="sweep + dashboard + daily")
+    ap.add_argument("--ci", action="store_true",
+                    help="continuous integration: implies --transported, and "
+                         "the gates are REPORTED but do not decide the exit "
+                         "code (a CI runner is not a launch host)")
     ap.add_argument("--transported", action="store_true",
                     help="this tree is a COPY of the delivery (e.g. the cloud "
                          "mirror): report the manifest check N/A instead of red")
@@ -700,6 +715,16 @@ def main():
     args = ap.parse_args()
     if args.all:
         args.dashboard = args.daily = True
+    if args.ci:
+        # A CI runner has no ethics judge, no nodes, no identity keys and no
+        # manifest of its own -- so G1/G5/G8/G9/G10 CANNOT pass there, ever.
+        # Wiring the exit code to them would make every CI run red for reasons
+        # that are true of the runner rather than of the code, and a check that
+        # is always red is one people learn to skim past (M34). The gates are
+        # still ASKED and still PRINTED in full: reported, not gating. What
+        # decides the exit code is the suites, which is the thing CI can
+        # actually observe.
+        args.transported = True
 
     say = Tee(os.path.join(HERE, args.out))
     t0 = time.time()
@@ -770,11 +795,21 @@ def main():
                                           None: "NOT MEASURED"}.get(gates, gates))
         say("  elapsed             %.1f min" % ((time.time() - t0) / 60))
         say("")
-        if bad or fails or gates == 1 or [n for n, st in inplace if st.startswith("FAIL")]:
+        gate_blocks = (gates == 1) and not args.ci
+        inplace_fail = [n for n, st in inplace if st.startswith("FAIL")] \
+            if not args.ci else []
+        if args.ci:
+            say("  ci mode             gates are REPORTED above, not gating --")
+            say("                      this runner has no judge, no nodes and no")
+            say("                      keys, so those gates cannot pass here. The")
+            say("                      suites decide the exit code.")
+        if bad or fails or gate_blocks or inplace_fail:
             say("  RESULT: FAIL. Something is wrong and it is named above.")
             code = 1
-        elif (unmeasured or absent or orphans or gates in (2, None) or args.quick
-              or [n for n, st in inplace if st == "ABSENT" or st.startswith("N/A")]):
+        elif (unmeasured or absent or orphans or args.quick
+              or (gates in (2, None) and not args.ci)
+              or [n for n, st in inplace
+                  if st == "ABSENT" or (st.startswith("N/A") and not args.ci)]):
             say("  RESULT: INCOMPLETE. Nothing failed; something was not measured.")
             say("          This is NOT a pass. Every unmeasured item is named above.")
             code = 2
