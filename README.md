@@ -4,8 +4,9 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.37** · source `07e097f3e37f` · 9,846 lines · 33 suites · 1,043 checks
-green on Linux.
+**v8.37** · source `07e097f3e37f` · 9,846 lines. Version, hash and line count
+re-verified 2026-08-27. The suite and check totals that stood here are
+**withdrawn** — see [Suite coverage](#suite-coverage).
 
 ---
 
@@ -40,6 +41,33 @@ Three things, in one process:
 - **It is not multi-operator ready.** Every node so far is one person's. The
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
+
+## Suite coverage
+
+This file used to open with *33 suites · 1,043 checks green on Linux*. That
+number is withdrawn, because the runner it was counted from could not have
+produced it honestly.
+
+`run_all_tests.sh` invokes **47** suites. **36** are on disk. The other
+**eleven** — `verify_patches`, `verify_auth`, `verify_tx_aer`,
+`test_path_pattern`, `test_succession_seal`, `test_ethics_judge`,
+`test_golden_ratio`, `test_judge_individuality`, `test_multi_provider_quorum`,
+`test_v86_bridge` and `test_v86_loss_tracking` — are named in the runner and
+do not exist. Until 2026-08-27 `run` scraped a tally out of stdout, so a
+missing suite contributed `0 passed, 0 failed`, printed `NO RESULT`, and left
+the failure count untouched. Eleven suites could be absent and the sweep still
+ended green. That is the orphan problem from the other direction:
+`run_local_sweep.py` had suites on disk that no runner called; this one calls
+suites that are not on disk. Both read as coverage and neither is.
+
+A missing suite is now a **failure**, loudly. The consequence is that a full
+sweep is currently red by construction, and will stay red until the eleven are
+either restored or removed from the runner. That is the correct state: the
+alternative is a green run that means nothing.
+
+No replacement total is printed here yet. Putting one up would require a clean
+sweep, and a clean sweep is not possible while eleven named suites are
+missing. When it is, the number goes back with the platform beside it (§8).
 
 ## Start here
 
