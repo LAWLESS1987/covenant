@@ -27,15 +27,34 @@ trace_runner e8f1d56c   verify_csv 921ed0c5   probe_power bd7456b9
 d2_regime_deep 27b933e4   d2_rebalance_deep b37a8443
 ```
 
-**And 12 suites the runner calls for exist nowhere** — not on the PC, not in the
-project: `verify_bundle.py`, `verify_patches.py`, `verify_auth.py`,
+**And 11 suites the runner calls for exist nowhere** — not on the PC, not in the
+project: `verify_patches.py`, `verify_auth.py`,
 `verify_tx_aer.py`, `test_path_pattern.py`, `test_succession_seal.py`,
 `test_ethics_judge.py`, `test_golden_ratio.py`, `test_judge_individuality.py`,
 `test_multi_provider_quorum.py`, `test_v86_bridge.py`, `test_v86_loss_tracking.py`.
-They are v8.11/v8.12-era names from `MANIFEST.json`. A local sweep therefore prints
-a dozen `NO RESULT` lines that look like failures and are not. Not deleted from the
+They are v8.11/v8.12-era names from `MANIFEST.json`. Not deleted from the
 runner here — that is L's call — but `run_local_sweep.py` lists them under
 "referenced but not present" instead of scoring them.
+
+> **Corrected 2026-08-27, twice, both against this file's own earlier claim (§10).**
+>
+> **It was twelve; it is eleven.** `verify_bundle.py` was on the list and now
+> exists — 4,938 bytes, dated 2026-08-26 19:38, one entry in `MANIFEST.sha256`,
+> and it runs. Re-checked individually: the other eleven are still absent from
+> the working tree, from every commit in the repository, and from all 302
+> manifest entries. This bundle never contained them.
+>
+> **They no longer print `NO RESULT` and they are no longer harmless.** This
+> paragraph said a sweep prints lines "that look like failures and are not."
+> Since the ABSENT-IS-NOT-ZERO change in `run_all_tests.sh` a missing suite is
+> counted as a **failure**, deliberately, because the previous behaviour let
+> eleven absent suites sit inside a green run. So a full sweep is now red by
+> construction until the eleven are restored or removed — and that red is real,
+> not cosmetic.
+>
+> The consequence is that no honest suite or check total can be published while
+> this stands, which is why the README's "33 suites · 1,043 checks" has been
+> withdrawn rather than replaced.
 
 ## 2. waitress was never installed, so W1 was inert on this machine
 
