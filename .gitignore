@@ -67,6 +67,7 @@ ONE_UP.txt
 PROBE_WIN_CONNECT.txt
 GIT_SETUP.txt
 ONE_RUN_ci.txt
+GITHUB_PUSH.txt
 
 # --- Transfer scratch -------------------------------------------------------
 _stage/

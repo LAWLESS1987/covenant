@@ -39,6 +39,33 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 ACK = "I know the portfolio is in the history"
+TRANSCRIPT = os.path.join(HERE, "GITHUB_PUSH.txt")
+_fh = None
+
+# gh is frequently installed somewhere PATH does not reach -- winget puts a
+# shim under Links, the MSI puts the real binary under Program Files, and a
+# cmd window opened BEFORE the install still carries the old PATH. Checking
+# only shutil.which() reported "not installed" on a machine where it was.
+GH_CANDIDATES = [
+    r"C:\Program Files\GitHub CLI\gh.exe",
+    r"C:\Program Files (x86)\GitHub CLI\gh.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links\gh.exe"),
+    os.path.expandvars(r"%LOCALAPPDATA%\GitHubCLI\gh.exe"),
+    os.path.expandvars(r"%ProgramFiles%\GitHub CLI\gh.exe"),
+    os.path.expandvars(r"%USERPROFILE%\scoop\shims\gh.exe"),
+    r"C:\ProgramData\chocolatey\bin\gh.exe",
+]
+
+
+def find_gh():
+    """PATH first, then the places installers actually put it."""
+    found = shutil.which("gh")
+    if found:
+        return found, "on PATH"
+    for c in GH_CANDIDATES:
+        if c and os.path.isfile(c):
+            return c, "not on PATH, found at %s" % c
+    return None, "not on PATH and not at any known install location"
 
 
 def run(args, check=False, capture=True):
@@ -53,6 +80,9 @@ def run(args, check=False, capture=True):
 
 def say(s=""):
     print(s, flush=True)
+    if _fh:
+        _fh.write(s + "\n")
+        _fh.flush()
 
 
 def main():
@@ -121,7 +151,10 @@ def main():
     say("3. How this authenticates")
     existing = run(["git", "remote", "get-url", "origin"])
     origin = existing.stdout.strip() if existing.returncode == 0 else None
-    gh = shutil.which("gh")
+    gh, gh_where = find_gh()
+    say("   gh: %s" % gh_where)
+    git_v = run(["git", "--version"])
+    say("   git: %s" % (git_v.stdout or git_v.stderr or "?").strip())
 
     if a.remote:
         plan = ("set-remote", a.remote)
@@ -143,7 +176,9 @@ def main():
         say("   gh is installed and authenticated. It will create the repository")
         say("   as you and push in one step.")
     else:
-        say("   No remote, and gh is not installed. Two ways forward, both yours:")
+        say("   No remote, and gh could not be located. Two ways forward:")
+        say("     0) if you just installed gh, this window's PATH predates it --")
+        say("        close this window, open a NEW one, and re-run.")
         say("     a) create an empty repo on github.com, then re-run:")
         say("          python github_push.py --remote <url>")
         say("     b) install the GitHub CLI, run `gh auth login`, re-run this.")
@@ -192,13 +227,21 @@ def main():
     say("       git push origin --all")
     say("   And the history still carries the portfolio. If this ever needs to")
     say("   be public, rewrite it FIRST.")
+    say()
+    say("   transcript: %s" % TRANSCRIPT)
     return 0
 
 
 if __name__ == "__main__":
+    _fh = open(TRANSCRIPT, "w", encoding="utf8", errors="replace")
     try:
         sys.exit(main())
     except Exception as e:
         say()
         say("STOPPED: %s" % e)
         sys.exit(1)
+    finally:
+        try:
+            _fh.close()
+        except Exception:
+            pass
