@@ -30,11 +30,26 @@ so `git reset --hard refs/backup/2026-08-27/main` puts main back exactly.
 Run: GIT_SETUP.bat  (or: python git_setup.py)
 """
 import os
+import re
 import subprocess
 import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+TRANSCRIPT = os.path.join(HERE, "GIT_SETUP.txt")
+_fh = None
+
+
+def emit(line=""):
+    """Print AND record. The first version of this script printed only to a
+    console that closes, so when it stopped at a conflict the reason was gone
+    -- a report you cannot read afterwards is not a report."""
+    print(line, flush=True)
+    if _fh:
+        _fh.write(line + "\n")
+        _fh.flush()
+
+
 BRANCHES = [
     "feat/one-command",
     "fix/tally-counts-failures-as-passes",   # subsumes remove-phantom-suites
@@ -53,17 +68,17 @@ def git(*args, check=True, quiet=False):
     if not quiet:
         for line in out.splitlines():
             if line.strip() and "unable to unlink" not in line:
-                print("    " + line.rstrip())
+                emit("    " + line.rstrip())
     if check and p.returncode != 0:
         raise RuntimeError("git %s -> exit %d" % (" ".join(args), p.returncode))
     return p.returncode, out
 
 
 def step(n, title):
-    print()
-    print("=" * 72)
-    print("  %s. %s" % (n, title))
-    print("=" * 72)
+    emit()
+    emit("=" * 72)
+    emit("  %s. %s" % (n, title))
+    emit("=" * 72)
 
 
 def clear_stale_locks():
@@ -75,26 +90,26 @@ def clear_stale_locks():
             if fn.endswith(".lock"):
                 found.append(os.path.join(dp, fn))
     if not found:
-        print("    none -- nothing to clear.")
+        emit("    none -- nothing to clear.")
         return True
     now = time.time()
     fresh = [p for p in found if now - os.path.getmtime(p) < LOCK_MIN_AGE_S]
     for p in found:
         age = now - os.path.getmtime(p)
-        print("    %-52s %6.0f s old" % (os.path.relpath(p, HERE), age))
+        emit("    %-52s %6.0f s old" % (os.path.relpath(p, HERE), age))
     if fresh:
-        print()
-        print("    REFUSING. A lock under %d s old may belong to a git process that"
+        emit()
+        emit("    REFUSING. A lock under %d s old may belong to a git process that"
               % LOCK_MIN_AGE_S)
-        print("    is genuinely running (an editor, a GUI client). Close it and")
-        print("    re-run. Deleting a live lock corrupts the operation holding it.")
+        emit("    is genuinely running (an editor, a GUI client). Close it and")
+        emit("    re-run. Deleting a live lock corrupts the operation holding it.")
         return False
     for p in found:
         try:
             os.remove(p)
-            print("    removed  %s" % os.path.relpath(p, HERE))
+            emit("    removed  %s" % os.path.relpath(p, HERE))
         except OSError as e:
-            print("    COULD NOT REMOVE %s: %s" % (p, e))
+            emit("    COULD NOT REMOVE %s: %s" % (p, e))
             return False
     return True
 
@@ -168,23 +183,87 @@ evidence recorded beside the hash.
 def commit_if_staged(msg, label):
     rc, _ = git("diff", "--cached", "--quiet", check=False, quiet=True)
     if rc == 0:
-        print("    nothing staged for %s -- skipping." % label)
+        emit("    nothing staged for %s -- skipping." % label)
         return
     p = subprocess.run(["git", "commit", "-F", "-"], cwd=HERE, input=msg,
                        capture_output=True, text=True, encoding="utf8",
                        errors="replace")
     for line in ((p.stdout or "") + (p.stderr or "")).splitlines():
         if line.strip() and "unable to unlink" not in line:
-            print("    " + line.rstrip())
+            emit("    " + line.rstrip())
     if p.returncode != 0:
         raise RuntimeError("commit failed for %s" % label)
 
 
+def resolve_run_all_tests(branch):
+    """ONE conflict is resolvable by rule, and the rule is checkable.
+
+    main changed run_all_tests.sh by adding exactly ONE line -- the K3 suite.
+    The branch REWRITES the file: it removes the eleven suites the script named
+    but that are not on disk, and stops the tally counting failures as passes.
+    Both are wanted, and they do not disagree about anything: one adds a line,
+    the other fixes the machinery around it.
+
+    So: take the branch's file, then require that the K3 line survived. If it
+    did not, this is NOT resolvable by rule and we abort rather than guess --
+    an auto-resolution that is not verified afterwards is just a guess with a
+    commit message.
+    """
+    K3 = "test_k3_p9_owner_only_guard.py"
+    emit("    resolving run_all_tests.sh by rule:")
+    emit("      main added exactly one line (%s);" % K3)
+    emit("      the branch rewrites the file. Take the branch's, keep the line.")
+    rc, _ = git("checkout", "--theirs", "--", "run_all_tests.sh", check=False, quiet=True)
+    if rc != 0:
+        emit("      could not take the branch's version.")
+        return False
+    path = os.path.join(HERE, "run_all_tests.sh")
+    try:
+        with open(path, "r", encoding="utf8", errors="replace") as fh:
+            body = fh.read()
+    except OSError as e:
+        emit("      could not read the result: %s" % e)
+        return False
+    if K3 not in body:
+        marker = "test_k1_runner_key_preservation.py"
+        if marker not in body:
+            emit("      VERIFY FAILED: neither %s nor %s is named in the merged"
+                 % (K3, marker))
+            emit("      file, so there is no correct place to restore the line.")
+            return False
+        out = []
+        for line in body.splitlines(True):
+            out.append(line)
+            if marker in line and line.strip().startswith("run "):
+                out.append("run %s 60\n" % K3)
+        body = "".join(out)
+        with open(path, "w", encoding="utf8", newline="\n") as fh:
+            fh.write(body)
+        emit("      restored the K3 line after the K1 line.")
+    # VERIFY, both halves, or abort.
+    if K3 not in body:
+        emit("      VERIFY FAILED: the K3 line is still missing.")
+        return False
+    named = re.findall(r"(?m)^\s*run\s+([A-Za-z0-9_.]+\.py)", body)
+    absent = [n for n in sorted(set(named))
+              if not os.path.isfile(os.path.join(HERE, n))]
+    if absent:
+        emit("      VERIFY FAILED: the merged file still names suites that are")
+        emit("      not on disk, which is the very thing this branch removes:")
+        for n in absent:
+            emit("        %s" % n)
+        return False
+    emit("      VERIFIED: K3 present, and all %d named suites exist on disk."
+         % len(set(named)))
+    git("add", "--", "run_all_tests.sh", check=False, quiet=True)
+    return True
+
+
 def main():
     print("git_setup -- put the repository into a real, pushable state")
-    print("  folder: %s" % HERE)
+    emit("  folder: %s" % HERE)
     if not os.path.isdir(os.path.join(HERE, ".git")):
-        print("  no .git here. Nothing to do.")
+        emit("  no .git here. Nothing to do.")
         return 1
 
     if not clear_stale_locks():
@@ -204,31 +283,39 @@ def main():
             git("add", "--", f, check=False, quiet=True)
     commit_if_staged(WORK_MSG, "the ONE-command work")
 
-    step(4, "Merge into main -- one at a time, stopping at the first conflict")
+    step(4, "Merge into main -- each branch tried on its own")
     git("switch", "main")
-    merged, skipped = [], []
+    merged, conflicted = [], []
     for b in BRANCHES:
         rc, _ = git("rev-parse", "--verify", "--quiet", b, check=False, quiet=True)
         if rc != 0:
-            print("    %-40s no such branch -- skipped" % b)
+            emit("    %-40s no such branch -- skipped" % b)
             continue
         rc, _ = git("merge-base", "--is-ancestor", b, "main", check=False, quiet=True)
         if rc == 0:
-            print("    %-40s already in main" % b)
+            emit("    %-40s already in main" % b)
             continue
-        print()
-        print("    merging %s ..." % b)
-        rc, out = git("merge", "--no-ff", "-m", "Merge %s" % b, b,
-                      check=False)
-        if rc != 0:
-            print()
-            print("    CONFLICT merging %s. Aborting THIS merge only;" % b)
-            print("    everything merged before it stays. Resolve by hand:")
-            print("        git merge --no-ff %s" % b)
-            git("merge", "--abort", check=False, quiet=True)
-            skipped.append(b)
-            break
-        merged.append(b)
+        emit()
+        emit("    merging %s ..." % b)
+        rc, _out = git("merge", "--no-ff", "-m", "Merge %s" % b, b, check=False)
+        if rc == 0:
+            merged.append(b)
+            continue
+        # Which paths actually conflicted?
+        _rc, u = git("diff", "--name-only", "--diff-filter=U", check=False, quiet=True)
+        paths = sorted(set(l.strip() for l in u.splitlines() if l.strip()))
+        emit("    conflicted paths: %s" % (", ".join(paths) or "(none reported)"))
+        if paths == ["run_all_tests.sh"] and resolve_run_all_tests(b):
+            rc, _ = git("commit", "--no-edit", check=False)
+            if rc == 0:
+                emit("    resolved and committed.")
+                merged.append(b)
+                continue
+        emit("    NOT auto-resolvable. Aborting THIS merge only; main keeps")
+        emit("    everything merged before it. Resolve by hand:")
+        emit("        git merge --no-ff %s" % b)
+        git("merge", "--abort", check=False, quiet=True)
+        conflicted.append(b)
 
     step(5, "Regenerate MANIFEST.sha256 over the merged tree")
     py = sys.executable
@@ -237,7 +324,7 @@ def main():
                        errors="replace")
     blob = (p.stdout or "") + (p.stderr or "")
     lines = [l for l in blob.splitlines() if l.strip()]
-    print("    " + (lines[-1].strip() if lines else "(no output)"))
+    emit("    " + (lines[-1].strip() if lines else "(no output)"))
     git("add", "--", "MANIFEST.sha256", check=False, quiet=True)
     commit_if_staged(
         "Regenerate the manifest over the merged tree\n\n"
@@ -248,27 +335,33 @@ def main():
 
     step("", "RESULT")
     git("--no-optional-locks", "status", "--short", "--branch", check=False)
-    print()
-    print("    merged: %s" % (", ".join(merged) or "nothing new"))
-    if skipped:
-        print("    STOPPED at: %s  (conflict -- resolve by hand)" % ", ".join(skipped))
-    print()
+    emit()
+    emit("    merged: %s" % (", ".join(merged) or "nothing new"))
+    if conflicted:
+        emit("    NOT merged (conflict): %s" % ", ".join(conflicted))
+    emit()
     git("log", "--oneline", "-8", check=False)
-    print()
-    print("    Recovery, exact: git reset --hard refs/backup/2026-08-27/main")
-    print()
-    print("    NOTHING WAS PUSHED. There is no remote. The portfolio is still")
-    print("    in the HISTORY, so if you push, push PRIVATE. GITHUB_PUSH.bat")
-    print("    is the next step and it says the same thing before it acts.")
+    emit()
+    emit("    Recovery, exact: git reset --hard refs/backup/2026-08-27/main")
+    emit()
+    emit("    NOTHING WAS PUSHED. There is no remote. The portfolio is still")
+    emit("    in the HISTORY, so if you push, push PRIVATE. GITHUB_PUSH.bat")
+    emit("    is the next step and it says the same thing before it acts.")
     return 0
 
 
 if __name__ == "__main__":
+    _fh = open(TRANSCRIPT, "w", encoding="utf8", errors="replace")
     try:
         sys.exit(main())
     except Exception as e:
-        print()
-        print("  STOPPED: %s" % e)
-        print("  Nothing after this point ran. Recovery:")
-        print("      git reset --hard refs/backup/2026-08-27/main")
+        emit()
+        emit("  STOPPED: %s" % e)
+        emit("  Nothing after this point ran. Recovery:")
+        emit("      git reset --hard refs/backup/2026-08-27/main")
         sys.exit(1)
+    finally:
+        try:
+            _fh.close()
+        except Exception:
+            pass

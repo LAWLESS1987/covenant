@@ -65,6 +65,7 @@ ONE_RETEST.txt
 ONE_RETEST_gates.txt
 ONE_UP.txt
 PROBE_WIN_CONNECT.txt
+GIT_SETUP.txt
 
 # --- Transfer scratch -------------------------------------------------------
 _stage/

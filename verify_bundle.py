@@ -60,7 +60,7 @@ OUTPUTS = {
     # guaranteed the NEXT run reported "changed" and refused. Adding a launcher
     # that writes a report here means adding its report to this list, always.
     "ONE_RUN.txt", "ONE_RETEST.txt", "ONE_RUN_cloud.txt", "ONE_RUN_pc.txt",
-    "ONE_RETEST_gates.txt", "ONE_UP.txt", "PROBE_WIN_CONNECT.txt",
+    "ONE_RETEST_gates.txt", "ONE_UP.txt", "PROBE_WIN_CONNECT.txt", "GIT_SETUP.txt",
     # ops
     "ACL_RESULT.txt",
     # state that is deliberately not source: the chain's own genesis is an
