@@ -41,11 +41,33 @@ they wrap has executed at least once. See require_testnet_proof().
 from __future__ import annotations
 
 import os
+import sys
 import json
 import time
 import stat
 import uuid
 import hashlib
+
+# P9 (applied 2026-08-27, on L's instruction). The policy-file permission
+# control below used `stat.S_IMODE(...) & 0o077`. That is exactly right on
+# POSIX and meaningless on NTFS, where st_mode reports 0o666 for any writable
+# file whatever the ACL says, and os.chmod only toggles the read-only
+# attribute. So on Windows the check was a CONSTANT: authorize_mainnet_payment
+# refused on this machine always, and the branch was unreachable in the
+# passing direction. See docs/P9_WINDOWS_OWNER_ONLY.md.
+#
+# ops/ is not a package, so it goes on the path explicitly rather than
+# depending on the caller's working directory.
+_OPS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops")
+if _OPS_DIR not in sys.path:
+    sys.path.insert(0, _OPS_DIR)
+try:
+    from owner_only import require_owner_only, OwnerOnlyError
+    _OWNER_ONLY_IMPORT_ERR = None
+except Exception as _e:                                  # pragma: no cover
+    require_owner_only = None
+    OwnerOnlyError = Exception
+    _OWNER_ONLY_IMPORT_ERR = _e
 from decimal import Decimal, InvalidOperation
 from dataclasses import dataclass, asdict, field
 from typing import Optional, Dict, Any, List, Tuple
@@ -277,12 +299,24 @@ class MainnetPolicy:
                 f"No mainnet policy at {path}. Mainnet sending requires an "
                 f"explicit written policy -- create one with "
                 f"write_policy_template('{path}') and edit it.")
-        mode = stat.S_IMODE(os.stat(path).st_mode)
-        if mode & 0o077:
+        # P9. Fails closed twice over: if the control itself cannot be loaded,
+        # or if it cannot read the ACL, this refuses rather than assuming the
+        # file is safe. It is strictly stronger than the mode bit it replaces
+        # -- POSIX behaviour is byte-for-byte identical, and on Windows it goes
+        # from "always refuse" to "refuse unless the ACL is actually
+        # restricted", which is the check the mode bit was standing in for.
+        if require_owner_only is None:                    # pragma: no cover
             raise MainnetGuardError(
-                f"Policy file {path} is mode {oct(mode)} -- writable or readable "
-                f"beyond its owner. Anything that can edit this file can raise "
-                f"your own spending limits. Run: chmod 600 {path}")
+                f"owner_only is not importable ({_OWNER_ONLY_IMPORT_ERR}). The "
+                f"policy-file permission control cannot be evaluated, so this "
+                f"refuses. A control that cannot run is not a control that "
+                f"passed.")
+        try:
+            require_owner_only(path)
+        except OwnerOnlyError as e:
+            raise MainnetGuardError(
+                f"{e} Anything that can edit this file can raise your own "
+                f"spending limits.")
         with open(path) as fh:
             raw = json.load(fh)
         dests = [Destination(**d) for d in raw.get("destinations", [])]
