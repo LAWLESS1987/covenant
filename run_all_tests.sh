@@ -61,7 +61,7 @@ clean_test_dbs () {
 }
 
 clean_test_dbs; rm -rf __pycache__ 2>/dev/null
-TOTAL=0; FAILED=0
+TOTAL=0; FAILED=0; UNSCORED=0
 # ABSENT IS NOT ZERO (added 2026-08-27).
 #
 # `run` swallowed stderr and scraped a tally out of stdout. A suite that is
@@ -84,14 +84,53 @@ run () {
     printf "  %-30s %s\n" "$1" "ABSENT -- not on disk, so it did NOT run. Counted as a failure, never as a pass."
     return
   fi
-  out=$(timeout "${2:-120}" "$PY" "$1" 2>/dev/null)
+  out=$(timeout "${2:-120}" "$PY" "$1" 2>/dev/null); rc=$?
   line=$(echo "$out" | grep -iE '[0-9]+ passed|ALL PASS|[0-9]+/[0-9]+ checks|[0-9]+/[0-9]+ passed|RESULTS:' | tail -1)
-  p=$(echo "$line" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+')
-  f=$(echo "$line" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+')
-  c=$(echo "$line" | grep -oE '^[0-9]+/[0-9]+' | cut -d/ -f1)
-  n=${p:-${c:-0}}; f=${f:-0}
-  TOTAL=$((TOTAL+n)); FAILED=$((FAILED+f))
-  printf "  %-30s %s\n" "$1" "${line:-NO RESULT}"
+
+  # A FAILURE COUNTED AS A PASS (fixed 2026-08-27).
+  #
+  # The scrape here was:
+  #     p=$(... grep -oE '[0-9]+ passed' ...)
+  #     f=$(... grep -oE '[0-9]+ failed' ...)
+  # Two defects, and they compounded in the same direction -- upward.
+  #
+  # 1. On "28/30 passed, 2 FAILED" the pattern `[0-9]+ passed` matches the
+  #    substring "30 passed". 30 is the TOTAL, not the passes. The two
+  #    failures were added to the pass count.
+  # 2. Both inner greps are case-SENSITIVE, while the line-selecting grep
+  #    above is -i. Suites that print "2 FAILED" in caps therefore scored
+  #    f=0. The failures vanished.
+  #
+  # Measured on the 2026-08-27 win32 sweep: reported "1152 checks, 2 failed";
+  # actually 1147 passed and 7 failed across 1154 checks. Five real failures
+  # were reported as five passes -- a 10-check swing in the wrong direction,
+  # in the number the README quotes.
+  #
+  # 3. A suite that RAN but printed nothing parseable scored 0 and 0, so it
+  #    could not fail. That is ABSENT IS NOT ZERO one layer down: the file is
+  #    on disk, it executed, and it still contributed nothing. Those are now
+  #    counted separately as UNSCORED and are never silently zero.
+  n=""; f=""
+  ab=$(echo "$line" | grep -oiE '[0-9]+ */ *[0-9]+ +(checks )?passed' | head -1)
+  if [ -n "$ab" ]; then
+    n=$(echo "$ab" | cut -d/ -f1 | tr -dc '0-9')
+    tot=$(echo "$ab" | cut -d/ -f2 | tr -dc '0-9')
+    f=$((tot - n))
+  else
+    n=$(echo "$line" | grep -oiE '[0-9]+ +passed' | grep -oE '[0-9]+' | head -1)
+  fi
+  # An explicit "K failed"/"K FAILED" always wins over a derived count.
+  fx=$(echo "$line" | grep -oiE '[0-9]+ +failed' | grep -oE '[0-9]+' | head -1)
+  [ -n "$fx" ] && f="$fx"
+  n=${n:-0}; f=${f:-0}
+
+  if [ -z "$line" ]; then
+    UNSCORED=$((UNSCORED+1))
+    printf "  %-30s %s\n" "$1" "NO RESULT (exit $rc) -- ran, printed no tally. NOT counted as a pass."
+  else
+    TOTAL=$((TOTAL+n)); FAILED=$((FAILED+f))
+    printf "  %-30s %s\n" "$1" "$line"
+  fi
   clean_test_dbs
 }
 echo "=== INTEGRITY ==="
@@ -397,6 +436,9 @@ echo "=== THIS RUNNER'S OWN CLEANUP (K1) ==="
 # unregistered suite is the orphan problem this script already documents
 # twice. It runs in temporary directories only and touches nothing beside it.
 run test_k1_runner_key_preservation.py 60
+# K2 pins this runner's own arithmetic: a failure must never be counted
+# as a pass. Registered with the fix, not after it.
+run test_k2_tally_arithmetic.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.
@@ -410,6 +452,10 @@ echo "  test_xrp_live.py   XRP autofill/submission against a funded testnet acco
 echo "                     -- mainnet stays BLOCKED until this has run once"
 echo "  (multi-node P2P over real sockets is now COVERED, above)"
 echo ""
-echo "TOTAL: $TOTAL checks, $FAILED failed"
+echo "TOTAL: $((TOTAL + FAILED)) checks -- $TOTAL passed, $FAILED failed, $UNSCORED suite(s) UNSCORED"
+if [ "$UNSCORED" -ne 0 ]; then
+  echo "UNSCORED means the suite ran and printed no tally this runner could read."
+  echo "It is not a pass. Read its output before treating this sweep as green."
+fi
 rm -rf __pycache__ 2>/dev/null
-[ "$FAILED" -eq 0 ] || exit 1
+[ "$FAILED" -eq 0 ] && [ "$UNSCORED" -eq 0 ] || exit 1
