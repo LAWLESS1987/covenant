@@ -3,6 +3,33 @@
 cd "$(dirname "$0")"
 export COVENANT_JUDGE_PROVIDERS="${COVENANT_JUDGE_PROVIDERS:-mock}"
 export COVENANT_INSECURE_MOCK_JUDGE="${COVENANT_INSECURE_MOCK_JUDGE:-1}"
+
+# RUN AGAINST THE PROJECT'S OWN INTERPRETER (added 2026-08-27).
+#
+# This sweep called `python3` directly. On Windows that resolves to the
+# WindowsApps shim, not to .venv, and the two interpreters do not carry the
+# same packages. Measured on L's PC that day:
+#
+#   interpreter                         flask cryptography waitress requests xrpl
+#   WindowsApps python3 (3.12)           yes     yes        yes      yes     NO
+#   .venv/Scripts/python.exe             yes     yes        yes      yes     yes
+#
+# So probe_final_pass.py died with MainnetGuardError and test_xrp_signer.py
+# with XRPSignerError, both saying "xrpl-py not importable", and both were
+# scored red. Nothing was wrong with either suite or with the code they
+# test: the sweep was simply run against an interpreter that requirements.txt
+# was never installed into.
+#
+# That is the §8 failure -- a sweep is green for the environment it ran in,
+# and this one did not name its environment. It does now, on the first line
+# of output, because a red suite that is really a missing package is the kind
+# of red that trains a reader to skim.
+if   [ -x .venv/Scripts/python.exe ]; then PY=".venv/Scripts/python.exe"
+elif [ -x .venv/bin/python ];        then PY=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then PY="python3"
+else                                      PY="python"
+fi
+echo "interpreter: $PY -> $("$PY" -c 'import sys; print(sys.executable)' 2>/dev/null)"
 # A PRE-EXISTING KEY IS A NODE IDENTITY, NEVER A TEST ARTEFACT (added 2026-08-27).
 #
 # The cleanup here, and the identical line at the end of `run`, used to be
@@ -57,7 +84,7 @@ run () {
     printf "  %-30s %s\n" "$1" "ABSENT -- not on disk, so it did NOT run. Counted as a failure, never as a pass."
     return
   fi
-  out=$(timeout "${2:-120}" python3 "$1" 2>/dev/null)
+  out=$(timeout "${2:-120}" "$PY" "$1" 2>/dev/null)
   line=$(echo "$out" | grep -iE '[0-9]+ passed|ALL PASS|[0-9]+/[0-9]+ checks|[0-9]+/[0-9]+ passed|RESULTS:' | tail -1)
   p=$(echo "$line" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+')
   f=$(echo "$line" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+')
@@ -68,7 +95,7 @@ run () {
   clean_test_dbs
 }
 echo "=== INTEGRITY ==="
-python3 verify_bundle.py 2>&1 | tail -1
+"$PY" verify_bundle.py 2>&1 | tail -1
 echo "=== SECURITY & REGRESSION ==="
 run verify_patches.py 60
 run verify_auth.py 120
@@ -337,7 +364,7 @@ run sim_order_independence.py 600
 # any particular rate. The block-reward correctness checks it used to expose are
 # now assertions inside test_security_audit.py (items AK/AL).
 echo "=== YIELD SAFETY (informational) ==="
-python3 sim_yield_safety.py > /dev/null 2>&1 && echo "  sim_yield_safety.py            ran clean (see output for curves)" || echo "  sim_yield_safety.py            ERROR"
+"$PY" sim_yield_safety.py > /dev/null 2>&1 && echo "  sim_yield_safety.py            ran clean (see output for curves)" || echo "  sim_yield_safety.py            ERROR"
 echo "=== THE DEPLOYMENT ITSELF, AND THE RADIO BEARER ==="
 # Added 2026-08-27. All three shipped in MANIFEST.sha256 and were called by
 # NEITHER runner -- found by diffing the test files on disk against the two
