@@ -1,0 +1,26 @@
+==== port diag Wed 08/26/2026 19:32:36.86 ====
+
+--- everything listening in 5000-5040 ---
+  TCP    0.0.0.0:5040           0.0.0.0:0              LISTENING       11356
+
+--- what those PIDs are ---
+
+Image Name:   svchost.exe
+PID:          11356
+Session Name: Services
+Session#:     0
+Mem Usage:    17,576 K
+Status:       Unknown
+User Name:    N/A
+CPU Time:     0:00:15
+Window Title: N/A
+
+--- raw probe of 5001: what does it answer to a well-formed GET ---
+
+--- and 5002 ---
+
+--- node A health ---
+
+--- node A peers ---
+
+==== DONE ====

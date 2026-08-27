@@ -1,0 +1,60 @@
+====================================================================
+COVENANT PREFLIGHT
+====================================================================
+
+-- dependencies --
+[  ok  ] flask importable
+[  ok  ] cryptography importable
+[  ok  ] requests importable
+[  ok  ] brainflow (optional)
+          absent -- neural bridge degrades gracefully, not an error
+
+-- modules --
+[  ok  ] core module imports
+          v8.9-merged
+[  ok  ] trading bridge imports
+[  ok  ] neural bridge imports
+[  ok  ] path-pattern module imports
+
+-- ethics gate --
+[ FAIL ] judge configuration
+          no provider API key set. The gate fails CLOSED, so this node will boot, serve /chain, peer correctly and REJECT EVERY TRANSACTION. Set ANTHROPIC_API_KEY, or opt in to the mock judge for development.
+[  ok  ] veto threshold
+          majority (0.5)
+
+-- genesis --
+[  ok  ] canonical genesis
+          00009b31c6c654d79bbeae0b verified (hash, PoW, signature)
+
+-- node identity --
+[ FAIL ] identity key permissions
+          covenant_A.db.key is 0o666 -- readable by others. chmod 600 it.
+[ warn ] identity backup
+          covenant_A.db.key IS this node's operator credential and its genesis mint key. Back it up. Losing it loses both.
+
+-- ports --
+[  ok  ] HTTP port 5000 free
+[  ok  ] P2P port 5001 free
+[  ok  ] bridge port 5011 free
+
+-- boot smoke test --
+node identity created at C:\Users\Lawre\AppData\Local\Temp\tmpt6z_onld\p.db.key (owner-only). Back this up: it is this node's operator credential and genesis mint key.
+adopted canonical genesis 00009b31c6c654d7 from genesis.json
+[  ok  ] node constructs and mints/adopts genesis
+          height=1, 27 routes registered
+[  ok  ] trading bridge attached
+[  ok  ] neural bridge attached
+[ warn ] health warning
+          ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction
+[ warn ] health warning
+          no peers configured -- this node is isolated
+[  ok  ] no route returns 5xx on a bare GET
+          []
+
+====================================================================
+22 checks: 17 ok, 3 warn, 2 FAIL
+
+BLOCKING -- do not launch until these are resolved:
+  * judge configuration: no provider API key set. The gate fails CLOSED, so this node will boot, serve /chain, peer correctly and REJECT EVERY TRANSACTION. Set ANTHROPIC_API_KEY, or opt in to the mock judge for development.
+  * identity key permissions: covenant_A.db.key is 0o666 -- readable by others. chmod 600 it.
+====================================================================

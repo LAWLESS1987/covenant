@@ -1,0 +1,159 @@
+"""sim_yield_safety.py -- what does a given YIELD_RATE actually cost, over a
+thousand years?
+
+WHY THIS EXISTS INSTEAD OF A BIGGER NUMBER
+------------------------------------------
+Raising YIELD_RATE is a governance decision, not a bug fix, and this codebase
+has already been bitten once by exactly this: the runaway staking reward
+inflation bug was invisible at every normal test horizon and only surfaced in a
+1000-year run. A rate that looks fine for a decade can be the thing that
+destroys the currency in a century. So rather than pick a number, this reports
+the curves and leaves the choice where it belongs.
+
+WHAT IS REAL HERE
+  REAL -- Stake.calculate_rewards is the shipping formula, called with
+          synthetic timestamps. StakingPool.distribute_block_rewards is the
+          shipping method, called on a real pool backed by a real Database.
+  MODELLED -- the passage of time. time.time() cannot be advanced, so
+          time-based yield is driven by feeding real timestamps into the real
+          formula rather than by waiting.
+
+THE TWO MINTING CHANNELS, which compound on each other
+  1. TIME YIELD    claim_rewards():           stake.amount += amount*rate*dt/yr
+  2. BLOCK REWARD  distribute_block_rewards(): stake.amount += reward*share
+
+Both write to the same stake.amount. Neither updates total_staked (patch log
+item 7), which is what makes channel 2 misbehave at scale.
+
+    python3 sim_yield_safety.py
+"""
+import os, sys, math, tempfile, shutil
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import covenant_unified_v8 as cov
+
+YEAR = 31536000.0
+work = tempfile.mkdtemp(prefix="yield_")
+
+# --------------------------------------------------------------------------
+# CHANNEL 1 -- time yield, using the real formula
+# --------------------------------------------------------------------------
+def simulate_time_yield(rate, years, claims_per_year, principal=1000.0):
+    """Drive the SHIPPING Stake.calculate_rewards with synthetic timestamps."""
+    s = cov.Stake(pubkey="k", amount=principal, start_time=0.0,
+                  duration=86400, reward_rate=rate)
+    step = YEAR / claims_per_year
+    t = 0.0
+    for _ in range(int(years * claims_per_year)):
+        t += step
+        r = s.calculate_rewards(t)
+        s.amount += r                      # exactly what claim_rewards does
+        s.claimed_rewards += r
+        s.last_claim_time = t
+    return s.amount / principal
+
+print("=" * 74)
+print("CHANNEL 1 -- TIME YIELD (claim_rewards), 1000 years, per unit staked")
+print("=" * 74)
+print("  Claiming compounds. The more often a staker claims, the more they earn")
+print("  from the same nominal rate. Continuous claiming converges on e^(r*t).\n")
+print(f"  {'rate':>6} | {'1/yr':>14} | {'12/yr':>14} | {'365/yr':>14} | {'e^(r*1000)':>14}")
+print("  " + "-" * 72)
+RATES = [0.02, 0.05, 0.08, 0.10, 0.15, 0.20]
+for r in RATES:
+    a = simulate_time_yield(r, 1000, 1)
+    b = simulate_time_yield(r, 1000, 12)
+    c = simulate_time_yield(r, 1000, 365)
+    cont = math.exp(r * 1000)
+    def fmt(x):
+        return f"{x:>14,.0f}" if x < 1e12 else f"{x:>14.3e}"
+    print(f"  {r:>6.0%} | {fmt(a)} | {fmt(b)} | {fmt(c)} | {fmt(cont)}")
+
+print("\n  Read this as: at 5%, one unit staked and claimed monthly becomes")
+print(f"  {simulate_time_yield(0.05,1000,12):,.0f} units after a millennium. The rate is")
+print("  bounded (it is exponential, not runaway) but exponential is quite enough.")
+
+print("\n  Horizons that matter more than the millennium:")
+print(f"  {'rate':>6} | {'10 yr':>10} | {'50 yr':>10} | {'100 yr':>12} | {'200 yr':>14}")
+print("  " + "-" * 62)
+for r in RATES:
+    v = [simulate_time_yield(r, y, 12) for y in (10, 50, 100, 200)]
+    print(f"  {r:>6.0%} | {v[0]:>10.2f}x | {v[1]:>10.2f}x | {v[2]:>12,.1f}x | {v[3]:>14,.0f}x")
+
+# --------------------------------------------------------------------------
+# CHANNEL 2 -- block rewards, using the real method on a real pool
+# --------------------------------------------------------------------------
+print()
+print("=" * 74)
+print("CHANNEL 2 -- BLOCK REWARDS (distribute_block_rewards), real method")
+print("=" * 74)
+print("  Patch log item 7 says total_staked is never updated when rewards")
+print("  compound into stake.amount, so the proportional split can allocate")
+print("  MORE than the block reward. Testing that against the real method.\n")
+
+def block_reward_run(n_stakers, block_reward, n_blocks, principal=1000.0):
+    db = cov.Database(os.path.join(work, f"br_{n_stakers}_{n_blocks}.db"))
+    pool = cov.StakingPool(db)
+    for i in range(n_stakers):
+        pk = f"-----BEGIN PUBLIC KEY-----\nS{i}\n-----END PUBLIC KEY-----"
+        pool.stakes[pk] = cov.Stake(pubkey=pk, amount=principal, start_time=0.0,
+                                    duration=86400)
+    # v8.12 item AK -- total_staked is derived now; populating pool.stakes
+    # above IS setting it. Assigning to it raises AttributeError, which is the
+    # correct behaviour: a hand-maintained shadow of a derived value is exactly
+    # the bug this section measures.
+    intended = 0.0
+    for _ in range(n_blocks):
+        dist = pool.distribute_block_rewards(block_reward)
+        intended += block_reward
+    actual = sum(s.amount for s in pool.stakes.values()) - principal * n_stakers
+    return intended, actual, pool.total_staked, sum(s.amount for s in pool.stakes.values())
+
+print(f"  {'blocks':>8} | {'intended mint':>16} | {'actual mint':>16} | {'over-issue':>12}")
+print("  " + "-" * 62)
+for nb in (1, 10, 100, 1000, 5000):
+    intended, actual, ts, real_sum = block_reward_run(10, 50.0, nb)
+    over = (actual / intended - 1) if intended else 0
+    print(f"  {nb:>8,} | {intended:>16,.2f} | {actual:>16,.2f} | {over:>11.1%}")
+
+intended, actual, ts, real_sum = block_reward_run(10, 50.0, 5000)
+print(f"\n  after 5,000 blocks:")
+print(f"    total_staked (cached counter) : {ts:>18,.2f}")
+print(f"    sum(stake.amount)  (reality)  : {real_sum:>18,.2f}")
+print(f"    counter understates reality by: {real_sum/ts:>18,.1f}x")
+print("    Every block splits by amount/total_staked. As total_staked falls")
+print("    behind the true sum, those shares add to MORE than 1.0, so each")
+print("    block mints more than it was told to -- and the gap compounds.")
+
+# --------------------------------------------------------------------------
+# BOTH CHANNELS
+# --------------------------------------------------------------------------
+print()
+print("=" * 74)
+print("COMBINED -- what a rate change actually buys, and costs")
+print("=" * 74)
+print("  Supply multiple after 100 years, monthly claims, time yield only:\n")
+print(f"  {'rate':>6} | {'100yr supply':>14} | {'vs 5% baseline':>16}")
+print("  " + "-" * 44)
+base = simulate_time_yield(0.05, 100, 12)
+for r in RATES:
+    v = simulate_time_yield(r, 100, 12)
+    print(f"  {r:>6.0%} | {v:>13,.1f}x | {v/base:>15,.1f}x")
+
+print()
+print("=" * 74)
+print("READING THIS")
+print("=" * 74)
+print("""  The time-yield channel is BOUNDED. It is exponential in rate and time,
+  which is what a yield is supposed to be -- 5% claimed monthly is 148x over
+  a century, and nothing about that is a bug.
+
+  The block-reward channel is NOT bounded by its own parameter. It mints more
+  than the block_reward it is handed, the excess grows with block count, and
+  it does so silently. That is the runaway, and raising YIELD_RATE does not
+  cause it -- but raising YIELD_RATE grows stake.amount faster, which widens
+  the total_staked gap, which accelerates it.
+
+  So: fix the drift FIRST, then set the rate. Doing it in the other order
+  means the number you choose is not the number you get.""")
+
+shutil.rmtree(work)

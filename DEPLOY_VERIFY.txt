@@ -1,0 +1,31 @@
+====================================================================
+verify_deploy  2026-08-27 04:09:52  expecting v8.37
+folder: C:\Users\Lawre\covenant
+====================================================================
+
+--- 1. DISK: do the delivered files hash to what was built? ---
+  ok       covenant_unified_v8.py  07e097f3e37f
+  ok       run_all_tests.sh  55016a9d1836
+  ok       run_local_sweep.py  8445f1164640
+  ok       test_a3s_send_bounds.py  bd0ab67ae2f6
+
+--- 2. COMPANIONS: are the sibling imports present? ---
+  ok       covenant_path_pattern.py  (needed by covenant_unified_v8.py)
+  ok       test_a9_relay_race.py  (needed by test_a1_kill_matrix.py)
+
+--- 2b. JUDGE: is Ollama answering before we stop anything? ---
+  ok       ollama answering, 1 model(s): qwen3:8b
+
+--- 3. RESTART ---
+  running AB_RESTART_NODES.bat ...
+  exit code 0  (transcript in NODE_RESTART.txt)
+
+--- 4. RUNNING: does each node report the source that is on disk? ---
+    (/health is rate-limited 20/60s per node -- polling every 3 s)
+  ok       node A :5000  v8.37  07e097f3e37f  9846 lines  == disk (first 12 of the digest)
+  ok       node B :5020  v8.37  07e097f3e37f  9846 lines  == disk (first 12 of the digest)
+  ok       node C :5060  v8.37  07e097f3e37f  9846 lines  == disk (first 12 of the digest)
+
+====================================================================
+RESULT: PASS -- project, disk and running process all agree.
+====================================================================

@@ -1,0 +1,91 @@
+{
+ "when": "2026-08-26T19:37:17",
+ "host": "Sales",
+ "platform": "win32",
+ "results": [
+  {
+   "gate": "G1",
+   "title": "Bundle integrity -- every shipped file hashes to the manifest",
+   "state": "BLOCKED",
+   "detail": "315 checked; 1 changed; 0 missing. changed: LAUNCH_CHECK.json",
+   "fix": "A changed file is either an edit you meant (re-run `python verify_bundle.py --write`) or a delivery that did not land. Do not launch until you know which."
+  },
+  {
+   "gate": "G2",
+   "title": "Companion imports sit beside the files that need them",
+   "state": "PASS",
+   "detail": "all present",
+   "fix": ""
+  },
+  {
+   "gate": "G3",
+   "title": "Python runtime and the packages the node imports at boot",
+   "state": "PASS",
+   "detail": "python 3.12.10; required imports present.",
+   "fix": ""
+  },
+  {
+   "gate": "G4",
+   "title": "One shared canonical genesis, not a self-mint per node",
+   "state": "PASS",
+   "detail": "present, 2051 bytes, hash 00009b31c6c6",
+   "fix": ""
+  },
+  {
+   "gate": "G5",
+   "title": "The ethics judge is reachable -- it fails CLOSED, silently",
+   "state": "PASS",
+   "detail": "Ollama up, 1 model(s): qwen3:8b",
+   "fix": ""
+  },
+  {
+   "gate": "G6",
+   "title": "The judge model fits in RAM without paging",
+   "state": "PASS",
+   "detail": "model qwen3:8b 4983 MB, 6603 MB available.",
+   "fix": ""
+  },
+  {
+   "gate": "G7",
+   "title": "Port arithmetic -- --port N occupies N, N+1 and N+11",
+   "state": "PASS",
+   "detail": "all ports free -- nothing is running, a cold start is clean.",
+   "fix": ""
+  },
+  {
+   "gate": "G8",
+   "title": "Identity keys are owner-only -- and on NTFS the mode bit lies (P9)",
+   "state": "PASS",
+   "detail": "5 key file(s); NTFS ACL restricted to owner + SYSTEM.",
+   "fix": ""
+  },
+  {
+   "gate": "G9",
+   "title": "Project, disk and RUNNING process are three claims -- do they agree?",
+   "state": "UNKNOWN",
+   "detail": "disk v8.37 07e097f3e37f | A UNREACHABLE; B UNREACHABLE; C UNREACHABLE  -- a node that cannot be reached is UNKNOWN, never OK.",
+   "fix": ""
+  },
+  {
+   "gate": "G10",
+   "title": "The watchdog is alive -- a quiet monitor is not a healthy one",
+   "state": "UNKNOWN",
+   "detail": "last line was 215 min ago and NO node answers /health -- so nothing is running and this is a cold start, not a restart. The stale log is the expected state, and starting is what fixes it. Last line, for the record: '2026-08-26T20:01:45Z INFO  nodeB balance agrees across both dbs: 12.0'",
+   "fix": ""
+  },
+  {
+   "gate": "G11",
+   "title": "XRP mainnet gate -- reports its state, never opens it",
+   "state": "PASS",
+   "detail": "testnet proof: ABSENT; policy: ABSENT. The gate is SHUT, which is the correct default: the XRP submission path has never executed on any network and nothing here can open it. Starting a node does not touch this.",
+   "fix": ""
+  },
+  {
+   "gate": "G12",
+   "title": "When did the suites last run, and on which platform?",
+   "state": "UNKNOWN",
+   "detail": "local sweep: SWEEP_RESULTS.txt (2026-08-24 04:33); win32 sweep: docs/results/SWEEP_RESULTS_2026-08-24_win32.txt (2026-08-26 16:51). A result is a claim about the platform it ran on (M29) and about the source it ran against -- neither is checkable from a filename. Re-run before launch.",
+   "fix": "python run_local_sweep.py"
+  }
+ ]
+}

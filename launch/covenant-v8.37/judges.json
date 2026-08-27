@@ -1,0 +1,48 @@
+{
+  "_comment": "Judge roster. Set COVENANT_JUDGE_PROVIDERS to the names you want.",
+
+  "_why_three": [
+    "build_semantic_quorum sets min_agree=1 and decides by MAJORITY VETO:",
+    "threshold = ceil(n * 0.5) dissents blocks. A judge that RAISES --",
+    "unreachable, timed out, model unloaded -- counts as a dissent.",
+    "",
+    "  n=1  threshold 1   one judge fails -> every transaction rejected",
+    "  n=2  threshold 1   one judge fails -> every transaction rejected",
+    "  n=3  threshold 2   one judge fails -> chain keeps running",
+    "  n=5  threshold 3   two may fail",
+    "",
+    "So TWO judges is strictly worse than one: two things that can each",
+    "unilaterally halt the chain. Verified by killing one: with 3 a benign",
+    "gift was ADMITTED; with 2 the same gift was REJECTED.",
+    "",
+    "The useful corollary: at 2-of-3 a WEAK judge is safe. It cannot block a",
+    "legitimate transfer alone and cannot approve theft alone. So the third",
+    "vote can be a small fast model -- which is what makes this affordable."
+  ],
+
+  "_why_a_size_ladder": [
+    "Measured per verdict: qwen3:8b 60s, qwen3:4b 34s, qwen3:1.7b 15s.",
+    "A ladder costs 109s per transaction; three 8b's cost ~180s. Same",
+    "fault tolerance, 40% less work, and the models differ -- which is real",
+    "reasoning diversity, not the label diversity QuorumJudge warns about."
+  ],
+
+  "_required_ollama_setting": [
+    "OLLAMA_MAX_LOADED_MODELS must be >= the number of DISTINCT models here.",
+    "At 1, each judge evicts the previous and pays a full reload: measured",
+    "13.7s + 7.3s + 2.7s = 23.7s of pure reload PER TRANSACTION. Three",
+    "models is 9.1GB resident, which fits 16GB with room to spare.",
+    "covenant_install.bat now sets 3."
+  ],
+
+  "_places": [
+    "All three below are on one machine, so they share ONE failure: that",
+    "machine. Model diversity is real; location diversity is not, yet.",
+    "For actual location diversity, point one entry at a second machine over",
+    "Tailscale -- same file, just a different url. See PHONE_NODE.md."
+  ],
+
+  "pc_qwen":  {"url": "http://127.0.0.1:11434/v1/chat/completions", "model": "qwen3:8b"},
+  "pc_mid":   {"url": "http://127.0.0.1:11434/v1/chat/completions", "model": "qwen3:4b"},
+  "pc_small": {"url": "http://127.0.0.1:11434/v1/chat/completions", "model": "qwen3:1.7b"}
+}

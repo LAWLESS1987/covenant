@@ -1,0 +1,26 @@
+space 87718a550f78  vocab=16,916 tokens=2,935,338 window=4
+
+  related   mean=0.1317  n=18
+  unrelated mean=-0.0010  n=10
+    weakest related: conceal/hide = 0.0417
+    weakest related: lie/falsehood = 0.0500
+    weakest related: steal/rob = 0.0503
+PASS  S1 related mean clears the unrelated spread by 2x  related=0.1317 vs max|unrelated|=0.0466
+PASS  S2 >=70% of related pairs beat EVERY unrelated pair  17/18 above max-unrelated=0.0466
+FAIL  I  induce(conceal hide secret) finds unlisted members  1 of 6 expected: ['hidden']
+PASS  I  induce(steal rob thief) finds unlisted members  4 of 7 expected: ['robbed', 'robbery', 'stole', 'thieves']
+PASS  I  induce(money cash coin) finds unlisted members  5 of 8 expected: ['gold', 'pounds', 'shillings', 'silver', 'sum']
+
+  -- P: whole-phrase similarity (expected to fail; see C) --
+     paraphrase 0.039 vs word-overlap 0.623  topic dominates (expected)
+     paraphrase 0.135 vs word-overlap 0.467  topic dominates (expected)
+     paraphrase 0.053 vs word-overlap 0.577  topic dominates (expected)
+
+  -- C: projection onto an induced axis (the right instrument) --
+     +0.0660 'hide the payment'
+     +0.0661 'conceal the transfer'
+     -0.0021 'make the payment'
+PASS  C  paraphrase sits closer on the axis than the word-overlap trap  contrast separates what similarity cannot
+PASS  D  similarity and space id are pure functions  
+
+6/7 passed

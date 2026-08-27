@@ -1,0 +1,24 @@
+# Covenant runtime dependencies (Python 3.10+)
+flask>=2.3
+cryptography>=41.0
+requests>=2.31
+
+# W1 (v8.29) -- production WSGI server. The node used to serve Flask through
+# werkzeug's DEVELOPMENT server (one unbounded thread per connection, no queue,
+# no idle timeout) on the one port an operator is told to expose. waitress is
+# pure Python -- no compiler, which matters on Termux/aarch64 where every
+# extension package is built from source -- and works on Windows.
+# OPTIONAL BY DESIGN: without it the node still starts, keeps the old dev
+# server byte for byte, and says so on /health and at boot. With it, the pool
+# is bounded and idle connections are reaped.
+waitress>=2.1
+
+# NEW v8.11 -- XRP Ledger transaction signing and submission
+# (covenant_xrp_signer.py). Required only if live XRP settlement is used;
+# the module raises a clear XRPSignerError if it is absent, and the rest of
+# the node runs unaffected. Verified against xrpl-py 5.0.0.
+xrpl-py>=4.0
+
+# OPTIONAL -- neural telemetry bridge only. Absent by default; the node
+# attaches the bridge with brainflow_available=False and runs unaffected.
+# brainflow>=5.10

@@ -1,0 +1,18 @@
+covenant local sweep -- 2026-08-22 18:46:05
+python 3.12.10  pid 16872
+leftover cleanup is disabled by design -- see kill_leftovers()
+staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
+staged.
+core   497328 bytes
+
+running 2 run(s) of 3 suite(s), alone
+
+test_a1a_a2.py                   rc=1      33.8s  <no tally> subprocess.TimeoutExpired: Command '['C:\\Users\\Lawre\\cove
+test_a1a_a2.py                   rc=1      31.6s  <no tally> subprocess.TimeoutExpired: Command '['C:\\Users\\Lawre\\cove
+test_a1_kill_matrix.py           rc=1      57.8s  28/30 passed
+test_a1_kill_matrix.py           rc=1      58.2s  28/30 passed
+test_multinode_live.py           rc=0      80.0s  21 passed, 0 failed
+test_multinode_live.py           rc=0      80.2s  21 passed, 0 failed
+
+total 5.7 min
+per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs

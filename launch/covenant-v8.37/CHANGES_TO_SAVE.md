@@ -1,0 +1,70 @@
+# What to save to the project — v8.18
+
+Final audit pass complete. **248 checks passing.**
+
+## NEW FILES (not previously in the project)
+
+| File | What it is |
+|---|---|
+| `covenant_xrp_mainnet.py` | Mainnet spending controls: allowlist, destination tags, exact-drops limits, locked reserve-then-settle ledger, reconciliation |
+| `covenant_xrp_signer.py` | XRP signing/submission (testnet default, mainnet double-gated) |
+| `test_xrp_mainnet.py` | 69 guard tests |
+| `test_xrp_signer.py` | 22 offline signer tests |
+| `test_xrp_live.py` | **Live testnet run — generates the proof that unlocks mainnet** |
+| `test_adversarial_suite.py` | 21 consolidated exploits (every one worked against an earlier revision) |
+| `test_multinode_live.py` | Real OS processes over real sockets — the path never previously covered |
+| `test_e2e_gift.py` | Gift → publish → chain → peer reconstruction |
+| `sim_order_independence.py` | 11 block-delivery orderings must converge |
+| `sim_yield_safety.py` | Millennium yield curves (informational — read before changing YIELD_RATE) |
+| `sim1000_network.py`, `sim1000_invariants.py` | 1000-node convergence/conservation |
+| `probe_scaling.py` | Balance-read growth curve |
+| `probe_block_hash.py` | Reproduces the post-mine mutation bug |
+| `probe_mainnet_review.py` | Reproduces the four external-review findings |
+| `probe_final_pass.py` | Reservation state machine + sync-route attacks |
+| `SECURITY_AUDIT_v8.12.md` | Findings AB–AL written up |
+
+## REPLACEMENTS
+
+`covenant_unified_v8.py`, `covenant_trading_bridge.py`, `test_security_audit.py`,
+`requirements.txt` (adds `xrpl-py`), `run_all_tests.sh`, `MANIFEST.json`.
+
+## FINDINGS THIS SESSION: AB–AU
+
+Critical: AB (net-zero ≠ authorization), AE (validation/application arithmetic
+mismatch → unbounded mint + consensus divergence), AF (one gift signature =
+unlimited replays), AJ (float absorption mint, 532,545 from nothing), AK (block
+rewards over-issued 270 billion percent), AN (**no block carrying value could
+ever propagate**), AP (spending limits were advisory, not binding).
+
+High: AC, AG, AH, AI, AL, AO (**no chain bootstrap — joining nodes never learned
+history**), AQ, AT, AU.
+
+**Six of these were introduced by the fix for the previous finding.** Every fix
+to the ledger or the guard layer needs its own adversarial pass, not just a
+regression run.
+
+## ASSEMBLY / RECURSIVE-SECURITY PASS (added this session)
+
+See `SESSION_FINDINGS.md`. New finding **AV** (HIGH): real-time push relay does
+not beat the bootstrap pull on a sparse topology (deterministic 19/21 on
+`test_multinode_live.py`); convergence holds, latency to non-adjacent nodes is
+bound by the bootstrap interval. Finding **AW** (LOW): height-only propagation
+assertions hide push failure behind eventual convergence.
+
+## BEFORE LAUNCH
+
+1. `ANTHROPIC_API_KEY` — without it the gate fails closed and the node rejects
+   **every** transaction while looking perfectly healthy. Preflight's only
+   BLOCKING item.
+2. `--export-genesis genesis.json` once; every node then uses `--genesis`.
+3. `./run_all_tests.sh` then `preflight.py` until clean.
+4. `test_xrp_live.py` on a networked machine — **mainnet stays blocked until
+   this has run once.** It cannot be run from the sandbox.
+
+## STILL OPEN (deliberate, not oversights)
+
+- `stake_lock` / `unstake` cannot travel on-chain: both are one-sided, so both
+  fail net-zero by construction.
+- Ethics gate is keyword matching unless a real judge key is set.
+- XRP submission paths (`autofill`, `submit_and_wait`, reserve check) are
+  written and reviewed but **never executed**.

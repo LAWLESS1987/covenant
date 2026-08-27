@@ -1,0 +1,57 @@
+==== node restart  Mon 08/24/2026  4:10:09.56 ====
+
+--- BEFORE: health A ---
+
+--- BEFORE: health B ---
+
+--- who is listening ---
+
+--- stop by window title, whole tree ---
+
+INFO: No tasks running with the specified criteria.
+
+INFO: No tasks running with the specified criteria.
+
+INFO: No tasks running with the specified criteria.
+--- stop by port, whatever still holds 5000 or 5020 ---
+
+--- ports after stop, expect nothing listed ---
+
+--- start on the deployed source ---
+start requested, model qwen3:8b
+[ollama-judge] named judges registered: pc_qwen, pc_mid, pc_small
+  fit check: qwen3:8b is 5.2 GB; this machine has 16.4 GB RAM, 8.7 GB of it free right now
+             fits with 3.5 GB of FREE RAM to spare
+             (11.2 GB against total, which is the number
+             this check used to print and the one that misleads).
+  fit check: qwen3:8b is 5.2 GB; this machine has 16.4 GB RAM, 8.7 GB of it free right now
+             fits with 3.5 GB of FREE RAM to spare
+             (11.2 GB against total, which is the number
+             this check used to print and the one that misleads).
+resuming existing nodeA_prod.db
+resuming existing nodeB_prod.db
+starting node A on 5000
+starting node B on 5020
+starting watchdog
+start complete
+
+=== Covenant status ===
+  node on 5000: UP
+     height 3 peers 1 judge quorum(local:0,mock_selfreport:0) insecure False
+  node on 5020: UP
+     height 3 peers 1 judge quorum(local:0,mock_selfreport:0) insecure False
+
+  watchdog verdict:
+2026-08-24T08:10:52Z INFO  node A v=v8.35 src=1207bd2e7dc5 height=3 peers=1 judge=quorum(local:0,mock_selfreport:0) insecure=False judges=1/1! (+2 known-false warnings suppressed)
+2026-08-24T08:10:52Z INFO  node A recorded a new anomaly kind: peer_message_error=1
+2026-08-24T08:10:52Z INFO  node B v=v8.35 src=1207bd2e7dc5 height=3 peers=1 judge=quorum(local:0,mock_selfreport:0) insecure=False judges=1/1! (+1 known-false warnings suppressed)
+2026-08-24T08:10:53Z INFO  founder balance agrees across both dbs: 988.0
+2026-08-24T08:10:54Z INFO  nodeB balance agrees across both dbs: 12.0
+2026-08-24T08:10:54Z ALERT node A: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform
+2026-08-24T08:10:54Z INFO  alert push is off (set COVENANT_ALERT_PUSH_URL to send surviving alerts to a phone)
+2026-08-24T08:10:54Z ALERT node A: ethics quorum is not independently diverse: 1 independent semantic judge(s) of 1 configured (single_semantic_judge) -- the self-report layer is not a second opinion (B2)
+2026-08-24T08:10:54Z ALERT node B: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform
+2026-08-24T08:10:54Z ALERT node B: ethics quorum is not independently diverse: 1 independent semantic judge(s) of 1 configured (single_semantic_judge) -- the self-report layer is not a second opinion (B2)
+  >> ALERTS above. 
+
+  logs\  prod.log nodeA.log nodeB.log watchdog.log

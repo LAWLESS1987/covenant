@@ -1,0 +1,162 @@
+# Covenant Security Audit — v8.10 / v8.11 / v8.12
+
+**Scope:** ledger event authorization, chain-derivable balance reconstruction,
+transaction identity, numeric integrity, XRP settlement.
+**Method:** every finding below was confirmed by running code and watching
+value move. None is a static inference. Each has a reproduction script and a
+regression test.
+
+**Result:** 10 findings. 6 critical. All closed and covered.
+
+| ID | Severity | Summary | Introduced |
+|----|----------|---------|------------|
+| AB | CRITICAL | Net-zero was treated as authorization | pre-existing |
+| AC | HIGH | Finding U's emit path terminated in an HTTP response body | pre-existing |
+| AE | CRITICAL | Validation and application ran different arithmetic | pre-existing |
+| AF | CRITICAL | One gift signature authorized unlimited replays | by the AB fix |
+| AG | HIGH | Gift `ref_id` carried no party identity | pre-existing |
+| AH | HIGH | Transaction id did not commit to amount or data | pre-existing |
+| AI | HIGH | Balance reads cost O(whole ledger) | pre-existing |
+| AJ | CRITICAL | Lossy float summation as an unauthorized mint | pre-existing |
+| AK | CRITICAL | Block rewards over-issued by 270 billion percent | pre-existing (flagged v7.1, left open) |
+| AL | HIGH | NaN/negative block reward permanently poisons the pool | pre-existing |
+
+Three of these were in code written during the audit itself (AF directly, and
+AE/AJ were reachable only once the emit path went live). Auditing a fix only
+against the bug it fixed proves nothing.
+
+---
+
+## AB — Net-zero is not authorization
+
+`validate_ledger_event` required a chain-carried event to sum to zero and
+nothing else. Net-zero proves value was not *created*. It never proved the
+debited account *agreed*, and the payer's signature appeared nowhere.
+
+**Exploit.** An attacker built an event debiting a stranger 5000 and crediting
+themselves 5000, attached it to their own correctly-signed `amount=0`
+transaction, and `apply_transaction_ledger` moved the money. Victim 5000 → 0,
+attacker 0 → 5000. Every peer would have agreed, because every peer runs the
+same validator.
+
+**Fix.** Every account with a net debit must present a proof it consented.
+Credited accounts need none. Two proof kinds (`ledger_event_v1` — a signature
+over the canonical digest of the whole entry set; `node_gift_v1` — the original
+gift signature re-derived). `LEDGER_EVENT_REQUIRE_AUTH` exists so the
+requirement is greppable, not so it can be switched off.
+
+## AC — The emit path was a dead end
+
+The consume half was fully built and tested. The only emitter built a correct
+event, carried a comment reading "publish this movement", and returned it in an
+HTTP response body where nothing read it. Gift 100 → mempool goes 0→0, and a peer
+replaying the chain reconstructs 0.00 while the origin shows 100.00. **Fix:**
+`P2PNode.publish_ledger_event` validates, wraps in an `amount=0` carrier tx,
+admits it through the bounded mempool, and propagates.
+
+## AE — Validation and application ran different arithmetic
+
+The validator summed the declared entries; the writer wrote only the entries
+that did not collide with an existing row. **Exploit:** plant one self-cancelling
+row, then reuse its `(pubkey, reason, ref_id)` on the debit side and a fresh
+`ref_id` on the credit side — validator passes net-zero, writer suppresses the
+debit and writes the credit. Unbounded mint, and state-dependent (a peer that
+never saw the plant computes a different balance from the same block). **Fix:**
+idempotency moved to the whole event (`BEGIN IMMEDIATE`, `applied_ledger_events`
+keyed on the digest); rows namespaced by that digest so none can collide.
+
+> **Contract — a sharp edge.** Any movement that will also be published on-chain
+> must go through `apply_ledger_event`, not loose `record_ledger_entry` calls.
+> Any new value-moving path must respect this.
+
+## AF — One gift signature authorized unlimited replays
+
+*Introduced by the AB fix.* The gift signature covers
+`(payer, recipient, amount, timestamp)` and not the `ref_id`, while idempotency
+keys on the `ref_id`. One 50-unit gift replayed five times moved 250. **Fix:**
+derive the `ref_id` from the signed parameters; a replay reuses it and the AE
+event-claim refuses it. 0/5 accepted.
+
+## AG — The gift `ref_id` carried no party identity
+
+Composed from `payer[:16]` and `recipient[:16]` — every PEM begins with the same
+16 characters, so both fields were constant and the id reduced to a timestamp.
+**Fix:** hash the full keys under a domain tag.
+
+## AH — A transaction id did not commit to the transaction
+
+`get_id()` hashed only `(sender, receiver, timestamp)`. A block carrying 1.0 and
+9999.0 moved exactly 1.0; the second payment never happened, no error. **Fix:**
+content-addressed over sender, receiver, timestamp, amount and data.
+`benefit_score` stays out deliberately (the judge blends it post-verify).
+
+## AI — Balance reads cost O(whole ledger)
+
+`get_balance` is a live SUM whose plan was a bare SCAN. 59× slower at 200k rows
+having gained nothing; unbounded, in the hot path. The idempotency index is
+partial (`WHERE ref_id != ''`) and cannot serve a plain pubkey lookup. **Fix:**
+covering index `idx_ledger_pubkey_delta` on `(pubkey, delta)`. 1.1×, flat. The
+test asserts the query plan, not a timing.
+
+## AJ — Lossy float summation as an unauthorized mint
+
+`total += delta` above 2⁵³ is lossy and order-dependent. Bracket a small credit
+between two huge cancelling values: total absorbs the +1.0, validator sees zero,
+no payer is identified so no signature is demanded. **532,545 created from
+nothing across four events.** The trap: CPython 3.12 gave builtin `sum()`
+Neumaier compensation, so `sum(deltas)` is correct but the hand loop never
+inherited it. **Fix:** `math.fsum` for every total and per-payer net, plus a
+`LEDGER_EVENT_MAX_ABS_DELTA = 1e12` per-entry bound. Order-independence asserted
+across all six permutations.
+
+## AK — Block rewards over-issued by 270 billion percent
+
+`total_staked` was a hand-maintained counter never updated when rewards
+compounded into `stake.amount`; shares summed to > 1.0 and the excess fed back.
+Measured: 250,000 intended → 676,563,839,999,194 actual over 5,000 blocks.
+**Fix:** `total_staked` is a derived `@property`; assigning to it raises. Second
+bug caught in the same pass: recomputing the derived total *inside* the loop
+under-issued 0.2% — denominator now snapshot once before the loop.
+
+## AL — NaN or negative block reward permanently poisons the pool
+
+`distribute_block_rewards` accepted NaN/±Inf/negative straight into
+`stake.amount`. One NaN makes that stake NaN forever, and since `total_staked`
+sums the stakes, one poisoned stake makes the whole pool NaN. `verify()` returns
+True for `amount=NaN`. **Fix:** fail closed before touching any stake; negative
+is refused, not clamped (a negative reward is confiscation wearing a reward's
+clothes).
+
+---
+
+## Audited and held (no finding)
+
+- **Code sandbox** — refused 9/9 escape primitives.
+- **Digest binding** — held against proof-lifting and zero-delta padding.
+- **Concurrency** — eight threads racing one event digest produced exactly one
+  writer and seven no-ops (`BEGIN IMMEDIATE`).
+- **Oversized payloads** — rejected by the entry-count cap before signature work.
+
+## 1000-node simulation
+
+1000 independent SQLite DBs, real signatures, real validation and replay (not
+1000 processes/sockets — propagation modelled by shared block lists).
+Convergence: 218 fully-applied nodes → one state. Conservation: 40,000.000000000
+present against 40,000.000000 minted. Interruption: all 60 sampled interrupted
+nodes held conserving ledgers. Order independence: all 11 delivery patterns → one
+fingerprint.
+
+## Still unproven
+
+Neither is covered by `run_all_tests.sh`. **Do not read a green sweep as covering them.**
+
+1. **Multi-node P2P over real sockets.** (The assembly pass added
+   `test_multinode_live.py`, which reproduces convergence but shows real-time
+   push relay to non-adjacent nodes lags the bootstrap pull — see
+   `SESSION_FINDINGS.md` finding AV.)
+2. **XRP submission.** Offline tests pass, but `autofill`, `submit_and_wait` and
+   the base-reserve check were never executed. Run `test_xrp_live.py` against a
+   faucet-funded testnet account first.
+
+Also open, deliberately not invented: `stake_lock` and `unstake` are one-sided,
+so both fail net-zero by construction and nothing can emit them.

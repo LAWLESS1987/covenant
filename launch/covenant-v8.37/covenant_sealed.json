@@ -1,0 +1,13 @@
+{
+  "format": "AES-256-GCM",
+  "kdf": "keyfile",
+  "n": 131072,
+  "r": 8,
+  "p": 1,
+  "root": "c119afb5735b715019e2f3aa6525f28d50532fdd0ba74ff7ae882895581bc521",
+  "files": 134,
+  "keyfile_hint": "covenant_A.db.key",
+  "plain_bytes": 694795,
+  "sealed_bytes": 694811,
+  "utc": "2026-08-22T05:23:06Z"
+}

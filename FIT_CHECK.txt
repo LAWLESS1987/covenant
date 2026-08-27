@@ -1,0 +1,15 @@
+==== fit check Sat 08/22/2026 21:29:14.74 ====
+[ollama-judge] named judges registered: pc_qwen, pc_mid, pc_small
+  fit check: qwen3:8b is 5.2 GB; this machine has 16.4 GB RAM, 2.8 GB of it free right now
+             WARNING: only 2.8 GB is free right now, less than
+             the 5.2 GB this model needs. It will load by paging
+             from disk, which costs more per token than any
+             setting can win back. Close something, or wait for
+             whatever is holding the RAM to finish.
+  fit check: qwen3:8b is 5.2 GB; this machine has 16.4 GB RAM, 2.8 GB of it free right now
+             WARNING: only 2.8 GB is free right now, less than
+             the 5.2 GB this model needs. It will load by paging
+             from disk, which costs more per token than any
+             setting can win back. Close something, or wait for
+             whatever is holding the RAM to finish.
+returned True

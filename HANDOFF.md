@@ -1,0 +1,166 @@
+# Covenant — HAND-OFF
+
+**Read this first.** It is the bridge between the recorded conversations (which
+predate this work and are now partly wrong) and the current code.
+
+Current version: **v8.18**. Verified: **266 checks passing**, all green.
+
+| suite | checks |
+|---|---|
+| `test_security_audit.py` | 127 |
+| `test_xrp_mainnet.py` | 69 |
+| `test_adversarial_suite.py` | 21 |
+| `test_xrp_signer.py` | 22 |
+| `test_e2e_gift.py` | 11 |
+| `test_backtest_guardrails.py` (quant) | 16 |
+| `sim_order_independence.py` | ALL INVARIANTS HELD |
+
+---
+
+## 1. SUPERSEDED — do not trust older transcripts on these
+
+The recorded conversations describe a system that no longer exists in these
+areas. If an older discussion contradicts this section, **this section wins.**
+
+| Older belief | Reality now |
+|---|---|
+| Block propagation works | It **never** worked. No block carrying value could propagate at all (finding AN). Fixed and verified with real processes. |
+| `total_staked` is a maintained counter | It is a **derived property**. Assigning to it raises. The old counter over-issued block rewards by 270 billion percent (AK). |
+| Ledger events publish on-chain | The emit path was a **dead end** — it returned the event in an HTTP response and nothing read it (AC). |
+| Net-zero validation is sufficient | Net-zero is **not authorization**. Any party could debit a stranger and credit themselves (AB). |
+| Finding U is unimplemented | Mostly implemented; only the *emit* half was missing. |
+| A joining node syncs | There was **no chain bootstrap at all** (AO). A late joiner sat at genesis forever. |
+
+---
+
+## 2. WHAT IS EMPIRICALLY VERIFIED
+
+Verified means *observed by running code*, not inferred.
+
+- **Multi-node P2P over real OS processes and sockets.** Block mined on A reaches
+  B directly and **relays to C**, which is not a peer of A. Three processes agree
+  on tip hash, still agree after a second block, and a cold fourth node catches
+  up in <3s. Harness: `test_multinode_live.py`.
+  > NOTE (assembly pass, this bundle): re-running in a clean sandbox first
+  > reproduced a deterministic 19/21 — the *real-time* relay to the 2-hop node
+  > did not beat the bootstrap pull. Root-caused and FIXED (finding AV): the
+  > bootstrap/gap-fill apply path did not re-announce onward. Now 21/21 across
+  > four runs with no regression. See `SESSION_FINDINGS.md` finding AV.
+- **Ledger convergence at 1000 nodes.** 218 fully-applied nodes computed **one**
+  network state. Supply exact: 40,000.000000000 against 40,000.000000 minted.
+  Interrupted nodes held *conserving* ledgers.
+- **Order independence** across 11 delivery patterns including reversed,
+  duplicated, and interrupted-then-resynced.
+- **Every exploit in `test_adversarial_suite.py`** worked against an earlier
+  revision and now fails.
+- **Backtest guardrails** reject a strategy mined from a provable random walk
+  (+144.70% net return, zero real edge) while passing a genuine trend.
+
+## 3. WHAT IS ASSUMED, NOT VERIFIED
+
+- **XRP submission has never executed.** Not once, on any network. `autofill`,
+  `submit_and_wait`, and the reserve check are written and reviewed only. The
+  sandbox cannot reach XRPL.
+- **The ethics gate is keyword matching** unless a real provider key is set.
+- **Bar data, not true tick.** Intrabar path is modelled. Any stop-loss strategy
+  will backtest better than it trades.
+- **No real market data was used.** The quant framework is validated on synthetic
+  data with known ground truth — that proves the *machinery*, not any strategy.
+
+---
+
+## 4. OPEN DECISIONS — these need a human, not a model
+
+**`stake_lock` / `unstake` cannot travel on-chain.** Both are one-sided, so both
+fail the net-zero rule by construction. They are whitelisted in
+`LEDGER_EVENT_REASONS` for a capability that does not exist. Making them work
+needs (a) a staking escrow counterparty account for locked principal to move to,
+and (b) a decision on whether compounded rewards — which are a genuine mint —
+may travel at all. **Deliberately not invented.**
+
+**`YIELD_RATE`.** Not raised. `sim_yield_safety.py` reports the curves so the
+number can be chosen against real figures. Time yield is bounded and healthy;
+the instability was in block rewards and is fixed.
+
+---
+
+## 5. THE ONE THING THAT MATTERS MOST
+
+Across this audit, **six of fourteen findings were introduced by the fix for the
+previous finding**: AB→AF, AK→under-issue, AR→AT, and others.
+
+The lesson is not "be careful." It is:
+
+> **Every change to the ledger or the guard layer needs its own adversarial
+> pass, not just a regression run. A green suite after a fix proves the old bug
+> is gone — not that the fix is sound.**
+
+The single highest-value action available is **not more AI sessions**. It is one
+human who can read Python reviewing the diffs. An external reviewer found four
+real vulnerabilities in the mainnet guard that my own 33-test suite passed
+cleanly — because those tests checked that limits were *calculated*, never that
+they *bound*.
+
+---
+
+## 6. LAUNCH SEQUENCE
+
+1. **`ANTHROPIC_API_KEY`** — preflight's only BLOCKING item. Without it the gate
+   fails closed and the node **rejects every transaction while looking perfectly
+   healthy**.
+2. `python3 covenant_unified_v8.py --export-genesis genesis.json` **once**. Every
+   node then starts with `--genesis genesis.json`. Without a shared genesis,
+   nodes cannot converge and each mints itself 1000.
+3. `./run_all_tests.sh` — expect all green.
+4. `python3 preflight.py` — until clean.
+5. `python3 test_xrp_live.py` on a networked machine. **Mainnet stays blocked
+   until this has run once** — that gate is deliberate and in code, not advice.
+
+## 7. MAINNET XRP — before any real money
+
+- `write_policy_template('xrp_mainnet_policy.json')`, then add **one** address
+  you have checked against its source. Start ceilings low.
+- Destination tags are **required by default**. Sending to an exchange without
+  one is the most common permanent loss in XRP and it reports success.
+- Limits are enforced by **reserve-then-settle under a file lock**. A crash
+  leaves the hold standing — deliberately. Use `reconciliation_report()` to see
+  and resolve orphans; `release()` is manual and must stay that way.
+
+## 8. FILE MAP
+
+**Core:** `covenant_unified_v8.py` (patch log AB–AU lives in the module
+docstring — the authoritative record), `covenant_trading_bridge.py`,
+`covenant_xrp_signer.py`, `covenant_xrp_mainnet.py`.
+
+**Suites:** `test_security_audit.py`, `test_adversarial_suite.py`,
+`test_multinode_live.py`, `test_e2e_gift.py`, `test_xrp_mainnet.py`,
+`test_xrp_signer.py`, `test_xrp_live.py` *(live, unlocks mainnet)*.
+
+**Simulations/probes:** `sim_order_independence.py`, `sim_yield_safety.py`,
+`sim1000_network.py`, `sim1000_invariants.py`, `probe_scaling.py`,
+`probe_block_hash.py`, `probe_mainnet_review.py`, `probe_final_pass.py`.
+
+**Quant:** `quant/covenant_backtest.py`, `quant/test_backtest_guardrails.py`,
+`quant/QUANT_README.md`.
+
+**Docs:** this file, `CHANGES_TO_SAVE.md`, `SECURITY_AUDIT_v8.12.md`,
+`LAUNCH.md`, `SESSION_FINDINGS.md`.
+
+---
+
+## 9. IF YOU ARE A FUTURE SESSION READING THIS
+
+The methodology that produced every finding here:
+
+1. **Empirical only.** Confirm by running code and watching value move. Static
+   reasoning is a starting point, never a conclusion.
+2. **Attack the newest code first.** It is the least reviewed, and in this
+   codebase it is where the bugs were.
+3. **Silent failure is the worst class.** A system that looks healthy while
+   recording nothing has caused more findings here than any other pattern.
+4. **Simulate past the horizon where it looks fine.** Two runaway-inflation bugs
+   were only visible at century scale.
+5. **Push back.** L explicitly wants theories stress-tested, not validated.
+   Declining with reasoning is more useful than agreeable compliance.
+
+Do not treat a green suite as permission. Treat it as the floor.

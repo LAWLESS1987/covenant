@@ -1,0 +1,11 @@
+{
+  "root": "c119afb5735b715019e2f3aa6525f28d50532fdd0ba74ff7ae882895581bc521",
+  "files": 134,
+  "utc": "2026-08-22T05:23:07Z",
+  "block_index": 2,
+  "block_hash": "00006f9db408bbb40b3cb7a6fed84c56917f66e599e926650e962c331fa47263",
+  "tx_id": "777d99280bc6652fe9afb8e6b225e21a16aaab143829698b9b4aea5cf097d342",
+  "port": 5000,
+  "confirmed_in_chain": true,
+  "note": "Anchored to a chain this operator runs end to end. Tamper-evident within the chain; NOT independent third-party timestamping."
+}

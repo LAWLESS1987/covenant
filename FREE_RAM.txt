@@ -1,0 +1,50 @@
+==== free ram Sat 08/22/2026 21:44:41.93 ====
+--- before ---
+FreePhysicalMemory=2859996
+--- loaded models before ---
+NAME        ID              SIZE      PROCESSOR    CONTEXT    UNTIL              
+qwen3:8b    500a1f067a9f    5.6 GB    100% CPU     2048       9 minutes from now    
+
+--- unloading qwen3:8b ---
+[?2026h[?25l[1G⠙ [K[?25h[?2026l[?25l[?2026h[?25l[1G[K[?25h[?2026l[2K[1G[?25h--- loaded models after ---
+NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
+
+--- after ---
+FreePhysicalMemory=8180484
+
+--- top consumers now ---
+image                                 MB   count
+------------------------------------------------
+claude.exe                          1383      12
+msedgewebview2.exe                  1031      38
+svchost.exe                          856      90
+Memory Compression                   551       1
+msedge.exe                           446      16
+vmmem                                399       1
+explorer.exe                         349       1
+MsMpEng.exe                          266       1
+Grammarly.Desktop.exe                216       1
+WindowsTerminal.exe                  189       1
+mscopilot.exe                        185       5
+python3.12.exe                       160       4
+RuntimeBroker.exe                    129       8
+mc-fw-host.exe                       113       2
+OneDrive.exe                         105       1
+WhatsApp.Root.exe                     88       1
+SearchHost.exe                        80       1
+StartMenuExperienceHost.exe           77       1
+dwm.exe                               75       1
+copilot.exe                           71       2
+TouchpointAnalyticsClientService.exe        66       1
+Secure System                         63       1
+
+tracked total: 8.2 GB across 313 processes
+
+covenant's own share:
+  python.exe                          43 MB  x4
+  python3.12.exe                     160 MB  x4
+  ollama.exe                          45 MB  x1
+  ollama app.exe                      35 MB  x1
+  cmd.exe                             35 MB  x7
+  subtotal                           317 MB
+==== DONE ====

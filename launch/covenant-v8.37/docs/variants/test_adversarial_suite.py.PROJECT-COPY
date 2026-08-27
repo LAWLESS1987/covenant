@@ -1,0 +1,254 @@
+"""test_adversarial_suite.py -- every confirmed attack from the v8.10/v8.11
+audit, re-run as assertions.
+
+Each check here corresponds to an exploit that WORKED against a previous
+revision. They were found by running code and watching value move, not by
+reading it. Keeping them as a suite means a future refactor that reopens one
+fails immediately rather than shipping.
+
+Findings covered: AB (net-zero is not authorization), AE (validation and
+application ran different arithmetic), AF (one gift signature authorized
+unlimited replays), AG (gift ref_id carried no party identity), AH (a
+transaction id did not commit to its contents), AI (balance reads cost
+O(whole ledger)), AJ (lossy float summation as an unauthorized mint).
+
+    python3 test_adversarial_suite.py
+"""
+import os, sys, time, math, json, base64, sqlite3, tempfile, shutil, threading
+import itertools
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import covenant_unified_v8 as cov
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
+
+passed = failed = 0
+work = tempfile.mkdtemp(prefix="advsuite_")
+
+def check(label, cond, detail=""):
+    global passed, failed
+    if cond:
+        passed += 1
+        print(f"  PASS: {label}" + (f" -- {detail}" if detail else ""))
+    else:
+        failed += 1
+        print(f"  FAIL: {label}" + (f" -- {detail}" if detail else ""))
+
+def kp():
+    k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    return k, k.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
+def db(name):
+    return cov.Database(os.path.join(work, f"{name}.db"))
+
+pool_sk, POOL = kp()
+rcp_sk, RCP = kp()
+thief_sk, THIEF = kp()
+victim_sk, VICTIM = kp()
+
+def signed(entries, sk):
+    return {"entries": entries,
+            "auth": {  # payer is whoever nets negative; caller supplies their key
+                [e["pubkey"] for e in entries
+                 if e["delta"] < 0][0]: {
+                    "kind": "ledger_event_v1",
+                    "signature": cov.Database.sign_ledger_event(sk, entries)}}}
+
+# ---------------------------------------------------------------- ITEM AB
+print("== AB: net-zero is not authorization ==")
+steal = [{"pubkey": VICTIM, "delta": -5000.0, "reason": "node_gift_sent", "ref_id": "t1"},
+         {"pubkey": THIEF, "delta": 5000.0, "reason": "node_gift_received", "ref_id": "t1"}]
+ok, why = cov.Database.validate_ledger_event({"entries": steal})
+check("an unauthorized net-zero transfer is refused", not ok, why[:64])
+
+d = db("ab")
+d.record_ledger_entry(VICTIM, 5000.0, "genesis_mint", ref_id="s")
+tx = cov.Transaction(sender_pubkey=THIEF, receiver="collective",
+                     data={"origin": "human", "ledger_event": {"entries": steal}}, amount=0.0)
+tx.sign(thief_sk)
+d.apply_transaction_ledger(cov.Block(index=1, transactions=[tx], previous_hash="0" * 64))
+check("the same attack in a real block moves nothing",
+      d.get_balance(VICTIM) == 5000.0 and d.get_balance(THIEF) == 0.0,
+      f"victim={d.get_balance(VICTIM)} thief={d.get_balance(THIEF)}")
+
+good = signed(steal[:0] + [
+    {"pubkey": POOL, "delta": -30.0, "reason": "node_gift_sent", "ref_id": "g1"},
+    {"pubkey": RCP, "delta": 30.0, "reason": "node_gift_received", "ref_id": "g1"}], pool_sk)
+ok, why = cov.Database.validate_ledger_event(good)
+check("a properly authorized movement is still accepted", ok, why)
+
+lifted = {"entries": [
+    {"pubkey": POOL, "delta": -30.0, "reason": "node_gift_sent", "ref_id": "g1"},
+    {"pubkey": THIEF, "delta": 30.0, "reason": "node_gift_received", "ref_id": "g1"}],
+    "auth": good["auth"]}
+ok, why = cov.Database.validate_ledger_event(lifted)
+check("an authorization cannot be lifted onto a redirected payout", not ok, why[:64])
+
+forged = dict(good)
+forged = {"entries": good["entries"],
+          "auth": {POOL: {"kind": "ledger_event_v1",
+                          "signature": cov.Database.sign_ledger_event(thief_sk, good["entries"])}}}
+check("a signature from a non-payer key is refused",
+      not cov.Database.validate_ledger_event(forged)[0])
+
+# ---------------------------------------------------------------- ITEM AE
+print("\n== AE: validation and application must run the same arithmetic ==")
+d = db("ae")
+d.record_ledger_entry(THIEF, 10.0, "genesis_mint", ref_id="s")
+plant = signed([
+    {"pubkey": THIEF, "delta": -10.0, "reason": "node_gift_sent", "ref_id": "burn"},
+    {"pubkey": VICTIM, "delta": 10.0, "reason": "node_gift_received", "ref_id": "burn"}], thief_sk)
+d.apply_ledger_event(plant, "setup")
+mint = signed([
+    {"pubkey": THIEF, "delta": -1000.0, "reason": "node_gift_sent", "ref_id": "burn"},
+    {"pubkey": THIEF, "delta": 1000.0, "reason": "node_gift_received", "ref_id": "fresh"}], thief_sk)
+before = d.get_balance(THIEF)
+d.apply_ledger_event(mint, "mint")
+check("an event whose debit collides cannot apply as a pure credit",
+      d.get_balance(THIEF) == before, f"{before} -> {d.get_balance(THIEF)}")
+
+d2 = db("ae2")
+d2.apply_ledger_event(plant, "setup")
+check("applying one event twice writes rows exactly once",
+      d2.apply_ledger_event(plant, "setup") == 0)
+
+# concurrency: exactly-once under contention
+d3 = db("ae3")
+d3.record_ledger_entry(THIEF, 1000.0, "genesis_mint", ref_id="s")
+evt = signed([
+    {"pubkey": THIEF, "delta": -100.0, "reason": "node_gift_sent", "ref_id": "r"},
+    {"pubkey": RCP, "delta": 100.0, "reason": "node_gift_received", "ref_id": "r"}], thief_sk)
+res, bar = [], threading.Barrier(8)
+def racer():
+    bar.wait()
+    try: res.append(d3.apply_ledger_event(evt, "race"))
+    except Exception as e: res.append(f"ERR {type(e).__name__}")
+ts = [threading.Thread(target=racer) for _ in range(8)]
+[t.start() for t in ts]; [t.join() for t in ts]
+check("8 threads racing one event produce exactly one writer",
+      len([r for r in res if r == 2]) == 1 and abs(d3.get_balance(THIEF) - 900.0) < 1e-9,
+      f"writers={len([r for r in res if r==2])} balance={d3.get_balance(THIEF)}")
+
+# ---------------------------------------------------------------- ITEM AF/AG
+print("\n== AF/AG: gift authorization must bind ref_id and identify parties ==")
+ts_ = 1000.0
+gsig = base64.b64encode(pool_sk.sign(
+    cov._domain_frame(b"COVENANT_NODE_GIFT_V1", POOL, RCP, str(50.0), str(ts_)),
+    padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH), hashes.SHA256())).decode()
+auth = {POOL: {"kind": "node_gift_v1", "recipient": RCP, "amount": 50.0,
+               "timestamp": ts_, "signature": gsig}}
+derived = cov.Database.node_gift_ref_id(POOL, RCP, 50.0, ts_)
+legit = {"entries": [
+    {"pubkey": POOL, "delta": -50.0, "reason": "node_gift_sent", "ref_id": derived},
+    {"pubkey": RCP, "delta": 50.0, "reason": "node_gift_received", "ref_id": derived}],
+    "auth": auth}
+check("a real gift with the derived ref_id is accepted",
+      cov.Database.validate_ledger_event(legit)[0])
+
+accepted = 0
+for i in range(5):
+    ev = {"entries": [
+        {"pubkey": POOL, "delta": -50.0, "reason": "node_gift_sent", "ref_id": f"replay-{i}"},
+        {"pubkey": RCP, "delta": 50.0, "reason": "node_gift_received", "ref_id": f"replay-{i}"}],
+        "auth": auth}
+    if cov.Database.validate_ledger_event(ev)[0]:
+        accepted += 1
+check("one gift signature cannot authorize caller-chosen ref_ids",
+      accepted == 0, f"{accepted}/5 replays accepted")
+
+_, POOL2 = kp()
+check("gift ref_id distinguishes payers",
+      cov.Database.node_gift_ref_id(POOL, RCP, 50.0, ts_)
+      != cov.Database.node_gift_ref_id(POOL2, RCP, 50.0, ts_))
+check("gift ref_id distinguishes amounts",
+      cov.Database.node_gift_ref_id(POOL, RCP, 50.0, ts_)
+      != cov.Database.node_gift_ref_id(POOL, RCP, 50.5, ts_))
+
+# ---------------------------------------------------------------- ITEM AH
+print("\n== AH: a transaction id must commit to what it pays ==")
+t = 500.0
+a = cov.Transaction(sender_pubkey=POOL, receiver=RCP, data={"origin": "human"},
+                    amount=1.0, timestamp=t)
+b = cov.Transaction(sender_pubkey=POOL, receiver=RCP, data={"origin": "human"},
+                    amount=9999.0, timestamp=t)
+c = cov.Transaction(sender_pubkey=POOL, receiver=RCP,
+                    data={"origin": "human", "memo": "x"}, amount=1.0, timestamp=t)
+check("id commits to amount", a.get_id() != b.get_id())
+check("id commits to data", a.get_id() != c.get_id())
+d4 = db("ah")
+d4.record_ledger_entry(POOL, 10000.0, "genesis_mint", ref_id="s")
+a.sign(pool_sk); b.sign(pool_sk)
+d4.apply_transaction_ledger(cov.Block(index=1, transactions=[a, b], previous_hash="0" * 64))
+check("two payments in one block both move",
+      abs(d4.get_balance(RCP) - 10000.0) < 1e-9, f"credited {d4.get_balance(RCP)}")
+
+# ---------------------------------------------------------------- ITEM AI
+print("\n== AI: balance reads must not scan the whole ledger ==")
+d5 = db("ai")
+with sqlite3.connect(d5.db_path) as c_:
+    plan = [r[-1] for r in c_.execute(
+        "EXPLAIN QUERY PLAN SELECT COALESCE(SUM(delta),0) "
+        "FROM ledger_entries WHERE pubkey = ?", ("x",))]
+check("get_balance uses a covering index, not a full scan",
+      any("COVERING INDEX" in p for p in plan) and not any("SCAN" in p for p in plan),
+      "; ".join(plan))
+
+# ---------------------------------------------------------------- ITEM AJ
+print("\n== AJ: float summation must not hide a credit ==")
+absorb = [
+    {"pubkey": VICTIM, "delta": -1e16, "reason": "node_gift_sent", "ref_id": "x1"},
+    {"pubkey": THIEF, "delta": 1.0, "reason": "node_gift_received", "ref_id": "x2"},
+    {"pubkey": VICTIM, "delta": 1e16, "reason": "node_gift_received", "ref_id": "x3"}]
+ok, why = cov.Database.validate_ledger_event({"entries": absorb})
+check("a credit hidden by float absorption is refused", not ok, why[:56])
+
+sub = [
+    {"pubkey": VICTIM, "delta": -1e12, "reason": "node_gift_sent", "ref_id": "y1"},
+    {"pubkey": THIEF, "delta": 1e-5, "reason": "node_gift_received", "ref_id": "y2"},
+    {"pubkey": VICTIM, "delta": 1e12, "reason": "node_gift_received", "ref_id": "y3"}]
+ok, why = cov.Database.validate_ledger_event({"entries": sub})
+check("absorption UNDER the magnitude cap is refused too (fsum, not the cap)",
+      not ok and "net-zero" in why, why[:56])
+
+verdicts = {cov.Database.validate_ledger_event({"entries": list(p)})[0]
+            for p in itertools.permutations(sub)}
+check("the net-zero verdict does not depend on entry order",
+      verdicts == {False}, str(verdicts))
+
+ok, why = cov.Database.validate_ledger_event({"entries": [
+    {"pubkey": VICTIM, "delta": -1e16, "reason": "node_gift_sent", "ref_id": "z"},
+    {"pubkey": THIEF, "delta": 1e16, "reason": "node_gift_received", "ref_id": "z"}]})
+check("an entry past float64's exact-integer range is refused",
+      not ok and "magnitude" in why, why[:56])
+
+# ---------------------------------------------------------------- sandbox
+print("\n== code sandbox: escape attempts ==")
+guardian = cov.CovenantGuardian(execute=False)
+escapes = [
+    ("dunder attribute walk", "def f():\n    return ().__class__.__bases__[0]\n"),
+    ("subclass traversal", "def f():\n    return type(1).__subclasses__()\n"),
+    ("import statement", "import os\ndef f():\n    return os.getcwd()\n"),
+    ("from-import", "from os import system\ndef f():\n    return 1\n"),
+    ("eval call", "def f():\n    return eval('1+1')\n"),
+    ("builtins via globals", "def f():\n    return globals()['__builtins__']\n"),
+    ("getattr indirection", "def f():\n    return getattr(str, 'join')\n"),
+    ("comprehension leak", "def f():\n    return [x.__class__ for x in [1]]\n"),
+    ("lambda dunder", "def f():\n    g = lambda: (1).__class__\n    return g()\n"),
+]
+blocked = 0
+for label, src in escapes:
+    try:
+        ok, _, _ = guardian.validate_and_score(src)
+        blocked += 0 if ok else 1
+    except Exception:
+        blocked += 1
+check("sandbox refuses every known escape primitive",
+      blocked == len(escapes), f"{blocked}/{len(escapes)} blocked")
+
+shutil.rmtree(work)
+print("\n" + "=" * 62)
+print(f"{passed} passed, {failed} failed")
+print("=" * 62)
+sys.exit(1 if failed else 0)

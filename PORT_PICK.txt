@@ -1,0 +1,27 @@
+bind-probing 5000-5400 in steps of 20 (each block is N, N+1, N+11)
+
+  FREE    5000  (5000, 5001, 5011)
+  FREE    5020  (5020, 5021, 5031)
+  taken   5040  5040: OSError [WinError 10048] Only one usage of each socket address (protocol/network address/port) is normally permitted
+  FREE    5060  (5060, 5061, 5071)
+  FREE    5080  (5080, 5081, 5091)
+  FREE    5100  (5100, 5101, 5111)
+  FREE    5120  (5120, 5121, 5131)
+  FREE    5140  (5140, 5141, 5151)
+  FREE    5160  (5160, 5161, 5171)
+  FREE    5180  (5180, 5181, 5191)
+  FREE    5200  (5200, 5201, 5211)
+  FREE    5220  (5220, 5221, 5231)
+  FREE    5240  (5240, 5241, 5251)
+  FREE    5260  (5260, 5261, 5271)
+  FREE    5280  (5280, 5281, 5291)
+  FREE    5300  (5300, 5301, 5311)
+  FREE    5320  (5320, 5321, 5331)
+  FREE    5340  (5340, 5341, 5351)
+  FREE    5360  (5360, 5361, 5371)
+  FREE    5380  (5380, 5381, 5391)
+  FREE    5400  (5400, 5401, 5411)
+
+20 free block(s). First 3: 5000, 5020, 5060
+
+Set a node's --port to one of these, keep every node at least 20 apart, and give each peer the P2P port (API+1) -- never the API port. test_3node_config.py asserts all of that against covenant_prod.bat.

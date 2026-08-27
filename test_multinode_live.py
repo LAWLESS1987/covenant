@@ -1,0 +1,349 @@
+"""test_multinode_live.py -- REAL processes, REAL sockets, the one path the
+project has never had a committed test for.
+
+Every prior "multi-node" result in this codebase was either (a) objects sharing
+a Python heap in a single process, or (b) the 1000-node convergence sim, which
+explicitly modelled propagation by handing nodes the same block list. This does
+neither. It launches covenant_unified_v8.py as separate OS processes, lets them
+find each other over 127.0.0.1 TCP, and drives the actual
+propagate -> accept -> relay -> mine -> block-sync cycle across the wire.
+
+WHAT IS REAL
+  - N genuine subprocesses, each its own interpreter, its own DB file, its own
+    listening sockets on distinct ports.
+  - A shared canonical genesis exported from one and loaded by all, so they
+    share a mint root (without this they cannot converge -- documented).
+  - HTTP for driving (submit tx, mine, read chain); raw P2P sockets for the
+    thing under test (propagation and sync between the processes).
+
+WHAT THIS CAN STILL NOT PROVE
+  - Behaviour across real network partitions, NAT, or latency/loss. Localhost
+    has none of those. This proves the protocol works between real processes;
+    it does not prove it works across the internet.
+
+    COVENANT_JUDGE_PROVIDERS=mock  COVENANT_INSECURE_MOCK_JUDGE=1  python3 test_multinode_live.py
+"""
+import os, sys, json, time, socket, signal, subprocess, tempfile, shutil, urllib.request
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cryptography.hazmat.primitives import serialization
+import covenant_unified_v8 as cov
+
+def _load_key(node_id):
+    """Each process persists its RSA identity at {COVENANT_DB_PATH}.key."""
+    kp = os.path.join(work, f"{node_id}.db.key")
+    for _ in range(40):
+        if os.path.exists(kp):
+            with open(kp, "rb") as fh:
+                return serialization.load_pem_private_key(fh.read(), password=None)
+        time.sleep(0.25)
+    raise RuntimeError(f"identity key for {node_id} never appeared at {kp}")
+
+
+def current_alignment(api_port):
+    try:
+        _, a = http("GET", api_port, "/alignment")
+        return float(a.get("current_alignment", 0.5))
+    except Exception:
+        return 1.0
+
+def submit_tx(node_id, api_port, receiver_pubkey, amount, benefit=None):
+    """Submit a properly signed, PoW-stamped transaction from node_id's own
+    genesis-funded key. benefit defaults to the node's current alignment so a
+    mined block stays inside the drift band. Returns (status, json)."""
+    if benefit is None:
+        benefit = current_alignment(api_port)
+    sk = _load_key(node_id)
+    pem = sk.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    reg = cov.RegistrationPoW.generate(pem, cov.BASE_REGISTRATION_DIFFICULTY)
+    tx = cov.Transaction(sender_pubkey=pem, receiver=receiver_pubkey,
+                         data={"origin": "human"}, amount=float(amount),
+                         benefit_score=float(benefit), reg_nonce=reg)
+    tx.sign(sk)
+    body = {"sender_pubkey": pem, "receiver": receiver_pubkey,
+            "data": {"origin": "human"}, "amount": float(amount),
+            "timestamp": tx.timestamp, "benefit_score": float(benefit),
+            "signature": tx.signature, "reg_nonce": reg}
+    raw = json.dumps(body).encode()
+    req = urllib.request.Request(f"http://127.0.0.1:{api_port}/transactions",
+                                 data=raw, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return r.status, json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode())
+
+def _pubkey_of(node_id):
+    sk = _load_key(node_id)
+    return sk.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
+def op_post(node_id, api_port, path, body=None):
+    """POST an operator-authenticated request signed by that node's own key --
+    the node seeds its allowlist with its own identity, so it can drive itself."""
+    sk = _load_key(node_id)
+    pem = sk.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    raw = json.dumps(body if body is not None else {}).encode()
+    hdrs = cov.sign_operator_request(sk, pem, "POST", path, raw)
+    hdrs["Content-Type"] = "application/json"
+    req = urllib.request.Request(f"http://127.0.0.1:{api_port}{path}",
+                                 data=raw, method="POST", headers=hdrs)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return r.status, json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode())
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CORE = os.path.join(HERE, "covenant_unified_v8.py")
+passed = failed = 0
+procs = []
+work = tempfile.mkdtemp(prefix="multinode_")
+
+def check(label, cond, detail=""):
+    global passed, failed
+    if cond:
+        passed += 1; print(f"  PASS: {label}" + (f" -- {detail}" if detail else ""))
+    else:
+        failed += 1; print(f"  FAIL: {label}" + (f" -- {detail}" if detail else ""))
+
+def free_port():
+    """A base port whose WHOLE BLOCK is bindable -- API n, P2P n+1, bridge n+11.
+
+    Was bind(("127.0.0.1", 0)) and use what the kernel handed back. On Windows
+    that lands in the dynamic range, where the OS reserves excluded port blocks
+    (`netsh int ipv4 show excludedportrange`): the API port bound fine and the
+    node then died with
+        PREFLIGHT FAILED: port 49553 (P2P (--port + 1)) is not free:
+        [WinError 10013] ... forbidden by its access permissions
+    Picking from a static range and proving all three ports bind removes both
+    the excluded-range hazard and the +1/+11 collision the old version could
+    not see. Measured on L's machine 2026-08-22."""
+    for base in range(17000, 19000, 20):
+        try:
+            socks = []
+            for off in (0, 1, 11):
+                x = socket.socket()
+                x.bind(("127.0.0.1", base + off))
+                socks.append(x)
+        except OSError:
+            for x in socks:
+                x.close()
+            continue
+        for x in socks:
+            x.close()
+        return base
+    raise RuntimeError("no free API/P2P/bridge port block in 17000-19000")
+
+def http(method, port, path, body=None, timeout=15, _retries=12):
+    url = f"http://127.0.0.1:{port}{path}"
+    data = json.dumps(body).encode() if body is not None else None
+    for attempt in range(_retries):
+        req = urllib.request.Request(url, data=data, method=method,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.status, json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < _retries - 1:
+                time.sleep(6.0)
+                continue
+            raise
+
+def wait_http(port, tries=60):
+    for _ in range(tries):
+        try:
+            http("GET", port, "/chain", timeout=2); return True
+        except Exception:
+            time.sleep(0.5)
+    return False
+
+def launch(node_id, api_port, genesis, peer_p2p_ports):
+    """--port is the API port. The node derives P2P = port+1 and bridge = P2P+10.
+    Peers must therefore be addressed at their P2P port, not their API port."""
+    env = dict(os.environ)
+    env["COVENANT_JUDGE_PROVIDERS"] = "mock"
+    env["COVENANT_INSECURE_MOCK_JUDGE"] = "1"
+    env["COVENANT_GENESIS"] = genesis
+    env["COVENANT_DB_PATH"] = os.path.join(work, f"{node_id}.db")
+    cmd = [sys.executable, CORE, "--real", "--port", str(api_port),
+           "--node-id", node_id, "--genesis", genesis]
+    if peer_p2p_ports:
+        cmd += ["--peers", ",".join(f"127.0.0.1:{p}" for p in peer_p2p_ports)]
+    logf = open(os.path.join(work, f"{node_id}.log"), "w")
+    p = subprocess.Popen(cmd, env=env, stdout=logf, stderr=subprocess.STDOUT)
+    procs.append((p, logf, node_id))
+    return p
+
+def cleanup():
+    for p, logf, nid in procs:
+        try:
+            p.send_signal(signal.SIGINT); p.wait(timeout=5)
+        except Exception:
+            try: p.kill()
+            except Exception: pass
+        try: logf.close()
+        except Exception: pass
+
+def dump_logs():
+    for _, _, nid in procs:
+        lp = os.path.join(work, f"{nid}.log")
+        if os.path.exists(lp):
+            print(f"\n----- {nid} log tail -----")
+            print("".join(open(lp).readlines()[-25:]))
+
+try:
+    print("== exporting a shared canonical genesis ==")
+    base = free_port()
+    ports = [base, base + 50, base + 100]
+    p2p_of = {p: p + 1 for p in ports}
+    genesis = os.path.join(work, "genesis.json")
+    exporter_env = dict(os.environ)
+    exporter_env["COVENANT_JUDGE_PROVIDERS"] = "mock"
+    exporter_env["COVENANT_INSECURE_MOCK_JUDGE"] = "1"
+    exporter_env["COVENANT_DB_PATH"] = os.path.join(work, "exporter.db")
+    r = subprocess.run([sys.executable, CORE, "--export-genesis", genesis],
+                       env=exporter_env, capture_output=True, text=True, timeout=60)
+    check("genesis exported to a shared file", os.path.exists(genesis),
+          r.stdout.strip()[-60:] or r.stderr.strip()[-60:])
+    if not os.path.exists(genesis):
+        raise SystemExit("cannot proceed without genesis")
+    ghash = json.load(open(genesis)).get("hash", "")[:16]
+
+    exporter_key = os.path.join(work, "exporter.db.key")
+    node_a_key = os.path.join(work, "NODE_A.db.key")
+    if os.path.exists(exporter_key):
+        shutil.copy(exporter_key, node_a_key)
+        os.chmod(node_a_key, 0o600)
+    check("founder identity carried into NODE_A", os.path.exists(node_a_key))
+
+    print("\n== launching 3 real node processes ==")
+    A, B, C = "NODE_A", "NODE_B", "NODE_C"
+    pA, pB, pC = ports
+    launch(A, pA, genesis, peer_p2p_ports=[pB + 1])
+    launch(B, pB, genesis, peer_p2p_ports=[pA + 1, pC + 1])
+    launch(C, pC, genesis, peer_p2p_ports=[pB + 1])
+    up = all(wait_http(p) for p in ports)
+    check("all three nodes came up and serve HTTP", up)
+    if not up:
+        dump_logs(); raise SystemExit("nodes did not start")
+
+    chains = {n: http("GET", p, "/chain")[1] for n, p in ((A, pA), (B, pB), (C, pC))}
+    def gen_hash(ch):
+        c = ch.get("chain", ch if isinstance(ch, list) else [])
+        return (c[0].get("hash", "")[:16] if c else "")
+    ghashes = {n: gen_hash(ch) for n, ch in chains.items()}
+    check("all three processes share one genesis hash",
+          len(set(ghashes.values())) == 1 and ghash in set(ghashes.values()),
+          str(ghashes))
+
+    print("\n== mine on A, watch it cross the wire to B and relay to C ==")
+    node_of = {pA: A, pB: B, pC: C}
+    st, txr = submit_tx(A, pA, _pubkey_of(B), 5.0)
+    check("a signed transaction is accepted on A", st == 200, str(txr)[:70])
+    s, mine = op_post(A, pA, "/mine", {})
+    check("A mined a block", s == 200, f"HTTP {s}: {str(mine)[:80]}")
+
+    def height(port):
+        _, ch = http("GET", port, "/chain")
+        c = ch.get("chain", ch if isinstance(ch, list) else [])
+        return len(c)
+
+    def wait_height(port, target, tries=20):
+        for _ in range(tries):
+            if height(port) >= target: return True
+            time.sleep(3.0)
+        return False
+
+    hA = height(pA)
+    check("A's chain grew past genesis", hA >= 2, f"height {hA}")
+    check("block reached B (direct peer) over the socket", wait_height(pB, hA),
+          f"B height {height(pB)} vs A {hA}")
+    check("block RELAYED to C (not a direct peer of A)", wait_height(pC, hA),
+          f"C height {height(pC)} vs A {hA}")
+
+    print("\n== convergence: identical tip hash across all three processes ==")
+    def tip(port):
+        _, ch = http("GET", port, "/chain")
+        c = ch.get("chain", ch if isinstance(ch, list) else [])
+        return c[-1].get("hash", "") if c else ""
+    tips = {n: tip(p) for n, p in ((A, pA), (B, pB), (C, pC))}
+    check("all three processes agree on the tip block hash",
+          len(set(tips.values())) == 1, {n: t[:12] for n, t in tips.items()})
+
+    print("\n== second block (mine is rate-limited to 1/60s; waiting it out) ==")
+    time.sleep(61)
+    try:
+        submit_tx(A, pA, _pubkey_of(C), 2.0)
+        s2, m2 = op_post(A, pA, "/mine", {})
+        check("A mined a second block after the rate-limit window", s2 == 200,
+              f"HTTP {s2}: {str(m2)[:60]}")
+    except Exception as e:
+        check("A mined a second block after the rate-limit window", False, str(e)[:60])
+    top = max(height(p) for p in ports)
+    conv = all(wait_height(p, top) for p in ports)
+    tips2 = {n: tip(p) for n, p in ((A, pA), (B, pB), (C, pC))}
+    check("chain still converges after the second block",
+          conv and len(set(tips2.values())) == 1,
+          {n: (height(p), t[:10]) for (n, p), t in zip(((A,pA),(B,pB),(C,pC)), tips2.values())})
+
+    print("\n== late joiner: start D knowing only C, must catch up the whole chain ==")
+    pD = base + 150
+    launch("NODE_D", pD, genesis, peer_p2p_ports=[pC + 1])
+    check("late joiner D started", wait_http(pD))
+    target = max(height(p) for p in (pA, pB, pC))
+    check("late joiner D caught up to the network height",
+          wait_height(pD, target, tries=60), f"D {height(pD)} vs target {target}")
+    check("late joiner D landed on the same tip hash",
+          tip(pD) == tip(pA), f"D {tip(pD)[:12]} vs A {tip(pA)[:12]}")
+
+    print("\n== conservation across the live network ==")
+    _, chA = http("GET", pA, "/chain")
+    check("no node minted its own genesis (supply not multiplied by node count)",
+          gen_hash(chA) == ghash, "shared root confirms single mint")
+
+    print("\n== adversarial: a forged-genesis block from a rogue peer ==")
+    rogue = {"type": "BLOCK_PROPAGATE",
+             "block": {"index": 1, "transactions": [], "previous_hash": "0"*64,
+                       "timestamp": time.time(), "nonce": 0, "hash": "deadbeef",
+                       "alignment_score": 0.5, "stake_rewards": 0.0},
+             "node_id": "ROGUE", "p2p_port": 9,
+             "nonce": f"rogue-{time.time()}"}
+    try:
+        s = socket.socket(); s.settimeout(5); s.connect(("127.0.0.1", pB + 1))
+        s.sendall(json.dumps(rogue).encode()); s.shutdown(socket.SHUT_WR)
+        _ = s.recv(4096); s.close()
+        sent = True
+    except Exception as e:
+        sent = False; print("   (rogue send failed:", e, ")")
+    time.sleep(0.5)
+    check("B survived a forged block and still serves its chain",
+          sent and height(pB) >= 1, f"B height {height(pB)}")
+    check("B did not adopt the forged block as its tip",
+          tip(pB) != "deadbeef")
+
+    print("\n== all nodes still healthy after the attack ==")
+    for n, p in ((A, pA), (B, pB), (C, pC)):
+        try:
+            st, _ = http("GET", p, "/chain", timeout=5)
+            check(f"{n} still responsive", st == 200)
+        except Exception as e:
+            check(f"{n} still responsive", False, str(e)[:50])
+
+except SystemExit as e:
+    print(f"\n[aborted] {e}")
+finally:
+    if failed:
+        dump_logs()
+    cleanup()
+    shutil.rmtree(work, ignore_errors=True)
+
+print("\n" + "=" * 62)
+print(f"{passed} passed, {failed} failed")
+print("=" * 62)
+sys.exit(1 if failed else 0)

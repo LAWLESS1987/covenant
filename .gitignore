@@ -1,0 +1,36 @@
+# --- Secrets and key material: never commit ------------------------------
+# Node database encryption keys. Committing any of these compromises every
+# ledger they unlock, including retroactively via the git history.
+*.key
+_keybackup/
+_unsealtest/
+
+# --- Ledger state ---------------------------------------------------------
+# Node databases are per-operator runtime state, not source. genesis.json is
+# deliberately NOT ignored: it is the canonical genesis, exported once and
+# shared (see README).
+*.db
+*.db-shm
+*.db-wal
+covenant_sealed.bin
+
+# --- Balances and account screenshots -------------------------------------
+balance.png
+balance_small.jpg
+
+# --- Python ---------------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+
+# --- Versioned backups ----------------------------------------------------
+# Superseded snapshots kept alongside the live file. Git is the version
+# history once this is a repository.
+*.PRE-*
+
+# --- Runtime output -------------------------------------------------------
+logs/
+judge_queue/
+
+# --- Vendored installers --------------------------------------------------
+KrakenDesktopInstaller.msi
