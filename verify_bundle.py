@@ -25,7 +25,8 @@ import hashlib, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 MAN = os.path.join(HERE, "MANIFEST.sha256")
 SKIP_DIR = {"logs", "__pycache__", ".venv", ".git", "judge_queue",
-            "_keybackup", "_unsealtest", "launch", "pending-v8.38"}
+            "_keybackup", "_unsealtest", "launch", "pending-v8.38",
+            "_to_delete", "_stage"}
 SKIP_EXT = {".pyc", ".db", ".key", ".msi"}
 
 # A MANIFEST MUST CONTAIN ONLY INPUTS.
@@ -53,6 +54,13 @@ OUTPUTS = {
     "live_out.txt", "live_claude_out.txt",
     # sweeps and dashboards
     "SWEEP_RESULTS.txt", "dashboard.html",
+    # ONE.bat / ONE_RETEST.bat transcripts (2026-08-27). Same landmine as
+    # LAUNCH_CHECK.json above and armed the same way: ONE.bat writes ONE_RUN.txt
+    # into this folder, so hashing it would mean every run of the launcher
+    # guaranteed the NEXT run reported "changed" and refused. Adding a launcher
+    # that writes a report here means adding its report to this list, always.
+    "ONE_RUN.txt", "ONE_RETEST.txt", "ONE_RUN_cloud.txt", "ONE_RUN_pc.txt",
+    "ONE_RETEST_gates.txt", "ONE_UP.txt", "PROBE_WIN_CONNECT.txt",
     # ops
     "ACL_RESULT.txt",
     # state that is deliberately not source: the chain's own genesis is an

@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""git_setup.py -- put the repository into a real, pushable state. 2026-08-27.
+
+WHY THIS RUNS ON WINDOWS AND NOT OVER THE FILE BRIDGE. The bridge mount cannot
+DELETE files, and git deletes a `.lock` file after every ref write. So over the
+bridge each git write succeeds and then leaves its own lock behind, and the
+NEXT git command fails with "Another git process seems to be running". Two of
+those locks are sitting in .git right now. Windows git can remove them; that is
+the whole reason this file exists.
+
+WHAT IT DOES, in order, and it stops at the first thing that goes wrong:
+
+  1. Clears STALE .git/*.lock files -- and refuses if any is under 60 s old,
+     because that one might belong to a git process that is actually running.
+  2. Commits the already-staged privacy change (portfolio + launcher reports
+     untracked; the files are untouched on disk).
+  3. Commits the ONE-command work.
+  4. Merges feat/one-command and the five unmerged branches into main, --no-ff,
+     one at a time. On ANY conflict it aborts THAT merge and stops, leaving
+     everything before it intact. It never forces and never discards.
+  5. Regenerates MANIFEST.sha256 over the merged tree and commits it, because
+     the merges change files the manifest describes.
+
+NOTHING IS PUSHED. There is no remote. Pushing is GITHUB_PUSH.bat, separately
+and deliberately.
+
+Every branch head was tagged under refs/backup/2026-08-27/ before any of this,
+so `git reset --hard refs/backup/2026-08-27/main` puts main back exactly.
+
+Run: GIT_SETUP.bat  (or: python git_setup.py)
+"""
+import os
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+BRANCHES = [
+    "feat/one-command",
+    "fix/tally-counts-failures-as-passes",   # subsumes remove-phantom-suites
+    "fix/remove-phantom-suites",             #   and sweep-uses-project-venv
+    "fix/sweep-uses-project-venv",
+    "docs/correct-missing-suite-count",
+    "docs/withdraw-unverified-suite-totals",
+]
+LOCK_MIN_AGE_S = 60
+
+
+def git(*args, check=True, quiet=False):
+    p = subprocess.run(["git"] + list(args), cwd=HERE, capture_output=True,
+                       text=True, encoding="utf8", errors="replace")
+    out = (p.stdout or "") + (p.stderr or "")
+    if not quiet:
+        for line in out.splitlines():
+            if line.strip() and "unable to unlink" not in line:
+                print("    " + line.rstrip())
+    if check and p.returncode != 0:
+        raise RuntimeError("git %s -> exit %d" % (" ".join(args), p.returncode))
+    return p.returncode, out
+
+
+def step(n, title):
+    print()
+    print("=" * 72)
+    print("  %s. %s" % (n, title))
+    print("=" * 72)
+
+
+def clear_stale_locks():
+    step(1, "Clear stale .git lock files")
+    gitdir = os.path.join(HERE, ".git")
+    found = []
+    for dp, _dns, fns in os.walk(gitdir):
+        for fn in fns:
+            if fn.endswith(".lock"):
+                found.append(os.path.join(dp, fn))
+    if not found:
+        print("    none -- nothing to clear.")
+        return True
+    now = time.time()
+    fresh = [p for p in found if now - os.path.getmtime(p) < LOCK_MIN_AGE_S]
+    for p in found:
+        age = now - os.path.getmtime(p)
+        print("    %-52s %6.0f s old" % (os.path.relpath(p, HERE), age))
+    if fresh:
+        print()
+        print("    REFUSING. A lock under %d s old may belong to a git process that"
+              % LOCK_MIN_AGE_S)
+        print("    is genuinely running (an editor, a GUI client). Close it and")
+        print("    re-run. Deleting a live lock corrupts the operation holding it.")
+        return False
+    for p in found:
+        try:
+            os.remove(p)
+            print("    removed  %s" % os.path.relpath(p, HERE))
+        except OSError as e:
+            print("    COULD NOT REMOVE %s: %s" % (p, e))
+            return False
+    return True
+
+
+PRIVACY_MSG = """Stop tracking the portfolio and the launcher reports
+
+holdings.txt is the ACTUAL portfolio -- exact quantities and average buy
+prices for ten assets -- and TRADING_POLICY.json carries the locked book
+value and the sleeve funding. Both were tracked, in the root and again in
+launch/covenant-v8.37/, so any remote this repo reached would have carried
+them. Untracking protects every FUTURE commit; it does NOTHING about the
+history, which still contains them. Until that history is rewritten, any
+remote must be PRIVATE.
+
+DEPLOY_VERIFY.txt, LAUNCH_CHECK.json and NODE_RESTART.txt are launcher
+OUTPUTS that were tracked as inputs, so every launch dirtied the worktree.
+That is the LAUNCH_CHECK.json-in-the-manifest deadlock (M48) one layer up,
+and it is what stands between this repo and using `git status --porcelain`
+as the delivery check at all.
+
+MANIFEST.sha256 stays tracked on purpose: it is a release reference written
+deliberately, like a lockfile, not a report written on every run.
+
+The files are untouched on disk.
+"""
+
+WORK_MSG = """Add ONE.bat: one command, both platforms, nothing silent
+
+There were twenty-two launchers in this folder and two sweep runners that
+disagreed with each other in both directions. covenant_one.py is the single
+entry point and the SAME FILE is the command in the cloud, so a PC run and a
+cloud run are the same task list executed by the same bytes.
+
+  ONE.bat          identity, coverage, integrity, gates, sweep, live state
+  ONE_UP.bat       gates, then verify_deploy -- refused BEFORE the stop if a
+                   gate blocks (P17)
+  ONE_RETEST.bat   the not-clean suites, alone and twice (M18/M20)
+  ONE_PROBE.bat    probe_win_connect.py
+
+It reports ABSENT, ORPHANED, deliberately-off and over-budget as first-class
+outcomes, and exit 2 (INCOMPLETE) exists so "nothing failed" can never be
+read as "everything passed". It prints the sha256 of its own source, so a
+transcript identifies the bytes that produced it (P11/P18, applied to the
+runner).
+
+Measured today, same runner bytes on both: cloud 1270 checks / 0 failed;
+win32 1257 / 3. The three win32 failures are real and reproduced alone.
+
+test_p18_version_collision.py is restored -- run_all_tests.sh named it and it
+was on no machine. 20/20 on both platforms.
+
+probe_win_connect.py settles A23's win32 failure by measurement instead of
+assumption. A refused connect costs 0.0 ms on Linux and 2045.8 ms here:
+MaxSynRetransmissions=4 and ~506 ms each is 2024 ms predicted against 2045.8
+measured. Windows holds the socket in SYN-SENT and spends the whole
+retransmission budget before surfacing the RST. A23 measured at a ~1 s
+deadline, which a refused connect cannot beat -- so both of its numbers were
+its own stopwatch.
+
+verify_bundle.py: OUTPUTS now covers the ONE.bat transcripts, for the same
+reason LAUNCH_CHECK.json is on it -- hashing a launcher's own report
+guarantees the next run reports "changed" and refuses.
+
+verify_deploy.py: the frozen four-entry delivery list expected a
+run_all_tests.sh from before two commits that have since landed, and refused
+a NODE restart over a stale hash for a TEST RUNNER. Updated, with the
+evidence recorded beside the hash.
+"""
+
+
+def commit_if_staged(msg, label):
+    rc, _ = git("diff", "--cached", "--quiet", check=False, quiet=True)
+    if rc == 0:
+        print("    nothing staged for %s -- skipping." % label)
+        return
+    p = subprocess.run(["git", "commit", "-F", "-"], cwd=HERE, input=msg,
+                       capture_output=True, text=True, encoding="utf8",
+                       errors="replace")
+    for line in ((p.stdout or "") + (p.stderr or "")).splitlines():
+        if line.strip() and "unable to unlink" not in line:
+            print("    " + line.rstrip())
+    if p.returncode != 0:
+        raise RuntimeError("commit failed for %s" % label)
+
+
+def main():
+    print("git_setup -- put the repository into a real, pushable state")
+    print("  folder: %s" % HERE)
+    if not os.path.isdir(os.path.join(HERE, ".git")):
+        print("  no .git here. Nothing to do.")
+        return 1
+
+    if not clear_stale_locks():
+        return 1
+
+    step(2, "Commit the privacy change (already staged)")
+    commit_if_staged(PRIVACY_MSG, "the privacy change")
+
+    step(3, "Commit the ONE-command work")
+    for f in ("covenant_one.py", "ONE.bat", "ONE_UP.bat", "ONE_RETEST.bat",
+              "ONE_PROBE.bat", "probe_win_connect.py",
+              "test_p18_version_collision.py", "verify_bundle.py",
+              "verify_deploy.py", ".gitignore",
+              "git_setup.py", "GIT_SETUP.bat",
+              "github_push.py", "GITHUB_PUSH.bat"):
+        if os.path.exists(os.path.join(HERE, f)):
+            git("add", "--", f, check=False, quiet=True)
+    commit_if_staged(WORK_MSG, "the ONE-command work")
+
+    step(4, "Merge into main -- one at a time, stopping at the first conflict")
+    git("switch", "main")
+    merged, skipped = [], []
+    for b in BRANCHES:
+        rc, _ = git("rev-parse", "--verify", "--quiet", b, check=False, quiet=True)
+        if rc != 0:
+            print("    %-40s no such branch -- skipped" % b)
+            continue
+        rc, _ = git("merge-base", "--is-ancestor", b, "main", check=False, quiet=True)
+        if rc == 0:
+            print("    %-40s already in main" % b)
+            continue
+        print()
+        print("    merging %s ..." % b)
+        rc, out = git("merge", "--no-ff", "-m", "Merge %s" % b, b,
+                      check=False)
+        if rc != 0:
+            print()
+            print("    CONFLICT merging %s. Aborting THIS merge only;" % b)
+            print("    everything merged before it stays. Resolve by hand:")
+            print("        git merge --no-ff %s" % b)
+            git("merge", "--abort", check=False, quiet=True)
+            skipped.append(b)
+            break
+        merged.append(b)
+
+    step(5, "Regenerate MANIFEST.sha256 over the merged tree")
+    py = sys.executable
+    p = subprocess.run([py, "verify_bundle.py", "--write"], cwd=HERE,
+                       capture_output=True, text=True, encoding="utf8",
+                       errors="replace")
+    blob = (p.stdout or "") + (p.stderr or "")
+    lines = [l for l in blob.splitlines() if l.strip()]
+    print("    " + (lines[-1].strip() if lines else "(no output)"))
+    git("add", "--", "MANIFEST.sha256", check=False, quiet=True)
+    commit_if_staged(
+        "Regenerate the manifest over the merged tree\n\n"
+        "The merges change files the manifest describes, so it is rewritten\n"
+        "here rather than left stale -- a stale manifest is a permanently\n"
+        "BLOCKED G1, which is how this repository spent today.\n",
+        "the manifest")
+
+    step("", "RESULT")
+    git("--no-optional-locks", "status", "--short", "--branch", check=False)
+    print()
+    print("    merged: %s" % (", ".join(merged) or "nothing new"))
+    if skipped:
+        print("    STOPPED at: %s  (conflict -- resolve by hand)" % ", ".join(skipped))
+    print()
+    git("log", "--oneline", "-8", check=False)
+    print()
+    print("    Recovery, exact: git reset --hard refs/backup/2026-08-27/main")
+    print()
+    print("    NOTHING WAS PUSHED. There is no remote. The portfolio is still")
+    print("    in the HISTORY, so if you push, push PRIVATE. GITHUB_PUSH.bat")
+    print("    is the next step and it says the same thing before it acts.")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as e:
+        print()
+        print("  STOPPED: %s" % e)
+        print("  Nothing after this point ran. Recovery:")
+        print("      git reset --hard refs/backup/2026-08-27/main")
+        sys.exit(1)

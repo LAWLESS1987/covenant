@@ -56,8 +56,22 @@ pol = os.path.join(work, "policy.json")
 ok, why = refuses(lambda: M.MainnetPolicy.load(pol), "no mainnet policy")
 check("a missing policy blocks all sends", ok, why)
 M.write_policy_template(pol)
-check("template is written mode 0600",
-      stat.S_IMODE(os.stat(pol).st_mode) == 0o600)
+# P9: on NTFS st_mode is 0o666 for any writable file whatever the ACL says,
+# so asserting 0o600 here is asserting a constant that is false on the
+# platform that runs production. §5 -- do not skip it, assert what correct
+# behaviour IS here: the file must be owner-only by the control that actually
+# governs access on this platform.
+if sys.platform == "win32":
+    from owner_only import require_owner_only, OwnerOnlyError
+    try:
+        require_owner_only(pol)
+        _ownerok, _why = True, "ACL restricted to owner"
+    except OwnerOnlyError as _e:
+        _ownerok, _why = False, str(_e)
+    check("template is owner-only (NTFS ACL, not the mode bit)", _ownerok, _why)
+else:
+    check("template is written mode 0600",
+          stat.S_IMODE(os.stat(pol).st_mode) == 0o600)
 ok, why = refuses(lambda: M.write_policy_template(pol), "refusing to overwrite")
 check("an existing policy is never overwritten", ok, why)
 ok, why = refuses(lambda: M.MainnetPolicy.load(pol), "checksum")
@@ -78,10 +92,21 @@ check("an empty allowlist means no sends", ok, why)
 
 write_policy([{"address": GOOD, "label": "exchange deposit",
                "destination_tag": 12345}])
-os.chmod(pol, 0o644)
-ok, why = refuses(lambda: M.MainnetPolicy.load(pol), "chmod 600")
-check("a world-readable policy is refused", ok, why)
-os.chmod(pol, 0o600)
+# P9: os.chmod on NTFS only toggles the read-only attribute -- it does NOT
+# make the file world-readable, so this mutation changed nothing on Windows
+# and the check passed only because the old guard refused everything. Loosen
+# by the mechanism that actually governs access on each platform.
+if sys.platform == "win32":
+    import subprocess as _sp
+    _sp.run(["icacls", pol, "/grant", "Everyone:F"], capture_output=True)
+    ok, why = refuses(lambda: M.MainnetPolicy.load(pol), "Everyone")
+    check("a policy anyone can edit is refused (NTFS ACL)", ok, why)
+    _sp.run(["icacls", pol, "/remove:g", "Everyone"], capture_output=True)
+else:
+    os.chmod(pol, 0o644)
+    ok, why = refuses(lambda: M.MainnetPolicy.load(pol), "chmod 600")
+    check("a world-readable policy is refused", ok, why)
+    os.chmod(pol, 0o600)
 
 write_policy([{"address": GOOD, "label": "x", "destination_tag": 1}], pp=100.0, pd=50.0)
 ok, why = refuses(lambda: M.MainnetPolicy.load(pol), "never bind")

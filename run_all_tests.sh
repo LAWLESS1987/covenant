@@ -359,6 +359,7 @@ echo "=== THIS RUNNER'S OWN CLEANUP (K1) ==="
 # unregistered suite is the orphan problem this script already documents
 # twice. It runs in temporary directories only and touches nothing beside it.
 run test_k1_runner_key_preservation.py 60
+run test_k3_p9_owner_only_guard.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.

@@ -42,9 +42,22 @@ print("== XRP signer: key handling ==")
 seed_path = os.path.join(work, "t.seed")
 addr = X.create_testnet_seed_file(seed_path)
 check("seed file created with a valid address", addr.startswith("r"), addr)
-check("seed file is mode 0600",
-      stat.S_IMODE(os.stat(seed_path).st_mode) == 0o600,
-      oct(stat.S_IMODE(os.stat(seed_path).st_mode)))
+# P9: st_mode is 0o666 on NTFS regardless of the ACL, so this asserted a
+# constant that is false on the platform that runs production. §5 -- assert
+# what correct behaviour IS here, by the control that governs access.
+if sys.platform == "win32":
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops"))
+    from owner_only import require_owner_only, OwnerOnlyError
+    try:
+        require_owner_only(seed_path)
+        _ok, _why = True, "ACL restricted to owner"
+    except OwnerOnlyError as _e:
+        _ok, _why = False, str(_e)
+    check("seed file is owner-only (NTFS ACL, not the mode bit)", _ok, _why)
+else:
+    check("seed file is mode 0600",
+          stat.S_IMODE(os.stat(seed_path).st_mode) == 0o600,
+          oct(stat.S_IMODE(os.stat(seed_path).st_mode)))
 
 ok, why = raises(lambda: X.create_testnet_seed_file(seed_path), "refusing to overwrite")
 check("refuses to overwrite an existing seed file", ok, why)

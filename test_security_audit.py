@@ -608,8 +608,24 @@ def main():
     pk_after = n1b.public_key.public_bytes(
         serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
     check("node identity survives a restart", pk_before == pk_after)
-    check("identity key file is owner-only",
-          oct(os.stat(os.path.join(tmpd, "a.db.key")).st_mode & 0o777) == "0o600")
+    # P9: st_mode is 0o666 on NTFS for any writable file whatever the ACL
+    # says, so this assertion was false on the platform that runs production
+    # and had been red there since 2026-08-24. §5 -- assert what correct
+    # behaviour IS here rather than skipping: the key must be owner-only by
+    # the control that actually governs access on this platform.
+    _keyf = os.path.join(tmpd, "a.db.key")
+    if sys.platform == "win32":
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops"))
+        from owner_only import require_owner_only, OwnerOnlyError
+        try:
+            require_owner_only(_keyf)
+            _ok, _why = True, "ACL restricted to owner"
+        except OwnerOnlyError as _e:
+            _ok, _why = False, str(_e)
+        check("identity key file is owner-only (NTFS ACL, not the mode bit)", _ok, _why)
+    else:
+        check("identity key file is owner-only",
+              oct(os.stat(_keyf).st_mode & 0o777) == "0o600")
 
     print(f"\n{'=' * 58}\n{PASS} passed, {FAIL} failed\n{'=' * 58}")
     return FAIL == 0
