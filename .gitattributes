@@ -20,6 +20,25 @@
 *.yml  text
 *.yaml text
 
+# Captured console output, kept byte-exact and NOT normalised.
+#
+# These are records of a run, not source. Each carries genuinely mixed
+# endings -- CLEANUP.txt is 2 CRLF and 35 bare LF -- because a .bat wrote
+# some lines and a Python step appended others to the same handle. Under
+# `text=auto eol=lf` the clean filter strips the surviving CRLF while the
+# committed blob keeps it, so the file reports a permanent 2-line diff that
+# no checkout can settle. Measured, after chasing a wrong guess first: there
+# are no \r\r\n sequences in any of them, so this is not the usual wmic
+# double-CR artefact -- it is simple interleaving.
+#
+# A record that cannot round-trip is not a record. -text stores them exactly
+# as captured.
+CLEANUP.txt       -text
+FREE_RAM.txt      -text
+LEAN_MEASURE*.txt -text
+diag_out.txt      -text
+pc_report.txt     -text
+
 # Binary: never diff, never normalise
 *.png  binary
 *.jpg  binary
