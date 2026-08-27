@@ -3,6 +3,33 @@
 cd "$(dirname "$0")"
 export COVENANT_JUDGE_PROVIDERS="${COVENANT_JUDGE_PROVIDERS:-mock}"
 export COVENANT_INSECURE_MOCK_JUDGE="${COVENANT_INSECURE_MOCK_JUDGE:-1}"
+
+# RUN AGAINST THE PROJECT'S OWN INTERPRETER (added 2026-08-27).
+#
+# This sweep called `python3` directly. On Windows that resolves to the
+# WindowsApps shim, not to .venv, and the two interpreters do not carry the
+# same packages. Measured on L's PC that day:
+#
+#   interpreter                         flask cryptography waitress requests xrpl
+#   WindowsApps python3 (3.12)           yes     yes        yes      yes     NO
+#   .venv/Scripts/python.exe             yes     yes        yes      yes     yes
+#
+# So probe_final_pass.py died with MainnetGuardError and test_xrp_signer.py
+# with XRPSignerError, both saying "xrpl-py not importable", and both were
+# scored red. Nothing was wrong with either suite or with the code they
+# test: the sweep was simply run against an interpreter that requirements.txt
+# was never installed into.
+#
+# That is the §8 failure -- a sweep is green for the environment it ran in,
+# and this one did not name its environment. It does now, on the first line
+# of output, because a red suite that is really a missing package is the kind
+# of red that trains a reader to skim.
+if   [ -x .venv/Scripts/python.exe ]; then PY=".venv/Scripts/python.exe"
+elif [ -x .venv/bin/python ];        then PY=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then PY="python3"
+else                                      PY="python"
+fi
+echo "interpreter: $PY -> $("$PY" -c 'import sys; print(sys.executable)' 2>/dev/null)"
 # A PRE-EXISTING KEY IS A NODE IDENTITY, NEVER A TEST ARTEFACT (added 2026-08-27).
 #
 # The cleanup here, and the identical line at the end of `run`, used to be
@@ -34,7 +61,7 @@ clean_test_dbs () {
 }
 
 clean_test_dbs; rm -rf __pycache__ 2>/dev/null
-TOTAL=0; FAILED=0
+TOTAL=0; FAILED=0; UNSCORED=0
 # ABSENT IS NOT ZERO (added 2026-08-27).
 #
 # `run` swallowed stderr and scraped a tally out of stdout. A suite that is
@@ -57,35 +84,85 @@ run () {
     printf "  %-30s %s\n" "$1" "ABSENT -- not on disk, so it did NOT run. Counted as a failure, never as a pass."
     return
   fi
-  out=$(timeout "${2:-120}" python3 "$1" 2>/dev/null)
+  out=$(timeout "${2:-120}" "$PY" "$1" 2>/dev/null); rc=$?
   line=$(echo "$out" | grep -iE '[0-9]+ passed|ALL PASS|[0-9]+/[0-9]+ checks|[0-9]+/[0-9]+ passed|RESULTS:' | tail -1)
-  p=$(echo "$line" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+')
-  f=$(echo "$line" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+')
-  c=$(echo "$line" | grep -oE '^[0-9]+/[0-9]+' | cut -d/ -f1)
-  n=${p:-${c:-0}}; f=${f:-0}
-  TOTAL=$((TOTAL+n)); FAILED=$((FAILED+f))
-  printf "  %-30s %s\n" "$1" "${line:-NO RESULT}"
+
+  # A FAILURE COUNTED AS A PASS (fixed 2026-08-27).
+  #
+  # The scrape here was:
+  #     p=$(... grep -oE '[0-9]+ passed' ...)
+  #     f=$(... grep -oE '[0-9]+ failed' ...)
+  # Two defects, and they compounded in the same direction -- upward.
+  #
+  # 1. On "28/30 passed, 2 FAILED" the pattern `[0-9]+ passed` matches the
+  #    substring "30 passed". 30 is the TOTAL, not the passes. The two
+  #    failures were added to the pass count.
+  # 2. Both inner greps are case-SENSITIVE, while the line-selecting grep
+  #    above is -i. Suites that print "2 FAILED" in caps therefore scored
+  #    f=0. The failures vanished.
+  #
+  # Measured on the 2026-08-27 win32 sweep: reported "1152 checks, 2 failed";
+  # actually 1147 passed and 7 failed across 1154 checks. Five real failures
+  # were reported as five passes -- a 10-check swing in the wrong direction,
+  # in the number the README quotes.
+  #
+  # 3. A suite that RAN but printed nothing parseable scored 0 and 0, so it
+  #    could not fail. That is ABSENT IS NOT ZERO one layer down: the file is
+  #    on disk, it executed, and it still contributed nothing. Those are now
+  #    counted separately as UNSCORED and are never silently zero.
+  n=""; f=""
+  ab=$(echo "$line" | grep -oiE '[0-9]+ */ *[0-9]+ +(checks )?passed' | head -1)
+  if [ -n "$ab" ]; then
+    n=$(echo "$ab" | cut -d/ -f1 | tr -dc '0-9')
+    tot=$(echo "$ab" | cut -d/ -f2 | tr -dc '0-9')
+    f=$((tot - n))
+  else
+    n=$(echo "$line" | grep -oiE '[0-9]+ +passed' | grep -oE '[0-9]+' | head -1)
+  fi
+  # An explicit "K failed"/"K FAILED" always wins over a derived count.
+  fx=$(echo "$line" | grep -oiE '[0-9]+ +failed' | grep -oE '[0-9]+' | head -1)
+  [ -n "$fx" ] && f="$fx"
+  n=${n:-0}; f=${f:-0}
+
+  if [ -z "$line" ]; then
+    UNSCORED=$((UNSCORED+1))
+    printf "  %-30s %s\n" "$1" "NO RESULT (exit $rc) -- ran, printed no tally. NOT counted as a pass."
+  else
+    TOTAL=$((TOTAL+n)); FAILED=$((FAILED+f))
+    printf "  %-30s %s\n" "$1" "$line"
+  fi
   clean_test_dbs
 }
 echo "=== INTEGRITY ==="
-python3 verify_bundle.py 2>&1 | tail -1
+"$PY" verify_bundle.py 2>&1 | tail -1
+# ELEVEN PHANTOM SUITES REMOVED (2026-08-27, on L's instruction).
+#
+# The lines below used to invoke eleven suites that do not exist. Checked
+# individually on that date: none is in the working tree, none is in any
+# commit in this repository, and none is among the 302 entries of
+# MANIFEST.sha256. They are v8.11/v8.12-era names carried over from
+# MANIFEST.json, and this bundle never contained them.
+#
+#   verify_patches.py 60              verify_auth.py 120
+#   verify_tx_aer.py 120              test_path_pattern.py 60
+#   test_succession_seal.py 90        test_ethics_judge.py 60
+#   test_golden_ratio.py 60           test_judge_individuality.py 60
+#   test_multi_provider_quorum.py 60  test_v86_bridge.py 90
+#   test_v86_loss_tracking.py 60
+#
+# Four section headers went with them because every suite beneath each was a
+# phantom: CRYPTOGRAPHY, ETHICS GATE, TRADING BRIDGE, PROPAGATION. Those
+# names described coverage that is not here. What remains of each concern is
+# covered elsewhere in this file -- the judge layer by test_b1_judge_parser
+# and test_b2_quorum_diversity, propagation by test_a9_relay_race and
+# test_a11_gossip_scale, the trading bridge by test_backtest_guardrails.
+#
+# THIS IS A DELETION OF CLAIMED COVERAGE, NOT A RESTORATION OF IT. Nothing
+# that ran before this change stops running. Eleven names that never ran stop
+# being counted, and the sweep can reach a total that means something. If any
+# of the eleven is ever written, add it back with its section.
 echo "=== SECURITY & REGRESSION ==="
-run verify_patches.py 60
-run verify_auth.py 120
 run test_security_audit.py 180
-echo "=== CRYPTOGRAPHY ==="
-run test_path_pattern.py 60
-run test_succession_seal.py 90
-echo "=== ETHICS GATE ==="
-run test_ethics_judge.py 60
-run test_golden_ratio.py 60
-run test_judge_individuality.py 60
-run test_multi_provider_quorum.py 60
-echo "=== TRADING BRIDGE ==="
-run test_v86_bridge.py 90
-run test_v86_loss_tracking.py 60
-echo "=== PROPAGATION ==="
-run verify_tx_aer.py 120
 # NEW v8.11 -- the audit suites. Every check in test_adversarial_suite.py
 # corresponds to an exploit that WORKED against an earlier revision, so a
 # failure here means a closed hole has reopened, not that a test is fussy.
@@ -337,7 +414,7 @@ run sim_order_independence.py 600
 # any particular rate. The block-reward correctness checks it used to expose are
 # now assertions inside test_security_audit.py (items AK/AL).
 echo "=== YIELD SAFETY (informational) ==="
-python3 sim_yield_safety.py > /dev/null 2>&1 && echo "  sim_yield_safety.py            ran clean (see output for curves)" || echo "  sim_yield_safety.py            ERROR"
+"$PY" sim_yield_safety.py > /dev/null 2>&1 && echo "  sim_yield_safety.py            ran clean (see output for curves)" || echo "  sim_yield_safety.py            ERROR"
 echo "=== THE DEPLOYMENT ITSELF, AND THE RADIO BEARER ==="
 # Added 2026-08-27. All three shipped in MANIFEST.sha256 and were called by
 # NEITHER runner -- found by diffing the test files on disk against the two
@@ -360,6 +437,9 @@ echo "=== THIS RUNNER'S OWN CLEANUP (K1) ==="
 # twice. It runs in temporary directories only and touches nothing beside it.
 run test_k1_runner_key_preservation.py 60
 run test_k3_p9_owner_only_guard.py 60
+# K2 pins this runner's own arithmetic: a failure must never be counted
+# as a pass. Registered with the fix, not after it.
+run test_k2_tally_arithmetic.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.
@@ -373,6 +453,10 @@ echo "  test_xrp_live.py   XRP autofill/submission against a funded testnet acco
 echo "                     -- mainnet stays BLOCKED until this has run once"
 echo "  (multi-node P2P over real sockets is now COVERED, above)"
 echo ""
-echo "TOTAL: $TOTAL checks, $FAILED failed"
+echo "TOTAL: $((TOTAL + FAILED)) checks -- $TOTAL passed, $FAILED failed, $UNSCORED suite(s) UNSCORED"
+if [ "$UNSCORED" -ne 0 ]; then
+  echo "UNSCORED means the suite ran and printed no tally this runner could read."
+  echo "It is not a pass. Read its output before treating this sweep as green."
+fi
 rm -rf __pycache__ 2>/dev/null
-[ "$FAILED" -eq 0 ] || exit 1
+[ "$FAILED" -eq 0 ] && [ "$UNSCORED" -eq 0 ] || exit 1
