@@ -1,6 +1,6 @@
 ==== free ram Sat 08/22/2026 21:44:41.93 ====
 --- before ---
-FreePhysicalMemory=2859996
+FreePhysicalMemory=2859996
 --- loaded models before ---
 NAME        ID              SIZE      PROCESSOR    CONTEXT    UNTIL              
 qwen3:8b    500a1f067a9f    5.6 GB    100% CPU     2048       9 minutes from now    
@@ -10,7 +10,7 @@ qwen3:8b    500a1f067a9f    5.6 GB    100% CPU     2048       9 minutes from now
 NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL 
 
 --- after ---
-FreePhysicalMemory=8180484
+FreePhysicalMemory=8180484
 
 --- top consumers now ---
 image                                 MB   count

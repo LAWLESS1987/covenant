@@ -2,25 +2,25 @@ Covenant PC report
 generated Fri 08/21/2026 21:56:26.98 
  
 == CPU == 
-MaxClockSpeed=2301
-Name=AMD Ryzen 5 5625U with Radeon Graphics         
-NumberOfCores=6
-NumberOfLogicalProcessors=12
+MaxClockSpeed=2301
+Name=AMD Ryzen 5 5625U with Radeon Graphics         
+NumberOfCores=6
+NumberOfLogicalProcessors=12
  
 == MEMORY (bytes) == 
-TotalPhysicalMemory=16441667584
-FreePhysicalMemory=6116332
-TotalVisibleMemorySize=16056316
+TotalPhysicalMemory=16441667584
+FreePhysicalMemory=6116332
+TotalVisibleMemorySize=16056316
  
 == GPU == 
-AdapterRAM=536870912
-DriverVersion=31.0.12044.8005
-Name=AMD Radeon (TM) Graphics
+AdapterRAM=536870912
+DriverVersion=31.0.12044.8005
+Name=AMD Radeon (TM) Graphics
 -- nvidia-smi -- 
  
 == DISK == 
-FreeSpace=362783518720
-Size=510869368832
+FreeSpace=362783518720
+Size=510869368832
  
 == POWER PLAN == 
 Power Scheme GUID: 48684d4a-8524-4093-8a63-ea7132b79c1c  (HP Recommended) 

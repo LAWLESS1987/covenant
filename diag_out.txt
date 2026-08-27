@@ -15,7 +15,7 @@ qwen3:8b    500a1f067a9f    5.2 GB    About an hour ago
 {"alignment":0.5,"anomaly_kinds":["tx_fetch_failed"],"chain_height":3,"crisis_mode":false,"degraded":true,"genesis":"00009b31c6c654d79bbeae0bcc9c82a7af224c87b19c92973f0011ade3e032f3","governor_unclassified":0,"judge":"quorum(local:0,mock_selfreport:0)","judge_insecure":false,"judge_keyless":true,"node_id":"B","own_genesis":false,"peers":1,"pending_transactions":2,"spike_detected":false,"subsystems":{"brainflow":false,"neural_bridge":true,"trading_bridge":true},"warnings":["ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction"]}
  
 -- free memory (KB) -- 
-FreePhysicalMemory=4053400
+FreePhysicalMemory=4053400
 -- python processes -- 
 
 Image Name                     PID Session Name        Session#    Mem Usage
