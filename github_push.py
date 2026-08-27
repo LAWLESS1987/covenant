@@ -57,15 +57,68 @@ GH_CANDIDATES = [
 ]
 
 
+SCAN_ROOTS = [
+    os.environ.get("ProgramFiles", r"C:\Program Files"),
+    os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+    os.environ.get("LOCALAPPDATA", ""),
+    os.environ.get("APPDATA", ""),
+    os.environ.get("ProgramData", r"C:\ProgramData"),
+    os.path.expanduser("~"),
+]
+SCAN_SKIP = {"Windows", "WindowsApps", "node_modules", "__pycache__", ".git",
+             ".venv", "Temp", "INetCache", "Package Cache", "Installer",
+             "Microsoft SDKs", "dotnet", "Docker", "WSL"}
+
+
+def scan_for_gh(deadline_s=25.0):
+    """Walk the places software actually lands, bounded in time and depth.
+
+    Written because the fast checks said "not installed" on a machine where
+    the owner said it was. A check whose negative answer is not trustworthy is
+    worse than no check: it sends you off fixing the wrong thing.
+    """
+    import time as _t
+    t0 = _t.time()
+    for root in SCAN_ROOTS:
+        if not root or not os.path.isdir(root):
+            continue
+        base_depth = root.rstrip("\\/").count(os.sep)
+        for dp, dns, fns in os.walk(root):
+            if _t.time() - t0 > deadline_s:
+                return None, "scan hit its %.0fs budget" % deadline_s
+            if dp.count(os.sep) - base_depth >= 4:
+                dns[:] = []
+                continue
+            dns[:] = [d for d in dns if d not in SCAN_SKIP
+                      and not d.startswith(".")]
+            for fn in fns:
+                if fn.lower() == "gh.exe":
+                    return os.path.join(dp, fn), "found by scan"
+    return None, "not found by scan either"
+
+
 def find_gh():
-    """PATH first, then the places installers actually put it."""
+    """PATH, then known install paths, then an actual bounded filesystem scan."""
     found = shutil.which("gh")
     if found:
-        return found, "on PATH"
+        return found, "on PATH (%s)" % found
     for c in GH_CANDIDATES:
         if c and os.path.isfile(c):
             return c, "not on PATH, found at %s" % c
-    return None, "not on PATH and not at any known install location"
+    say("   gh not on PATH or at a known location -- scanning (up to 25s) ...")
+    found, how = scan_for_gh()
+    if found:
+        return found, "%s: %s" % (how, found)
+    return None, how
+
+
+def find_github_desktop():
+    for c in (os.path.expandvars(r"%LOCALAPPDATA%\GitHubDesktop\GitHubDesktop.exe"),
+              os.path.expandvars(r"%ProgramData%\%USERNAME%\GitHubDesktop"),
+              r"C:\ProgramData\Lawre\GitHubDesktop"):
+        if c and os.path.exists(c):
+            return c
+    return None
 
 
 def run(args, check=False, capture=True):
@@ -98,26 +151,31 @@ def main():
     say()
 
     # ---------------------------------------------------------------- 1. clean
+    # MEASURED FIRST, ACTED ON LAST. The first version refused here and
+    # returned, which meant a dirty tree hid the answer to "is gh installed?"
+    # -- the very question the run was for. Diagnose everything, then refuse
+    # only the irreversible act. A check that suppresses a diagnosis is a
+    # check that sends you off fixing the wrong thing.
     say("1. Is the working tree clean?")
     p = run(["git", "--no-optional-locks", "status", "--porcelain"])
-    dirty = [l for l in (p.stdout or "").splitlines() if l.strip()]
     if p.returncode != 0:
         say("   Could not ask git. Is this a repository?")
         return 1
+    dirty = [l for l in (p.stdout or "").splitlines() if l.strip()]
     if dirty:
-        say("   NO -- %d entry(ies). Pushing now would publish a state that was" % len(dirty))
-        say("   never committed and never tested. Commit or ignore these first:")
+        say("   NO -- %d entry(ies). Nothing will be pushed, but the rest of" % len(dirty))
+        say("   this run still reports what it finds:")
         for l in dirty[:25]:
             say("     " + l)
         if len(dirty) > 25:
             say("     ... %d more" % (len(dirty) - 25))
-        say()
         say("   Run GIT_SETUP.bat if these are today's changes.")
-        return 1
+    else:
+        say("   yes.")
     head = run(["git", "rev-parse", "--short", "HEAD"]).stdout.strip()
     branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
     tree = run(["git", "rev-parse", "--short", "HEAD^{tree}"]).stdout.strip()
-    say("   yes. %s at %s (tree %s)" % (branch, head, tree))
+    say("   %s at %s (tree %s)" % (branch, head, tree))
 
     # ------------------------------------------------------------ 2. visibility
     say()
@@ -176,13 +234,29 @@ def main():
         say("   gh is installed and authenticated. It will create the repository")
         say("   as you and push in one step.")
     else:
-        say("   No remote, and gh could not be located. Two ways forward:")
-        say("     0) if you just installed gh, this window's PATH predates it --")
-        say("        close this window, open a NEW one, and re-run.")
-        say("     a) create an empty repo on github.com, then re-run:")
-        say("          python github_push.py --remote <url>")
-        say("     b) install the GitHub CLI, run `gh auth login`, re-run this.")
+        say("   No remote, and gh could not be located anywhere.")
+        gd = find_github_desktop()
+        if gd:
+            say()
+            say("   BUT GitHub Desktop IS here: %s" % gd)
+            say("   GitHub Desktop and the GitHub CLI are different programs --")
+            say("   Desktop does not provide `gh`. Desktop can publish this")
+            say("   repository itself, in four clicks and no typing:")
+            say("       1. open GitHub Desktop")
+            say("       2. File -> Add local repository -> %s" % HERE)
+            say("       3. Publish repository")
+            say("       4. LEAVE \"Keep this code private\" TICKED, then Publish")
+            say("   That is the shortest route from here.")
+        say()
+        say("   Or, without Desktop:")
+        say("     0) if you JUST installed gh, this window's PATH predates it --")
+        say("        close this window, open a new one, and re-run.")
+        say("     a) create an empty repo at https://github.com/new, then:")
+        say("          GITHUB_PUSH.bat --remote https://github.com/<you>/covenant.git")
+        say("     b) install the GitHub CLI, `gh auth login`, re-run this.")
         say("   I will not create an account or handle a password.")
+        say()
+        say("   transcript: %s" % TRANSCRIPT)
         return 1
 
     # ----------------------------------------------------------------- 4. act
@@ -204,7 +278,17 @@ def main():
     if a.dry_run:
         say()
         say("   --dry-run: nothing was done.")
+        say("   transcript: %s" % TRANSCRIPT)
         return 0
+
+    if dirty:
+        say()
+        say("   REFUSING TO PUSH: the working tree is dirty (listed above).")
+        say("   Everything else in this report stands; only the push is refused.")
+        say("   Run GIT_SETUP.bat, then re-run this.")
+        say()
+        say("   transcript: %s" % TRANSCRIPT)
+        return 1
 
     say()
     say("5. Doing it")

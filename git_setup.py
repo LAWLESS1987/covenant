@@ -313,13 +313,15 @@ def main():
               "verify_deploy.py", ".gitignore",
               "git_setup.py", "GIT_SETUP.bat",
               "github_push.py", "GITHUB_PUSH.bat",
-              "UNISON.md", ".github/workflows/covenant.yml"):
+              "UNISON.md", ".github/workflows/covenant.yml",
+              "START_HERE.md", "GO.bat"):
         if os.path.exists(os.path.join(HERE, f)):
             git("add", "--", f, check=False, quiet=True)
     commit_if_staged(WORK_MSG, "the ONE-command work")
 
     step("3b", "Commit the CI setup and the working convention")
-    for f in ("UNISON.md", ".github/workflows/covenant.yml", "covenant_one.py"):
+    for f in ("UNISON.md", ".github/workflows/covenant.yml", "covenant_one.py",
+              "START_HERE.md", "GO.bat"):
         if os.path.exists(os.path.join(HERE, f)):
             git("add", "--", f, check=False, quiet=True)
     commit_if_staged(CI_MSG, "the CI setup")
