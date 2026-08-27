@@ -69,23 +69,34 @@ run () {
 }
 echo "=== INTEGRITY ==="
 python3 verify_bundle.py 2>&1 | tail -1
+# ELEVEN PHANTOM SUITES REMOVED (2026-08-27, on L's instruction).
+#
+# The lines below used to invoke eleven suites that do not exist. Checked
+# individually on that date: none is in the working tree, none is in any
+# commit in this repository, and none is among the 302 entries of
+# MANIFEST.sha256. They are v8.11/v8.12-era names carried over from
+# MANIFEST.json, and this bundle never contained them.
+#
+#   verify_patches.py 60              verify_auth.py 120
+#   verify_tx_aer.py 120              test_path_pattern.py 60
+#   test_succession_seal.py 90        test_ethics_judge.py 60
+#   test_golden_ratio.py 60           test_judge_individuality.py 60
+#   test_multi_provider_quorum.py 60  test_v86_bridge.py 90
+#   test_v86_loss_tracking.py 60
+#
+# Four section headers went with them because every suite beneath each was a
+# phantom: CRYPTOGRAPHY, ETHICS GATE, TRADING BRIDGE, PROPAGATION. Those
+# names described coverage that is not here. What remains of each concern is
+# covered elsewhere in this file -- the judge layer by test_b1_judge_parser
+# and test_b2_quorum_diversity, propagation by test_a9_relay_race and
+# test_a11_gossip_scale, the trading bridge by test_backtest_guardrails.
+#
+# THIS IS A DELETION OF CLAIMED COVERAGE, NOT A RESTORATION OF IT. Nothing
+# that ran before this change stops running. Eleven names that never ran stop
+# being counted, and the sweep can reach a total that means something. If any
+# of the eleven is ever written, add it back with its section.
 echo "=== SECURITY & REGRESSION ==="
-run verify_patches.py 60
-run verify_auth.py 120
 run test_security_audit.py 180
-echo "=== CRYPTOGRAPHY ==="
-run test_path_pattern.py 60
-run test_succession_seal.py 90
-echo "=== ETHICS GATE ==="
-run test_ethics_judge.py 60
-run test_golden_ratio.py 60
-run test_judge_individuality.py 60
-run test_multi_provider_quorum.py 60
-echo "=== TRADING BRIDGE ==="
-run test_v86_bridge.py 90
-run test_v86_loss_tracking.py 60
-echo "=== PROPAGATION ==="
-run verify_tx_aer.py 120
 # NEW v8.11 -- the audit suites. Every check in test_adversarial_suite.py
 # corresponds to an exploit that WORKED against an earlier revision, so a
 # failure here means a closed hole has reopened, not that a test is fussy.
