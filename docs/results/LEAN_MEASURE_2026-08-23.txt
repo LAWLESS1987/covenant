@@ -1,8 +1,8 @@
 ==== lean measure Sat 08/22/2026 21:20:27.80 ====
 
 --- physical memory, KB ---
-FreePhysicalMemory=5893984
-TotalVisibleMemorySize=16056316
+FreePhysicalMemory=5893984
+TotalVisibleMemorySize=16056316
 
 --- processes ---
 

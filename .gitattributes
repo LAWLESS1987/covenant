@@ -1,0 +1,30 @@
+# Normalise line endings. Authored on Windows, CI is green on Linux (README),
+# so text is stored LF in the repository and checked out native.
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF. Some cmd.exe constructs (notably a
+# multi-line GOTO label or a trailing argument) misparse with bare LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts must be LF or the shebang line carries a stray CR and the
+# interpreter is not found.
+*.sh  text eol=lf
+
+# Explicitly text
+*.py   text
+*.md   text
+*.txt  text
+*.json text
+*.html text
+*.yml  text
+*.yaml text
+
+# Binary: never diff, never normalise
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.msi  binary
+*.bin  binary
+*.db   binary
+*.zip  binary
