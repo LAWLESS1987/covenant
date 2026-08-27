@@ -34,3 +34,39 @@ judge_queue/
 
 # --- Vendored installers --------------------------------------------------
 KrakenDesktopInstaller.msi
+
+# --- Personal financial position: never publish -----------------------------
+# holdings.txt is L's ACTUAL portfolio -- exact quantities and average buy
+# prices. TRADING_POLICY.json carries the locked book value and the sleeve
+# funding. Both were TRACKED until 2026-08-27, so they are still present in
+# the existing git history: untracking them protects every FUTURE commit and
+# does nothing about the past. Until that history is rewritten, any remote
+# this repo is pushed to must be PRIVATE. See claude/GITHUB_IMPROVEMENTS.
+holdings.txt
+TRADING_POLICY.json
+launch/*/holdings.txt
+launch/*/TRADING_POLICY.json
+
+# --- Launcher reports: outputs, not inputs ----------------------------------
+# These are WRITTEN by the launchers into this folder. Tracking an output as
+# an input means every launch dirties the worktree -- the same deadlock as
+# hashing LAUNCH_CHECK.json in MANIFEST.sha256 (M48), one layer up. They are
+# already on verify_bundle.py's OUTPUTS list; this is the git half of it.
+# NB MANIFEST.sha256 stays TRACKED on purpose: it is a release reference, like
+# a lockfile, written deliberately at release time rather than on every run.
+DEPLOY_VERIFY.txt
+LAUNCH_CHECK.json
+NODE_RESTART.txt
+launch/*/NODE_RESTART.txt
+ONE_RUN.txt
+ONE_RUN_cloud.txt
+ONE_RUN_pc.txt
+ONE_RETEST.txt
+ONE_RETEST_gates.txt
+ONE_UP.txt
+PROBE_WIN_CONNECT.txt
+
+# --- Transfer scratch -------------------------------------------------------
+_stage/
+_to_delete/
+.fuse_hidden*
