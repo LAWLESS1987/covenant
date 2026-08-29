@@ -246,3 +246,59 @@ disk. `git push origin --all` costs nothing and completes the redundancy.
 4. Volatility-scaled sizing, built as a drawdown control with an explicit target,
    validated by CPCV rather than a single split — and with the Cederburg result
    written into its docstring so nobody later mistakes it for an edge.
+
+---
+
+## OUTCOME — PBO run, same day. Prediction confirmed, but only after the first answer was disbelieved.
+
+§1.3 filed: *"PBO will come back high — above 0.5... If PBO comes back low,
+something is wrong with the implementation, not with the strategy."*
+
+`pbo_hbar.py`, CSCV per Bailey/Borwein/López de Prado/Zhu. HBAR 408 bars,
+warmup 74, the same 53-variant D6 grid, T=333 returns, S=16 contiguous blocks
+of 20, all C(16,8)=12,870 splits, combined-window Sharpe computed exactly from
+per-block (n, Σ, Σ²).
+
+**First answer: PBO = 0.3469.** Refuted. So the filed rule was honoured rather
+than the number, and the implementation was audited.
+
+**The no-op trap.** Seven of the 53 variants never trade. Scored 0.0 they are
+not neutral — they are the **best performers in the grid**, because:
+
+| | |
+|---|---|
+| variants that trade | 46 |
+| of those, with POSITIVE full-sample Sharpe | **0** |
+| best | **−0.0299** (`sma_cross 20/72`) |
+| worst | −0.1596 |
+
+Zero beats every negative number, so `argmax` picked a no-op in sample *and*
+out of sample. PBO 0.347 was a faithful measurement of **"not trading beats
+trading"** — true, and not the question PBO asks. PBO asks whether *selection
+among strategies* generalises, which is only meaningful over strategies that
+trade.
+
+**Corrected, over the 46 live variants: PBO = 0.5440.**
+
+- 7,001 of 12,870 splits put the in-sample-best variant **below** the
+  out-of-sample median
+- median logit λ = **−0.128** (negative favours overfitting)
+- median OOS rank of the in-sample-best variant = **0.468**
+
+**Prediction CONFIRMED.** Choosing a variant on train performance is slightly
+*worse* than choosing at random. This is the standard statistic for what D6
+already saw anecdotally (top-10 by train → −2.70% / −7.06% OOS, p = 0.656 /
+0.891) — now named, and reproducible in one command.
+
+**Both numbers are kept in the script**, because the degenerate one carries the
+sharper finding: on 408 verified bars, across 46 trading variants, **the null
+strategy outperforms every strategy in the grid.** `MY_STRATEGY.md` says no
+profit edge survived deflation. This is stronger — nothing was close, and doing
+nothing won.
+
+That is not an argument against the system. It is the argument *for* the one
+`MY_STRATEGY.md` already makes: the only replicated effect is drawdown
+reduction, and sizing is the lever. It also raises the bar for §1.1's
+volatility-scaled sizing — it must be built as a drawdown control and validated
+by CPCV, never sold as return improvement, because there is no return here to
+improve.
