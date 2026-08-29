@@ -34,11 +34,33 @@ import hashlib
 import json
 import os
 import re
+import tempfile
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
 GENESIS = "0" * 64
+
+# ---------------------------------------------------------------- BOUNDS --
+# STATED, ENFORCED, AND REFUSED AT -- not "reasonable defaults" a flood walks
+# quietly past. A store with no ceiling is a disk-exhaustion primitive handed
+# to anyone holding the token, and the damage lands on the OPERATOR: a full
+# disk takes down the node, the watchdog and the chain sharing that disk.
+#
+# Generous for a memory store, and finite. Raise by environment where a big
+# corpus is intended -- importing 200k conversations is a legitimate reason
+# to lift a bound, and lifting it deliberately is not the same as never
+# having had one.
+MAX_BODY_BYTES = int(os.environ.get("AI_MEMORY_MAX_BODY", 1 << 20))
+MAX_MEMORIES = int(os.environ.get("AI_MEMORY_MAX_COUNT", 250000))
+MAX_STORE_BYTES = int(os.environ.get("AI_MEMORY_MAX_BYTES", 4 << 30))
+
+
+class StoreFull(Exception):
+    """A bound was reached. Distinct from ValueError on purpose: a caller
+    should fix and retry a bad name, and must NOT retry a full store --
+    retrying a flood is the flood."""
 
 
 def _now() -> float:
@@ -103,6 +125,79 @@ class MemoryStore:
         self.audit = os.path.join(self.root, "audit.jsonl")
         os.makedirs(self.root, exist_ok=True)
         os.makedirs(self.trash, exist_ok=True)
+        # ONE WRITER AT A TIME, AND THE LEDGER MOVES WITH THE FILE.
+        #
+        # Without this the audit chain BREAKS UNDER CONCURRENCY, and breaks
+        # the worst way -- silently, discovered later by whoever runs
+        # verify. Two racing writes both read the same chain head and both
+        # claim it as `prev`, so the chain forks; verify_chain() then
+        # reports BROKEN and cannot distinguish a race from an attacker.
+        # The integrity check would be accusing the operator of tampering
+        # because two agents happened to write at once.
+        #
+        # Re-entrant: put() and supersede() both call get() while holding
+        # it on the same thread.
+        self._lock = threading.RLock()
+
+    # ------------------------------------------------------- durable write
+    @staticmethod
+    def _atomic_write(path, text):
+        """Write via temp file + fsync + os.replace.
+
+        open(path, "w") TRUNCATES FIRST. A crash, a full disk, or a killed
+        process between the truncate and the write leaves a zero-byte or
+        half-written memory: the file is still present, still parses as
+        "there", and its content is gone. os.replace is atomic on Windows
+        and POSIX alike, so a reader sees the old file or the new one and
+        never a torn one.
+        """
+        d = os.path.dirname(path) or "."
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp-", suffix=".part")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+                fh.flush()
+                os.fsync(fh.fileno())      # the bytes, not just the buffer
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+    def _bounds_check(self, name, body):
+        """Refuse BEFORE writing, naming the bound and the numbers. A limit
+        that reports only "error" teaches the caller to retry, which is
+        precisely wrong when the cause is a flood."""
+        n = len(body.encode("utf-8"))
+        if n > MAX_BODY_BYTES:
+            raise StoreFull(
+                "memory body is %d bytes, over the %d-byte limit. A memory "
+                "is a fact, not a corpus -- chunk it, or raise "
+                "AI_MEMORY_MAX_BODY deliberately." % (n, MAX_BODY_BYTES))
+        try:
+            files = [f for f in os.listdir(self.root)
+                     if f.endswith(".md") and not f.startswith(".")]
+        except OSError:
+            return
+        if len(files) >= MAX_MEMORIES and not os.path.exists(self._path(name)):
+            raise StoreFull(
+                "store holds %d memories, at the %d limit. Existing memories "
+                "can still be UPDATED; only new names are refused, so a "
+                "flood cannot push out what is already here."
+                % (len(files), MAX_MEMORIES))
+        total = 0
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(self.root, f))
+            except OSError:
+                pass
+        if total + n > MAX_STORE_BYTES:
+            raise StoreFull(
+                "store is %d bytes; this write would pass the %d-byte limit. "
+                "Refusing rather than filling the disk that the node and the "
+                "watchdog share." % (total, MAX_STORE_BYTES))
 
     # ---------------------------------------------------------- audit chain
     def _chain_head(self) -> str:
@@ -119,8 +214,13 @@ class MemoryStore:
     def _audit(self, action: str, name: str, agent: str, digest: str) -> None:
         rec = {"at": _now(), "action": action, "name": name, "agent": agent,
                "sha256": digest, "prev": self._chain_head()}
+        # fsync: a ledger that loses its last line after the FILE it
+        # describes has landed is worse than no ledger -- verify would
+        # blame the operator for a write the disk had merely not flushed.
         with open(self.audit, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(rec, sort_keys=True) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
 
     def verify_chain(self) -> Dict[str, Any]:
         """Walk the audit chain; the first broken link is named, not summed
@@ -168,9 +268,10 @@ class MemoryStore:
             meta["last_used"] = old.get("last_used", meta["last_used"])
         meta.update(extra or {})
         text = render_memory(name, description, mtype, body, agent, meta)
-        with open(path, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(text)
-        self._audit(action, name, agent, _sha(text))
+        with self._lock:
+            self._bounds_check(name, body)
+            self._atomic_write(path, text)
+            self._audit(action, name, agent, _sha(text))
         return parse_memory(text)
 
     def touch(self, name: str) -> Optional[Dict[str, Any]]:
@@ -190,9 +291,8 @@ class MemoryStore:
         text = render_memory(m["name"], m.get("description", ""),
                              meta.get("type", "reference"), m["body"],
                              meta.get("agent", "unknown"), meta)
-        with open(self._path(name), "w", encoding="utf-8",
-                  newline="\n") as fh:
-            fh.write(text)
+        with self._lock:
+            self._atomic_write(self._path(name), text)
         return parse_memory(text)
 
     def supersede(self, old_name: str, new_name: str, agent: str) -> bool:
@@ -206,10 +306,9 @@ class MemoryStore:
         text = render_memory(old["name"], old.get("description", ""),
                              meta.get("type", "reference"), old["body"],
                              meta.get("agent", "unknown"), meta)
-        with open(self._path(old_name), "w", encoding="utf-8",
-                  newline="\n") as fh:
-            fh.write(text)
-        self._audit("supersede", old_name, agent, _sha(new_name))
+        with self._lock:
+            self._atomic_write(self._path(old_name), text)
+            self._audit("supersede", old_name, agent, _sha(new_name))
         return True
 
     def get(self, name: str) -> Optional[Dict[str, Any]]:
@@ -225,8 +324,12 @@ class MemoryStore:
         if not os.path.exists(path):
             return False
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        os.replace(path, os.path.join(self.trash, f"{name}.{stamp}.md"))
-        self._audit("tombstone", name, agent, _sha(why))
+        with self._lock:
+            if not os.path.exists(path):
+                return False        # another thread tombstoned it first
+            os.replace(path, os.path.join(self.trash,
+                                          f"{name}.{stamp}.md"))
+            self._audit("tombstone", name, agent, _sha(why))
         return True
 
     def list(self) -> List[Dict[str, Any]]:

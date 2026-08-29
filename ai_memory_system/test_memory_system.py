@@ -14,6 +14,11 @@ WHAT THIS PINS, and why each one is a property somebody could take away:
       who and why. What one agent writes another may retire, never erase.
   H*  the HTTP surface, against a REAL server on a loopback port: health,
       list, read, write, search, 404s, and the openapi contract.
+  F*  FLOOD AND CORRUPTION, executed rather than asserted: 40 concurrent
+      writers leave the chain intact (the race that used to fork it read as
+      tampering), oversized bodies and full stores are refused before any
+      write, a crash mid-write leaves the OLD memory intact, and the rate
+      limiter buckets per client with a bounded tracking table.
   N*  THE SECURITY BOUNDARY, executable: bound off-loopback with no token
       the server REFUSES TO START; with a token, every route but /health
       demands it, a wrong token is rejected, and the right one works.
@@ -438,6 +443,158 @@ def c_cli(root):
           and "--token" in r.stderr, f"rc={r.returncode} {r.stderr[:120]}")
 
 
+
+
+# ------------------------------------------- flood and corruption (F block)
+def f_hardening(root):
+    """F -- the properties that hold when something goes WRONG: many writers
+    at once, a body too big, a store at its limit, a client in a loop, and a
+    crash in the middle of a write.
+
+    Every one of these is a claim that only means something if it is
+    executed. A limit nobody has hit in a test is a limit nobody knows the
+    behaviour of."""
+    import concurrent.futures as cf
+    import memory_store as ms
+
+    # F1 -- THE RACE. Before the lock, two concurrent writes both read the
+    # same chain head and both claimed it as `prev`, forking the chain: a
+    # later verify would report BROKEN and blame the operator for tampering
+    # that was really just concurrency. 40 writers, one store.
+    fr = tempfile.mkdtemp(prefix="aimem_f1_")
+    st = MemoryStore(fr)
+    with cf.ThreadPoolExecutor(max_workers=16) as ex:
+        list(ex.map(lambda i: st.put(f"concurrent-{i:03d}", "d", "project",
+                                     f"body {i}", "racer"), range(40)))
+    chain = st.verify_chain()
+    check("F1 40 CONCURRENT writes leave the audit chain intact -- the fork "
+          "that concurrency used to cause would read as tampering",
+          chain["ok"] and chain["entries"] == 40, chain)
+    check("F1b ...and every memory actually landed",
+          len(st.list()) == 40, len(st.list()))
+
+    # F2 -- an oversized body is refused BEFORE anything is written.
+    big = "x" * (ms.MAX_BODY_BYTES + 1)
+    try:
+        st.put("too-big", "d", "project", big, "flooder")
+        check("F2 a body over the limit is refused", False, "it was accepted")
+    except ms.StoreFull as e:
+        check("F2 a body over the limit is refused, and the message names "
+              "the bound and the actual size",
+              str(ms.MAX_BODY_BYTES) in str(e) and "chunk" in str(e).lower(),
+              str(e)[:100])
+    check("F2b ...and nothing was written for it",
+          st.get("too-big") is None, "")
+    check("F2c ...and the chain did not grow",
+          st.verify_chain()["entries"] == 40, "")
+
+    # F3 -- at the count limit, NEW names are refused and EXISTING ones are
+    # still updatable. A flood must not be able to push out what is already
+    # stored, and must not lock the owner out of their own memories.
+    old_max = ms.MAX_MEMORIES
+    ms.MAX_MEMORIES = 40
+    try:
+        try:
+            st.put("one-too-many", "d", "project", "b", "flooder")
+            check("F3 a new name past the count limit is refused",
+                  False, "accepted")
+        except ms.StoreFull as e:
+            check("F3 a new name past the count limit is refused",
+                  "40" in str(e), str(e)[:90])
+        upd = st.put("concurrent-000", "d", "project", "updated", "owner")
+        check("F3b ...but an EXISTING memory can still be updated, so a "
+              "flood cannot lock the owner out of their own store",
+              upd["body"] == "updated", upd.get("body"))
+    finally:
+        ms.MAX_MEMORIES = old_max
+
+    # F4 -- no .part files survive. Atomic write means temp-then-replace, and
+    # a leftover temp file is a half-written memory sitting in the store.
+    strays = [f for f in os.listdir(fr) if f.startswith(".tmp-")]
+    check("F4 atomic writes leave no half-written .part files behind",
+          not strays, strays)
+
+    # F5 -- a torn write cannot destroy the previous content. Simulated by
+    # failing INSIDE the atomic write, which is exactly where a crash hurts.
+    before = st.get("concurrent-001")["body"]
+    real = ms.MemoryStore._atomic_write
+
+    def explode(path, text):
+        raise OSError("simulated crash mid-write")
+
+    ms.MemoryStore._atomic_write = staticmethod(explode)
+    try:
+        st.put("concurrent-001", "d", "project", "SHOULD NOT LAND", "crasher")
+    except OSError:
+        pass
+    finally:
+        ms.MemoryStore._atomic_write = real
+    after = st.get("concurrent-001")["body"]
+    check("F5 a crash DURING a write leaves the previous memory intact -- "
+          "the old bytes or the new ones, never a torn file",
+          after == before and "SHOULD NOT LAND" not in after, after[:60])
+    check("F5b ...and the chain still verifies after the failed write",
+          st.verify_chain()["ok"], "")
+
+    shutil.rmtree(fr, ignore_errors=True)
+
+    # F6 -- the rate limiter, as a pure function of time.
+    rl = server.RateLimiter(burst=3, per_sec=1.0)
+    t0 = 1000.0
+    allowed = [rl.allow("1.2.3.4", t0)[0] for _ in range(5)]
+    check("F6 a burst is allowed up to the stated size, then refused",
+          allowed == [True, True, True, False, False], allowed)
+    ok, retry = rl.allow("1.2.3.4", t0)
+    check("F6b a refusal states how long to wait", not ok and retry >= 1,
+          (ok, retry))
+    check("F6c a DIFFERENT client is unaffected -- the limit is per client, "
+          "so one runaway agent cannot lock everyone out",
+          rl.allow("5.6.7.8", t0)[0], "")
+    check("F6d the bucket refills with time",
+          rl.allow("1.2.3.4", t0 + 5)[0], "")
+    for i in range(server.MAX_CLIENTS_TRACKED + 10):
+        rl.allow(f"10.0.{i // 256}.{i % 256}", t0)
+    check("F6e the tracking table itself is bounded -- an attacker cycling "
+          "source addresses cannot grow it without limit",
+          len(rl._buckets) <= server.MAX_CLIENTS_TRACKED + 1,
+          len(rl._buckets))
+
+    # F7 -- over HTTP: a flood gets 429 with Retry-After, and a full store
+    # gets 507 (do not retry), never a 500 (which invites a retry).
+    port = free_port()
+    base = _spawn(root, "127.0.0.1", port)
+    old_lim = server.Handler.limiter
+    server.Handler.limiter = server.RateLimiter(burst=2, per_sec=0.01)
+    try:
+        codes = [call(base + "/memories")[0] for _ in range(5)]
+        check("F7 a client over budget gets 429, not a hang and not a crash",
+              429 in codes, codes)
+        req = urllib.request.Request(base + "/memories")
+        try:
+            urllib.request.urlopen(req, timeout=5)
+            hdr = None
+        except urllib.error.HTTPError as e:
+            hdr = e.headers.get("Retry-After")
+        check("F7b ...and the 429 carries Retry-After so a well-behaved "
+              "client backs off instead of hammering",
+              hdr is not None, hdr)
+    finally:
+        server.Handler.limiter = old_lim
+
+    old_body = ms.MAX_BODY_BYTES
+    ms.MAX_BODY_BYTES = 50
+    try:
+        code, body = call(base + "/memories/oversize", "PUT",
+                          {"description": "d", "type": "project",
+                           "agent": "flooder", "body": "y" * 500,
+                           "reconcile": "false"})
+        check("F8 a full store answers 507 with retry:false -- a 500 would "
+              "tell the caller to try again, which is the flood",
+              code == 507 and body.get("retry") is False, (code, body))
+    finally:
+        ms.MAX_BODY_BYTES = old_body
+
+
 def main():
     print("M1 -- the AI memory system: store, chain, tombstones, HTTP, auth\n")
     root = tempfile.mkdtemp(prefix="aimem_")
@@ -451,6 +608,8 @@ def main():
         h_http(root)
         print()
         n_auth(root)
+        print()
+        f_hardening(root)
         print()
         c_cli(root)
     finally:

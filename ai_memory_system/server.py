@@ -42,6 +42,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -50,8 +51,57 @@ from typing import Any, Dict, Tuple
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from memory_store import MemoryStore   # noqa: E402
-import recall                          # noqa: E402
+from memory_store import (MemoryStore, StoreFull,      # noqa: E402
+                          MAX_BODY_BYTES)
+import recall                                    # noqa: E402
+
+
+# ------------------------------------------------------------ FLOOD LIMITS --
+# A memory endpoint with no rate limit is a machine anyone with the token can
+# stop. Every write here fsyncs (durability, deliberately) which makes writes
+# EXPENSIVE, and expensive-per-request plus unlimited-requests is the whole
+# recipe. So: a token bucket per client address, refilling steadily, with a
+# burst allowance so ordinary agent traffic never notices it exists.
+#
+# This bounds ONE client. It is not DDoS protection and does not pretend to
+# be -- a thousand addresses still add up, and the answer to that is a proxy
+# in front, not a bigger number here. What it does buy is that a single
+# runaway agent (or a loop somebody wrote by accident) cannot take the store
+# down while the operator is asleep.
+RATE_BURST = int(os.environ.get("AI_MEMORY_RATE_BURST", 60))
+RATE_PER_SEC = float(os.environ.get("AI_MEMORY_RATE_PER_SEC", 5))
+MAX_CLIENTS_TRACKED = 4096
+# Recalls touch (write) the memories they return -- consolidation. Capped,
+# because otherwise one cheap GET /recall?limit=50 becomes 50 fsynced writes
+# and the read path is a write amplifier a flood can aim with.
+TOUCH_PER_RECALL = 3
+
+
+class RateLimiter:
+    """Token bucket per client. Pure enough to test: time is an argument."""
+
+    def __init__(self, burst=RATE_BURST, per_sec=RATE_PER_SEC):
+        self.burst, self.per_sec = float(burst), float(per_sec)
+        self._buckets = {}
+        self._lock = threading.Lock()
+
+    def allow(self, who, now=None):
+        """(allowed, retry_after_seconds)."""
+        now = time.time() if now is None else now
+        with self._lock:
+            # Bound the tracking table itself: an attacker cycling source
+            # addresses must not be able to grow this without limit. Dropping
+            # the whole table is crude and safe -- worst case every client
+            # gets a fresh full bucket, which is the state we started in.
+            if len(self._buckets) > MAX_CLIENTS_TRACKED:
+                self._buckets.clear()
+            tokens, last = self._buckets.get(who, (self.burst, now))
+            tokens = min(self.burst, tokens + (now - last) * self.per_sec)
+            if tokens < 1.0:
+                self._buckets[who] = (tokens, now)
+                return False, max(1, int((1.0 - tokens) / self.per_sec) + 1)
+            self._buckets[who] = (tokens - 1.0, now)
+            return True, 0
 
 VERSION = "ai-memory/1.0"
 MAX_BODY = 1 << 20          # 1 MiB. A memory is a fact, not a corpus.
@@ -64,6 +114,11 @@ class Handler(BaseHTTPRequestHandler):
     store: MemoryStore = None          # set by serve()
     token: str = ""                    # "" -> loopback-only, unauthenticated
     started: float = 0.0
+    limiter: "RateLimiter" = None
+    # A slow-loris client that opens a socket and dribbles bytes holds a
+    # thread for as long as it likes. A read timeout turns that from a
+    # resource leak into a dropped connection.
+    timeout = 30
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s %s %s\n" % (
@@ -118,11 +173,38 @@ class Handler(BaseHTTPRequestHandler):
             return {}, "body must be a JSON object"
         return data, ""
 
+    def _rate_ok(self) -> bool:
+        """False (and a 429 already sent) when this client is over budget."""
+        if self.limiter is None:
+            return True
+        ok, retry = self.limiter.allow(self.client_address[0])
+        if ok:
+            return True
+        body = json.dumps({
+            "error": "rate limited",
+            "retry_after_seconds": retry,
+            "limit": f"{RATE_PER_SEC}/s sustained, {RATE_BURST} burst, "
+                     f"per client address",
+            "why": "every write here fsyncs, so unlimited requests would "
+                   "let one client stop the machine. Raise with "
+                   "AI_MEMORY_RATE_PER_SEC if your workload is legitimately "
+                   "heavier.",
+        }, indent=1).encode()
+        self.send_response(429)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Retry-After", str(retry))
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        return False
+
     def do_OPTIONS(self):                       # noqa: N802
         self._send(204, {})
 
     # ------------------------------------------------------------- routing
     def do_GET(self):                           # noqa: N802
+        if not self._rate_ok():
+            return
         u = urllib.parse.urlparse(self.path)
         path = u.path.rstrip("/") or "/"
         qs = urllib.parse.parse_qs(u.query)
@@ -186,7 +268,10 @@ class Handler(BaseHTTPRequestHandler):
                 limit = 10
             full = [self.store.get(m["name"]) for m in self.store.list()]
             ranked = recall.rank([f for f in full if f], q, limit)
-            for r in ranked:
+            # Only the top few are reinforced -- see TOUCH_PER_RECALL. A
+            # read path that writes once per result is a write amplifier
+            # pointed at the operator's disk.
+            for r in ranked[:TOUCH_PER_RECALL]:
                 self.store.touch(r["name"])
             return self._send(200, {
                 "query": q, "count": len(ranked), "results": ranked,
@@ -222,6 +307,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "no such route", "path": path})
 
     def do_PUT(self):                           # noqa: N802
+        if not self._rate_ok():
+            return
         if not self._authed():
             return self._deny()
         m = _NAME.match(urllib.parse.urlparse(self.path).path.rstrip("/"))
@@ -259,6 +346,12 @@ class Handler(BaseHTTPRequestHandler):
                 m.group(1), str(data["description"]), str(data["type"]),
                 str(data["body"]), str(data["agent"]),
                 tier=str(data.get("tier", "archival")))
+        except StoreFull as e:
+            # 507, not 400 and not 500: the request was well-formed and the
+            # server is fine -- the STORE is full. A caller that reads the
+            # status knows not to retry, which a 500 would invite.
+            return self._send(507, {"error": "store full", "detail": str(e),
+                                    "retry": False})
         except ValueError as e:
             return self._send(400, {"error": str(e)})
         if verdict and verdict["action"] == "SUPERSEDE" and verdict["target"]:
@@ -273,6 +366,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "reconcile": verdict})
 
     def do_DELETE(self):                        # noqa: N802
+        if not self._rate_ok():
+            return
         if not self._authed():
             return self._deny()
         m = _NAME.match(urllib.parse.urlparse(self.path).path.rstrip("/"))
@@ -336,7 +431,9 @@ OPENAPI = {
 }
 
 
-def serve(host: str, port: int, root: str, token: str = "") -> int:
+def serve(host: str, port: int, root: str, token: str = "",
+          rate_burst: int = RATE_BURST, rate_per_sec: float = RATE_PER_SEC
+          ) -> int:
     """Start the server. Refuses to bind beyond loopback without a token --
     see the module docstring for why that refusal is the design."""
     off_loopback = host not in LOOPBACK and host != ""
@@ -357,6 +454,7 @@ def serve(host: str, port: int, root: str, token: str = "") -> int:
     Handler.store = MemoryStore(root)
     Handler.token = token
     Handler.started = time.time()
+    Handler.limiter = RateLimiter(rate_burst, rate_per_sec)
     httpd = ThreadingHTTPServer((host, port), Handler)
     chain = Handler.store.verify_chain()
     print(f"{VERSION} on http://{host}:{port}   store={Handler.store.root}")
@@ -364,6 +462,8 @@ def serve(host: str, port: int, root: str, token: str = "") -> int:
           f"{'OK' if chain['ok'] else 'BROKEN'} "
           f"({chain.get('entries', 0)} entries)")
     print(f"  auth: {'bearer token' if token else 'none (loopback only)'}")
+    print(f"  limits: {rate_per_sec}/s per client (burst {rate_burst}), "
+          f"body <= {MAX_BODY_BYTES} bytes, atomic+fsync writes")
     print("  GET /openapi.json for the machine-readable contract.")
     try:
         httpd.serve_forever()
