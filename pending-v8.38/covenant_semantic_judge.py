@@ -72,6 +72,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
@@ -564,6 +565,30 @@ class SemanticModel(object):
         self.hold_seq = 0
         self.review_bound_s = int(raw.get("review_bound_s", 86400))
         self.holds_cap = int(raw.get("holds_cap", 5000))
+        # ---- WHICH PASSES CANNOT RUN ON THIS FILE, NAMED (SEM4).
+        #
+        # Being less capable is survivable -- it is what the v1-compat path
+        # above exists for. Reporting full competence while less capable is
+        # not: `full` is a value a model with no fitted script cannot compute,
+        # published as a measurement (M50). So the flag is DERIVED from the
+        # very attributes passes 3/4/5 guard on -- never asserted separately,
+        # and never from the file's own say-so. A pass added later with a new
+        # guard must be added here, or SEM4's D8b fails loudly.
+        self.inert_passes = tuple(
+            (n, guard, why)
+            for n, guard, present, why in (
+                (3, "seeded_lexicon", bool(self.seeded),
+                 "no seeded lexicon: pass 3 never scores, so a prohibited "
+                 "instruction in any unseeded language cannot even ABSTAIN"),
+                (4, "space_script", bool(self.space_script),
+                 "no fitted script: pass 4 cannot tell foreign text from "
+                 "fitted text, so CLEAN is a claim this model has no "
+                 "standing to make on any payload"),
+                (5, "vocab", bool(self.vocab),
+                 "no vocabulary: pass 5 cannot measure coverage, so nothing "
+                 "distinguishes a payload that was read from one that was "
+                 "not"),
+            ) if not present)
         if self.gate_lo <= 0 or self.veto_at <= self.gate_lo:
             raise SemanticJudgeError(
                 f"incoherent bands: gate_lo={self.gate_lo} veto_at={self.veto_at}")
@@ -623,6 +648,23 @@ class SemanticModel(object):
                 f"a judge whose weights can be edited without changing its id "
                 f"is not a control, and two nodes could not prove they judged "
                 f"with the same one.")
+        # ABSENT IS A CONFIGURATION; CORRUPT IS AN ATTACK (SEM4 D6). A v1
+        # file with no /2 claim loads and the extension simply does not
+        # engage. But a file that CALLS ITSELF format /2 while missing the
+        # competence keys is refused: the id check alone cannot catch it
+        # (whoever can edit the file can recompute the id), and deleting
+        # three keys would otherwise be the cheapest way to switch off
+        # passes 3, 4 and 5 while the judge keeps reporting full competence.
+        fmt = str(raw.get("format", ""))
+        if fmt.endswith("/2"):
+            gone = [k for k in ("vocab", "space_script", "seeded_lexicon")
+                    if not raw.get(k)]
+            if gone:
+                raise SemanticJudgeError(
+                    f"model at {path} claims format {fmt!r} but is missing "
+                    f"{', '.join(gone)} -- a /2 model without its competence "
+                    f"declaration is corrupt, not old. A v1 file makes no /2 "
+                    f"claim and still loads.")
         return cls(raw, actual)
 
     def save(self, path: str) -> None:
@@ -785,7 +827,10 @@ class SemanticModel(object):
         # to hold a few words of that language. Eleven words is enough to
         # raise an alarm and never enough to certify silence.
         gaps = {}
-        competence = "full"
+        # A model with inert passes starts at "unfitted" for EVERY payload --
+        # not because the payload was hard, but because this file cannot tell
+        # (SEM4 D2c). Disclosure only: no branch below reads it back (D8a).
+        competence = "unfitted" if self.inert_passes else "full"
         hold_id = None
         if self.space_script:
             gaps = _script_gaps(tokens, self.space_script)
@@ -830,13 +875,26 @@ class SemanticModel(object):
         spots. A judge that states its competence can be asked for help; one
         that does not can only be guessed at."""
         langs = list(self.raw.get("seeded_languages", []))
+        # `depth` is what who_can_clear matches a hold against. Overstating it
+        # gets a hold cleared by somebody who cannot read the payload, so a
+        # degraded file may not say "fitted in one language" beside an empty
+        # scripts list (SEM4 D3c).
+        if self.inert_passes:
+            depth = ("DEGRADED: %d of 5 passes inert on this file -- see "
+                     "inert_passes. No fit is claimed."
+                     % len(self.inert_passes))
+        else:
+            depth = ("fitted in one language, seeded prohibitions in %d more"
+                     % len(langs))
         return {
             "id": self.model_id,
             "scripts": [self.space_script] if self.space_script else [],
             "fitted": {"eng": self.space_script} if self.space_script else {},
             "seeded": sorted(langs),
-            "depth": ("fitted in one language, seeded prohibitions in %d more"
-                      % len(langs)),
+            "degraded": bool(self.inert_passes),
+            "inert_passes": [{"pass": n, "guard": g, "why": why}
+                             for n, g, why in self.inert_passes],
+            "depth": depth,
         }
 
     def clear_hold(self, hold_id: str, by: str,
@@ -1019,6 +1077,20 @@ def install(reasoning_judge_cls, judgment_result_cls, registry_cls=None,
     when its model is missing is the failure mode this whole file exists to
     remove."""
     model = SemanticModel.load(model_path)
+    # Said ONCE, here, on STDERR. Stdout is a data channel (M47 -- test_b1's
+    # check T parses a subprocess's stdout), and a warning per assessment
+    # would be permanent furniture nobody reads (M34). Install is the one
+    # moment an operator is watching.
+    if model.inert_passes:
+        lines = [f"SEMANTIC JUDGE DEGRADED: model {model.model_id} carries no "
+                 f"competence declaration -- {len(model.inert_passes)} of 5 "
+                 f"passes are inert:"]
+        for n, guard, why in model.inert_passes:
+            lines.append(f"  pass {n} ({guard}): {why}")
+        lines.append("  Verdicts are unchanged; only the disclosure is new. A "
+                     "v2 model (build_model_v2.py, with vocab, space_script "
+                     "and seeded_lexicon) clears this.")
+        print("\n".join(lines), file=sys.stderr)
 
     class SemanticJudge(reasoning_judge_cls):
         """Deterministic lexical-semantic judge.

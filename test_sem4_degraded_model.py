@@ -52,7 +52,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import covenant_semantic_judge as sj
 
-MODEL = os.path.join(HERE, "semantic_judge_model.json")
+# The degraded file this suite is ABOUT. When it was written (2026-08-28)
+# `semantic_judge_model.json` WAS the v1 file 75b88e4445bb; the v2 rebuild
+# now ships under that name and the v1 file ships beside it as
+# model_v1.json (reconstructed 2026-08-29 by subtracting build_model_v2's
+# added keys from the shipped v2 -- the subtraction reproduced the
+# historical id to the digit, which is the reconstruction's proof).
+MODEL = os.path.join(HERE, "model_v1.json")
+if not os.path.exists(MODEL):
+    MODEL = os.path.join(HERE, "semantic_judge_model.json")
 PRISTINE = os.path.expanduser("~/prefix_sem_judge.py")     # the source before this fix
 
 results = []

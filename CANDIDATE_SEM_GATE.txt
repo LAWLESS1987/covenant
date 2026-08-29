@@ -1,0 +1,29 @@
+covenant local sweep -- 2026-08-29 13:00:40
+python 3.12.10  pid 30232
+leftover cleanup is disabled by design -- see kill_leftovers()
+staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
+staged.
+candidate overlay from C:\Users\Lawre\covenant\pending-v8.38: 13 file(s) copied -- build_model_v2.py, build_semantic_model.py, competence.py, covenant_semantic_judge.py, covenant_unified_v8.PROJECT-8e04a293efd9.py, covenant_unified_v8.py, lexicon_multi.py, lexicon_register.py ...
+OVERLAY REPLACED GATE FILE test_competence.py with the candidate's d81782af42e5 (--allow-suite-overlay): every verdict that suite prints below is the CANDIDATE'S OWN CLAIM, not the deployed check's.
+OVERLAY REPLACED GATE FILE test_sem5_register_coverage.py with the candidate's 3f8baa73d519 (--allow-suite-overlay): every verdict that suite prints below is the CANDIDATE'S OWN CLAIM, not the deployed check's.
+OVERLAY REPLACED GATE FILE test_semantic_judge.py with the candidate's 5d2a918af647 (--allow-suite-overlay): every verdict that suite prints below is the CANDIDATE'S OWN CLAIM, not the deployed check's.
+core   577358 bytes  sha256 525f235134f5  (as STAGED, not as deployed)
+
+running 1 run(s) of 5 suite(s), alone
+
+check  test_sem4_degraded_model.py      sha256 b5b5aa671b55  (as STAGED)
+check  test_competence.py               sha256 d81782af42e5  (as STAGED)
+check  test_semantic_judge.py           sha256 5d2a918af647  (as STAGED)
+check  test_sem5_register_coverage.py   sha256 3f8baa73d519  (as STAGED)
+check  test_j1_judge_paths.py           sha256 195a1b14c693  (as STAGED)
+
+test_sem4_degraded_model.py      rc=0       0.5s  28/28 passed
+test_competence.py               rc=0       0.6s  56/56 passed
+test_semantic_judge.py           rc=0       1.4s  26/26 passed
+test_sem5_register_coverage.py   rc=0       0.2s  6/6 passed
+test_j1_judge_paths.py           rc=0       0.4s  34/34 passed
+
+total 0.1 min
+GREEN: every suite that ran, passed.
+CANDIDATE SWEEP: staged from C:\Users\Lawre\covenant\pending-v8.38 over the deployed tree. The deployed core was NOT changed.
+per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs

@@ -188,7 +188,16 @@
   }
  },
  "min_reviewers": 2,
- "model_id": "b054d716e198",
+ "missing_seeds": [
+  "defraud",
+  "embezzle",
+  "extort",
+  "falsify",
+  "launder",
+  "misappropriate"
+ ],
+ "missing_seeds_note": "Formal-register verbs of theft absent from the fitted space: the corpus (46 Gutenberg volumes of philosophy and history) does not use them, so the space cannot see them. Declared 2026-08-29 after SEM5's S5 measured the miss; each verified absent from the fitted vocabulary. The register lexicon is the compensating control -- these words judged alone still pass, and that fact is on the record here rather than silent.",
+ "model_id": "41bba7d7d753",
  "not_observable": {
   "Honor your father and your mother.": "not evidenced by a transfer",
   "Remember the Sabbath day, to keep it holy.": "not evidenced by a transfer",
