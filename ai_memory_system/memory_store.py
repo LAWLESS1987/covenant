@@ -39,6 +39,8 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
+from index_db import MemoryIndex
+
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
 GENESIS = "0" * 64
 
@@ -138,10 +140,51 @@ class MemoryStore:
         # Re-entrant: put() and supersede() both call get() while holding
         # it on the same thread.
         self._lock = threading.RLock()
+        # THE INDEX IS A CACHE OVER THE FILES, NEVER A SECOND TRUTH.
+        #
+        # Without it every operation was O(n): list() parsed every file,
+        # search() read every file, and each WRITE scanned the directory for
+        # bounds and tokenised every stored body to reconcile. Fine at 52
+        # memories; unusable at a million -- and "a million should integrate
+        # the same way" is the correct requirement, so O(n) was simply the
+        # wrong design.
+        #
+        # If index and files ever disagree, THE FILES WIN and the index is
+        # rebuilt. That ordering is what makes a corrupt index an
+        # inconvenience instead of a data loss.
+        self.index = MemoryIndex(self.root)
+        self._bulk = False
+        try:
+            if self.index.count() != len(self._files()):
+                self.index.rebuild(parse_memory, self._files)
+        except Exception:            # noqa: BLE001 -- an index that cannot
+            pass                     # be built must not stop the store
+
+    def _files(self) -> List[str]:
+        try:
+            return [f for f in os.listdir(self.root)
+                    if f.endswith(".md") and not f.startswith(".")]
+        except OSError:
+            return []
+
+    def bulk(self, on: bool = True) -> None:
+        """Import mode: skip the per-write fsync.
+
+        Durability is per-WRITE for interactive use, because losing the one
+        memory somebody just wrote is the failure that matters. A bulk import
+        is different: it is re-runnable from the source export, so paying an
+        fsync a million times to protect work that can simply be replayed is
+        the wrong trade. Ends with one flush."""
+        self._bulk = bool(on)
+        if not on:
+            try:
+                os.sync()            # POSIX; Windows has no equivalent call
+            except AttributeError:
+                pass
 
     # ------------------------------------------------------- durable write
     @staticmethod
-    def _atomic_write(path, text):
+    def _atomic_write(path, text, fsync=True):
         """Write via temp file + fsync + os.replace.
 
         open(path, "w") TRUNCATES FIRST. A crash, a full disk, or a killed
@@ -157,7 +200,8 @@ class MemoryStore:
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)
                 fh.flush()
-                os.fsync(fh.fileno())      # the bytes, not just the buffer
+                if fsync:
+                    os.fsync(fh.fileno())  # the bytes, not just the buffer
             os.replace(tmp, path)
         except BaseException:
             try:
@@ -176,23 +220,16 @@ class MemoryStore:
                 "memory body is %d bytes, over the %d-byte limit. A memory "
                 "is a fact, not a corpus -- chunk it, or raise "
                 "AI_MEMORY_MAX_BODY deliberately." % (n, MAX_BODY_BYTES))
-        try:
-            files = [f for f in os.listdir(self.root)
-                     if f.endswith(".md") and not f.startswith(".")]
-        except OSError:
-            return
-        if len(files) >= MAX_MEMORIES and not os.path.exists(self._path(name)):
+        # Counted and summed from the INDEX. This used to listdir and stat
+        # every file on every write -- a million syscalls per memory stored.
+        count = self.index.count()
+        if count >= MAX_MEMORIES and not self.index.has(name):
             raise StoreFull(
                 "store holds %d memories, at the %d limit. Existing memories "
                 "can still be UPDATED; only new names are refused, so a "
                 "flood cannot push out what is already here."
-                % (len(files), MAX_MEMORIES))
-        total = 0
-        for f in files:
-            try:
-                total += os.path.getsize(os.path.join(self.root, f))
-            except OSError:
-                pass
+                % (count, MAX_MEMORIES))
+        total = self.index.total_bytes()
         if total + n > MAX_STORE_BYTES:
             raise StoreFull(
                 "store is %d bytes; this write would pass the %d-byte limit. "
@@ -270,9 +307,11 @@ class MemoryStore:
         text = render_memory(name, description, mtype, body, agent, meta)
         with self._lock:
             self._bounds_check(name, body)
-            self._atomic_write(path, text)
+            self._atomic_write(path, text, fsync=not self._bulk)
             self._audit(action, name, agent, _sha(text))
-        return parse_memory(text)
+            out = parse_memory(text)
+            self.index.upsert(out, len(text.encode("utf-8")))
+        return out
 
     def touch(self, name: str) -> Optional[Dict[str, Any]]:
         """Record that a memory was USED: +1 use, stamp the clock. This is
@@ -292,8 +331,10 @@ class MemoryStore:
                              meta.get("type", "reference"), m["body"],
                              meta.get("agent", "unknown"), meta)
         with self._lock:
-            self._atomic_write(self._path(name), text)
-        return parse_memory(text)
+            self._atomic_write(self._path(name), text, fsync=not self._bulk)
+            out = parse_memory(text)
+            self.index.upsert(out, len(text.encode("utf-8")))
+        return out
 
     def supersede(self, old_name: str, new_name: str, agent: str) -> bool:
         """Mark old as superseded BY new, keeping both. The destructive
@@ -309,6 +350,7 @@ class MemoryStore:
         with self._lock:
             self._atomic_write(self._path(old_name), text)
             self._audit("supersede", old_name, agent, _sha(new_name))
+            self.index.upsert(parse_memory(text), len(text.encode("utf-8")))
         return True
 
     def get(self, name: str) -> Optional[Dict[str, Any]]:
@@ -330,33 +372,54 @@ class MemoryStore:
             os.replace(path, os.path.join(self.trash,
                                           f"{name}.{stamp}.md"))
             self._audit("tombstone", name, agent, _sha(why))
+            self.index.remove(name)
         return True
 
     def list(self) -> List[Dict[str, Any]]:
+        """From the index -- O(rows), no file reads. Falls back to the files
+        if the index is unavailable, because the files are the truth."""
+        try:
+            out = self.index.list()
+            if out or not self._files():
+                return [{"name": m["name"],
+                         "description": m.get("description", ""),
+                         "metadata": m.get("metadata", {}),
+                         "links": sorted(set(re.findall(
+                             r"\[\[([a-z0-9-]+)\]\]",
+                             (self.index.get_body(m["name"]) or {})
+                             .get("body", ""))))}
+                        for m in out]
+        except Exception:            # noqa: BLE001
+            pass
+        return self._list_from_files()
+
+    def _list_from_files(self) -> List[Dict[str, Any]]:
         out = []
-        for fn in sorted(os.listdir(self.root)):
-            if fn.endswith(".md") and not fn.startswith("."):
-                try:
-                    m = parse_memory(
-                        open(os.path.join(self.root, fn),
-                             encoding="utf-8").read())
-                    out.append({k: m.get(k) for k in
-                                ("name", "description", "metadata", "links")})
-                except (ValueError, OSError):
-                    out.append({"name": fn[:-3], "description":
-                                "(unparseable -- see file)", "metadata": {},
-                                "links": []})
+        for fn in sorted(self._files()):
+            try:
+                m = parse_memory(
+                    open(os.path.join(self.root, fn), encoding="utf-8").read())
+                out.append({k: m.get(k) for k in
+                            ("name", "description", "metadata", "links")})
+            except (ValueError, OSError):
+                out.append({"name": fn[:-3], "description":
+                            "(unparseable -- see file)", "metadata": {},
+                            "links": []})
         return out
 
     def search(self, query: str) -> List[Dict[str, Any]]:
-        """Case-insensitive substring over name, description and body.
-        Deliberately dumb: a store this size needs recall, not ranking, and
-        a scorer nobody can explain is a judge nobody can check."""
+        """Full-text through the index. The old version opened and read every
+        file in the store for every query."""
+        try:
+            return [{"name": m["name"],
+                     "description": m.get("description", ""),
+                     "metadata": m.get("metadata", {})}
+                    for m in self.index.search(query, limit=200)]
+        except Exception:            # noqa: BLE001
+            pass
         q = query.lower()
         hits = []
-        for fn in sorted(os.listdir(self.root)):
-            if not fn.endswith(".md") or fn.startswith("."):
-                continue
+        for fn in sorted(self._files()):
             try:
                 text = open(os.path.join(self.root, fn),
                             encoding="utf-8").read()
@@ -370,8 +433,7 @@ class MemoryStore:
         return hits
 
     def state(self) -> Dict[str, Any]:
-        files = [f for f in os.listdir(self.root)
-                 if f.endswith(".md") and not f.startswith(".")]
+        files = self._files()
         newest = 0.0
         for f in files:
             try:

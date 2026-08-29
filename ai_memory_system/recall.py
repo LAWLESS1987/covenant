@@ -208,10 +208,19 @@ def reconcile(new_body: str, existing: List[Dict[str, Any]],
     if not _content(new_body):
         return {"action": "NOOP", "target": None, "overlap": 0.0,
                 "why": "empty body"}
+    # RANK BY (containment, jaccard) -- the second term is not a tidy-up.
+    #
+    # A new memory can contain BOTH an exact duplicate of itself and a
+    # shorter memory it merely subsumes; both score containment 1.0.
+    # Breaking that tie by whichever came first alphabetically made an exact
+    # restatement supersede the WRONG memory -- marking an unrelated shorter
+    # fact superseded_by, which corrupts the supersession graph rather than
+    # merely missing a NOOP. Jaccard separates them: identical text scores
+    # 1.0, a subsumed cousin much less. Measured on this suite 2026-08-29.
     best, best_ov, best_jac = None, 0.0, 0.0
     for m in existing:
         con, jac = overlap(new_body, m.get("body", ""))
-        if con > best_ov:
+        if (con, jac) > (best_ov, best_jac):
             best, best_ov, best_jac = m, con, jac
 
     negations = ("not ", "no longer", "never", "wrong", "incorrect",

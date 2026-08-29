@@ -519,7 +519,7 @@ def f_hardening(root):
     before = st.get("concurrent-001")["body"]
     real = ms.MemoryStore._atomic_write
 
-    def explode(path, text):
+    def explode(path, text, fsync=True):
         raise OSError("simulated crash mid-write")
 
     ms.MemoryStore._atomic_write = staticmethod(explode)
