@@ -76,6 +76,11 @@ def _text_of(part: Any) -> str:
     return ""
 
 
+# WHICH SYSTEM SAID IT. Unifying twelve histories without provenance
+# produces one undifferentiated pile in which "an AI told me X" is
+# unanswerable -- and the single most useful question across systems is
+# exactly "who said this, and does anyone disagree?". Every memory carries
+# its source; nothing is imported anonymously.
 def parse_claude(data: Any) -> Iterator[Tuple[str, str, str]]:
     """claude.ai export: [{uuid, name, created_at, chat_messages:[...]}]."""
     if not isinstance(data, list):
@@ -108,8 +113,9 @@ def parse_chatgpt(data: Any) -> Iterator[Tuple[str, str, str]]:
         when = ""
         try:
             import datetime
-            when = datetime.datetime.utcfromtimestamp(
-                float(conv.get("create_time") or 0)).strftime("%Y-%m-%d")
+            when = datetime.datetime.fromtimestamp(
+                float(conv.get("create_time") or 0),
+                datetime.timezone.utc).strftime("%Y-%m-%d")
         except (ValueError, TypeError, OSError):
             pass
         nodes = [n for n in (conv.get("mapping") or {}).values()
@@ -135,8 +141,28 @@ def parse_plain(path: str) -> Iterator[Tuple[str, str, str]]:
         yield os.path.splitext(os.path.basename(path))[0], "", text
 
 
-def sources(path: str) -> Iterator[Tuple[str, str, str]]:
-    """(title, date, body) for every conversation found under `path`."""
+def detect_source(path: str, data: Any) -> str:
+    """Name the system this file came from, from its SHAPE first and its
+    path second. Shape is the stronger signal: a folder can be renamed, a
+    `mapping` node-graph cannot be anything but an OpenAI export."""
+    if isinstance(data, list) and data:
+        first = data[0] if isinstance(data[0], dict) else {}
+        if "chat_messages" in first:
+            return "claude"
+        if "mapping" in first:
+            return "chatgpt"
+    low = path.lower()
+    for key in ("claude", "chatgpt", "openai", "grok", "gemini", "bard",
+                "copilot", "perplexity", "deepseek", "mistral", "poe",
+                "character", "replika", "ollama", "qwen", "meta"):
+        if key in low:
+            return "grok" if key == "grok" else key
+    return "unknown"
+
+
+def sources(path: str) -> Iterator[Tuple[str, str, str, str]]:
+    """(title, date, body, source_system) for every conversation under
+    `path`."""
     if os.path.isdir(path):
         # RECURSE. An export usually arrives as a zip that unpacks into a
         # folder, and two exports side by side are two folders -- a
@@ -156,21 +182,24 @@ def sources(path: str) -> Iterator[Tuple[str, str, str]]:
             print(f"  UNPARSEABLE {os.path.basename(path)}: {e}",
                   file=sys.stderr)
             return
+        src = detect_source(path, data)
         got = False
         for title, when, body in parse_claude(data):
             got = True
-            yield title, when, body
+            yield title, when, body, src
         if not got:
             for title, when, body in parse_chatgpt(data):
                 got = True
-                yield title, when, body
+                yield title, when, body, src
         if not got:
             # A JSON we do not recognise is stored WHOLE rather than
             # dropped: unknown shape is not the same as no content.
             yield (os.path.splitext(os.path.basename(path))[0], "",
-                   json.dumps(data, indent=1)[:200000])
+                   json.dumps(data, indent=1)[:200000], src)
         return
-    yield from parse_plain(path)
+    src = detect_source(path, None)
+    for title, when, body in parse_plain(path):
+        yield title, when, body, src
 
 
 def chunks(body: str, size: int = CHUNK_CHARS) -> List[str]:
@@ -195,6 +224,10 @@ def main(argv=None) -> int:
     ap.add_argument("--root", default="")
     ap.add_argument("--agent", default="import")
     ap.add_argument("--tier", default="archival", choices=["core", "archival"])
+    ap.add_argument("--source", default="",
+                    help="override the detected source system (claude, grok, "
+                         "chatgpt, gemini...). Detection reads the file's "
+                         "SHAPE; override when it cannot tell.")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
 
@@ -206,9 +239,15 @@ def main(argv=None) -> int:
     store = MemoryStore(root)
 
     seen: Dict[str, int] = {}
+    by_source: Dict[str, int] = {}
     written, parts, skipped = 0, 0, []
-    for title, when, body in sources(a.path):
-        base = slugify(f"{when}-{title}" if when else title)
+    for title, when, body, src in sources(a.path):
+        src = a.source or src
+        by_source[src] = by_source.get(src, 0) + 1
+        # The source is in the NAME as well as the metadata. Two systems
+        # discussing the same topic on the same day would otherwise collide
+        # on one slug, and the second would silently overwrite the first.
+        base = slugify(f"{src}-{when}-{title}" if when else f"{src}-{title}")
         n = seen.get(base, 0) + 1
         seen[base] = n
         if n > 1:
@@ -223,7 +262,8 @@ def main(argv=None) -> int:
             if i > 1:
                 prev = base if i == 2 else f"{base}-p{i - 1}"
                 linked = f"continued from [[{prev}]]\n\n" + linked
-            desc = (f"{title} ({when})" if when else title)
+            desc = (f"[{src}] {title} ({when})" if when
+                    else f"[{src}] {title}")
             if len(pieces) > 1:
                 desc += f" -- part {i}/{len(pieces)}"
             if a.dry_run:
@@ -231,7 +271,7 @@ def main(argv=None) -> int:
             else:
                 try:
                     store.put(name, desc[:200], "reference", linked, a.agent,
-                              tier=a.tier)
+                              tier=a.tier, extra={"source": src})
                 except ValueError as e:
                     skipped.append(f"{name}: {e}")
                     continue
@@ -239,6 +279,16 @@ def main(argv=None) -> int:
         written += 1
 
     print(f"\n{written} conversation(s) -> {parts} memory file(s) in {root}")
+    # WHAT CAME FROM WHERE, every run. Unifying twelve histories, the count
+    # per system is the first thing you check and the first thing that
+    # reveals a silent miss -- an export that contributed nothing shows up
+    # here as an absence rather than as a number nobody printed.
+    if by_source:
+        print("by source system:")
+        for k in sorted(by_source):
+            flag = ("   <- shape and path both unrecognised; pass --source "
+                    "to name it" if k == "unknown" else "")
+            print(f"  {k:12s} {by_source[k]}{flag}")
     if skipped:
         print(f"{len(skipped)} SKIPPED (named, never silent):", file=sys.stderr)
         for s in skipped:
