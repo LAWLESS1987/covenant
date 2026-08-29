@@ -17,7 +17,14 @@ plan for reversing that decision safely, if and when it is wanted.
 | `holdings.txt` | 505 bytes, 13 lines, ~10 position rows with quantities and average buy prices |
 | `TRADING_POLICY.json` | keys `policy`, `locked_positions`, `sleeve`, `graduation_requirements`, `overrides` |
 | paths to purge | 4 — root and `launch/covenant-v8.37/` for both files |
-| commits touching them | `716a60a` (added), `2dfe018` (removed) |
+| commits that MODIFIED them | `716a60a` (added), `2dfe018` (removed) |
+| commits whose TREE CONTAINS them | **16** — every commit between those two |
+
+A correction worth keeping, because it was nearly a mistake in this very
+file: only **two** commits modify those files, but **sixteen** commits have
+them in their tree. Anyone can read the data from any of the sixteen. A purge
+must be verified against every reachable commit, which is what the loop in
+step 2 does — not against the two that `git log -- <path>` reports.
 
 `sync_holdings.py` was checked separately and embeds no position data — it
 reads the file, it does not carry it. It can stay.
