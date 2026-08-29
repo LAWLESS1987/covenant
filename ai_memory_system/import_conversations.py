@@ -9,9 +9,12 @@ that already exists as data somewhere. This takes the data.
 
 SUPPORTED INPUTS (auto-detected, no flag needed):
   * claude.ai export      conversations.json  -- Settings > Privacy > Export
-  * ChatGPT export        conversations.json  (a different shape, same name)
-  * a directory           any .json / .md / .txt inside it
-  * one file              .json / .md / .txt
+  * ChatGPT export        conversations.json / conversations-000.json ...
+  * a .zip                extracted in place, then walked
+  * Claude Code           *.jsonl  (~/.claude/projects) -- already on disk
+  * Ollama desktop        db.sqlite -- already on disk, opened READ-ONLY
+  * a directory           walked recursively
+  * one file              .json / .jsonl / .sqlite / .md / .txt
 
 WHAT IT WILL NOT DO, on purpose:
   * it does not summarise. There is no model call here, so nothing invents a
@@ -36,6 +39,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
@@ -49,6 +53,26 @@ from memory_store import MemoryStore   # noqa: E402
 
 CHUNK_CHARS = 6000
 _SLUG_BAD = re.compile(r"[^a-z0-9]+")
+
+# A TOOL'S OWN WORKING DIRECTORY IS NOT A CONVERSATION.
+#
+# Measured on this machine 2026-08-29: walking ~/.claude/projects picked up 22
+# files that were not chats at all -- 16 workflow-agent .meta.json files, a
+# scratch .txt, and the operator's own memory/*.md (which are memories
+# already, and belong in through the frontmatter-aware path, not as raw text
+# blobs). Imported blind they would have filed subagent orchestration as
+# things somebody said, which is the same defect as importing ChatGPT's
+# web.run messages -- caught here only because the per-source counts printed
+# a number that did not match the file count.
+_SKIP_DIRS = {"subagents", "workflows", "tasks", "shell-snapshots", "statsig",
+              "__pycache__", "node_modules", ".git", ".trash", "memory",
+              "todos", "scratchpad", "logs", "tool-results"}
+_SKIP_SUFFIXES = (".meta.json", ".lock", ".part")
+
+
+def _is_internal(name: str) -> bool:
+    low = name.lower()
+    return low.startswith(".") or low.endswith(_SKIP_SUFFIXES)
 
 
 def slugify(text: str, fallback: str = "conversation") -> str:
@@ -217,6 +241,139 @@ def parse_plain(path: str) -> Iterator[Tuple[str, str, str]]:
         yield os.path.splitext(os.path.basename(path))[0], "", text
 
 
+# ---------------------------------------------------------------- LOCAL --
+# Two corpora that need no export request because they are already on disk.
+# Both are read STRICTLY read-only: these are live application databases and
+# transcript files, and an importer that corrupts the thing it is reading has
+# destroyed the original to make a copy.
+
+# Claude Code writes one JSONL per session. Most record types are plumbing;
+# only `user` and `assistant` carry conversation. Titles arrive in their own
+# records, keyed by sessionId, so a first pass collects them.
+_CC_NOISE = {"bridge-session", "queue-operation", "attachment", "last-prompt",
+             "atis-latch", "system", "ai-title", "custom-title"}
+
+
+def _cc_text(content: Any) -> str:
+    """Text out of a Claude Code message.
+
+    Assistant content is a list of typed blocks. `text` is the conversation;
+    `tool_use` and `tool_result` are ORCHESTRATION -- and tool_result in
+    particular carries whole file contents, which would bury the actual
+    exchange under megabytes of things nobody said. `thinking` is dropped
+    too: it was never shown, and storing it as something the assistant said
+    would misattribute reasoning as statement.
+    """
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return _text_of(content)
+    out = []
+    for b in content:
+        if isinstance(b, dict) and b.get("type") == "text":
+            out.append(str(b.get("text") or ""))
+        elif isinstance(b, str):
+            out.append(b)
+    return "\n".join(x for x in out if x.strip())
+
+
+def parse_claude_code(path: str) -> Iterator[Tuple[str, str, str]]:
+    """One Claude Code .jsonl -> one conversation per sessionId."""
+    titles: Dict[str, str] = {}
+    sessions: Dict[str, List[str]] = {}
+    stamps: Dict[str, str] = {}
+    meta: Dict[str, str] = {}
+    try:
+        fh = io.open(path, encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue          # a torn last line is normal in a live log
+            if not isinstance(rec, dict):
+                continue
+            kind = rec.get("type")
+            sid = str(rec.get("sessionId") or "")
+            if kind in ("ai-title", "custom-title"):
+                t = rec.get("customTitle") or rec.get("aiTitle")
+                if sid and t:
+                    titles[sid] = str(t)
+                continue
+            if kind in _CC_NOISE or kind not in ("user", "assistant"):
+                continue
+            msg = rec.get("message") or {}
+            body = _cc_text(msg.get("content")).strip()
+            if not body:
+                continue
+            who = msg.get("role") or kind
+            # A sidechain is a subagent's conversation, not the operator's.
+            # Kept -- it is real work -- but LABELLED, so nobody later reads
+            # a subagent's words as something the user said.
+            if rec.get("isSidechain"):
+                who = f"{who} (subagent)"
+            sessions.setdefault(sid, []).append(f"**{who}:** {body}")
+            stamps.setdefault(sid, str(rec.get("timestamp") or "")[:10])
+            if sid not in meta:
+                bits = [str(rec.get("cwd") or ""), str(rec.get("gitBranch")
+                                                       or "")]
+                meta[sid] = " ".join(b for b in bits if b)
+    for sid, lines in sessions.items():
+        if not lines:
+            continue
+        title = titles.get(sid) or f"session {sid[:8]}"
+        head = meta.get(sid, "")
+        body = (f"_{head}_\n\n" if head else "") + "\n\n".join(lines)
+        yield title, stamps.get(sid, ""), body
+
+
+def parse_ollama(path: str) -> Iterator[Tuple[str, str, str]]:
+    """Ollama desktop's db.sqlite -- chats + messages.
+
+    Opened via a mode=ro URI, never a plain connect: Ollama may be RUNNING,
+    and a writer that takes a lock on a live application database to read it
+    is how an import corrupts the thing it was copying.
+    """
+    import sqlite3
+    try:
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10)
+    except sqlite3.Error as e:
+        print(f"  UNREADABLE {os.path.basename(path)}: {e}", file=sys.stderr)
+        return
+    try:
+        cur = con.cursor()
+        cur.execute("select name from sqlite_master where type='table'")
+        tables = {r[0] for r in cur.fetchall()}
+        if not {"chats", "messages"} <= tables:
+            return                       # not an Ollama db; leave it alone
+        cur.execute("select id, title, created_at from chats")
+        for cid, title, created in cur.fetchall():
+            cur.execute(
+                "select role, content, thinking, model_name, created_at "
+                "from messages where chat_id=? order by id", (cid,))
+            lines = []
+            model = ""
+            for role, content, _thinking, model_name, _ts in cur.fetchall():
+                model = model or (model_name or "")
+                text = (content or "").strip()
+                if text:
+                    lines.append(f"**{role or '?'}:** {text}")
+            if lines:
+                head = f"_model: {model}_\n\n" if model else ""
+                yield (str(title or f"ollama chat {cid}"),
+                       str(created or "")[:10], head + "\n\n".join(lines))
+    except sqlite3.Error as e:
+        print(f"  SQLITE ERROR on {os.path.basename(path)}: {e}",
+              file=sys.stderr)
+    finally:
+        con.close()
+
+
 def detect_source(path: str, data: Any) -> str:
     """Name the system this file came from, from its SHAPE first and its
     path second. Shape is the stronger signal: a folder can be renamed, a
@@ -253,8 +410,12 @@ def sources(path: str) -> Iterator[Tuple[str, str, str, str]]:
         for fn in sorted(os.listdir(path)):
             full = os.path.join(path, fn)
             if os.path.isdir(full) and not fn.startswith("."):
+                if fn.lower() in _SKIP_DIRS:
+                    continue
                 yield from sources(full)
-            elif fn.lower().endswith((".json", ".md", ".txt")):
+            elif (fn.lower().endswith((".json", ".jsonl", ".md", ".txt",
+                                       ".sqlite", ".db"))
+                  and not _is_internal(fn)):
                 yield from sources(full)
         return
     if path.lower().endswith(".zip"):
@@ -270,6 +431,16 @@ def sources(path: str) -> Iterator[Tuple[str, str, str, str]]:
         except (zipfile.BadZipFile, OSError) as e:
             print(f"  UNREADABLE ZIP {os.path.basename(path)}: {e}",
                   file=sys.stderr)
+        return
+    low = path.lower()
+    if low.endswith(".jsonl"):
+        for title, when, body in parse_claude_code(path):
+            yield title, when, body, "claude-code"
+        return
+    if low.endswith((".sqlite", ".db")):
+        src = "ollama" if "ollama" in low else detect_source(path, None)
+        for title, when, body in parse_ollama(path):
+            yield title, when, body, src
         return
     if path.lower().endswith(".json"):
         try:
