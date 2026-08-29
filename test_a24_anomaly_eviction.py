@@ -177,10 +177,17 @@ def s2():
     This is the measurement A24's fix shape asked for."""
     t0 = time.time()
     clean = fresh(); _stream(clean, t0)
-    before = clean.report()
-
     dirty = fresh(); _stream(dirty, t0)
     flood(dirty, "peer_tx_id_invalid", 6000)
+    # Take the two reports BACK-TO-BACK, after the flood. report() anchors its
+    # recent/baseline windows at the moment of the call; a 6,000-frame flood
+    # costs real wall clock (about a second on a loaded win32 box), and with
+    # `before` taken before the flood the oldest honest event slid out of each
+    # window between the two calls -- S2d then failed 690/150 vs 689/149 on a
+    # stream the flood never touched. Measured 2026-08-29, deployed core and
+    # candidate alike, every run under load. The flood cannot leak into
+    # `before`: clean and dirty are separate monitors.
+    before = clean.report()
     after = dirty.report()
 
     b_names = [s["kind"] for s in before["spikes"]]

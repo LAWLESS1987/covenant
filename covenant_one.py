@@ -116,6 +116,15 @@ SUITES = [
     ("test_p11_version_identity.py",     180,  "IDENTITY"),
     ("test_p12_substrate_sensing.py",    180,  "IDENTITY"),
     ("test_p14_watchdog_self_drift.py",  120,  "IDENTITY"),
+    # P15 (2026-08-28): the watchdog's ollama identity probe -- canned
+    # responses, no socket, no keys. 29/29 here 2026-08-29; shipped 08-28 and
+    # wired into NO runner until now, which is exactly the orphan class this
+    # coverage phase exists to catch.
+    ("test_p15_judge_identity.py",       120,  "IDENTITY"),
+    # P19 (2026-08-29): the sweep's own overlay guard -- a candidate folder
+    # must not supply the checks that judge it. Subprocess-drives the real
+    # run_local_sweep.py in a scratch tree; no node, no socket. 23/23.
+    ("test_p19_overlay_guard.py",        180,  "GATE INTEGRITY"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     ("test_b5_mine_latency.py",          300,  "JUDGE"),
@@ -142,6 +151,22 @@ DELIBERATELY_OFF = {
     "test_xrp_live.py":
         "needs a FUNDED XRP testnet account. Mainnet stays BLOCKED until this "
         "has run once.",
+    "test_c2_watchdog_live.py":
+        "boots the watchdog's REAL topology (5000/5020/5060) on nodes it "
+        "starts itself -- same class as test_covenant_app: run it with the "
+        "chain STOPPED. 27/27 x2 on Linux 2026-08-29 (run_all_tests.sh runs "
+        "it in the sandbox sweep, where there is no chain to collide with).",
+    "test_j1_judge_paths.py":
+        "records two OPEN judge-path defects of the deployed core (X2: a "
+        "registry overwrite leaves no trace; X4: quorum diversity reports the "
+        "constructor override, not the model that will be sent) -- the fix "
+        "landed in pending-v8.38 (fdb4290) and ships with the v8.40 "
+        "candidate. 12/14 red against deployed BY DESIGN; joins the sweep "
+        "when the candidate lands, and its red is this line until then.",
+    "test_sem4_degraded_model.py":
+        "imports covenant_semantic_judge, which ships in pending-v8.38 only "
+        "-- cannot even import against the deployed tree. Runs in candidate "
+        "sweeps; joins this list when the v8.40 candidate lands.",
     "probe_block_hash.py":  "one-off investigation probe, not a pass/fail suite",
     "probe_mainnet_review.py": "one-off investigation probe, not a pass/fail suite",
     "probe_power.py":       "one-off investigation probe, not a pass/fail suite",

@@ -1,46 +1,17 @@
-covenant local sweep -- 2026-08-27 03:22:52
-python 3.12.10  pid 10840
+covenant local sweep -- 2026-08-29 12:06:44
+python 3.12.10  pid 23796
 leftover cleanup is disabled by design -- see kill_leftovers()
-staging into C:\Users\<user>\AppData\Local\Temp\covenant_sweep ...
+staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
 staged.
-core   551342 bytes
+core   561241 bytes  sha256 89ef8efe914e  (as STAGED, not as deployed)
 
-test_a1a_a2.py                   rc=0      13.1s  15/15 passed
-test_a3_bounded_reads.py         rc=0       2.8s  7 passed, 0 failed
-test_a5_size_coherence.py        rc=0       4.0s  20 passed, 0 failed
-test_a11_gossip_scale.py         rc=0       1.3s  23/23 passed
-test_a12_dead_peer_backoff.py    rc=0      19.9s  21/21 passed
-test_a13_one_way_sync.py         rc=0      36.1s  25/25 passed
-test_a14_boot_probe.py           rc=0      13.2s  15/15 passed
-test_a15_exchange_deadline.py    rc=0      18.5s  14/14 passed
-test_a17_oneway_peer_sync.py     rc=0      15.1s  6/6 passed
-test_b1_judge_parser.py          rc=0      33.2s  162/162 passed
-test_b2_quorum_diversity.py      rc=0       3.8s  73/73 passed
-test_p14_watchdog_self_drift.py  rc=0       0.1s  33/33 passed
-test_y1_stake_divergence.py      rc=0       4.5s  10/10 passed
-test_w1_wsgi.py                  rc=0      12.0s  24/24 passed
-test_p11_version_identity.py     rc=0       1.8s  29/29 passed
-test_p12_substrate_sensing.py    rc=0      11.4s  41/41 passed
-test_a20_peer_version.py         rc=0       8.2s  27/27 passed
-test_a22_topology_vigilance.py   rc=0       1.4s  21/21 passed
-test_a23_ack_health.py           rc=1      15.3s  A23: 22/24 passed
-test_a3s_send_bounds.py          rc=0       9.1s  49/49 checks
-test_w2_sandbox_platform.py      rc=0       2.4s  12/12 passed
-test_d3_daily_guards.py          rc=0       5.9s  77/77 passed
-test_adversarial_suite.py        rc=0       0.9s  21 passed, 0 failed
-test_b5_mine_latency.py          rc=0      33.9s  31/31 passed
-test_security_audit.py           rc=1      55.2s  128 passed, 1 failed
-test_e2e_gift.py                 rc=0       0.7s  11 passed, 0 failed
-test_a9_relay_race.py            rc=0      26.3s  18/18 passed
-test_a1_kill_matrix.py           rc=1      58.7s  28/30 passed
-test_a4_block_injection.py       rc=0     147.9s  60/60 passed
-test_multinode_live.py           rc=0      80.4s  21 passed, 0 failed
-sim_order_independence.py        rc=0      14.9s  ALL INVARIANTS HELD
-sim_yield_safety.py              rc=0      68.5s  <no tally>   means the number you choose is not the number you get.
-probe_final_pass.py              rc=1       0.1s  <no tally> covenant_xrp_mainnet.MainnetGuardError: xrpl-py not importab
-test_r1_lora_frame.py            rc=0       0.1s  58 passed, 0 failed
-test_backtest_guardrails.py      rc=0       2.4s  16 passed, 0 failed
-test_3node_config.py             rc=0       0.1s  11/11 passed
+running 2 run(s) of 1 suite(s), alone
 
-total 12.1 min
-per-suite logs: C:\Users\<user>\AppData\Local\Temp\covenant_sweep\logs
+check  test_a24_anomaly_eviction.py     sha256 e44452095326  (as STAGED)
+
+test_a24_anomaly_eviction.py     rc=0       6.0s  70/70 passed
+test_a24_anomaly_eviction.py     rc=0       6.4s  70/70 passed
+
+total 0.2 min
+GREEN: every suite that ran, passed.
+per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs

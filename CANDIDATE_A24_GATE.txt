@@ -1,22 +1,22 @@
-covenant local sweep -- 2026-08-29 11:52:33
-python 3.10.12  pid 5
+covenant local sweep -- 2026-08-29 12:13:59
+python 3.12.10  pid 25256
 leftover cleanup is disabled by design -- see kill_leftovers()
-staging into /sessions/rcw-01vzghf8hbfrykbxpwhjglx1/tmp/covenant_sweep ...
+staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
 staged.
-candidate overlay from /sessions/rcw-01vzghf8hbfrykbxpwhjglx1/mnt/covenant/pending-v8.38: 9 file(s) copied -- build_model_v2.py, build_semantic_model.py, competence.py, covenant_semantic_judge.py, covenant_unified_v8.PROJECT-8e04a293efd9.py, covenant_unified_v8.py, lexicon_multi.py, lexicon_register.py ...
+candidate overlay from C:\Users\Lawre\covenant\pending-v8.38: 9 file(s) copied -- build_model_v2.py, build_semantic_model.py, competence.py, covenant_semantic_judge.py, covenant_unified_v8.PROJECT-8e04a293efd9.py, covenant_unified_v8.py, lexicon_multi.py, lexicon_register.py ...
 OVERLAY BLOCKED test_competence.py: candidate copy d81782af42e5 NOT staged; the sweep runs the deployed copy (no deployed copy). Gate files never come from the folder under test (P19); --allow-suite-overlay test_competence.py overrides.
 OVERLAY BLOCKED test_sem5_register_coverage.py: candidate copy 3f8baa73d519 NOT staged; the sweep runs the deployed copy (no deployed copy). Gate files never come from the folder under test (P19); --allow-suite-overlay test_sem5_register_coverage.py overrides.
 OVERLAY BLOCKED test_semantic_judge.py: candidate copy 5d2a918af647 NOT staged; the sweep runs the deployed copy (no deployed copy). Gate files never come from the folder under test (P19); --allow-suite-overlay test_semantic_judge.py overrides.
-core   567459 bytes  sha256 970b4d28b858  (as STAGED, not as deployed)
+core   577358 bytes  sha256 525f235134f5  (as STAGED, not as deployed)
 
 running 2 run(s) of 1 suite(s), alone
 
-check  test_a24_anomaly_eviction.py     sha256 ae1d56f9667b  (as STAGED)
+check  test_a24_anomaly_eviction.py     sha256 e44452095326  (as STAGED)
 
-test_a24_anomaly_eviction.py     rc=1       2.7s  15/42 passed
-test_a24_anomaly_eviction.py     rc=1       2.7s  15/42 passed
+test_a24_anomaly_eviction.py     rc=0       7.6s  70/70 passed
+test_a24_anomaly_eviction.py     rc=0       8.1s  70/70 passed
 
-total 0.1 min
-RED: 2 suite(s) -- test_a24_anomaly_eviction.py, test_a24_anomaly_eviction.py
-CANDIDATE SWEEP: staged from /sessions/rcw-01vzghf8hbfrykbxpwhjglx1/mnt/covenant/pending-v8.38 over the deployed tree. The deployed core was NOT changed.
-per-suite logs: /sessions/rcw-01vzghf8hbfrykbxpwhjglx1/tmp/covenant_sweep/logs
+total 0.3 min
+GREEN: every suite that ran, passed.
+CANDIDATE SWEEP: staged from C:\Users\Lawre\covenant\pending-v8.38 over the deployed tree. The deployed core was NOT changed.
+per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs

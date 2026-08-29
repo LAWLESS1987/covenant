@@ -24,7 +24,7 @@ import hashlib, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 MAN = os.path.join(HERE, "MANIFEST.sha256")
-SKIP_DIR = {"logs", "__pycache__", ".venv", ".git", "judge_queue",
+SKIP_DIR = {"logs", "__pycache__", ".venv", ".git", ".claude", "judge_queue",
             "_keybackup", "_unsealtest", "launch", "pending-v8.38",
             # Restore points are the same unlanded bytes under another name;
             # pending-v8.38 is skipped, so its snapshots must be too

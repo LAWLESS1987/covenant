@@ -268,7 +268,10 @@ def run_main(argv, prices, state=None):
     """Run daily.main() with fetch stubbed. prices: {sym: (px, closes, why)}
     state=None resets the journal, state=KEEP leaves it, a dict installs it."""
     real_fetch, real_hold, real_argv = daily.fetch, daily.load_holdings, sys.argv
-    daily.fetch = lambda s: prices.get(s, (None, None, "not stubbed"))
+    # *a/**k: daily.fetch grew (source=, notes=, divs=) on 2026-08-28 and the
+    # old one-arg stub then broke every path through one() with a TypeError
+    # scored as NO RESULT. The stub ignores them, as it ignored source before.
+    daily.fetch = lambda s, *a, **k: prices.get(s, (None, None, "not stubbed"))
     daily.load_holdings = lambda *a, **k: [dict(h) for h in HOLD]
     sys.argv = ["daily.py"] + argv
     if state is KEEP:

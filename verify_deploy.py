@@ -60,8 +60,19 @@ MANIFEST = {
     # test_p15_judge_identity (~10:30Z -- shipped 08-28, wired into no runner
     # until the package-coherence run found the gap)
     # (M53 -- the pins move in the SAME change as the file they pin).
+    # ... and re-pinned AGAIN 2026-08-29 ~16:30Z. The b969f5e0d471 file all
+    # three of those re-pins blessed was a MANGLED half-merge: the 06:44Z
+    # session died mid-edit (its stale git locks were found at 11:30Z) and
+    # left the OLD header on the NEW body -- `rm -f *.db.key` back at the
+    # top (the exact line K1 forbids), the case-sensitive scrape back as
+    # live code, and the eleven phantom suites resurrected. K1 6/20 and
+    # K2 6/18 against it; nobody ran them before pinning. Rebuilt from the
+    # PRE-LAND restore point plus the two real insertions (P15+C2, A24
+    # section with P18+P19): 44 suites, K1 20/20, K2 25/25. A pin proves
+    # WHICH bytes arrived, never that the bytes are right -- the suites
+    # that judge the runner have to actually run.
     "run_all_tests.sh":
-        "b969f5e0d4716aa52c8aea32b3d51005c32aa1b402d4dc0b1f3913d04cbfce33",
+        "a8af8433d1c63fd46fc8ec0fedc72cfc2caa3fea25d0af4e1bc0673cbbdf226e",
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
