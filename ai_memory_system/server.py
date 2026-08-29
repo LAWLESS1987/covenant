@@ -320,6 +320,11 @@ class Handler(BaseHTTPRequestHandler):
                                         "note": "no edge layer on this store"})
             name = (qs.get("name") or [""])[0]
             out = dict(myc.stats())
+            # Published deliberately: a store's structural identity is not a
+            # secret, because it protects nothing by being hidden. It lets a
+            # holder detect substitution and drift, and its own `limits`
+            # field says plainly that it does not stop duplication.
+            out["fingerprint"] = myc.fingerprint()
             if name:
                 out["neighbours"] = myc.neighbours(name, 15)
             return self._send(200, out)

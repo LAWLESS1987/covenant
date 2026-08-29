@@ -219,6 +219,81 @@ class Mycelium:
         return [{"name": b, "weight": round(self._decayed(w, seen, now), 4),
                  "kind": kind} for b, w, seen, kind in rows]
 
+    # ---------------------------------------------------------- identity --
+    # WHAT GROWTH ACTUALLY BUYS, AND WHAT IT DOES NOT.
+    #
+    # The graph is PATH-DEPENDENT: its shape is the record of which memories
+    # proved useful together, in what order. Two stores holding byte-identical
+    # memories but used differently diverge structurally within a handful of
+    # recalls, and the difference cannot be derived from the memories -- it is
+    # evidence of use, not of content. So the topology is an identity: a store
+    # can prove which store it is, and detect that another is not it.
+    #
+    # IT DOES NOT MAKE THE STORE HARD TO COPY, and saying otherwise would be
+    # the worst line in this repository. Anything on disk can be copied
+    # byte-for-byte; a copy of this database IS this graph. Growth defeats
+    # RECONSTRUCTION (you cannot infer the graph from the memories) and
+    # defeats SUBSTITUTION (a different store fails the fingerprint). It does
+    # nothing whatever against duplication, and a system that felt unclonable
+    # while being one `copy` away from cloned would be trusted exactly where
+    # it is weakest -- which is the failure this project exists to refuse.
+    #
+    # The honest security value is therefore DETECTION, never prevention:
+    # after a copy, the two diverge on first use and can both prove it.
+    def fingerprint(self, now: Optional[float] = None) -> Dict[str, Any]:
+        """A digest over the topology and its decayed weights.
+
+        Weights are rounded to two places before hashing: the fingerprint has
+        to survive the continuous decay it measures, or it would change every
+        second on its own and detect nothing.
+        """
+        import hashlib
+        now = time.time() if now is None else now
+        with self._lock:
+            rows = self._con.execute(
+                "select a, b, w, seen, kind from edges order by a, b"
+            ).fetchall()
+        parts, explicit = [], 0
+        for a, b, w, seen, kind in rows:
+            if kind == "explicit":
+                explicit += 1
+            parts.append(f"{a}|{b}|{self._decayed(w, seen, now):.2f}|{kind}")
+        body = "\n".join(parts)
+        return {
+            "edges": len(rows),
+            "explicit": explicit,
+            "topology": hashlib.sha256(
+                "\n".join(f"{a}|{b}" for a, b, _w, _s, _k in rows)
+                .encode()).hexdigest()[:16],
+            "weighted": hashlib.sha256(body.encode()).hexdigest()[:16],
+            "means": ("`topology` is the shape alone and changes only when an "
+                      "edge appears or goes; `weighted` also tracks how "
+                      "strongly, so it moves whenever use does"),
+            "limits": ("this identifies a store and detects substitution or "
+                       "drift. It does NOT make the store hard to copy -- a "
+                       "byte copy of this database reproduces this graph "
+                       "exactly. Detection, never prevention."),
+        }
+
+    def divergence(self, other: Dict[str, Any]) -> Dict[str, Any]:
+        """Compare against another store's fingerprint and say WHICH claim
+        failed -- same shape but different strengths is a different fact from
+        a different shape, and reporting one number would hide it."""
+        mine = self.fingerprint()
+        same_topo = mine["topology"] == other.get("topology")
+        same_w = mine["weighted"] == other.get("weighted")
+        if same_topo and same_w:
+            verdict = "identical: same edges, same strengths"
+        elif same_topo:
+            verdict = ("same edges, DIFFERENT strengths -- these were the "
+                       "same store and have been used differently since")
+        else:
+            verdict = ("DIFFERENT edges -- not the same graph. Either a "
+                       "different store, or one that has learned links the "
+                       "other never had")
+        return {"same_topology": same_topo, "same_weights": same_w,
+                "mine": mine, "theirs": other, "verdict": verdict}
+
     def stats(self) -> Dict[str, Any]:
         with self._lock:
             n, avg = self._con.execute(
