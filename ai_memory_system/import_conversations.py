@@ -102,8 +102,51 @@ def parse_claude(data: Any) -> Iterator[Tuple[str, str, str]]:
             yield title, when, "\n\n".join(lines)
 
 
+# Tool authors whose messages are orchestration, not conversation. Importing
+# them fills a memory store with plumbing the user never saw.
+_CHATGPT_TOOLS = {"web.run", "web.search", "browser", "bio", "sonic_webpage",
+                  "dalle.text2im", "python", "automations"}
+# Citation sentinels ChatGPT embeds in assistant text -- Unicode private-use
+# markers that render as garbage anywhere outside chatgpt.com.
+_PUA = re.compile(r"[-]")
+
+
+def _chatgpt_text(content: Any) -> str:
+    """Text out of ONE message, branching on content_type.
+
+    Reaching for parts[0] breaks on every message that is not text or
+    multimodal_text -- code, execution_output and tether_quote carry their
+    payload in `text`/`result` and have no `parts` key at all. The naive
+    version dropped every code block in the archive without erroring.
+    """
+    if not isinstance(content, dict):
+        return _text_of(content)
+    ctype = content.get("content_type") or ""
+    if ctype in ("text", "multimodal_text") or "parts" in content:
+        out = []
+        for p in content.get("parts") or []:
+            # multimodal parts are dicts (image pointers), not strings
+            out.append(p if isinstance(p, str) else _text_of(p))
+        return "\n".join(x for x in out if x)
+    for key in ("text", "result", "content"):
+        if isinstance(content.get(key), str):
+            return content[key]
+    return _text_of(content)
+
+
 def parse_chatgpt(data: Any) -> Iterator[Tuple[str, str, str]]:
-    """ChatGPT export: [{title, create_time, mapping:{id:{message}}}]."""
+    """OpenAI export. The shape is a NODE-MAP DAG, not a message list.
+
+    Every edit and regeneration forks the tree, so `mapping` holds abandoned
+    branches that were never part of the visible conversation. The active
+    branch is found by starting at `current_node` and walking `parent`
+    upward, then reversing. A first draft of this function sorted
+    mapping.values() by create_time instead, which silently imported dead
+    drafts alongside real turns -- corrected 2026-08-29 from documented
+    structure. DeepSeek uses the same family (its leaf is `fragments`).
+    """
+    if isinstance(data, dict) and isinstance(data.get("conversations"), list):
+        data = data["conversations"]        # some exports wrap the array
     if not isinstance(data, list):
         return
     for conv in data:
@@ -113,21 +156,54 @@ def parse_chatgpt(data: Any) -> Iterator[Tuple[str, str, str]]:
         when = ""
         try:
             import datetime
-            when = datetime.datetime.fromtimestamp(
-                float(conv.get("create_time") or 0),
-                datetime.timezone.utc).strftime("%Y-%m-%d")
+            ts = float(conv.get("create_time") or 0)
+            if ts > 0:
+                when = datetime.datetime.fromtimestamp(
+                    ts, datetime.timezone.utc).strftime("%Y-%m-%d")
         except (ValueError, TypeError, OSError):
             pass
-        nodes = [n for n in (conv.get("mapping") or {}).values()
-                 if isinstance(n, dict) and isinstance(n.get("message"), dict)]
-        nodes.sort(key=lambda n: (n["message"].get("create_time") or 0))
+
+        mapping = conv.get("mapping") or {}
+        if not isinstance(mapping, dict):
+            continue
+        # Walk the ACTIVE branch, leaf to root, then reverse.
+        chain, node_id, guard = [], conv.get("current_node"), 0
+        while node_id and guard < 100000:
+            guard += 1
+            node = mapping.get(node_id)
+            if not isinstance(node, dict):
+                break
+            chain.append(node)
+            node_id = node.get("parent")
+        if not chain:
+            # No current_node (older or truncated export): fall back to the
+            # whole mapping, and SAY SO in the body rather than passing off
+            # a branch-polluted transcript as the real one.
+            chain = [n for n in mapping.values() if isinstance(n, dict)]
+            chain.sort(key=lambda n: (((n.get("message") or {})
+                                       .get("create_time")) or 0),
+                       reverse=True)
+        chain.reverse()
+
         lines = []
-        for n in nodes:
-            msg = n["message"]
-            who = ((msg.get("author") or {}).get("role")) or "?"
-            body = _text_of(msg.get("content"))
-            if body.strip():
-                lines.append(f"**{who}:** {body.strip()}")
+        for node in chain:
+            msg = node.get("message")
+            if not isinstance(msg, dict):
+                continue                     # root/structural nodes are null
+            meta = msg.get("metadata") or {}
+            if msg.get("weight") == 0.0:
+                continue                     # hidden by the product
+            if meta.get("is_visually_hidden_from_conversation"):
+                continue
+            author = msg.get("author") or {}
+            if (author.get("name") or "") in _CHATGPT_TOOLS:
+                continue                     # orchestration, not conversation
+            who = author.get("role") or "?"
+            if who == "system":
+                continue
+            body = _PUA.sub("", _chatgpt_text(msg.get("content"))).strip()
+            if body:
+                lines.append(f"**{who}:** {body}")
         if lines:
             yield title, when, "\n\n".join(lines)
 
@@ -168,12 +244,32 @@ def sources(path: str) -> Iterator[Tuple[str, str, str, str]]:
         # folder, and two exports side by side are two folders -- a
         # non-recursive walk silently imported one and reported success,
         # measured on this file's own fixture 2026-08-29.
+        # SPLIT EXPORTS. A large OpenAI archive contains conversations-000.json,
+        # conversations-001.json ... and NO conversations.json at all, so an
+        # importer that opens the singular name finds nothing and reports
+        # success -- the silent-empty-import. Globbing every .json in the tree
+        # (below) covers it by construction; this comment is here so nobody
+        # "optimises" the walk down to the one expected filename.
         for fn in sorted(os.listdir(path)):
             full = os.path.join(path, fn)
             if os.path.isdir(full) and not fn.startswith("."):
                 yield from sources(full)
             elif fn.lower().endswith((".json", ".md", ".txt")):
                 yield from sources(full)
+        return
+    if path.lower().endswith(".zip"):
+        # Exports arrive as zips. Unpacking by hand first is a step people
+        # skip, and a skipped step reads as "the importer found nothing".
+        import tempfile
+        import zipfile
+        try:
+            with zipfile.ZipFile(path) as z:
+                tmp = tempfile.mkdtemp(prefix="mem_zip_")
+                z.extractall(tmp)
+            yield from sources(tmp)
+        except (zipfile.BadZipFile, OSError) as e:
+            print(f"  UNREADABLE ZIP {os.path.basename(path)}: {e}",
+                  file=sys.stderr)
         return
     if path.lower().endswith(".json"):
         try:
