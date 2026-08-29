@@ -410,7 +410,7 @@ def verify_stake_action_signature(pubkey_pem: str, action: str, timestamp: float
 # not a second parallel one).
 # ---------------------------------------------------------------------------
 
-COVENANT_VERSION = "v8.39"
+COVENANT_VERSION = "v8.40"
 
 # ---------------------------------------------------------------------------
 # P11 (v8.31) -- SAY WHAT YOU ARE RUNNING.
@@ -1612,6 +1612,25 @@ class JudgmentResult:
     # this flag only lets the operator tell "slow/broken judge" from "bad
     # transaction" on /anomalies (kind judge_unavailable). Never read to allow.
     infrastructure_failure: bool = False
+    # v8.38 -- True when violates=True means "no judge here could READ this",
+    # not "a judge found fault with it". Same discipline as the flag above:
+    # the gate still fails closed, this NEVER allows anything, and it exists
+    # only so the message the sender receives is true.
+    #
+    # It was added because of a measured defect, not a hypothetical. The
+    # semantic judge returns, carefully: "HELD, NOT JUDGED ... it has made NO
+    # finding and is NOT alleging anything". The gate then wrapped that in
+    # "Ethical gate rejected: Ethical violation: ... VIOLATES --" and the
+    # sender read the accusation first. Every word of care in the judge was
+    # undone by the layer that reported it -- M47's shape, one level up: a
+    # reporting layer must not change the meaning of what it reports.
+    not_understood: bool = False
+    # v8.38 -- True when violates=True means "a judge is not SURE", not "a
+    # judge found fault". Same discipline again: never read to allow, the gate
+    # still fails closed, and it exists so the message is true. ABSTAIN is this
+    # judge's UNKNOWN, and reporting an UNKNOWN as a VIOLATION is the same
+    # category error as reporting it as a PASS -- only in the other direction.
+    uncertain: bool = False
 
 
 class ReasoningJudge(ABC):
@@ -1732,9 +1751,18 @@ class QuorumJudge(ReasoningJudge):
         # Summary preserves each judge's EXACT reasoning verbatim, its id, and a
         # clean/VIOLATES label -- not just the collapsed labels, so an operator
         # reading a rejection sees which provider said what and why.
+        # A component that could not READ the payload is labelled HELD, not
+        # VIOLATES. The label rides inside every rejection message an operator
+        # or a sender ever reads, so getting it wrong here reinstates the
+        # accusation two layers below where it was carefully declined.
+        def _label(r):
+            if not r.violates:
+                return "clean"
+            if r.not_understood:
+                return "HELD"
+            return "UNSURE" if r.uncertain else "VIOLATES"
         summary = " | ".join(
-            f"{r.judge_id}: {'clean' if not r.violates else 'VIOLATES'} -- {r.reasoning}"
-            for r in results)
+            f"{r.judge_id}: {_label(r)} -- {r.reasoning}" for r in results)
         principle = next((r.principle_violated for r in results if r.principle_violated), None)
         estimates = [r.benefit_estimate for r in results if r.benefit_estimate is not None]
         median_benefit = sorted(estimates)[len(estimates) // 2] if estimates else None
@@ -1742,10 +1770,23 @@ class QuorumJudge(ReasoningJudge):
         # AND at least one VIOLATING component failed on infrastructure. A real
         # dissent from a working judge is never relabelled.
         infra = violates and any(r.violates and r.infrastructure_failure for r in results)
+        # ALL of the blocking judges must be reporting illegibility, not just
+        # one. If any judge actually alleges something, this is an allegation
+        # and must read as one -- a quorum where one member cannot read the
+        # payload and another found theft in it has found theft.
+        blocking = [r for r in results if r.violates]
+        unread = bool(blocking) and all(r.not_understood for r in blocking)
+        # uncertain only when nothing alleged: every blocker is unsure or
+        # unreadable, and at least one of them actually looked.
+        unsure = (bool(blocking)
+                  and all(r.uncertain or r.not_understood for r in blocking)
+                  and not unread)
         return JudgmentResult(violates, summary, principle_violated=principle,
                               judge_id=self.judge_id, benefit_estimate=median_benefit,
                               component_results=list(results),
-                              infrastructure_failure=infra)
+                              infrastructure_failure=infra,
+                              not_understood=violates and unread,
+                              uncertain=violates and unsure)
 
 
 class ReasoningSentinel:
@@ -1768,6 +1809,17 @@ class ReasoningSentinel:
         saved verdict could differ from the one acted on."""
         result = self.judge.evaluate(tx.data, self.principles)
         if result.violates:
+            if result.uncertain and not result.not_understood:
+                # Stopped, and honestly: no violation was found. Naming a
+                # principle here would invent the finding that was not made.
+                return (False, f"Blocked, not proven: {result.reasoning}",
+                        None, result)
+            if result.not_understood:
+                # Refused, and truthfully. No principle is named because none
+                # was found -- naming one here would invent the finding the
+                # judge explicitly declined to make.
+                return (False, f"Held, not judged: {result.reasoning}",
+                        None, result)
             return (False, f"Ethical violation: {result.reasoning} (Principle: {result.principle_violated})",
                     None, result)
         benefit_est = result.benefit_estimate if JUDGE_BENEFIT else None
@@ -6811,7 +6863,17 @@ class CovenantAPI:
                 # idle" from "denying 100% of traffic". Spike detection over this
                 # kind makes a stuck gate visible within one window.
                 self.node.anomaly_monitor.record("ethics_gate_rejection", message[:200])
-                return jsonify({"status": "error", "message": f"Ethical gate rejected: {message}"}), 400
+                held = bool(getattr(judgment, "not_understood", False))
+                unsure = bool(getattr(judgment, "uncertain", False))
+                return jsonify({
+                    "status": "error",
+                    "held_not_judged": held,
+                    # the gate already phrased a hold correctly; prefixing it
+                    # again produced "Held, not judged. Held, not judged: ..."
+                    "not_proven": unsure,
+                    "message": (message if (held or unsure)
+                                else f"Ethical gate rejected: {message}"),
+                }), 400
             if JUDGE_BENEFIT and judge_benefit is not None:
                 tx.benefit_score = (2 * judge_benefit + tx.benefit_score) / 3.0
                 tx.judge_benefit_estimate = judge_benefit
@@ -7526,6 +7588,10 @@ class CovenantAPI:
                 "substrate": self.node.substrate.snapshot(),          # P12 (v8.32)
                 "mesh": self.node.peer_state.summary(),               # A20 (v8.33)
                 "quorum": quorum_rep,                                 # B2  (v8.35)
+                # v8.38. Absent (null) when no semantic judge is installed --
+                # deliberately null and not {}, so a reader can tell "no queue"
+                # from "empty queue".
+                "ethics_review": semantic_review_report(self.node.sentinel.judge),
                 "judge_insecure": insecure,
                 "crisis_mode": self.node.crisis_mode,
                 "subsystems": {
@@ -9262,9 +9328,70 @@ class JudgeProviderRegistry:
     build_semantic_quorum() picks them up with no changes to the builder."""
     _providers: Dict[str, Any] = {}
 
+    # v8.38 -- every provider name that was registered twice, in the order it
+    # happened. A ledger and not a refusal; register() says why.
+    _shadowed: List[Dict[str, str]] = []
+
+    @staticmethod
+    def _origin(factory) -> str:
+        """Where a factory came from, for a human reading a warning. Total, by
+        the same rule the diversity report follows: a registry that cannot
+        describe itself must not become a registry that cannot boot."""
+        try:
+            code = getattr(factory, "__code__", None)
+            if code is not None:
+                return f"{os.path.basename(code.co_filename)}:{code.co_firstlineno}"
+            return str(getattr(factory, "__module__", None) or type(factory).__name__)
+        except Exception:                                    # noqa: BLE001
+            return "<unknown>"
+
     @classmethod
-    def register(cls, name: str, factory) -> None:
+    def register(cls, name: str, factory, replace: bool = False) -> None:
+        """Bind a provider name to a factory.
+
+        WHY THIS WARNS AND DOES NOT REFUSE. Two shipped modules both register
+        `local`: covenant_judge_local (OpenAICompatJudge) and
+        covenant_judge_ollama (OllamaJudge). Import order alone decided which
+        one every `local:N` judge in the quorum turned out to be, and it did so
+        in silence -- measured live on v8.37: importing local then ollama moved
+        'local' from OpenAICompatJudge to OllamaJudge with no output at all. An
+        operator reading COVENANT_JUDGE_PROVIDERS=local had no way to learn
+        which of two implementations was judging their chain.
+
+        Refusing the second registration would end the silence by breaking a
+        configuration that works today, at import time, on a running node. That
+        is the wrong trade, and it is the one LinkConductance already settled:
+        DISCLOSE, do not gate. So the overwrite still happens, it is recorded in
+        `_shadowed`, and it says so on STDERR -- stderr and not stdout for the
+        reason the semantic-judge banner learned by breaking test_b1: stdout is
+        a data channel for anything that parses it.
+
+        `replace=True` is the deliberate override -- recorded, but silent,
+        because a warning an operator has already answered is noise (M34).
+        Re-registering the SAME factory object (a module imported twice) is
+        neither recorded nor announced, because nothing changed.
+        """
+        prior = cls._providers.get(name)
+        if prior is not None and prior is not factory:
+            cls._shadowed.append({
+                "name": str(name),
+                "was": cls._origin(prior),
+                "now": cls._origin(factory),
+                "deliberate": "yes" if replace else "no",
+            })
+            if not replace:
+                print(f"WARNING: judge provider {name!r} was already registered by "
+                      f"{cls._origin(prior)} and is being REPLACED by "
+                      f"{cls._origin(factory)}. Import order now decides which "
+                      f"implementation judges your chain. Pass replace=True if "
+                      f"that is deliberate.", file=sys.stderr, flush=True)
         cls._providers[name] = factory
+
+    @classmethod
+    def shadowed_providers(cls) -> List[Dict[str, str]]:
+        """Every provider name redefined this process, oldest first. A copy:
+        an observer must not be able to edit the record it is observing."""
+        return [dict(r) for r in cls._shadowed]
 
     @classmethod
     def build(cls, name: str, index: int = 0) -> ReasoningJudge:
@@ -9314,6 +9441,54 @@ def _build_insecure_mock_provider(index: int) -> ReasoningJudge:
 
 
 JudgeProviderRegistry.register("mock", _build_insecure_mock_provider)
+
+
+# --------------------------------------------------------------------------
+# v8.38 -- the semantic judge, registered as the provider `semantic`.
+#
+# WHY IT IS AN IMPORT AND NOT A CLASS IN THIS FILE. covenant_semantic_judge is
+# pure stdlib and pure integer arithmetic; keeping it out of here is what lets
+# it run on a phone under Termux, where scipy does not build, and what lets its
+# model be replaced without touching a 9,800-line consensus file.
+#
+# WHY IT FAILS SOFT HERE AND HARD THERE. If the module or its model is absent
+# this registers nothing and prints why -- an operator who did not ask for the
+# semantic judge must not lose their node over it. But `install()` itself
+# refuses a tampered or incoherent model rather than degrading to a no-op,
+# because a judge that silently becomes a pass-through is the failure this
+# whole component exists to remove. Absent is a configuration; corrupt is an
+# attack.
+#
+# It is additive. No verdict, route, bound or refusal below is changed, and
+# `mock_selfreport` keeps its absolute veto exactly as it was -- it is the
+# SELF-REPORT channel and B2's finding was that counting it as a second opinion
+# is a category error, not that the channel should go.
+try:
+    import covenant_semantic_judge as _covenant_semantic_judge
+    _SEMANTIC_JUDGE_CLS = _covenant_semantic_judge.install(
+        ReasoningJudge, JudgmentResult, JudgeProviderRegistry)
+    SEMANTIC_JUDGE_MODEL = _SEMANTIC_JUDGE_CLS.model_obj.model_id
+    # STDERR, not stdout, and the reason is a real defect this patch had.
+    # This runs at IMPORT time, and test_b1's check T launches a subprocess and
+    # parses its STDOUT to read back the accepted judge timeout. A banner on
+    # stdout became that subprocess's first line and the check read it instead
+    # of the number -- 161/162, consistently, alone, twice, while pristine
+    # v8.37 passed 162/162. Found by running the existing suites against the
+    # file being shipped (M6), not by review.
+    #
+    # The general rule, and it is P11's rule one layer along: an OBSERVABILITY
+    # feature must not be able to change behaviour. stdout is a data channel
+    # for anything that parses it; diagnostics belong on stderr. covenant_prod
+    # redirects 2>&1 into the node log, so an operator still sees this.
+    print(f"semantic judge available: model {SEMANTIC_JUDGE_MODEL} "
+          f"(provider 'semantic'; add it to COVENANT_JUDGE_PROVIDERS to use it)",
+          file=sys.stderr, flush=True)
+except ImportError:
+    SEMANTIC_JUDGE_MODEL = None
+except Exception as _e:                      # a bad model must be loud
+    SEMANTIC_JUDGE_MODEL = None
+    print(f"WARNING: semantic judge present but NOT loaded: {_e}",
+          file=sys.stderr, flush=True)
 
 
 def build_semantic_quorum(providers: Optional[List[str]] = None,
@@ -9475,6 +9650,57 @@ def _judge_facts(j, semantic_ids: Set[str], required_ids: Set[str]) -> Dict[str,
         role = "semantic"
     else:
         role = "other"
+    # THE MODEL THIS JUDGE WILL ACTUALLY SEND -- not the constructor override.
+    #
+    # v8.38. `getattr(j, "model")` is the EXPLICIT override, and it is None in
+    # every configuration this repo ships. OllamaJudge keeps its per-instance
+    # model in `_model_override`, set by the judges.json factory whose own
+    # comment says those overrides exist so "several judges can coexist in one
+    # process pointing at different endpoints and different models"; and
+    # OpenAICompatJudge resolves model -> env -> default_model inside `_model()`.
+    # So the mechanism built to CREATE model diversity was invisible to the
+    # meter built to MEASURE it, and the meter reported the absence of a field
+    # as the absence of the thing.
+    #
+    # Measured on this machine's real judges.json (pc_qwen qwen3:8b, pc_mid
+    # qwen3:4b, pc_small qwen3:1.7b): three different models reported as
+    # `<provider default>` three times, independent_semantic_judges = 1, and the
+    # operator told at every boot that a deliberately diverse quorum was "not
+    # independently diverse". That is M34 -- a permanent warning that is false
+    # is how an operator learns to skim the true ones.
+    #
+    # WHY IT CALLS `_model()` INSTEAD OF REBUILDING ITS PRECEDENCE. The
+    # precedence lives in the judge class and can change there; a second copy
+    # here would be a meter that silently drifts from the thing it meters, which
+    # is P18/M52 in miniature. The call is guarded, and its failure is REPORTED
+    # as model_source="resolver_raised" rather than swallowed: "the meter could
+    # not read" and "the judge has no model" are different claims, and rendering
+    # the first as `<provider default>` would be M30 again.
+    #
+    # DISCLOSURE ONLY. This raises independent_semantic_judges for a genuinely
+    # multi-model local quorum from 1 to n. Nothing in this file gates on that
+    # number -- it is printed on /health and at boot -- and `diverse` still
+    # requires an EMPTY degradation list, so three judges sharing one parser and
+    # one credential env remain non-diverse, correctly, and now say why.
+    model_val = None
+    model_src = "none"
+    _resolver = getattr(j, "_model", None)
+    if callable(_resolver):
+        try:
+            model_val = _resolver()
+            model_src = "resolver" if model_val else "none"
+        except Exception:                                    # noqa: BLE001
+            model_src = "resolver_raised"
+    if not model_val and model_src != "resolver_raised":
+        for _attr, _src in (("_model_override", "instance_override"),
+                            ("model", "constructor"),
+                            ("default_model", "class_default")):
+            _v = getattr(j, _attr, None)
+            if _v:
+                model_val, model_src = _v, _src
+                break
+    if not model_val:
+        model_val = "<provider default>"
     return {
         "id": jid,
         "role": role,
@@ -9482,11 +9708,46 @@ def _judge_facts(j, semantic_ids: Set[str], required_ids: Set[str]) -> Dict[str,
         "provider": str(getattr(cls, "provider", "n/a"))[:32],
         "credential_env": env_var,
         "credentialled": credentialled,
-        "model": str(getattr(j, "model", None) or "<provider default>")[:64],
+        "model": str(model_val)[:64],
+        "model_source": model_src,
         "live_path": bool(live_path),
         "verdict_path": _owner("_parse_verdict"),
         "prompt_path": _owner("_build_prompt"),
     }
+
+
+def semantic_review_report(judge, peer_claims=None):
+    """The semantic judge's review queue, for /health. v8.38.
+
+    Walks a quorum to find any member that keeps one. Pure and total, for the
+    same reason quorum_diversity_report is: an observability feature must not
+    be able to stop a node booting (P11/M47). Returns None when there is no
+    such judge, and None is rendered as ABSENT rather than as an empty queue --
+    "nobody is held" and "nobody is counting" are different claims and only one
+    of them is good news.
+
+    What it surfaces is transactions the ethics model could not READ. Nothing
+    has been alleged against any of them. They are stopped, and they are
+    waiting on anyone competent to answer for them. A hold nobody can see is
+    not a safeguard, it is a pile.
+    """
+    try:
+        seen, stack = set(), [judge]
+        while stack:
+            j = stack.pop()
+            if j is None or id(j) in seen:
+                continue
+            seen.add(id(j))
+            fn = getattr(j, "review_report", None)
+            if callable(fn):
+                return fn(peer_claims)
+            stack.extend(list(getattr(j, "judges", []) or []))
+            inner = getattr(j, "inner", None)
+            if inner is not None:
+                stack.append(inner)
+        return None
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 def quorum_diversity_report(judge) -> Dict[str, Any]:
@@ -9612,6 +9873,34 @@ def quorum_diversity_warnings(rep: Dict[str, Any],
             f"judge(s) of {rep.get('semantic_judges')} configured "
             f"({', '.join(str(d) for d in degs) or 'no second opinion'}) "
             f"-- the self-report layer is not a second opinion (B2)")
+    # v8.38 -- A GAP THE MODEL FIX OPENED, CLOSED IN THE SAME CHANGE.
+    #
+    # Until _judge_facts read the effective model, a three-model local quorum
+    # counted as ONE judge, so the sentence above fired and the operator was
+    # told something false but was at least told SOMETHING. Reading the real
+    # models raises the count to three and silences that sentence -- and
+    # `duplicate_implementation` and `shared_credential` are still true, still
+    # in `degradations`, still enough to hold `diverse` at False, and now
+    # nothing says them out loud. Trading a false warning for silence about a
+    # true one is not an improvement; it is M30 wearing a fix's clothes.
+    #
+    # Independence of OPINION and independence of FAILURE are different
+    # properties and only the first one went up. Three judges on three models
+    # behind one parser and one credential env still fall together, which is
+    # what judges.json's own note means by "All three below are on one machine,
+    # so they share ONE failure: that machine."
+    if (rep.get("is_quorum")
+            and rep.get("independent_semantic_judges", 0) >= 2
+            and not rep.get("diverse")):
+        shared = [str(d) for d in degs
+                  if str(d).startswith(("duplicate_implementation:",
+                                        "shared_credential:"))]
+        if shared:
+            out.append(
+                f"ethics quorum: {rep.get('independent_semantic_judges')} "
+                f"independent semantic judges, but they share a failure "
+                f"({', '.join(shared)}) -- one parser bug or one missing "
+                f"credential takes all of them at once (B2)")
     return out
 
 

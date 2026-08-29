@@ -45,6 +45,12 @@ SUITES = [
     ("test_a14_boot_probe.py", 150), ("test_a15_exchange_deadline.py", 150),
     ("test_a17_oneway_peer_sync.py", 150), ("test_b1_judge_parser.py", 180),
     ("test_b2_quorum_diversity.py", 180),
+    # v8.40 (2026-08-29): the semantic-judge layer's own gates, landed with
+    # the layer. j1 34/34, sem4 28/28, competence 56/56, semantic 26/26,
+    # sem5 6/6 -- the tallies of the candidate sweep that admitted them.
+    ("test_j1_judge_paths.py", 120), ("test_sem4_degraded_model.py", 120),
+    ("test_competence.py", 120), ("test_semantic_judge.py", 120),
+    ("test_sem5_register_coverage.py", 120),
     ("test_p14_watchdog_self_drift.py", 120),
     # 2026-08-29: closing the runner/runner drift M58 recorded. The 08-27
     # delivery's runner (07786e6ca851) had "P18 added to SUITES"; the 00:40Z
@@ -166,11 +172,26 @@ def stage():
     # a .py-only tree both suites fail on absent files and say so, which
     # reads exactly like a real defect. Copying is not executing: nothing in
     # the sweep runs a .bat except through the console's own allowlist.
+    # The judge's model files joined 2026-08-29 with v8.40: the semantic
+    # judge is code PLUS a model, and staged from a .py-only tree it raises
+    # "no semantic model" -- all four semantic suites went red on the first
+    # v8.40 deployed sweep from exactly this line. The candidate OVERLAY has
+    # copied .json since 00:40Z; the base stage never did, which is the same
+    # asymmetry twice in one day.
     for n in os.listdir(SRC):
         p = os.path.join(SRC, n)
         if os.path.isfile(p) and (n.endswith(".py") or n.endswith(".bat")
-                                  or n.endswith(".html") or n == "genesis.json"):
+                                  or n.endswith(".html") or n == "genesis.json"
+                                  or n in ("semantic_judge_model.json",
+                                           "model_v1.json")):
             shutil.copy2(p, WORK)
+    # SEM4's D7 proves verdicts unchanged against the pristine pre-fix judge
+    # source, which ships at docs/semantic/. The whole docs/ tree carries a
+    # 46-book corpus and does not belong in every sweep; the one file does.
+    _pristine = os.path.join(SRC, "docs", "semantic", "prefix_sem_judge.py")
+    if os.path.isfile(_pristine):
+        os.makedirs(os.path.join(WORK, "docs", "semantic"), exist_ok=True)
+        shutil.copy2(_pristine, os.path.join(WORK, "docs", "semantic"))
     for d in ("realdata", "quant", "ops"):
         s = os.path.join(SRC, d)
         if os.path.isdir(s):

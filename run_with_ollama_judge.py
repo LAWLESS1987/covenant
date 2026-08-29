@@ -35,7 +35,10 @@ os.environ.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "300")
 os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
 
 os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
-    "COVENANT_JUDGE_PROVIDERS_OVERRIDE", "local")
+    # v8.40: local (ollama) + semantic (the deterministic lexical judge)
+    # -- two INDEPENDENT opinions, which is what B2 requires the quorum
+    # to have and what providers="local" alone never gave it.
+    "COVENANT_JUDGE_PROVIDERS_OVERRIDE", "local,semantic")
 # never silently fall back to keyword matching
 os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
 

@@ -441,6 +441,30 @@ run test_b1_judge_parser.py 180
 #                       peer. Section X is the PRE-FIX RECORD: 22/29 on pristine
 #                       v8.34, 73/73 on v8.35.
 run test_b2_quorum_diversity.py 180
+#   The semantic-judge layer (v8.40, landed 2026-08-29). Five gates that
+#                       rode in with the layer itself:
+#   test_j1_judge_paths      maps every path a verdict can take to a judge;
+#                       X2 (registry overwrite on the record) and X4 (report
+#                       the model that will be SENT, not the constructor
+#                       override) are the fixes it pins. 34/34 on v8.40.
+#   test_sem4_degraded_model the judge may not report full competence on a
+#                       model that cannot measure it -- inert passes named,
+#                       'unfitted' derived from the guards, install() warns
+#                       once on stderr, format /2 minus its keys REFUSED,
+#                       verdicts proven unchanged against the pristine
+#                       pre-fix source (docs/semantic/). 28/28.
+#   test_competence          the v2 model pair loads and the competence
+#                       machinery works both directions. 56/56.
+#   test_semantic_judge      the judge itself: verdict lattice, holds,
+#                       who_can_clear, the ILLEGIBLE floor. 26/26.
+#   test_sem5_register_coverage  the register rule as designed, and S5:
+#                       whatever the model misses it must DECLARE
+#                       (missing_seeds carries six formal verbs). 6/6.
+run test_j1_judge_paths.py 120
+run test_sem4_degraded_model.py 120
+run test_competence.py 120
+run test_semantic_judge.py 120
+run test_sem5_register_coverage.py 120
 #   test_b5_mine_latency (B5, measurement; the FIX waits on L's B4 answer.
 #                       v8.24 adds observability only: a /mine refusal is now
 #                       recorded as mine_rejected_ethics, and an infrastructure

@@ -47,6 +47,14 @@ model; this only stops the gap from being invisible.**
 Run: python3 test_sem4_degraded_model.py
 """
 import os, sys, ast, json, copy, inspect, tempfile, subprocess, importlib.util
+# win32: a piped or console stdout defaults to cp1252, and this suite
+# prints the scripts it tests (Devanagari, CJK) -- a gate that crashes
+# on its own evidence is NO RESULT, not a verdict. Measured 2026-08-29:
+# UnicodeEncodeError under the plain console; the fix is self-contained
+# here rather than an environment ask of every runner.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -61,7 +69,14 @@ import covenant_semantic_judge as sj
 MODEL = os.path.join(HERE, "model_v1.json")
 if not os.path.exists(MODEL):
     MODEL = os.path.join(HERE, "semantic_judge_model.json")
-PRISTINE = os.path.expanduser("~/prefix_sem_judge.py")     # the source before this fix
+# The source BEFORE the SEM4 fix, for D7's verdict-invariance proof. The
+# repo copy ships under docs/semantic/ so D7 runs on CI and on any clone --
+# a proof that only runs on the author's machine proves nothing to anyone
+# else (M25's shape). The home-directory copy is kept as a fallback for the
+# machine that made the fix.
+PRISTINE = os.path.join(HERE, "docs", "semantic", "prefix_sem_judge.py")
+if not os.path.exists(PRISTINE):
+    PRISTINE = os.path.expanduser("~/prefix_sem_judge.py")
 
 results = []
 def check(label, ok, detail=""):

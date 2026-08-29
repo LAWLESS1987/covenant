@@ -48,11 +48,15 @@ import urllib.request
 # ---------------------------------------------------------------- manifest
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
-EXPECTED_VERSION = "v8.39"
-EXPECTED_LINES = 10008
+EXPECTED_VERSION = "v8.40"
+EXPECTED_LINES = 10297
 MANIFEST = {
+    # v8.40 (2026-08-29): the semantic-judge layer, landed. The pin below is
+    # the SAME digest the candidate sweep printed for its staged core
+    # (525f235134f5 "as STAGED") -- what was swept is what shipped, provable
+    # from the two files carrying one hash.
     "covenant_unified_v8.py":
-        "89ef8efe914e8bddd3b73819e81fc025ff8841a37b7f979028aee7bab1bac780",
+        "525f235134f59f25f80643154ab688db0c49311858169b3cf3f386c72d4c8845",
     "test_a3s_send_bounds.py":
         "bd0ab67ae2f62a12b6a0253926511ca7cffa6155e3a74bb6633d3875006d1d7c",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
@@ -74,8 +78,12 @@ MANIFEST = {
     # ... and re-pinned ~21:00Z 08-29 with P20 (the watchdog self-evaluation
     # suite) wired in. K1 20/20 and K2 25/25 ran against these bytes BEFORE
     # the pin moved -- the order the b969 lesson above teaches.
+    # ... and re-pinned with the v8.40 landing: the five semantic-layer
+    # gates joined this runner, run_local_sweep.SUITES and covenant_one's
+    # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
+    # bytes before this pin moved.
     "run_all_tests.sh":
-        "ef61a599a48c4a24f936313413823d0981e55abe8896b8905c03b9176e23f3fd",
+        "7eaeb0cdf83d477fed5ce2ad1404ca801d80e98d666583fc7b00b0cb118c0098",
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -92,8 +100,13 @@ MANIFEST = {
     # full candidate sweep came back red on a13 and the background runner
     # said "completed (exit code 0)". It now returns 1 on red; P19 23/23
     # re-run against the new bytes before this pin moved.
+    # ... and re-pinned with the v8.40 landing (five suites into SUITES);
+    # then AGAIN within the hour: the BASE stage never copied the judge's
+    # model files or SEM4's pristine source -- the candidate overlay had
+    # since 00:40Z, and the first v8.40 deployed sweep went red on all four
+    # semantic suites from that asymmetry. P19 23/23 after each move.
     "run_local_sweep.py":
-        "324499832a098a7ca99746321138d69194db8b36e532ecbe38b0b9d319c34111",
+        "b8f381abd39a5f450b22f278d57f8989a17162f20216a09845159b3bbe274f39",
     "test_p19_overlay_guard.py":
         "ed76c4497594d56b48ea7724a4aeed24bf1e9a38959fa705d9071812e07d4ed7",
     # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
@@ -108,6 +121,11 @@ COMPANIONS = {
     "test_c2_watchdog_live.py": "covenant_watchdog.py",
     "test_p19_overlay_guard.py": "run_local_sweep.py",
     "test_p15_judge_identity.py": "covenant_watchdog.py",
+    # v8.40: the judge is code plus a MODEL, and a judge whose model is
+    # absent fails closed at install() -- so the model's presence is a
+    # delivery claim, checked here before anything restarts.
+    "covenant_semantic_judge.py": "semantic_judge_model.json",
+    "test_sem4_degraded_model.py": "covenant_semantic_judge.py",
 }
 NODES = [("A", 5000), ("B", 5020), ("C", 5060)]
 RESTART_BAT = "AB_RESTART_NODES.bat"

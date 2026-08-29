@@ -839,7 +839,10 @@ def start_node(node):
     env.setdefault("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:8b")
     env.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "600")
     env.setdefault("COVENANT_JUDGE_TIMEOUT", "600")
-    env["COVENANT_JUDGE_PROVIDERS"] = "local"
+    # v8.40: match run_with_ollama_judge.py's pair -- a node the watchdog
+    # revives must judge with the same quorum a node the operator starts
+    # does, or a restart silently changes the gate (P17's hazard sideways).
+    env["COVENANT_JUDGE_PROVIDERS"] = "local,semantic"
     env.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
     os.makedirs(LOGDIR, exist_ok=True)
     out = open(os.path.join(LOGDIR, f"node{node['id']}.log"), "a",
@@ -1091,6 +1094,19 @@ def main():
     # re-emitted every adapted condition every round and undone P12 -- unless
     # kept out of the observe() key. Gap detection is timestamp-based, on
     # purpose.
+    # C3 (2026-08-29): name this process so the guard that heals THIS layer
+    # (covenant_watchdog_guard.py, run by the OS scheduler) can tell a dead
+    # watchdog from a wedged one. A stale pid file is harmless -- the guard
+    # verifies the PID is a live python before believing it; what would not
+    # be harmless is a guard with no pid to check spawning a second watchdog
+    # beside a slow one, doubling every restart the first might still make.
+    try:
+        with open(os.path.join(LOGDIR, "watchdog.pid"), "w",
+                  encoding="utf-8", newline="\n") as fh:
+            fh.write(str(os.getpid()) + "\n")
+    except OSError as e:
+        log("INFO", f"could not write watchdog.pid ({e}) -- the guard will "
+                    f"treat a long gap as unverifiable and report, not act")
     log("INFO", f"watchdog started, every {a.interval}s, log {LOGFILE}")
     # CORRECTED within the hour, against my own first wording. That said the
     # guarantee was "one line every 30 rounds (~30 min)", which is TRUE and far

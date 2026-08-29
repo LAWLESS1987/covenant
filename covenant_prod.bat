@@ -32,7 +32,12 @@ set COVENANT_LOCAL_JUDGE_URL=http://127.0.0.1:11434/v1/chat/completions
 if "%COVENANT_LOCAL_JUDGE_MODEL%"=="" set COVENANT_LOCAL_JUDGE_MODEL=qwen3:8b
 set COVENANT_LOCAL_JUDGE_TIMEOUT=600
 set COVENANT_JUDGE_TIMEOUT=600
-set COVENANT_JUDGE_PROVIDERS=local
+REM v8.40 (2026-08-29): the semantic judge rides in the quorum, not on
+REM the bench. The smoke boot of this landing printed the core's own
+REM hint ('add it to COVENANT_JUDGE_PROVIDERS to use it') -- a judge
+REM shipped and wired to nothing is the defect class this repo keeps
+REM finding in itself, caught this time BEFORE the restart.
+set COVENANT_JUDGE_PROVIDERS=local,semantic
 set "COVENANT_INSECURE_MOCK_JUDGE="
 set COVENANT_OLLAMA_NUM_PREDICT=96
 set COVENANT_OLLAMA_NUM_CTX=2048
