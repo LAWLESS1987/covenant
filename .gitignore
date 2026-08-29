@@ -138,3 +138,6 @@ coinbase_balance.txt
 # the file is absent, so ignoring it fails in the safe direction.
 trader_config.json
 TRADER_HALT
+# The scheduled run's log: portfolio totals, position sizes, orders placed.
+# That is holdings by another name, and holdings are not published.
+trader_log.txt
