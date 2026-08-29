@@ -302,3 +302,51 @@ reduction, and sizing is the lever. It also raises the bar for §1.1's
 volatility-scaled sizing — it must be built as a drawdown control and validated
 by CPCV, never sold as return improvement, because there is no return here to
 improve.
+
+
+---
+
+## CORRECTION to §2.3 — the memory recommendations were already done, and one was wrong
+
+While staging an `OLLAMA_TUNE.bat`, I overwrote an existing **`ollama_tune.bat`**
+(Windows filesystems are case-insensitive, so the two are one file). 93 lines of
+prior work, destroyed and then recovered from git. Recorded here rather than
+quietly reverted, because what it contained invalidates part of §2.3.
+
+**§2.3 item 3 — `OLLAMA_MAX_LOADED_MODELS=1` — is WRONG for this system.**
+`ollama_tune.bat` sets it to **3**, and states the measurement:
+
+> one slot per DISTINCT judge model. At 1, every judge call evicts the previous
+> one and pays a full reload: **measured 23.7 s wasted per transaction with
+> three judges.**
+
+The quorum runs several judge models. Setting 1 does not protect the memory
+margin; it forces eviction thrash on the critical path of a consensus gate. I
+reasoned from the margin and ignored that the judge is a QUORUM — the plurality
+that `CONSTRAINT_COVERAGE.md` argues is the whole coverage strategy. The two
+recommendations contradicted each other and I did not notice.
+
+**§2.3 item 2 — `OLLAMA_KEEP_ALIVE`** — already set, to `30m`, with reasoning
+("a 24GB model reloaded per verdict is the difference between seconds and
+minutes"). My suggestion of `-1` is defensible but not obviously better, and it
+was not new.
+
+**And the file already does more than §2.3 proposed**, all with reasons:
+
+| setting | why, in its own words |
+|---|---|
+| `OLLAMA_HOST=127.0.0.1:11434` | "Ollama has NO auth: any process or machine that can reach the port can load models and read your prompts. Do not bind 0.0.0.0." |
+| `OLLAMA_NUM_PARALLEL=1` | parallel slots each get their own KV cache |
+| `OLLAMA_FLASH_ATTENTION=1` | cheaper attention, less KV memory |
+| `OLLAMA_KV_CACHE_TYPE=q8_0` | "roughly halves KV cache RAM" |
+| `OLLAMA_CONTEXT_LENGTH=2048` | matches the ~500-token judge prompt |
+| `ollama_tune.bat undo` | reversible, which mine was not |
+
+**So §2.3 stands only in its first item** — pin the quantization tag into
+`fit_check`, which nothing here does. Items 2 and 3 are withdrawn: one was
+already done better, the other was actively harmful.
+
+The lesson is the session's own, turned inward: **I recommended a memory fix
+without reading the memory tooling that already existed.** `IMPROVEMENTS_2026-08-29.md`
+§2 opens by praising `judge_bench.fit_check` for exactly this kind of care, and
+I did not extend the same reading to the file sitting beside it.
