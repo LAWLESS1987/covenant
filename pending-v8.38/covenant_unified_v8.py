@@ -9166,9 +9166,70 @@ class JudgeProviderRegistry:
     build_semantic_quorum() picks them up with no changes to the builder."""
     _providers: Dict[str, Any] = {}
 
+    # v8.38 -- every provider name that was registered twice, in the order it
+    # happened. A ledger and not a refusal; register() says why.
+    _shadowed: List[Dict[str, str]] = []
+
+    @staticmethod
+    def _origin(factory) -> str:
+        """Where a factory came from, for a human reading a warning. Total, by
+        the same rule the diversity report follows: a registry that cannot
+        describe itself must not become a registry that cannot boot."""
+        try:
+            code = getattr(factory, "__code__", None)
+            if code is not None:
+                return f"{os.path.basename(code.co_filename)}:{code.co_firstlineno}"
+            return str(getattr(factory, "__module__", None) or type(factory).__name__)
+        except Exception:                                    # noqa: BLE001
+            return "<unknown>"
+
     @classmethod
-    def register(cls, name: str, factory) -> None:
+    def register(cls, name: str, factory, replace: bool = False) -> None:
+        """Bind a provider name to a factory.
+
+        WHY THIS WARNS AND DOES NOT REFUSE. Two shipped modules both register
+        `local`: covenant_judge_local (OpenAICompatJudge) and
+        covenant_judge_ollama (OllamaJudge). Import order alone decided which
+        one every `local:N` judge in the quorum turned out to be, and it did so
+        in silence -- measured live on v8.37: importing local then ollama moved
+        'local' from OpenAICompatJudge to OllamaJudge with no output at all. An
+        operator reading COVENANT_JUDGE_PROVIDERS=local had no way to learn
+        which of two implementations was judging their chain.
+
+        Refusing the second registration would end the silence by breaking a
+        configuration that works today, at import time, on a running node. That
+        is the wrong trade, and it is the one LinkConductance already settled:
+        DISCLOSE, do not gate. So the overwrite still happens, it is recorded in
+        `_shadowed`, and it says so on STDERR -- stderr and not stdout for the
+        reason the semantic-judge banner learned by breaking test_b1: stdout is
+        a data channel for anything that parses it.
+
+        `replace=True` is the deliberate override -- recorded, but silent,
+        because a warning an operator has already answered is noise (M34).
+        Re-registering the SAME factory object (a module imported twice) is
+        neither recorded nor announced, because nothing changed.
+        """
+        prior = cls._providers.get(name)
+        if prior is not None and prior is not factory:
+            cls._shadowed.append({
+                "name": str(name),
+                "was": cls._origin(prior),
+                "now": cls._origin(factory),
+                "deliberate": "yes" if replace else "no",
+            })
+            if not replace:
+                print(f"WARNING: judge provider {name!r} was already registered by "
+                      f"{cls._origin(prior)} and is being REPLACED by "
+                      f"{cls._origin(factory)}. Import order now decides which "
+                      f"implementation judges your chain. Pass replace=True if "
+                      f"that is deliberate.", file=sys.stderr, flush=True)
         cls._providers[name] = factory
+
+    @classmethod
+    def shadowed_providers(cls) -> List[Dict[str, str]]:
+        """Every provider name redefined this process, oldest first. A copy:
+        an observer must not be able to edit the record it is observing."""
+        return [dict(r) for r in cls._shadowed]
 
     @classmethod
     def build(cls, name: str, index: int = 0) -> ReasoningJudge:
@@ -9427,6 +9488,57 @@ def _judge_facts(j, semantic_ids: Set[str], required_ids: Set[str]) -> Dict[str,
         role = "semantic"
     else:
         role = "other"
+    # THE MODEL THIS JUDGE WILL ACTUALLY SEND -- not the constructor override.
+    #
+    # v8.38. `getattr(j, "model")` is the EXPLICIT override, and it is None in
+    # every configuration this repo ships. OllamaJudge keeps its per-instance
+    # model in `_model_override`, set by the judges.json factory whose own
+    # comment says those overrides exist so "several judges can coexist in one
+    # process pointing at different endpoints and different models"; and
+    # OpenAICompatJudge resolves model -> env -> default_model inside `_model()`.
+    # So the mechanism built to CREATE model diversity was invisible to the
+    # meter built to MEASURE it, and the meter reported the absence of a field
+    # as the absence of the thing.
+    #
+    # Measured on this machine's real judges.json (pc_qwen qwen3:8b, pc_mid
+    # qwen3:4b, pc_small qwen3:1.7b): three different models reported as
+    # `<provider default>` three times, independent_semantic_judges = 1, and the
+    # operator told at every boot that a deliberately diverse quorum was "not
+    # independently diverse". That is M34 -- a permanent warning that is false
+    # is how an operator learns to skim the true ones.
+    #
+    # WHY IT CALLS `_model()` INSTEAD OF REBUILDING ITS PRECEDENCE. The
+    # precedence lives in the judge class and can change there; a second copy
+    # here would be a meter that silently drifts from the thing it meters, which
+    # is P18/M52 in miniature. The call is guarded, and its failure is REPORTED
+    # as model_source="resolver_raised" rather than swallowed: "the meter could
+    # not read" and "the judge has no model" are different claims, and rendering
+    # the first as `<provider default>` would be M30 again.
+    #
+    # DISCLOSURE ONLY. This raises independent_semantic_judges for a genuinely
+    # multi-model local quorum from 1 to n. Nothing in this file gates on that
+    # number -- it is printed on /health and at boot -- and `diverse` still
+    # requires an EMPTY degradation list, so three judges sharing one parser and
+    # one credential env remain non-diverse, correctly, and now say why.
+    model_val = None
+    model_src = "none"
+    _resolver = getattr(j, "_model", None)
+    if callable(_resolver):
+        try:
+            model_val = _resolver()
+            model_src = "resolver" if model_val else "none"
+        except Exception:                                    # noqa: BLE001
+            model_src = "resolver_raised"
+    if not model_val and model_src != "resolver_raised":
+        for _attr, _src in (("_model_override", "instance_override"),
+                            ("model", "constructor"),
+                            ("default_model", "class_default")):
+            _v = getattr(j, _attr, None)
+            if _v:
+                model_val, model_src = _v, _src
+                break
+    if not model_val:
+        model_val = "<provider default>"
     return {
         "id": jid,
         "role": role,
@@ -9434,7 +9546,8 @@ def _judge_facts(j, semantic_ids: Set[str], required_ids: Set[str]) -> Dict[str,
         "provider": str(getattr(cls, "provider", "n/a"))[:32],
         "credential_env": env_var,
         "credentialled": credentialled,
-        "model": str(getattr(j, "model", None) or "<provider default>")[:64],
+        "model": str(model_val)[:64],
+        "model_source": model_src,
         "live_path": bool(live_path),
         "verdict_path": _owner("_parse_verdict"),
         "prompt_path": _owner("_build_prompt"),
@@ -9598,6 +9711,34 @@ def quorum_diversity_warnings(rep: Dict[str, Any],
             f"judge(s) of {rep.get('semantic_judges')} configured "
             f"({', '.join(str(d) for d in degs) or 'no second opinion'}) "
             f"-- the self-report layer is not a second opinion (B2)")
+    # v8.38 -- A GAP THE MODEL FIX OPENED, CLOSED IN THE SAME CHANGE.
+    #
+    # Until _judge_facts read the effective model, a three-model local quorum
+    # counted as ONE judge, so the sentence above fired and the operator was
+    # told something false but was at least told SOMETHING. Reading the real
+    # models raises the count to three and silences that sentence -- and
+    # `duplicate_implementation` and `shared_credential` are still true, still
+    # in `degradations`, still enough to hold `diverse` at False, and now
+    # nothing says them out loud. Trading a false warning for silence about a
+    # true one is not an improvement; it is M30 wearing a fix's clothes.
+    #
+    # Independence of OPINION and independence of FAILURE are different
+    # properties and only the first one went up. Three judges on three models
+    # behind one parser and one credential env still fall together, which is
+    # what judges.json's own note means by "All three below are on one machine,
+    # so they share ONE failure: that machine."
+    if (rep.get("is_quorum")
+            and rep.get("independent_semantic_judges", 0) >= 2
+            and not rep.get("diverse")):
+        shared = [str(d) for d in degs
+                  if str(d).startswith(("duplicate_implementation:",
+                                        "shared_credential:"))]
+        if shared:
+            out.append(
+                f"ethics quorum: {rep.get('independent_semantic_judges')} "
+                f"independent semantic judges, but they share a failure "
+                f"({', '.join(shared)}) -- one parser bug or one missing "
+                f"credential takes all of them at once (B2)")
     return out
 
 
