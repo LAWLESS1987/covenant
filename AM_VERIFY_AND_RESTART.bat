@@ -1,6 +1,6 @@
 @echo off
 REM ===========================================================================
-REM  AM_VERIFY_AND_RESTART.bat  -- 2026-08-26, for the v8.37 propagation.
+REM  AM_VERIFY_AND_RESTART.bat  -- 2026-08-27, for the v8.39 propagation.
 REM
 REM  Closes the three-claims gap in one double-click (M38): the PROJECT, the
 REM  file on DISK and the RUNNING process are three separate claims that drift
@@ -23,7 +23,7 @@ set PY=python
 if exist ".venv\Scripts\python.exe" set PY=.venv\Scripts\python.exe
 
 echo.
-echo   Verifying the v8.37 delivery, restarting the nodes, and confirming
+echo   Verifying the v8.39 delivery, restarting the nodes, and confirming
 echo   the RUNNING processes report the source that is on disk.
 echo   A copy of everything below is written to DEPLOY_VERIFY.txt
 echo.

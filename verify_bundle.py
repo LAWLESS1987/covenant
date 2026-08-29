@@ -26,6 +26,10 @@ HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 MAN = os.path.join(HERE, "MANIFEST.sha256")
 SKIP_DIR = {"logs", "__pycache__", ".venv", ".git", "judge_queue",
             "_keybackup", "_unsealtest", "launch", "pending-v8.38",
+            # Restore points are the same unlanded bytes under another name;
+            # pending-v8.38 is skipped, so its snapshots must be too
+            # (2026-08-29: the 08:15 manifest hashed PRE-LAND as source).
+            "pending-v8.38.BACKUP-2026-08-29", "PRE-LAND-2026-08-29",
             "_to_delete", "_stage"}
 SKIP_EXT = {".pyc", ".db", ".key", ".msi"}
 

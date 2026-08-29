@@ -505,6 +505,147 @@ def self_drift_report(loaded, on_disk):
     return alerts, infos
 
 
+# --------------------------------------------------------------------------
+# P15 (2026-08-28). THE FOURTH LONG-LIVED PROCESS IS THE JUDGE ITSELF.
+#
+# P11 named the nodes' identity, P14 named the watchdog's own. That left
+# exactly one long-lived process unwatched, and it is the one INSIDE
+# consensus: ollama. This file mentioned ollama twice, both in start_node --
+# it LAUNCHES against the judge and never PROBES it. Nothing anywhere read
+# /api/tags or /api/ps, so nothing could say which model answers the ethics
+# gate, whether the served tag still resolves to the same digest, or whether
+# the endpoint is up at all. Re-pull or re-tag the model and the gate's
+# verdicts change with no surface in this system saying anything changed.
+#
+# Two probes, both GET, both read-only:
+#   /api/tags  -> which models this endpoint serves, each with its digest.
+#                 The digest is the identity: same tag, new digest means the
+#                 gate's behaviour may have changed.
+#   /api/ps    -> which model is loaded right now. Recorded in state for a
+#                 reader; deliberately NOT in the log line, because ollama
+#                 loads and unloads on demand and a line that flips with that
+#                 weather would churn Adaptation (P12: change, not state --
+#                 and on-demand loading IS the state working).
+#
+# What it says, and when:
+#   first sight        INFO, identity in full (model@digest, served count)
+#   digest change      ALERT once, both digests named, then baseline moves --
+#                      an alert that re-fires for ever trains its reader (M34)
+#   tag missing        ALERT: the gate's calls will fail, and it fails closed
+#   unreachable        ALERT: fail-closed means every transaction refused.
+#                      The node's own /health CANNOT say this -- its "no
+#                      provider key" warning tests env vars, not the judge
+#                      (that is FALSE_POSITIVE_WARNINGS above, and why this
+#                      probe asks the judge itself).
+#
+# Disclosure only. It restarts nothing, blocks nothing, reconfigures nothing
+# -- the same boundary P12, P14 and B2 draw, for the same reason (M31/M47:
+# sensing may inform disclosure, never behaviour).
+# --------------------------------------------------------------------------
+JUDGE_URL = os.environ.get("COVENANT_LOCAL_JUDGE_URL",
+                           "http://127.0.0.1:11434/v1/chat/completions")
+JUDGE_MODEL = os.environ.get("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:8b")
+
+
+def _judge_root(url=None):
+    """scheme://host:port of the judge endpoint -- the ollama API root."""
+    from urllib.parse import urlsplit
+    p = urlsplit(url or JUDGE_URL)
+    return f"{p.scheme}://{p.netloc}"
+
+
+def judge_identity(root=None, timeout=8, opener=None):
+    """Probe the judge endpoint. GET only -- a monitor must not be able to
+    make the thing it watches do work (no POST, no /api/generate, ever).
+
+    Returns {"reachable", "error", "served" {name: digest12}, "loaded" [names]}.
+    Never raises: transport injectable via opener(url)->parsed-json for tests.
+    """
+    root = (root or _judge_root()).rstrip("/")
+
+    def _get(path):
+        if opener is not None:
+            return opener(root + path)
+        with urllib.request.urlopen(root + path, timeout=timeout) as r:
+            return json.loads(r.read().decode())
+
+    ident = {"reachable": False, "error": None, "served": {}, "loaded": []}
+    try:
+        tags = _get("/api/tags")
+    except Exception as e:                                  # noqa: BLE001
+        ident["error"] = type(e).__name__
+        return ident
+    ident["reachable"] = True
+    models = tags.get("models") if isinstance(tags, dict) else None
+    for m in models if isinstance(models, list) else []:
+        if isinstance(m, dict) and m.get("name"):
+            ident["served"][str(m["name"])] = str(m.get("digest") or "")[:12]
+    try:
+        ps = _get("/api/ps")
+        pm = ps.get("models") if isinstance(ps, dict) else None
+        if isinstance(pm, list):
+            ident["loaded"] = sorted(str(m.get("name")) for m in pm
+                                     if isinstance(m, dict) and m.get("name"))
+    except Exception:                                       # noqa: BLE001
+        pass    # /api/ps failing is not /api/tags failing; identity stands
+    return ident
+
+
+def judge_identity_report(ident, prev, expected_model=None, root=None):
+    """(alerts, infos, state) for the judge-identity reading. Pure, so it is
+    testable: everything it needs arrives as arguments, and it only returns
+    text -- it can restart, block and reconfigure nothing.
+
+    prev is the state dict this function returned last round, or {}. An
+    OUTAGE keeps the baseline (an unreachable judge is not a changed one);
+    a digest change moves the baseline after being said once, so the alert
+    appears, then CLEARs, and the log carries the transition (M34).
+    """
+    expected_model = expected_model or JUDGE_MODEL
+    root = root or _judge_root()
+    alerts, infos = [], []
+    prev = prev if isinstance(prev, dict) else {}
+
+    if not isinstance(ident, dict) or not ident.get("reachable"):
+        err = ident.get("error") if isinstance(ident, dict) else None
+        alerts.append(
+            f"JUDGE UNREACHABLE: the ethics gate's endpoint {root} did not "
+            f"answer ({err}) -- the gate fails closed, so every transaction "
+            f"will be refused while this holds. The nodes' own /health cannot "
+            f"say this: their 'no provider key' warning tests env vars, not "
+            f"the judge.")
+        return alerts, infos, prev
+
+    served = ident.get("served") if isinstance(ident.get("served"), dict) \
+        else {}
+    digest = served.get(expected_model) or None
+    if digest is None:
+        alerts.append(
+            f"JUDGE MODEL MISSING: '{expected_model}' is not among the "
+            f"model(s) served at {root} ({sorted(served) or 'none'}) -- the "
+            f"ethics gate's calls will fail, and the gate fails closed.")
+
+    pd = prev.get("digest")
+    if pd and digest and digest != pd:
+        alerts.append(
+            f"JUDGE MODEL CHANGED: {expected_model} was digest {pd} and is "
+            f"now {digest} -- the gate's verdicts may differ and NOTHING in "
+            f"the chain records this. If this re-pull or re-tag was not "
+            f"yours, treat the change as hostile until explained.")
+
+    infos.append(f"judge: {expected_model}@{digest or 'NOT-SERVED'} -- "
+                 f"{len(served)} model(s) served at {root}")
+
+    # A vanished tag keeps the old digest as baseline, so a reappearance
+    # under a NEW digest still reads as a change, not a first sight.
+    return alerts, infos, {"digest": digest or pd,
+                           "served": dict(sorted(served.items())),
+                           "loaded": list(ident.get("loaded") or [])}
+
+
+_judge_prev = {}
+
+
 # ---------------------------------------------------------------- logging --
 def _rotate():
     try:
@@ -693,6 +834,16 @@ def one_pass(strict=False):
     for line in drift_infos:
         log("INFO", line)
 
+    # P15: the fourth long-lived process -- the judge itself. One probe per
+    # pass (all three nodes share one ollama), disclosure only.
+    j_alerts, j_infos, _judge_prev["state"] = judge_identity_report(
+        judge_identity(), _judge_prev.get("state", {}))
+    alerts.extend(j_alerts)
+    for line in j_infos:
+        rendered = _adapt_info.observe("judge:identity", line)
+        if rendered:
+            log("INFO", rendered)
+
     # The check nothing else does: same identity, both databases, must agree.
     if all(os.path.exists(os.path.join(HERE, n["db"])) for n in NODES) and \
             os.path.exists(os.path.join(HERE, "nodeA_prod.db.key")):
@@ -783,8 +934,19 @@ def main():
     # The roll-up already guarantees a line every ROLL_UP_EVERY rounds. What
     # was missing is that a reader had no way to know that, so no reader could
     # judge a gap. Now the first line states the contract, and every line
-    # carries the round number -- so "the last round was 41 and it is an hour
-    # later" is a fact anyone can check, including a script.
+    # carries a UTC timestamp -- so "the last line is N seconds old against a
+    # stated floor" is a fact anyone can check, including a script
+    # (test_c2_watchdog_live.py's gap_check() is that script, run live).
+    #
+    # CORRECTED 2026-08-29 (M42's family): this comment used to claim "every
+    # line carries the round number". No line ever did -- only the roll-up's
+    # "[unchanged, N rounds]" and CLEARED's "after N round(s)" carry counts --
+    # and the suite's G3 check now pins that. The claim was not only stale, it
+    # was structurally impossible as written: a per-line round number changes
+    # every line's TEXT, and Adaptation keys on text, so it would have
+    # re-emitted every adapted condition every round and undone P12 -- unless
+    # kept out of the observe() key. Gap detection is timestamp-based, on
+    # purpose.
     log("INFO", f"watchdog started, every {a.interval}s, log {LOGFILE}")
     # CORRECTED within the hour, against my own first wording. That said the
     # guarantee was "one line every 30 rounds (~30 min)", which is TRUE and far

@@ -141,3 +141,7 @@ TRADER_HALT
 # The scheduled run's log: portfolio totals, position sizes, orders placed.
 # That is holdings by another name, and holdings are not published.
 trader_log.txt
+
+# restore-point snapshots of unlanded candidates -- never source
+PRE-LAND-*/
+pending-*.BACKUP-*/

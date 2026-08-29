@@ -410,7 +410,7 @@ def verify_stake_action_signature(pubkey_pem: str, action: str, timestamp: float
 # not a second parallel one).
 # ---------------------------------------------------------------------------
 
-COVENANT_VERSION = "v8.37"
+COVENANT_VERSION = "v8.39"
 
 # ---------------------------------------------------------------------------
 # P11 (v8.31) -- SAY WHAT YOU ARE RUNNING.
@@ -5612,7 +5612,129 @@ class SpikingAnomalyMonitor:
         self.max_events = max_events
         self._events: List[Tuple[float, str, str]] = []   # (ts, kind, detail)
         self.nonepoch_observations = 0   # see observe(): relative-time callers
+        self._evicted: Dict[str, int] = {}   # A24: what the bound DROPPED, per kind
+        # A24b (v8.39). The eviction COUNTERS above are monotonic and never
+        # reset -- that is right, they are the permanent record. But the
+        # `buffer_pressure` FLAG derived from them was `bool(self._evicted)`,
+        # which is monotonic too, so one 6,000-frame flood turned on a /health
+        # warning that never went off again. Measured on the v8.38 that
+        # introduced it: fifteen minutes later ZERO evicted records remained
+        # inside report()'s baseline window -- per_kind was a complete census
+        # again -- and /health still said "anomaly buffer under pressure";
+        # thirty days later, still. So an attacker who could no longer choose
+        # what /anomalies SAYS could still choose, with one socket, what
+        # /health WARNS, for the life of the process. That is M34's disease
+        # (an alert that never clears trains its reader to skim) introduced by
+        # the fix for M34's disease one layer down, which is the third time
+        # this project has rebuilt a bug immediately after fixing it (M33).
+        # The flag is now bounded by the SAME window report() reports on:
+        # pressure is true exactly while an evicted record would still have
+        # fallen inside the baseline window, which is precisely when "these
+        # counts are a sample, not a census" is a true statement. Nothing is
+        # hidden -- the monotonic totals are still reported unconditionally,
+        # and clearing the flag costs an attacker the one thing worth having:
+        # they must STOP.
+        self._last_evict_ts: float = 0.0
+        # A24 (v8.38): compaction is batched so the eviction pass is amortised.
+        # The v8.37 policy re-sliced the WHOLE list on every record once full --
+        # measured 13.1 us per record at saturation against 0.4 us empty, a 33x
+        # cost the flooder chooses, paid while holding the lock report() needs.
+        # The hard ceiling is unchanged at max_events; compaction drops to a
+        # low-water mark, so it runs about once per _compact_batch records
+        # instead of once per record, and the list never exceeds max_events.
+        self._compact_batch = max(1, min(512, max_events // 16))
+        self._low_water = max(1, max_events - self._compact_batch)
         self._lock = threading.Lock()
+
+    # -- A24 (v8.38) -------------------------------------------------------
+    # A bounded buffer that evicts OLDEST-OVERALL is a buffer whose contents an
+    # attacker chooses. Measured on v8.36 AND v8.37 (so this predates every
+    # guard in the file and was not introduced by one): 5,200 garbage frames
+    # from a single socket fill 5,000/5,000 slots with one peer-triggered kind,
+    # evict a planted `peer_send_failure`, AND leave a genuine spike of a third
+    # kind undetectable -- so /health and the watchdog (P12), which read this
+    # report and nothing else, report exactly what the attacker chose. That is
+    # the watchdog-log failure (3,973 lines carrying 16 messages) rebuilt one
+    # layer down, with an adversary holding the pen.
+    #
+    # THE RULE: under pressure this buffer degrades toward DIVERSITY, not
+    # toward recency. Capacity is shared between the kinds present by
+    # progressive filling, so a kind at or below its fair share can never be
+    # evicted by another kind's flood, and a kind above its share loses only
+    # its OLDEST records. Every `kind` in this file is a source literal (57 of
+    # them) or a call-site label ("peer"/"bridge") -- never a peer-supplied
+    # string -- so the number of shares is bounded by this file, not by
+    # traffic. `observe()` is the one caller-named channel and its only user is
+    # covenant_neural_bridge's fixed channel list.
+    #
+    # NOTHING IS SILENT (M34). Evictions are counted per kind, monotonically,
+    # and reported: a non-zero total is the signal that per_kind is a
+    # fair-shared sample rather than a census. Deliberately NOT recorded as an
+    # anomaly of its own -- an anomaly about anomaly recording is a feedback
+    # loop that would flood the very buffer it is reporting on.
+    @staticmethod
+    def _fair_share(counts: Dict[str, int], capacity: int) -> Dict[str, int]:
+        """Progressive filling: how many records of each kind to KEEP.
+
+        Pure and total. Every kind gets an equal share of `capacity`; a kind
+        wanting less than its share keeps all of it and donates the remainder
+        to the rest, repeatedly, until nothing is under its share. The property
+        that matters, and the one the suite asserts: a kind whose count is at
+        or below capacity/len(counts) is returned UNCHANGED, so one kind's
+        flood can never evict another kind's records.
+        """
+        keep = {k: 0 for k in counts}
+        pending = {k: int(c) for k, c in counts.items() if c > 0}
+        remaining = max(0, int(capacity))
+        while pending and remaining > 0:
+            share = remaining // len(pending)
+            if share <= 0:
+                # Capacity below the number of kinds present. One record of each
+                # of many kinds says more than many records of one, so spend
+                # what is left on breadth, deterministically.
+                for k in sorted(pending):
+                    if remaining <= 0:
+                        break
+                    keep[k] = 1
+                    remaining -= 1
+                return keep
+            under = [k for k, c in pending.items() if c <= share]
+            if not under:
+                for k in pending:
+                    keep[k] = share
+                remaining -= share * len(pending)
+                for k in sorted(pending)[:remaining]:
+                    keep[k] += 1          # deterministic largest-remainder
+                return keep
+            for k in under:
+                keep[k] = pending[k]
+                remaining -= pending[k]
+                del pending[k]
+        return keep
+
+    def _compact_locked(self):
+        """Enforce the fair share. Caller holds self._lock."""
+        by_kind: Dict[str, List[Tuple[float, str, str]]] = {}
+        for ev in self._events:
+            by_kind.setdefault(ev[1], []).append(ev)
+        keep = self._fair_share({k: len(v) for k, v in by_kind.items()},
+                                self._low_water)
+        out: List[Tuple[float, str, str]] = []
+        for k, evs in by_kind.items():
+            want = keep.get(k, 0)
+            if want >= len(evs):
+                out.extend(evs)
+                continue
+            # Sort by TIME, not by arrival order: observe() carries the source's
+            # own timestamp, so the newest record of a kind is not always the
+            # last one appended.
+            evs.sort(key=lambda e: e[0])
+            self._evicted[k] = self._evicted.get(k, 0) + (len(evs) - want)
+            self._last_evict_ts = time.time()   # A24b: when, not just how many
+            if want:
+                out.extend(evs[-want:])
+        out.sort(key=lambda e: e[0])
+        self._events = out
 
     def record(self, kind: str, detail: str = ""):
         now = time.time()
@@ -5621,7 +5743,7 @@ class SpikingAnomalyMonitor:
             # Bounded so a sustained attack can't grow this list without limit
             # (the same mempool-bounding reasoning as v8.9 audit item Y).
             if len(self._events) > self.max_events:
-                self._events = self._events[-self.max_events:]
+                self._compact_locked()          # A24: fair share, not recency
 
     def observe(self, source: str, timestamp: Optional[float] = None):
         """Ingest one EXTERNAL telemetry event at a caller-supplied time.
@@ -5656,12 +5778,14 @@ class SpikingAnomalyMonitor:
         with self._lock:
             self._events.append((ts, str(source), "external telemetry"))
             if len(self._events) > self.max_events:
-                self._events = self._events[-self.max_events:]
+                self._compact_locked()          # A24: fair share, not recency
 
     def report(self) -> Dict[str, Any]:
         now = time.time()
         with self._lock:
             events = list(self._events)
+            evicted = dict(self._evicted)       # A24
+            last_evict = self._last_evict_ts    # A24b
         recent = [e for e in events if now - e[0] <= self.window_seconds]
         baseline = [e for e in events if now - e[0] <= self.baseline_seconds]
         kinds = sorted({e[1] for e in baseline})
@@ -5684,6 +5808,25 @@ class SpikingAnomalyMonitor:
             "spikes": spikes,
             "spike_detected": bool(spikes),
             "nonepoch_observations": self.nonepoch_observations,
+            # A24: what the bound DROPPED, per kind, since boot -- monotonic,
+            # never reset. Additive keys: per_kind's shape is unchanged because
+            # twenty suites, /health and the watchdog read it. A non-zero total
+            # is the one thing a reader must know before trusting the counts
+            # above, because it means they are a fair-shared SAMPLE and not a
+            # census -- and a sustained non-zero total on a peer-triggered kind
+            # is what a flood against this buffer looks like from outside.
+            "evicted_under_pressure": evicted,
+            "total_evicted_under_pressure": sum(evicted.values()),
+            # A24b (v8.39): PRESENT TENSE. True exactly while an evicted record
+            # would still have been inside the baseline window above -- i.e.
+            # exactly while "per_kind is a sample, not a census" is true. The
+            # two counters either side of this line are the permanent record
+            # and are unconditional; this is the live claim, and a live claim
+            # that can never become false is not a claim.
+            "buffer_pressure": bool(evicted) and last_evict > 0.0
+                               and (now - last_evict) <= self.baseline_seconds,
+            "last_eviction_age_seconds": (None if last_evict <= 0.0
+                                          else round(max(0.0, now - last_evict), 3)),
         }
 
 
@@ -7301,6 +7444,25 @@ class CovenantAPI:
                 warnings.append("no peers configured -- this node is isolated")
             if mon.get("spike_detected"):
                 warnings.append(f"anomaly spike: {[s['kind'] for s in mon.get('spikes', [])]}")
+            if mon.get("buffer_pressure"):
+                # A24. The anomaly buffer is full and is fair-sharing between
+                # kinds. Say so where an operator looks, and name the kind that
+                # is costing the most, because a peer-triggered kind dominating
+                # this list IS the flood. Since v8.39 (A24b) the CONDITION can
+                # become false again -- it is bounded by the same baseline
+                # window this report covers, so the warning clears ~10 min
+                # after the last eviction instead of standing for the life of
+                # the process. Adaptation can only clear an alert whose
+                # condition can clear.
+                # Text is deliberately stable while the
+                # top kind is unchanged so the watchdog's Adaptation emits it
+                # once and then CLEARs it (M34/P12).
+                _ev = mon.get("evicted_under_pressure") or {}
+                _top = max(_ev, key=lambda k: _ev[k]) if _ev else "?"
+                warnings.append(
+                    f"anomaly buffer under pressure -- records evicted to keep "
+                    f"kinds diverse; heaviest kind {_top}. /anomalies counts are "
+                    f"a fair-shared sample, not a census")
             if self.node.crisis_mode:
                 warnings.append(f"crisis mode active: {self.node.crisis_reason}")
             dead = self.node.dead_peer_count()   # A12

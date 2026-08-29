@@ -18,7 +18,9 @@ unless all three agree:
 
 NOTE ON THE HASH COMPARISON, because the field name misleads.  /health's
 `source_sha256` does NOT contain a sha256; it contains CORE_SOURCE_SHA12, the
-first 12 hex characters of one (covenant_unified_v8.py line 7362, pinned by
+first 12 hex characters of one (CORE_SOURCE_SHA12, defined near the top of
+covenant_unified_v8.py and emitted on /health; the line number this comment
+used to cite drifted three versions ago and is not repeated here, pinned by
 test_p11 V6b). So claim 3 is compared over 12 characters -- 48 bits -- which is
 ample for detecting "nobody restarted the node" and is NOT a tamper check.
 Claim 1 compares the full 64. The first draft of this script compared /health's
@@ -38,6 +40,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -45,53 +48,47 @@ import urllib.request
 # ---------------------------------------------------------------- manifest
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
-#
-# 2026-08-27: both runner hashes moved. run_local_sweep.py gained three suites
-# that were on disk and in NEITHER runner (test_r1_lora_frame,
-# test_backtest_guardrails, test_3node_config -- 85 checks that had never run
-# here) and now stages .bat and .html so the config and console suites can see
-# the deployment they assert about; run_all_tests.sh gained the same three, and
-# now counts a suite that is ABSENT FROM DISK as a failure instead of as zero.
-# covenant_unified_v8.py is deliberately unchanged -- no node source was
-# touched.
-EXPECTED_VERSION = "v8.37"
-EXPECTED_LINES = 9846
+EXPECTED_VERSION = "v8.39"
+EXPECTED_LINES = 10008
 MANIFEST = {
     "covenant_unified_v8.py":
-        "07e097f3e37f51bf1c53df1873cc32e980da5f8146035cd98dbf780386e85cb2",
+        "89ef8efe914e8bddd3b73819e81fc025ff8841a37b7f979028aee7bab1bac780",
     "test_a3s_send_bounds.py":
         "bd0ab67ae2f62a12b6a0253926511ca7cffa6155e3a74bb6633d3875006d1d7c",
-    # UPDATED 2026-08-27, and the reason is recorded because a frozen hash
-    # updated without one is indistinguishable from a hash updated to make a
-    # red gate green.
-    #
-    # 55016a9d1836 was the v8.37 delivery hash. TWO COMMITS landed after that
-    # freeze and both touched this file:
-    #     0741b89  Stop the test sweep deleting node identity keys
-    #     5517b64  P9: make the policy-file owner-only check platform-correct
-    # The copy on disk is byte-identical to git HEAD (836bd0832b68 both ways),
-    # so it is the committed tree, not a hand edit or a partial copy -- the two
-    # things this check exists to catch. Both commits are covered by suites
-    # that passed on BOTH platforms today: test_k1_runner_key_preservation
-    # 20/20 and test_k3_p9_owner_only_guard 16/16.
-    #
-    # NOTE FOR THE NEXT PERSON. run_all_tests.sh is a TEST RUNNER. It is not
-    # node source and cannot change what a node executes, yet a stale hash for
-    # it refused a node restart outright. This four-entry list is frozen in
-    # source at build time, so it goes stale on every commit that touches one
-    # of the four -- the same shape as the MANIFEST.sha256 phantom and the
-    # transcript-in-manifest deadlock, both found the same day. A delivery
-    # check that must be hand-edited to stay true will be hand-edited to stay
-    # quiet. Derive it from the tag/commit being deployed instead.
+    # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
+    # wired in (~05:45Z), then test_p19_overlay_guard (~08:00Z), then
+    # test_p15_judge_identity (~10:30Z -- shipped 08-28, wired into no runner
+    # until the package-coherence run found the gap)
+    # (M53 -- the pins move in the SAME change as the file they pin).
     "run_all_tests.sh":
-        "836bd0832b68e9b1798fdd3964c02dcc842ebdddc131bfc73bfb119f1f918437",
+        "b969f5e0d4716aa52c8aea32b3d51005c32aa1b402d4dc0b1f3913d04cbfce33",
+    # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
+    # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
+    # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
+    # session added the --candidate overlay and never moved this pin, so
+    # this file would have reported MISMATCH on the very runner that ran
+    # the candidate sweep. M53's failure mode, caught by hashing the
+    # transcription against the pin before editing (M61).
+    # ... and re-pinned again ~10:30Z 08-29: the 00:40Z rewrite had silently
+    # DROPPED the 08-27 runner's "P18 added to SUITES" (M58's drift) -- the
+    # SUITES list now carries test_a24 / test_p18 / test_p19 / test_p15, so
+    # the first win32 sweep of v8.39 actually covers the fixes it ships.
     "run_local_sweep.py":
-        "8445f1164640c79c392ced622cb13b8ff329e78b0b93364a49c4d9b1f87b074c",
+        "893b430512e959eeaed776ee9d531059ea85313fbc7dddb08950876dbd91c8a8",
+    "test_p19_overlay_guard.py":
+        "ed76c4497594d56b48ea7724a4aeed24bf1e9a38959fa705d9071812e07d4ed7",
+    # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
+    # runners name is part of the delivery (M53).
+    "test_p15_judge_identity.py":
+        "15b12fe9a8b17c0b316a536e93fbb27844c2d388166de9f738241ca896b64e9f",
 }
 # file -> module it imports that must sit in the same directory
 COMPANIONS = {
     "covenant_unified_v8.py": "covenant_path_pattern.py",
     "test_a1_kill_matrix.py": "test_a9_relay_race.py",
+    "test_c2_watchdog_live.py": "covenant_watchdog.py",
+    "test_p19_overlay_guard.py": "run_local_sweep.py",
+    "test_p15_judge_identity.py": "covenant_watchdog.py",
 }
 NODES = [("A", 5000), ("B", 5020), ("C", 5060)]
 RESTART_BAT = "AB_RESTART_NODES.bat"
@@ -135,6 +132,44 @@ def main():
 
     failures = []
     unknowns = []
+
+    # ------------------------------------------------- 0. THE VERIFIER ITSELF
+    # P14 found that the watchdog checked every node's source and never its own.
+    # This script had the same shape: EXPECTED_VERSION and the four digests are
+    # pinned by the run that BUILT the delivery, and NOTHING required them to be
+    # updated when the next version shipped. A verifier one version behind does
+    # not report itself -- it reports "MISMATCH covenant_unified_v8.py" and lets
+    # the operator conclude the DELIVERY is broken. That is the wrong diagnosis
+    # from a correct-looking tool, which is worse than no tool (A25).
+    # So: read the version the core beside us actually declares -- from its own
+    # source text, without importing it -- and if it disagrees with the pin,
+    # say plainly which of the two is stale before touching anything else.
+    say("")
+    say("--- 0. THE VERIFIER ITSELF: are these pins for the file beside me? ---")
+    core_path = os.path.join(HERE, "covenant_unified_v8.py")
+    declared = None
+    try:
+        with open(core_path, "r", encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                if raw.startswith("COVENANT_VERSION"):
+                    declared = raw.split("=", 1)[1].strip().strip('"\'')
+                    break
+    except OSError as e:
+        declared = None
+        say(f"  UNKNOWN  cannot read {core_path}: {e}")
+        unknowns.append("verifier could not read the core")
+    if declared is None:
+        say("  UNKNOWN  the core declares no COVENANT_VERSION at module level")
+        unknowns.append("core declares no version")
+    elif declared != EXPECTED_VERSION:
+        say(f"  STALE VERIFIER  this script is pinned to {EXPECTED_VERSION}")
+        say(f"                  the core beside it declares {declared}")
+        say(f"  -- Do NOT read the mismatches below as a bad delivery. Either")
+        say(f"     verify_deploy.py was not updated with the {declared} package,")
+        say(f"     or the wrong core was copied in. Fix the pins, or re-copy.")
+        failures.append(f"verifier pinned to {EXPECTED_VERSION}, core is {declared}")
+    else:
+        say(f"  ok       pins and core agree on {EXPECTED_VERSION}")
 
     # ------------------------------------------------------- 1. DISK
     say("")
@@ -242,58 +277,34 @@ def main():
         # /t N` waits inside the launcher ("Input redirection is not
         # supported"), which is why claim 4 below polls /health for 90 s on its
         # own account rather than trusting the launcher to have waited.
-        # NO PIPE. capture_output was here until 2026-08-27 and it could not
-        # survive a restart that WORKED.
         #
-        # The launcher's whole job is to `start` three detached node windows
-        # and a watchdog. Those grandchildren inherit the captured stdout
-        # handle and outlive the cmd that spawned them, so the pipe never
-        # reaches EOF. subprocess.run's timeout then kills only the direct
-        # child and calls communicate() again to drain -- and blocks there
-        # with no deadline at all. Measured that day: 12 minutes past a 300 s
-        # timeout, all three nodes up and answering /health, the verifier
-        # still waiting on a pipe held open by the very processes it was
-        # about to go and verify.
-        #
-        # It had never shown up because the only previous run of this step hit
-        # `'covenant_prod.bat' is not recognized` and started nothing, so
-        # there were no grandchildren to hold the pipe. A FAILED restart
-        # returned cleanly and a SUCCESSFUL one hung -- the verifier had
-        # never once completed the thing it exists to verify.
-        #
-        # The launcher writes its own transcript to NODE_RESTART.txt, so
-        # there is nothing here worth capturing. DEVNULL gives the
-        # grandchildren a handle they can hold forever at no cost, and step 4
-        # below already polls /health on its own account rather than
-        # trusting this call.
-        p = subprocess.run([bat], cwd=HERE, timeout=300, shell=False,
-                           stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
-        say(f"  exit code {p.returncode}  (transcript in NODE_RESTART.txt)")
-        # A NON-ZERO LAUNCHER IS A FAILURE, and until 2026-08-27 this printed
-        # the number and carried on to report PASS.
-        #
-        # That is not theoretical. Measured that day: the launcher returned
-        # 255 having stopped nothing and started nothing -- it could not even
-        # write its own report, because the previous restart's nodes were
-        # holding NODE_RESTART.txt open. Step 4 then found those SAME nodes
-        # still up and still matching disk, and this script said "project,
-        # disk and running process all agree." Every word of that was true
-        # and the conclusion the reader draws from it -- that the restart
-        # worked -- was false.
-        #
-        # Step 4 answers "is the right version running", never "did MY
-        # restart put it there". Only the launcher's exit code speaks to
-        # that, so it has to be read.
-        if p.returncode != 0:
-            say(f"  FAIL     the restart launcher exited {p.returncode}, so it "
-                f"did NOT complete.")
-            say(f"           Whatever step 4 finds below is the state that was "
-                f"ALREADY running, not")
-            say(f"           the result of this restart. See NODE_RESTART.txt "
-                r"and %TEMP%\covenant_prod_*.txt.")
-            failures.append(f"restart launcher exited {p.returncode}")
+        # NO PIPES on stdout/stderr (2026-08-29). capture_output=True was this
+        # morning's 300 s TimeoutExpired on a restart that WORKED. Mechanism:
+        # run() with pipes waits in communicate(), which reads until EOF, and
+        # EOF needs every inherited write handle closed -- but the launcher's
+        # covenant_prod.bat `start`s three nodes and a watchdog, each of which
+        # inherits the pipe's write handle and holds it for as long as it
+        # runs. cmd.exe exits, the nodes come up, and this verifier still
+        # sits on a pipe the running chain keeps open. A scratch FILE has no
+        # reader: run() then waits only on the cmd.exe process handle, which
+        # the started nodes do not keep alive. The launcher's real report is
+        # NODE_RESTART.txt; this scratch copy is disposable.
+        scratch = os.path.join(tempfile.gettempdir(),
+                               f"verify_restart_{os.getpid()}.txt")
+        with open(scratch, "w", encoding="utf-8", errors="replace") as lout:
+            p = subprocess.run([bat], cwd=HERE, timeout=300, shell=False,
+                               stdin=subprocess.DEVNULL,
+                               stdout=lout, stderr=subprocess.STDOUT)
+        say(f"  exit code {p.returncode}")
+    except subprocess.TimeoutExpired:
+        # Do NOT return here. The launcher not returning and the restart not
+        # happening are different claims -- this morning's INCOMPLETE was the
+        # first mistaken for the second. Claim 4 below asks the nodes
+        # themselves, which is the only answer that counts; the unknown still
+        # keeps a full PASS off the table.
+        say("  restart launcher did not return within 300 s -- not waiting")
+        say("  any longer. Claim 4 below decides from the nodes themselves.")
+        unknowns.append("restart launcher did not return in 300 s")
     except Exception as e:
         say(f"  restart launcher failed: {type(e).__name__}: {e}")
         unknowns.append("restart launcher failed")

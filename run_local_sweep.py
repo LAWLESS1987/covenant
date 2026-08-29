@@ -19,11 +19,21 @@ in their command line, so it can never touch the production nodes in this folder
 
 Scratch dir: %TEMP%\\covenant_sweep. Nothing in the covenant folder is written
 except SWEEP_RESULTS.txt.
+
+P19 (2026-08-29): the --candidate overlay no longer stages the candidate's
+copies of gate files (test_*.py, sim_*.py, probe_*.py, verify_*.py, the two
+runners) -- the folder under test must not supply the checks that judge it.
+Blocked files are reported with both hashes; --allow-suite-overlay NAME (or
+'all') overrides, loudly. Every suite that will run is hashed AS STAGED into
+the results file, so "which bytes of the check ran" is never a forensic
+question again.
 """
-import os, re, shutil, subprocess, sys, tempfile, time
+import fnmatch, hashlib, os, re, shutil, subprocess, sys, tempfile, time
 
 SRC   = os.path.dirname(os.path.abspath(__file__))
 CANDIDATE = ""            # set by --candidate DIR; overlaid onto the scratch tree
+ALLOW_OVERLAY = set()     # --allow-suite-overlay NAME (repeatable; 'all') -- see P19
+STAGE_REPORT = []         # built during stage(), written into the results file
 WORK  = os.path.join(tempfile.gettempdir(), "covenant_sweep")
 OUT   = os.path.join(SRC, "SWEEP_RESULTS.txt")
 BUDGET_TOTAL_S = 45 * 60          # hard ceiling for the whole sweep
@@ -36,6 +46,18 @@ SUITES = [
     ("test_a17_oneway_peer_sync.py", 150), ("test_b1_judge_parser.py", 180),
     ("test_b2_quorum_diversity.py", 180),
     ("test_p14_watchdog_self_drift.py", 120),
+    # 2026-08-29: closing the runner/runner drift M58 recorded. The 08-27
+    # delivery's runner (07786e6ca851) had "P18 added to SUITES"; the 00:40Z
+    # 08-29 rewrite that introduced --candidate was built from an older base
+    # and silently DROPPED it -- so the win32 candidate sweeps that blessed
+    # pending-v8.38 could not have run a24/p18 (M58/PRELAND). These four are
+    # the delivery's own suites: a24/a24b + p18 arrived with v8.39, p19
+    # guards this runner itself, p15 is the shipped watchdog's newest control
+    # (canned responses -- no ollama needed).
+    ("test_a24_anomaly_eviction.py", 300),
+    ("test_p18_version_collision.py", 120),
+    ("test_p19_overlay_guard.py", 180),
+    ("test_p15_judge_identity.py", 120),
     ("test_y1_stake_divergence.py", 120), ("test_w1_wsgi.py", 150),
     ("test_p11_version_identity.py", 180),
     ("test_p12_substrate_sensing.py", 180),
@@ -80,6 +102,35 @@ SUITES = [
 # this list finds an answer rather than an omission.
 TALLY = re.compile(r"(\d+\s*/\s*\d+\s*(?:checks|passed)|\d+ passed[^\n]*|ALL PASS[^\n]*|"
                    r"ALL INVARIANTS HELD|RESULTS:[^\n]*|A23: \d+/\d+ passed)", re.I)
+
+# ---- P19 (2026-08-29): the folder under test must not supply the checks
+# that judge it. The overlay below copies candidate *.py OVER the staged
+# tree -- which is its purpose for the core and its modules, and was also,
+# unnoticed, true for the SUITES: a candidate folder containing
+# test_a23_ack_health.py would replace the gate's own check with whatever
+# the candidate chose to claim about itself, and the results file would
+# report the verdict as the sweep's. (Found while explaining the win32
+# 23/23-vs-24/24 A23 delta: a green tally the project's suite bytes cannot
+# produce means SOME other suite ran, and this overlay is one of two ways
+# that happens silently.) So: files whose NAME says "check" -- test_*.py,
+# sim_*.py, probe_*.py, verify_*.py, the two runners -- are never taken
+# from the candidate by default. Each one blocked is reported with both
+# hashes. --allow-suite-overlay NAME (or 'all') overrides, loudly, for the
+# legitimate case of a candidate that ships an updated suite -- and the
+# results file then says in as many words that the verdict for that suite
+# is the candidate's own claim.
+GATE_PATTERNS = ("test_*.py", "sim_*.py", "probe_*.py", "verify_*.py")
+GATE_NAMES = {"run_local_sweep.py", "run_all_tests.sh"}
+
+def is_gate_file(name):
+    return name in GATE_NAMES or any(fnmatch.fnmatch(name, p) for p in GATE_PATTERNS)
+
+def sha12(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:12]
 
 def kill_leftovers():
     """DISABLED 2026-08-22, deliberately.
@@ -140,16 +191,37 @@ def stage():
     if CANDIDATE:
         if not os.path.isdir(CANDIDATE):
             raise SystemExit("--candidate %r is not a directory" % CANDIDATE)
-        over = []
+        over, blocked, replaced = [], [], []
         for n in sorted(os.listdir(CANDIDATE)):
             p2 = os.path.join(CANDIDATE, n)
-            if os.path.isfile(p2) and (n.endswith(".py") or n.endswith(".json")
-                                       or n.endswith(".bat") or n.endswith(".html")):
-                shutil.copy2(p2, WORK)
-                over.append(n)
-        print("candidate overlay from %s: %d file(s) -- %s"
+            if not (os.path.isfile(p2) and (n.endswith(".py") or n.endswith(".json")
+                                            or n.endswith(".bat") or n.endswith(".html"))):
+                continue
+            if is_gate_file(n):                                   # P19, above
+                if not ("all" in ALLOW_OVERLAY or n in ALLOW_OVERLAY):
+                    staged_p = os.path.join(WORK, n)
+                    have = (sha12(staged_p) if os.path.exists(staged_p)
+                            else "(no deployed copy)")
+                    blocked.append((n, sha12(p2), have))
+                    continue
+                replaced.append((n, sha12(p2)))
+            shutil.copy2(p2, WORK)
+            over.append(n)
+        STAGE_REPORT.append("candidate overlay from %s: %d file(s) copied -- %s"
               % (CANDIDATE, len(over), ", ".join(over[:8])
                  + (" ..." if len(over) > 8 else "")))
+        for n, csha, dsha in blocked:
+            STAGE_REPORT.append(
+                "OVERLAY BLOCKED %s: candidate copy %s NOT staged; the sweep "
+                "runs the deployed copy %s. Gate files never come from the "
+                "folder under test (P19); --allow-suite-overlay %s overrides."
+                % (n, csha, dsha, n))
+        for n, csha in replaced:
+            STAGE_REPORT.append(
+                "OVERLAY REPLACED GATE FILE %s with the candidate's %s "
+                "(--allow-suite-overlay): every verdict that suite prints "
+                "below is the CANDIDATE'S OWN CLAIM, not the deployed check's."
+                % (n, csha))
 
 def clean_dbs():
     """Remove databases between suites, as run_all_tests.sh does.
@@ -186,6 +258,8 @@ def parse_argv():
             repeat = int(argv[i + 1]); i += 2
         elif argv[i] == "--out":
             OUT = os.path.join(SRC, argv[i + 1]); i += 2
+        elif argv[i] == "--allow-suite-overlay" and i + 1 < len(argv):
+            ALLOW_OVERLAY.add(argv[i + 1]); i += 2
         elif argv[i] == "--candidate" and i + 1 < len(argv):
             CANDIDATE = argv[i + 1]
             if not os.path.isabs(CANDIDATE):
@@ -207,6 +281,8 @@ def main():
         say(fh, "staging into %s ..." % WORK)
         stage()
         say(fh, "staged.")
+        for _line in STAGE_REPORT:          # P19: the overlay's report belongs
+            say(fh, _line)                  # in the results file, not just stdout
     except Exception as e:
         import traceback
         say(fh, "SETUP FAILED: %r" % (e,))
@@ -240,6 +316,18 @@ def main():
             plan += [(n, 300) for n in missing]          # not in the default list
             plan = [x for x in plan for _ in range(repeat)]
             say(fh, "running %d run(s) of %d suite(s), alone" % (repeat, len(set(n for n, _ in plan))))
+            say(fh, "")
+        # P19/M40: pin the CHECKS, not just the core. "Which test_a23 ran?"
+        # cost a morning of AST forensics; one line per suite, hashed as
+        # STAGED, answers it for ever.
+        _seen = set()
+        for _s, _t in plan:
+            _p3 = os.path.join(WORK, _s)
+            if _s in _seen or not os.path.exists(_p3):
+                continue
+            _seen.add(_s)
+            say(fh, "check  %-32s sha256 %s  (as STAGED)" % (_s, sha12(_p3)))
+        if _seen:
             say(fh, "")
         for suite, tmo in plan:
             if not os.path.exists(os.path.join(WORK, suite)):
