@@ -124,6 +124,12 @@ SUITES = [
     # P20 (2026-08-29): the watchdog's self-evaluation ledger -- every layer
     # it senses, one PASS/WARN/FAIL block, report-only by AST. 23/23.
     ("test_p20_watchdog_self_eval.py",   120,  "IDENTITY"),
+    # C3 (2026-08-29): the guard that heals the watchdog -- pure
+    # decide(), report-only by AST, no process started. 21/21.
+    ("test_c3_guard.py",                 120,  "IDENTITY"),
+    # M2 (2026-08-29): merkle proofs over the seal -- prove one file,
+    # disclose nothing else. 21/21, pure hashing.
+    ("test_m2_merkle_seal.py",           120,  "SECURITY"),
     # A24, moved here from DELIBERATELY_OFF 2026-08-29 exactly as that
     # entry's own REMEDY clause instructed ("propagate the v8.38+ core,
     # then move this line into SUITES") -- the v8.40 core at root carries

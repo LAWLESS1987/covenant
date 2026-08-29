@@ -85,8 +85,24 @@ EXCLUDE_EXT = {".pyc", ".pyo", ".tmp",
                # manifest and the archive.
                ".msi", ".exe", ".zip"}
 EXCLUDE_SUFFIX = ("-wal", "-shm")          # sqlite sidecars: in flux
+# A SEAL MUST NOT HASH ITS OWN OUTPUT. Every name here is something this
+# script WRITES; leaving one in the walk means producing a proof changes the
+# set the proof is about, so the proof is invalid the moment it exists.
+# Caught live 2026-08-29: `merkle` wrote SEAL_MERKLE.txt, `prove` then walked
+# a set containing it, and a legitimate proof failed against the root printed
+# seconds earlier. Same landmine verify_bundle.py documents as M48.
 EXCLUDE_NAMES = {"covenant_sealed.bin", "covenant_sealed.json",
-                 "MANIFEST.sha256", "SEAL_ROOT.txt", "SEAL_PUBLIC.txt"}
+                 "MANIFEST.sha256", "SEAL_ROOT.txt", "SEAL_PUBLIC.txt",
+                 "SEAL_MERKLE.txt",
+                 # Written by covenant_anchor.py, not by this file -- which is
+                 # why it survived the original exclusion list. Same loop one
+                 # level up: anchoring root R writes this file, which changes
+                 # the tree, so the anchored root no longer matches the folder
+                 # it certifies. Its integrity comes from being ON CHAIN
+                 # (block_index), not from being inside the manifest.
+                 "SEAL_ANCHOR.json"}
+# Proofs are outputs too, and there can be any number of them.
+EXCLUDE_PREFIX = ("PROOF_",)
 
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 1 << 17, 8, 1     # ~128 MB, ~1s. Deliberate.
 MAGIC = b"CVNTSEAL1"
@@ -106,7 +122,7 @@ def walk():
         for f in sorted(files):
             if f in EXCLUDE_NAMES or os.path.splitext(f)[1] in EXCLUDE_EXT:
                 continue
-            if f.endswith(EXCLUDE_SUFFIX):
+            if f.endswith(EXCLUDE_SUFFIX) or f.startswith(EXCLUDE_PREFIX):
                 continue
             full = os.path.join(root, f)
             rel = os.path.relpath(full, HERE).replace("\\", "/")
@@ -139,6 +155,163 @@ def root_hash(rows):
     for rel, size, digest in rows:
         h.update(f"{digest}  {size}  {rel}\n".encode())
     return h.hexdigest()
+
+
+
+# --------------------------------------------------------------- merkle --
+# FOLLOWABLE BRANCHES, SEALED BASE.
+#
+# root_hash() above is a single linear digest over every row: it proves the
+# SET, and to let anyone check one file you must hand them the whole
+# manifest -- all 134 filenames and hashes. That is all-or-nothing
+# disclosure, and it is the reason this section exists.
+#
+# A Merkle tree over the same rows lets you prove ONE file belongs to the
+# sealed set by revealing that file plus about log2(n) sibling hashes --
+# eight of them for 134 files -- and NOTHING about the other 133. The root
+# stays public, the branch is followable, the base stays shut.
+#
+# THE FLAT ROOT IS NOT REPLACED. It is already published in SEAL_ROOT.txt
+# and anchored into the chain at block 2; changing what `root` means would
+# invalidate a proof somebody may already hold. The merkle root is written
+# alongside it, as a second and different claim.
+#
+# DOMAIN SEPARATION, and why it is not decoration. A tree that hashes leaves
+# and internal nodes the same way lets an attacker present an internal node
+# AS a leaf -- the classic second-preimage weakness (and the duplicated-last
+# -node variant that cost Bitcoin a CVE). Leaves are hashed under a 0x00
+# prefix and internal nodes under 0x01, so no leaf digest can ever equal an
+# internal one, and an odd node is CARRIED UP rather than duplicated.
+#
+# WHAT A PROOF STILL LEAKS, stated because a proof that oversells itself is
+# worse than none: it reveals the number of files (the tree depth) and the
+# proven file's position among the sorted rows. It does not reveal any other
+# filename, size or content.
+def _leaf(rel, size, digest):
+    return hashlib.sha256(b"\x00" + f"{digest}  {size}  {rel}".encode()
+                          ).hexdigest()
+
+
+def _pair(a, b):
+    return hashlib.sha256(b"\x01" + bytes.fromhex(a) + bytes.fromhex(b)
+                          ).hexdigest()
+
+
+def merkle_levels(rows):
+    """Every level of the tree, leaves first. rows must already be sorted --
+    build_manifest() sorts them, and the order IS part of the commitment."""
+    level = [_leaf(rel, size, digest) for rel, size, digest in rows]
+    if not level:
+        return [[hashlib.sha256(b"\x00").hexdigest()]]
+    levels = [level]
+    while len(level) > 1:
+        nxt = []
+        for i in range(0, len(level) - 1, 2):
+            nxt.append(_pair(level[i], level[i + 1]))
+        if len(level) % 2:
+            nxt.append(level[-1])      # carried, never duplicated
+        levels.append(nxt)
+        level = nxt
+    return levels
+
+
+def merkle_root(rows):
+    return merkle_levels(rows)[-1][0]
+
+
+def merkle_proof(rows, index):
+    """[(side, hash), ...] from the leaf up. `side` says whether the sibling
+    sits left or right, which the verifier needs to hash in the right
+    order."""
+    levels = merkle_levels(rows)
+    proof, i = [], index
+    for level in levels[:-1]:
+        if i % 2 == 0:
+            if i + 1 < len(level):
+                proof.append(("right", level[i + 1]))
+        else:
+            proof.append(("left", level[i - 1]))
+        i //= 2
+    return proof
+
+
+def verify_merkle(leaf, proof, root):
+    h = leaf
+    for side, sib in proof:
+        h = _pair(sib, h) if side == "left" else _pair(h, sib)
+    return h == root
+
+
+def cmd_prove(args):
+    """Prove ONE file is in the sealed set, revealing nothing else."""
+    rows = build_manifest()
+    target = args.path.replace("\\", "/")
+    idx = next((i for i, (rel, _s, _d) in enumerate(rows)
+                if rel.replace("\\", "/") == target), None)
+    if idx is None:
+        print(f"  {args.path} is not in the sealed set "
+              f"({len(rows)} files). Nothing was proven.")
+        return 1
+    rel, size, digest = rows[idx]
+    proof = merkle_proof(rows, idx)
+    out = {"file": rel, "size": size, "sha256": digest,
+           "leaf": _leaf(rel, size, digest),
+           "proof": [[side, h] for side, h in proof],
+           "merkle_root": merkle_root(rows),
+           "files_in_set": len(rows),
+           "reveals": ("this file, the number of files, and its position. "
+                       "No other filename, size or content.")}
+    name = f"PROOF_{os.path.basename(rel).replace('.', '_')}.json"
+    with open(os.path.join(HERE, name), "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1)
+    print(f"  {rel}")
+    print(f"  {len(proof)} sibling hashes prove it against root "
+          f"{out['merkle_root'][:16]}...")
+    print(f"  wrote {name} -- safe to hand to anyone; it discloses no other "
+          f"file")
+    return 0
+
+
+def cmd_check_proof(args):
+    """Check a proof someone handed you, against a root you already trust."""
+    try:
+        with open(args.proof, encoding="utf-8") as f:
+            p = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"  unreadable proof: {e}")
+        return 1
+    root = args.root or p.get("merkle_root")
+    ok = verify_merkle(p["leaf"], [(s, h) for s, h in p["proof"]], root)
+    print(f"  file  {p.get('file')}")
+    print(f"  root  {root}")
+    print(f"  {'VALID' if ok else 'INVALID'}: the leaf "
+          f"{'chains to' if ok else 'DOES NOT chain to'} that root")
+    if not args.root:
+        print("  NOTE: checked against the root INSIDE the proof, which "
+              "proves only internal consistency. Pass --root with a root you "
+              "obtained independently (SEAL_ROOT.txt, the anchor block) for "
+              "this to mean anything.")
+    return 0 if ok else 1
+
+
+def cmd_merkle(_):
+    rows = build_manifest()
+    r = merkle_root(rows)
+    depth = len(merkle_levels(rows)) - 1
+    with open(os.path.join(HERE, "SEAL_MERKLE.txt"), "w",
+              encoding="utf-8") as f:
+        f.write(f"merkle_root {r}\nfiles       {len(rows)}\n"
+                f"depth       {depth}\nutc         "
+                f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
+                f"# Proves membership of ONE file with ~{depth} sibling\n"
+                f"# hashes, revealing nothing about the others. The flat\n"
+                f"# root in SEAL_ROOT.txt is a separate, older claim and is\n"
+                f"# deliberately unchanged.\n")
+    print(f"  {len(rows)} files, tree depth {depth}")
+    print(f"  merkle root {r}")
+    print(f"  a single-file proof needs ~{depth} sibling hashes")
+    print("  wrote SEAL_MERKLE.txt")
+    return 0
 
 
 # ------------------------------------------------------------- manifest --
@@ -445,6 +618,14 @@ def main():
     sub.add_parser("manifest")
     sub.add_parser("public")
     sub.add_parser("verify")
+    sub.add_parser("merkle")
+    pr = sub.add_parser("prove")
+    pr.add_argument("path", help="path as it appears in MANIFEST.sha256")
+    cp = sub.add_parser("check-proof")
+    cp.add_argument("proof")
+    cp.add_argument("--root", help="a merkle root you obtained INDEPENDENTLY "
+                                   "-- without it, the check is only "
+                                   "internally consistent")
     e = sub.add_parser("encrypt")
     e.add_argument("--keyfile", help="unlock by POSSESSION of this file "
                                      "instead of a passphrase")
@@ -454,7 +635,9 @@ def main():
     d.add_argument("dest")
     d.add_argument("--keyfile", help="path to the key file, if it has moved")
     a = ap.parse_args()
-    return {"manifest": cmd_manifest, "public": cmd_public, "verify": cmd_verify,
+    return {"manifest": cmd_manifest, "public": cmd_public,
+            "verify": cmd_verify, "merkle": cmd_merkle, "prove": cmd_prove,
+            "check-proof": cmd_check_proof,
             "encrypt": cmd_encrypt, "decrypt": cmd_decrypt}[a.cmd](a)
 
 

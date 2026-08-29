@@ -323,6 +323,25 @@ run test_c2_watchdog_live.py 480
 #                       no I/O from the evaluator itself). 23/23 on delivery.
 #                       No node, no socket, no key.
 run test_p20_watchdog_self_eval.py 120
+#   test_c3_guard (C3, 2026-08-29) the guard that heals the WATCHDOG:
+#                       every branch of its pure decide(), including the
+#                       three refusals that matter more than the action
+#                       (a wedged pid is not a dead one; inside the
+#                       cooldown it holds; a watchdog that does not
+#                       compile is never revived). AST-pins decide() as
+#                       unable to spawn, kill or log. 21/21, no process
+#                       started, no node touched.
+run test_c3_guard.py 120
+#   test_m2_merkle_seal (M2, 2026-08-29) followable branches, sealed
+#                       base: the flat seal root proves the SET and
+#                       discloses every filename to do it; the merkle
+#                       layer proves ONE file with ~log2(n) siblings and
+#                       nothing about the rest. Pins domain separation,
+#                       odd nodes carried not duplicated, four ways of
+#                       faking a proof, and that the seal never hashes
+#                       its own output -- which it was doing. 21/21,
+#                       pure hashing, nothing sealed or encrypted.
+run test_m2_merkle_seal.py 120
 #   test_a20_peer_version (v8.33) A20/A21: every peer reply carries this node's
 #                       version and source hash, and the 120 s tip-gossip
 #                       heartbeat carries a bounded state digest -- so two nodes
