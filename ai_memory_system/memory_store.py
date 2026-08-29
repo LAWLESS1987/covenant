@@ -349,6 +349,11 @@ class MemoryStore:
             self._audit(action, name, agent, _sha(text))
             out = parse_memory(text)
             self.index.upsert(out, len(text.encode("utf-8")))
+            # A written [[link]] is an ASSERTED edge, not an observed one --
+            # never pruned, never decayed away. The system does not get to
+            # forget what it was told because it has not needed it lately.
+            if out.get("links") and self.index.myc:
+                self.index.myc.link_explicit(out["name"], out["links"])
         return out
 
     def touch(self, name: str) -> Optional[Dict[str, Any]]:

@@ -27,6 +27,8 @@ import sqlite3
 import threading
 from typing import Any, Dict, List, Optional
 
+from mycelium import Mycelium
+
 SCHEMA_VERSION = 1
 
 
@@ -56,6 +58,7 @@ class MemoryIndex:
         # files are the truth.
         self._con.execute("pragma synchronous=NORMAL")
         self.fts = _has_fts5(self._con)
+        self.myc: Optional[Mycelium] = None
         try:
             self._create()
         except sqlite3.DatabaseError:
@@ -103,6 +106,9 @@ class MemoryIndex:
         c.execute("insert or replace into meta values ('schema', ?)",
                   (str(SCHEMA_VERSION),))
         c.commit()
+        # The edge layer shares this connection and lock: one file, one
+        # writer discipline, and the graph cannot outlive the rows it links.
+        self.myc = Mycelium(self._con, self._lock)
 
     # ------------------------------------------------------------- writing
     def upsert(self, mem: Dict[str, Any], size: int = 0) -> None:

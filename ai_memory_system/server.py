@@ -269,14 +269,31 @@ class Handler(BaseHTTPRequestHandler):
             # Shortlist through the index, then rank. This used to read
             # EVERY memory off disk on every recall -- an index in the store
             # that the request path never called.
-            cands = self.store.index.search(q, limit=max(50, limit * 5))
-            full = [self.store.index.get_body(c["name"]) for c in cands]
+            # MYCELIAL RECALL. Text search supplies a few SEEDS; activation
+            # spreads outward along proven edges. Cost follows the GRAPH, not
+            # the size of the store -- and it reaches memories that never used
+            # the query's words but have repeatedly proven related, which no
+            # amount of scanning can do at any speed.
+            seeds = self.store.index.search(q, limit=8)
+            names = {c["name"]: 1.0 for c in seeds}
+            myc = self.store.index.myc
+            if myc and names:
+                for row in myc.spread(names, hops=2,
+                                      limit=max(25, limit * 3)):
+                    names.setdefault(row["name"], row["activation"])
+            full = [self.store.index.get_body(n) for n in names]
             ranked = recall.rank([f for f in full if f], q, limit)
             # Only the top few are reinforced -- see TOUCH_PER_RECALL. A
             # read path that writes once per result is a write amplifier
             # pointed at the operator's disk.
-            for r in ranked[:TOUCH_PER_RECALL]:
-                self.store.touch(r["name"])
+            used = [r["name"] for r in ranked[:TOUCH_PER_RECALL]]
+            for name in used:
+                self.store.touch(name)
+            # Only what was actually RETURNED thickens. Reinforcing every
+            # candidate would teach the graph that everything relates to
+            # everything, which is the same as teaching it nothing.
+            if myc and len(used) > 1:
+                myc.reinforce(used)
             return self._send(200, {
                 "query": q, "count": len(ranked), "results": ranked,
                 "note": "every result carries the components that produced "
@@ -295,6 +312,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200,
                               recall.context_window([f for f in full if f],
                                                     budget))
+
+        if path == "/mycelium":
+            myc = self.store.index.myc
+            if not myc:
+                return self._send(200, {"edges": 0,
+                                        "note": "no edge layer on this store"})
+            name = (qs.get("name") or [""])[0]
+            out = dict(myc.stats())
+            if name:
+                out["neighbours"] = myc.neighbours(name, 15)
+            return self._send(200, out)
 
         if path == "/audit":
             recs = []
