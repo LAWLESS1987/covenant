@@ -145,3 +145,107 @@ average buy prices) is readable at `965ba6e`, which is on `origin/main`.
 
 Collaboration is the *reason* to do the purge now. It is no longer a
 before-going-public task.
+
+---
+
+# ADDENDUM — the Zenodo paper, read in full (2026-08-29)
+
+Retrieved and read via the browser pane (WebFetch could not parse the PDF).
+Four pages. This supersedes the earlier "not yet read" caveat.
+
+## What IAP actually proposes
+
+*Latent Trajectory Gating: Eliminating Autoregressive Drift via the Invariant
+Agency Protocol.* Nickolas Patrick Joseph Schoff, "Schoff Research Program",
+5 June 2026, CC BY 4.0.
+
+The thesis, stated fairly: standard mitigations (RLHF, temperature, top-p)
+"operate purely at the surface level of token selection... suppress symptoms
+rather than addressing the structural mechanics of latent generation." Instead,
+let the model explore freely *inside* — an "Exploratory Matrix" of high-variance
+latent trajectories — then insert an **Invariant Gating Matrix** immediately
+before the final linear layer and softmax. Trajectories that violate the
+constraint set are mapped to the empty set and dissipate in the hidden layers;
+only constraint-satisfying trajectories crystallize into output tokens. A second
+component, the **Invariant Core**, is "a static, high-fidelity memory bank (e.g.
+an external verified retrieval database or permanent semantic anchor) that holds
+the rigid boundaries of truth."
+
+The whole formalisation is one piecewise line:
+
+    P_C(tau) = tau       if tau |= C
+             = empty     if tau |/= C
+
+## What it does not contain
+
+- **No experiments. No benchmarks. No measurements. No numbers of any kind.**
+  Four pages: abstract, introduction, an ASCII block diagram, the line above, a
+  qualitative comparison table, discussion, references.
+- **No definition of the hard part.** `tau |= C` — deciding whether a latent
+  trajectory "logically satisfies" an invariant — is the entire problem, and it
+  is asserted, not constructed.
+- **No account of the degenerate case.** If every candidate trajectory violates
+  C, the model must still emit something; the empty set is not a token.
+- **No comparison to constrained decoding / logit masking / grammar-constrained
+  generation**, which are shipping today and occupy the same design space.
+- **Three references**, two of which are self-citations to his own unpublished
+  work co-authored with LLMs (one "& Gemini", one "& Claude"). The only external
+  reference is Vaswani et al. 2017.
+
+And one claim that this project's own standards must flag: the comparison table
+lists hallucination risk under IAP as **"Zero at output."** That is
+unfalsifiable as written and asserted with no evidence. It is precisely what
+`test_sem4_degraded_model.py` exists to refuse — *"a value the model cannot
+compute, published as a measurement."*
+
+## The finding that actually matters: covenant already implements the thesis
+
+Read past the framing and IAP's architecture is one covenant already runs — one
+layer down the stack, and with the measurements the paper lacks.
+
+| IAP component | covenant's existing equivalent |
+|---|---|
+| Exploratory Matrix — free internal variance | any sender may propose any transaction; nothing is pre-censored |
+| **Invariant Gating Matrix `P_C`** — hard filter before crystallization | `ReasoningSentinel.validate_transaction` + the ethics gate: a violating tx is rejected and never enters a block |
+| **Invariant Core** — "static, high-fidelity memory bank holding rigid boundaries of truth" | `covenant_semantic_judge` + `DIVINE_PRINCIPLES` — a fitted lexicon and axes, deterministic and versioned by `model_id` |
+| trajectories dissipate leaving no footprint | rejected transactions never reach the chain; the rejection is recorded as an anomaly rather than as content |
+
+Covenant applies `P_C` at the **protocol** layer rather than the **logit** layer.
+That is a weaker claim than the paper's and a far more implementable one — you do
+not need access to hidden states to gate what gets committed.
+
+**And there is one place the two directly disagree, productively.** IAP argues
+against turning temperature to zero, because it "flattens the model's contextual
+processing, causing rigid, dogmatic repetitions." `covenant_judge_ollama.py`
+pins `temperature: 0, top_k: 1, top_p: 1.0` and a fixed seed, on the reasoning
+*"a gate that answers differently on a retry is not a gate."*
+
+Both are right, because they are about different components. **The generator may
+explore; the gate may not.** Covenant already separates those into different
+processes — which is arguably a cleaner realisation of IAP's own thesis than the
+paper describes, since IAP puts explorer and gate inside one forward pass and
+must then explain how the gate stays trustworthy while the model is dreaming.
+
+## Revised recommendation
+
+Unchanged on the mechanics — **there is nothing to merge**: no code in the
+paper, and the repo's licence is unresolved three ways.
+
+But the useful direction is the **reverse of the original request.** Do not merge
+his work into covenant. Covenant is the *empirical instance of his claim*:
+a working constraint-projection gate with a static invariant core and actual
+numbers behind it — SEM3 measured AUC 0.994 separating covert from innocent,
+0 false positives across 640 benign phrases, and honestly disclosed the blind
+spot (the judge passes `embezzle the funds`, 640/640 clean, because the corpus
+is Gutenberg-era).
+
+That is a real offer with real mutual benefit on both sides: **his framing, your
+evidence.** A paper whose central weakness is that nothing was measured, meeting
+a codebase whose central discipline is that everything is. If he wants IAP to be
+more than an argument, the fastest path is to test it against a gate that already
+exists — and covenant gets an outside reviewer for a component that currently has
+only one.
+
+That collaboration needs no merge, no licence resolution, and no repository
+access — which also means it can start before the holdings purge, unlike
+everything else in this document.
