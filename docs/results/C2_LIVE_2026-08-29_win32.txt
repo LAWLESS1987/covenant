@@ -1,0 +1,29 @@
+﻿PASS  S1 genesis exported for the loaded path  canonical genesis written to genesis.json
+PASS  S2 three nodes healthy on the watchdog's hardcoded topology  {'A': 1, 'B': 1, 'C': 1}
+PASS  S2b all three report the staged source identity (P11)  {'525f235134f5'}
+PASS  O1 --once exits 1 while the mock judge is live (honest, not green)  rc=1 alerts=12
+FAIL  O2 no false alarm beyond the mock-judge honesty alerts  2026-08-29T21:17:22Z ALERT node A: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code pr
+PASS  O3 the judge probe is green against a serving endpoint  
+PASS  O4 a dead judge is a named, fail-closed ALERT (P15 live)  
+PASS  L1 the startup line states the P16 silence contract, per-round floor  
+PASS  L2 P11 identity lines for all three nodes, version and source named  [('A', 'v8.40', '525f235134f5'), ('B', 'v8.40', '525f235134f5'), ('C', 'v8.40', '525f235134f5')]
+PASS  L3 adaptation dedups permanent conditions on the real log (P12)  6 distinct text(s), worst repeat 1, 6 rounds
+PASS  L4 judge identity is named in the log (P15)  
+PASS  L5 the promised heartbeat is real: max inter-line gap within contract  max gap 4s
+PASS  G1 gap_check reads ALIVE while the watchdog runs  ALIVE gap=1.3s
+PASS  K1 unreachable WARNs escalate 1/3 -> 2/3 -> 3/3, in order  offsets 27,1487,2088
+PASS  K2 three strikes is an ALERT: node C down  
+PASS  K3 the watchdog itself relaunches the node (start_node ran)  waited 18s
+PASS  K4 node C is BACK: reachable, same genesis, height preserved  height 1 vs 1
+PASS  K5 the restart is visible in state: uptime-went-backwards ALERT  
+PASS  K6 ...and it CLEARs when uptime grows again (P12 sweep)  
+PASS  K7 no rollback false alarm: height never 'went backwards'  
+PASS  K8 the 3-strike counter reset: one down-ALERT, then it CLEARs, WARNs stop  1 ALERT / 1 CLEARED, 0 boot-window WARN(s) after restart line
+PASS  J1 a re-tagged judge is an ALERT naming both digests (P15 live)  JUDGE MODEL CHANGED: qwen3:8b was digest aaaaaaaaaaaa and is now bbbbbbbbbbbb
+PASS  J2 said once, then the baseline moves (M34): one ALERT, no re-fire  1 ALERT line(s)
+PASS  J2b ...and the transition is recorded: the alert CLEARs next round  1 CLEARED line(s)
+PASS  G3 no per-line round number exists -- gap detection MUST be timestamp-based (the P16 comment overclaims; see docstring)  
+PASS  G2 a SIGKILLed watchdog is detectable ONLY by the gap -- and it is  gap 22s
+PASS  G2b ...because its last line is ordinary, not a death notice (P16's point, measured)  balance read for nodeC unavailable on ['A', 'B', 'C'] -- fewer than two database
+
+C2-LIVE: 26/27 passed

@@ -263,7 +263,22 @@ def main():
                        cwd=WORK, env=wd_env, capture_output=True, text=True,
                        timeout=180)
     alerts = [l for l in o.stdout.splitlines() if " ALERT " in l]
-    benign = ("INSECURE", "insecure")
+    # ALERTS THAT ARE TRUE ARE NOT FALSE ALARMS.
+    #
+    # O2 asks whether the watchdog invents alarms, so the allowlist must hold
+    # every alert that is CORRECT here -- and no more, or the check stops
+    # measuring anything.
+    #
+    # "code sandbox unavailable" was the one failure of the first win32 run
+    # of this suite (26/27, 2026-08-29). It is not a false alarm: this
+    # platform has no usable `fork` start method, so the sandbox's memory,
+    # process and file-size limits genuinely cannot be enforced, and the node
+    # responds by REFUSING every /propose_code rather than running one
+    # unbounded. The suite was written on Linux, where fork exists and the
+    # alert never fires. Silencing it in the node would be the actual defect;
+    # excluding it from "false alarms" is the correct fix, and it is matched
+    # narrowly on that phrase so no other alert slips through with it.
+    benign = ("INSECURE", "insecure", "code sandbox unavailable")
     check("O1 --once exits 1 while the mock judge is live (honest, not green)",
           o.returncode == 1 and alerts, f"rc={o.returncode} alerts={len(alerts)}")
     noisy = [a for a in alerts if not any(b in a for b in benign)]
