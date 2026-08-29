@@ -266,7 +266,11 @@ class Handler(BaseHTTPRequestHandler):
                 limit = max(1, min(50, int((qs.get("limit") or ["10"])[0])))
             except ValueError:
                 limit = 10
-            full = [self.store.get(m["name"]) for m in self.store.list()]
+            # Shortlist through the index, then rank. This used to read
+            # EVERY memory off disk on every recall -- an index in the store
+            # that the request path never called.
+            cands = self.store.index.search(q, limit=max(50, limit * 5))
+            full = [self.store.index.get_body(c["name"]) for c in cands]
             ranked = recall.rank([f for f in full if f], q, limit)
             # Only the top few are reinforced -- see TOUCH_PER_RECALL. A
             # read path that writes once per result is a write amplifier
@@ -333,7 +337,11 @@ class Handler(BaseHTTPRequestHandler):
         # should not have every file argued with.
         verdict = None
         if str(data.get("reconcile", "true")).lower() != "false":
-            existing = [self.store.get(x["name"]) for x in self.store.list()]
+            # Only memories sharing vocabulary can overlap enough to
+            # matter, so the full-text shortlist replaces comparing this body
+            # against every stored one -- which was a full scan plus a file
+            # read per row, on every write.
+            existing = self.store.index.candidates(str(data["body"]), limit=40)
             existing = [e for e in existing if e and e["name"] != m.group(1)]
             verdict = recall.reconcile(str(data["body"]), existing)
             if verdict["action"] == "NOOP" and verdict["target"]:

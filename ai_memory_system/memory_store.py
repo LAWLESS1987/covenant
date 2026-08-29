@@ -238,15 +238,44 @@ class MemoryStore:
 
     # ---------------------------------------------------------- audit chain
     def _chain_head(self) -> str:
-        head = GENESIS
+        """The last line's hash, in O(1) -- by seeking to the END of the
+        ledger rather than reading all of it.
+
+        Two earlier versions were both wrong, and the second wrong one is
+        worth keeping on the record. Reading every line to find the last made
+        each write cost O(total writes): storing a memory got slower the more
+        you had stored. Caching the head in memory fixed the speed and BROKE
+        THE CHAIN -- two MemoryStore instances can share one root (the server
+        holds one, a script another), each cached its own head, and the second
+        writer appended against a stale one, forking the ledger. The lock is
+        per-instance; the file is not.
+
+        So: no cache, and no full read. Seek back from the end for the last
+        newline. The file is always consulted, which is what keeps
+        independent writers agreeing, and the cost no longer depends on how
+        much history there is.
+        """
         try:
-            with open(self.audit, encoding="utf-8") as fh:
-                for line in fh:
-                    if line.strip():
-                        head = _sha(line.rstrip("\n"))
-        except OSError:
-            pass
-        return head
+            with open(self.audit, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                end = fh.tell()
+                if end == 0:
+                    return GENESIS
+                # Walk backwards in blocks until a complete final line is in
+                # hand. 4 KiB covers any realistic record in one read.
+                block, pos, buf = 4096, end, b""
+                while pos > 0:
+                    step = min(block, pos)
+                    pos -= step
+                    fh.seek(pos)
+                    buf = fh.read(step) + buf
+                    lines = [ln for ln in buf.split(b"\n") if ln.strip()]
+                    if len(lines) >= 1 and (pos == 0 or buf.count(b"\n") >= 2):
+                        return _sha(lines[-1].decode("utf-8"))
+                lines = [ln for ln in buf.split(b"\n") if ln.strip()]
+                return _sha(lines[-1].decode("utf-8")) if lines else GENESIS
+        except (OSError, UnicodeDecodeError):
+            return GENESIS
 
     def _audit(self, action: str, name: str, agent: str, digest: str) -> None:
         # In bulk mode the ledger flushes but does not fsync, matching the
@@ -266,6 +295,9 @@ class MemoryStore:
                 os.fsync(fh.fileno())
 
     def verify_chain(self) -> Dict[str, Any]:
+        # Deliberately reads the FILE and ignores the cached head: this is the
+        # integrity check, and a check that consults the thing it is checking
+        # proves nothing.
         """Walk the audit chain; the first broken link is named, not summed
         away. An empty ledger verifies -- an absent one is a fresh store,
         not a corrupt one."""
