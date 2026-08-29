@@ -134,6 +134,33 @@ def main():
         g.STATE, g.GUARD_LOG = old_state, old_log
         shutil.rmtree(tmp, ignore_errors=True)
 
+    # ---- N: the nodes, seen but never touched -----------------------------
+    # Added 2026-08-29 after a real outage in which the nodes AND the
+    # watchdog died together (one console group, one Ctrl+C) and the guard's
+    # log -- the only thing still being written -- said nothing about the
+    # chain being down.
+    check("N1 the guard can SEE the nodes", callable(getattr(g, "node_report",
+                                                             None)), "")
+    up, down = g.node_report()
+    check("N2 it returns (up, down) as ports, and every port is accounted "
+          "for -- a node missing from both lists would be invisible",
+          sorted(up + down) == sorted(g.NODE_PORTS), (up, down))
+    nsrc = inspect.getsource(g.node_report)
+    check("N3 IT ONLY LOOKS. No restart, no spawn, no kill anywhere in it -- "
+          "restarting nodes is the watchdog's job, and two supervisors on "
+          "one machine disagreeing is worse than a slow recovery",
+          not any(w in nsrc for w in ("revive", "Popen", "start_node",
+                                      "taskkill", "kill", "subprocess")),
+          [w for w in ("revive", "Popen", "start_node", "taskkill", "kill",
+                       "subprocess") if w in nsrc])
+    check("N4 ...and it says WHY it does not act, in the code, so nobody "
+          "later 'improves' it into a second supervisor",
+          "watchdog owns" in inspect.getsource(g.main)
+          or "watchdog's job" in nsrc, "")
+    check("N5 the death threshold is tuned to the watchdog's OWN contract: "
+          "it writes every 60s, so 180s is three missed rounds, not five",
+          g.GAP_DEAD_S == 180, g.GAP_DEAD_S)
+
     # ---- R: report-only, by AST ------------------------------------------
     tree = ast.parse(inspect.getsource(g.decide).lstrip())
     called = set()

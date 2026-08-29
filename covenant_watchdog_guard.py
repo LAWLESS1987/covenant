@@ -55,11 +55,51 @@ WD_SRC = os.path.join(HERE, "covenant_watchdog.py")
 GUARD_LOG = os.path.join(LOGDIR, "guard.log")
 STATE = os.path.join(LOGDIR, "guard_state.json")
 
-GAP_DEAD_S = int(os.environ.get("COVENANT_GUARD_GAP_DEAD_S", "300"))
+# 180s, not 300s. The watchdog writes at least every 60s in this
+# deployment (its own silence contract says so), and 300s meant tolerating
+# five missed rounds before believing it. Retuned 2026-08-29 after a real
+# outage: the nodes AND the watchdog died together, so the chain that heals
+# nodes was itself the casualty, and every second of detection lag was a
+# second the whole system was unattended. Three missed rounds is still well
+# clear of a slow round and halves the blind window.
+GAP_DEAD_S = int(os.environ.get("COVENANT_GUARD_GAP_DEAD_S", "180"))
 COOLDOWN_S = int(os.environ.get("COVENANT_GUARD_COOLDOWN_S", "900"))
+# Production API ports, read ONLY to report. See node_report().
+NODE_PORTS = (5000, 5020, 5060)
 
 # The watchdog stamps every line "YYYY-MM-DDTHH:MM:SSZ LEVEL ..." (UTC).
 _TS = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z ")
+
+
+def node_report():
+    """Are the nodes answering? REPORTED, NEVER ACTED ON.
+
+    Why look at all: this guard heals the WATCHDOG, and the watchdog heals
+    the NODES. That chain assumed the watchdog dies alone. It does not --
+    covenant_prod.bat starts nodes and watchdog in one console group, so a
+    single window close or Ctrl+C takes the healer and the healed together
+    (measured 2026-08-29: all four gone, ^C in the node log). When that
+    happens the guard's log was the only thing still being written, and it
+    said nothing about the chain being down.
+
+    Why it does not ACT: restarting nodes is the watchdog's job, with its own
+    3-strike judgement and its own knowledge of which node is which. A second
+    process restarting nodes on a different rule is two supervisors
+    disagreeing about the same machine, which is worse than a slow recovery.
+    So this only writes down what it saw, so the log tells the truth about
+    the whole system rather than about one process in it.
+    """
+    import urllib.error
+    import urllib.request
+    up, down = [], []
+    for port in NODE_PORTS:
+        try:
+            with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/health", timeout=4):
+                up.append(port)
+        except (urllib.error.URLError, OSError, ValueError):
+            down.append(port)
+    return up, down
 
 
 def glog(msg):
@@ -205,12 +245,21 @@ def main(argv=None):
     action, why = decide(gap, GAP_DEAD_S, alive, attempt_age, COOLDOWN_S,
                          compiles)
 
+    # What the nodes are doing, on every pass, whatever the verdict about
+    # the watchdog. A guard that reports the supervisor as healthy while the
+    # three things it supervises are dead is technically correct and
+    # practically useless.
+    up, down = node_report()
+    if down:
+        glog(f"NODES DOWN {down} (up {up or 'none'}) -- not this guard's to "
+             f"restart; the watchdog owns that, with its 3-strike judgement")
+
     if action == "healthy":
         # Quiet on the console, one line in the file: a guard that logs
         # nothing cannot prove IT ran, and a dead guard beside a dead
         # watchdog is the 08-24 silence one layer up.
-        glog(f"ok: {why}")
-        return 0
+        glog(f"ok: {why}" + (f" | nodes up {up}" if up else " | NO node up"))
+        return 0 if not down else 1
     if status_only or action in ("hold", "report-only"):
         glog(f"{action.upper()}: {why}")
         return 0 if action == "hold" else 1
