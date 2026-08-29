@@ -38,7 +38,7 @@ COVENANT PREFLIGHT
 [  ok  ] bridge port 5011 free
 
 -- boot smoke test --
-node identity created at C:\Users\Lawre\AppData\Local\Temp\tmpt6z_onld\p.db.key (owner-only). Back this up: it is this node's operator credential and genesis mint key.
+node identity created at C:\Users\<user>\AppData\Local\Temp\tmpt6z_onld\p.db.key (owner-only). Back this up: it is this node's operator credential and genesis mint key.
 adopted canonical genesis 00009b31c6c654d7 from genesis.json
 [  ok  ] node constructs and mints/adopts genesis
           height=1, 27 routes registered

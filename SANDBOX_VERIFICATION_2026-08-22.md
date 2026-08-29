@@ -2,7 +2,7 @@
 
 Reproduced the assembly-pass setup in a clean Linux sandbox (Python 3.11.15,
 fresh venv, `flask cryptography requests xrpl-py` from `requirements.txt`) from
-the source in `C:\Users\Lawre\covenant`. Your machine was not modified.
+the source in `C:\Users\<user>\covenant`. Your machine was not modified.
 
 ---
 

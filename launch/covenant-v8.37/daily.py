@@ -19,10 +19,10 @@ MAX_POSITION_PCT = 0.20      # Rule 1
 MIN_CASH_PCT     = 0.10      # Rule 1 -- cash floor
 # D4: the journal lives OUTSIDE the synced folder, on purpose. Two reasons,
 # both learned the hard way elsewhere in this project:
-#   1. `C:\Users\Lawre\covenant` leaves the machine (DAILY_CHECK.md section 7).
+#   1. `C:\Users\<user>\covenant` leaves the machine (DAILY_CHECK.md section 7).
 #      An equity-by-day history of the whole portfolio is not a key, but it is
 #      not something to post off the box either -- same reasoning that puts the
-#      Kraken read-only credential in `C:\Users\Lawre\.kraken`.
+#      Kraken read-only credential in `C:\Users\<user>\.kraken`.
 #   2. covenant_seal.py hashes every file in the folder and anchors the root to
 #      the chain. A state file that changes on every run would invalidate the
 #      seal daily and train the operator to ignore a mismatch -- which is the

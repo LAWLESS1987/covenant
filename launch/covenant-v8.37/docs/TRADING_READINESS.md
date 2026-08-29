@@ -200,7 +200,7 @@ Each line is checkable; none is a recommendation to trade.
 | 4 | `paper_run.py` has ≥ 30 sealed, settled signals and `--verify` passes | **`paper_run.py` does not exist either.** The covenant folder holds `paper_bot.py` and nothing else of that shape. Zero sealed signals exist. This line cannot be satisfied until the file is written and has then run ≥ 30 times | L's call |
 | 5 | `EdgeMonitor` seeded with `expected_mean`/`expected_sd` from a backtest that **passed** `evaluate()` | **cannot be seeded honestly today** — no rule has passed (DSR 0.000). Run it on the drawdown target instead, or not at all | L's call |
 | 6 | `kraken` CLI installed on L's machine, read-only by default, paper mode validated, `--allow-dangerous` never in a cloud path | per `EXECUTION_ARCHITECTURE.md`; L confirms | L |
-| 7 | Trade key only in `~/.config/kraken/config.toml` inside WSL; never in `C:\Users\Lawre\covenant`; Ledger phrase untouched | standing | L |
+| 7 | Trade key only in `~/.config/kraken/config.toml` inside WSL; never in `C:\Users\<user>\covenant`; Ledger phrase untouched | standing | L |
 | 8 | Order size clamped to the venue balance (`execute.py` `kraken balance` check) — the SOL-not-on-Kraken bug | implemented per the doc; re-test after D3 | L, loop |
 | 9 | `TRADING_POLICY.json` locks the ten positions; the sleeve is the only live capital; rule 4 (never average down) binds | standing | L |
 | 10 | Every order confirmed by L per order; the cloud session computes, never places | standing, Section 0 | both |

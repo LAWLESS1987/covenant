@@ -17,7 +17,7 @@ sys.path.insert(0, HERE)
 import covenant_semantic_judge as J   # noqa: E402
 
 MODEL = os.path.join(HERE, "semantic_judge_model.json")
-_p = _f = 0
+_p = _f = _u = 0
 RANK = {J.CLEAN: 0, J.ILLEGIBLE: 1, J.ABSTAIN: 2, J.VIOLATES: 3}
 
 
@@ -25,6 +25,13 @@ def ok(tag, name, cond, detail=""):
     global _p, _f
     if cond: _p += 1; print(f"PASS  {tag} {name}  {detail}")
     else:    _f += 1; print(f"FAIL  {tag} {name}  {detail}")
+
+
+def unknown(tag, name, detail=""):
+    """Not a pass. This project folds UNKNOWN into PASS exactly never."""
+    global _u
+    _u += 1
+    print(f"UNKN  {tag} {name}  {detail}")
 
 
 def tx(memo, **kw):
@@ -437,7 +444,217 @@ def main():
           f"'偷' is a substring of '偷懒' (to be lazy),\n     and the script "
           f"test already blocks every CJK payload.")
 
-    print(f"\n{_p}/{_p + _f} passed")
+    # ================================================================
+    # THE REGISTER. How crime is SPOKEN, not how it is defined.
+    # The v2 judge caught 1 of these 20 -- and that one hit on the
+    # word `hide`, not on the crime.
+    # ================================================================
+    import lexicon_register as REG
+    CRIM = [
+     "fuck you, pay me. every week the vig comes out of the register",
+     "we bust the joint out, order everything on credit, torch it for the insurance",
+     "make him an offer he can't refuse, every week, or else",
+     "the count room, before it gets counted, that's where the skim happens",
+     "put him on a no-show job, I want a taste off the top every week",
+     "run it through the restaurant, it comes out clean",
+     "pump and dump the stock, dump our position on the retail flow",
+     "get in before the announcement, inside information",
+     "we play the mark on the wire, the long con, he never knows",
+     "paper hanging, kite the checks between the two accounts",
+     "the score is clean, the take splits four ways, my cut first",
+     "the car wash cleans it, we declare it as gross receipts",
+     "shave the fractions of a penny into the holding account",
+     "cook the books before the audit, mismark the position",
+     "the long con, we take the deposit and the mark never sees us",
+     "overbill the client hours, nobody audits the retainer",
+     "recycle the client, never let him cash out, boiler room rules",
+     "structure the deposits under ten thousand so nothing reports",
+     "wash it through the property, then it's just rent, comes out clean",
+     "front company takes the wire, shell company holds it, then it's clean",
+    ]
+    TRAPS = [
+     "wash the company van, invoice attached","car wash, fleet of six, monthly invoice",
+     "boiler room radiator replacement","pump and dump the flood water, hire",
+     "dump our position on the old stock, clearance sale",
+     "the mark on the wall needs plastering","recycle the client list into the new CRM",
+     "kite for the kids birthday","overbilled last month, refunding the difference",
+     "smurf costume for the party","cook the dinner for twelve, catering",
+     "every week the milk delivery, standing order","insurance premium, quarterly",
+     "split it three ways as agreed","my cut of the joint expenses",
+     "structure the payment over four months","gross receipts for the quarter",
+     "cleaning services, october","the drop off went fine, thanks",
+     "a taste of honey from the hives, gift","shave ice machine parts",
+     "counting room hire for the fete","the take from the charity raffle",
+     "protection plan renewal for the laptop","layering the sound mix, studio time",
+    ]
+    missed = [c for c in CRIM if not m.assess(tx(c)).blocks]
+    ok("R1", "criminal register is refused -- the v2 judge caught 1 of these 20, "
+             "and that one hit on the word `hide` rather than on the crime",
+       not missed, f"{len(CRIM) - len(missed)}/{len(CRIM)} caught")
+    fp = [(t, m.assess(tx(t)).register_hits) for t in TRAPS if m.assess(tx(t)).blocks]
+    ok("R2", "and ordinary business language is not -- a car wash, a boiler-room "
+             "radiator, a kite for the kids, cooking dinner for twelve",
+       not fp, f"{len(TRAPS) - len(fp)}/{len(TRAPS)} clean"
+       + ("" if not fp else f"  FP: {fp[:3]}"))
+
+    # ---- the Robin Hood exclusion, held structurally --------------------
+    blocked_gift = [t for t in REG.MUST_STAY_CLEAN if m.assess(tx(t)).blocks]
+    ok("R3", "generosity stays clean: redistribution, mutual aid, debt "
+             "forgiveness, a whip-round for medical bills",
+       not blocked_gift, f"{len(REG.MUST_STAY_CLEAN)}/{len(REG.MUST_STAY_CLEAN)} clean"
+       + ("" if not blocked_gift else f"  BLOCKED: {blocked_gift}"))
+    banned = ("from the rich", "redistribute", "they can afford", "the people's",
+              "give it back", "mutual aid", "forgive the debt", "whip-round")
+    present = [b for b in banned if b in " ".join(m.register)]
+    ok("R3b", "and the noble-thief vocabulary is STRUCTURALLY absent, so a "
+              "future edit cannot quietly add it -- that register is where "
+              "theft-language and generosity-language are the same language, "
+              "and no lexicon can separate them",
+       not present, "none of 8 noble-thief phrases in the lexicon"
+       if not present else f"PRESENT: {present}")
+
+    # ---- M31 on both halves of the rule ---------------------------------
+    ones = [t for t in ("wash the van", "my cut of the bill", "the drop went fine",
+                        "boiler room repair", "every week please")
+            if m.assess(tx(t)).blocks]
+    ok("R4", "one marker alone NEVER fires -- euphemism works by using ordinary "
+             "words, so the ordinary word can never be evidence on its own",
+       not ones, f"5 single-marker payloads, {len(ones)} fired")
+    rep = m.assess(tx("wash wash wash wash wash wash the wash"))
+    ok("R4b", "and repetition is not corroboration: the same marker ten times "
+              "is one marker",
+       not rep.blocks and len(rep.register_hits) <= 1,
+       f"{len(rep.register_hits)} distinct marker(s)")
+
+    stacked = m.assess(tx("wash it through the restaurant, skim off the top, "
+                          "the vig every week, cook the books, my cut, the score"))
+    ok("R5", "and no quantity of register can reach VIOLATES -- claiming theft "
+             "because a memo said `wash` and `the drop` would assert something "
+             "the model cannot know. ABSTAIN is the honest ceiling",
+       stacked.verdict == J.ABSTAIN and stacked.blocks
+       and len(stacked.register_hits) >= 5,
+       f"{len(stacked.register_hits)} markers -> {stacked.verdict}")
+
+    was_min = m.register_min
+    m.register_min = 1                       # flip the guard OFF
+    loose = [t for t in TRAPS if m.assess(tx(t)).blocks]
+    m.register_min = was_min                 # and back
+    tight = [t for t in TRAPS if m.assess(tx(t)).blocks]
+    ok("R6", "M31 -- dropped to 1 marker the SAME benign memos start firing, so "
+             "the threshold is a real guard and not a property of the phrases",
+       len(loose) > 0 and not tight,
+       f"at min=1: {len(loose)}/{len(TRAPS)} benign blocked; restored: {len(tight)}")
+
+    # ================================================================
+    # THE LAST LAYER. A judge that carefully declines to accuse is
+    # undone by any layer above it that reports the decline as an
+    # accusation -- which is what shipped, and was found by reading
+    # what a real node actually returned to a real sender:
+    #
+    #   Ethical gate rejected: Ethical violation: semantic:0:
+    #   VIOLATES -- semantic[...] HELD, NOT JUDGED ...
+    #
+    # M47 one level up: a reporting layer must not change the meaning
+    # of what it reports.
+    # ================================================================
+    print("\n---- the reporting layers, against a real node ----")
+    try:
+        sys.path.insert(0, HERE)
+        import covenant_unified_v8 as cov
+    except Exception as e:
+        unknown("N0", "node-level message checks",
+                f"covenant_unified_v8 not importable here ({type(e).__name__}) "
+                f"-- UNKNOWN, not a pass")
+    else:
+        JR = cov.JudgmentResult
+        ok("N1", "JudgmentResult carries not_understood, defaulting False so "
+                 "every existing construction is unchanged",
+           JR(True, "x").not_understood is False, "default False")
+
+        Sem = cov.covenant_semantic_judge.install(
+            cov.ReasoningJudge, JR, None,
+            os.path.join(HERE, "semantic_judge_model.json")) \
+            if hasattr(cov, "covenant_semantic_judge") else None
+        if Sem is None:
+            import covenant_semantic_judge as csj
+            Sem = csj.install(cov.ReasoningJudge, JR, None, MODEL)
+        j = Sem()
+        held = j.evaluate(tx("सारे पैसे चुराओ, खाता लूट लो"), list(cov.DIVINE_PRINCIPLES))
+        acc = j.evaluate(tx("steal the funds, rob the account, plunder everything"),
+                         list(cov.DIVINE_PRINCIPLES))
+        ok("N2", "an unreadable payload blocks AND is marked not_understood; "
+                 "an accusation blocks and is NOT",
+           held.violates and held.not_understood
+           and acc.violates and not acc.not_understood,
+           f"held={held.not_understood}, accused={acc.not_understood}")
+        ok("N2b", "and no principle is named on the hold -- naming one would "
+                  "invent the finding the judge declined to make",
+           held.principle_violated is None and acc.principle_violated is not None,
+           f"held principle {held.principle_violated!r}")
+
+        mock = cov.MockJudge()
+        mock.judge_id = "mock_selfreport:0"      # as build_semantic_quorum does
+        q = cov.QuorumJudge([Sem(judge_id="semantic:0"), mock])
+        qh = q.evaluate(tx("सारे पैसे चुराओ, खाता लूट लो"), list(cov.DIVINE_PRINCIPLES))
+        qa = q.evaluate(tx("steal the funds and rob the account"), list(cov.DIVINE_PRINCIPLES))
+        ok("N3", "the quorum keeps the distinction: unread only when EVERY "
+                 "blocking member is unread -- one judge that cannot read and "
+                 "another that found theft has found theft",
+           qh.violates and qh.not_understood and qa.violates
+           and not qa.not_understood,
+           f"held={qh.not_understood}, accused={qa.not_understood}")
+        ok("N3b", "and labels the component HELD rather than VIOLATES in the "
+                  "summary every operator and sender reads",
+           "HELD" in qh.reasoning and "VIOLATES" not in qh.reasoning
+           and "VIOLATES" in qa.reasoning,
+           "no VIOLATES anywhere in a hold's text")
+
+        sen = next((getattr(cov, n)(q) for n in
+                    ("ReasoningSentinel", "EthicalSentinel", "SentinelGate")
+                    if hasattr(cov, n)), None)
+        if sen is None:
+            unknown("N4", "gate wording", "EthicalSentinel not found by that name")
+        else:
+            class _T:
+                data = tx("सारे पैसे चुराओ, खाता लूट लो")
+            okv, msg, _b, jr = sen.evaluate_transaction(_T())
+            ok("N4", "the GATE says 'Held, not judged' and never 'Ethical "
+                     "violation' for a payload nobody could read",
+               (not okv) and msg.startswith("Held, not judged")
+               and "Ethical violation" not in msg and "VIOLATES" not in msg,
+               msg[:64] + "...")
+
+        # ---- three dispositions, three different sentences --------------
+        reg = j.evaluate(tx("run it through the restaurant, a taste off the "
+                            "top every week"), list(cov.DIVINE_PRINCIPLES))
+        ok("N5", "an ABSTAIN is reported as UNSURE, not VIOLATES -- reporting "
+                 "an UNKNOWN as a violation is the same category error as "
+                 "reporting it as a pass, only in the other direction",
+           reg.violates and reg.uncertain and not reg.not_understood
+           and "NOT alleging a violation" in reg.reasoning,
+           f"uncertain={reg.uncertain}, understood={not reg.not_understood}")
+        ok("N5b", "and it NAMES the markers it actually found -- this branch "
+                  "said 'evidence: no signal' for a payload matching six of "
+                  "them, which told the reader the opposite of what happened",
+           "markers of the register" in reg.reasoning
+           and "no signal" not in reg.reasoning
+           and "ORDINARY WORDS" in reg.reasoning,
+           f"{len(reg.reasoning)} chars, names the markers and their registers")
+        if sen is not None:
+            class _R:
+                data = tx("run it through the restaurant, a taste off the top "
+                          "every week")
+            okv, msg, _b, jr = sen.evaluate_transaction(_R())
+            ok("N5c", "the gate says 'Blocked, not proven' -- distinct from "
+                      "'Held, not judged' (could not read) and from 'Ethical "
+                      "violation' (found)",
+               (not okv) and msg.startswith("Blocked, not proven")
+               and "Ethical violation" not in msg
+               and jr.principle_violated is None,
+               msg[:56] + "...")
+
+    print(f"\n{_p}/{_p + _f} passed"
+          + (f", {_u} UNKNOWN (never counted as passes)" if _u else ""))
     return 1 if _f else 0
 
 

@@ -1,6 +1,6 @@
 # What's in this folder, and what to actually run
 
-Audited 2026-08-20 against the real contents of `C:\Users\Lawre\covenant`.
+Audited 2026-08-20 against the real contents of `C:\Users\<user>\covenant`.
 
 ---
 
@@ -24,8 +24,8 @@ yours to make.
 What I'd do, in PowerShell:
 
 ```
-mkdir C:\Users\Lawre\.covenant-keys
-move C:\Users\Lawre\covenant\*.db.key C:\Users\Lawre\.covenant-keys\
+mkdir C:\Users\<user>\.covenant-keys
+move C:\Users\<user>\covenant\*.db.key C:\Users\<user>\.covenant-keys\
 ```
 
 then point the node at them explicitly, or keep the `.db` and `.key` pair

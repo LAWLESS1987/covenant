@@ -43,7 +43,7 @@ What follows is the part that needs the phone.
    behind its own NAT and the Tailscale interface is on the Windows side;
    a node inside WSL is not reachable at `100.x.y.z` without a port proxy.
    (If you must use WSL, install Tailscale *inside* WSL and use that IP.)
-3. From `C:\Users\Lawre\covenant` (with `covenant_path_pattern.py` beside
+3. From `C:\Users\<user>\covenant` (with `covenant_path_pattern.py` beside
    the core):
    ```
    set COVENANT_JUDGE_PROVIDERS=...      (your real provider config)

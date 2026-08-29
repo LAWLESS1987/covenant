@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 kraken_balance.py -- read your Kraken balance LOCALLY and write a shareable
 summary. Your API key never leaves your machine.
 
@@ -89,26 +89,115 @@ def kraken_private(endpoint: str, key: str, secret: str, data=None):
     return body.get("result", {})
 
 
-def public_prices(assets):
-    """Public ticker -- no auth needed."""
-    pairs = {a: f"{a}USD" for a in assets if a not in ("ZUSD", "USD")}
-    if not pairs:
-        return {}
-    url = "https://api.kraken.com/0/public/Ticker?pair=" + ",".join(pairs.values())
+def _usd_pair_map():
+    """asset code -> its USD pair name, from Kraken's OWN pair table.
+
+    M-fix (2026-08-28): this used to be guessed as f"{asset}USD", which is
+    wrong for every legacy asset. Kraken's private Balance endpoint answers in
+    legacy codes -- XXLM, XXRP, XXBT, ZUSD -- and the USD pair for XXLM is
+    XXLMZUSD, not XXLMUSD. Measured: "XXLMUSD" -> EQuery:Unknown asset pair.
+    AssetPairs is keyed on the same legacy codes Balance returns, so looking
+    the pair up removes the guess entirely rather than patching it.
+    """
+    url = "https://api.kraken.com/0/public/AssetPairs"
     try:
-        with urllib.request.urlopen(url, timeout=25) as r:
+        req = urllib.request.Request(url, headers={"User-Agent": "covenant-balance/1.0"})
+        with urllib.request.urlopen(req, timeout=25) as r:
             res = json.loads(r.read().decode()).get("result", {})
     except Exception:
         return {}
     out = {}
-    for a, p in pairs.items():
-        for k, v in res.items():
-            if p in k or k.endswith("USD") and a in k:
-                try:
-                    out[a] = float(v["c"][0])
-                except Exception:
-                    pass
-                break
+    for name, v in res.items():
+        if v.get("quote") not in ("ZUSD", "USD") or v.get("status") != "online":
+            continue
+        base = v.get("base")
+        # Several pair names can share a base; keep the shortest, which is the
+        # canonical one Kraken echoes back in a Ticker result.
+        if base and (base not in out or len(name) < len(out[base])):
+            out[base] = name
+    return out
+
+
+def _altnames():
+    """Kraken code -> the symbol a human uses: XXLM->XLM, ZUSD->USD, XXBT->XBT.
+
+    Taken from Kraken's own Assets table rather than derived by stripping a
+    leading X/Z. That heuristic is wrong for exactly the assets it looks
+    right for -- there are 837 assets and the legacy prefix is not a rule.
+    Emitted into the JSON sidecar so sync_holdings.py needs no network.
+    """
+    try:
+        req = urllib.request.Request("https://api.kraken.com/0/public/Assets",
+                                     headers={"User-Agent": "covenant-balance/1.0"})
+        with urllib.request.urlopen(req, timeout=25) as r:
+            res = json.loads(r.read().decode()).get("result", {})
+    except Exception:
+        return {}
+    return {c: v.get("altname") for c, v in res.items() if v.get("altname")}
+
+
+def spot_asset(a):
+    """Strip Kraken's staking/earn suffix: SOL.S, XXBT.M, ADA.F -> SOL, XXBT, ADA.
+
+    A staked coin is the same exposure as an unstaked one. Leaving them as
+    separate rows would halve each one's apparent share of the portfolio, and
+    the 20% concentration cap is computed from exactly that share -- so the
+    split would silently under-report a breach of the rule that matters most.
+    """
+    return a.split(".")[0]
+
+
+def public_prices(assets):
+    """asset code -> USD price. Public ticker, no auth needed.
+
+    Queries the batch, then falls back to one request per pair if the batch
+    fails. That fallback is not defensive padding: Kraken rejects the WHOLE
+    query if a single pair in it is unknown (measured -- 'good,bad' returns
+    EQuery:Unknown asset pair and an empty result), so one unrecognised coin
+    in the account would otherwise zero out the price of every other coin.
+    """
+    pairmap = _usd_pair_map()
+    want = {}                                   # pair name -> [asset codes]
+    for a in assets:
+        s = spot_asset(a)
+        if s in ("ZUSD", "USD"):
+            continue
+        p = pairmap.get(s)
+        if p:
+            want.setdefault(p, []).append(a)
+    if not want:
+        return {}
+
+    def _ticker(pairs):
+        url = ("https://api.kraken.com/0/public/Ticker?pair=" + ",".join(pairs))
+        req = urllib.request.Request(url, headers={"User-Agent": "covenant-balance/1.0"})
+        with urllib.request.urlopen(req, timeout=25) as r:
+            body = json.loads(r.read().decode())
+        if body.get("error"):
+            raise ValueError("; ".join(body["error"]))
+        return body.get("result", {})
+
+    res = {}
+    try:
+        res = _ticker(list(want))
+    except Exception:
+        for p in want:                          # one bad pair must not sink the rest
+            try:
+                res.update(_ticker([p]))
+            except Exception:
+                pass
+
+    out = {}
+    for pair, codes in want.items():
+        v = res.get(pair)
+        if not v:
+            continue
+        try:
+            px = float(v["c"][0])
+        except Exception:
+            continue
+        for a in codes:
+            out[a] = px
     return out
 
 
@@ -116,7 +205,18 @@ def main():
     key, secret = load_creds()
     print("reading balance from Kraken (locally)...")
     bal = kraken_private("Balance", key, secret)
-    holdings = {a: float(v) for a, v in bal.items() if float(v) > 0}
+    # Aggregate staking/earn variants into their spot asset (SOL + SOL.S).
+    # See spot_asset(): held apart, each row shows half the true position
+    # and a breach of the 20% concentration cap can pass unnoticed.
+    holdings, staked = {}, {}
+    for _a, _v in bal.items():
+        _amt = float(_v)
+        if _amt <= 0:
+            continue
+        _s = spot_asset(_a)
+        holdings[_s] = holdings.get(_s, 0.0) + _amt
+        if _s != _a:
+            staked[_s] = staked.get(_s, 0.0) + _amt
     if not holdings:
         print("No non-zero balances found.")
         return
@@ -139,6 +239,11 @@ def main():
         vs = f"{val:,.2f}" if val else "n/a"
         lines.append(f"  {a:<10}{amt:>18,.8f}{ps:>12}{vs:>14}")
     lines += ["  " + "-" * 52, f"  {'TOTAL':<10}{'':>18}{'':>12}{total:>13,.2f}", ""]
+    if staked:
+        lines.append("  staked/earn included in the rows above:")
+        for _s in sorted(staked):
+            lines.append(f"    {_s:<10}{staked[_s]:>18,.8f}")
+        lines.append("")
     if total > 0:
         lines.append("  concentration:")
         for a, amt, p, val in sorted(rows, key=lambda r: -(r[3] or 0)):
@@ -147,6 +252,15 @@ def main():
     text = "\n".join(lines)
     print("\n" + text)
     open(OUT, "w", encoding="utf-8").write(text)
+    # Machine-readable sidecar. The table above is for a human; sync_holdings.py
+    # must not have to parse thousands separators out of a fixed-width column.
+    # Balances only -- same contents as the table, no key, no secret, no
+    # account id. Gitignored as *_balance.json for the same reason as the .txt.
+    json.dump({"venue": "kraken", "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+               "balances": {a: amt for a, amt, _p, _v in rows},
+               "staked": staked,
+               "altnames": _altnames()},
+              open(os.path.splitext(OUT)[0] + ".json", "w", encoding="utf-8"), indent=2)
     print(f"\nwritten to {os.path.basename(OUT)} -- Claude can read this.")
     print("Your API key stayed in", CRED)
 

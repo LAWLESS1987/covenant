@@ -32,7 +32,14 @@ import pickle
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
-TOKENS = "/home/claude/jlens/tokens.pkl"
+# The corpus token cache. NOT a hardcoded path: preflight_publish.py's G5
+# found this file naming a directory that exists on exactly one machine, which
+# is both somebody's account name published to every reader and a build that
+# cannot run anywhere else. Looked for beside this file first, then wherever
+# COVENANT_TOKENS_PKL says.
+TOKENS = os.environ.get(
+    "COVENANT_TOKENS_PKL",
+    os.path.join(HERE, "tokens.pkl"))
 MIN_COUNT, VOCAB_CAP = 8, 30000          # v1's build parameters, from its own file
 
 
@@ -42,6 +49,14 @@ def main():
     build = v1["build"]
     assert build["min_count"] == MIN_COUNT and build["vocab"] == VOCAB_CAP, build
 
+    if not os.path.exists(TOKENS):
+        raise SystemExit(
+            f"no corpus token cache at {TOKENS}.\n"
+            f"This rebuild needs the 2,952,375-token cache the space was "
+            f"fitted on -- set COVENANT_TOKENS_PKL to it, or put tokens.pkl "
+            f"beside this script. Without it the vocabulary cannot be "
+            f"reproduced, and a vocabulary that cannot be reproduced is a "
+            f"competence claim nobody can check.")
     toks = pickle.load(open(TOKENS, "rb"))
     assert len(toks) == int(v1["space_tokens"]), (
         f"corpus cache has {len(toks)} tokens, model claims {v1['space_tokens']}"
@@ -85,6 +100,21 @@ def main():
                 if lang not in idx[st.lower()]:
                     idx[st.lower()].append(lang)
     out["seeded_index"] = {k: sorted(v) for k, v in sorted(idx.items())}
+    import lexicon_register
+    out["register_lexicon"] = lexicon_register.build()
+    out["register_min_markers"] = lexicon_register.MIN_MARKERS
+    out["register_note"] = (
+        "How crime is SPOKEN, not how it is defined. Fires only on "
+        f"{lexicon_register.MIN_MARKERS}+ distinct markers and caps at ABSTAIN "
+        "-- these are ordinary English words and a violation claim on them "
+        "would be unfounded. Fitted: 0 false positives in 64 adversarial "
+        "benign memos, 20/20 criminal lines. The Robin Hood register is "
+        "deliberately absent: it is where theft-language and generosity-"
+        "language are the same language, and encoding it would fire on "
+        "charity, mutual aid and debt forgiveness.")
+    print(f"register lexicon: {len(out['register_lexicon'])} phrases, "
+          f"{len(lexicon_register.REGISTER)} registers, "
+          f"fires at {out['register_min_markers']}+, capped at ABSTAIN")
     out["verified_languages"] = {}      # none yet. Honest, and it shows.
     out["min_reviewers"] = 2
     out["seeded_note"] = (

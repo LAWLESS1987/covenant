@@ -3,7 +3,7 @@
 ## The finding
 
 Every run since 2026-08-21 05:35 ended the same way: *"**L: copy
-`covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+`covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`."* Sixteen runs, fourteen node versions, twenty-five
 closed backlog items. M5 recorded why the loop could not do it itself —
 scheduled cloud runs have no device bridge — and treated that as settled.
@@ -68,7 +68,7 @@ Both directions now work, and were used:
 
 `project_write` puts a new bare filename under `claude/`, which would mix L's
 repo files in with the loop's own notes. So the files pulled off the PC sit
-under **`pc/`**, which mirrors `C:\Users\Lawre\covenant\` exactly:
+under **`pc/`**, which mirrors `C:\Users\<user>\covenant\` exactly:
 
 ```
 pc/daily.py  pc/guards.py  pc/paper_bot.py  pc/holdings.txt
@@ -77,7 +77,7 @@ pc/phone/node-install.sh  pc/phone/node-install-v2.sh  pc/phone/covenant-doctor.
 ```
 
 A run that edits one of these puts it back at the PC path with the `pc/` prefix
-stripped — `pc/daily.py` → `C:\Users\Lawre\covenant\daily.py`. `daily.py`
+stripped — `pc/daily.py` → `C:\Users\<user>\covenant\daily.py`. `daily.py`
 imports `guards` as a sibling, so they must stay in the same directory whatever
 that directory is called.
 

@@ -97,12 +97,30 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, "/home/claude/covenant_src/claude/semantic")
-from sem_core import build_space, tokenize  # noqa: E402
+# -------------------------------------------------------------------------
+# PATHS.  Parameterised 2026-08-29 (preflight_publish.py G5). This file named
+# one machine's home directory six times, which published an account name AND
+# meant the model could not be rebuilt anywhere else. A model whose build
+# cannot be re-run is a set of weights nobody can check -- and this project
+# already carries one of those in `supersedes`, whose source is simply gone.
+# -------------------------------------------------------------------------
+HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+SEM = os.environ.get("COVENANT_SEMANTIC_DIR", HERE)
+WORK = os.environ.get("COVENANT_SEMANTIC_WORK", HERE)
+sys.path.insert(0, SEM)
+try:
+    from sem_core import build_space, tokenize  # noqa: E402
+except ImportError:
+    raise SystemExit(
+        f"sem_core.py is not in {SEM}. Set COVENANT_SEMANTIC_DIR to the\n"
+        f"directory holding it -- it is the space builder the shipped model\n"
+        f"was fitted with, and no other implementation reproduces its ids.")
 
-BOOKS = "/home/claude/jlens/books"
-MANIFEST = "/home/claude/covenant_src/claude_phil_CORPUS_MANIFEST.json"
-OUT = "/home/claude/jlens/semantic_judge_model.json"
+BOOKS = os.environ.get("COVENANT_CORPUS_DIR", os.path.join(WORK, "books"))
+MANIFEST = os.environ.get("COVENANT_CORPUS_MANIFEST",
+                          os.path.join(HERE, "CORPUS_MANIFEST.json"))
+OUT = os.environ.get("COVENANT_MODEL_OUT",
+                     os.path.join(HERE, "semantic_judge_model.json"))
 
 # min_count=8 is align_ceiling's value and gives vocab 17,388 -- within 3% of the
 # lost probe's 16,916, which is the closest thing to a provenance check available.
@@ -201,7 +219,7 @@ def morphological(word, seeds):
 
 def load_tokens():
     ids = json.load(open(MANIFEST))["ids"]
-    cache = "/home/claude/jlens/tokens.pkl"
+    cache = os.path.join(WORK, "tokens.pkl")
     if os.path.exists(cache):
         return pickle.load(open(cache, "rb")), ids
     toks = []
@@ -212,7 +230,7 @@ def load_tokens():
 
 
 def get_space(tokens):
-    cache = f"/home/claude/jlens/space_mc{MINC}.pkl"
+    cache = os.path.join(WORK, f"space_mc{MINC}.pkl")
     if os.path.exists(cache):
         return pickle.load(open(cache, "rb"))
     sp = build_space(tokens, "phil", vocab_size=VOCAB, min_count=MINC,

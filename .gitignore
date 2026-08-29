@@ -68,8 +68,73 @@ PROBE_WIN_CONNECT.txt
 GIT_SETUP.txt
 ONE_RUN_ci.txt
 GITHUB_PUSH.txt
+GH_LOGIN.txt
+GH_CODE.txt
 
 # --- Transfer scratch -------------------------------------------------------
 _stage/
 _to_delete/
 .fuse_hidden*
+
+# --- ADDED 2026-08-29 by preflight_publish.py's G4 -------------------------
+# G4 probes the ignore RULES with paths that do not exist (`git check-ignore`),
+# so it tests what the file would actually refuse rather than what it looks
+# like it refuses. On its first run it found these three uncovered, next to
+# rules that already covered *.key and *.db. An ignore file nobody has watched
+# refuse anything has not been tested (M31).
+*.pem
+*.p12
+*.pfx
+*.env
+.env.*
+.covenant-keys/
+**/.covenant-keys/
+secrets.*
+*_secret*
+*.seed
+*.mnemonic
+id_rsa*
+id_ed25519*
+
+# --- corpus cache: reproducible, not committable --------------------------
+# fetch46.py rebuilds these 46 public-domain Gutenberg texts (~17 MB) from
+# claude_phil_CORPUS_MANIFEST.json. Keeping them locally is what makes the
+# semantic model's vocabulary reproducible -- the model file's own
+# `supersedes` block records an earlier model whose source is simply GONE, and
+# weights nobody can rebuild are weights nobody can check. Committing them is a
+# different question: they are re-fetchable from the manifest, so the manifest
+# is the artifact and these are the cache.
+docs/semantic/books/
+**/books/
+*.pkl
+tokens.pkl
+space_mc*.pkl
+
+# --- exchange credentials and the balances they read ----------------------
+# kraken_balance.py and coinbase_balance.py both REFUSE to read a credential
+# from inside this folder -- that is the real control and it is in the code.
+# These rules are the second layer: if one ever lands here by accident, git
+# must not be the thing that publishes it. Defence in depth, not a substitute.
+#
+# The *_balance.txt files are not credentials. They are HOLDINGS -- what you
+# own and how much -- which is nobody's business in a public repository, and
+# the reason those scripts write them here at all is so Claude can read them
+# WITHOUT the key. That argument stops working the moment they are pushed.
+.kraken/
+.coinbase/
+cdp_api_key.json
+*_api_key.json
+kraken_balance.txt
+coinbase_balance.txt
+*_balance.txt
+# Same data, machine-readable, written by the same two scripts for
+# sync_holdings.py. It is HOLDINGS -- it must not be published either.
+*_balance.json
+
+# --- trader runtime config ------------------------------------------------
+# trader_config.json carries `armed`. It is per-operator runtime state, and
+# committing it could publish an armed configuration or, worse, arm a fresh
+# clone by accident. covenant_trader.py rewrites a DISARMED default whenever
+# the file is absent, so ignoring it fails in the safe direction.
+trader_config.json
+TRADER_HALT

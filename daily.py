@@ -19,10 +19,10 @@ MAX_POSITION_PCT = 0.20      # Rule 1
 MIN_CASH_PCT     = 0.10      # Rule 1 -- cash floor
 # D4: the journal lives OUTSIDE the synced folder, on purpose. Two reasons,
 # both learned the hard way elsewhere in this project:
-#   1. `C:\Users\Lawre\covenant` leaves the machine (DAILY_CHECK.md section 7).
+#   1. `C:\Users\<user>\covenant` leaves the machine (DAILY_CHECK.md section 7).
 #      An equity-by-day history of the whole portfolio is not a key, but it is
 #      not something to post off the box either -- same reasoning that puts the
-#      Kraken read-only credential in `C:\Users\Lawre\.kraken`.
+#      Kraken read-only credential in `C:\Users\<user>\.kraken`.
 #   2. covenant_seal.py hashes every file in the folder and anchors the root to
 #      the chain. A state file that changes on every run would invalidate the
 #      seal daily and train the operator to ignore a mismatch -- which is the
@@ -124,7 +124,13 @@ def fetch_coinbase(sym):
     human-readable reason otherwise -- a failed read is REPORTED as failed and
     never silently substituted (DAILY_CHECK.md section 3).
     """
-    prod = CB.get(sym)
+    # S1: same reasoning as _kraken_pair_lookup -- CB is hardcoded to the nine
+    # assets held on 2026-08-19, and sync_holdings.py can now add a tenth
+    # without anyone opening this file. Coinbase's product ids are plain
+    # "{SYM}-USD", so the fallback needs no lookup table; a symbol with no
+    # market simply 404s and is reported as a failed read, which is the
+    # existing contract. Assets already KNOWN to have no market skip the call.
+    prod = CB.get(sym) or (None if sym in NOT_ON_COINBASE else f"{sym}-USD")
     if not prod:
         return None, None, None          # not a Coinbase market at all
     url = f"https://api.exchange.coinbase.com/products/{prod}/candles?granularity=86400"
@@ -184,6 +190,45 @@ def _verify_and_split(rows):
     return closes[0], settled[:200], None
 
 
+_KR_PAIRS = None    # lazily built, once per run
+
+
+def _kraken_pair_lookup(sym):
+    """Resolve a symbol Kraken lists but KR does not name. None if unlisted.
+
+    S1 (2026-08-28): KR and CB above are hardcoded to the nine assets held on
+    2026-08-19. That was fine while holdings.txt was edited by hand -- you
+    could not add a coin without also seeing this file. sync_holdings.py breaks
+    that coupling: it can introduce an asset from the exchange without a human
+    ever opening daily.py, and the asset would then read NO PRICE despite both
+    venues listing it. The hardcoded maps stay as the fast, audited path; this
+    is only the fallback, and it fails to None exactly like an unknown symbol.
+    """
+    global _KR_PAIRS
+    if _KR_PAIRS is None:
+        _KR_PAIRS = {}
+        try:
+            req = urllib.request.Request(
+                "https://api.kraken.com/0/public/AssetPairs",
+                headers={"User-Agent": "covenant-daily/1.0"})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                res = json.loads(r.read().decode()).get("result", {})
+            for name, v in res.items():
+                if v.get("quote") not in ("ZUSD", "USD") or v.get("status") != "online":
+                    continue
+                ws = (v.get("wsname") or "")          # e.g. "XLM/USD"
+                base = ws.split("/")[0] if "/" in ws else v.get("base", "")
+                if base and (base not in _KR_PAIRS or len(name) < len(_KR_PAIRS[base])):
+                    _KR_PAIRS[base] = name
+        except Exception:
+            _KR_PAIRS = {}
+    # Kraken names two majors differently from everyone else, and neither is
+    # derivable -- they are historical, so they are listed rather than guessed.
+    ALIAS = {"BTC": "XBT", "DOGE": "XDG"}
+    s = sym.upper()
+    return _KR_PAIRS.get(s) or _KR_PAIRS.get(ALIAS.get(s, s))
+
+
 def fetch_kraken(sym):
     """Same contract as fetch_coinbase, against Kraken's public OHLC endpoint.
 
@@ -191,7 +236,7 @@ def fetch_kraken(sym):
     that this endpoint answers plain urllib byte-exactly, and that every
     row-loss hazard in M1 belonged to the WebFetch summariser, not to Kraken.
     """
-    pair = KR.get(sym)
+    pair = KR.get(sym) or _kraken_pair_lookup(sym)
     if not pair:
         return None, None, None
     url = (f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval=1440"
@@ -221,7 +266,45 @@ def fetch_kraken(sym):
     return _verify_and_split(rows)
 
 
-def fetch(sym, source=None):
+def prefetch(syms, source=None):
+    """Fetch every symbol concurrently. Returns {sym: (px, closes, why, notes)}.
+
+    E1 (2026-08-28): the run was doing two serial HTTPS round trips per holding
+    -- ~20 calls, 6.0 s measured -- while waiting on the network for essentially
+    all of it. Ten symbols is small enough that the whole thing fits in one
+    wave.
+
+    Two things this must NOT break, both of which rule out simply threading the
+    existing loop:
+
+      * Determinism. fetch() appends to the XVENUE_NOTES global, and threads
+        would interleave those appends in completion order, so the same
+        portfolio could print its warnings in a different order each run. A
+        report that reshuffles itself trains you to skim it. Each worker gets
+        its OWN notes list here, and the caller splices them back in holdings
+        order, so the output is byte-identical to the serial version.
+      * Duplicated lookups. _KR_PAIRS is a lazily-built global; N threads
+        racing on it would each fetch AssetPairs. It is warmed once, before
+        the pool starts, and is read-only thereafter.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    syms = [s for s in syms if s != "CASH"]
+    if any(s not in KR for s in syms):
+        _kraken_pair_lookup(syms[0] if syms else "BTC")     # warm _KR_PAIRS once
+
+    def one(sym):
+        notes, divs = [], []
+        px, closes, why = fetch(sym, source, notes=notes, divs=divs)
+        return sym, (px, closes, why, notes, divs)
+
+    if not syms:
+        return {}
+    with ThreadPoolExecutor(max_workers=min(8, len(syms))) as pool:
+        return dict(pool.map(one, syms))
+
+
+def fetch(sym, source=None, notes=None, divs=None):
     """Dispatcher + cross-venue verification.
 
     Returns (price, closes, why_failed). With source="both" the Coinbase read
@@ -231,6 +314,12 @@ def fetch(sym, source=None):
     one line, it mis-sizes the 20% trim on every OTHER holding.
     """
     source = (source or SOURCE).lower()
+    # E1: when prefetch() runs us on a worker thread it hands in its own
+    # containers, so concurrent symbols never interleave into the globals.
+    # Called directly (source=None), we fall back to them and behave exactly
+    # as before -- fetch() is still usable on its own.
+    _notes = XVENUE_NOTES if notes is None else notes
+    _divs = XVENUE_MAXDIV if divs is None else divs
     if source == "coinbase":
         return fetch_coinbase(sym)
     if source == "kraken":
@@ -243,12 +332,12 @@ def fetch(sym, source=None):
         kpx, kcloses, kwhy = fetch_kraken(sym)
         if kpx is None:
             return None, None, why or kwhy
-        XVENUE_NOTES.append(f"{sym}: Coinbase unavailable ({why}); priced on Kraken alone")
+        _notes.append(f"{sym}: Coinbase unavailable ({why or 'no Coinbase market'}); priced on Kraken alone")
         return kpx, kcloses, None
 
     kpx, kcloses, kwhy = fetch_kraken(sym)
     if kpx is None:
-        XVENUE_NOTES.append(f"{sym}: no Kraken cross-check ({kwhy or 'not listed'}) "
+        _notes.append(f"{sym}: no Kraken cross-check ({kwhy or 'not listed'}) "
                             f"-- single-venue read")
         return px, closes, None
 
@@ -262,7 +351,7 @@ def fetch(sym, source=None):
                             f"{div * 100:.2f}% (Coinbase {a:.8g}, Kraken {b:.8g}, "
                             f"tolerance {XVENUE_TOL * 100:.2f}%) -- one read is "
                             f"wrong and there is no way to tell which")
-    XVENUE_MAXDIV.append((sym, div))
+    _divs.append((sym, div))
     return px, closes, None
 
 
@@ -371,6 +460,12 @@ def main():
           + ("  -- Coinbase, verified against Kraken]" if args.source == "both"
              else "  -- SINGLE VENUE, no cross-check]"))
 
+    # E1: one concurrent wave for every symbol, then the loop below is pure
+    # arithmetic. The notes each worker collected are spliced back in HOLDINGS
+    # order, not completion order, so this prints exactly what the serial
+    # version printed.
+    prefetched = prefetch([h["sym"] for h in hold], args.source)
+
     rows, total, unpriced = [], 0.0, []
     for h in hold:
         if h["sym"] == "CASH":
@@ -378,7 +473,28 @@ def main():
             rows.append({**h, "px": 1.0, "val": val, "regime": "cash", "s200": None})
             total += val
             continue
-        px, closes, why_failed = fetch(h["sym"])
+        px, closes, why_failed, _n, _d = prefetched.get(
+            h["sym"], (None, None, "not fetched", [], []))
+        XVENUE_NOTES.extend(_n)
+        XVENUE_MAXDIV.extend(_d)
+
+        # S1b (2026-08-28): a hand-entered price OUTRANKS a fetched one, and the
+        # dynamic symbol fallback above is exactly why this guard is needed.
+        # Before it, column 4 was only ever consulted when no venue answered.
+        # Now a venue can answer for a symbol that previously had no market --
+        # and CC is a three-character ticker that more than one asset can own.
+        # Silently swapping the operator's own number for a fetched one on a
+        # ticker match alone is how you value the wrong asset without a warning.
+        # So: keep the hand-entered price, and REPORT the venue's, which turns a
+        # possible collision into something visible instead of something assumed.
+        if h.get("manual") is not None and px is not None:
+            gap = (px - h["manual"]) / h["manual"] if h["manual"] else 0.0
+            XVENUE_NOTES.append(
+                f"{h['sym']}: a venue now quotes {px:.6f}, your hand-entered price "
+                f"is {h['manual']:.6f} ({gap:+.1%}). Using YOURS. If they are the "
+                f"same asset, drop column 4 in holdings.txt to price it live.")
+            px, closes = None, None
+
         if px is None:
             # DO NOT substitute the average buy price. That invents a number,
             # inflates the position's value, prints a flat 0% P/L that looks
@@ -405,7 +521,12 @@ def main():
         rows.append({**h, "px": px, "val": val, "s200": s200, "regime": regime,
                      "bars": len(closes) if closes else 0})
         total += val
-        time.sleep(0.2)
+        # E1: the 0.2 s courtesy sleep that used to sit here is gone. It paced
+        # the two HTTP calls this loop USED to make per holding; prefetch() now
+        # makes them all before the loop starts, so by this line there is
+        # nothing left to pace and the delay was purely additive -- 1.80 s of a
+        # 3.4 s run, measured. Rate limiting still exists, as the bounded
+        # worker pool in prefetch().
 
     rows.sort(key=lambda r: -r["val"])
     cash = sum(r["val"] for r in rows if r["sym"] == "CASH")

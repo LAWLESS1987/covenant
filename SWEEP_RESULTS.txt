@@ -1,7 +1,7 @@
 covenant local sweep -- 2026-08-27 03:22:52
 python 3.12.10  pid 10840
 leftover cleanup is disabled by design -- see kill_leftovers()
-staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
+staging into C:\Users\<user>\AppData\Local\Temp\covenant_sweep ...
 staged.
 core   551342 bytes
 
@@ -43,4 +43,4 @@ test_backtest_guardrails.py      rc=0       2.4s  16 passed, 0 failed
 test_3node_config.py             rc=0       0.1s  11/11 passed
 
 total 12.1 min
-per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs
+per-suite logs: C:\Users\<user>\AppData\Local\Temp\covenant_sweep\logs

@@ -50,8 +50,17 @@ RESTART = os.path.join(HERE, "AB_RESTART_NODES.bat")
 _passed, _failed = 0, 0
 
 
-def ok(tag, name, cond, detail=""):
+def ok(tag, name, cond, detail="", needs=None):
+    """`needs`: the input file this check reads.
+
+    If that file is absent the check is not run and not counted -- neither as a
+    pass nor as a failure. Letting it run against an empty string turns "the
+    file is not here" into "the three nodes disagree", which is a different
+    finding about a different thing."""
     global _passed, _failed
+    if needs and needs in MISSING:
+        print(f"UNKN  {tag} {name}  not run: {needs} is not here")
+        return
     if cond:
         _passed += 1
         print(f"PASS  {tag} {name}  {detail}")
@@ -60,9 +69,30 @@ def ok(tag, name, cond, detail=""):
         print(f"FAIL  {tag} {name}  {detail}")
 
 
+MISSING = []
+
+
 def read(path):
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        return fh.read()
+    """Read one of this suite's INPUTS, or record that it is not here.
+
+    A missing input is not a failing check (M37). This suite asserts that the
+    shipped configuration files agree with each other; run somewhere one of
+    them is absent -- a fresh clone, a partial copy, a sweep scratch tree
+    staged without the .bat files -- it used to die on a raw FileNotFoundError
+    traceback with no tally, which the sweep then printed as a RED suite. That
+    reads exactly like the three nodes disagreeing, and it is not: it is the
+    file not being there.
+
+    Returns "" and records the name, so main() can report UNKNOWN and say which
+    file. UNKNOWN is never folded into PASS."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        rel = os.path.basename(path)
+        if rel not in MISSING:
+            MISSING.append(rel)
+        return ""
 
 
 # --------------------------------------------------------------- the parser
@@ -196,7 +226,7 @@ def main():
     ok("N5", "covenant_watchdog.py NODES matches covenant_prod.bat exactly",
        not mismatches,
        "; ".join(mismatches) if mismatches
-       else f"{len(wd)} nodes, ports peers and dbs all agree")
+       else f"{len(wd)} nodes, ports peers and dbs all agree", needs="covenant_watchdog.py")
 
     # ------------------------------------------------------------- N6 tooling
     missing = []
@@ -224,7 +254,7 @@ def main():
        not unstopped,
        "; ".join(unstopped) + " -- an unstopped node keeps its port and the "
        "next start reports 'already up' and does nothing (P3)"
-       if unstopped else "all ports named")
+       if unstopped else "all ports named", needs="AB_RESTART_NODES.bat")
 
     # ------------------------------------------------------------------ N8 db
     dbs = [n["db"] for n in nodes.values() if n["db"]]
@@ -235,6 +265,14 @@ def main():
     ok("N9", "every node is started with the SAME canonical genesis file",
        len(genesis) == 1, str(genesis))
 
+    if MISSING:
+        print(f"\nUNKNOWN: {len(MISSING)} input file(s) are not here -- "
+              f"{', '.join(MISSING)}")
+        print("These are the files this suite COMPARES. Without them it has "
+              "not checked the\nconfiguration and has not found it wrong. "
+              "Exit 2: not a pass, and not a failure\nof the three nodes.")
+        print(f"\n{_passed}/{_passed + _failed} passed, {len(MISSING)} input(s) missing")
+        return 2
     print(f"\n{_passed}/{_passed + _failed} passed")
     return 1 if _failed else 0
 

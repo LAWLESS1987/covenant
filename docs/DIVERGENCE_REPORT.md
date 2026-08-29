@@ -3,7 +3,7 @@
 Neither location had everything, and that is the finding.
 
 - **150** files lived in the claude.ai project.
-- **255** files lived in `C:\Users\Lawre\covenant`.
+- **255** files lived in `C:\Users\<user>\covenant`.
 - **95** were byte-identical in both.
 - **42** existed **only in the project** — including the loop's entire memory:
   `IMPROVEMENT_LOG.md`, `RUN_LOG_ARCHIVE.md`, `LOOP_HEADER_ARCHIVE.md`, every

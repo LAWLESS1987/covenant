@@ -24,8 +24,23 @@ from __future__ import annotations
 import os, pickle, sys
 import numpy as np
 
-sys.path.insert(0, "/home/claude/phil")
-from sem_core import tokenize, build_space  # noqa: E402
+# ---------------------------------------------------------------------------
+# PATHS.  Parameterised 2026-08-29 (preflight_publish.py G5). A placeholder
+# would have hidden the account name and left the script unrunnable; these are
+# real settings, defaulting beside this file, that say what is missing.
+# ---------------------------------------------------------------------------
+HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+SEM = os.environ.get("COVENANT_SEMANTIC_DIR", HERE)
+WORK = os.environ.get("COVENANT_SEMANTIC_WORK", SEM)
+sys.path.insert(0, SEM)
+try:
+    from sem_core import tokenize, build_space  # noqa: E402
+except ImportError:
+    raise SystemExit(
+        f"sem_core.py is not in {SEM}.\n"
+        f"Set COVENANT_SEMANTIC_DIR to the directory holding it. This script\n"
+        f"measures an alignment ceiling and cannot approximate it without the\n"
+        f"space builder that produced the numbers being compared.")
 
 RNG = np.random.default_rng(20260825)
 D_REMOVE = 3
@@ -48,7 +63,7 @@ def procrustes(S, T):
 
 
 def get_space(text, name, vocab=VOCAB, minc=MINC, dim=DIM):
-    p = f"/home/claude/phil/space_{name}.pkl"
+    p = os.path.join(WORK, f"space_{name}.pkl")
     if os.path.exists(p):
         return pickle.load(open(p, "rb"))
     sp = build_space(tokenize(text), name, vocab_size=vocab, min_count=minc,
@@ -90,8 +105,16 @@ def align_score(S, XS, T, XT, n_anchors, held, refine=0, verbose=False):
 
 
 def main():
-    ta = open("/home/claude/phil/half_A.txt", encoding="utf-8").read()
-    tb = open("/home/claude/phil/half_B.txt", encoding="utf-8").read()
+    ha = os.path.join(WORK, "half_A.txt")
+    hb = os.path.join(WORK, "half_B.txt")
+    for _h in (ha, hb):
+        if not os.path.exists(_h):
+            raise SystemExit(
+                f"no corpus half at {_h}. Set COVENANT_SEMANTIC_WORK to the\n"
+                f"directory holding half_A.txt and half_B.txt -- the two halves\n"
+                f"ARE the experiment, and a run without them measures nothing.")
+    ta = open(ha, encoding="utf-8").read()
+    tb = open(hb, encoding="utf-8").read()
     A, B = get_space(ta, "A"), get_space(tb, "B")
     XA, XB = clean(A), clean(B)
 

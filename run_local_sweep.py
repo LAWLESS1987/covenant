@@ -23,6 +23,7 @@ except SWEEP_RESULTS.txt.
 import os, re, shutil, subprocess, sys, tempfile, time
 
 SRC   = os.path.dirname(os.path.abspath(__file__))
+CANDIDATE = ""            # set by --candidate DIR; overlaid onto the scratch tree
 WORK  = os.path.join(tempfile.gettempdir(), "covenant_sweep")
 OUT   = os.path.join(SRC, "SWEEP_RESULTS.txt")
 BUDGET_TOTAL_S = 45 * 60          # hard ceiling for the whole sweep
@@ -123,6 +124,32 @@ def stage():
         s = os.path.join(SRC, d)
         if os.path.isdir(s):
             shutil.copytree(s, os.path.join(WORK, d), dirs_exist_ok=True)
+    # ---- CANDIDATE OVERLAY (2026-08-29) ---------------------------------
+    #
+    # THE GATE THAT COULD NOT GATE. This sweep is the stated precondition for
+    # landing anything -- and it stages the DEPLOYED core, so the only way to
+    # sweep a candidate was to deploy it first. v8.38 sat in pending-v8.38 for
+    # three days unswept for exactly that reason: the check that was supposed
+    # to run before the change could only run after it. M48's shape in the
+    # release process rather than in a gate.
+    #
+    # --candidate DIR copies DIR over the scratch tree AFTER the deployed
+    # files, so the suites run against the candidate and the production folder
+    # is never written. Nothing here can land anything: the overlay exists only
+    # inside %TEMP%, and the deployed core is untouched either way.
+    if CANDIDATE:
+        if not os.path.isdir(CANDIDATE):
+            raise SystemExit("--candidate %r is not a directory" % CANDIDATE)
+        over = []
+        for n in sorted(os.listdir(CANDIDATE)):
+            p2 = os.path.join(CANDIDATE, n)
+            if os.path.isfile(p2) and (n.endswith(".py") or n.endswith(".json")
+                                       or n.endswith(".bat") or n.endswith(".html")):
+                shutil.copy2(p2, WORK)
+                over.append(n)
+        print("candidate overlay from %s: %d file(s) -- %s"
+              % (CANDIDATE, len(over), ", ".join(over[:8])
+                 + (" ..." if len(over) > 8 else "")))
 
 def clean_dbs():
     """Remove databases between suites, as run_all_tests.sh does.
@@ -151,7 +178,7 @@ def parse_argv():
     The repeat exists because of M18/M20: a suite that fails while 23 others
     and two nodes share the CPU has not failed yet. It fails when it fails
     alone, twice."""
-    global OUT
+    global OUT, CANDIDATE
     argv, repeat, only = sys.argv[1:], 1, []
     i = 0
     while i < len(argv):
@@ -159,6 +186,11 @@ def parse_argv():
             repeat = int(argv[i + 1]); i += 2
         elif argv[i] == "--out":
             OUT = os.path.join(SRC, argv[i + 1]); i += 2
+        elif argv[i] == "--candidate" and i + 1 < len(argv):
+            CANDIDATE = argv[i + 1]
+            if not os.path.isabs(CANDIDATE):
+                CANDIDATE = os.path.join(SRC, CANDIDATE)
+            i += 2
         else:
             only.append(argv[i]); i += 1
     return only, repeat
@@ -185,10 +217,22 @@ def main():
     env.update(COVENANT_INSECURE_MOCK_JUDGE="1", COVENANT_JUDGE_PROVIDERS="mock",
                PYTHONUNBUFFERED="1")
     env.pop("COVENANT_WSGI", None)
+    red, dep_skipped = [], []
     t_start = time.time()
     absent, skipped = [], []
     if True:
-        say(fh, "core   %s bytes" % os.path.getsize(os.path.join(SRC, "covenant_unified_v8.py")))
+        # The core that was actually STAGED, hashed -- not the one in SRC.
+        # Read from SRC it reported 551,342 bytes for a candidate sweep whose
+        # overlay had just replaced it with 554,085: the line named the file
+        # the sweep was NOT running. M38 in one print statement.
+        _core = os.path.join(WORK, "covenant_unified_v8.py")
+        try:
+            import hashlib
+            _b = open(_core, "rb").read()
+            say(fh, "core   %s bytes  sha256 %s  (as STAGED, not as deployed)"
+                % (len(_b), hashlib.sha256(_b).hexdigest()[:12]))
+        except OSError as e:
+            say(fh, "core   UNREADABLE in the scratch tree: %s" % e)
         say(fh, "")
         plan = [(n, t) for (n, t) in SUITES if not only or n in only]
         if only:
@@ -229,9 +273,36 @@ def main():
                 tally = "<no tally> " + out.strip().splitlines()[-1][:60]
             else:
                 tally = "<no output>"
-            say(fh, "%-32s rc=%-4s %6.1fs  %s" % (suite, rc, dt, tally[:80]))
+            # M37: A SUITE FAILING FOR WANT OF A DEPENDENCY IS NOT A
+            # REGRESSION. probe_final_pass has been red on every sweep because
+            # xrpl-py is not installed -- a true statement about this machine's
+            # packages and nothing at all about the node. Left as rc=1 it is a
+            # permanently-red line, and a permanently-red line trains its
+            # reader to skim the whole column (M34). It is now counted apart.
+            missing_dep = (rc != 0 and (
+                "ModuleNotFoundError" in out or "ImportError" in out
+                or "not importable" in out))
+            if missing_dep:
+                dep_skipped.append(suite)
+                say(fh, "%-32s DEP  %6.1fs  NOT RUN -- %s"
+                    % (suite, dt, tally[:66]))
+            else:
+                if rc != 0:
+                    red.append(suite)
+                say(fh, "%-32s rc=%-4s %6.1fs  %s" % (suite, rc, dt, tally[:80]))
         say(fh, "")
         say(fh, "total %.1f min" % ((time.time() - t_start) / 60.0))
+        # The verdict, stated once, so nobody has to scan 37 lines to find it.
+        if red:
+            say(fh, "RED: %d suite(s) -- %s" % (len(red), ", ".join(red)))
+        else:
+            say(fh, "GREEN: every suite that ran, passed.")
+        if dep_skipped:
+            say(fh, "NOT RUN (missing dependency, M37 -- not a regression): %s"
+                % ", ".join(dep_skipped))
+        if CANDIDATE:
+            say(fh, "CANDIDATE SWEEP: staged from %s over the deployed tree. "
+                    "The deployed core was NOT changed." % CANDIDATE)
         if skipped:
             say(fh, "not run, %d-minute budget spent: %s" % (BUDGET_TOTAL_S // 60, ", ".join(skipped)))
         if absent:

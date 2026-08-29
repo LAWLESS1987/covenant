@@ -1,0 +1,48 @@
+covenant local sweep -- 2026-08-28 21:23:09
+python 3.12.10  pid 30304
+leftover cleanup is disabled by design -- see kill_leftovers()
+staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
+staged.
+core   559515 bytes  sha256 d3a0ca17030a  (as STAGED, not as deployed)
+
+test_a1a_a2.py                   rc=0      12.9s  15/15 passed
+test_a3_bounded_reads.py         rc=0       3.0s  7 passed, 0 failed
+test_a5_size_coherence.py        rc=0       4.6s  20 passed, 0 failed
+test_a11_gossip_scale.py         rc=0       2.1s  23/23 passed
+test_a12_dead_peer_backoff.py    rc=0      21.0s  21/21 passed
+test_a13_one_way_sync.py         rc=0      36.5s  25/25 passed
+test_a14_boot_probe.py           rc=0      18.0s  15/15 passed
+test_a15_exchange_deadline.py    rc=0      16.1s  14/14 passed
+test_a17_oneway_peer_sync.py     rc=0      15.1s  6/6 passed
+test_b1_judge_parser.py          rc=0      29.7s  162/162 passed
+test_b2_quorum_diversity.py      rc=0       2.4s  73/73 passed
+test_p14_watchdog_self_drift.py  rc=0       0.2s  33/33 passed
+test_y1_stake_divergence.py      rc=0       4.2s  10/10 passed
+test_w1_wsgi.py                  rc=0      14.7s  24/24 passed
+test_p11_version_identity.py     rc=0       3.3s  29/29 passed
+test_p12_substrate_sensing.py    rc=0       9.6s  41/41 passed
+test_a20_peer_version.py         rc=0       9.7s  27/27 passed
+test_a22_topology_vigilance.py   rc=0       2.9s  21/21 passed
+test_a23_ack_health.py           rc=0      13.1s  A23: 23/23 passed
+test_a3s_send_bounds.py          rc=0       9.0s  49/49 checks
+test_w2_sandbox_platform.py      rc=0       3.5s  12/12 passed
+test_d3_daily_guards.py          rc=0       5.9s  77/77 passed
+test_adversarial_suite.py        rc=0       0.9s  21 passed, 0 failed
+test_b5_mine_latency.py          rc=0      24.2s  31/31 passed
+test_security_audit.py           rc=0      68.9s  129 passed, 0 failed
+test_e2e_gift.py                 rc=0       0.7s  11 passed, 0 failed
+test_a9_relay_race.py            rc=0      25.8s  18/18 passed
+test_a1_kill_matrix.py           rc=0      67.6s  30/30 passed
+test_a4_block_injection.py       rc=0      53.1s  60/60 passed
+test_multinode_live.py           rc=0      79.6s  21 passed, 0 failed
+sim_order_independence.py        rc=0      14.3s  ALL INVARIANTS HELD
+sim_yield_safety.py              rc=0      64.7s  <no tally>   means the number you choose is not the number you get.
+probe_final_pass.py              rc=0       3.9s  <no tally> ============================================================
+test_r1_lora_frame.py            rc=0       0.1s  58 passed, 0 failed
+test_backtest_guardrails.py      rc=0       2.3s  16 passed, 0 failed
+test_3node_config.py             rc=0       0.2s  11/11 passed
+
+total 10.7 min
+GREEN: every suite that ran, passed.
+CANDIDATE SWEEP: staged from C:\Users\Lawre\covenant\pending-v8.38 over the deployed tree. The deployed core was NOT changed.
+per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs

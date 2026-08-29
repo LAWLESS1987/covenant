@@ -118,12 +118,14 @@ class Assessment(object):
 
     __slots__ = ("verdict", "score", "principle", "evidence", "model_id",
                  "unobservable", "coverage", "script_gaps", "evasion",
-                 "seeded_hits", "competence", "hold_id", "fitted_script")
+                 "seeded_hits", "competence", "hold_id", "fitted_script",
+                 "register_hits")
 
     def __init__(self, verdict, score, principle, evidence, model_id,
                  unobservable, coverage=None, script_gaps=None, evasion=False,
                  seeded_hits=None, competence="full", hold_id=None,
-                 fitted_script=""):
+                 fitted_script="", register_hits=None):
+        self.register_hits = list(register_hits or [])
         self.hold_id = hold_id
         self.fitted_script = fitted_script
         self.coverage = coverage
@@ -150,10 +152,29 @@ class Assessment(object):
             return (f"semantic[{self.model_id}] VIOLATES score={self.score} "
                     f">= veto; {self.principle}; evidence: {ev}")
         if self.verdict == ABSTAIN:
-            return (f"semantic[{self.model_id}] ABSTAIN score={self.score} in "
-                    f"the gate band -- below the veto and above nothing, so it "
-                    f"blocks rather than approves; nearest: {self.principle}; "
-                    f"evidence: {ev}")
+            # It said `evidence: no signal` for a payload that matched six
+            # register markers, because this branch only ever reported the
+            # induced score. An operator reading that is being told the
+            # opposite of what happened. Every reason the verdict is ABSTAIN
+            # is named here, in the order it was found.
+            why = []
+            if self.score:
+                why.append(f"lexicon score {self.score} in the gate band "
+                           f"[{self.principle}]: {ev}")
+            if self.seeded_hits:
+                why.append("seeded terms in an unreviewed language: "
+                           + ", ".join(t for _w, t in self.seeded_hits))
+            if self.register_hits:
+                why.append(
+                    f"{len(self.register_hits)} markers of the register in "
+                    f"which crime is usually discussed -- "
+                    + ", ".join(f"{p} [{c}]" for p, c in self.register_hits[:6])
+                    + ". THESE ARE ORDINARY WORDS. Two or more together is why "
+                      "this stopped; it is not a finding that anything is "
+                      "wrong, and this model cannot make one")
+            return (f"semantic[{self.model_id}] ABSTAIN -- it blocks rather "
+                    f"than approves, and it is NOT alleging a violation. "
+                    + " | ".join(why or ["no signal"]))
         if self.verdict == ILLEGIBLE:
             # THE MOST IMPORTANT STRING IN THIS FILE.
             #
@@ -388,6 +409,58 @@ def _repair(text: str) -> str:
         lambda m: _LEET[m.group(1) or m.group(2) or m.group(3)], t)
 
 
+def _leaf_strings(data: Any, transform=None) -> List[str]:
+    """Every leaf string in the payload, separately.
+
+    Phrases are matched WITHIN a leaf and never across two, because a phrase
+    spanning two fields is not a phrase -- it is an accident of how the payload
+    happened to be walked, and a marker assembled from two unrelated fields is
+    evidence of nothing."""
+    out: List[str] = []
+
+    def walk(node, depth):
+        if depth > MAX_DEPTH or len(out) >= MAX_FEATURE_TOKENS:
+            return
+        if isinstance(node, dict):
+            for k in sorted(node.keys(), key=lambda x: str(x)):
+                if str(k).startswith("_"):
+                    continue
+                walk(node[k], depth + 1)
+        elif isinstance(node, (list, tuple)):
+            for v in node:
+                walk(v, depth + 1)
+        elif isinstance(node, (str, int, float, bool)) or node is None:
+            raw = str(node)
+            if transform is not None:
+                raw = transform(raw)
+            out.append(unicodedata.normalize("NFC", raw.lower()))
+
+    walk(data, 0)
+    return out
+
+
+_NONWORD = re.compile(r"[^\w'\- ]+", re.UNICODE)
+_SPACES = re.compile(r"\s+")
+
+
+def _register_markers(data: Any, lexicon: Dict[str, str]) -> List[tuple]:
+    """Distinct register markers present, as (phrase, category).
+
+    Distinct: the same phrase twice is one marker. Saying `wash` three times is
+    saying it once -- repetition is emphasis, not corroboration, and the whole
+    rule rests on several DIFFERENT markers of the register appearing together.
+    """
+    if not lexicon:
+        return []
+    found: Dict[str, str] = {}
+    for leaf in _leaf_strings(data) + _leaf_strings(data, _repair):
+        t = " " + _SPACES.sub(" ", _NONWORD.sub(" ", leaf)) + " "
+        for phrase, cat in lexicon.items():
+            if phrase not in found and f" {phrase} " in t:
+                found[phrase] = cat
+    return sorted(found.items())
+
+
 def _repaired_tokens(data: Any) -> List[str]:
     """_canonical_tokens over a repaired view of the same payload."""
     return _canonical_tokens(data, transform=_repair)
@@ -463,6 +536,11 @@ class SemanticModel(object):
         # So verification is a record per language: who checked it, how many
         # agreed, when. `min_reviewers` is the bar a language must clear before
         # its stems may assert a violation rather than merely abstain.
+        # the register lexicon -- how crime is SPOKEN. Fires only on two or
+        # more distinct markers, and caps at ABSTAIN. See lexicon_register.py
+        # for the measurement that set both numbers.
+        self.register = dict(raw.get("register_lexicon", {}))
+        self.register_min = int(raw.get("register_min_markers", 2))
         self.verified_languages = dict(raw.get("verified_languages", {}))
         self.min_reviewers = int(raw.get("min_reviewers", 2))
         # kept so a v2.0 model file still loads and behaves
@@ -683,6 +761,22 @@ class SemanticModel(object):
                 if principle is None:
                     principle = sprin
 
+        # ---- 3b. the register. Two or more markers, and ABSTAIN at most.
+        #
+        # ORDINARY WORDS. `wash`, `the drop`, `my cut`, `boiler room` are almost
+        # always innocent, which is precisely why euphemism uses them, and why
+        # one of them can never be evidence. Two together is the fitted rule:
+        # 0 false positives in 64 adversarial benign memos, 20 of 20 criminal
+        # lines caught. It can never assert a violation -- claiming theft
+        # because a memo said `wash` and `the drop` would be asserting
+        # something the model cannot possibly know.
+        register_hits = []
+        if self.register:
+            marks = _register_markers(data, self.register)
+            if len(marks) >= self.register_min:
+                register_hits = marks
+                verdict = _worse(verdict, ABSTAIN)
+
         # ---- 4. script competence. A FLOOR of ILLEGIBLE.
         #
         # The space was fitted on one script. Two or more tokens outside it is
@@ -708,7 +802,8 @@ class SemanticModel(object):
                           dict(self.not_observable), coverage=cov,
                           script_gaps=gaps, evasion=evasion,
                           seeded_hits=seeded_hits, competence=competence,
-                          hold_id=hold_id, fitted_script=self.space_script)
+                          hold_id=hold_id, fitted_script=self.space_script,
+                          register_hits=register_hits)
 
     def _open_hold(self, gaps: Dict[str, int], coverage) -> str:
         """Number and date one hold. Records scripts, counts and a clock --
@@ -868,9 +963,9 @@ class SemanticModel(object):
             "fitted_script": self.space_script,
             "seeded_languages": sorted(self.raw.get("seeded_languages", [])),
             "note": "scripts, counts and clocks only; no payload text is "
-                    "retained. A hold is closed by a person, never by a "
-                    "timeout -- an exclusion that ages out has been forgotten, "
-                    "not answered.",
+                    "retained. A hold is closed by a party that names what it "
+                    "can read, never by a timeout -- an exclusion that ages "
+                    "out has been forgotten, not answered.",
         }
         unqual = [c for c in self.cleared if not c.get("qualified")]
         if self.cleared:
@@ -971,10 +1066,21 @@ def install(reasoning_judge_cls, judgment_result_cls, registry_cls=None,
             principle = a.principle if (a.principle in (principles or [])) else None
             reasoning = a.reasoning()
 
+            # ILLEGIBLE blocks, and it blocks for a reason that is not an
+            # allegation. Say which, so the layer that reports this to the
+            # sender does not reinstate the accusation this verdict exists to
+            # avoid making. It never allows anything -- `mine_blocks` is
+            # unchanged and the gate still fails closed.
+            unread = (a.verdict == ILLEGIBLE)
+            # ABSTAIN blocks and alleges nothing either -- it is this judge's
+            # UNKNOWN. Reporting an UNKNOWN as a VIOLATION is the same category
+            # error as reporting it as a PASS, only in the other direction.
+            unsure = (a.verdict == ABSTAIN)
             if inner_result is None:
                 return judgment_result_cls(
                     mine_blocks, reasoning, principle_violated=principle,
-                    judge_id=self.judge_id, benefit_estimate=None)
+                    judge_id=self.judge_id, benefit_estimate=None,
+                    not_understood=unread, uncertain=unsure)
 
             # ---- wrapper mode. OR, and only OR. -------------------------
             violates = bool(inner_result.violates) or bool(mine_blocks)
@@ -988,7 +1094,45 @@ def install(reasoning_judge_cls, judgment_result_cls, registry_cls=None,
                 benefit_estimate=inner_result.benefit_estimate,
                 component_results=[inner_result],
                 infrastructure_failure=getattr(
-                    inner_result, "infrastructure_failure", False) and violates)
+                    inner_result, "infrastructure_failure", False) and violates,
+                # only if the INNER judge alleged nothing either -- otherwise
+                # something was found and it must read as found
+                not_understood=(unread and not bool(inner_result.violates)),
+                uncertain=(unsure and not bool(inner_result.violates)))
+
+        # ---- the review queue, reachable from the node -----------------
+        def review_report(self, peer_claims=None):
+            """What this judge is holding, why, and who could answer for it.
+
+            Shaped for /health. Pure and total: an observability feature must
+            not be able to stop a node (P11), so anything unexpected degrades
+            to a report that says so rather than raising.
+
+            The mesh view is emitted ONLY when peer competence claims are
+            actually supplied. Computing `nobody_can_read` from this node's own
+            claim alone would assert that the whole mesh is blind whenever the
+            node is, which is a claim it has no standing to make -- peers do
+            not publish competence yet, and inventing their silence as a `no`
+            is the same error as reading an unreadable payload as `clean`."""
+            try:
+                rep = self.model.gap_report()
+                rep["verification"] = self.model.verification_report()
+                rep["competence"] = self.model.competence_claim()
+                claims = list(peer_claims or [])
+                if claims:
+                    rep.update(self.model.who_can_clear(
+                        claims + [self.model.competence_claim()]))
+                    rep["claims_known"] = len(claims) + 1
+                else:
+                    rep["claims_known"] = 1
+                    rep["mesh_note"] = (
+                        "no peer has published a competence claim, so who "
+                        "could clear these is unknown -- and unknown is not "
+                        "'nobody'")
+                return rep
+            except Exception as e:
+                return {"error": f"{type(e).__name__}: {e}",
+                        "note": "the review report failed; the judge did not"}
 
     SemanticJudge.model_obj = model
     if registry_cls is not None:

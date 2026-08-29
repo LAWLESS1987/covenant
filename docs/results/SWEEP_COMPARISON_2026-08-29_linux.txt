@@ -1,0 +1,62 @@
+CANDIDATE SWEEP COMPARISON -- 2026-08-29, linux
+
+  deployed  covenant_unified_v8.py  07e097f3e37f  v8.37
+  candidate covenant_unified_v8.py  d3a0ca17030a  v8.38 (pending-v8.38)
+
+The candidate was staged OVER the deployed tree inside %TEMP%.
+The deployed core was not written to at any point.
+
+suite                            v8.37 deployed                  v8.38 candidate                 delta
+-----------------------------------------------------------------------------------------------------
+probe_final_pass.py              <no tally> covenant_xrp_mainne  NOT RUN -- <no tally> covenant  CHANGED
+sim_order_independence.py        ALL INVARIANTS HELD             ALL INVARIANTS HELD             same
+sim_yield_safety.py              <no tally>   means the number   <no tally>   means the number   same
+test_3node_config.py             <no tally> FileNotFoundError:   11/11 passed                    CHANGED
+test_a11_gossip_scale.py         23/23 passed                    23/23 passed                    same
+test_a12_dead_peer_backoff.py    21/21 passed                    21/21 passed                    same
+test_a13_one_way_sync.py         25/25 passed                    25/25 passed                    same
+test_a14_boot_probe.py           15/15 passed                    15/15 passed                    same
+test_a15_exchange_deadline.py    14/14 passed                    14/14 passed                    same
+test_a17_oneway_peer_sync.py     6/6 passed                      6/6 passed                      same
+test_a1_kill_matrix.py           30/30 passed                    30/30 passed                    same
+test_a1a_a2.py                   15/15 passed                    15/15 passed                    same
+test_a20_peer_version.py         27/27 passed                    27/27 passed                    same
+test_a22_topology_vigilance.py   21/21 passed                    21/21 passed                    same
+test_a23_ack_health.py           A23: 24/24 passed               A23: 24/24 passed               same
+test_a3_bounded_reads.py         7 passed, 0 failed              7 passed, 0 failed              same
+test_a3s_send_bounds.py          49/49 checks                    49/49 checks                    same
+test_a4_block_injection.py       60/60 passed                    60/60 passed                    same
+test_a5_size_coherence.py        20 passed, 0 failed             20 passed, 0 failed             same
+test_a9_relay_race.py            18/18 passed                    18/18 passed                    same
+test_adversarial_suite.py        21 passed, 0 failed             21 passed, 0 failed             same
+test_b1_judge_parser.py          162/162 passed                  162/162 passed                  same
+test_b2_quorum_diversity.py      73/73 passed                    73/73 passed                    same
+test_b5_mine_latency.py          31/31 passed                    31/31 passed                    same
+test_backtest_guardrails.py      16 passed, 0 failed             16 passed, 0 failed             same
+test_d3_daily_guards.py          <no tally> ModuleNotFoundError  NOT RUN -- <no tally> ModuleNo  CHANGED
+test_e2e_gift.py                 11 passed, 0 failed             11 passed, 0 failed             same
+test_multinode_live.py           21 passed, 0 failed             21 passed, 0 failed             same
+test_p11_version_identity.py     29/29 passed                    29/29 passed                    same
+test_p12_substrate_sensing.py    41/41 passed                    41/41 passed                    same
+test_p14_watchdog_self_drift.py  33/33 passed                    33/33 passed                    same
+test_r1_lora_frame.py            58 passed, 0 failed             58 passed, 0 failed             same
+test_security_audit.py           128 passed, 0 failed            128 passed, 0 failed            same
+test_w1_wsgi.py                  24/24 passed                    24/24 passed                    same
+test_w2_sandbox_platform.py      21/21 passed                    21/21 passed                    same
+test_y1_stake_divergence.py      10/10 passed                    10/10 passed                    same
+-----------------------------------------------------------------------------------------------------
+36 suites compared, 3 with a different result.
+
+v8.37 baseline : 1 red (test_3node_config, inputs absent in this sandbox)
+v8.38 candidate: 0 red.  GREEN: every suite that ran, passed.
+not run either way, missing dependency (M37, not a regression):
+  test_d3_daily_guards.py   no module 'guards'
+  probe_final_pass.py       xrpl-py not importable
+
+WHAT THIS DOES NOT PROVE. It is linux. Three of the four suites that
+have ever been red were red ONLY on win32, and two of those were the
+test looking too early rather than the node being wrong. This run says
+v8.38 introduces no regression the sandbox can see; the machine is
+still the only place the win32 half is measured:
+
+    python run_local_sweep.py --candidate pending-v8.38

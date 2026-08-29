@@ -198,8 +198,8 @@ been measured on.
   order by hand.
 - **Never** ask for, store, or use an exchange API key with trade or withdrawal
   permission. A "Query Funds"-only Kraken key is the maximum, and it lives at
-  `C:\Users\Lawre\.kraken\credentials` — **outside** the cloud-synced folder.
+  `C:\Users\<user>\.kraken\credentials` — **outside** the cloud-synced folder.
 - **Never** touch, request, or record the Ledger recovery phrase or passcode.
   There is no legitimate reason to ever type those anywhere.
-- The synced folder `C:\Users\Lawre\covenant` leaves the machine. Nothing secret
+- The synced folder `C:\Users\<user>\covenant` leaves the machine. Nothing secret
   goes in it.

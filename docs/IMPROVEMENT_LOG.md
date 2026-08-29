@@ -121,7 +121,7 @@ reason that seems excellent at the time.
 > `claude_phil_align_ceiling.py` (2026-08-25 09:36) and **`fetch46.py`
 > (2026-08-26 07:38 — 37 minutes before this run booted)**. All three are
 > semantic/SEM-family: `fetch46.py` fetches the Gutenberg ids named in
-> `claude_phil_CORPUS_MANIFEST.json` into `/home/claude/jlens/books/`. The
+> `claude_phil_CORPUS_MANIFEST.json` into `/home/<user>/jlens/books/`. The
 > newest may be an IN-FLIGHT run rather than a torn commit (M23), so this run
 > deliberately picked a Section-A item to stay clear of it, and re-read this
 > log at write-back: `created_at` was unchanged at 02:02:14Z, so no concurrent
@@ -130,7 +130,7 @@ reason that seems excellent at the time.
 >
 > ⚠ **READ `claude/PC_SYNC_LOOP.md` BEFORE SHIPPING ANYTHING.** From 08-21
 > 05:35 to 08-22 12:30 every run ended "L: copy this into
-> `C:\Users\Lawre\covenant`", and for fourteen node versions nobody did.
+> `C:\Users\<user>\covenant`", and for fourteen node versions nobody did.
 > The machine running the node was on a pre-v8.15 source: no
 > `preflight_port_check`, no `_gossip_tip`, no `MAX_EXCHANGE_S`, none of it.
 > **`project_write` is not delivery.** In an attended, L-started session,
@@ -454,7 +454,7 @@ that isn't JSON is an HTTP server. This is what `preflight_port_check` uses.
   harness that starts nodes must start, test, and kill them inside ONE script
   invocation (see `test_a1a_a2.py` for the working pattern).
 - Scheduled cloud runs have **no device bridge** — `device_commit_files` to
-  `C:\Users\Lawre\covenant` is impossible, every time, by design. Deliver via
+  `C:\Users\<user>\covenant` is impossible, every time, by design. Deliver via
   SendUserFile + `project_write`, and say in the summary that L must copy the
   files into the local repo (or re-run the tests locally).
 - `covenant_unified_v8.py` imports `covenant_path_pattern` — copy both out of
@@ -485,7 +485,7 @@ silently break it. `serialized_size()` is now the single measure.
 
 ### M8. Moving big files between the project and disk (cloud sandbox).
 - `project_write(local_path=...)` only accepts a path **inside the working
-  directory** (`/home/claude/...`); `/tmp` is refused. Build in `/home/claude`.
+  directory** (`/home/<user>/...`); `/tmp` is refused. Build in `/home/<user>`.
 - `project_read` returns most files **inline**, which burns context if you
   then retype them. Cheaper: spawn a general-purpose subagent with the list of
   paths and have it `json.load` the raw response and write each file verbatim
@@ -647,7 +647,7 @@ parallel batches (8 fast, then a9/a4/a1/multinode) in ~4 min total here;
 
 ### M17. Edit the log on disk, and get the pristine source for free.
 - **Log write-back without retyping 97 KB:** have a fresh subagent write
-  `IMPROVEMENT_LOG.md` to `/home/claude/...` verbatim, apply the run's
+  `IMPROVEMENT_LOG.md` to `/home/<user>/...` verbatim, apply the run's
   changes there with `Edit`/a python `replace` that asserts exactly one
   match per anchor, then `project_write(local_path=...)`. Zero main-context
   cost for the unchanged bulk, and "never rewrite earlier entries" is
@@ -2578,7 +2578,7 @@ that belongs with B, not D.
 `EXECUTION_ARCHITECTURE.md` describes both as built and bug-fixed ("`execute.py`
 now calls `kraken balance` first and clamps every order"), and
 `TRADING_READINESS.md` §2 lines 3–4 say "L must upload" them. Neither is in
-`C:\Users\Lawre\covenant` — a `find` over the whole folder returns only
+`C:\Users\<user>\covenant` — a `find` over the whole folder returns only
 `paper_bot.py`. They were written in a cloud session, delivered by
 SendUserFile, and never saved. So checklist lines 3 and 4 were never blocked on
 an upload; they are blocked on code that has to be written. Both docs corrected
@@ -3432,7 +3432,7 @@ both.
 
 **Delivery (M25) — SendUserFile AND project_write, round-trip hash-verified
 (`dd613fc534e0` read back out of the project).** **L must copy into
-`C:\\Users\\Lawre\\covenant`:** `covenant_unified_v8.py` (v8.36),
+`C:\\Users\\<user>\\covenant`:** `covenant_unified_v8.py` (v8.36),
 `test_a23_ack_health.py`, `run_all_tests.sh`, and `run_local_sweep.py` (over the
 one already there). `covenant_unified_v8.py` needs `covenant_path_pattern.py`
 beside it (already there); `test_a1_kill_matrix.py` imports
@@ -3514,7 +3514,7 @@ suites were re-run **alone** afterwards: a9 18, a11 23, a12 21, a13 25, a14
 **Delivery (M25) — SendUserFile AND project_write, round-trip verified by a
 fresh subagent reading the bytes back OUT of the project (`07e097f3e37f`,
 `bd0ab67ae2f6`, `5727b42d1ed8`, `309053b11eda`, all four `cmp`-identical at
-full length).** **L must copy into `C:\\Users\\Lawre\\covenant`:**
+full length).** **L must copy into `C:\\Users\\<user>\\covenant`:**
 `covenant_unified_v8.py` (**v8.37**), `test_a3s_send_bounds.py`,
 `run_all_tests.sh`, and `run_local_sweep.py` (over the one already there).
 `covenant_unified_v8.py` needs `covenant_path_pattern.py` beside it (already
@@ -3604,7 +3604,7 @@ you, then read the failure instead of adjusting the check.**
 
 **Delivered (M25):** `pc/verify_deploy.py`, `pc/AM_VERIFY_AND_RESTART.bat` — by
 SendUserFile AND project_write. **L: copy BOTH into
-`C:\\Users\\Lawre\\covenant` beside the four v8.37 files, then double-click
+`C:\\Users\\<user>\\covenant` beside the four v8.37 files, then double-click
 `AM_VERIFY_AND_RESTART.bat`.** Nothing else is needed; if the copy is wrong it
 will say so and refuse to restart, and if it passes then for the first time the
 log's version claim will have been checked rather than asserted.

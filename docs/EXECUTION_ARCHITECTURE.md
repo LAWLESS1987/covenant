@@ -95,7 +95,7 @@ Guards that must not be removed:
   session.
 - Never touch the Ledger recovery phrase. Unchanged, absolute.
 - Credentials live in `~/.config/kraken/config.toml` inside WSL — **never** in
-  `C:\Users\Lawre\covenant`, which syncs off the machine.
+  `C:\Users\<user>\covenant`, which syncs off the machine.
 - Never claim a profit edge. Established: no timing edge survived out-of-sample
   on two real assets (XRP −2.70% p=0.656; HBAR −7.06% p=0.891). Only drawdown
   reduction (~3×) replicated.

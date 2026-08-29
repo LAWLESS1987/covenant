@@ -42,7 +42,7 @@ registry 'local' resolves to: OllamaJudge
   BENCH PASSED 6/6 
   
 ---- [4/5] launch ---- 
-  founder key backed up to C:\Users\Lawre\.covenant-keys\ 
+  founder key backed up to C:\Users\<user>\.covenant-keys\ 
   
 ---- [5/5] live transfer ---- 
 -- health --

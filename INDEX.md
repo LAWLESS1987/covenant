@@ -1,6 +1,6 @@
 # What's in this folder, and what to actually run
 
-Audited 2026-08-20 against the real contents of `C:\Users\Lawre\covenant`.
+Audited 2026-08-20 against the real contents of `C:\Users\<user>\covenant`.
 
 ---
 
@@ -24,8 +24,8 @@ yours to make.
 What I'd do, in PowerShell:
 
 ```
-mkdir C:\Users\Lawre\.covenant-keys
-move C:\Users\Lawre\covenant\*.db.key C:\Users\Lawre\.covenant-keys\
+mkdir C:\Users\<user>\.covenant-keys
+move C:\Users\<user>\covenant\*.db.key C:\Users\<user>\.covenant-keys\
 ```
 
 then point the node at them explicitly, or keep the `.db` and `.key` pair
@@ -42,26 +42,38 @@ matters, because the next key might be one that does.
 
 | you want to | run |
 |---|---|
-| today's holdings + rule check | `DAILY.bat` (or `python daily.py`) |
+| **the whole trading side, one command** | **`TRADE.bat`** (or `python trade_daily.py`) |
+| the automated trader (disarmed by default) | `TRADER.bat` (or `python covenant_trader.py`) |
+| **stop the trader now** | create a file named `TRADER_HALT` in this folder |
+| just the rule check, no exchange read | `DAILY.bat` (or `python daily.py`) |
 | your alert levels | read `ALERTS.md` |
-| install Kraken CLI | WSL → `kraken\unpack-kraken.sh` |
-| start paper trading | `python3 kraken\paper_run.py --init` |
-| seal today's signals | `python3 kraken\paper_run.py --place` |
-| see what the rules would trade | `python kraken\execute.py` |
+| read live balances | `python kraken_balance.py` + `python coinbase_balance.py` |
+| pull those into holdings.txt | `python sync_holdings.py` (add `--write` to apply) |
+| set up the exchange keys | read `EXCHANGE_SETUP.md` |
 | put the daily check on your phone | `phone\PHONE_SETUP.md` |
 
 ## The trading side
 
 | file | what it does |
 |---|---|
+| `trade_daily.py` | **the operational loop:** read both exchanges → sync → rule check |
+| `covenant_trader.py` | the local program: nodes + both venues + rules + sealed decisions. **Disarmed unless you edit `trader_config.json`** |
+| `venues.py` | Kraken/Coinbase order adapters. Every call defaults to the venue's validate-only endpoint |
 | `daily.py` | live prices, portfolio, 20% cap + cash floor check, phone push |
 | `holdings.txt` | **the one file you edit.** Quantities and average buy prices |
-| `ALERTS.md` | every regime line and the price where each position flips |
+| `ALERTS.md` | regime lines — **frozen at 2026-08-19; four have flipped since.** `daily.py` prints the live ones |
 | `MY_STRATEGY.md` | the five rules, in plain language |
-| `kraken/execute.py` | rules → exact orders, clamped to what Kraken actually holds |
-| `kraken/paper_run.py` | seals signals in a tamper-evident journal, scores them |
-| `kraken/KRAKEN_SETUP.md` | install, read-only key, MCP wiring |
-| `kraken_balance.py` | older balance reader — superseded by the Kraken CLI |
+| `kraken_balance.py` | reads your Kraken balance locally; writes balances, never the key |
+| `coinbase_balance.py` | the same for Coinbase (CDP read-only key) |
+| `sync_holdings.py` | balances → `holdings.txt`; dry-run by default, never deletes a position |
+| `EXCHANGE_SETUP.md` | how to create both read-only keys and run the chain |
+
+**Gone, and not recoverable from git.** `kraken/execute.py`,
+`kraken/paper_run.py` and `kraken/KRAKEN_SETUP.md` were listed here, but no
+file under `kraken/` was ever committed — `git log --all --diff-filter=A`
+returns nothing for that path. They existed only on disk. The order-preview
+and paper-trading layer would have to be rebuilt; `sync_holdings.py` does not
+replace it, because it syncs positions and does not compute orders.
 
 ## Research — how the strategy was tested
 

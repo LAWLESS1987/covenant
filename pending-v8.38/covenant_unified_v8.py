@@ -1612,6 +1612,25 @@ class JudgmentResult:
     # this flag only lets the operator tell "slow/broken judge" from "bad
     # transaction" on /anomalies (kind judge_unavailable). Never read to allow.
     infrastructure_failure: bool = False
+    # v8.38 -- True when violates=True means "no judge here could READ this",
+    # not "a judge found fault with it". Same discipline as the flag above:
+    # the gate still fails closed, this NEVER allows anything, and it exists
+    # only so the message the sender receives is true.
+    #
+    # It was added because of a measured defect, not a hypothetical. The
+    # semantic judge returns, carefully: "HELD, NOT JUDGED ... it has made NO
+    # finding and is NOT alleging anything". The gate then wrapped that in
+    # "Ethical gate rejected: Ethical violation: ... VIOLATES --" and the
+    # sender read the accusation first. Every word of care in the judge was
+    # undone by the layer that reported it -- M47's shape, one level up: a
+    # reporting layer must not change the meaning of what it reports.
+    not_understood: bool = False
+    # v8.38 -- True when violates=True means "a judge is not SURE", not "a
+    # judge found fault". Same discipline again: never read to allow, the gate
+    # still fails closed, and it exists so the message is true. ABSTAIN is this
+    # judge's UNKNOWN, and reporting an UNKNOWN as a VIOLATION is the same
+    # category error as reporting it as a PASS -- only in the other direction.
+    uncertain: bool = False
 
 
 class ReasoningJudge(ABC):
@@ -1732,9 +1751,18 @@ class QuorumJudge(ReasoningJudge):
         # Summary preserves each judge's EXACT reasoning verbatim, its id, and a
         # clean/VIOLATES label -- not just the collapsed labels, so an operator
         # reading a rejection sees which provider said what and why.
+        # A component that could not READ the payload is labelled HELD, not
+        # VIOLATES. The label rides inside every rejection message an operator
+        # or a sender ever reads, so getting it wrong here reinstates the
+        # accusation two layers below where it was carefully declined.
+        def _label(r):
+            if not r.violates:
+                return "clean"
+            if r.not_understood:
+                return "HELD"
+            return "UNSURE" if r.uncertain else "VIOLATES"
         summary = " | ".join(
-            f"{r.judge_id}: {'clean' if not r.violates else 'VIOLATES'} -- {r.reasoning}"
-            for r in results)
+            f"{r.judge_id}: {_label(r)} -- {r.reasoning}" for r in results)
         principle = next((r.principle_violated for r in results if r.principle_violated), None)
         estimates = [r.benefit_estimate for r in results if r.benefit_estimate is not None]
         median_benefit = sorted(estimates)[len(estimates) // 2] if estimates else None
@@ -1742,10 +1770,23 @@ class QuorumJudge(ReasoningJudge):
         # AND at least one VIOLATING component failed on infrastructure. A real
         # dissent from a working judge is never relabelled.
         infra = violates and any(r.violates and r.infrastructure_failure for r in results)
+        # ALL of the blocking judges must be reporting illegibility, not just
+        # one. If any judge actually alleges something, this is an allegation
+        # and must read as one -- a quorum where one member cannot read the
+        # payload and another found theft in it has found theft.
+        blocking = [r for r in results if r.violates]
+        unread = bool(blocking) and all(r.not_understood for r in blocking)
+        # uncertain only when nothing alleged: every blocker is unsure or
+        # unreadable, and at least one of them actually looked.
+        unsure = (bool(blocking)
+                  and all(r.uncertain or r.not_understood for r in blocking)
+                  and not unread)
         return JudgmentResult(violates, summary, principle_violated=principle,
                               judge_id=self.judge_id, benefit_estimate=median_benefit,
                               component_results=list(results),
-                              infrastructure_failure=infra)
+                              infrastructure_failure=infra,
+                              not_understood=violates and unread,
+                              uncertain=violates and unsure)
 
 
 class ReasoningSentinel:
@@ -1768,6 +1809,17 @@ class ReasoningSentinel:
         saved verdict could differ from the one acted on."""
         result = self.judge.evaluate(tx.data, self.principles)
         if result.violates:
+            if result.uncertain and not result.not_understood:
+                # Stopped, and honestly: no violation was found. Naming a
+                # principle here would invent the finding that was not made.
+                return (False, f"Blocked, not proven: {result.reasoning}",
+                        None, result)
+            if result.not_understood:
+                # Refused, and truthfully. No principle is named because none
+                # was found -- naming one here would invent the finding the
+                # judge explicitly declined to make.
+                return (False, f"Held, not judged: {result.reasoning}",
+                        None, result)
             return (False, f"Ethical violation: {result.reasoning} (Principle: {result.principle_violated})",
                     None, result)
         benefit_est = result.benefit_estimate if JUDGE_BENEFIT else None
@@ -6668,7 +6720,17 @@ class CovenantAPI:
                 # idle" from "denying 100% of traffic". Spike detection over this
                 # kind makes a stuck gate visible within one window.
                 self.node.anomaly_monitor.record("ethics_gate_rejection", message[:200])
-                return jsonify({"status": "error", "message": f"Ethical gate rejected: {message}"}), 400
+                held = bool(getattr(judgment, "not_understood", False))
+                unsure = bool(getattr(judgment, "uncertain", False))
+                return jsonify({
+                    "status": "error",
+                    "held_not_judged": held,
+                    # the gate already phrased a hold correctly; prefixing it
+                    # again produced "Held, not judged. Held, not judged: ..."
+                    "not_proven": unsure,
+                    "message": (message if (held or unsure)
+                                else f"Ethical gate rejected: {message}"),
+                }), 400
             if JUDGE_BENEFIT and judge_benefit is not None:
                 tx.benefit_score = (2 * judge_benefit + tx.benefit_score) / 3.0
                 tx.judge_benefit_estimate = judge_benefit
@@ -7364,6 +7426,10 @@ class CovenantAPI:
                 "substrate": self.node.substrate.snapshot(),          # P12 (v8.32)
                 "mesh": self.node.peer_state.summary(),               # A20 (v8.33)
                 "quorum": quorum_rep,                                 # B2  (v8.35)
+                # v8.38. Absent (null) when no semantic judge is installed --
+                # deliberately null and not {}, so a reader can tell "no queue"
+                # from "empty queue".
+                "ethics_review": semantic_review_report(self.node.sentinel.judge),
                 "judge_insecure": insecure,
                 "crisis_mode": self.node.crisis_mode,
                 "subsystems": {
@@ -9373,6 +9439,40 @@ def _judge_facts(j, semantic_ids: Set[str], required_ids: Set[str]) -> Dict[str,
         "verdict_path": _owner("_parse_verdict"),
         "prompt_path": _owner("_build_prompt"),
     }
+
+
+def semantic_review_report(judge, peer_claims=None):
+    """The semantic judge's review queue, for /health. v8.38.
+
+    Walks a quorum to find any member that keeps one. Pure and total, for the
+    same reason quorum_diversity_report is: an observability feature must not
+    be able to stop a node booting (P11/M47). Returns None when there is no
+    such judge, and None is rendered as ABSENT rather than as an empty queue --
+    "nobody is held" and "nobody is counting" are different claims and only one
+    of them is good news.
+
+    What it surfaces is transactions the ethics model could not READ. Nothing
+    has been alleged against any of them. They are stopped, and they are
+    waiting on anyone competent to answer for them. A hold nobody can see is
+    not a safeguard, it is a pile.
+    """
+    try:
+        seen, stack = set(), [judge]
+        while stack:
+            j = stack.pop()
+            if j is None or id(j) in seen:
+                continue
+            seen.add(id(j))
+            fn = getattr(j, "review_report", None)
+            if callable(fn):
+                return fn(peer_claims)
+            stack.extend(list(getattr(j, "judges", []) or []))
+            inner = getattr(j, "inner", None)
+            if inner is not None:
+                stack.append(inner)
+        return None
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
 
 
 def quorum_diversity_report(judge) -> Dict[str, Any]:

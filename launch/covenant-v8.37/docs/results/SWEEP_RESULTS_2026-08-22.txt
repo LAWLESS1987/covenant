@@ -1,7 +1,7 @@
 covenant local sweep -- 2026-08-22 18:57:40
 python 3.12.10  pid 15612
 leftover cleanup is disabled by design -- see kill_leftovers()
-staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
+staging into C:\Users\<user>\AppData\Local\Temp\covenant_sweep ...
 staged.
 core   498630 bytes
 
@@ -31,4 +31,4 @@ sim_yield_safety.py              rc=0      68.1s  <no tally>   means the number 
 probe_final_pass.py              rc=1       0.6s  <no tally> covenant_xrp_mainnet.MainnetGuardError: Policy file C:\Users
 
 total 10.0 min
-per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs
+per-suite logs: C:\Users\<user>\AppData\Local\Temp\covenant_sweep\logs

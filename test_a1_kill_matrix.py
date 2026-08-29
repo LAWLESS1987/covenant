@@ -35,6 +35,60 @@ import os, sys, json, time, signal, subprocess, socket, threading, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_a9_relay_race import Net, http, check, results
 
+# ---------------------------------------------------------------------------
+# THE SAMPLING WINDOW.  Fixed 2026-08-29, and the assertion below is untouched.
+#
+# K1 and K3 have been red on every Windows sweep and green on every Linux one,
+# with the same node and the same assertion. The cause is not the node and not
+# the check -- it is WHEN the check looks.
+#
+# A broadcast is `_SEND_POOL.submit`, i.e. asynchronous. Against a peer whose
+# port REFUSES -- which is what killing a process gives you on Linux -- one
+# `_send_raw` fails in ~0.13 s. Against a peer that ACCEPTS AND HOLDS -- which
+# is what it gives you on Windows -- it costs the full retry budget: 3 attempts
+# x PEER_SEND_TIMEOUT_S plus the phi backoff sleeps, ~15.1 s at the defaults
+# (the node's own A12 comment states this figure, and this suite does not
+# override the timeout).
+#
+# The test slept 3.0 s and then read /anomalies. It was looking TWELVE SECONDS
+# before the evidence could exist, and reporting the empty result as the node's
+# failure.
+#
+# Section 0 forbids weakening a control to make a test pass, and nothing here
+# does: the predicate is still exactly `"peer_send_failure" in anomalies`, and
+# a peer that never records one still fails. What changes is that the suite now
+# waits out the budget it is measuring against before deciding the evidence is
+# absent. "It never appeared" and "I looked before it could appear" are
+# different findings and only one of them is about the node.
+#
+# It also fixes P7. The instrumentation below was added on 2026-08-23 to answer
+# whether A12's backoff had skipped the send, and was left for "the next
+# Windows sweep" to report. That sweep reported `dead_peers 0->0,
+# heartbeats_skipped 0->0` -- which looks like a refutation and is not one,
+# because the `post` reading was taken at the SAME too-early moment as the
+# assertion it was meant to explain. Both hypotheses predict 0 inside the blind
+# window. The reading is now taken after the wait, so it can finally
+# discriminate.
+PEER_SEND_TIMEOUT_S = float(os.environ.get("COVENANT_PEER_SEND_TIMEOUT", "5"))
+SEND_BUDGET_S = 3 * PEER_SEND_TIMEOUT_S + 3.0     # + phi backoff sleeps, + margin
+
+
+def wait_anomaly(n, nid, kind, budget=None):
+    """Poll /anomalies until `kind` appears, or the send budget elapses.
+
+    Returns (present, waited_s) so the check's own detail line can say how long
+    it looked -- a bounded wait that reports its bound is a measurement; one
+    that does not is a magic number waiting to become wrong on a new platform.
+    """
+    budget = SEND_BUDGET_S if budget is None else budget
+    t0 = time.time()
+    while time.time() - t0 < budget:
+        if kind in n.anomalies(nid):
+            return True, round(time.time() - t0, 1)
+        time.sleep(0.5)
+    return kind in n.anomalies(nid), round(time.time() - t0, 1)
+
+
 def p7(n, nid, when):
     """P7 (2026-08-23): MEASURE, do not guess.
 
@@ -147,11 +201,12 @@ def k1(base):
         pre = p7(n, "A", "after kill, before mine")      # P7
         s, r = n.mine("A", n.pem("C"), 3.0)
         check("K1 A mined while B was dead", s == 200 and n.height("A") == 2, f"HTTP {s}")
-        time.sleep(3.0)
-        post = p7(n, "A", "after mine")                   # P7
         check("K1 C cannot have the block yet (its only peer is dead)", n.height("C") == 1, f"C={n.height('C')}")
+        seen, waited = wait_anomaly(n, "A", "peer_send_failure")
+        post = p7(n, "A", f"after the send budget ({waited}s)")   # P7, after the wait
         check("K1 A recorded the failed delivery, not silence",
               "peer_send_failure" in n.anomalies("A"),
+              f"waited {waited}s of {SEND_BUDGET_S}s budget | "
               f"kinds={sorted(n.anomalies('A'))} | P7 dead_peers "
               f"{pre.get('dead_peers')}->{post.get('dead_peers')} "
               f"heartbeats_skipped {pre.get('heartbeats_skipped')}->"
@@ -202,9 +257,11 @@ def k3(base):
         s, r = n.mine("A", n.pem("B"), 2.0)
         check("K3 A mined while C was dead", s == 200, f"HTTP {s}")
         check("K3 B got it", n.wait_height("B", 2, 20), f"B={n.height('B')}")
-        post = p7(n, "B", "after relay")                  # P7
+        seen3, waited3 = wait_anomaly(n, "B", "peer_send_failure")
+        post = p7(n, "B", f"after the send budget ({waited3}s)")  # P7, after the wait
         check("K3 B recorded the failed relay to dead C",
               "peer_send_failure" in n.anomalies("B"),
+              f"waited {waited3}s of {SEND_BUDGET_S}s budget | "
               f"kinds={sorted(n.anomalies('B'))} | P7 dead_peers "
               f"{pre.get('dead_peers')}->{post.get('dead_peers')} "
               f"heartbeats_skipped {pre.get('heartbeats_skipped')}->"

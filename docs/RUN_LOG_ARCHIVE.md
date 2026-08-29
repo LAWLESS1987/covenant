@@ -128,7 +128,7 @@ connection — confirm the 64 MB cap never bites a legitimate large catch-up.
 `project_write` for `covenant_unified_v8.py` (replaces project copy),
 `test_a3_bounded_reads.py` (saved as `claude/test_a3_bounded_reads.py`), and
 `run_all_tests.sh` (replaces project copy). **L: copy `covenant_unified_v8.py`
-into `C:\Users\Lawre\covenant`** — it needs `covenant_path_pattern.py` beside
+into `C:\Users\<user>\covenant`** — it needs `covenant_path_pattern.py` beside
 it. The two test files and the runner are optional to copy but let you re-run
 the sweep locally.
 
@@ -190,10 +190,10 @@ fix). `py_compile` clean.
 **Delivery (M5).** SendUserFile + `project_write`: `covenant_unified_v8.py`
 (replaced), `claude/test_a5_size_coherence.py` (new), `run_all_tests.sh`
 (replaced; new test wired in). **L: copy `covenant_unified_v8.py` into
-`C:\Users\Lawre\covenant`** beside `covenant_path_pattern.py`.
+`C:\Users\<user>\covenant`** beside `covenant_path_pattern.py`.
 
 **Loop improvements.** M7 (measure every ceiling against the honest maximum),
-M8 (project↔disk mechanics: `local_path` must be under `/home/claude`; use a
+M8 (project↔disk mechanics: `local_path` must be under `/home/<user>`; use a
 subagent to fetch big files verbatim). Backlog: A5 closed; its unfinished
 scale-sim half split into **A6** so it is not hidden under a strike-through;
 **A7** records the consensus-rule consequence for L. **Trigger prompt NOT
@@ -274,7 +274,7 @@ accepted (A4.17). No timestamp rule exists. → A8 for L.
 **Delivery (M5).** SendUserFile + `project_write`: `covenant_unified_v8.py`
 (replaced, sha256 d18e634d…), `claude/test_a4_block_injection.py` (new),
 `run_all_tests.sh` (replaced; A4 wired in with a 600 s budget). **L: copy
-`covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+`covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`; the test and runner are optional.
 
 **Loop improvements.** M9 (write the matrix from the attacker's side, assert
@@ -351,7 +351,7 @@ the 2/2 diagnostic reproduction.
 **Delivery (M5).** SendUserFile + `project_write`: `covenant_unified_v8.py`
 (replaced, sha256 c88ac111…), `claude/test_a9_relay_race.py` (new),
 `run_all_tests.sh` (replaced; A9 wired in, 420 s). **L: copy
-`covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+`covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`.
 
 **Loop improvements.** M10. Backlog: A9 closed; A1 unblocked and reworded
@@ -424,7 +424,7 @@ started by the schedule).** SendUserFile + `project_write`:
 `run_all_tests.sh` (replaced; A1 wired in, 560 s), `claude/trace_runner.py`
 (new; the M10 tracing harness). **L: copy `covenant_unified_v8.py`,
 `test_a9_relay_race.py` and `test_a1_kill_matrix.py` into
-`C:\Users\Lawre\covenant`** beside `covenant_path_pattern.py`.
+`C:\Users\<user>\covenant`** beside `covenant_path_pattern.py`.
 
 **Loop improvements.** M11. Backlog: A1 closed (history kept); A11 added
 (measure the periodic gossip at scale, folded into A6). `update_trigger`
@@ -498,7 +498,7 @@ v8.20 did.
 **Delivery (M5).** SendUserFile + `project_write`: `covenant_unified_v8.py`
 (replaced, sha256 d18201ae…), `claude/test_a11_gossip_scale.py` (new),
 `run_all_tests.sh` (replaced; A11 wired in, 120 s). **L: copy
-`covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+`covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`; the test and runner are optional.
 
 **Loop improvements.** M12 (solve the recurrence before building the
@@ -585,7 +585,7 @@ per the standard, as the one un-run suite.
 **Delivery (M5).** SendUserFile + `project_write`: `covenant_unified_v8.py`
 (replaced, sha256 8b304a2f…, +118 lines), `claude/test_b1_judge_parser.py`
 (new), `run_all_tests.sh` (replaced; new "JUDGE LAYER" section, 180 s).
-**L: copy `covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+**L: copy `covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`; the test and runner are optional.
 
 **Loop improvements.** M13 (judge-layer test recipe). Backlog: B1, B3
@@ -685,7 +685,7 @@ shipped file at least once; the fast seven ran on both v8.22 and v8.23.
 (replaced, sha256 c5447e79…, 8483 lines, +225/−21),
 `claude/test_a12_dead_peers.py` (new), `run_all_tests.sh` (replaced; A12
 wired in, 240 s). **L: copy `covenant_unified_v8.py` into
-`C:\Users\Lawre\covenant`** beside `covenant_path_pattern.py`; the test and
+`C:\Users\<user>\covenant`** beside `covenant_path_pattern.py`; the test and
 runner are optional. Project round-trip of the big file could not be
 re-read for a hash this time (the resumed fetch subagent had no `Projects`
 tool — M14); the write returned `replaced: true` from the local file whose
@@ -761,7 +761,7 @@ concern; irrelevant to a 2–3 node symmetric LAN today):** consolidate the
 two v8.23 sources. Recommended: keep the **`PeerHealth`** version
 (`c5447e79`, in your ~00:15 SendUserFile download) — it is the more thorough
 fix (it identified head-of-line blocking as the primary hazard and found
-A13/A14) — and re-copy it into `C:\Users\Lawre\covenant`, then a future
+A13/A14) — and re-copy it into `C:\Users\<user>\covenant`, then a future
 attended run can re-save it to the project so source and log agree. If you
 prefer the simpler version already in the project (`2d3e9da6`, also fully
 tested), say so and a future run will note it as canonical and mark the
@@ -851,7 +851,7 @@ multinode 21/21; `py_compile` + `bash -n` clean. ~4 min in two batches.
 hash (M15)**: `covenant_unified_v8.py` v8.24 (sha256 `ec267d40…`, 8401
 lines, +19), `claude/test_b5_mine_latency.py` (`6305310d…`),
 `run_all_tests.sh` (comment updated). **L: copy `covenant_unified_v8.py`
-into `C:\Users\Lawre\covenant`** beside `covenant_path_pattern.py`. Note
+into `C:\Users\<user>\covenant`** beside `covenant_path_pattern.py`. Note
 this v8.24 is built on the `_delivery_order` v8.23 (`2d3e9da6`) that the
 project holds — if you consolidate on `PeerHealth` (`c5447e79`), the three
 v8.24 edits (grep `v8.24`) are small enough to re-apply by hand.
@@ -924,7 +924,7 @@ a9 18/18, a4 60/60, a1_kill_matrix 29/29, multinode 21/21; `py_compile` +
 hash**: `covenant_unified_v8.py` v8.25 (sha256 `acaca10a…`, 8469 lines,
 +68), `claude/test_a13_one_way_sync.py` (`12c51090…`), `run_all_tests.sh`
 (`32a5c69f…`, A13 wired in at 180 s). **L: copy `covenant_unified_v8.py`
-into `C:\Users\Lawre\covenant`** beside `covenant_path_pattern.py`. If you
+into `C:\Users\<user>\covenant`** beside `covenant_path_pattern.py`. If you
 consolidate on `PeerHealth` (`c5447e79`), re-apply by hand: the two
 `__init__` fields, `_send_announce` (and its one-line use in
 `announce_block`), `_pull_from_peer_ahead` + the hook line after
@@ -1014,7 +1014,7 @@ hash (fresh subagent)**: `covenant_unified_v8.py` v8.26 (sha256
 `9eda9538…`, 8539 lines, +70), `claude/test_a14_boot_probe.py`
 (`a0139c0a…`), `run_all_tests.sh` (`9e561c5b…`, A14 wired in at 180 s),
 `claude/test_a13_one_way_sync.py` (`81d06496…`, flake fix). **L: copy
-`covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+`covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`; the tests and runner are optional. Built on the
 `_delivery_order` line as the last three runs were; the edit is one method
 + one constant (grep `A14`) and re-applies by hand on `PeerHealth`.
@@ -1094,7 +1094,7 @@ parallel batches (10 + 5).
 hash (fresh subagent, see below): `covenant_unified_v8.py` v8.27 (sha256
 `07ff5266…`, 8593 lines, +54), `claude/test_a15_exchange_deadline.py`
 (`24e92b31…`), `run_all_tests.sh` (`5ee68f4b…`, A15 wired in at 180 s).
-**L: copy `covenant_unified_v8.py` into `C:\Users\Lawre\covenant`** beside
+**L: copy `covenant_unified_v8.py` into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`; the test and runner are optional. Built on the
 `_delivery_order` line like the last four runs; the edit is self-contained
 in `recv_bounded` + two `except` arms (grep `A15`) and re-applies by hand
@@ -1161,7 +1161,7 @@ do history → DE4. Result: 281 bars 2025-04-15 → 2026-01-20, sha256
 
 **Delivery (M5).** SendUserFile + `project_write`, both round-tripped by
 hash: `realdata/deep/XLM_2025Q2_2026Jan.csv` (new, `60506ff9…`) — **L:
-save it into `C:\Users\Lawre\covenant\realdata\deep\`**; and
+save it into `C:\Users\<user>\covenant\realdata\deep\`**; and
 `claude/test_a15_exchange_deadline.py` (`d9ec18d7…`, flake fix only,
 optional). No change to `covenant_unified_v8.py`.
 
@@ -1277,7 +1277,7 @@ arrives.
 
 **Delivery (M5), all round-tripped by hash (see the 08:05 write-back
 note).** `covenant_unified_v8.py` v8.28 (`76d2c54e…`, 8609 lines, +16 in
-one method) — **L: copy into `C:\Users\Lawre\covenant`** beside
+one method) — **L: copy into `C:\Users\<user>\covenant`** beside
 `covenant_path_pattern.py`; `claude/test_a17_oneway_peer_sync.py`,
 `claude/test_a1_kill_matrix.py` (K5), `run_all_tests.sh` (A17 at 180 s);
 `realdata/deep/{XLM,SOL,XRP}_2025_2026Aug.csv`; `claude/d2_regime_deep.py`,
@@ -1333,7 +1333,7 @@ window, so D6 is a re-analysis on a *different* period, not a replay.
 
 **Delivery (M5).** SendUserFile + `project_write`, round-tripped by hash:
 `realdata/deep/HBAR_2025Jul_2026Aug.csv` (new) — **L: save it into
-`C:\Users\Lawre\covenant\realdata\deep\`**; `claude/verify_csv.py`
+`C:\Users\<user>\covenant\realdata\deep\`**; `claude/verify_csv.py`
 (new, optional — the contiguity checker). No change to
 `covenant_unified_v8.py`.
 
@@ -1418,7 +1418,7 @@ now runs ADA too (one-line change).
 
 **Delivery (M5).** SendUserFile + `project_write`:
 `realdata/deep/ADA_2025_2026Aug.csv` (new, `a0ae69f1…`) — **L: save it
-into `C:\Users\Lawre\covenant\realdata\deep\`**, beside the three
+into `C:\Users\<user>\covenant\realdata\deep\`**, beside the three
 `_2026Aug` files from the 07:14 run (those are in the project; if you only
 have the `_2026Jan` downloads, the Aug ones supersede them); and
 `claude/d2_regime_deep.py` (`0de9e9dc…`, ADA added; this edit sits on the
@@ -1498,7 +1498,7 @@ done for all ten).
 **Delivery (M5).** SendUserFile + `project_write`, round-tripped by hash:
 `realdata/deep/{ATOM,AVAX,NEAR,CRO,ONDO,PEPE}_2025_2026Aug.csv`,
 `realdata/deep/WLFI_2025Sep_2026Aug.csv` — **L: save all seven into
-`C:\Users\Lawre\covenant\realdata\deep\`**; `claude/d2_regime_deep.py`
+`C:\Users\<user>\covenant\realdata\deep\`**; `claude/d2_regime_deep.py`
 (`27b933e4…`), `claude/TRADING_READINESS.md` (`e2650abf…`).
 `covenant_unified_v8.py` untouched (project holds v8.28 `76d2c54e…` per
 the 08:00 entry; not re-verified here).
@@ -1543,7 +1543,7 @@ named the PC files, and this session is **attended and L-started**, which turns
 out to be the whole difference.
 
 **THE FINDING, and it corrects sixteen runs at once.** Every run since 08-21
-05:35 ended *"L: copy `covenant_unified_v8.py` into `C:\Users\Lawre\covenant`"*.
+05:35 ended *"L: copy `covenant_unified_v8.py` into `C:\Users\<user>\covenant`"*.
 Nobody had ever checked whether that happened. The PC held **7774 lines,
 `54955648…`, mtime 2026-08-20 23:33 — pre-v8.15.** `grep -c` for the symbol each
 closed item names: `preflight_port_check` 0, `serialized_size` 0, `_gossip_tip`
@@ -2960,7 +2960,7 @@ third party to ask permission.
 the caveat stated to L that installing a later release-signed build will require
 an uninstall, which erases the audit log. `project_write`:
 `claude/ANDROID_GUARD.md`, the design record, headed with a note that it is
-**not** the source. **Nothing here goes into `C:\Users\Lawre\covenant`** — it
+**not** the source. **Nothing here goes into `C:\Users\<user>\covenant`** — it
 is an Android project, not part of the node, and it must not be dropped into the
 folder `covenant_seal.py` hashes.
 
@@ -3157,7 +3157,7 @@ is the claim that it already was. **L: the one line that makes it true is
 `covenant_unified_v8.py` (**v8.35**, 9,595 lines, sha256 `1207bd2e7dc5…`),
 `covenant_watchdog.py`, `test_b2_quorum_diversity.py`,
 `test_a20_peer_version.py`, `run_all_tests.sh`.
-**L must copy all five into `C:\\Users\\Lawre\\covenant`** — `covenant_unified_v8.py`
+**L must copy all five into `C:\\Users\\<user>\\covenant`** — `covenant_unified_v8.py`
 needs `covenant_path_pattern.py` beside it (already there), and
 `test_a1_kill_matrix.py` imports `test_a9_relay_race.py`. This was a scheduled
 cloud run: **no device bridge**, so the copy could not be done from here.

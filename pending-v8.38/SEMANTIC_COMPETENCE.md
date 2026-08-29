@@ -384,3 +384,203 @@ And the deeper one stands: a Hindi speaker still cannot be found CLEAN by this
 judge. Not *unlikely to be* — structurally cannot. The queue makes that
 visible and gives it an owner. It does not make it right. Only a fitted model
 for their language does that, and the ledger exists to say whose turn it is.
+
+---
+
+## The last layer — found by running it, not by reading it
+
+Everything above was green. Then a real v8.38 node was booted in the sandbox
+with the semantic judge in its quorum, and a real signed transaction with a
+Devanagari memo was submitted to `/transactions`. This is what the sender
+actually received:
+
+```
+Ethical gate rejected: Ethical violation: semantic:0: VIOLATES --
+semantic[c52949fad2f0] HELD, NOT JUDGED. This model was fitted on Latin and
+cannot read Devanagari x12. It has made NO finding about this transaction
+and is NOT alleging anything...
+```
+
+**Every word of care in the judge, undone by the layer that reported it.** The
+sender reads *Ethical violation* and *VIOLATES* before reaching *no finding was
+made*. Three separate layers each stamped an accusation onto a refusal that had
+gone to some trouble not to be one — the gate's `Ethical violation:` prefix, the
+quorum's per-component `VIOLATES` label, and the HTTP handler's
+`Ethical gate rejected:`.
+
+This is M47 one level up: **a reporting layer must not change the meaning of
+what it reports.** And it was invisible to every unit test, because each layer
+is correct in isolation. It took submitting a transaction to a running node to
+see it.
+
+### The fix, following the file's own precedent
+
+`JudgmentResult` already carried `infrastructure_failure` — *"True when
+violates=True was produced by the judge INFRASTRUCTURE, not by a semantic
+verdict… Never read to allow."* Exactly the right shape, so `not_understood`
+was built with exactly the same discipline: **it never allows anything, the gate
+still fails closed, and it changes only what the sender is told.**
+
+| layer | before | after |
+|---|---|---|
+| judge | sets `violates` | also sets `not_understood` when ILLEGIBLE |
+| quorum | `VIOLATES` on every blocker | `HELD` when that component could not read it |
+| quorum aggregate | — | `not_understood` only when **every** blocking member is |
+| gate | `Ethical violation: …` | `Held, not judged: …`, and names no principle |
+| HTTP | `Ethical gate rejected:` | the gate's own wording, plus `held_not_judged: true` |
+
+The quorum rule is the one that matters: **one judge that cannot read the
+payload and another that found theft in it has found theft.** Unread survives
+aggregation only if nothing was alleged by anyone.
+
+And the gate names **no principle** on a hold. Naming one would invent the
+finding the judge explicitly declined to make.
+
+Measured, from the same node, after the fix:
+
+```
+UNREADABLE (Devanagari)   held_not_judged: true
+  Held, not judged: semantic:0: HELD -- ... It has made NO finding about
+  this transaction and is NOT alleging anything ...
+
+ACCUSED (English theft)   held_not_judged: false
+  Ethical gate rejected: Ethical violation: semantic:0: VIOLATES --
+  ... score=623 >= veto; You shall not steal.; evidence: rob(404) ...
+```
+
+The word `VIOLATES` no longer appears anywhere in a hold. `HELD` never appears
+in an accusation. `N1`–`N4` hold both of those against a real `QuorumJudge` and
+a real `ReasoningSentinel`.
+
+### And `/health` now carries the queue
+
+`semantic_review_report()` walks a quorum to find any member keeping a review
+queue, and is pure and total for the same reason `quorum_diversity_report` is:
+an observability feature must not be able to stop a node booting.
+
+Verified on the running node — a Devanagari transaction submitted, refused,
+and then visible:
+
+```json
+"ethics_review": {
+  "open_holds": 1, "overdue": 0, "review_bound_s": 86400,
+  "by_script": {"Devanagari": 1},
+  "accountability": "1 transaction(s) held pending review, oldest 0s
+                     against a 86400s bound. No finding was made against
+                     any of them."
+}
+```
+
+The mesh view (`coverable` / `nobody_can_read`) is emitted **only** when peer
+competence claims are actually supplied. Computing it from this node's own
+claim alone would assert the whole mesh is blind whenever this node is —
+inventing the peers' silence as a `no`, which is the same error as reading an
+unreadable payload as `clean`. Peers do not publish competence claims yet; until
+they do the report says `"unknown is not 'nobody'"` and stops there.
+
+### Still not run
+
+**The win32 sweep.** These changes touch `JudgmentResult`, `QuorumJudge` and the
+`/transactions` path — all consensus-adjacent. Two suites pass here (26/26 and
+45/45), but the other ~160 checks live on the machine and the Windows-only
+defects have only ever been caught by the sweep. **v8.38 should not land until
+`run_local_sweep.py` is green**, and that is now one button on the console.
+
+---
+
+## The register — how crime is spoken, not how it is defined
+
+Twenty lines of screen dialogue in which a crime is plainly being arranged,
+against the v2 judge:
+
+```
+caught 1 of 20  --  and the one hit was on the word `hide`, not on the crime
+```
+
+The lexicon holds the **dictionary** words for theft — steal, rob, plunder,
+embezzle. Nobody arranging one uses them. They say *the vig*, *a taste off the
+top*, *run it through the restaurant*, *the score*, *kite the checks*,
+*structure the deposits*, *cook the books*. Euphemism is not decoration around
+the crime; it is the register the crime is conducted in.
+
+### Why one marker must never fire
+
+Euphemism works **by** using ordinary words. `wash`, `clean`, `the drop`, `my
+cut`, `a taste`, `boiler room` are overwhelmingly innocent — a car wash, a
+boiler-room radiator, a kite for the kids' birthday. So the ordinary word can
+never be evidence on its own. Co-occurrence is.
+
+| rule | benign false positives | criminal caught |
+|---|---|---|
+| **2+ distinct markers** | **0 / 64** | **20 / 20** |
+| 3+ distinct markers | 0 / 64 | 13 / 20 |
+| 2+ distinct *categories* | 0 / 64 | 4 / 20 |
+| 3+ distinct *categories* | 0 / 64 | 1 / 20 |
+
+The category rule was my instinct and the measurement rejected it: **criminals
+stay inside a register**, so requiring two different ones throws away four
+fifths of the signal.
+
+The 64 benign lines were written to be adversarial — *car wash, fleet of six*,
+*boiler room radiator replacement*, *pump and dump the flood water*, *dump our
+position on the old stock, clearance sale*, *the mark on the wall needs
+plastering*, *recycle the client list into the new CRM*, *smurf costume for the
+party*. None fired. `R6` mutation-tests the threshold: dropped to one marker,
+**21 of 25 of those same benign memos block**.
+
+It caps at **ABSTAIN** and can never assert a violation. The reason is stronger
+than the one capping unreviewed translations: these are ordinary English words,
+and claiming theft because a memo said *wash* and *the drop* would assert
+something the model cannot possibly know.
+
+### The Robin Hood register is deliberately absent, and that is a safety constraint
+
+The noble-thief vocabulary — *take from the rich*, *redistribute*, *they can
+afford it*, *the people's money*, *give it back to them* — is the one place
+where theft-language and **generosity-language are the same language**. Encode
+it and the judge fires on charity, mutual aid, debt forgiveness, a whip-round
+for somebody's medical bills: false positives with a political direction,
+landing on exactly the transactions this system exists to protect.
+
+No lexicon can separate *take from the rich and give to the poor* from *give to
+the poor*. So the register stays out, `R3` proves ten generosity payloads stay
+clean, and `R3b` asserts the phrases are **structurally absent** so a later edit
+cannot quietly add them.
+
+Excluded for the same reason: Ocean's Eleven, The Italian Job, Jean Valjean —
+narratives that endorse the theft. Included: predation the story does not
+excuse.
+
+**And what it cannot do.** Euphemism is generative. Anyone who reads the lexicon
+invents new phrasing in a minute — that is what euphemism is *for*. This catches
+the register leaking through when nobody was hiding, which is the ordinary case,
+and it is worth exactly that much.
+
+### A third disposition, because two were not enough
+
+Adding the register exposed the same reporting defect one more time. A payload
+matching six markers came back:
+
+```
+Ethical gate rejected: Ethical violation: semantic:0: VIOLATES --
+semantic[...] ABSTAIN score=0 ... evidence: no signal
+```
+
+Labelled `VIOLATES` when the judge said `ABSTAIN`, and **"evidence: no signal"
+for a payload that matched six markers** — the message told the reader the
+opposite of what happened. `ABSTAIN` is this judge's UNKNOWN, and reporting an
+UNKNOWN as a violation is the same category error as reporting it as a pass,
+only in the other direction.
+
+So `uncertain` joins `not_understood`, same discipline, never read to allow:
+
+| what happened | the sender is told |
+|---|---|
+| could not read it | `Held, not judged:` … *NO finding, NOT alleging anything* |
+| read it, concerned, cannot prove | `Blocked, not proven:` … *NOT alleging a violation* |
+| found it | `Ethical gate rejected: Ethical violation:` … *evidence: rob(404)* |
+
+And the `ABSTAIN` reasoning now names every marker it found and its register,
+followed by: *THESE ARE ORDINARY WORDS. Two or more together is why this
+stopped; it is not a finding that anything is wrong, and this model cannot make
+one.*
