@@ -397,6 +397,13 @@ def main():
             say(fh, "referenced by run_all_tests.sh but not present on this machine: %s" % ", ".join(absent))
         say(fh, "per-suite logs: %s" % os.path.join(WORK, "logs"))
         fh.close()
+        # SAY IT WITH THE EXIT CODE TOO (2026-08-29). main() used to fall off
+        # the end here -- sys.exit(None) is exit 0 -- so a sweep that printed
+        # "RED: 1 suite(s)" still told every SCRIPTED caller it succeeded.
+        # Found when the 20:xx candidate sweep came back RED on a13 and the
+        # background runner reported "completed (exit code 0)". The file said
+        # the truth and the process contradicted it; both channels must agree.
+        return 1 if red else 0
 
 if __name__ == "__main__":
     sys.exit(main())

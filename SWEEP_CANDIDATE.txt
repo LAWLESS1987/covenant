@@ -83,3 +83,15 @@ test_e2e_gift.py                 rc=0       0.7s  11 passed, 0 failed
 test_a9_relay_race.py            rc=0      26.6s  18/18 passed
 test_a1_kill_matrix.py           rc=0      72.3s  30/30 passed
 test_a4_block_injection.py       rc=0     100.9s  60/60 passed
+test_multinode_live.py           rc=0      83.2s  21 passed, 0 failed
+sim_order_independence.py        rc=0      14.5s  ALL INVARIANTS HELD
+sim_yield_safety.py              rc=0      66.7s  <no tally>   means the number you choose is not the number you get.
+probe_final_pass.py              rc=0       1.1s  <no tally> ============================================================
+test_r1_lora_frame.py            rc=0       0.1s  58 passed, 0 failed
+test_backtest_guardrails.py      rc=0       2.4s  16 passed, 0 failed
+test_3node_config.py             rc=0       0.2s  11/11 passed
+
+total 12.3 min
+RED: 1 suite(s) -- test_a13_one_way_sync.py
+CANDIDATE SWEEP: staged from C:\Users\Lawre\covenant\pending-v8.38 over the deployed tree. The deployed core was NOT changed.
+per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs

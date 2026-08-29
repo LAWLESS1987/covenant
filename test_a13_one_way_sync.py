@@ -162,6 +162,12 @@ def main():
           f"X={len(x.node.chain)} Y={len(y.node.chain)} (pre-fix record on v8.24: X stays at 2)")
     check("T3 the pull ran on a covenant-fetch thread (not the send pool)",
           threads and all(t.startswith("covenant-fetch") for t in threads), threads)
+    # peer_ahead_filled is recorded by the fetch thread AFTER the last block
+    # lands, so "chain converged" does not yet imply "the fill is on the
+    # ledger" -- sampled with zero grace this failed 24/25 twice on 08-29
+    # under sweep load (candidate runs, whose larger core widens the window).
+    # Bounded wait for the RECORDING, same as T2 waits for the chain.
+    wait_for(lambda: kinds(x).get("peer_ahead_filled", 0) >= 1, 5)
     k = kinds(x)
     check("T4 peer_ahead recorded once, peer_ahead_filled recorded",
           k.get("peer_ahead", 0) == 1 and k.get("peer_ahead_filled", 0) == 1, k)

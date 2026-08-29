@@ -87,8 +87,13 @@ MANIFEST = {
     # DROPPED the 08-27 runner's "P18 added to SUITES" (M58's drift) -- the
     # SUITES list now carries test_a24 / test_p18 / test_p19 / test_p15, so
     # the first win32 sweep of v8.39 actually covers the fixes it ships.
+    # ... re-pinned ~21:30Z 08-29: main() used to fall off its end, so a
+    # sweep that PRINTED "RED: 1 suite(s)" still EXITED 0 -- found when the
+    # full candidate sweep came back red on a13 and the background runner
+    # said "completed (exit code 0)". It now returns 1 on red; P19 23/23
+    # re-run against the new bytes before this pin moved.
     "run_local_sweep.py":
-        "893b430512e959eeaed776ee9d531059ea85313fbc7dddb08950876dbd91c8a8",
+        "324499832a098a7ca99746321138d69194db8b36e532ecbe38b0b9d319c34111",
     "test_p19_overlay_guard.py":
         "ed76c4497594d56b48ea7724a4aeed24bf1e9a38959fa705d9071812e07d4ed7",
     # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
