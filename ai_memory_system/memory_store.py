@@ -249,6 +249,11 @@ class MemoryStore:
         return head
 
     def _audit(self, action: str, name: str, agent: str, digest: str) -> None:
+        # In bulk mode the ledger flushes but does not fsync, matching the
+        # file write beside it. Both are re-derivable from the source export
+        # a bulk import is replaying; paying two fsyncs per memory to protect
+        # replayable work is the wrong trade, and paying one while skipping
+        # the other is just an accident.
         rec = {"at": _now(), "action": action, "name": name, "agent": agent,
                "sha256": digest, "prev": self._chain_head()}
         # fsync: a ledger that loses its last line after the FILE it
@@ -257,7 +262,8 @@ class MemoryStore:
         with open(self.audit, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(rec, sort_keys=True) + "\n")
             fh.flush()
-            os.fsync(fh.fileno())
+            if not self._bulk:
+                os.fsync(fh.fileno())
 
     def verify_chain(self) -> Dict[str, Any]:
         """Walk the audit chain; the first broken link is named, not summed
@@ -381,13 +387,14 @@ class MemoryStore:
         try:
             out = self.index.list()
             if out or not self._files():
+                # links come from the body THIS query already returned. The
+                # first version re-queried per row (N+1), which kept list()
+                # linear even with an index in front of it.
                 return [{"name": m["name"],
                          "description": m.get("description", ""),
                          "metadata": m.get("metadata", {}),
                          "links": sorted(set(re.findall(
-                             r"\[\[([a-z0-9-]+)\]\]",
-                             (self.index.get_body(m["name"]) or {})
-                             .get("body", ""))))}
+                             r"\[\[([a-z0-9-]+)\]\]", m.get("body", ""))))}
                         for m in out]
         except Exception:            # noqa: BLE001
             pass

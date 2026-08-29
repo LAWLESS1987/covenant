@@ -111,6 +111,8 @@ class MemoryIndex:
         desc = mem.get("description", "")
         body = mem.get("body", "")
         with self._lock:
+            prev = self._con.execute(
+                "select size from memories where name=?", (name,)).fetchone()
             self._con.execute(
                 """insert into memories
                    (name, description, body, metadata, size, source, tier,
@@ -136,30 +138,66 @@ class MemoryIndex:
                     self._con.execute(
                         "insert into memories_fts(rowid, name, description, "
                         "body) values (?,?,?,?)", (rid, name, desc, body))
+            if prev is None:
+                self._bump("count", 1)
+                self._bump("bytes", size)
+            else:
+                self._bump("bytes", size - int(prev[0] or 0))
             self._con.commit()
 
     def remove(self, name: str) -> None:
         with self._lock:
-            row = self._con.execute("select id from memories where name=?",
-                                    (name,)).fetchone()
-            if row and self.fts:
-                self._con.execute("delete from memories_fts where rowid=?",
-                                  (row[0],))
-            self._con.execute("delete from memories where name=?", (name,))
+            row = self._con.execute(
+                "select id, size from memories where name=?",
+                (name,)).fetchone()
+            if row:
+                if self.fts:
+                    self._con.execute(
+                        "delete from memories_fts where rowid=?", (row[0],))
+                self._con.execute("delete from memories where name=?", (name,))
+                self._bump("count", -1)
+                self._bump("bytes", -int(row[1] or 0))
             self._con.commit()
 
     # ------------------------------------------------------------- reading
+    def _stat(self, key: str) -> int:
+        row = self._con.execute("select v from meta where k=?",
+                                (key,)).fetchone()
+        return int(row[0]) if row and str(row[0]).lstrip("-").isdigit() else 0
+
+    def _bump(self, key: str, delta: int) -> None:
+        self._con.execute(
+            "insert into meta(k, v) values (?, ?) "
+            "on conflict(k) do update set v = cast(v as integer) + ?",
+            (key, str(delta), delta))
+
     def count(self) -> int:
+        """O(1). This was COUNT(*) over the whole table, called by the bounds
+        check on every single write -- so storing a memory got more expensive
+        the more memories you had, which is precisely what stops a store from
+        growing. Measured 2026-08-29: 20ms/write at 2k, 68ms at 16k, still
+        climbing. Now a counter."""
         with self._lock:
-            return self._con.execute(
-                "select count(*) from memories").fetchone()[0]
+            return self._stat("count")
 
     def total_bytes(self) -> int:
-        """The bounds check used to stat every file on EVERY write. One
-        indexed sum replaces a million syscalls."""
+        """O(1), for the same reason -- this was SUM(size) over every row."""
         with self._lock:
-            return self._con.execute(
-                "select coalesce(sum(size),0) from memories").fetchone()[0]
+            return self._stat("bytes")
+
+    def recount(self) -> None:
+        """Recompute the counters from the rows. Used after a rebuild, and
+        available to anyone who suspects they have drifted -- a cached count
+        that cannot be re-derived is a number you have to take on faith."""
+        with self._lock:
+            n, b = self._con.execute(
+                "select count(*), coalesce(sum(size),0) from memories"
+            ).fetchone()
+            self._con.execute("insert or replace into meta values ('count',?)",
+                              (str(n),))
+            self._con.execute("insert or replace into meta values ('bytes',?)",
+                              (str(b),))
+            self._con.commit()
 
     def has(self, name: str) -> bool:
         with self._lock:
@@ -168,7 +206,7 @@ class MemoryIndex:
 
     def list(self, limit: int = 0, offset: int = 0,
              source: str = "") -> List[Dict[str, Any]]:
-        q = "select name, description, metadata from memories"
+        q = "select name, description, metadata, body from memories"
         args: List[Any] = []
         if source:
             q += " where source=?"
@@ -180,7 +218,8 @@ class MemoryIndex:
         with self._lock:
             rows = self._con.execute(q, args).fetchall()
         return [{"name": r[0], "description": r[1],
-                 "metadata": json.loads(r[2] or "{}")} for r in rows]
+                 "metadata": json.loads(r[2] or "{}"),
+                 "body": r[3]} for r in rows]
 
     def search(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
         with self._lock:
@@ -274,6 +313,7 @@ class MemoryIndex:
             except (ValueError, OSError):
                 continue        # a file that will not parse is reported by
                                 # the store's own list(), not silently fixed
+        self.recount()
         return n
 
     def close(self) -> None:
