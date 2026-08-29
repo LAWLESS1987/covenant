@@ -121,6 +121,9 @@ SUITES = [
     # wired into NO runner until now, which is exactly the orphan class this
     # coverage phase exists to catch.
     ("test_p15_judge_identity.py",       120,  "IDENTITY"),
+    # P20 (2026-08-29): the watchdog's self-evaluation ledger -- every layer
+    # it senses, one PASS/WARN/FAIL block, report-only by AST. 23/23.
+    ("test_p20_watchdog_self_eval.py",   120,  "IDENTITY"),
     # P19 (2026-08-29): the sweep's own overlay guard -- a candidate folder
     # must not supply the checks that judge it. Subprocess-drives the real
     # run_local_sweep.py in a scratch tree; no node, no socket. 23/23.

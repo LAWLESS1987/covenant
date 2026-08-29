@@ -315,6 +315,14 @@ run test_p15_judge_identity.py 120
 #                       this sandbox sweep there is no chain to collide with.
 #                       ~3.5 min; 27/27 x2 on Linux 2026-08-29.
 run test_c2_watchdog_live.py 480
+#   test_p20_watchdog_self_eval (P20, 2026-08-29) the watchdog's periodic
+#                       self-evaluation: every sensory stream it reads becomes
+#                       one dated PASS/WARN/FAIL block per layer in
+#                       ops/SELF_EVAL.md, worst wins. Pure function + a temp-dir
+#                       writer test; AST-pins REPORT-ONLY (no probe, no restart,
+#                       no I/O from the evaluator itself). 23/23 on delivery.
+#                       No node, no socket, no key.
+run test_p20_watchdog_self_eval.py 120
 #   test_a20_peer_version (v8.33) A20/A21: every peer reply carries this node's
 #                       version and source hash, and the 120 s tip-gossip
 #                       heartbeat carries a bounded state digest -- so two nodes

@@ -71,8 +71,11 @@ MANIFEST = {
     # section with P18+P19): 44 suites, K1 20/20, K2 25/25. A pin proves
     # WHICH bytes arrived, never that the bytes are right -- the suites
     # that judge the runner have to actually run.
+    # ... and re-pinned ~21:00Z 08-29 with P20 (the watchdog self-evaluation
+    # suite) wired in. K1 20/20 and K2 25/25 ran against these bytes BEFORE
+    # the pin moved -- the order the b969 lesson above teaches.
     "run_all_tests.sh":
-        "a8af8433d1c63fd46fc8ec0fedc72cfc2caa3fea25d0af4e1bc0673cbbdf226e",
+        "ef61a599a48c4a24f936313413823d0981e55abe8896b8905c03b9176e23f3fd",
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40

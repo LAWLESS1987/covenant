@@ -646,6 +646,135 @@ def judge_identity_report(ident, prev, expected_model=None, root=None):
 _judge_prev = {}
 
 
+# --------------------------------------------------------------------------
+# SELF-EVALUATION (2026-08-29). "Constant self-evaluating by all systems
+# involved" -- the operator's words, and the missing consumer of everything
+# this file already senses. Every stream above ends in the LOG, which is a
+# record for a reader who already knows something is wrong. This section
+# turns the same readings into a periodic VERDICT: one dated block, one line
+# per layer, PASS/WARN/FAIL each, appended to a ledger a person or a later
+# session reads FIRST.
+#
+# It operates on METADATA AND MYCELIUM the pass already holds -- the /health
+# fields, the topology states, the judge identity baseline, the P14 drift
+# answer. No new probe: a self-evaluation that probes is measuring its own
+# probe, and one that re-asks the node is measuring the network twice.
+#
+# REPORT-ONLY, the same boundary P12 draws for the substrate sensor and the
+# topology reader: nothing here restarts, blocks or reconfigures anything on
+# the strength of its own verdict. A monitor that acts on its self-opinion
+# is a loop; a monitor that publishes it is a record.
+#
+# For Misha, and all that were lost to injustice.
+# --------------------------------------------------------------------------
+SELF_EVAL_EVERY = int(os.environ.get("COVENANT_SELF_EVAL_ROUNDS", "60"))
+SELF_EVAL_PATH = os.environ.get(
+    "COVENANT_SELF_EVAL_PATH", os.path.join(HERE, "ops", "SELF_EVAL.md"))
+SELF_EVAL_MAX_BYTES = 512 * 1024
+_self_eval = {"round": 0}
+
+SELF_EVAL_HEADER = (
+    "# covenant self-evaluation ledger\n"
+    "# For Misha, and all that were lost to injustice.\n"
+    "# One block per evaluation: PASS/WARN/FAIL per layer, worst wins.\n"
+    "# Written by covenant_watchdog.py (report-only) and by the scheduled\n"
+    "# covenant-self-eval task. Append-only; rotates to .prev at 512KB.\n\n")
+
+_RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
+
+
+def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
+                    round_no=0):
+    """(block, overall) -- every layer, judged from what this pass sensed.
+
+    Pure, the same shape as topology_report and judge_identity_report:
+    everything it needs arrives as arguments and it only returns text.
+      states     -- node_id -> /health dict or None       (metadata)
+      topo       -- node_id -> topology state dict         (mycelium)
+      judge      -- the judge-identity baseline state      (metadata)
+      self_drift -- P14's alert list for THIS file          (metadata)
+      alerts     -- every alert this pass raised
+    """
+    layers = []
+
+    def layer(name, verdict, detail):
+        layers.append((name, verdict, detail))
+
+    up = {k: s for k, s in states.items() if s}
+    if not up:
+        layer("nodes", "FAIL", "no node reachable -- the chain is not running")
+    else:
+        down = sorted(set(states) - set(up))
+        srcs = {str(s.get("source_sha256"))[:12] for s in up.values()}
+        hs = [s.get("chain_height") for s in up.values()
+              if isinstance(s.get("chain_height"), int)]
+        spread = (max(hs) - min(hs)) if hs else 0
+        d = (f"{len(up)}/{len(states)} up, height {max(hs) if hs else '?'} "
+             f"(spread {spread}), source {'/'.join(sorted(srcs))}")
+        if down:
+            layer("nodes", "FAIL", f"{down} unreachable; " + d)
+        elif len(srcs) > 1 or spread > 1:
+            layer("nodes", "WARN", d)
+        else:
+            layer("nodes", "PASS", d)
+
+    reporting = {k: v for k, v in topo.items()
+                 if isinstance(v, dict) and v.get("addrs") is not None}
+    if not reporting:
+        layer("mycelium", "WARN", "no topology state held -- /mycelium has "
+                                  "not answered yet this process")
+    else:
+        held = ", ".join(f"{k}={len(v.get('addrs') or [])}"
+                         for k, v in sorted(reporting.items()))
+        v = "PASS" if len(reporting) == len(states) else "WARN"
+        layer("mycelium", v, f"{len(reporting)}/{len(states)} reporting; "
+                             f"links held: {held}")
+
+    if isinstance(judge, dict) and judge.get("digest"):
+        layer("judge", "PASS", f"baseline digest {str(judge['digest'])[:19]}, "
+                               f"{len(judge.get('served') or {})} model(s)")
+    else:
+        layer("judge", "FAIL", "no judge identity baseline -- unreachable or "
+                               "expected model never seen (gate fails closed)")
+
+    if self_drift:
+        layer("self", "FAIL", str(self_drift[0])[:120])
+    else:
+        layer("self", "PASS", "running watchdog matches its file on disk (P14)")
+
+    if alerts:
+        v = "FAIL" if any("FORK" in a or "down" in a or "NO node" in a
+                          for a in alerts) else "WARN"
+        layer("alerts", v, f"{len(alerts)} live -- first: {alerts[0][:110]}")
+    else:
+        layer("alerts", "PASS", "none this pass")
+
+    overall = max((v for _, v, _ in layers), key=lambda v: _RANK[v])
+    block = [f"## {now_iso}  overall {overall}  (round {round_no})"]
+    block += [f"{n:9s} {v:4s}  {d}" for n, v, d in layers]
+    return "\n".join(block) + "\n\n", overall
+
+
+def _self_eval_write(block):
+    """Append one block to the ledger. A failed write is logged and never
+    raised: the evaluation must not be able to kill the evaluator."""
+    try:
+        os.makedirs(os.path.dirname(SELF_EVAL_PATH), exist_ok=True)
+        fresh = not os.path.exists(SELF_EVAL_PATH)
+        if not fresh and os.path.getsize(SELF_EVAL_PATH) > SELF_EVAL_MAX_BYTES:
+            os.replace(SELF_EVAL_PATH, SELF_EVAL_PATH + ".prev")
+            fresh = True
+        with open(SELF_EVAL_PATH, "a", encoding="utf-8", newline="\n") as fh:
+            if fresh:
+                fh.write(SELF_EVAL_HEADER)
+            fh.write(block)
+        return True
+    except OSError as e:
+        log("INFO", f"self-eval ledger write failed ({type(e).__name__}: {e})"
+                    f" -- this round's verdict is in the log only")
+        return False
+
+
 # ---------------------------------------------------------------- logging --
 def _rotate():
     try:
@@ -909,6 +1038,21 @@ def one_pass(strict=False):
             log("INFO", rendered)
     else:
         _adapt_info._state.pop("summary", None)
+
+    # SELF-EVALUATION: every SELF_EVAL_EVERY rounds, one verdict block from
+    # this pass's own readings -- see the section above one_pass for the
+    # boundary. Logged unconditionally (it is at most hourly, and a verdict
+    # that Adaptation could mute would defeat the ledger's purpose).
+    _self_eval["round"] += 1
+    if SELF_EVAL_EVERY > 0 and _self_eval["round"] % SELF_EVAL_EVERY == 0:
+        block, overall = self_evaluation(
+            states, dict(_topo_prev), _judge_prev.get("state", {}),
+            list(s_alerts), list(alerts),
+            time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            round_no=_self_eval["round"])
+        if _self_eval_write(block):
+            log("INFO", f"self-evaluation: {overall} "
+                        f"(round {_self_eval['round']}) -> {SELF_EVAL_PATH}")
     return alerts
 
 
