@@ -341,5 +341,160 @@ class CoinbaseVenue:
                          if live else None)}
 
 
+class RobinhoodVenue:
+    """Robinhood Crypto, to the same contract as the two above -- with ONE
+    difference that is stated rather than smoothed over.
+
+    KRAKEN AND COINBASE HAVE A SERVER-SIDE DRY RUN. THIS DOES NOT.
+    Kraken takes validate=true and Coinbase has /orders/preview: with
+    live=False the VENUE parses the order, checks the balance and the
+    minimums, and answers what it would do. Robinhood publishes no such
+    endpoint. So live=False here can only mean "the checks THIS FILE can do
+    locally passed" -- it has not been near a matching engine, the balance
+    has not been verified against it, and it is not a promise that a live
+    order would succeed.
+
+    Returning the same shape as the other two while meaning something weaker
+    is exactly the quiet unequal-guarantee this project keeps catching in
+    itself, so every dry run from here carries venue_validated=False and
+    says why in `descr`. A caller that treats a dry run as proof must read
+    that field; the other two venues set it True.
+
+    AUTH. Ed25519 over `api_key + timestamp + path + method + body`, the
+    scheme Robinhood documents. Credentials live OUTSIDE this folder, like
+    the others:
+        %USERPROFILE%\\.robinhood\\credentials
+    as JSON: {"api_key": "...", "private_key_b64": "..."} where the private
+    key is the base64 seed issued when the key was created. Nothing here
+    will ever ask you for one, and a read-only key covers everything except
+    live=True.
+    """
+    name = "robinhood"
+    CRED = os.path.join(HOME, ".robinhood", "credentials")
+    HOST = "https://trading.robinhood.com"
+
+    def __init__(self):
+        self._k = None
+
+    def has_credentials(self):
+        return os.path.exists(self.CRED)
+
+    def _creds(self):
+        if self._k:
+            return self._k
+        if not self.has_credentials():
+            raise VenueError(
+                f"no credential at {self.CRED} (see EXCHANGE_SETUP.md). "
+                f"Robinhood requires auth even for market data, so nothing "
+                f"on this venue answers read-only without a key.")
+        try:
+            with open(self.CRED, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            key = raw["api_key"]
+            seed = base64.b64decode(raw["private_key_b64"])
+        except (ValueError, KeyError, OSError) as e:
+            raise VenueError(f"robinhood credential unreadable: {e}")
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ed25519
+        except ImportError:
+            raise VenueError(
+                "robinhood signing needs `cryptography` (ed25519) -- it is in "
+                "requirements.txt but is not importable here")
+        # 32 bytes is the seed; a 64-byte blob is seed+public, so take 32.
+        priv = ed25519.Ed25519PrivateKey.from_private_bytes(seed[:32])
+        self._k = (key, priv)
+        return self._k
+
+    def _call(self, method, path, body=None):
+        key, priv = self._creds()
+        payload = json.dumps(body) if body else ""
+        ts = str(int(time.time()))
+        msg = f"{key}{ts}{path}{method}{payload}".encode()
+        sig = base64.b64encode(priv.sign(msg)).decode()
+        req = urllib.request.Request(
+            self.HOST + path,
+            data=payload.encode() if payload else None,
+            method=method,
+            headers={"x-api-key": key, "x-signature": sig,
+                     "x-timestamp": ts, "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read().decode() or "{}")
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.read().decode()[:300]
+            except Exception:                                   # noqa: BLE001
+                pass
+            raise VenueError(f"robinhood {method} {path}: HTTP {e.code} "
+                             f"{detail}")
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            raise VenueError(f"robinhood {method} {path}: {e}")
+
+    def meta(self, symbol):
+        sym = f"{symbol.upper()}-USD"
+        res = self._call(
+            "GET", f"/api/v1/crypto/trading/trading_pairs/?symbol={sym}")
+        rows = res.get("results") or []
+        if not rows:
+            raise VenueError(f"robinhood does not list a USD pair for {symbol}")
+        r = rows[0]
+        return {"pair": sym, "symbol": symbol.upper(),
+                "ordermin": float(r.get("min_order_size") or 0),
+                "increment": r.get("quote_increment"),
+                "status": r.get("status")}
+
+    def balances(self):
+        res = self._call("GET", "/api/v1/crypto/trading/holdings/")
+        out = {}
+        for h in res.get("results") or []:
+            code = str(h.get("asset_code") or "").upper()
+            try:
+                qty = float(h.get("total_quantity") or 0)
+            except (TypeError, ValueError):
+                continue
+            if code and qty:
+                out[code] = out.get(code, 0.0) + qty
+        return out
+
+    def open_orders(self):
+        res = self._call("GET", "/api/v1/crypto/trading/orders/?state=open")
+        return res.get("results") or []
+
+    def place(self, symbol, side, qty, live=False, ordertype="market",
+              price=None):
+        if side.lower() not in ("buy", "sell"):
+            raise VenueError(f"robinhood: bad side {side!r}")
+        m = self.meta(symbol)
+        size = float(qty)
+        if m["ordermin"] and size < m["ordermin"]:
+            raise VenueError(f"robinhood: {size} {symbol} is under the "
+                             f"minimum order size {m['ordermin']}")
+        if not live:
+            # LOCAL ONLY -- see the class docstring. There is no venue-side
+            # preview to call, so this reports what was checked HERE and
+            # refuses to imply anything more.
+            return {"venue": self.name, "live": False,
+                    "venue_validated": False,
+                    "symbol": symbol.upper(), "side": side.lower(),
+                    "qty": size, "product": m["pair"],
+                    "descr": f"LOCAL dry run only: size >= min "
+                             f"({m['ordermin']}), pair status "
+                             f"{m.get('status')}. Robinhood has no preview "
+                             f"endpoint, so balance and buying power were "
+                             f"NOT checked by the venue.",
+                    "txid": None}
+        body = {"symbol": m["pair"], "client_order_id": secrets.token_hex(16),
+                "side": side.lower(), "type": ordertype,
+                f"{ordertype}_order_config": {"asset_quantity": str(size)}}
+        res = self._call("POST", "/api/v1/crypto/trading/orders/", body)
+        return {"venue": self.name, "live": True, "venue_validated": True,
+                "symbol": symbol.upper(), "side": side.lower(), "qty": size,
+                "product": m["pair"], "descr": json.dumps(res)[:120],
+                "txid": res.get("id")}
+
+
 def all_venues():
-    return [KrakenVenue(), CoinbaseVenue()]
+    """Every adapter. Callers should check has_credentials() first -- a venue
+    with no key is not an error, it is a venue this machine cannot reach."""
+    return [KrakenVenue(), CoinbaseVenue(), RobinhoodVenue()]
