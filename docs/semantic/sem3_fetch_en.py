@@ -4,8 +4,8 @@ in the results doc. Gutenberg strip identical to fetch10.py."""
 import json, os, re, sys, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-OUT = "/home/claude/sem3/corpus_en.txt"
-BOOKS = "/home/claude/sem3/books"
+OUT = os.path.expanduser("~/sem3/corpus_en.txt")
+BOOKS = os.path.expanduser("~/sem3/books")
 UA = {"User-Agent": "corpus-builder/1.0"}
 START = re.compile(r"\*\*\*\s*START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK.*?\*\*\*", re.I | re.S)
 END = re.compile(r"\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK.*?\*\*\*", re.I | re.S)
@@ -39,7 +39,7 @@ def fetch(tid):
     return tid, True
 
 if __name__ == "__main__":
-    ids = json.load(open("/home/claude/sem3/manifest_en.json"))["en"]["ids"]
+    ids = json.load(open(os.path.expanduser("~/sem3/manifest_en.json")))["en"]["ids"]
     with ThreadPoolExecutor(max_workers=12) as ex:
         res = list(ex.map(fetch, ids))
     bad = [(t, r) for t, r in res if r is not True]

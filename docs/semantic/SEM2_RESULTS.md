@@ -113,5 +113,5 @@ Prediction verdict: **PASS. The method is not the problem; the corpus was.**
 
 Nothing here touches the node, the judge, the sweep/publish files, or
 anything the two concurrent sessions of 08-28/29 were writing. No file in
-`C:\Users\Lawre\covenant` needed to change for this item — which is exactly
+`%USERPROFILE%\covenant` needed to change for this item — which is exactly
 why it had never been saved here until the 08-29 rescue.

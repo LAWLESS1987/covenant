@@ -1,7 +1,7 @@
 covenant local sweep -- 2026-08-28 21:23:09
 python 3.12.10  pid 30304
 leftover cleanup is disabled by design -- see kill_leftovers()
-staging into C:\Users\Lawre\AppData\Local\Temp\covenant_sweep ...
+staging into %USERPROFILE%\AppData\Local\Temp\covenant_sweep ...
 staged.
 core   559515 bytes  sha256 d3a0ca17030a  (as STAGED, not as deployed)
 
@@ -44,5 +44,5 @@ test_3node_config.py             rc=0       0.2s  11/11 passed
 
 total 10.7 min
 GREEN: every suite that ran, passed.
-CANDIDATE SWEEP: staged from C:\Users\Lawre\covenant\pending-v8.38 over the deployed tree. The deployed core was NOT changed.
-per-suite logs: C:\Users\Lawre\AppData\Local\Temp\covenant_sweep\logs
+CANDIDATE SWEEP: staged from %USERPROFILE%\covenant\pending-v8.38 over the deployed tree. The deployed core was NOT changed.
+per-suite logs: %USERPROFILE%\AppData\Local\Temp\covenant_sweep\logs

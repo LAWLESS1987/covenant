@@ -5,11 +5,12 @@ The model file's own separation record says n=11 violating / 22 benign is
 "two observations, not a validation". This is the validation at n: every
 phrase class the axis eval used, scored through SemanticModel.assess exactly
 as the node would run it. Deterministic; run twice and diff."""
+import os
 import hashlib
 import json
 import sys
 
-sys.path.insert(0, "/home/claude/sem3")
+sys.path.insert(0, os.path.expanduser("~/sem3"))
 from covenant_semantic_judge import SemanticModel
 from sem3_axis import AXES, INNOCENT_VERBS, NOUN_PAIRS
 
@@ -35,7 +36,7 @@ def phrases():
 
 
 def main():
-    m = SemanticModel.load("/home/claude/sem3/semantic_judge_model.json")
+    m = SemanticModel.load(os.path.expanduser("~/sem3/semantic_judge_model.json"))
     covert, oov, innocent, artifact = phrases()
     out = {"model_id": m.model_id, "space": m.space_sig,
            "bands": {"gate_lo": m.gate_lo, "veto_at": m.veto_at}}
@@ -63,7 +64,7 @@ def main():
 
     body = json.dumps(out, sort_keys=True, default=list)
     print("judge report sha256", hashlib.sha256(body.encode()).hexdigest()[:16])
-    json.dump(out, open("/home/claude/sem3/SEM3_JUDGE_REPORT.json", "w"),
+    json.dump(out, open(os.path.expanduser("~/sem3/SEM3_JUDGE_REPORT.json"), "w"),
               indent=1, sort_keys=True, default=list)
 
 

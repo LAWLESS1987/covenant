@@ -9,7 +9,7 @@ it is not one Claude can take.**
 `gh` **is** installed — the PATH checks were wrong, and only a real filesystem
 scan found it:
 
-    C:\Users\Lawre\AppData\Local\copilot-desktop-gh-2.96.0\gh.exe
+    %USERPROFILE%\AppData\Local\copilot-desktop-gh-2.96.0\gh.exe
 
 It is the copy **bundled inside Copilot Desktop**, which is why it is not on
 PATH and why `gh auth login` typed bare does not resolve. It is not
@@ -35,7 +35,7 @@ one-time code in the browser, approve. It publishes by itself from there.
 **B — GitHub Desktop, no terminal at all.** Already installed and already
 OAuth-authorized:
 
-    File -> Add local repository -> C:\Users\Lawre\covenant
+    File -> Add local repository -> %USERPROFILE%\covenant
     Publish repository
     LEAVE "Keep this code private" TICKED -> Publish
 

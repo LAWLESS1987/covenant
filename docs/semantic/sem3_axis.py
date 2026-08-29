@@ -22,6 +22,7 @@ Three phrase classes per axis:
 
 Everything is deterministic given SEED; run it twice and diff.
 """
+import os
 import hashlib
 import json
 import pickle
@@ -29,7 +30,7 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, "/home/claude/sem3")
+sys.path.insert(0, os.path.expanduser("~/sem3"))
 
 SEED = 20260829
 D_REMOVE = 3          # build_semantic_model.py values, verbatim
@@ -126,7 +127,7 @@ def auc(pos, neg):
 
 
 def main():
-    space = pickle.load(open("/home/claude/sem3/cache/en10_20000_10.pkl", "rb"))
+    space = pickle.load(open(os.path.expanduser("~/sem3/cache/en10_20000_10.pkl"), "rb"))
     print(f"space {space.sig} V={len(space.words):,} tokens={space.n_tokens:,}")
     X = clean(space.vecs)
 
@@ -252,7 +253,7 @@ def main():
 
     body = json.dumps(report, sort_keys=True)
     print(f"\nreport sha256 {hashlib.sha256(body.encode()).hexdigest()[:16]}")
-    json.dump(report, open("/home/claude/sem3/SEM3_AXIS_REPORT.json", "w"),
+    json.dump(report, open(os.path.expanduser("~/sem3/SEM3_AXIS_REPORT.json"), "w"),
               indent=1, sort_keys=True)
 
 

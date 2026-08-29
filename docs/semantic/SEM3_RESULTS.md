@@ -117,7 +117,7 @@ collision again.
 
 Nothing here touches the node, the judge/model files, the sweep/publish
 files, or anything the concurrent sessions of 08-28/29 were writing. The
-original said "No file needs copying into `C:\Users\Lawre\covenant` for this
+original said "No file needs copying into `%USERPROFILE%\covenant` for this
 item" — that judgement, repeated across many sessions, is exactly what left
 eighteen documents with the project as their only copy. Copied here on
 08-29 for that reason. The v8.39 seven-file package (08-27 05:50 entry)

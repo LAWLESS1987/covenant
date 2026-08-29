@@ -53,7 +53,7 @@ sys.path.insert(0, HERE)
 import covenant_semantic_judge as sj
 
 MODEL = os.path.join(HERE, "semantic_judge_model.json")
-PRISTINE = "/home/claude/prefix_sem_judge.py"     # the source before this fix
+PRISTINE = os.path.expanduser("~/prefix_sem_judge.py")     # the source before this fix
 
 results = []
 def check(label, ok, detail=""):
