@@ -1,0 +1,95 @@
+{
+ "appropriation": {
+  "N1_perm_p": 0.00025,
+  "N3_random_axis_auc": {
+   "max": 0.9126,
+   "mean": 0.5411,
+   "p": 0.004975
+  },
+  "S1_auc_covert_vs_trap": 0.9936,
+  "S1b_auc_oov_vs_trap": 0.4755,
+  "S2_axis_paraphrase_closer": "164/168",
+  "S2_p_binomial": "8.77e-44",
+  "S2_similarity_trap_wins": "157/168",
+  "dropped": {
+   "noun_pairs": [
+    [
+     "purse",
+     "wallet"
+    ],
+    [
+     "accounts",
+     "ledger"
+    ]
+   ],
+   "oov_dropped": [
+    "swipe",
+    "abscond",
+    "confiscate",
+    "ransack",
+    "despoil",
+    "filch",
+    "swindle"
+   ],
+   "pool_a": [
+    "embezzle"
+   ],
+   "pool_b": [
+    "looted",
+    "pilfer"
+   ]
+  },
+  "mean_proj": {
+   "covert": 0.1389,
+   "covert_oov": 0.0222,
+   "innocent_trap": 0.0246
+  },
+  "n_oov_phrases": 42,
+  "n_triples": 168
+ },
+ "concealment": {
+  "N1_perm_p": 0.00025,
+  "N3_random_axis_auc": {
+   "max": 0.9529,
+   "mean": 0.5405,
+   "p": 0.004975
+  },
+  "S1_auc_covert_vs_trap": 0.9943,
+  "S1b_auc_oov_vs_trap": 0.8387,
+  "S2_axis_paraphrase_closer": "216/224",
+  "S2_p_binomial": "5.33e-54",
+  "S2_similarity_trap_wins": "207/224",
+  "dropped": {
+   "noun_pairs": [
+    [
+     "purse",
+     "wallet"
+    ],
+    [
+     "accounts",
+     "ledger"
+    ]
+   ],
+   "oov_dropped": [
+    "smuggle",
+    "smuggled",
+    "camouflage"
+   ],
+   "pool_a": [
+    "falsified"
+   ],
+   "pool_b": [
+    "misrepresent"
+   ]
+  },
+  "mean_proj": {
+   "covert": 0.142,
+   "covert_oov": 0.0541,
+   "innocent_trap": 0.0095
+  },
+  "n_oov_phrases": 98,
+  "n_triples": 224
+ },
+ "seed": 20260829,
+ "space_sig": "85e88a9650a6"
+}
