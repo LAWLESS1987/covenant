@@ -33,6 +33,29 @@ The asymmetry is the whole argument: private -> public is two clicks, any
 day. Public -> private does not exist. Deleting a public repo does not recall
 forks, clones, caches or third-party mirrors.
 
+## URGENT AMENDMENT (2026-08-29, same day): this is not only a "before public" task
+
+The purge below was written as a precondition for making the repo PUBLIC. That
+framing is too narrow and it nearly cost something.
+
+Within an hour of writing it, the question arose of merging outside work from a
+named collaborator. The natural next step for that is a **collaborator invite on
+the private repo** — and a collaborator with read access can clone the
+**entire history**. Everything in the table below is readable to them:
+`holdings.txt`, 505 bytes, ~10 positions with quantities and average buy prices,
+at commit `965ba6e`, which is on `origin/main`.
+
+**So the rule is stronger than "purge before going public":**
+
+> **Purge before the repo gains ANY reader who is not L.**
+
+Public is one way to gain readers. A collaborator invite is another, it is two
+clicks, it feels much smaller, and it exposes exactly the same commits. So does
+a fork, a deploy key, an org transfer, or handing someone a clone on a USB
+stick.
+
+Nothing has been shared. This is written before, not after.
+
 ## The route, in order. Do not reorder.
 
 ### 1. Purge the four paths from history
