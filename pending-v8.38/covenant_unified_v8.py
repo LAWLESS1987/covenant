@@ -9100,6 +9100,46 @@ def _retry_with_backoff(fn, max_retries: int = 3, base_delay_s: float = 1.0):
     raise last_exc
 
 
+# ---------------------------------------------------------------------------
+# NO SECRET SURVIVES A TRIP THROUGH AN ERROR MESSAGE.
+#
+# Provider errors are shown to the transaction submitter on purpose: a gate
+# that refuses without saying why is a gate nobody can operate. That makes
+# every one of those strings an egress path, and the only safe assumption is
+# that any of them may contain a credential -- a key in a query string, a
+# bearer token echoed back by a proxy, a signature in a redirect.
+#
+# Deliberately conservative: it would rather blank a harmless-looking value
+# than let one key through. A redaction that is easy to defeat is decoration.
+_SECRET_PATTERNS = [
+    # key=..., api_key=..., token=..., access_token=..., signature=...
+    re.compile(r"(?i)\b((?:api[_-]?key|key|token|access[_-]?token|secret|"
+               r"password|passwd|pwd|signature|sig|auth)\s*[=:]\s*)"
+               r"([^\s&\"']{6,})"),
+    # Bearer <token>
+    re.compile(r"(?i)\b(bearer\s+)([A-Za-z0-9._~+/-]{12,}=*)"),
+    # Well-known key shapes, even with no label at all
+    re.compile(r"\b(sk-[A-Za-z0-9_-]{12,})"),
+    re.compile(r"\b(AIza[A-Za-z0-9_-]{20,})"),
+    re.compile(r"\b(xox[baprs]-[A-Za-z0-9-]{10,})"),
+    re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{20,})"),
+]
+
+
+def _redact_secrets(text: str) -> str:
+    """Blank anything that looks like a credential, keeping the shape of the
+    message so it stays diagnosable."""
+    if not text:
+        return text
+    out = text
+    for pat in _SECRET_PATTERNS:
+        if pat.groups >= 2:
+            out = pat.sub(lambda m: m.group(1) + "[REDACTED]", out)
+        else:
+            out = pat.sub("[REDACTED]", out)
+    return out
+
+
 class _APIReasoningJudge(ReasoningJudge):
     """Base for provider-backed semantic judges. Subclasses set `provider`,
     `env_var`, and a default `judge_id`, and may override `_call` with the
@@ -9132,10 +9172,19 @@ class _APIReasoningJudge(ReasoningJudge):
         except Exception as e:   # noqa: BLE001
             # Any live-path failure (network, parse, provider outage) fails
             # closed with the reason surfaced, never fails open.
+            #
+            # REDACTED, because this string travels. It is preserved verbatim
+            # by the quorum summary and returned to whoever submitted the
+            # transaction -- which is the correct behaviour (an operator must
+            # be able to see WHY the gate refused) and is exactly why no
+            # secret may appear in it. Fixing only the one provider that put
+            # its key in a URL would leave the next one to repeat it; this
+            # closes the class.
             return JudgmentResult(
                 True,
                 f"fail-closed: {self.provider} semantic judge error "
-                f"({type(e).__name__}: {str(e)[:300]}); denying by default",
+                f"({type(e).__name__}: {_redact_secrets(str(e))[:300]}); "
+                f"denying by default",
                 judge_id=self.judge_id,
                 infrastructure_failure=True,
             )
@@ -9308,10 +9357,28 @@ class GoogleReasoningJudge(_APIReasoningJudge):
     def _call(self, data: Dict[str, Any], principles: List[str]) -> JudgmentResult:
         import requests
         model = self.model or "gemini-1.5-pro"
+        # THE KEY GOES IN A HEADER, NEVER THE URL.
+        #
+        # It used to be `?key={self.api_key}`, and that one character of
+        # convenience was an unauthenticated remote credential disclosure.
+        # requests' raise_for_status() builds its message as
+        # "... for url: {self.url}" with no redaction, so any 4xx from Google
+        # -- expired key, exhausted quota, 429, bad model name -- produced an
+        # exception whose text CONTAINED THE KEY. That text is surfaced
+        # verbatim by the fail-closed handler below, preserved verbatim by
+        # the quorum summary, and returned in the 400 body to whoever POSTed
+        # the transaction. POST /transactions is deliberately not an operator
+        # endpoint and the API binds 0.0.0.0, so the reader could be anyone
+        # who can reach the port.
+        #
+        # Google accepts x-goog-api-key, exactly as OpenAI and Anthropic take
+        # theirs in headers -- which is why only this provider was affected.
+        # Found 2026-08-29 by an adversarial audit; two independent reviewers
+        # each tried to refute it and could not.
         resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-            f"?key={self.api_key}",
-            headers={"content-type": "application/json"},
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"content-type": "application/json",
+                     "x-goog-api-key": self.api_key},
             json={"contents": [{"parts": [{"text": self._build_prompt(data, principles)}]}]},
             timeout=JUDGE_TIMEOUT_S,
         )

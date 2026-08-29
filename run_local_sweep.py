@@ -64,6 +64,7 @@ SUITES = [
     ("test_p18_version_collision.py", 120),
     ("test_p19_overlay_guard.py", 180), ("test_c3_guard.py", 120),
     ("test_m2_merkle_seal.py", 120), ("test_t1_triangulate.py", 120),
+    ("test_e1_secret_egress.py", 120),
     ("test_p15_judge_identity.py", 120),
     ("test_y1_stake_divergence.py", 120), ("test_w1_wsgi.py", 150),
     ("test_p11_version_identity.py", 180),

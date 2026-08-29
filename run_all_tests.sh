@@ -352,6 +352,18 @@ run test_m2_merkle_seal.py 120
 #                       cannot be quoted without its caveat. Pure -- no
 #                       network, no git, no cloud. 20/20.
 run test_t1_triangulate.py 120
+#   test_e1_secret_egress (E1, 2026-08-29) an adversarial audit found an
+#                       UNAUTHENTICATED REMOTE CREDENTIAL DISCLOSURE: the
+#                       Google judge passed its key in the URL, requests'
+#                       raise_for_status() puts the whole URL in the
+#                       exception, the fail-closed handler surfaces that
+#                       verbatim, the quorum preserves it verbatim, and
+#                       the 400 body goes to whoever POSTed -- on an
+#                       endpoint that is deliberately not operator-only.
+#                       Five reasonable links; the defect lived only at
+#                       the JOIN, which is what this suite tests. L2 is
+#                       the end-to-end regression. 15/15, no key, no net.
+run test_e1_secret_egress.py 120
 #   test_a20_peer_version (v8.33) A20/A21: every peer reply carries this node's
 #                       version and source hash, and the 120 s tip-gossip
 #                       heartbeat carries a bounded state digest -- so two nodes
