@@ -342,6 +342,16 @@ run test_c3_guard.py 120
 #                       its own output -- which it was doing. 21/21,
 #                       pure hashing, nothing sealed or encrypted.
 run test_m2_merkle_seal.py 120
+#   test_t1_triangulate (T1, 2026-08-29) PC, GitHub and cloud each hold
+#                       a root; agreement is a fact anyone can check and
+#                       divergence NAMES the outlier without overwriting
+#                       it. Everything trustworthy here is a refusal: a
+#                       silent witness is not a disagreeing one, too few
+#                       answers is UNPROVEN and UNPROVEN IS NOT SUCCESS,
+#                       and the limits ride inside the verdict so it
+#                       cannot be quoted without its caveat. Pure -- no
+#                       network, no git, no cloud. 20/20.
+run test_t1_triangulate.py 120
 #   test_a20_peer_version (v8.33) A20/A21: every peer reply carries this node's
 #                       version and source hash, and the 120 s tip-gossip
 #                       heartbeat carries a bounded state digest -- so two nodes

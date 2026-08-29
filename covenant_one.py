@@ -130,6 +130,9 @@ SUITES = [
     # M2 (2026-08-29): merkle proofs over the seal -- prove one file,
     # disclose nothing else. 21/21, pure hashing.
     ("test_m2_merkle_seal.py",           120,  "SECURITY"),
+    # T1 (2026-08-29): three witnesses, one root each, and the refusals
+    # that keep the comparison honest. Pure. 20/20.
+    ("test_t1_triangulate.py",           120,  "SECURITY"),
     # A24, moved here from DELIBERATELY_OFF 2026-08-29 exactly as that
     # entry's own REMEDY clause instructed ("propagate the v8.38+ core,
     # then move this line into SUITES") -- the v8.40 core at root carries
