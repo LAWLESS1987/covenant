@@ -10,6 +10,29 @@ re-verified 2026-08-27. The suite and check totals that stood here are
 
 ---
 
+### Start here if you work with AI systems over long periods
+
+**→ [What we found](docs/WHAT_WE_FOUND.md)**
+
+Five AI systems interrogated in one day about a body of work built with them
+over months. The finding that generalises past this project: **empty knowledge
+reports itself accurately, partial knowledge completes itself silently** — and a
+fragment carries no marker saying "fragment." If your work is spread across
+several systems, each holds a fragment and each will confidently complete it.
+
+It also documents why models appear to agree across vendors and months (stored
+memory retains your claims and discards their corrections), why demanding
+honesty produces compliance while supplying a checkable contradiction does not,
+and why fluency can never distinguish a sound claim from a generated one. Four
+claims that did **not** survive checking are recorded alongside those that did.
+
+No names, no personal data, nothing that requires trusting the author.
+
+**→ [Succession](docs/SUCCESSION.md)** — how this outlives whoever built it, and
+why publishing a state root lets someone verify a record they cannot read.
+
+---
+
 ## What it is
 
 Three things, in one process:
