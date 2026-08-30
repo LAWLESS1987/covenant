@@ -4,9 +4,11 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.37** · source `07e097f3e37f` · 9,846 lines. Version, hash and line count
-re-verified 2026-08-27. The suite and check totals that stood here are
-**withdrawn** — see [Suite coverage](#suite-coverage).
+**v8.40** · source `c4f1b285942a` · 10,633 lines · **60 suites, 1,765 checks,
+0 failed** on win32. Version, hash, line count and totals re-verified
+2026-08-30 against a live restarted chain. What that number does and does not
+cover is in [Suite coverage](#suite-coverage), and it is worth reading before
+quoting it.
 
 ---
 
@@ -64,8 +66,27 @@ Three things, in one process:
 
 ## What it is not
 
-- **It does not move real money.** The XRP path is blocked in code behind four
-  locks, and the submission path **has never executed on any network**.
+- **It does not move real money — and here is the shape of that, because the
+  short version misleads in both directions.** The XRP path is blocked behind
+  four locks and its submission path **has never executed on any network**:
+  there is no testnet proof and no mainnet policy on disk.
+
+  What is easy to miss is that this repository *does* hold Kraken and Coinbase
+  order adapters (`venues.py`), a planner (`covenant_trader.py`), and a
+  scheduled task that runs the planner **daily, without a human**. Every order
+  it builds goes to the venue's own dry-run endpoint — Kraken `validate=true`,
+  Coinbase `/orders/preview` — which prices and rejects an order without
+  booking it. The trader is disarmed; armed, it would still be bounded by a
+  halt file, $25 per order, $50 per day, two orders per day, and a requirement
+  that the decision be sealed to the chain first.
+
+  So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
+  between them is a commitment — `docs/CONSTITUTION.md` II.1 — rather than an
+  absence of capability, and a promise whose shape you cannot see is not a
+  promise but a reassurance. It is a live state that one config flag changes,
+  so it is measured rather than asserted: **`python money_posture.py`**. That
+  reads no key, places nothing, and arms nothing. If it ever prints ARMED, the
+  clause is being broken and these documents are out of date.
 - **It has no proven trading edge.** No timing edge survived out-of-sample
   (XRP −2.70% p=0.656; HBAR −7.06% p=0.891; rebalancing +0.45% at p=0.109).
   The regime rule is risk control, never alpha — and on three of ten assets it
@@ -76,30 +97,79 @@ Three things, in one process:
 
 ## Suite coverage
 
-This file used to open with *33 suites · 1,043 checks green on Linux*. That
-number is withdrawn, because the runner it was counted from could not have
-produced it honestly.
+**60 suites · 1,765 checks · 0 failed**, win32, 2026-08-30, against the live
+chain after a restart. `python covenant_one.py` reproduces it and writes a
+transcript.
 
-`run_all_tests.sh` invokes **47** suites. **36** are on disk. The other
-**eleven** — `verify_patches`, `verify_auth`, `verify_tx_aer`,
-`test_path_pattern`, `test_succession_seal`, `test_ethics_judge`,
-`test_golden_ratio`, `test_judge_individuality`, `test_multi_provider_quorum`,
-`test_v86_bridge` and `test_v86_loss_tracking` — are named in the runner and
-do not exist. Until 2026-08-27 `run` scraped a tally out of stdout, so a
-missing suite contributed `0 passed, 0 failed`, printed `NO RESULT`, and left
-the failure count untouched. Eleven suites could be absent and the sweep still
-ended green. That is the orphan problem from the other direction:
-`run_local_sweep.py` had suites on disk that no runner called; this one calls
-suites that are not on disk. Both read as coverage and neither is.
+This section previously said the opposite, and that history is kept because it
+is the more useful half.
 
-A missing suite is now a **failure**, loudly. The consequence is that a full
-sweep is currently red by construction, and will stay red until the eleven are
-either restored or removed from the runner. That is the correct state: the
-alternative is a green run that means nothing.
+It once opened with *33 suites · 1,043 checks green on Linux*. That was
+**withdrawn** on 2026-08-27, because the runner it came from could not have
+produced it honestly: `run_all_tests.sh` named **47** suites of which **36**
+existed, and its helper scraped a tally out of stdout — so a missing suite
+contributed `0 passed, 0 failed`, printed `NO RESULT`, and left the failure
+count untouched. Eleven suites could be absent and the sweep still ended green.
+All eleven are now gone from the runner, and a missing suite is a **failure**,
+loudly.
 
-No replacement total is printed here yet. Putting one up would require a clean
-sweep, and a clean sweep is not possible while eleven named suites are
-missing. When it is, the number goes back with the platform beside it (§8).
+**What the current number covers, said so it cannot be quoted as more.**
+
+- It is **win32**. Three suites behave differently on Linux — a refused TCP
+  connect costs about 0.0 ms there and about 2,045 ms here. CI runs the same
+  file on ubuntu for that reason, and a green tick in either place does not
+  speak for the other.
+- The **launch gates are reported, not passed**. A CI runner has no ethics
+  judge, no nodes, no identity keys and no delivery manifest, so those gates
+  cannot pass there. They are printed in full and are not allowed to decide the
+  exit code, because a check that is always red teaches people to skim past it.
+- **Two suites are deliberately off**, on the record with reasons:
+  `test_xrp_live.py` needs a funded testnet account, `test_covenant_app.py`
+  needs the chain stopped. No green run speaks for either.
+- A **suite the runner names but is not on disk**, an **orphan on disk that no
+  runner calls**, a suite **kept out of the delivery by an ignore rule**, and a
+  **missing declared dependency** are each their own named outcome, and none is
+  ever folded into a pass. All four exist because each happened here first.
+
+**The failure that produced the last two.** From 2026-08-29 to 2026-08-30 CI was
+red, and not for a defect in the code. `.gitignore`'s `*_secret*` rule silently
+swallowed `test_e1_secret_egress.py` — the regression suite proving a credential
+cannot escape through an error message, whose every "secret" is a labelled
+fixture. It existed on the development machine, so local runs passed. It was
+never committed, so CI checked out a tree without it and correctly called it
+ABSENT. The rule matched on the **name** and not the **nature**, and a file
+called `*_secret*` is at least as likely to be the check that no secret escapes
+as it is to be a secret.
+
+The coverage phase could not catch it either, because it asked `os.path.isfile`
+— *is this on THIS disk* — and never *is this in what I am about to ship*. The
+check written to stop a runner naming an absent suite could therefore only fire
+on a machine where the mistake had not been made. It now asks git as well, and
+separates **IGNORED** (an ignore rule keeps it out of the delivery: reddens the
+run, names the rule and its line number) from **UNSHIPPED** (merely uncommitted:
+loud, but does not redden — otherwise every in-progress suite turns the run
+amber, and permanent amber is skimmed past).
+
+**And one more, found while writing this paragraph.** An earlier run today
+reported *1,744 checks, 0 failed, RESULT: PASS* — and the same transcript said
+`folder integrity  test_p18_version_collision.py=FAIL rc=1` a few lines above
+it. Both sentences were in one file. `--ci` discarded **every** in-place
+failure (`... if not args.ci else []`), so a real version collision —
+`pending-v8.38/covenant_unified_v8.py` declaring `VERSION = "v8.40"` with
+different bytes from the root core — had been suppressed in every CI run since
+the flag existed. The blanket exclusion was never needed: the one in-place
+check that genuinely cannot apply to a copy is the delivery manifest, and
+`--transported` already reports that as N/A. A version collision is a fact
+about a tree, and a copy is a tree. Failures now count everywhere, verified by
+planting a collision and confirming a `--ci` run turns red.
+
+Separately, four suites had been failing for one missing declared dependency.
+`xrpl-py` is in `requirements.txt` and simply was not installed, so a SECURITY
+suite read 14/16 and looked like a regression. The runner named four symptoms
+and no cause. `preflight_deps.py` now names a missing dependency **and the
+suites it will take down with it**, found by walking the import graph — because
+its first version reported only the file that imports `xrpl` directly and
+missed all four that reach it through `covenant_xrp_mainnet`.
 
 ## Start here
 

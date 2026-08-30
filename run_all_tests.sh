@@ -597,6 +597,11 @@ run test_s1_scale.py 60
 # agrees without running these exact bytes. From the 2025 Mahowald Prize
 # shortlist (Pedersen, Neuromorphic Intermediate Representation).
 run test_n1_conformance.py 60
+# C4 (2026-08-30) pins three unauthenticated paths that grew without a bound:
+# succession register (5,000 guardians, 48.8s, lock held throughout), the
+# rate limiter's own key map (200,000 keys, 40.76 MB), and peer-supplied
+# nonces (1 MB accepted, expired rows never deleted).
+run test_c4_bounded_resources.py 60
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.

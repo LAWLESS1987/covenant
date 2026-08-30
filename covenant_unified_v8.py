@@ -257,6 +257,11 @@ BASE_REGISTRATION_DIFFICULTY = 2
 # that never matched request.endpoint ("add_transaction"/"add_peer") except
 # for "mine", which happened to match by coincidence. Fixed here.
 RATE_LIMIT_DEFAULT = 20  # per 60s, unlisted/read endpoints
+# C2: an upper bound on how many distinct sources the limiter will remember.
+# 20,000 is far above any real peer count and roughly 4 MB at the measured
+# 213.7 bytes per key -- bounded, and generous enough that eviction is an
+# attack signal rather than routine.
+RATE_LIMIT_MAX_KEYS = int(os.environ.get("COVENANT_RATE_LIMIT_MAX_KEYS", "20000"))
 RATE_LIMIT = {
     "add_transaction": 10,
     "mine": 1,
@@ -4132,19 +4137,46 @@ class SuccessionGuardianSystem:
 
     def register(self, primary_pubkey: str, successor_pubkey: str, guardian_pubkeys: List[str],
                  threshold: int, heartbeat_interval_days: float, grace_period_days: float) -> Tuple[bool, str]:
+        # C1: CAP BEFORE ANY WORK, and the ordering here is load-bearing.
+        #
+        # This route is unauthenticated by design -- registering succession for
+        # a pubkey you do not control confers no authority, and the docstring
+        # on the route is right about that. It says nothing about COST, which
+        # is what was wrong. Measured: 5,000 guardians accepted, 200 OK after
+        # 48.8 s, and a legitimate signed heartbeat blocked 25.7 s behind it
+        # because this method holds the lock for the whole loop.
+        #
+        # The cap must come before the PEM parsing below, or parsing hundreds
+        # of thousands of candidate keys simply becomes the new denial path.
+        if len(guardian_pubkeys) > MAX_SUCCESSION_GUARDIANS:
+            return False, (f"at most {MAX_SUCCESSION_GUARDIANS} guardians "
+                           f"({len(guardian_pubkeys)} supplied) -- far above any "
+                           f"real M-of-N, and the bound is what keeps an "
+                           f"unauthenticated route from costing minutes")
         if threshold < 1 or threshold > len(guardian_pubkeys):
             return False, f"threshold must be between 1 and the number of guardians ({len(guardian_pubkeys)})"
         if len(set(guardian_pubkeys)) < 2:
             return False, "at least 2 distinct guardians required -- a threshold of 1-of-1 is not multi-sig"
         if successor_pubkey == primary_pubkey:
             return False, "successor cannot be the same key as the primary"
+        # C1: reject keys that are not keys, AFTER the cap. heartbeat and
+        # confirm both call load_pem_public_key already, so a non-PEM
+        # registration was permanently unusable anyway -- it just left the node
+        # accruing dead rows that the hourly monitor walks forever. A 200 KB
+        # junk string was accepted as primary_pubkey with 200 OK, measured.
+        for label, key in ([("primary", primary_pubkey),
+                            ("successor", successor_pubkey)]
+                           + [("guardian", g) for g in guardian_pubkeys]):
+            if not _looks_like_pubkey(key):
+                return False, (f"{label} pubkey is not a usable public key -- "
+                               f"rejected at write time rather than stored and "
+                               f"discovered unusable at succession")
         with self.lock:
             cfg = SuccessionConfig(primary_pubkey=primary_pubkey, successor_pubkey=successor_pubkey,
                                     threshold=threshold, heartbeat_interval_days=heartbeat_interval_days,
                                     grace_period_days=grace_period_days, last_heartbeat=time.time())
             self.db.save_succession_config(cfg)
-            for g in guardian_pubkeys:
-                self.db.add_succession_guardian(primary_pubkey, g)
+            self.db.add_succession_guardians(primary_pubkey, guardian_pubkeys)
         return True, f"registered with {len(guardian_pubkeys)} guardians, threshold {threshold}"
 
     def seal_recovery_material(self, primary_pubkey: str, material: bytes,
@@ -4536,6 +4568,7 @@ class RateLimiter:
     def __init__(self):
         self._hits: Dict[str, List[float]] = {}
         self._lock = threading.Lock()
+        self.evictions = 0
 
     def allow(self, peer_id: str, endpoint: str, limit: Optional[int] = None) -> bool:
         if limit is None:
@@ -4547,14 +4580,78 @@ class RateLimiter:
             if len(hits) < limit:
                 hits.append(now)
                 self._hits[key] = hits
+                self._evict(now)
                 return True
             self._hits[key] = hits
+            self._evict(now)
             return False
+
+    def _evict(self, now: float) -> None:
+        """Keep _hits bounded. C2 (2026-08-30).
+
+        THE CONTROL PROTECTING EVERYTHING ELSE WAS THE UNBOUNDED STRUCTURE.
+        `rate_limit` is the FIRST before_request hook, so it runs before any
+        authentication, and the API binds 0.0.0.0. Every distinct remote
+        address created a permanently retained key. Measured: 200,000 distinct
+        IPv6 sources -> 200,000 keys, 40.76 MB, 213.7 bytes per key. 500
+        distinct addresses against open GET /health -> 500 keys, 500 x HTTP
+        200, no credentials needed. The default limit of 20/60s never engages
+        because the attack spends exactly one request per address.
+
+        Deleting a key when its pruned list is empty does NOT fix it -- that
+        branch is unreachable, since the smallest configured limit is 1 and an
+        empty list always satisfies `len(hits) < limit`, so the key is
+        immediately rewritten. The bound has to be on the DICTIONARY.
+
+        Cheap by construction: the sweep runs only when the map is over
+        capacity, and drops keys whose newest hit is already outside the
+        window -- those can never deny anything, so nothing is weakened. If
+        that is still not enough, the oldest are dropped until it fits, which
+        is a deliberate choice of BOUNDED MEMORY over perfect accounting for
+        the least recently active sources.
+        """
+        if len(self._hits) <= RATE_LIMIT_MAX_KEYS:
+            return
+        cutoff = now - 60
+        stale = [k for k, v in self._hits.items() if not v or max(v) <= cutoff]
+        for k in stale:
+            self._hits.pop(k, None)
+        if len(self._hits) > RATE_LIMIT_MAX_KEYS:
+            for k in sorted(self._hits, key=lambda k: max(self._hits[k]))[
+                    :len(self._hits) - RATE_LIMIT_MAX_KEYS]:
+                self._hits.pop(k, None)
+        self.evictions += 1
 
 
 # ---------------------------------------------------------------------------
 # Database Layer — union schema of both sources
 # ---------------------------------------------------------------------------
+
+
+# C3: an upper bound on anything a peer can make this node store. Real nonces
+# in this system are hex digests and short ids; 256 is far above any of them
+# and far below the 64 MiB a peer frame may carry.
+MAX_NONCE_LEN = 256
+
+# C1: 16 is far above any real M-of-N succession and far below the point where
+# an unauthenticated request costs minutes of serialized work.
+MAX_SUCCESSION_GUARDIANS = int(os.environ.get("COVENANT_MAX_SUCCESSION_GUARDIANS", "16"))
+MAX_PUBKEY_LEN = 4096
+
+
+def _looks_like_pubkey(k) -> bool:
+    """Cheap shape check before the expensive parse.
+
+    Deliberately not a full parse here: the point of C1 is that work done
+    before a cap is work an unauthenticated caller controls.
+    """
+    return (isinstance(k, str) and 0 < len(k) <= MAX_PUBKEY_LEN
+            and "BEGIN PUBLIC KEY" in k)
+
+
+def _valid_nonce(n) -> bool:
+    """A nonce is a short string or it is not a nonce."""
+    return isinstance(n, str) and 0 < len(n) <= MAX_NONCE_LEN
 
 
 @contextlib.contextmanager
@@ -4939,6 +5036,31 @@ class Database:
         with _db(self.db_path) as conn:
             conn.execute("INSERT OR IGNORE INTO succession_guardians (primary_pubkey, guardian_pubkey, label) VALUES (?,?,?)",
                          (primary_pubkey, guardian_pubkey, label))
+
+    def add_succession_guardians(self, primary_pubkey: str,
+                                 guardian_pubkeys: List[str], label: str = "") -> None:
+        """All guardians in ONE connection, ONE transaction. C1 (2026-08-30).
+
+        add_succession_guardian (singular) opens its own connection and its own
+        implicit transaction per guardian, and with journal_mode=wal plus
+        synchronous=FULL that is one fsync EACH. register() looped over it with
+        no cap, so cost was linear in the caller's input at roughly 9-11 ms per
+        guardian: 5,000 guardians returned 200 OK after 48.8 seconds, measured.
+
+        Worse than the time is the lock. register() holds the succession lock
+        for the whole loop, and heartbeat, confirm and check_dead_mans_switch
+        all take it -- so a signed heartbeat that costs 14 ms at rest blocked
+        for 25.7 seconds behind one in-flight registration. This removes N-1
+        fsyncs and is the root-cause half of that fix; the cap in register() is
+        the other half.
+        """
+        if not guardian_pubkeys:
+            return
+        rows = [(primary_pubkey, g, label) for g in guardian_pubkeys]
+        with _db(self.db_path) as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO succession_guardians "
+                "(primary_pubkey, guardian_pubkey, label) VALUES (?,?,?)", rows)
 
     def get_succession_guardians(self, primary_pubkey: str) -> List[str]:
         with _db(self.db_path) as conn:
@@ -5686,6 +5808,24 @@ class Database:
             cols = ["peer_id", "host", "port", "source_addr", "accepted", "reject_reason", "timestamp"]
             return [dict(zip(cols, row)) for row in conn.execute(
                 "SELECT peer_id, host, port, source_addr, accepted, reject_reason, timestamp FROM peer_registrations")]
+
+    def purge_expired_nonces(self) -> int:
+        """Delete nonces whose expiry has passed. Returns rows reclaimed.
+
+        C3: mark_nonce_seen wrote an expiry and is_nonce_seen filtered on it,
+        so an expired nonce stopped MATCHING -- and nothing ever deleted it.
+        There was no DELETE, no purge, no VACUUM anywhere in this file. A copy
+        of the live nodeA_prod.db held 18 rows of which 16 were already
+        expired, the oldest 7.54 days past. The bound was imaginary rather than
+        generous.
+
+        Strictly expired rows only, so this can never drop a nonce that is
+        still protecting against a replay.
+        """
+        with _db(self.db_path) as conn:
+            cur = conn.execute("DELETE FROM seen_nonces WHERE expiry < ?",
+                               (time.time(),))
+            return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
 
     def mark_nonce_seen(self, nonce: str, expiry: int = 86400):
         with _db(self.db_path) as conn:
@@ -8572,8 +8712,25 @@ class CovenantUnifiedMaster:
             if isinstance(msg, dict) and msg.get("p2p_port") is not None:
                 self.node._note_peer_contact(addr[0], msg.get("p2p_port"))
             # Replay protection -- weird_science had none of this at all.
+            #
+            # C3 (2026-08-30): the nonce arrives from a PEER, straight out of
+            # json.loads, and used to be stored verbatim. No type check, no
+            # length check, no signature, and the Flask RateLimiter is a
+            # before_request hook that never sees a raw P2P socket at all.
+            # MAX_PEER_MSG_BYTES defaults to 64 MiB, so a 1 MB string went
+            # through mark_nonce_seen and was stored intact -- measured. Rows
+            # up to megabytes, one row per distinct nonce, and nothing ever
+            # reclaimed them. Guarding here is the fail-closed half and has to
+            # land with or before the purge, because a purge alone just lets an
+            # attacker outrun the interval.
             nonce = msg.get("nonce")
             if nonce is not None:
+                if not _valid_nonce(nonce):
+                    self.node.anomaly_monitor.record(
+                        "nonce_rejected",
+                        "peer nonce not a str<=%d: %r" % (MAX_NONCE_LEN,
+                                                          type(nonce).__name__))
+                    return
                 if self.db.is_nonce_seen(nonce):
                     return
                 self.db.mark_nonce_seen(nonce)
@@ -8867,8 +9024,18 @@ class CovenantUnifiedMaster:
             if self.node.crisis_mode:
                 conn.close()
                 return
+            # C3: same guard as the peer path. The bridge is a second door into
+            # the same unbounded store, and fixing one door is how a closed hole
+            # reopens -- see test_e1_secret_egress, where the same defect lived
+            # in four files and fixing one would have left three.
             nonce = msg.get("nonce")
             if nonce is not None:
+                if not _valid_nonce(nonce):
+                    self.node.anomaly_monitor.record(
+                        "nonce_rejected",
+                        "bridge nonce not a str<=%d: %r" % (MAX_NONCE_LEN,
+                                                            type(nonce).__name__))
+                    return
                 if self.db.is_nonce_seen(nonce):
                     return
                 self.db.mark_nonce_seen(nonce)

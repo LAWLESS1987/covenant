@@ -131,6 +131,17 @@ SUITES = [
     # behaviour root that is blind to prose and mutation-tested against two
     # real semantic breaks. 14/14 before wiring.
     ("test_n1_conformance.py",           120,  "SECURITY"),
+    # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
+    # each measured before it was touched: /succession/register accepted 5,000
+    # guardians and returned 200 OK after 48.8s while blocking a signed
+    # heartbeat for 25.7s; RateLimiter._hits retained 200,000 keys / 40.76 MB
+    # and is the FIRST before_request hook, so the control protecting
+    # everything else was itself the unbounded structure; peer nonces were
+    # stored verbatim, a 1 MB string included, and nothing ever deleted an
+    # expired one. C4 pins the caps, that the ordering of cap-then-validate is
+    # load-bearing, that BOTH nonce doors are guarded, and that purging removes
+    # only what has expired. 21/21 before wiring.
+    ("test_c4_bounded_resources.py",     120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
@@ -1011,8 +1022,25 @@ def main():
         say("  elapsed             %.1f min" % ((time.time() - t0) / 60))
         say("")
         gate_blocks = (gates == 1) and not args.ci
-        inplace_fail = [n for n, st in inplace if st.startswith("FAIL")] \
-            if not args.ci else []
+        # --ci used to discard EVERY in-place failure: `... if not args.ci
+        # else []`. That hid a real one. On 2026-08-30 a --ci run printed
+        # "folder integrity  test_p18_version_collision.py=FAIL rc=1" and
+        # "P18: 19/20 passed" in its own transcript, and then closed with
+        # "RESULT: PASS. Everything this runner names was measured and
+        # correct." Both statements were in the same file. The collision was
+        # real -- pending-v8.38/covenant_unified_v8.py declared VERSION v8.40
+        # with different bytes from the root core -- and it had been suppressed
+        # in every CI run since the flag existed.
+        #
+        # The blanket exclusion was never needed. The one in-place check that
+        # legitimately cannot apply to a copy is the DELIVERY MANIFEST, and
+        # --transported already reports that as N/A rather than FAIL. A version
+        # COLLISION is a fact about a tree, and a copy is a tree: two files
+        # claiming one version with different bytes is exactly as wrong there.
+        #
+        # So failures count everywhere, and the thing that is genuinely N/A on
+        # a copy goes on saying N/A.
+        inplace_fail = [n for n, st in inplace if st.startswith("FAIL")]
         if args.ci:
             say("  ci mode             gates are REPORTED above, not gating --")
             say("                      this runner has no judge, no nodes and no")

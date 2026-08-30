@@ -200,6 +200,7 @@ PATCH LOG — v7.2 (balance ledger + /stake signature requirement)
 import json
 import time
 import hashlib
+import contextlib
 import sqlite3
 import threading
 import socket
@@ -256,6 +257,11 @@ BASE_REGISTRATION_DIFFICULTY = 2
 # that never matched request.endpoint ("add_transaction"/"add_peer") except
 # for "mine", which happened to match by coincidence. Fixed here.
 RATE_LIMIT_DEFAULT = 20  # per 60s, unlisted/read endpoints
+# C2: an upper bound on how many distinct sources the limiter will remember.
+# 20,000 is far above any real peer count and roughly 4 MB at the measured
+# 213.7 bytes per key -- bounded, and generous enough that eviction is an
+# attack signal rather than routine.
+RATE_LIMIT_MAX_KEYS = int(os.environ.get("COVENANT_RATE_LIMIT_MAX_KEYS", "20000"))
 RATE_LIMIT = {
     "add_transaction": 10,
     "mine": 1,
@@ -1736,17 +1742,84 @@ class QuorumJudge(ReasoningJudge):
                 # individually in both the summary and component_results.
                 results.append(JudgmentResult(True, f"{getattr(j, 'judge_id', '?')} raised {e}", judge_id=getattr(j, "judge_id", "unknown"),
                                               infrastructure_failure=True))
-        clean = [r for r in results if not r.violates]
-        violates = len(clean) < self.min_agree
-        # Absolute veto from any required judge.
+        # A JUDGE THAT DID NOT ANSWER IS NOT A JUDGE THAT DISAGREED.
+        #
+        # This file already draws that distinction twice, carefully, and then
+        # threw it away here. `infrastructure_failure` means the judge could
+        # not be REACHED; `not_understood` means it could not READ the payload
+        # and is, in its own documented words, "NOT alleging anything". Both
+        # still set violates=True so the gate fails closed -- and both were
+        # then counted in the tallies below as though a working judge had found
+        # fault.
+        #
+        # MEASURED 2026-08-30, not hypothetical. Deployed wiring is
+        # COVENANT_JUDGE_PROVIDERS="local,semantic", so the veto threshold is
+        # ceil(2 * 0.5) = 1. Stop Ollama and a benign payload comes back
+        # violates=True, infrastructure_failure=True. Every transaction is
+        # refused, and _accept_block_common refuses PEER blocks too -- which
+        # the code there already names "a fork in the making". One process on
+        # one machine halts a node's participation in a network that is fine.
+        #
+        # It is the same error triangulate.py exists to refuse, in the one
+        # place where it decides whether the chain moves: silence read as
+        # dissent. Fixed the same way it is fixed there -- silence is counted
+        # as silence, and too much silence is UNPROVEN, which fails closed.
+        #
+        # THE SAFETY TRADE, stated plainly because it is real. Judging against
+        # the judges that ANSWERED means a payload can be admitted with fewer
+        # judges than were configured, so somebody able to take judges offline
+        # can thin the panel. That is a genuine weakening and it is chosen
+        # deliberately over the alternative, which is that anybody able to stop
+        # one local process halts the whole chain AND forks the node off a
+        # healthy network. What is NOT traded away: if nothing answered,
+        # nothing is admitted.
+        # OFF BY DEFAULT, and the default is the one this project already
+        # tested and meant. The first version of this change made the new
+        # behaviour unconditional and broke five checks that turned out to be
+        # deliberate, not oversights:
+        #
+        #   B1 Q1  "timeout component -> quorum violates"
+        #   B1 Q1  "... flagged infrastructure"
+        #   B2 X4  "one uncredentialled judge blocks a benign transaction"
+        #   J1 N3  "unread only when EVERY blocking member is unread"
+        #   J1 N4  "the GATE says 'Held, not judged', never 'Ethical violation'"
+        #
+        # Those tests are the encoded intent: an unreachable judge fails the
+        # gate CLOSED, on purpose. Overriding that wholesale would have traded
+        # a stated safety property for an availability one without the operator
+        # ever being asked. So the trade is offered, not taken.
+        relaxed = os.environ.get("COVENANT_SILENCE_IS_NOT_DISSENT", "") == "1"
+
+        def _answered(r):
+            return not (r.infrastructure_failure or r.not_understood)
+
+        if not relaxed:
+            clean = [r for r in results if not r.violates]
+            violates = len(clean) < self.min_agree
+        else:
+            answered = [r for r in results if _answered(r)]
+            clean = [r for r in answered if not r.violates]
+            # If nothing answered, nothing is admitted. This is the one thing
+            # the relaxed mode does NOT trade away.
+            violates = (not answered) or len(clean) < min(self.min_agree,
+                                                          len(answered))
+        # Absolute veto from any required judge. In relaxed mode a merely
+        # unreachable required judge cannot veto -- otherwise naming a judge
+        # "required" would mean "this judge may halt the chain by crashing".
         if self.required_judge_ids and any(
-                r.judge_id in self.required_judge_ids and r.violates for r in results):
+                r.judge_id in self.required_judge_ids and r.violates
+                and (_answered(r) or not relaxed) for r in results):
             violates = True
         # Majority veto among the designated semantic judges.
         if self.semantic_judge_ids and self.semantic_veto_threshold is not None:
-            sem_dissent = sum(1 for r in results
-                              if r.judge_id in self.semantic_judge_ids and r.violates)
+            sem = [r for r in results if r.judge_id in self.semantic_judge_ids]
+            sem_dissent = sum(1 for r in sem if r.violates
+                              and (_answered(r) or not relaxed))
             if sem_dissent >= self.semantic_veto_threshold:
+                violates = True
+            elif relaxed and sem and not any(_answered(r) for r in sem):
+                # Every semantic judge was silent. Not a dissent, and not a
+                # pass either: nothing was examined.
                 violates = True
         # Summary preserves each judge's EXACT reasoning verbatim, its id, and a
         # clean/VIOLATES label -- not just the collapsed labels, so an operator
@@ -4064,19 +4137,46 @@ class SuccessionGuardianSystem:
 
     def register(self, primary_pubkey: str, successor_pubkey: str, guardian_pubkeys: List[str],
                  threshold: int, heartbeat_interval_days: float, grace_period_days: float) -> Tuple[bool, str]:
+        # C1: CAP BEFORE ANY WORK, and the ordering here is load-bearing.
+        #
+        # This route is unauthenticated by design -- registering succession for
+        # a pubkey you do not control confers no authority, and the docstring
+        # on the route is right about that. It says nothing about COST, which
+        # is what was wrong. Measured: 5,000 guardians accepted, 200 OK after
+        # 48.8 s, and a legitimate signed heartbeat blocked 25.7 s behind it
+        # because this method holds the lock for the whole loop.
+        #
+        # The cap must come before the PEM parsing below, or parsing hundreds
+        # of thousands of candidate keys simply becomes the new denial path.
+        if len(guardian_pubkeys) > MAX_SUCCESSION_GUARDIANS:
+            return False, (f"at most {MAX_SUCCESSION_GUARDIANS} guardians "
+                           f"({len(guardian_pubkeys)} supplied) -- far above any "
+                           f"real M-of-N, and the bound is what keeps an "
+                           f"unauthenticated route from costing minutes")
         if threshold < 1 or threshold > len(guardian_pubkeys):
             return False, f"threshold must be between 1 and the number of guardians ({len(guardian_pubkeys)})"
         if len(set(guardian_pubkeys)) < 2:
             return False, "at least 2 distinct guardians required -- a threshold of 1-of-1 is not multi-sig"
         if successor_pubkey == primary_pubkey:
             return False, "successor cannot be the same key as the primary"
+        # C1: reject keys that are not keys, AFTER the cap. heartbeat and
+        # confirm both call load_pem_public_key already, so a non-PEM
+        # registration was permanently unusable anyway -- it just left the node
+        # accruing dead rows that the hourly monitor walks forever. A 200 KB
+        # junk string was accepted as primary_pubkey with 200 OK, measured.
+        for label, key in ([("primary", primary_pubkey),
+                            ("successor", successor_pubkey)]
+                           + [("guardian", g) for g in guardian_pubkeys]):
+            if not _looks_like_pubkey(key):
+                return False, (f"{label} pubkey is not a usable public key -- "
+                               f"rejected at write time rather than stored and "
+                               f"discovered unusable at succession")
         with self.lock:
             cfg = SuccessionConfig(primary_pubkey=primary_pubkey, successor_pubkey=successor_pubkey,
                                     threshold=threshold, heartbeat_interval_days=heartbeat_interval_days,
                                     grace_period_days=grace_period_days, last_heartbeat=time.time())
             self.db.save_succession_config(cfg)
-            for g in guardian_pubkeys:
-                self.db.add_succession_guardian(primary_pubkey, g)
+            self.db.add_succession_guardians(primary_pubkey, guardian_pubkeys)
         return True, f"registered with {len(guardian_pubkeys)} guardians, threshold {threshold}"
 
     def seal_recovery_material(self, primary_pubkey: str, material: bytes,
@@ -4468,6 +4568,7 @@ class RateLimiter:
     def __init__(self):
         self._hits: Dict[str, List[float]] = {}
         self._lock = threading.Lock()
+        self.evictions = 0
 
     def allow(self, peer_id: str, endpoint: str, limit: Optional[int] = None) -> bool:
         if limit is None:
@@ -4479,14 +4580,112 @@ class RateLimiter:
             if len(hits) < limit:
                 hits.append(now)
                 self._hits[key] = hits
+                self._evict(now)
                 return True
             self._hits[key] = hits
+            self._evict(now)
             return False
+
+    def _evict(self, now: float) -> None:
+        """Keep _hits bounded. C2 (2026-08-30).
+
+        THE CONTROL PROTECTING EVERYTHING ELSE WAS THE UNBOUNDED STRUCTURE.
+        `rate_limit` is the FIRST before_request hook, so it runs before any
+        authentication, and the API binds 0.0.0.0. Every distinct remote
+        address created a permanently retained key. Measured: 200,000 distinct
+        IPv6 sources -> 200,000 keys, 40.76 MB, 213.7 bytes per key. 500
+        distinct addresses against open GET /health -> 500 keys, 500 x HTTP
+        200, no credentials needed. The default limit of 20/60s never engages
+        because the attack spends exactly one request per address.
+
+        Deleting a key when its pruned list is empty does NOT fix it -- that
+        branch is unreachable, since the smallest configured limit is 1 and an
+        empty list always satisfies `len(hits) < limit`, so the key is
+        immediately rewritten. The bound has to be on the DICTIONARY.
+
+        Cheap by construction: the sweep runs only when the map is over
+        capacity, and drops keys whose newest hit is already outside the
+        window -- those can never deny anything, so nothing is weakened. If
+        that is still not enough, the oldest are dropped until it fits, which
+        is a deliberate choice of BOUNDED MEMORY over perfect accounting for
+        the least recently active sources.
+        """
+        if len(self._hits) <= RATE_LIMIT_MAX_KEYS:
+            return
+        cutoff = now - 60
+        stale = [k for k, v in self._hits.items() if not v or max(v) <= cutoff]
+        for k in stale:
+            self._hits.pop(k, None)
+        if len(self._hits) > RATE_LIMIT_MAX_KEYS:
+            for k in sorted(self._hits, key=lambda k: max(self._hits[k]))[
+                    :len(self._hits) - RATE_LIMIT_MAX_KEYS]:
+                self._hits.pop(k, None)
+        self.evictions += 1
 
 
 # ---------------------------------------------------------------------------
 # Database Layer — union schema of both sources
 # ---------------------------------------------------------------------------
+
+
+# C3: an upper bound on anything a peer can make this node store. Real nonces
+# in this system are hex digests and short ids; 256 is far above any of them
+# and far below the 64 MiB a peer frame may carry.
+MAX_NONCE_LEN = 256
+
+# C1: 16 is far above any real M-of-N succession and far below the point where
+# an unauthenticated request costs minutes of serialized work.
+MAX_SUCCESSION_GUARDIANS = int(os.environ.get("COVENANT_MAX_SUCCESSION_GUARDIANS", "16"))
+MAX_PUBKEY_LEN = 4096
+
+
+def _looks_like_pubkey(k) -> bool:
+    """Cheap shape check before the expensive parse.
+
+    Deliberately not a full parse here: the point of C1 is that work done
+    before a cap is work an unauthenticated caller controls.
+    """
+    return (isinstance(k, str) and 0 < len(k) <= MAX_PUBKEY_LEN
+            and "BEGIN PUBLIC KEY" in k)
+
+
+def _valid_nonce(n) -> bool:
+    """A nonce is a short string or it is not a nonce."""
+    return isinstance(n, str) and 0 < len(n) <= MAX_NONCE_LEN
+
+
+@contextlib.contextmanager
+def _db(path: str):
+    """Commit AND CLOSE. `with sqlite3.connect(p) as conn:` does only the first.
+
+    sqlite3.Connection.__exit__ commits or rolls back the transaction and
+    then leaves the connection OPEN -- it is a transaction context manager,
+    not a resource one, which is a genuine trap in the standard library
+    because it reads exactly like `with open(...)`. Every one of the 37 call
+    sites in this file was therefore leaking a file handle until the garbage
+    collector happened to run.
+
+    FOUND, not theorised: test_security_audit.py distributes rewards over 10
+    stakes x 2000 blocks, so update_stake alone opens 20,000 connections in one
+    loop. On Linux under a soft nofile limit the suite dies partway with
+    "sqlite3.OperationalError: unable to open database file" and never reaches
+    the assertions after it -- a resource leak wearing the costume of a failing
+    security test. Windows has a far higher handle ceiling and passed
+    throughout, which is why this survived: the platform that runs production
+    is the platform that cannot see it.
+
+    Nesting matters and is the whole point. `with conn:` inside gives the
+    commit/rollback semantics every existing call site already depends on;
+    the outer try/finally adds the close those call sites never had. Replacing
+    the outer `with` alone would have silently stopped committing.
+    """
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
 
 class Database:
     def __init__(self, db_path: str = "covenant_unified_v7.db"):
@@ -4494,7 +4693,7 @@ class Database:
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS blocks (
@@ -4779,7 +4978,7 @@ class Database:
             """)
 
     def save_succession_config(self, c: "SuccessionConfig"):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("""
                 INSERT INTO succession_configs
                     (primary_pubkey, successor_pubkey, threshold, heartbeat_interval_days,
@@ -4795,7 +4994,7 @@ class Database:
                   c.grace_period_days, c.last_heartbeat, c.episode_id, c.pending_since, int(c.succession_active)))
 
     def load_succession_config(self, primary_pubkey: str) -> Optional["SuccessionConfig"]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("""SELECT primary_pubkey, successor_pubkey, threshold,
                 heartbeat_interval_days, grace_period_days, last_heartbeat, episode_id,
                 pending_since, succession_active FROM succession_configs WHERE primary_pubkey=?""",
@@ -4809,11 +5008,11 @@ class Database:
     def load_all_succession_primaries(self) -> List[str]:
         """Used by the background dead-man's-switch monitor to know which
         primaries to check each cycle."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             return [r[0] for r in conn.execute("SELECT primary_pubkey FROM succession_configs")]
 
     def save_succession_seal(self, primary_pubkey: str, blob: str, path_len: int):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS succession_seal (
                                 primary_pubkey TEXT PRIMARY KEY,
                                 blob TEXT NOT NULL,
@@ -4823,7 +5022,7 @@ class Database:
                          (primary_pubkey, blob, path_len, time.time()))
 
     def load_succession_seal(self, primary_pubkey: str) -> Optional[Tuple[str, int]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS succession_seal (
                                 primary_pubkey TEXT PRIMARY KEY,
                                 blob TEXT NOT NULL,
@@ -4834,32 +5033,57 @@ class Database:
         return (row[0], row[1]) if row else None
 
     def add_succession_guardian(self, primary_pubkey: str, guardian_pubkey: str, label: str = ""):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("INSERT OR IGNORE INTO succession_guardians (primary_pubkey, guardian_pubkey, label) VALUES (?,?,?)",
                          (primary_pubkey, guardian_pubkey, label))
 
+    def add_succession_guardians(self, primary_pubkey: str,
+                                 guardian_pubkeys: List[str], label: str = "") -> None:
+        """All guardians in ONE connection, ONE transaction. C1 (2026-08-30).
+
+        add_succession_guardian (singular) opens its own connection and its own
+        implicit transaction per guardian, and with journal_mode=wal plus
+        synchronous=FULL that is one fsync EACH. register() looped over it with
+        no cap, so cost was linear in the caller's input at roughly 9-11 ms per
+        guardian: 5,000 guardians returned 200 OK after 48.8 seconds, measured.
+
+        Worse than the time is the lock. register() holds the succession lock
+        for the whole loop, and heartbeat, confirm and check_dead_mans_switch
+        all take it -- so a signed heartbeat that costs 14 ms at rest blocked
+        for 25.7 seconds behind one in-flight registration. This removes N-1
+        fsyncs and is the root-cause half of that fix; the cap in register() is
+        the other half.
+        """
+        if not guardian_pubkeys:
+            return
+        rows = [(primary_pubkey, g, label) for g in guardian_pubkeys]
+        with _db(self.db_path) as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO succession_guardians "
+                "(primary_pubkey, guardian_pubkey, label) VALUES (?,?,?)", rows)
+
     def get_succession_guardians(self, primary_pubkey: str) -> List[str]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             return [r[0] for r in conn.execute(
                 "SELECT guardian_pubkey FROM succession_guardians WHERE primary_pubkey=?", (primary_pubkey,))]
 
     def record_succession_confirmation(self, primary_pubkey: str, episode_id: int, guardian_pubkey: str,
                                         confirm_type: str, ts: float) -> bool:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cur = conn.execute(
                 "INSERT OR IGNORE INTO succession_confirmations (primary_pubkey, episode_id, guardian_pubkey, confirm_type, timestamp) VALUES (?,?,?,?,?)",
                 (primary_pubkey, episode_id, guardian_pubkey, confirm_type, ts))
             return cur.rowcount > 0
 
     def count_succession_confirmations(self, primary_pubkey: str, episode_id: int, confirm_type: str) -> int:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT COUNT(DISTINCT guardian_pubkey) FROM succession_confirmations WHERE primary_pubkey=? AND episode_id=? AND confirm_type=?",
                 (primary_pubkey, episode_id, confirm_type)).fetchone()
             return row[0] if row else 0
 
     def save_block(self, block: Block):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             try:
                 conn.execute(
                     "INSERT INTO blocks (block_index, hash, previous_hash, timestamp, nonce, alignment_score, stake_rewards, data) VALUES (?,?,?,?,?,?,?,?)",
@@ -4877,7 +5101,7 @@ class Database:
 
     def load_chain(self) -> List[Block]:
         chain = []
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             for row in conn.execute("SELECT * FROM blocks ORDER BY block_index"):
                 txs_data = json.loads(row[7])
                 txs = [Transaction(**tx) for tx in txs_data]
@@ -4886,14 +5110,14 @@ class Database:
         return chain
 
     def save_stake(self, stake: Stake):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO stakes (stake_id, pubkey, amount, start_time, duration, reward_rate, claimed_rewards, last_claim_time, closed_at) VALUES (?,?,?,?,?,?,?,?,?)",
                 (stake.get_id(), stake.pubkey, stake.amount, stake.start_time, stake.duration, stake.reward_rate, stake.claimed_rewards, stake.last_claim_time, stake.closed_at)
             )
 
     def update_stake(self, stake: Stake):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("UPDATE stakes SET amount = ?, claimed_rewards = ?, last_claim_time = ? WHERE stake_id = ?",
                          (stake.amount, stake.claimed_rewards, stake.last_claim_time, stake.get_id()))
 
@@ -4901,7 +5125,7 @@ class Database:
         """NEW v8.4 -- see PATCH LOG item L. An UPDATE, not a DELETE --
         the row stays in the table permanently as an audit record of a
         completed stake; see StakingPool.unstake() for why."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("UPDATE stakes SET closed_at = ? WHERE stake_id = ?", (closed_at, stake_id))
 
     def load_stakes(self) -> Dict[str, Stake]:
@@ -4917,7 +5141,7 @@ class Database:
         close_stake) rather than deleted.
         """
         stakes: Dict[str, Stake] = {}
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["pubkey", "amount", "start_time", "duration", "reward_rate", "claimed_rewards", "last_claim_time", "closed_at"]
             for row in conn.execute(f"SELECT {', '.join(cols)} FROM stakes WHERE closed_at IS NULL"):
                 kwargs = dict(zip(cols, row))
@@ -4945,7 +5169,7 @@ class Database:
         """
         if not math.isfinite(delta):
             raise ShapeValidationError(f"ledger delta must be finite, got {delta!r}")
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cur = conn.execute(
                 "INSERT INTO ledger_entries (pubkey, delta, reason, ref_id, timestamp) "
                 "VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",
@@ -4971,7 +5195,7 @@ class Database:
         already called, not just at the one call site (StakingPool.stake)
         that actually needed to respect a lockup. See get_spendable_balance
         below for the lockup-aware number."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("SELECT COALESCE(SUM(delta), 0) FROM ledger_entries WHERE pubkey = ?", (pubkey,)).fetchone()
             return row[0] if row else 0.0
 
@@ -4985,7 +5209,7 @@ class Database:
         represents a credit or a debit. Used by TradingBridge's node-gift
         cap (covenant_trading_bridge.py) to bound cumulative gifted volume
         in a trailing window, not just call cadence."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT COALESCE(SUM(ABS(delta)), 0) FROM ledger_entries WHERE pubkey = ? AND reason = ? AND timestamp >= ?",
                 (pubkey, reason, since_timestamp)
@@ -4997,7 +5221,7 @@ class Database:
         submitted a sequenced report -- sequence numbers are expected to
         start at 1, so 0 as "nothing accepted yet" means the very first
         report (sequence=1) is always > 0 and always accepted."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT last_sequence FROM trading_sequence_state WHERE pubkey = ?", (pubkey,)
             ).fetchone()
@@ -5042,7 +5266,7 @@ class Database:
         """NEW v8.7 -- see PATCH LOG item Q. One row per still-vesting
         gift; see gift_lockups table comment for why rows aren't deleted
         on unlock."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO gift_lockups (recipient_pubkey, amount, unlock_at, ref_id, created_at) VALUES (?,?,?,?,?)",
                 (recipient_pubkey, amount, unlock_at, ref_id, time.time())
@@ -5058,7 +5282,7 @@ class Database:
         "this much of the total isn't available," not "these specific
         units are frozen.\""""
         as_of = as_of if as_of is not None else time.time()
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT COALESCE(SUM(amount), 0) FROM gift_lockups WHERE recipient_pubkey = ? AND unlock_at > ?",
                 (pubkey, as_of)
@@ -5085,7 +5309,7 @@ class Database:
         require one -- optional here (None) so this method still works
         for any future caller that doesn't have a sequenced payload to
         report from."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO trading_pnl_events (pubkey, asset, exchange, external_ref, pnl_usd, timestamp, ref_id, sequence) "
                 "VALUES (?,?,?,?,?,?,?,?)",
@@ -5104,7 +5328,7 @@ class Database:
         them going in)."""
         since_timestamp = since_timestamp if since_timestamp is not None else 0.0
         until_timestamp = until_timestamp if until_timestamp is not None else time.time()
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             rows = conn.execute(
                 "SELECT pnl_usd FROM trading_pnl_events WHERE pubkey = ? AND timestamp >= ? AND timestamp <= ?",
                 (pubkey, since_timestamp, until_timestamp)
@@ -5125,7 +5349,7 @@ class Database:
         collision raises ValueError rather than silently overwriting an
         existing DAG entry -- code history gets the same immutability
         guarantee the value ledger already has."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             try:
                 conn.execute(
                     "INSERT INTO code_dag (hash_id, source_code, parent_hashes, transformation_notes, moral_score, submitter_pubkey, signature, timestamp) VALUES (?,?,?,?,?,?,?,?)",
@@ -5136,7 +5360,7 @@ class Database:
                 raise ValueError(f"Code DAG conflict (no overwrites allowed): {e}")
 
     def load_dag_chain(self) -> List["DAGNode"]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["hash_id", "source_code", "parent_hashes", "transformation_notes", "moral_score", "submitter_pubkey", "signature", "timestamp"]
             out = []
             for row in conn.execute(f"SELECT {', '.join(cols)} FROM code_dag ORDER BY timestamp"):
@@ -5146,7 +5370,7 @@ class Database:
             return out
 
     def get_dag_node(self, hash_id: str) -> Optional["DAGNode"]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["hash_id", "source_code", "parent_hashes", "transformation_notes", "moral_score", "submitter_pubkey", "signature", "timestamp"]
             row = conn.execute(f"SELECT {', '.join(cols)} FROM code_dag WHERE hash_id = ?", (hash_id,)).fetchone()
             if row is None:
@@ -5513,7 +5737,7 @@ class Database:
 
     def ledger_event_already_applied(self, evt: dict) -> bool:
         digest = Database.canonical_ledger_digest(evt["entries"])
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT 1 FROM applied_ledger_events WHERE digest = ?", (digest,)
             ).fetchone()
@@ -5546,33 +5770,33 @@ class Database:
                 self.record_ledger_entry(tx.receiver, tx.amount, "tx_credit", ref_id=tx.get_id())
 
     def save_friendship_score(self, pubkey: str, score: float, ts: float):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("INSERT INTO friendship_scores (pubkey, score, updated_at, update_count) VALUES (?,?,?,0) "
                          "ON CONFLICT(pubkey) DO UPDATE SET score=excluded.score, updated_at=excluded.updated_at",
                          (pubkey, score, ts))
 
     def load_friendship_scores(self) -> Dict[str, float]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             return {row[0]: row[1] for row in conn.execute("SELECT pubkey, score FROM friendship_scores")}
 
     def get_update_count(self, pubkey: str) -> int:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("SELECT update_count FROM friendship_scores WHERE pubkey=?", (pubkey,)).fetchone()
             return row[0] if row else 0
 
     def increment_update_count(self, pubkey: str):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("UPDATE friendship_scores SET update_count = update_count + 1 WHERE pubkey=?", (pubkey,))
 
     def save_judgment(self, tx_id: str, result: JudgmentResult):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO judgments (tx_id, violates, reasoning, principle_violated, judge_id, timestamp) VALUES (?,?,?,?,?,?)",
                 (tx_id, int(result.violates), result.reasoning, result.principle_violated, result.judge_id, time.time())
             )
 
     def save_peer_registration(self, entry: Dict[str, Any]):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO peer_registrations (peer_id, host, port, source_addr, accepted, reject_reason, timestamp) VALUES (?,?,?,?,?,?,?)",
                 (entry.get("peer_id"), entry.get("host"), entry.get("port"), entry.get("source_addr"),
@@ -5580,19 +5804,37 @@ class Database:
             )
 
     def load_peer_registrations(self) -> List[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["peer_id", "host", "port", "source_addr", "accepted", "reject_reason", "timestamp"]
             return [dict(zip(cols, row)) for row in conn.execute(
                 "SELECT peer_id, host, port, source_addr, accepted, reject_reason, timestamp FROM peer_registrations")]
 
+    def purge_expired_nonces(self) -> int:
+        """Delete nonces whose expiry has passed. Returns rows reclaimed.
+
+        C3: mark_nonce_seen wrote an expiry and is_nonce_seen filtered on it,
+        so an expired nonce stopped MATCHING -- and nothing ever deleted it.
+        There was no DELETE, no purge, no VACUUM anywhere in this file. A copy
+        of the live nodeA_prod.db held 18 rows of which 16 were already
+        expired, the oldest 7.54 days past. The bound was imaginary rather than
+        generous.
+
+        Strictly expired rows only, so this can never drop a nonce that is
+        still protecting against a replay.
+        """
+        with _db(self.db_path) as conn:
+            cur = conn.execute("DELETE FROM seen_nonces WHERE expiry < ?",
+                               (time.time(),))
+            return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+
     def mark_nonce_seen(self, nonce: str, expiry: int = 86400):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("INSERT OR REPLACE INTO seen_nonces (nonce, expiry) VALUES (?, ?)", (nonce, time.time() + expiry))
 
     def is_nonce_seen(self, nonce: str) -> bool:
         if not nonce:
             return False
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("SELECT 1 FROM seen_nonces WHERE nonce = ? AND expiry > ?", (nonce, time.time())).fetchone()
             return row is not None
 
@@ -8470,8 +8712,25 @@ class CovenantUnifiedMaster:
             if isinstance(msg, dict) and msg.get("p2p_port") is not None:
                 self.node._note_peer_contact(addr[0], msg.get("p2p_port"))
             # Replay protection -- weird_science had none of this at all.
+            #
+            # C3 (2026-08-30): the nonce arrives from a PEER, straight out of
+            # json.loads, and used to be stored verbatim. No type check, no
+            # length check, no signature, and the Flask RateLimiter is a
+            # before_request hook that never sees a raw P2P socket at all.
+            # MAX_PEER_MSG_BYTES defaults to 64 MiB, so a 1 MB string went
+            # through mark_nonce_seen and was stored intact -- measured. Rows
+            # up to megabytes, one row per distinct nonce, and nothing ever
+            # reclaimed them. Guarding here is the fail-closed half and has to
+            # land with or before the purge, because a purge alone just lets an
+            # attacker outrun the interval.
             nonce = msg.get("nonce")
             if nonce is not None:
+                if not _valid_nonce(nonce):
+                    self.node.anomaly_monitor.record(
+                        "nonce_rejected",
+                        "peer nonce not a str<=%d: %r" % (MAX_NONCE_LEN,
+                                                          type(nonce).__name__))
+                    return
                 if self.db.is_nonce_seen(nonce):
                     return
                 self.db.mark_nonce_seen(nonce)
@@ -8765,8 +9024,18 @@ class CovenantUnifiedMaster:
             if self.node.crisis_mode:
                 conn.close()
                 return
+            # C3: same guard as the peer path. The bridge is a second door into
+            # the same unbounded store, and fixing one door is how a closed hole
+            # reopens -- see test_e1_secret_egress, where the same defect lived
+            # in four files and fixing one would have left three.
             nonce = msg.get("nonce")
             if nonce is not None:
+                if not _valid_nonce(nonce):
+                    self.node.anomaly_monitor.record(
+                        "nonce_rejected",
+                        "bridge nonce not a str<=%d: %r" % (MAX_NONCE_LEN,
+                                                            type(nonce).__name__))
+                    return
                 if self.db.is_nonce_seen(nonce):
                     return
                 self.db.mark_nonce_seen(nonce)
