@@ -580,6 +580,11 @@ run test_k2_tally_arithmetic.py 60
 # suite reading 14/16, which is exactly what a regression looks like and was
 # not one. Four symptoms named, the single cause named nowhere.
 run test_d1_preflight_deps.py 60
+# R2 (2026-08-30) pins redundancy.py -- one question at every scale, how many
+# independent carriers and what survives the first loss. Chiefly it pins the
+# SUBSTRING bug that tool shipped with: twelve files under ai_memory_system/
+# (public software) flagged for containing "ai_memory" (the private record).
+run test_r2_redundancy.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.

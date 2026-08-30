@@ -111,6 +111,27 @@ missing. When it is, the number goes back with the platform beside it (§8).
 | how it is deployed and configured | `DEPLOYMENT.md` |
 | every finding, in order, with the wrong turns kept | `docs/IMPROVEMENT_LOG.md` |
 | what changed between the project and the machine | `docs/DIVERGENCE_REPORT.md` |
+| **how authority is distributed, and what it survives** | **`docs/GOVERNANCE.md`** |
+| what binds whoever runs it | `docs/CONSTITUTION.md` |
+| how independent peers relate, without a centre | `docs/FEDERATION.md` |
+| what happens when a person stops | `docs/SUCCESSION.md` |
+
+### Checking it without trusting it
+
+The point of the list above is that none of it has to be taken on faith. Three
+verifiers compute the same constitution hash in three languages sharing no
+code, so no single runtime — and no single implementation — has to be believed:
+
+```bash
+python constitution.py verify      # needs Python
+sh verify.sh                       # needs neither Python nor Windows
+powershell -File verify.ps1        # needs neither Python nor a Unix shell
+python redundancy.py               # how many carriers at every level, and what they share
+```
+
+They have already disagreed once, over whether a heading's em dash was part of
+what was signed. That disagreement was the finding, and it was worth more than
+any one of them alone.
 
 ## Quick start
 

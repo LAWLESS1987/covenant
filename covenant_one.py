@@ -102,6 +102,15 @@ SUITES = [
     # 14/16 and no regression anywhere near it. Pure: no network, no install.
     # 21/21 before wiring, so it is not turning the sweep red on arrival.
     ("test_d1_preflight_deps.py",        120,  "SECURITY"),
+    # R2 (2026-08-30). Pins redundancy.py, which asks one question at every
+    # scale: how many independent carriers, and what survives the first loss.
+    # Its whole value is being believed, so R2 pins the ways it could lie --
+    # chiefly the SUBSTRING bug it shipped with, which flagged twelve files
+    # under ai_memory_system/ (the public software) for containing the string
+    # "ai_memory" (the private record). Same error as the ignore rule that
+    # swallowed test_e1_secret_egress.py and held CI red for a day: a pattern
+    # that cannot tell a thing from a thing ABOUT it. 17/17 before wiring.
+    ("test_r2_redundancy.py",            120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
