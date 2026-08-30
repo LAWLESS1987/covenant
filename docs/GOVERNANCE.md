@@ -180,6 +180,22 @@ be removed from.
 3. Add your endpoint to your own `peers.txt`. Nobody else's copy needs to change.
 4. `federation.py` reports **SAME CORE**, **DIVERGED**, or **UNREACHABLE**.
 
+**A fork does not have to run these bytes to prove it agrees.** Until
+2026-08-30 it did: `federation.py` compared a hash over the *text* of the rules,
+so the same constitution translated into another language, or the same
+behaviour reimplemented in another runtime, read as DIVERGED — while an
+instance that copied the text and changed the code read as SAME CORE. It
+certified byte-identity and called it agreement.
+
+`conformance.py` publishes a second root, taken over what the governance
+primitives *do* on fixed vectors and never over the prose that explains them.
+Two instances sharing no source can match it; one that kept the words and broke
+the behaviour cannot. `federation.py` now reports **CONFORMANT** for exactly
+that case — different wording, identical computation — which is what a
+sovereign fork looks like. The idea is borrowed from the Neuromorphic
+Intermediate Representation (see the credits in the README): compare the
+computation, not the artefact.
+
 **Divergence is reported and never punished.** There is no mechanism here for
 one peer to overwrite another, and adding one would be the single change that
 turns this from federation into administration. A peer running different code
@@ -264,6 +280,7 @@ powershell -File verify.ps1 # the same answer, no Python and no Unix shell
 python federation.py        # SAME CORE / DIVERGED / UNREACHABLE
 python scale.py             # compose levels to any depth, any shape
 python money_posture.py     # what could this do with funds RIGHT NOW
+python conformance.py       # a behaviour root: same computation, any wording
 ```
 
 Three verifiers in three languages sharing no code. They have already disagreed

@@ -116,6 +116,29 @@ missing. When it is, the number goes back with the platform beside it (§8).
 | how independent peers relate, without a centre | `docs/FEDERATION.md` |
 | what happens when a person stops | `docs/SUCCESSION.md` |
 
+### A debt to the Mahowald Prize shortlist
+
+The 2025 Misha Mahowald Prize shortlist was read here for what it implies, not
+for what it builds, and one idea runs under all three entries: **canonical
+meaning survives incidental form.**
+
+- **Jens Egholm Pedersen** (KTH), *Neuromorphic Intermediate Representation* —
+  stop comparing implementations, compare a canonical description of the
+  computation. `conformance.py` and the CONFORMANT verdict in `federation.py`
+  are that idea applied to governance: a fork can now prove it agrees without
+  running these exact bytes.
+- **Mark Iskarous** (Johns Hopkins) — a texture representation invariant to
+  force and speed. The identity survives, the incidental variation is
+  discarded. The same move fixed two real bugs here in one day: a heading's em
+  dash counted as part of what was signed, and a level's value depending on how
+  deep it sat.
+- **Kerem Çamsarı and the OPUS Lab** (UC Santa Barbara) — massive parallelism,
+  asynchronous dynamics, sparsity. Agreement with no clock and no centre, which
+  is the same problem a federation has.
+
+None of them had this project in mind. The debt is recorded because taking an
+idea and not saying where it came from is the thing this repository is about.
+
 ### Checking it without trusting it
 
 The point of the list above is that none of it has to be taken on faith. Three

@@ -121,6 +121,16 @@ SUITES = [
     # It also pins the two wrong versions that shipped before it, both caught
     # by these tests. 23/23 before wiring.
     ("test_s1_scale.py",                 120,  "SECURITY"),
+    # N1 (2026-08-30). From the 2025 Misha Mahowald Prize shortlist, read for
+    # what it implies rather than what it builds: Pedersen's Neuromorphic
+    # Intermediate Representation stops comparing IMPLEMENTATIONS and compares
+    # a canonical description of the COMPUTATION. federation.py had the same
+    # bug NIR exists to fix -- it decided agreement by hashing the TEXT of the
+    # rules, so a faithful reimplementation read DIVERGED while an instance
+    # that copied the text and changed the code read SAME CORE. N1 pins a
+    # behaviour root that is blind to prose and mutation-tested against two
+    # real semantic breaks. 14/14 before wiring.
+    ("test_n1_conformance.py",           120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),

@@ -78,6 +78,24 @@ DEFAULT_PEERS = os.path.join(HERE, "peers.txt")
 TIMEOUT = 15
 
 
+def _conformance():
+    """This instance's behaviour root, or None if it cannot be computed.
+
+    Never fatal: an instance that cannot run the vectors still has a
+    constitution hash, and losing the older check to gain the newer one would
+    be a bad trade.
+    """
+    try:
+        import conformance
+        rs = conformance.run_vectors()
+        if any(r["error"] for r in rs):
+            return None
+        return {"root": conformance.conformance_root(rs), "vectors": len(rs),
+                "spec": conformance.SPEC_VERSION}
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
 def _local_anchor() -> Optional[Dict[str, object]]:
     sys.path.insert(0, HERE)
     try:
@@ -141,6 +159,14 @@ def cmd_mine() -> int:
         return 2
     print("  hash   : %s" % r["hash"])
     print("  blocks : %d" % r["blocks"])
+    cr = _conformance()
+    if cr:
+        print("  behave : %s  (%d vectors)" % (cr["root"], cr["vectors"]))
+        print()
+        print("  Publish BOTH. The hash says your rules read the same; the")
+        print("  behaviour root says your code DOES the same. A fork in another")
+        print("  language will differ on the first and can still match the")
+        print("  second, and that combination is the whole point of forking.")
     print()
     print("  Publish docs/CONSTITUTION_ANCHOR.json somewhere fetchable and")
     print("  give anyone the raw URL. That is the whole of joining, and there")
@@ -162,7 +188,7 @@ def cmd_check(peers_path: str) -> int:
         print("  instance with no peers is complete on its own.")
         return 0
     print()
-    same = diverged = unreachable = 0
+    same = diverged = unreachable = conformant = 0
     for name, where in peers:
         anchor, err = _fetch(where)
         if anchor is None:
@@ -175,14 +201,38 @@ def cmd_check(peers_path: str) -> int:
             print("  %-12s SAME CORE    %s" % (name, anchor["hash"][:16]))
             same += 1
             continue
+        # TEXT DIFFERS. Before calling that divergence, ask whether they
+        # BEHAVE the same -- a faithful reimplementation, or the same rules in
+        # another language, differs here and is not diverged in any sense that
+        # matters. Comparing artefacts instead of computations is the mistake
+        # the Neuromorphic Intermediate Representation exists to fix in its own
+        # field, and it was this file's mistake too.
+        mine_c = _conformance()
+        theirs_c = anchor.get("conformance") or {}
+        if (mine_c and theirs_c.get("root")
+                and theirs_c["root"] == mine_c["root"]):
+            print("  %-12s CONFORMANT   behaviour %s (%d vectors)"
+                  % (name, mine_c["root"][:16], mine_c["vectors"]))
+            print("               Their rules are WORDED differently and their")
+            print("               code answers every vector as ours does. That is")
+            print("               a sovereign fork, not a divergence.")
+            conformant += 1
+            continue
         diverged += 1
         print("  %-12s DIVERGED     %s" % (name, str(anchor.get("hash"))[:16]))
+        if mine_c and theirs_c.get("root"):
+            print("               behaviour differs too: %s vs ours %s"
+                  % (str(theirs_c["root"])[:16], mine_c["root"][:16]))
+        elif mine_c and not theirs_c:
+            print("               they publish no behaviour root, so whether")
+            print("               they COMPUTE the same is unknown -- which is")
+            print("               not the same as knowing they do not.")
         for mark, opens in compare(mine, anchor):
             if mark != "SAME":
                 print("               %-8s %s" % (mark, opens[:56]))
     print()
-    print("  %d sharing the core, %d diverged, %d unreachable."
-          % (same, diverged, unreachable))
+    print("  %d sharing the core, %d conformant, %d diverged, %d unreachable."
+          % (same, conformant, diverged, unreachable))
     print()
     print("  Diverged is not a failing grade. An instance that amended a rule")
     print("  may have found something this one got wrong, and that is the most")

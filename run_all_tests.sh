@@ -592,6 +592,11 @@ run test_r2_redundancy.py 60
 # root along, because the obvious implementation launders disagreement into
 # consensus one level at a time.
 run test_s1_scale.py 60
+# N1 (2026-08-30) pins a conformance root that compares the COMPUTATION
+# rather than the artefact, so a fork in another language can prove it
+# agrees without running these exact bytes. From the 2025 Mahowald Prize
+# shortlist (Pedersen, Neuromorphic Intermediate Representation).
+run test_n1_conformance.py 60
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.
