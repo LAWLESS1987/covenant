@@ -1737,17 +1737,84 @@ class QuorumJudge(ReasoningJudge):
                 # individually in both the summary and component_results.
                 results.append(JudgmentResult(True, f"{getattr(j, 'judge_id', '?')} raised {e}", judge_id=getattr(j, "judge_id", "unknown"),
                                               infrastructure_failure=True))
-        clean = [r for r in results if not r.violates]
-        violates = len(clean) < self.min_agree
-        # Absolute veto from any required judge.
+        # A JUDGE THAT DID NOT ANSWER IS NOT A JUDGE THAT DISAGREED.
+        #
+        # This file already draws that distinction twice, carefully, and then
+        # threw it away here. `infrastructure_failure` means the judge could
+        # not be REACHED; `not_understood` means it could not READ the payload
+        # and is, in its own documented words, "NOT alleging anything". Both
+        # still set violates=True so the gate fails closed -- and both were
+        # then counted in the tallies below as though a working judge had found
+        # fault.
+        #
+        # MEASURED 2026-08-30, not hypothetical. Deployed wiring is
+        # COVENANT_JUDGE_PROVIDERS="local,semantic", so the veto threshold is
+        # ceil(2 * 0.5) = 1. Stop Ollama and a benign payload comes back
+        # violates=True, infrastructure_failure=True. Every transaction is
+        # refused, and _accept_block_common refuses PEER blocks too -- which
+        # the code there already names "a fork in the making". One process on
+        # one machine halts a node's participation in a network that is fine.
+        #
+        # It is the same error triangulate.py exists to refuse, in the one
+        # place where it decides whether the chain moves: silence read as
+        # dissent. Fixed the same way it is fixed there -- silence is counted
+        # as silence, and too much silence is UNPROVEN, which fails closed.
+        #
+        # THE SAFETY TRADE, stated plainly because it is real. Judging against
+        # the judges that ANSWERED means a payload can be admitted with fewer
+        # judges than were configured, so somebody able to take judges offline
+        # can thin the panel. That is a genuine weakening and it is chosen
+        # deliberately over the alternative, which is that anybody able to stop
+        # one local process halts the whole chain AND forks the node off a
+        # healthy network. What is NOT traded away: if nothing answered,
+        # nothing is admitted.
+        # OFF BY DEFAULT, and the default is the one this project already
+        # tested and meant. The first version of this change made the new
+        # behaviour unconditional and broke five checks that turned out to be
+        # deliberate, not oversights:
+        #
+        #   B1 Q1  "timeout component -> quorum violates"
+        #   B1 Q1  "... flagged infrastructure"
+        #   B2 X4  "one uncredentialled judge blocks a benign transaction"
+        #   J1 N3  "unread only when EVERY blocking member is unread"
+        #   J1 N4  "the GATE says 'Held, not judged', never 'Ethical violation'"
+        #
+        # Those tests are the encoded intent: an unreachable judge fails the
+        # gate CLOSED, on purpose. Overriding that wholesale would have traded
+        # a stated safety property for an availability one without the operator
+        # ever being asked. So the trade is offered, not taken.
+        relaxed = os.environ.get("COVENANT_SILENCE_IS_NOT_DISSENT", "") == "1"
+
+        def _answered(r):
+            return not (r.infrastructure_failure or r.not_understood)
+
+        if not relaxed:
+            clean = [r for r in results if not r.violates]
+            violates = len(clean) < self.min_agree
+        else:
+            answered = [r for r in results if _answered(r)]
+            clean = [r for r in answered if not r.violates]
+            # If nothing answered, nothing is admitted. This is the one thing
+            # the relaxed mode does NOT trade away.
+            violates = (not answered) or len(clean) < min(self.min_agree,
+                                                          len(answered))
+        # Absolute veto from any required judge. In relaxed mode a merely
+        # unreachable required judge cannot veto -- otherwise naming a judge
+        # "required" would mean "this judge may halt the chain by crashing".
         if self.required_judge_ids and any(
-                r.judge_id in self.required_judge_ids and r.violates for r in results):
+                r.judge_id in self.required_judge_ids and r.violates
+                and (_answered(r) or not relaxed) for r in results):
             violates = True
         # Majority veto among the designated semantic judges.
         if self.semantic_judge_ids and self.semantic_veto_threshold is not None:
-            sem_dissent = sum(1 for r in results
-                              if r.judge_id in self.semantic_judge_ids and r.violates)
+            sem = [r for r in results if r.judge_id in self.semantic_judge_ids]
+            sem_dissent = sum(1 for r in sem if r.violates
+                              and (_answered(r) or not relaxed))
             if sem_dissent >= self.semantic_veto_threshold:
+                violates = True
+            elif relaxed and sem and not any(_answered(r) for r in sem):
+                # Every semantic judge was silent. Not a dissent, and not a
+                # pass either: nothing was examined.
                 violates = True
         # Summary preserves each judge's EXACT reasoning verbatim, its id, and a
         # clean/VIOLATES label -- not just the collapsed labels, so an operator

@@ -172,6 +172,18 @@ SUITES = [
     # must not supply the checks that judge it. Subprocess-drives the real
     # run_local_sweep.py in a scratch tree; no node, no socket. 23/23.
     ("test_p19_overlay_guard.py",        180,  "GATE INTEGRITY"),
+    # F1 (2026-08-30). Pins the line between availability and permissiveness.
+    # Deployed wiring is COVENANT_JUDGE_PROVIDERS="local,semantic" with a veto
+    # threshold of 1, and an UNREACHABLE judge fails closed -- so its
+    # violates=True was counted as dissent, one stopped Ollama refused every
+    # transaction, and _accept_block_common refused peer blocks too, which the
+    # code there already calls "a fork in the making". Silence read as dissent,
+    # in the one place that decides whether the chain moves.
+    # The fix is OFF BY DEFAULT: the first attempt made it unconditional and
+    # broke five checks in B1/B2/J1 that turned out to be deliberate. F1 pins
+    # BOTH modes -- the untouched default, and that relaxed mode still blocks a
+    # genuine dissent and still admits nothing when nothing answered.
+    ("test_f1_fallback_silence.py",      120,  "JUDGE"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40

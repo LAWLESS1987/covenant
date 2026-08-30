@@ -592,6 +592,10 @@ run test_r2_redundancy.py 60
 # root along, because the obvious implementation launders disagreement into
 # consensus one level at a time.
 run test_s1_scale.py 60
+# F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
+# was counted alongside genuine dissent, so one stopped Ollama refused every
+# transaction AND every peer block. Off by default -- F1 pins both modes.
+run test_f1_fallback_silence.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.
