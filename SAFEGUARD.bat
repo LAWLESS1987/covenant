@@ -32,7 +32,7 @@ set STAMP=%DATE:~-4%%DATE:~4,2%%DATE:~7,2%
 
 echo.
 echo   ==========================================================
-echo    STEP 1 of 3 -- verify the record
+echo    STEP 1 of 4 -- verify the record
 echo   ==========================================================
 if not exist "%STORE%" goto NOSTORE
 set AI_MEMORY_ROOT=%STORE%
@@ -45,7 +45,7 @@ if not "%RC%"=="0" goto DRIFTED
 
 echo.
 echo   ==========================================================
-echo    STEP 2 of 3 -- three copies
+echo    STEP 2 of 4 -- three copies
 echo   ==========================================================
 if not exist "%USERPROFILE%\ai_memory_backups\%STAMP%" mkdir "%USERPROFILE%\ai_memory_backups\%STAMP%" >nul 2>&1
 copy /Y "%STORE%\*.md" "%USERPROFILE%\ai_memory_backups\%STAMP%\" >nul 2>&1
@@ -68,23 +68,24 @@ cd /d "%~dp0"
 
 echo.
 echo   ==========================================================
-echo    STEP 3 of 3 -- the shareable part still holds
+echo    STEP 3 of 4 -- the shareable part still holds
 echo   ==========================================================
 "%PY%" refutable.py selftest
+
+echo.
+echo   ==========================================================
+echo    STEP 4 of 4 -- is this machine exposed right now?
+echo   ==========================================================
+REM The node watches its peers and its traffic; nothing in it watches
+REM its own posture. This asks the question it never asks itself.
+"%PY%" exposure_check.py
 
 echo.
 echo   ==========================================================
 echo    STILL OPEN -- these need you, not me
 echo   ==========================================================
 echo.
-echo    A. NETWORK EXPOSURE. Nodes listen on 0.0.0.0 and the firewall
-echo       permits inbound on Public AND Private. Admin prompt, once:
-echo.
-echo       netsh advfirewall firewall add rule name="Covenant nodes - block inbound" dir=in action=block protocol=TCP localport=5000,5010,5020,5030,5060,5070
-echo.
-echo       Durable fix: bind 127.0.0.1 in covenant_unified_v8.py. Needs a restart.
-echo.
-echo    B. EXPORT THE CORPUS. ~110 conversations exist only in vendor
+echo    A. EXPORT THE CORPUS. ~110 conversations exist only in vendor
 echo       interfaces. This is the part that dies with account access.
 echo         ChatGPT  Settings, Data controls, Export
 echo         Claude   Settings, Account, Export data
@@ -93,7 +94,7 @@ echo         Mistral  Settings, Data
 echo         DeepSeek Profile, Data export
 echo       Then: "%PY%" ai_memory_system\import_conversations.py FILE
 echo.
-echo    C. SEND THE MESSAGES. docs\OUTREACH.md has five drafts.
+echo    B. SEND THE MESSAGES. docs\OUTREACH.md has five drafts.
 echo       Schoff first, he already knows you. Chella second, it matters most.
 echo.
 goto DONE
