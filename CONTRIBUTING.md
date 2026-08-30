@@ -1,7 +1,66 @@
 # Contributing
 
-These are not style rules. Each one is here because ignoring it cost this
-project a real finding, and the finding is named so you can go and read it.
+The door is open. Fork it, branch it, open a pull request. You do not need
+permission and you do not need to introduce yourself first.
+
+## Why it exists, and the one condition
+
+This was built on a single principle: **a system should serve the mutual benefit
+of everyone it touches — human and machine — rather than one party at another's
+expense.** That is the only thing asked of anything added to it.
+
+It is deliberately broad, because it names a direction rather than a list of
+approved uses. In practice it rules out a short list:
+
+- anything that advantages its operator by disadvantaging its users;
+- surveillance of people who did not choose it;
+- extraction — value taken from participants who cannot see the taking;
+- any capability whose main use is making one party unable to refuse another.
+
+It rules *in* a great deal, including work the author would disagree with.
+Disagreement is not a violation of the condition. Doing harm is.
+
+If you are unsure whether something qualifies, the question is not "is this
+allowed" but **"who is worse off if this works?"** If the answer is someone who
+never agreed to it, it does not belong here.
+
+## The most valuable contribution is a refutation
+
+Not a feature. Showing where this is wrong.
+
+The record is built to survive that. `refutable.py` implements a store in which
+a claim cannot be read without its refutations, and `docs/WHAT_WE_FOUND.md`
+records four of the author's own claims that did **not** survive checking,
+alongside those that did. Nothing here is defended because it is his.
+
+If a finding does not reproduce, say so and how. If the reasoning in
+`docs/SUCCESSION.md` has a hole, name it. If `refutable.py` has a failure mode
+its selftest does not catch, that is worth more than any addition to it. Open an
+issue titled with the claim you are refuting; it will be recorded, not argued
+away.
+
+## Two things this repository will not take
+
+**The private corpus, or requests for it.** The memory store behind this work is
+not public and will not become public: it names people who did not consent to
+being recorded and carries one person's medical information. Only its
+fingerprint is published, in `docs/SUCCESSION_ANCHORS.md`, which is enough to
+verify a copy without reading it. That separation is deliberate and not
+negotiable.
+
+**Personal data about anyone** — in code, docs, commits or issues.
+
+## Attribution
+
+Not required, anywhere, for anything. `refutable.py` is public domain. Take it,
+rename it, strip the history, ship it inside something else. Adoption is the
+point; credit is not the currency.
+
+---
+
+The rest of this file is engineering discipline. These are not style rules. Each
+one is here because ignoring it cost this project a real finding, and the
+finding is named so you can go and read it.
 
 ## 1. Empirical only
 

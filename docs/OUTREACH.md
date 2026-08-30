@@ -18,6 +18,19 @@ would be read.
 asserted and discards what the model corrected, so apparent agreement across
 sessions is partly an artefact of storage policy.*
 
+**Every message carries the same offer, and it is not a courtesy.** The
+repository is open to anyone on one condition — that what is added serves the
+mutual benefit of everyone the system touches, rather than one party at
+another's expense. A branch is theirs if they want one. And the contribution
+worth most is a refutation, because the record is built to keep those rather
+than argue them away. See `CONTRIBUTING.md`.
+
+That paragraph does two things at once, which is why it earns its place in a
+short email. It states the terms of the project without asking anyone to adopt
+a worldview. And it invites the reader to attack the finding, which is the
+single most credible thing you can say to a working researcher — the opposite
+of what someone defending a claim would write.
+
 ---
 
 ## 1 — Antonio Chella (Università degli Studi di Palermo)
