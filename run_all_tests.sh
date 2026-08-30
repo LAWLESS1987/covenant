@@ -585,6 +585,13 @@ run test_d1_preflight_deps.py 60
 # SUBSTRING bug that tool shipped with: twelve files under ai_memory_system/
 # (public software) flagged for containing "ai_memory" (the private record).
 run test_r2_redundancy.py 60
+# S1 (2026-08-30) pins scale.py: a level's verdict is a witness one level up,
+# so governance composes to any depth and any shape with no new machinery. The
+# invariant that makes it safe is that divergence never disappears as you
+# climb -- a diverged level goes SILENT upward rather than passing its majority
+# root along, because the obvious implementation launders disagreement into
+# consensus one level at a time.
+run test_s1_scale.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.

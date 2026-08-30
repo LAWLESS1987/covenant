@@ -54,7 +54,61 @@ out at the same number is a real convergence, and it is worth noticing. It is
 not evidence of anything beyond itself, and nothing in this document rests on
 it. If the convergence is a coincidence, every argument here still stands.
 
-## III. The measured state
+## III. Composition: no top, and no bottom
+
+Sections I and II describe one level. This section is why there can be any
+number of them.
+
+**A level's verdict is a witness one level up.** Three nodes attest to a
+ledger; three ledgers attest to a region; three regions attest to a federation
+— and the code judging the federation is the code that judged the three nodes,
+unchanged. `scale.py` is that composition, and it is about eighty lines,
+because composition is the only thing it adds.
+
+This matters for a reason beyond elegance. A structure whose levels are a
+hand-written list needs its author to authorise each new one, and that author
+is a gatekeeper — the exact thing federation exists to remove. `triangulate.py`
+had three named scales and adding a fourth meant editing the file. A relation
+that composes with itself needs no such permission.
+
+**Any shape, not merely any depth.** A level speaks the agreed root *unchanged*,
+so its value does not depend on how deep it sits. A federation whose members
+are a single node, a region, and an entire country composes exactly as well as
+three identical nodes, because all any of them is saying is *the content is
+this*. Who said it is the tally's business, and is kept separately.
+
+### The invariant that makes it trustworthy
+
+> **Divergence never disappears as you climb.**
+
+Everything else here is bookkeeping. The obvious implementation is the
+dangerous one: let a level that diverged pass its **majority** root upward. Do
+that, and disagreement launders itself into consensus one level at a time —
+three regions each quietly outvoting a dissenting node report perfect
+agreement, and the higher you look the cleaner it appears. That is exactly
+backwards, and it fails hardest at the scale where someone would have acted.
+
+So a diverged level contributes **silence** upward, never a root. Silence is
+already a thing this system refuses to confuse with agreement: a witness that
+did not answer is not a witness that agreed. The divergence then travels
+*sideways* instead, in a list that accumulates to the summit, so a
+disagreement eleven levels down is still named at the top.
+
+**A clean summit over a hidden disagreement is the one output this must never
+produce**, and it cannot: a run is CLEAN only when the top agreed *and* nothing
+anywhere beneath it diverged. `python scale.py` demonstrates precisely this —
+a federation whose own verdict is AGREE, reporting NOT CLEAN and exiting
+non-zero, because one ledger three levels down disagreed.
+
+### What does not compose, deliberately
+
+Nothing here ever resolves a divergence, at any scale. The majority is evidence
+about the outlier and never a decision. That is not an omission: a mechanism
+able to settle disagreement between peers is the single change that would turn
+this federation into an administration, and it is the reason a national branch
+can adopt the machinery without adopting anybody's authority.
+
+## IV. The measured state
 
 Not asserted. Run `python redundancy.py` and it prints this, live.
 
@@ -81,7 +135,7 @@ copies below a level with N=1 does not raise the floor; it makes the drop look
 further away. Every claim in this document inherits that cap, and no amount of
 engineering removes it, because it is not an engineering problem.
 
-## IV. The bound on survival
+## V. The bound on survival
 
 > Survive at all cost, **as long as mutual benefit is preserved.**
 
@@ -110,7 +164,7 @@ So the survival instinct is bounded, mechanically and not by good intentions:
   check flagged twelve innocent files, and a check that cries wolf is one you
   learn to skim past.
 
-## V. How a branch joins
+## VI. How a branch joins
 
 A **fork, not a branch.** A branch lives in someone else's repository and can
 be deleted by whoever owns it. A fork is yours. If this project is worth
@@ -138,7 +192,7 @@ run under its own law, by its own operators, reporting divergence honestly. It
 inherits no obligation to this repository. What it gains is a common way to
 *check*, which is worth having precisely because it costs no sovereignty.
 
-## VI. What this is not
+## VII. What this is not
 
 **This system is not ready to govern anything of consequence**, and section V
 of [`CONSTITUTION.md`](CONSTITUTION.md) enumerates why in detail. The short
@@ -162,7 +216,7 @@ form:
 Anyone told this system is ready should ask which line of this section no longer
 applies, and how that was checked.
 
-## VII. Verification
+## VIII. Verification
 
 ```
 python redundancy.py        # N at every level, and what shares a failure
@@ -170,6 +224,7 @@ python constitution.py verify
 sh verify.sh                # the same answer, no Python
 powershell -File verify.ps1 # the same answer, no Python and no Unix shell
 python federation.py        # SAME CORE / DIVERGED / UNREACHABLE
+python scale.py             # compose levels to any depth, any shape
 ```
 
 Three verifiers in three languages sharing no code. They have already disagreed

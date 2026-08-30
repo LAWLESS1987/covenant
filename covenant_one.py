@@ -111,6 +111,16 @@ SUITES = [
     # swallowed test_e1_secret_egress.py and held CI red for a day: a pattern
     # that cannot tell a thing from a thing ABOUT it. 17/17 before wiring.
     ("test_r2_redundancy.py",            120,  "SECURITY"),
+    # S1 (2026-08-30). scale.py makes a level's verdict usable as a witness one
+    # level up, so governance composes to any depth AND any shape with no new
+    # machinery -- the thing "the same function at every scale" has to mean if
+    # it means anything. S1 pins the invariant that makes it safe: divergence
+    # never disappears as you climb. A diverged level goes SILENT upward
+    # instead of passing its majority root along, because the obvious
+    # implementation launders disagreement into consensus one level at a time.
+    # It also pins the two wrong versions that shipped before it, both caught
+    # by these tests. 23/23 before wiring.
+    ("test_s1_scale.py",                 120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
