@@ -111,12 +111,32 @@ overstates its own reach is the first thing it should prohibit.
   is unwarranted is penalised more heavily than a bare accusation. A gate that
   blocks the case for innocence harder than the charge is dangerous precisely
   where it matters. Documented; unfixed.
-- **An earlier audit of the ledger listed** unbound sender identity, mintable
-  privileged identity, quorum not required for locally created blocks, Sybil
-  quorum via empty validator authorisation, no Byzantine consensus, recovery by
-  most-common-chain rather than finality, and **audit history destroyed during
-  chain replacement.** Whether each survives in the current version has not
-  been re-checked. Until it is, none of them should be assumed fixed.
+- **An earlier audit of the ledger (v3.3) listed fifteen defects.** As of
+  2026-08-30 four were re-checked against v8.40 and appear resolved; the rest
+  are recorded below as unverified, because "not checked" and "fixed" are
+  different words and only one of them is earned.
+
+  **Re-checked and resolved:**
+  *Sender identity not bound to public keys* — `Transaction.verify` loads the
+  key from `sender_pubkey` and verifies the signature against it, so the key is
+  the identity. *Mintable value* — balance is checked on the transaction path
+  and insufficient balance is refused. *Recovery by most-common-chain rather
+  than finality* — no longest-chain or most-common-chain adoption exists in the
+  source. *Audit history destroyed during chain replacement* — there is no
+  chain-replacement path; `/sync` only appends, through the same
+  `_accept_block_common` gate as every other route, and the sole whole-chain
+  assignment is the startup load from disk.
+
+  **Not applicable as written**, because the architecture changed: the
+  validator-set and block-signature defects assumed a validator-quorum design.
+  No validator set is present in v8.40. That is a different design, not a fixed
+  defect, and it has not been audited on its own terms.
+
+  **Still unverified:** quorum for locally created blocks, split quorum state,
+  Byzantine behaviour under partition, SQLite WAL replacement safety, the
+  accounting check, whether balances and transaction indexes are
+  cryptographically committed, and identity persistence across restarts.
+  Assume none of these are fixed.
 
 **Therefore: this system is not ready to govern anything of consequence.** It
 is a working demonstration of two ideas — evaluation inside the transaction
