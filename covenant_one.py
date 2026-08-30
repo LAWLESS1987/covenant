@@ -94,6 +94,14 @@ SUITES = [
     # have, which is this project's whole disease in one function. Measured
     # 25/25 before wiring, so it is not turning the sweep red on arrival.
     ("test_k2_tally_arithmetic.py",      120,  "SECURITY"),
+    # D1 (2026-08-30). Same family as K2 above: a claim about the RUNNER
+    # rather than about the node. K2 pins that a failure is not counted as a
+    # pass; D1 pins that a MISSING DECLARED DEPENDENCY names itself instead of
+    # surfacing as four unrelated failures in three sections -- which is what
+    # it did on the run that produced this line, with a SECURITY suite reading
+    # 14/16 and no regression anywhere near it. Pure: no network, no install.
+    # 21/21 before wiring, so it is not turning the sweep red on arrival.
+    ("test_d1_preflight_deps.py",        120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
@@ -484,7 +492,28 @@ def phase_coverage(say):
     for s, why in sorted(DELIBERATELY_OFF.items()):
         mark = "" if os.path.isfile(os.path.join(HERE, s)) else "   [not on disk]"
         say("      OFF      %-34s %s%s" % (s, why, mark))
-    return absent, orphans
+
+    # A suite list that matches the disk is only half of "can this run". The
+    # other half is whether what those suites IMPORT is installed, and nothing
+    # here asked until 2026-08-30, when xrpl-py -- DECLARED in requirements.txt,
+    # absent from the machine -- produced four failures across three sections,
+    # one of them a SECURITY suite reading 14/16. Four symptoms named, the one
+    # cause named nowhere. It is the same disease as the orphan check above:
+    # the runner already knew, and never said.
+    say("")
+    say("  DECLARED DEPENDENCIES -- requirements.txt against what is installed:")
+    missing_deps = 0
+    try:
+        import preflight_deps
+        missing_deps = preflight_deps.report(say, HERE)
+    except Exception as e:                                   # noqa: BLE001
+        # A preflight must never be the thing that takes down the run it
+        # precedes. Report the miss and carry on: unmeasured, loudly, is the
+        # one outcome this project always allows -- unmeasured and quiet is not.
+        say("      COULD NOT CHECK -- %s: %s" % (type(e).__name__, e))
+        say("      Treat dependencies as UNVERIFIED for this run.")
+        missing_deps = 0
+    return absent, orphans, missing_deps
 
 
 IN_PLACE = [
@@ -778,9 +807,10 @@ def main():
     gates = None
     results = []
     actions = []
+    missing_deps = 0
     try:
         phase_identity(say)
-        absent, orphans = phase_coverage(say)
+        absent, orphans, missing_deps = phase_coverage(say)
         inplace = phase_integrity(say, transported=args.transported)
         gates = phase_gates(say)
         if args.check:
@@ -825,6 +855,10 @@ def main():
             ("  -> " + ", ".join(absent)) if absent else ""))
         say("  orphaned on disk    %d%s" % (len(orphans),
             ("  -> " + ", ".join(orphans)) if orphans else ""))
+        say("  declared deps missing %d%s"
+            % (missing_deps,
+               "   <- suites needing them are UNMEASURED, not failing"
+               if missing_deps else ""))
         bad_inplace = [n for n, st in inplace if st != "ok"]  # noqa: F841
         say("  folder integrity    %s" % (", ".join("%s=%s" % (n, st)
                                                     for n, st in inplace) or "NOT MEASURED"))
@@ -846,7 +880,7 @@ def main():
         if bad or fails or gate_blocks or inplace_fail:
             say("  RESULT: FAIL. Something is wrong and it is named above.")
             code = 1
-        elif (unmeasured or absent or orphans or args.quick
+        elif (unmeasured or absent or orphans or args.quick or missing_deps
               or (gates in (2, None) and not args.ci)
               or [n for n, st in inplace
                   if st == "ABSENT" or (st.startswith("N/A") and not args.ci)]):

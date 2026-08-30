@@ -573,6 +573,13 @@ run test_k3_p9_owner_only_guard.py 60
 # K2 pins this runner's own arithmetic: a failure must never be counted
 # as a pass. Registered with the fix, not after it.
 run test_k2_tally_arithmetic.py 60
+# D1 (2026-08-30) pins the other half of "can this run at all": a DECLARED
+# dependency that is not installed must name itself, and name the suites it
+# takes down with it. On the run that produced this line, xrpl-py was absent
+# and it surfaced as four failures in three sections -- one of them a SECURITY
+# suite reading 14/16, which is exactly what a regression looks like and was
+# not one. Four symptoms named, the single cause named nowhere.
+run test_d1_preflight_deps.py 60
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.
