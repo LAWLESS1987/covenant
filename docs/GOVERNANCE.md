@@ -227,6 +227,16 @@ So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
 between them is [`CONSTITUTION.md`](CONSTITUTION.md) II.1 — a commitment, not an
 absence of capability — and that is the only honest way to describe it.
 
+**Two claims are being made here and they have different tenses, deliberately.**
+That this system does not move real money is a statement about *now*: the
+mainnet gate exists in order to be opened one day, which is why opening it
+requires a testnet proof that does not exist. That no trade will be placed *by
+automation* is a promise, it has no "yet" in it, and it is not going to acquire
+one. Money moving under a person's deliberate hand and a loop deciding to move
+it are different things, and only the second is forbidden. An evaluator should
+hold this project to the second claim permanently and to the first only as of
+the date on it.
+
 **Why disclose the dangerous half at all?** Because a promise whose shape you
 cannot see is not a promise, it is a reassurance. A reader who finds a daily
 scheduled task and an `AddOrder` call *after* being told "no trades placed by

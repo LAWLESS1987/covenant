@@ -66,10 +66,24 @@ Three things, in one process:
 
 ## What it is not
 
-- **It does not move real money — and here is the shape of that, because the
-  short version misleads in both directions.** The XRP path is blocked behind
-  four locks and its submission path **has never executed on any network**:
-  there is no testnet proof and no mainnet policy on disk.
+- **It does not move real money *yet* — and here is the shape of that, because
+  the short version misleads in both directions.** The XRP path is blocked
+  behind four locks and its submission path **has never executed on any
+  network**: there is no testnet proof and no mainnet policy on disk.
+
+  **The word "yet" is doing real work there and is not a hedge.** "It does not
+  move real money" reads as a permanent property of the system. It is not one.
+  It is a current state, and the design contains a deliberate path out of it:
+  the mainnet gate exists in order to be opened, which is why opening it
+  requires a testnet proof that does not exist. Writing "does not" and stopping
+  would claim a promise nobody has made.
+
+  What has been promised is narrower and absolute, and lives in
+  `docs/CONSTITUTION.md` II.1: **no trades placed by automation, and no
+  credentials requested or stored.** That clause has no "yet" in it and is not
+  going to acquire one. Money moving under a person's deliberate hand is a
+  different thing from a loop deciding to move it, and only the second is
+  forbidden. Keeping those two apart is the whole point of stating either.
 
   What is easy to miss is that this repository *does* hold Kraken and Coinbase
   order adapters (`venues.py`), a planner (`covenant_trader.py`), and a
