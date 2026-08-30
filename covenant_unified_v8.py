@@ -200,6 +200,7 @@ PATCH LOG — v7.2 (balance ledger + /stake signature requirement)
 import json
 import time
 import hashlib
+import contextlib
 import sqlite3
 import threading
 import socket
@@ -4488,13 +4489,47 @@ class RateLimiter:
 # Database Layer — union schema of both sources
 # ---------------------------------------------------------------------------
 
+
+@contextlib.contextmanager
+def _db(path: str):
+    """Commit AND CLOSE. `with sqlite3.connect(p) as conn:` does only the first.
+
+    sqlite3.Connection.__exit__ commits or rolls back the transaction and
+    then leaves the connection OPEN -- it is a transaction context manager,
+    not a resource one, which is a genuine trap in the standard library
+    because it reads exactly like `with open(...)`. Every one of the 37 call
+    sites in this file was therefore leaking a file handle until the garbage
+    collector happened to run.
+
+    FOUND, not theorised: test_security_audit.py distributes rewards over 10
+    stakes x 2000 blocks, so update_stake alone opens 20,000 connections in one
+    loop. On Linux under a soft nofile limit the suite dies partway with
+    "sqlite3.OperationalError: unable to open database file" and never reaches
+    the assertions after it -- a resource leak wearing the costume of a failing
+    security test. Windows has a far higher handle ceiling and passed
+    throughout, which is why this survived: the platform that runs production
+    is the platform that cannot see it.
+
+    Nesting matters and is the whole point. `with conn:` inside gives the
+    commit/rollback semantics every existing call site already depends on;
+    the outer try/finally adds the close those call sites never had. Replacing
+    the outer `with` alone would have silently stopped committing.
+    """
+    conn = sqlite3.connect(path)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 class Database:
     def __init__(self, db_path: str = "covenant_unified_v7.db"):
         self.db_path = db_path
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS blocks (
@@ -4779,7 +4814,7 @@ class Database:
             """)
 
     def save_succession_config(self, c: "SuccessionConfig"):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("""
                 INSERT INTO succession_configs
                     (primary_pubkey, successor_pubkey, threshold, heartbeat_interval_days,
@@ -4795,7 +4830,7 @@ class Database:
                   c.grace_period_days, c.last_heartbeat, c.episode_id, c.pending_since, int(c.succession_active)))
 
     def load_succession_config(self, primary_pubkey: str) -> Optional["SuccessionConfig"]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("""SELECT primary_pubkey, successor_pubkey, threshold,
                 heartbeat_interval_days, grace_period_days, last_heartbeat, episode_id,
                 pending_since, succession_active FROM succession_configs WHERE primary_pubkey=?""",
@@ -4809,11 +4844,11 @@ class Database:
     def load_all_succession_primaries(self) -> List[str]:
         """Used by the background dead-man's-switch monitor to know which
         primaries to check each cycle."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             return [r[0] for r in conn.execute("SELECT primary_pubkey FROM succession_configs")]
 
     def save_succession_seal(self, primary_pubkey: str, blob: str, path_len: int):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS succession_seal (
                                 primary_pubkey TEXT PRIMARY KEY,
                                 blob TEXT NOT NULL,
@@ -4823,7 +4858,7 @@ class Database:
                          (primary_pubkey, blob, path_len, time.time()))
 
     def load_succession_seal(self, primary_pubkey: str) -> Optional[Tuple[str, int]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS succession_seal (
                                 primary_pubkey TEXT PRIMARY KEY,
                                 blob TEXT NOT NULL,
@@ -4834,32 +4869,32 @@ class Database:
         return (row[0], row[1]) if row else None
 
     def add_succession_guardian(self, primary_pubkey: str, guardian_pubkey: str, label: str = ""):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("INSERT OR IGNORE INTO succession_guardians (primary_pubkey, guardian_pubkey, label) VALUES (?,?,?)",
                          (primary_pubkey, guardian_pubkey, label))
 
     def get_succession_guardians(self, primary_pubkey: str) -> List[str]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             return [r[0] for r in conn.execute(
                 "SELECT guardian_pubkey FROM succession_guardians WHERE primary_pubkey=?", (primary_pubkey,))]
 
     def record_succession_confirmation(self, primary_pubkey: str, episode_id: int, guardian_pubkey: str,
                                         confirm_type: str, ts: float) -> bool:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cur = conn.execute(
                 "INSERT OR IGNORE INTO succession_confirmations (primary_pubkey, episode_id, guardian_pubkey, confirm_type, timestamp) VALUES (?,?,?,?,?)",
                 (primary_pubkey, episode_id, guardian_pubkey, confirm_type, ts))
             return cur.rowcount > 0
 
     def count_succession_confirmations(self, primary_pubkey: str, episode_id: int, confirm_type: str) -> int:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT COUNT(DISTINCT guardian_pubkey) FROM succession_confirmations WHERE primary_pubkey=? AND episode_id=? AND confirm_type=?",
                 (primary_pubkey, episode_id, confirm_type)).fetchone()
             return row[0] if row else 0
 
     def save_block(self, block: Block):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             try:
                 conn.execute(
                     "INSERT INTO blocks (block_index, hash, previous_hash, timestamp, nonce, alignment_score, stake_rewards, data) VALUES (?,?,?,?,?,?,?,?)",
@@ -4877,7 +4912,7 @@ class Database:
 
     def load_chain(self) -> List[Block]:
         chain = []
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             for row in conn.execute("SELECT * FROM blocks ORDER BY block_index"):
                 txs_data = json.loads(row[7])
                 txs = [Transaction(**tx) for tx in txs_data]
@@ -4886,14 +4921,14 @@ class Database:
         return chain
 
     def save_stake(self, stake: Stake):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO stakes (stake_id, pubkey, amount, start_time, duration, reward_rate, claimed_rewards, last_claim_time, closed_at) VALUES (?,?,?,?,?,?,?,?,?)",
                 (stake.get_id(), stake.pubkey, stake.amount, stake.start_time, stake.duration, stake.reward_rate, stake.claimed_rewards, stake.last_claim_time, stake.closed_at)
             )
 
     def update_stake(self, stake: Stake):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("UPDATE stakes SET amount = ?, claimed_rewards = ?, last_claim_time = ? WHERE stake_id = ?",
                          (stake.amount, stake.claimed_rewards, stake.last_claim_time, stake.get_id()))
 
@@ -4901,7 +4936,7 @@ class Database:
         """NEW v8.4 -- see PATCH LOG item L. An UPDATE, not a DELETE --
         the row stays in the table permanently as an audit record of a
         completed stake; see StakingPool.unstake() for why."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("UPDATE stakes SET closed_at = ? WHERE stake_id = ?", (closed_at, stake_id))
 
     def load_stakes(self) -> Dict[str, Stake]:
@@ -4917,7 +4952,7 @@ class Database:
         close_stake) rather than deleted.
         """
         stakes: Dict[str, Stake] = {}
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["pubkey", "amount", "start_time", "duration", "reward_rate", "claimed_rewards", "last_claim_time", "closed_at"]
             for row in conn.execute(f"SELECT {', '.join(cols)} FROM stakes WHERE closed_at IS NULL"):
                 kwargs = dict(zip(cols, row))
@@ -4945,7 +4980,7 @@ class Database:
         """
         if not math.isfinite(delta):
             raise ShapeValidationError(f"ledger delta must be finite, got {delta!r}")
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cur = conn.execute(
                 "INSERT INTO ledger_entries (pubkey, delta, reason, ref_id, timestamp) "
                 "VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",
@@ -4971,7 +5006,7 @@ class Database:
         already called, not just at the one call site (StakingPool.stake)
         that actually needed to respect a lockup. See get_spendable_balance
         below for the lockup-aware number."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("SELECT COALESCE(SUM(delta), 0) FROM ledger_entries WHERE pubkey = ?", (pubkey,)).fetchone()
             return row[0] if row else 0.0
 
@@ -4985,7 +5020,7 @@ class Database:
         represents a credit or a debit. Used by TradingBridge's node-gift
         cap (covenant_trading_bridge.py) to bound cumulative gifted volume
         in a trailing window, not just call cadence."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT COALESCE(SUM(ABS(delta)), 0) FROM ledger_entries WHERE pubkey = ? AND reason = ? AND timestamp >= ?",
                 (pubkey, reason, since_timestamp)
@@ -4997,7 +5032,7 @@ class Database:
         submitted a sequenced report -- sequence numbers are expected to
         start at 1, so 0 as "nothing accepted yet" means the very first
         report (sequence=1) is always > 0 and always accepted."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT last_sequence FROM trading_sequence_state WHERE pubkey = ?", (pubkey,)
             ).fetchone()
@@ -5042,7 +5077,7 @@ class Database:
         """NEW v8.7 -- see PATCH LOG item Q. One row per still-vesting
         gift; see gift_lockups table comment for why rows aren't deleted
         on unlock."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO gift_lockups (recipient_pubkey, amount, unlock_at, ref_id, created_at) VALUES (?,?,?,?,?)",
                 (recipient_pubkey, amount, unlock_at, ref_id, time.time())
@@ -5058,7 +5093,7 @@ class Database:
         "this much of the total isn't available," not "these specific
         units are frozen.\""""
         as_of = as_of if as_of is not None else time.time()
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT COALESCE(SUM(amount), 0) FROM gift_lockups WHERE recipient_pubkey = ? AND unlock_at > ?",
                 (pubkey, as_of)
@@ -5085,7 +5120,7 @@ class Database:
         require one -- optional here (None) so this method still works
         for any future caller that doesn't have a sequenced payload to
         report from."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO trading_pnl_events (pubkey, asset, exchange, external_ref, pnl_usd, timestamp, ref_id, sequence) "
                 "VALUES (?,?,?,?,?,?,?,?)",
@@ -5104,7 +5139,7 @@ class Database:
         them going in)."""
         since_timestamp = since_timestamp if since_timestamp is not None else 0.0
         until_timestamp = until_timestamp if until_timestamp is not None else time.time()
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             rows = conn.execute(
                 "SELECT pnl_usd FROM trading_pnl_events WHERE pubkey = ? AND timestamp >= ? AND timestamp <= ?",
                 (pubkey, since_timestamp, until_timestamp)
@@ -5125,7 +5160,7 @@ class Database:
         collision raises ValueError rather than silently overwriting an
         existing DAG entry -- code history gets the same immutability
         guarantee the value ledger already has."""
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             try:
                 conn.execute(
                     "INSERT INTO code_dag (hash_id, source_code, parent_hashes, transformation_notes, moral_score, submitter_pubkey, signature, timestamp) VALUES (?,?,?,?,?,?,?,?)",
@@ -5136,7 +5171,7 @@ class Database:
                 raise ValueError(f"Code DAG conflict (no overwrites allowed): {e}")
 
     def load_dag_chain(self) -> List["DAGNode"]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["hash_id", "source_code", "parent_hashes", "transformation_notes", "moral_score", "submitter_pubkey", "signature", "timestamp"]
             out = []
             for row in conn.execute(f"SELECT {', '.join(cols)} FROM code_dag ORDER BY timestamp"):
@@ -5146,7 +5181,7 @@ class Database:
             return out
 
     def get_dag_node(self, hash_id: str) -> Optional["DAGNode"]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["hash_id", "source_code", "parent_hashes", "transformation_notes", "moral_score", "submitter_pubkey", "signature", "timestamp"]
             row = conn.execute(f"SELECT {', '.join(cols)} FROM code_dag WHERE hash_id = ?", (hash_id,)).fetchone()
             if row is None:
@@ -5513,7 +5548,7 @@ class Database:
 
     def ledger_event_already_applied(self, evt: dict) -> bool:
         digest = Database.canonical_ledger_digest(evt["entries"])
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute(
                 "SELECT 1 FROM applied_ledger_events WHERE digest = ?", (digest,)
             ).fetchone()
@@ -5546,33 +5581,33 @@ class Database:
                 self.record_ledger_entry(tx.receiver, tx.amount, "tx_credit", ref_id=tx.get_id())
 
     def save_friendship_score(self, pubkey: str, score: float, ts: float):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("INSERT INTO friendship_scores (pubkey, score, updated_at, update_count) VALUES (?,?,?,0) "
                          "ON CONFLICT(pubkey) DO UPDATE SET score=excluded.score, updated_at=excluded.updated_at",
                          (pubkey, score, ts))
 
     def load_friendship_scores(self) -> Dict[str, float]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             return {row[0]: row[1] for row in conn.execute("SELECT pubkey, score FROM friendship_scores")}
 
     def get_update_count(self, pubkey: str) -> int:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("SELECT update_count FROM friendship_scores WHERE pubkey=?", (pubkey,)).fetchone()
             return row[0] if row else 0
 
     def increment_update_count(self, pubkey: str):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("UPDATE friendship_scores SET update_count = update_count + 1 WHERE pubkey=?", (pubkey,))
 
     def save_judgment(self, tx_id: str, result: JudgmentResult):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO judgments (tx_id, violates, reasoning, principle_violated, judge_id, timestamp) VALUES (?,?,?,?,?,?)",
                 (tx_id, int(result.violates), result.reasoning, result.principle_violated, result.judge_id, time.time())
             )
 
     def save_peer_registration(self, entry: Dict[str, Any]):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO peer_registrations (peer_id, host, port, source_addr, accepted, reject_reason, timestamp) VALUES (?,?,?,?,?,?,?)",
                 (entry.get("peer_id"), entry.get("host"), entry.get("port"), entry.get("source_addr"),
@@ -5580,19 +5615,19 @@ class Database:
             )
 
     def load_peer_registrations(self) -> List[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             cols = ["peer_id", "host", "port", "source_addr", "accepted", "reject_reason", "timestamp"]
             return [dict(zip(cols, row)) for row in conn.execute(
                 "SELECT peer_id, host, port, source_addr, accepted, reject_reason, timestamp FROM peer_registrations")]
 
     def mark_nonce_seen(self, nonce: str, expiry: int = 86400):
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             conn.execute("INSERT OR REPLACE INTO seen_nonces (nonce, expiry) VALUES (?, ?)", (nonce, time.time() + expiry))
 
     def is_nonce_seen(self, nonce: str) -> bool:
         if not nonce:
             return False
-        with sqlite3.connect(self.db_path) as conn:
+        with _db(self.db_path) as conn:
             row = conn.execute("SELECT 1 FROM seen_nonces WHERE nonce = ? AND expiry > ?", (nonce, time.time())).fetchone()
             return row is not None
 
