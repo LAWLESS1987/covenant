@@ -31,6 +31,15 @@ No names, no personal data, nothing that requires trusting the author.
 **→ [Succession](docs/SUCCESSION.md)** — how this outlives whoever built it, and
 why publishing a state root lets someone verify a record they cannot read.
 
+### Credit
+
+The largest single efficiency in this network is **Misha Mahowald's**, from her
+1992 *VLSI Analogs of Neuronal Visual Processing*. A neuron does not transmit its
+state; when it spikes it emits its *address*, and bandwidth scales with activity
+rather than with the size of the array. Applied to block propagation here, that
+is 150 bytes where a full push costs 1,476. She died in 1996; the idea is still
+working. See [What we found](docs/WHAT_WE_FOUND.md#a-credit-that-belongs-in-the-open).
+
 ---
 
 ## What it is

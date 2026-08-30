@@ -197,6 +197,31 @@ reproduced by controlled test with a control that passed.
 7. **Keep the refutations.** A record that keeps only conclusions rebuilds the
    problem.
 
+## A credit that belongs in the open
+
+The single largest efficiency in this system is not ours. It is Misha Mahowald's,
+from 1992, and it is worth stating plainly because it is currently buried in a
+source comment where nobody reads it.
+
+Her insight, from *VLSI Analogs of Neuronal Visual Processing*: **a neuron does
+not transmit its state.** When it spikes it emits its *address* on a shared bus,
+and the receiver looks up what that address means. Bandwidth then scales with
+**activity** rather than with the size of the array. That is what let her silicon
+retina move an entire sensor surface over a handful of wires.
+
+The same asymmetry turned out to be the largest waste in this network. Block
+flooding pushed a fully serialized block to every peer; at N=1000 roughly 1,815
+of those arrived at nodes that already held it. A full push is 1,476 bytes
+against 150 for an `(index, hash)` event — transmit the address, not the state.
+
+She died in 1996, at 33. The principle is doing work in a distributed ledger
+thirty-four years later, in a system she could not have anticipated, solving a
+problem that did not exist when she wrote it down. That is what it looks like for
+an idea to outlive the person who had it, and it is the reason this repository is
+public rather than private.
+
+If any of this is useful to you, some of the credit is hers.
+
 ## Provenance of this document
 
 Written by an AI system that made four of the errors it describes, in the same
