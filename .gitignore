@@ -96,6 +96,33 @@ secrets.*
 id_rsa*
 id_ed25519*
 
+# ...but a TEST ABOUT secrets contains none, and must be committed.
+#
+# THIS COST A RED CI FOR A DAY, 2026-08-29 to 2026-08-30. `*_secret*` above
+# silently swallowed test_e1_secret_egress.py -- the regression suite for the
+# credential-in-a-URL disclosure, whose every "secret" is a labelled fixture
+# like "AIzaSyD-EXAMPLE-not-a-real-key" and which makes no network call at
+# all. The file existed on the production PC, so the PC ran it and passed. It
+# was never committed, so CI checked out a tree without it, the runner
+# correctly reported it ABSENT, and every run went red from the commit that
+# added it to the suite table onward. Green before, red after, and no defect
+# anywhere in the code being tested.
+#
+# The rule matched on the NAME and not on the NATURE. A file called *_secret*
+# is as likely to be the check that no secret escapes as it is to be a secret
+# -- and the check is precisely the thing you most want in the repository.
+# The same error turned up the same day in a guard that flagged twelve
+# innocent files under ai_memory_system/ for containing "ai_memory": a
+# pattern that cannot tell a thing from a thing ABOUT it.
+#
+# Tests and probes are never credentials. If one ever does hold a real
+# secret, that is a defect in the test, to be fixed there -- not hidden by an
+# ignore rule that also hides the test's absence.
+!test_*secret*
+!probe_*secret*
+!test_*key*
+!test_*env*
+
 # --- corpus cache: reproducible, not committable --------------------------
 # fetch46.py rebuilds these 46 public-domain Gutenberg texts (~17 MB) from
 # claude_phil_CORPUS_MANIFEST.json. Keeping them locally is what makes the
@@ -145,3 +172,27 @@ trader_log.txt
 # restore-point snapshots of unlanded candidates -- never source
 PRE-LAND-*/
 pending-*.BACKUP-*/
+
+# --- The private record: never publishable, by rule not by habit ----------
+# CONSTITUTION.md II.4 says the private corpus is never published, in whole or
+# in part, for any reason -- including a reason that seems excellent at the
+# time. It names people who did not consent to being recorded and it carries
+# one person's medical detail. Only its FINGERPRINT is published, in
+# docs/SUCCESSION_ANCHORS.md.
+#
+# Until 2026-08-30 that rule was kept by remembering it. redundancy.py's
+# principle check pointed out that nothing enforced it: the corpus lives
+# outside the repository, so it had never been tracked, and "has not happened"
+# had been standing in for "cannot happen". One stray copy into the tree is
+# the whole rule gone, and it would be gone irreversibly -- a published git
+# history cannot be unpublished.
+#
+# NOTE what is NOT ignored: ai_memory_system/ is the SOFTWARE and is public on
+# purpose. The store is ai_memory/. One is code about the record; the other is
+# the record. A pattern that cannot tell them apart is worse than none.
+ai_memory/
+ai_memory_backups/
+covenant-memory-backup/
+.covenant-keys/
+audit.jsonl
+guard_state.json

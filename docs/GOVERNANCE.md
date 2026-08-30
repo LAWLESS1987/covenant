@@ -1,0 +1,189 @@
+# Governance: one rule, repeated at every scale
+
+This document describes the *structure* of governance here — how authority is
+distributed, how failure is survived, and how a new participant joins without
+asking anyone's permission.
+
+Three companion documents carry the rest, and this one does not repeat them:
+
+| Document | Answers |
+|---|---|
+| [`CONSTITUTION.md`](CONSTITUTION.md) | What binds the operator, and what the governed are owed |
+| [`FEDERATION.md`](FEDERATION.md) | How independent peers relate without a centre |
+| [`SUCCESSION.md`](SUCCESSION.md) | What happens when a person stops |
+
+---
+
+## I. The recurring unit
+
+Everything below is one question, asked identically at every scale:
+
+> **How many independent carriers hold this, and what happens at the first loss?**
+
+Not "is it backed up." A tree survives losing a limb and does not survive
+losing its trunk, and the difference is not size — it is how many other things
+were carrying the same load.
+
+The question does not change when the scale does. That is the whole design.
+Growth adds *scales*, not *mechanisms*. A new level needs a new row, never new
+machinery — and if a proposed level requires a new mechanism, that is the
+signal it does not belong.
+
+`redundancy.py` asks it, at every level, and prints the answer.
+
+## II. Why three
+
+One carrier cannot be checked at all.
+
+Two can disagree and cannot settle it. A tie tells you something is wrong and
+never which side. Two is enough to *detect* and never enough to *decide*.
+
+Three is the smallest number that can lose one and still hold a majority, and
+the smallest that can adjudicate rather than merely notice.
+
+This is not a fact about ledgers. It is a fact about counting, so it holds
+identically for hashes, files, machines, and people — which is exactly why the
+same rule can govern all of them.
+
+**On the geometry, stated plainly and without mysticism.** A triangle is the
+smallest rigid polygon: three struts cannot deform without one changing length,
+while four can fold flat. Engineers build trusses from triangles for that
+reason, and the number is the same three that gives a quorum its first
+majority. That two very different problems — rigidity and adjudication — bottom
+out at the same number is a real convergence, and it is worth noticing. It is
+not evidence of anything beyond itself, and nothing in this document rests on
+it. If the convergence is a coincidence, every argument here still stands.
+
+## III. The measured state
+
+Not asserted. Run `python redundancy.py` and it prints this, live.
+
+| Level | Carriers | N | Survives one loss? |
+|---|---|---|---|
+| **L0** the check | three verifier implementations sharing no code | 3 | yes, and can adjudicate |
+| **L1** the record | working copy, second folder, cloud, git history | 4 | yes — but see below |
+| **L2** the witnesses | this tree, the remote, the published anchors | 2 | detects, cannot decide |
+| **L3** the nodes | four live nodes | 4 | yes — but see below |
+| **L4** the supervisors | watchdog, then guard, then nothing | 2 | detects, cannot decide |
+| **L5** the operators | one person | **1** | **no** |
+
+**Count carriers, then count what they share.** L1 reads as 4 and is not: two of
+those folders sit on one disk and the git history sits on it too, so a disk
+failure takes three of four. L3 reads as 4 and is not: all four nodes start in
+one console group, so one window close takes every one of them — measured on
+2026-08-29, when precisely that happened and took the watchdog with it.
+
+Redundancy that shares a failure is one carrier wearing several names. A
+governance document that counts the names is lying with true numbers.
+
+**The structure is capped by its weakest level, and that level is L5.** Adding
+copies below a level with N=1 does not raise the floor; it makes the drop look
+further away. Every claim in this document inherits that cap, and no amount of
+engineering removes it, because it is not an engineering problem.
+
+## IV. The bound on survival
+
+> Survive at all cost, **as long as mutual benefit is preserved.**
+
+The second clause is not decoration, and it is the harder half.
+
+Redundancy can always be bought by breaking the principle. Mirror the private
+corpus to a hundred machines and it becomes extremely durable — and nobody
+named in it agreed to that. Publish the keys and the ledger can always be
+recovered, by anyone, forever.
+
+**A system that survived that way did not survive. Something else did, wearing
+its name.**
+
+So the survival instinct is bounded, mechanically and not by good intentions:
+
+- `redundancy.py` checks that no tracked file carries the private corpus, the
+  audit chain, or the keys — and reports a violation as a stop condition, not a
+  warning.
+- `.gitignore` enforces it rather than relying on anyone remembering. Until
+  2026-08-30 that rule was kept by memory alone: the corpus lives outside the
+  repository, so it had never been tracked, and *"has not happened"* had been
+  standing in for *"cannot happen."*
+- The distinction is kept precisely. `ai_memory_system/` is the **software**,
+  public on purpose. `ai_memory/` is the **record**, never publishable. A guard
+  that cannot tell them apart is worse than none — the first version of that
+  check flagged twelve innocent files, and a check that cries wolf is one you
+  learn to skim past.
+
+## V. How a branch joins
+
+A **fork, not a branch.** A branch lives in someone else's repository and can
+be deleted by whoever owns it. A fork is yours. If this project is worth
+adopting, it must be adoptable by someone who does not trust its author — which
+means the mechanism of joining cannot route through him.
+
+There is no registration, no approval, no key to be issued, and no list you can
+be removed from.
+
+1. Fork the repository. It is now yours; nothing here can reach it.
+2. Run the three verifiers. If they disagree with each other, do not proceed —
+   report it. That disagreement is worth more than any assurance in this file.
+3. Add your endpoint to your own `peers.txt`. Nobody else's copy needs to change.
+4. `federation.py` reports **SAME CORE**, **DIVERGED**, or **UNREACHABLE**.
+
+**Divergence is reported and never punished.** There is no mechanism here for
+one peer to overwrite another, and adding one would be the single change that
+turns this from federation into administration. A peer running different code
+is information about the network, not an error to be corrected — and if a
+divergent peer is right, the majority needs to know that more than it needs
+agreement.
+
+A national or institutional branch is exactly this and nothing more: a fork,
+run under its own law, by its own operators, reporting divergence honestly. It
+inherits no obligation to this repository. What it gains is a common way to
+*check*, which is worth having precisely because it costs no sovereignty.
+
+## VI. What this is not
+
+**This system is not ready to govern anything of consequence**, and section V
+of [`CONSTITUTION.md`](CONSTITUTION.md) enumerates why in detail. The short
+form:
+
+- **L5 = 1.** One person runs every node, holds every key, and controls every
+  remote. A single-operator network is not governed; it is owned. Quorum among
+  machines one party controls is theatre. This is the largest gap and it is not
+  a software problem.
+- **The verifier runs on the governed machine.** An adversary with root rewrites
+  the ledger and recomputes every hash. Publishing state roots off-host makes
+  tampering *detectable*; nothing here makes it *preventable*.
+- **The ethics gate has known defects**, including one demonstrated on
+  2026-08-30: it refused a record for a word appearing inside a sentence saying
+  the thing was *not* happening. A gate that blocks the case for innocence more
+  readily than the accusation is dangerous exactly where it matters.
+- **Most of an earlier fifteen-defect audit is still unverified.** Four were
+  re-checked and resolved. "Not checked" and "fixed" are different words and
+  only one of them is earned.
+
+Anyone told this system is ready should ask which line of this section no longer
+applies, and how that was checked.
+
+## VII. Verification
+
+```
+python redundancy.py        # N at every level, and what shares a failure
+python constitution.py verify
+sh verify.sh                # the same answer, no Python
+powershell -File verify.ps1 # the same answer, no Python and no Unix shell
+python federation.py        # SAME CORE / DIVERGED / UNREACHABLE
+```
+
+Three verifiers in three languages sharing no code. They have already disagreed
+once — on one block of three, over whether a heading's em dash was part of what
+was signed — and that disagreement was the finding. It was worth more than
+either implementation would have been alone.
+
+That is the argument for all of this, at every scale, in one sentence:
+**agreement between independent checkers is evidence, and a lone checker
+agreeing with itself is not.**
+
+---
+
+*A constraint you can lift when it becomes inconvenient is not a constraint. A
+constraint you can lift but not conceal is the most an honest system with one
+operator can offer — and this document exists to say, precisely, that one
+operator is what it still has.*
