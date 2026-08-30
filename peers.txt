@@ -1,0 +1,4 @@
+# peers.txt -- yours. Nobody approves this list and nobody can add to it.
+# name  url-or-path
+
+self  docs/CONSTITUTION_ANCHOR.json
