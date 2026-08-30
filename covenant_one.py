@@ -366,13 +366,50 @@ def run_open(say, cmd, cwd=None, env=None, timeout=None, label=None):
 # process tree cannot reach the production nodes or the node identity keys.
 # --------------------------------------------------------------------------
 def stage(say):
-    work = os.path.join(tempfile.gettempdir(), "covenant_one")
+    # ONE SCRATCH DIRECTORY PER RUN, keyed by pid.
+    #
+    # What this replaces, and the two false reports it produced on 2026-08-30.
+    # The previous version took the fixed path .../covenant_one, DELETED it,
+    # and only then looped looking for a free name:
+    #
+    #     work = .../"covenant_one"
+    #     if os.path.isdir(work): shutil.rmtree(work)      # <- destroys it
+    #     while os.path.isdir(work) and os.listdir(work):  # <- now always False
+    #         work = .../"covenant_one%d" % n
+    #
+    # The collision check was written and then made unreachable by the rmtree
+    # two lines above it. So a second run on the same machine did not pick a
+    # new directory; it deleted the first run's staged copy mid-flight. The
+    # first run then failed suite after suite with "can't open file", and
+    # reported 45 and then 39 suites unclean -- dozens of alarming failures,
+    # none of them real, in a tool whose entire job is to be believed.
+    #
+    # A pid is unique among live processes by definition, so two runs cannot
+    # collide at all rather than being trusted to notice each other.
+    work = os.path.join(tempfile.gettempdir(), "covenant_one_%d" % os.getpid())
     if os.path.isdir(work):
         shutil.rmtree(work, ignore_errors=True)
-    n = 2
-    while os.path.isdir(work) and os.listdir(work):
-        work = os.path.join(tempfile.gettempdir(), "covenant_one%d" % n)
-        n += 1
+
+    # Sweep scratch left by runs that are long over. By AGE, never by name:
+    # deleting a sibling because it looks like ours is exactly the mistake
+    # above. Anything younger than a day might still be running, and disk is
+    # cheaper than another day of false failures.
+    try:
+        cutoff = time.time() - 24 * 3600
+        for name in os.listdir(tempfile.gettempdir()):
+            if not name.startswith("covenant_one"):
+                continue
+            old = os.path.join(tempfile.gettempdir(), name)
+            if old == work or not os.path.isdir(old):
+                continue
+            try:
+                if os.path.getmtime(old) < cutoff:
+                    shutil.rmtree(old, ignore_errors=True)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
     os.makedirs(os.path.join(work, "logs"), exist_ok=True)
     for name in os.listdir(HERE):
         p = os.path.join(HERE, name)
