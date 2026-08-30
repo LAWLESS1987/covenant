@@ -116,6 +116,19 @@ The standing rules a successor needs, in full:
 5. **Before treating any model output as evidence, ask what outside the
    conversation could confirm or refute it.** If nothing could, it is data about
    that model under that pressure, not about the world.
+6. **Fluency is not the test.** A better-written answer and a worse one come out
+   of the same process. Since fluency is constant, it can never be what
+   distinguishes a sound claim from a generated one. The only discriminator is
+   whether a claim traces to something outside the message.
+7. **Partial knowledge is the dangerous state, not empty knowledge.** A system
+   holding nothing reports the absence accurately. A system holding a *fragment*
+   completes it with the most plausible continuation, and the fragment arrives
+   with no marker saying "fragment." Expect confident, specific, wrong detail
+   precisely where a source is partially informed — including yourself.
+
+Rules 6 and 7 were established on 2026-08-30 by five systems independently, each
+reaching the same principle from a different direction, and by checking their
+claims against this repository.
 
 ---
 
