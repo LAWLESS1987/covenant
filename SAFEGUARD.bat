@@ -32,7 +32,7 @@ set STAMP=%DATE:~-4%%DATE:~4,2%%DATE:~7,2%
 
 echo.
 echo   ==========================================================
-echo    STEP 1 of 5 -- verify the record
+echo    STEP 1 of 6 -- verify the record
 echo   ==========================================================
 if not exist "%STORE%" goto NOSTORE
 set AI_MEMORY_ROOT=%STORE%
@@ -45,7 +45,7 @@ if not "%RC%"=="0" goto DRIFTED
 
 echo.
 echo   ==========================================================
-echo    STEP 2 of 5 -- three copies
+echo    STEP 2 of 6 -- three copies
 echo   ==========================================================
 if not exist "%USERPROFILE%\ai_memory_backups\%STAMP%" mkdir "%USERPROFILE%\ai_memory_backups\%STAMP%" >nul 2>&1
 copy /Y "%STORE%\*.md" "%USERPROFILE%\ai_memory_backups\%STAMP%\" >nul 2>&1
@@ -68,13 +68,13 @@ cd /d "%~dp0"
 
 echo.
 echo   ==========================================================
-echo    STEP 3 of 5 -- the shareable part still holds
+echo    STEP 3 of 6 -- the shareable part still holds
 echo   ==========================================================
 "%PY%" refutable.py selftest
 
 echo.
 echo   ==========================================================
-echo    STEP 4 of 5 -- is this machine exposed right now?
+echo    STEP 4 of 6 -- is this machine exposed right now?
 echo   ==========================================================
 REM The node watches its peers and its traffic; nothing in it watches
 REM its own posture. This asks the question it never asks itself.
@@ -82,7 +82,7 @@ REM its own posture. This asks the question it never asks itself.
 
 echo.
 echo   ==========================================================
-echo    STEP 5 of 5 -- is the TOP of the supervision chain running?
+echo    STEP 5 of 6 -- is the TOP of the supervision chain running?
 echo   ==========================================================
 REM The watchdog revives nodes, the guard revives the watchdog, and nothing
 REM sits above the guard. test_c2 already reads the WATCHDOG's silence; nothing
@@ -91,6 +91,16 @@ REM whose silence nobody listened for. It reports HISTORY as well as "now",
 REM because a guard gated off on battery resumes on mains and reads healthy
 REM every time anyone looks while plugged in.
 "%PY%" guard_freshness.py
+
+echo.
+echo   ==========================================================
+echo    STEP 6 of 6 -- what could this do with funds right now?
+echo   ==========================================================
+REM Both easy readings are wrong and the true one changes with a config flag,
+REM so it is measured rather than asserted. Reads no key, places nothing,
+REM arms nothing. If it ever prints ARMED, CONSTITUTION.md II.1 is being
+REM broken and the documents are out of date.
+"%PY%" money_posture.py
 
 echo.
 echo   ==========================================================

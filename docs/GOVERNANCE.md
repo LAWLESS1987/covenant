@@ -192,7 +192,45 @@ run under its own law, by its own operators, reporting divergence honestly. It
 inherits no obligation to this repository. What it gains is a common way to
 *check*, which is worth having precisely because it costs no sovereignty.
 
-## VII. What this is not
+## VII. Money, stated exactly
+
+An evaluator will ask this first, and both of the easy answers are wrong.
+
+**The capability to place a real order exists**, in this repository, wired to two
+real exchanges. `venues.py` holds Kraken and Coinbase order adapters,
+`covenant_trader.py` plans orders, and the `CovenantTrader` scheduled task runs
+it **daily, with no human involved**.
+
+**Nothing has ever been booked.** Every order is sent to the venue's own dry-run
+endpoint — Kraken `validate=true`, Coinbase `/orders/preview` — which prices and
+rejects it without placing it. The trader is disarmed. Armed, it would still be
+bounded by a halt file, $25 per order, $50 per day, two orders per day, and a
+requirement that the decision be sealed to the chain first.
+
+So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
+between them is [`CONSTITUTION.md`](CONSTITUTION.md) II.1 — a commitment, not an
+absence of capability — and that is the only honest way to describe it.
+
+**Why disclose the dangerous half at all?** Because a promise whose shape you
+cannot see is not a promise, it is a reassurance. A reader who finds a daily
+scheduled task and an `AddOrder` call *after* being told "no trades placed by
+automation" has been misled, even though every individual sentence was true.
+Disclosure is what makes the constraint meaningful rather than decorative.
+
+**Do not take it on trust.** It is a live state that one config flag changes, so
+it is measured, not asserted:
+
+```
+python money_posture.py
+```
+
+Read-only: it reads no key, places nothing, and arms nothing — deliberately, so
+that the checker can never become the thing that arms the trader. If it ever
+prints **ARMED**, clause II.1 is being broken and these documents are out of
+date. That is the finding, and it is meant to be findable by someone who does
+not trust the author.
+
+## VIII. What this is not
 
 **This system is not ready to govern anything of consequence**, and section V
 of [`CONSTITUTION.md`](CONSTITUTION.md) enumerates why in detail. The short
@@ -216,7 +254,7 @@ form:
 Anyone told this system is ready should ask which line of this section no longer
 applies, and how that was checked.
 
-## VIII. Verification
+## IX. Verification
 
 ```
 python redundancy.py        # N at every level, and what shares a failure
@@ -225,6 +263,7 @@ sh verify.sh                # the same answer, no Python
 powershell -File verify.ps1 # the same answer, no Python and no Unix shell
 python federation.py        # SAME CORE / DIVERGED / UNREACHABLE
 python scale.py             # compose levels to any depth, any shape
+python money_posture.py     # what could this do with funds RIGHT NOW
 ```
 
 Three verifiers in three languages sharing no code. They have already disagreed
