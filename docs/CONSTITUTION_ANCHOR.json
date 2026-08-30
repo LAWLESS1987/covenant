@@ -1,0 +1,26 @@
+{
+  "hash": "0f0b316270f5acff8ead6842bbc3fcea10e2dba2c6d597730ab97f7cb5dfa55f",
+  "blocks": 3,
+  "at": "2026-08-30",
+  "note": "Hash over the rules that bind the operator. A change here is an amendment. See docs/CONSTITUTION.md section III.",
+  "detail": [
+    {
+      "file": "CONTRIBUTING.md",
+      "opens": "## Why it exists, and the one condition",
+      "chars": 1009,
+      "digest": "be700287d1469abd078dc690d965e4400cbf099f7bca8ebac9f0361ac4c8949f"
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "opens": "## What never changes",
+      "chars": 307,
+      "digest": "8a7618639ac51d1678f33cead0db5db95e8c4a3f0c5c559db0529284e9a69534"
+    },
+    {
+      "file": "docs/SUCCESSION.md",
+      "opens": "## Layer 4 - Continuation, not just preservation",
+      "chars": 2632,
+      "digest": "672107a4c4ef00b5c8692f93e82da3e28ae4631cfb17a9fd5e56719d7ecd97c5"
+    }
+  ]
+}
