@@ -556,6 +556,62 @@ def phase_coverage(say):
     # one of them a SECURITY suite reading 14/16. Four symptoms named, the one
     # cause named nowhere. It is the same disease as the orphan check above:
     # the runner already knew, and never said.
+    # ON DISK HERE is not IN THE DELIVERY, and the difference is the whole
+    # reason CI was red from 2026-08-29 to 2026-08-30. .gitignore's `*_secret*`
+    # swallowed test_e1_secret_egress.py, `git add` declined it without a word,
+    # and this phase -- the phase that exists to catch a runner naming a suite
+    # that is not there -- reported it present, because os.path.isfile asks
+    # "is this on THIS disk" and never "is this in what I am about to ship".
+    #
+    # So the check written to stop exactly this could not fire on the machine
+    # where the mistake was made. It could only fire on a clean checkout, in a
+    # CI log the operator gets a 403 on. That is the same blind spot one level
+    # up, and this closes it.
+    say("")
+    say("  SHIPPED -- is every listed suite actually IN the delivery, not just")
+    say("  on this disk?")
+    unshipped, ignored_by = [], {}
+    if subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                      cwd=HERE, capture_output=True,
+                      text=True).returncode != 0:
+        # A tarball delivery, a transported copy, a PRE-LAND snapshot. Without
+        # this gate every listed suite reports UNSHIPPED and the run is
+        # permanently INCOMPLETE for a reason that is true of the folder rather
+        # than of the code -- M34, a check that is always red.
+        say("      NOT MEASURED -- not a git work tree. This is not a pass;")
+        say("      it means the question could not be asked here.")
+    else:
+        # ls-files and check-ignore only. NEVER `git status`: this file already
+        # records (see phase_identity) that a plain status refreshes the index,
+        # takes .git/index.lock, and once blocked a git rm for two hours.
+        tracked = set()
+        out = subprocess.run(["git", "ls-files"], cwd=HERE,
+                             capture_output=True, text=True)
+        if out.returncode == 0:
+            tracked = {os.path.basename(l.strip()) for l in
+                       out.stdout.splitlines() if l.strip()}
+        unshipped = sorted(s for s in listed
+                           if s not in tracked
+                           and os.path.isfile(os.path.join(HERE, s)))
+        for s in unshipped:
+            ci = subprocess.run(["git", "check-ignore", "-v", s], cwd=HERE,
+                                capture_output=True, text=True)
+            if ci.returncode == 0 and ci.stdout.strip():
+                ignored_by[s] = ci.stdout.strip().split("\t")[0]
+        if not unshipped:
+            say("      SHIPPED  every listed suite is in the delivery.")
+        for s in unshipped:
+            if s in ignored_by:
+                say("      IGNORED  %s" % s)
+                say("               on disk here, and an ignore rule keeps it")
+                say("               OUT of the delivery: %s" % ignored_by[s])
+                say("               CI will call this ABSENT. A suite the")
+                say("               runner names has no legitimate reason to")
+                say("               be ignored. Fix the RULE, not the list.")
+            else:
+                say("      UNSHIPPED %s -- on disk, not yet committed." % s)
+                say("               Fix: git add %s" % s)
+
     say("")
     say("  DECLARED DEPENDENCIES -- requirements.txt against what is installed:")
     missing_deps = 0
@@ -569,7 +625,7 @@ def phase_coverage(say):
         say("      COULD NOT CHECK -- %s: %s" % (type(e).__name__, e))
         say("      Treat dependencies as UNVERIFIED for this run.")
         missing_deps = 0
-    return absent, orphans, missing_deps
+    return absent, orphans, missing_deps, sorted(ignored_by)
 
 
 IN_PLACE = [
@@ -864,9 +920,10 @@ def main():
     results = []
     actions = []
     missing_deps = 0
+    ignored = []
     try:
         phase_identity(say)
-        absent, orphans, missing_deps = phase_coverage(say)
+        absent, orphans, missing_deps, ignored = phase_coverage(say)
         inplace = phase_integrity(say, transported=args.transported)
         gates = phase_gates(say)
         if args.check:
@@ -911,6 +968,12 @@ def main():
             ("  -> " + ", ".join(absent)) if absent else ""))
         say("  orphaned on disk    %d%s" % (len(orphans),
             ("  -> " + ", ".join(orphans)) if orphans else ""))
+        say("  listed but NOT SHIPPED %d%s"
+            % (len(ignored),
+               ("  -> " + ", ".join(ignored)
+                + "   <- an ignore rule keeps these OUT of the delivery;"
+                  " CI will call them ABSENT")
+               if ignored else ""))
         say("  declared deps missing %d%s"
             % (missing_deps,
                "   <- suites needing them are UNMEASURED, not failing"
@@ -937,6 +1000,7 @@ def main():
             say("  RESULT: FAIL. Something is wrong and it is named above.")
             code = 1
         elif (unmeasured or absent or orphans or args.quick or missing_deps
+              or ignored
               or (gates in (2, None) and not args.ci)
               or [n for n, st in inplace
                   if st == "ABSENT" or (st.startswith("N/A") and not args.ci)]):
