@@ -630,6 +630,9 @@ run test_v1_verifier_agreement.py 120
 # M1 (2026-08-30) pins that the spliced fast miner agrees with compute_hash,
 # and that peer-controlled tx.data cannot make the splice ambiguous.
 run test_m1_mine_equivalence.py 180
+# B6 (2026-08-31) pins the batched balance reader: one connection per loop,
+# same answers, and every refusal still firing.
+run test_b6_balance_batching.py 120
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.

@@ -5333,6 +5333,78 @@ class Database:
             row = conn.execute("SELECT COALESCE(SUM(delta), 0) FROM ledger_entries WHERE pubkey = ?", (pubkey,)).fetchone()
             return row[0] if row else 0.0
 
+    def get_balances(self, pubkeys) -> Dict[str, float]:
+        """get_balance for many pubkeys, on ONE connection. Same statement.
+
+        WHY THIS EXISTS, and it is availability rather than speed.
+
+        Two loops call get_balance once per transaction, and each call opened
+        its own sqlite connection. Measured decomposition, reproduced twice:
+        connect() 0.30 ms, FIRST statement on a fresh connection 1.56 ms, warm
+        statement on the same connection 0.019 ms. About 99% of the ~2.3 ms per
+        call is connection setup, so the cost is per-CALL and not per-ROW -- a
+        rebuilt live-sized ledger of 7 rows measured slightly SLOWER at
+        5000 senders than a 200,000-row one. This is not a synthetic-big-database
+        number that evaporates in production.
+
+        At the size this system runs at (1-5 pending) batching saves 10-15 ms
+        against a /mine measured at 4,625 ms. Under 1%, and not worth doing for
+        speed. What justifies it is that both loops are reachable by someone
+        else:
+
+          * /transactions admits up to MAX_PENDING_TRANSACTIONS = 5000 from any
+            valid keypair, and unaffordable transactions stay in still_pending
+            FOREVER by design. The /mine loop sits inside `with chain_lock`, so
+            a remote party permanently converts the operator's own /mine into a
+            32.7 s no-op that holds chain_lock throughout -- blocking
+            /transactions, /chain and peer block acceptance -- and it never
+            clears. Measured: 5000 pending / 8 senders, 32,672 ms -> 31 ms.
+          * The peer overdraft loop is worse in kind, because it needs no
+            operator auth at all. At the protocol ceiling of ~7,800
+            transactions in one 8 MiB block: 30,955 ms -> 189.3 ms. That loop
+            was about 82% of all the work one maximal block could force.
+
+        ONE STATEMENT PER DISTINCT PUBKEY, deliberately not a grouped IN (...).
+        A peer chooses how many distinct senders a block carries -- up to
+        ~7,825 at MAX_BLOCK_BYTES -- against SQLITE_LIMIT_VARIABLE_NUMBER.
+        Measured on this build (sqlite 3.49.1) 32,766 parameters are accepted
+        and 32,767 raises OperationalError, but sqlite before 3.32 caps at 999,
+        and there is no try/except around the peer loop, so it would propagate
+        out of the P2P handler as an unhandled error. Per-key statements on one
+        warm connection have no such ceiling and are already ~120x cheaper than
+        per-key CONNECTIONS.
+
+        WHAT IS GIVEN UP, stated because the first write-up of this change said
+        it was nothing. It is not nothing: /stake, /unstake and /claim_rewards
+        all write ledger_entries WITHOUT taking chain_lock, so a concurrent
+        debit can land between the first read here and the last. That was true
+        of the per-transaction calls too, only in a narrower window.
+
+        It is still not a control weakening, and that is measured rather than
+        asserted. The freshness surrendered is worth at most this loop's own
+        duration, inside a race window that is already vastly wider: /mine
+        holds chain_lock from here through proof of work AND the entire judging
+        window, and this project's own test_b5 prints hours under chain_lock
+        for a full judged block. Shrinking the loop from 32.7 s to 31 ms makes
+        that window smaller, not larger.
+        """
+        out: Dict[str, float] = {}
+        distinct = []
+        seen = set()
+        for k in pubkeys:
+            if k not in seen:
+                seen.add(k)
+                distinct.append(k)
+        if not distinct:
+            return out
+        with _db(self.db_path) as conn:
+            for k in distinct:
+                row = conn.execute(
+                    "SELECT COALESCE(SUM(delta), 0) FROM ledger_entries WHERE pubkey = ?",
+                    (k,)).fetchone()
+                out[k] = row[0] if row else 0.0
+        return out
+
     def sum_ledger_entries_since(self, pubkey: str, reason: str, since_timestamp: float) -> float:
         """NEW v8.6 -- see PATCH LOG item N. General-purpose rolling-window
         sum over the SAME append-only ledger get_balance already reads --
@@ -7637,11 +7709,18 @@ class CovenantAPI:
                 # tx.amount <= 0 (nothing to afford); the db-shape check is
                 # gone.
                 included, still_pending, reserved = [], [], {}
+                # ONE connection for the whole loop, not one per transaction.
+                # No hasattr() guard, deliberately: PATCH LOG item H records
+                # that exact pattern failing OPEN on this very check, and a
+                # missing method must raise rather than skip an affordability
+                # test. See Database.get_balances for the measured numbers.
+                balances = self.db.get_balances(
+                    [t.sender_pubkey for t in sorted_pending if t.amount > 0])
                 for tx in sorted_pending:
                     if tx.amount <= 0:
                         included.append(tx)
                         continue
-                    bal = self.db.get_balance(tx.sender_pubkey)
+                    bal = balances.get(tx.sender_pubkey, 0.0)
                     already = reserved.get(tx.sender_pubkey, 0.0)
                     if bal - already >= tx.amount:
                         included.append(tx)
@@ -8633,10 +8712,18 @@ class CovenantUnifiedMaster:
         # the most self-defeating instance of this fail-open pattern in
         # the file. Now unconditional.
         reserved: Dict[str, float] = {}
+        # ONE connection for the whole block. This loop is reachable by a peer
+        # with NO operator auth, and at the protocol ceiling of ~7,800
+        # transactions it was ~82% of all the work one maximal 8 MiB block
+        # could force: 30,955 ms -> 189.3 ms. The hasattr guard that used to
+        # sit here failed OPEN and was removed in v8.2 (item H); nothing
+        # conditional replaces it.
+        balances = self.db.get_balances(
+            [t.sender_pubkey for t in block.transactions if t.amount > 0])
         for tx in block.transactions:
             if tx.amount <= 0:
                 continue
-            bal = self.db.get_balance(tx.sender_pubkey)
+            bal = balances.get(tx.sender_pubkey, 0.0)
             already = reserved.get(tx.sender_pubkey, 0.0)
             if bal - already < tx.amount:
                 # v8.14 item AN -- was a silent refusal. An overdrawn block from

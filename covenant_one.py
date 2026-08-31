@@ -171,6 +171,18 @@ SUITES = [
     # an unguarded split would raise inside /mine while holding chain_lock.
     # 15/15 before wiring.
     ("test_m1_mine_equivalence.py",      180,  "SECURITY"),
+    # B6 (2026-08-31). Two loops called get_balance once per transaction and
+    # each call opened its own sqlite connection -- ~99% of the 2.3 ms per call
+    # was connection setup, so the cost was per-CALL, not per-ROW. It is an
+    # AVAILABILITY fix, not a speed one: /transactions admits 5,000 pending
+    # from any keypair, unaffordable ones stay pending forever by design, and
+    # the /mine loop holds chain_lock -- so a remote party permanently turned
+    # the operator's own /mine into a 32.7s no-op (now 31ms). The peer
+    # overdraft loop needs no auth at all and was ~82% of the work one maximal
+    # 8 MiB block could force. B6 pins that the batched reader AGREES with
+    # get_balance, that the reserved accumulator still catches a same-sender
+    # overdraw, and that neither call site fails open. 13/13 before wiring.
+    ("test_b6_balance_batching.py",      120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     # E2 (2026-08-30). /chain served the whole chain on every request via
