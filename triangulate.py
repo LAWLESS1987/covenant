@@ -72,7 +72,7 @@ UNPROVEN = "UNPROVEN"
 
 # --------------------------------------------------------------- the core --
 def attest(roots: Dict[str, Optional[str]], scale: str = "",
-           quorum: int = 2) -> Dict[str, Any]:
+           quorum: Optional[int] = None) -> Dict[str, Any]:
     """The whole judgement, pure. `roots` maps witness -> root, or None for a
     witness that could not be reached.
 
@@ -84,6 +84,41 @@ def attest(roots: Dict[str, Optional[str]], scale: str = "",
     present = {k: v for k, v in roots.items() if v}
     silent = sorted(k for k, v in roots.items() if not v)
 
+    # THE DEFAULT QUORUM IS A MAJORITY OF THE WITNESSES ASKED -- not a
+    # constant, and deliberately not a majority of those who ANSWERED.
+    #
+    # The constant 2 was the defect. It does not grow with the question: put a
+    # hundred witnesses to this function and two of them agreeing establishes
+    # agreement for all hundred, which is a claim far stronger than its
+    # evidence and a ready-made route for a small colluding subset to speak
+    # for everyone.
+    #
+    # "A majority of those PRESENT" is the worse repair, and it is worth
+    # naming because it is the one that looks reasonable: it means SILENCING
+    # WITNESSES MAKES AGREEMENT EASIER. Knock enough witnesses offline and the
+    # survivors clear a smaller bar. A mechanism in which one party gains by
+    # suppressing others is exactly the transaction this project exists to
+    # refuse.
+    #
+    # So the bar is set by the question asked, and silence can only ever make
+    # a verdict harder to reach. An explicitly passed quorum is honoured
+    # unchanged: a caller who knows its own topology outranks a default. At
+    # the three-witness scale this file was written for, this is still 2.
+    if quorum is None:
+        # A FLOOR OF TWO, and it is derived rather than chosen. The pure
+        # majority rule gives a majority of one witness = one, so a lone
+        # witness would AGREE with itself -- a verdict with nothing behind
+        # it, and a claim stronger than its evidence. This project already
+        # says so in its own words, in test_v1's N1: "One implementation
+        # agreeing with itself is not agreement." A caller relying on that
+        # AGREE is harmed for the benefit of whoever produced it, which is
+        # the shape of transaction the one condition forbids.
+        #
+        # Nothing else moves: max(2, n//2+1) is 2 at n=2 and n=3, and 3 at
+        # n=5, so the majority-of-asked rule still binds everywhere it was
+        # the larger number.
+        quorum = max(2, len(roots) // 2 + 1)
+
     tally: Dict[str, List[str]] = {}
     for who, root in present.items():
         tally.setdefault(root, []).append(who)
@@ -91,9 +126,32 @@ def attest(roots: Dict[str, Optional[str]], scale: str = "",
         holders.sort()
 
     ranked = sorted(tally.items(), key=lambda kv: (-len(kv[1]), kv[0]))
-    top_root, top_holders = (ranked[0] if ranked else (None, []))
-    outliers = sorted(w for r, hs in tally.items() if r != top_root
-                      for w in hs)
+
+    # A ROOT IS THE REFERENCE ONLY IF IT HAS A STRICT PLURALITY -- strictly
+    # more holders than any other root.
+    #
+    # This code used to take ranked[0] unconditionally, which on {x:A, y:B,
+    # z:C} made x's root the reference and reported y and z as outliers. That
+    # is a winner declared by nothing but the alphabet, and the vector pinning
+    # this case says in its own words that the function "declares no winner by
+    # luck of ordering". The comment was right and the code was not.
+    #
+    # On a tie for top there is therefore NO reference, and no tie-break is
+    # invented here: choosing between equally-held roots is a decision, and
+    # this function reports evidence and decides nothing. With no reference
+    # `outliers` is EMPTY -- an outlier is a witness that differs FROM THE
+    # REFERENCE, and where there is no reference the word names nothing.
+    #
+    # A quorum that was not met is likewise no reference: under UNPROVEN
+    # nothing was compared, so there is nothing for a witness to differ from.
+    quorum_met = len(present) >= quorum
+    reference: Optional[str] = None
+    if quorum_met and ranked and (len(ranked) == 1
+                                  or len(ranked[0][1]) > len(ranked[1][1])):
+        reference = ranked[0][0]
+    held_by = tally[reference] if reference else []
+    outliers = (sorted(w for r, hs in tally.items() if r != reference
+                       for w in hs) if reference else [])
 
     if len(present) < quorum:
         verdict, agreed = UNPROVEN, False
@@ -105,10 +163,17 @@ def attest(roots: Dict[str, Optional[str]], scale: str = "",
         why = (f"all {len(present)} answering witnesses hold the same root"
                + (f"; {silent} did not answer, so this agreement covers "
                   f"{sorted(present)} only" if silent else ""))
+    elif reference is None:
+        verdict, agreed = DIVERGED, False
+        why = (f"{len(tally)} different roots and no strict plurality among "
+               f"them, so NO root is the reference and nothing here is an "
+               f"outlier -- a witness can only be an outlier against a "
+               f"reference. Breaking the tie would be a decision, and nothing "
+               f"here decides or overwrites anybody.")
     else:
         verdict, agreed = DIVERGED, False
-        why = (f"{len(tally)} different roots. {top_holders} hold "
-               f"{str(top_root)[:12]}...; {outliers} differ. The majority is "
+        why = (f"{len(tally)} different roots. {held_by} hold "
+               f"{str(reference)[:12]}...; {outliers} differ. The majority is "
                f"EVIDENCE about the outlier, not a decision -- nothing here "
                f"overwrites anybody.")
 
@@ -116,8 +181,20 @@ def attest(roots: Dict[str, Optional[str]], scale: str = "",
         "scale": scale, "verdict": verdict, "agreed": agreed,
         "quorum": quorum, "answered": sorted(present), "silent": silent,
         "roots": {k: (v[:16] if v else None) for k, v in roots.items()},
-        "majority": {"root": (top_root[:16] if top_root else None),
-                     "held_by": top_holders},
+        "majority": {"root": (reference[:16] if reference else None),
+                     "held_by": held_by},
+        # THE REFERENCE, STATED OUTRIGHT AND IN FULL. Every other root in this
+        # report is truncated for reading; this one is not, because it is the
+        # only field meant to be COMPARED rather than read. A party handed a
+        # verdict must be able to check it against its own view instead of
+        # trusting the verdict's word for it, and 16 characters cannot be
+        # checked against anything.
+        #
+        # It also closes a gap nothing else covers: which root an agreeing
+        # level speaks upward was never stated anywhere, so an implementation
+        # that returned a hardcoded constant upward would have passed every
+        # test in this repository.
+        "reference": reference,
         "outliers": outliers,
         "why": why,
         "limits": ("detects divergence, corruption and single-point "

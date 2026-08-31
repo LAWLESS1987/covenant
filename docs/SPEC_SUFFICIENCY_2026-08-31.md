@@ -1,5 +1,15 @@
 # Is the published conformance spec sufficient on its own?
 
+> **SUPERSEDED AS A CURRENT CLAIM — kept verbatim as the record of the test.**
+> Every root, count and verdict below describes the **11-vector spec whose root
+> was `9d630fee…6f1c2784`**. Later on 2026-08-31 twelve vectors were added to
+> close the gaps this document found; the spec is now **23 vectors at root
+> `0c398099…0f0ddcef`**. The five rival readings named here as surviving no
+> longer survive — each is caught by at least one of the new vectors and each
+> moves the root. Read the findings as the reason the vectors changed, not as
+> a description of the vectors that exist today. Nothing below has been
+> rewritten: a sufficiency test edited after the fact is not evidence.
+
 Tested 2026-08-31. Two implementations were written from `docs/CONFORMANCE_SPEC.json`
 ALONE, by agents forbidden to open `conformance.py`, `triangulate.py`, `scale.py`
 or any test. Both contamination audits came back clean.

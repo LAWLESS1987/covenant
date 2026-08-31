@@ -342,13 +342,13 @@ operator is what it still has.*
 
 ## X. Verification that cannot see who you are
 
-`conformance.py` runs eleven fixed vectors through this instance's governance
-primitives and hashes the **semantic results** — verdicts, quorum outcomes,
-whether a divergence survived a climb — and never the prose that explains them.
-[`CONFORMANCE_SPEC.json`](CONFORMANCE_SPEC.json) publishes all eleven: inputs,
-expected outputs, and the hashing rule. Someone who has never read this Python
-can rebuild it in another language and either reproduce
-`9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784` or not.
+`conformance.py` runs twenty-three fixed vectors through this instance's
+governance primitives and hashes the **semantic results** — verdicts, quorum
+outcomes, whether a divergence survived a climb — and never the prose that
+explains them. [`CONFORMANCE_SPEC.json`](CONFORMANCE_SPEC.json) publishes all
+twenty-three: inputs, expected outputs, and the hashing rule. Someone who has
+never read this Python can rebuild it in another language and either reproduce
+`0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef` or not.
 
 **The omission is the subject of this section.** No attribute of the party doing
 the computing is an input to that root — not their name, their language, their
@@ -357,9 +357,9 @@ agreeing and disagreeing, a quorum raised, a level speaking silence upward.
 Identity has nowhere to enter. That is not tolerance; it is a fact about what
 gets hashed.
 
-**The limits, before a reader finds them.** A root over eleven vectors is a
-claim about eleven vectors, it is not a proof of correctness, and it decides
-nothing. No second party has ever reproduced it — `peers.txt` still reads
+**The limits, before a reader finds them.** A root over twenty-three vectors is
+a claim about twenty-three vectors, it is not a proof of correctness, and it
+decides nothing. No second party has ever reproduced it — `peers.txt` still reads
 `self` — and section IX's cap, **L5 = 1**, applies to every sentence below.
 
 ### Why the rule legislates conduct and not creed
@@ -537,8 +537,8 @@ run the checks, and try to break them.
   Asking whether one side's gain was the other's loss needs a baseline of what
   the other would otherwise have had, and nothing here supplies one.
 - That tag-blind verification prevents discrimination. It removes one input from
-  one judgement, over eleven vectors, and no input from any choice a party makes
-  about another party.
+  one judgement, over twenty-three vectors, and no input from any choice a
+  party makes about another party.
 - That tag-based sorting is inevitable, or that sorting on tags leads to
   eugenics. The model says the opposite asymptotically; two programmes are
   attributed to one man, and no general law is claimed.

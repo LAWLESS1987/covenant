@@ -85,10 +85,20 @@ def main():
     check("D4 divergence is never `agreed`", not r["agreed"], "")
 
     r3 = t.attest({"pc": A, "github": B, "cloud": "c" * 64})
-    check("D5 three-way disagreement is still DIVERGED, with two outliers "
-          "and no winner declared by luck of ordering",
-          r3["verdict"] == t.DIVERGED and len(r3["outliers"]) == 2,
-          r3["outliers"])
+    # This assertion used to require TWO outliers here, which is the winner
+    # declared by luck of ordering that its own sentence forbids: with one
+    # holder each, naming y and z as outliers can only mean x's root was made
+    # the reference because x sorts first. An outlier is a witness that differs
+    # FROM THE REFERENCE, so where no root has a strict plurality there is no
+    # reference and the word names nothing. The verdict stays DIVERGED -- the
+    # disagreement is not softened, only left un-adjudicated, which is what
+    # this function does with every disagreement.
+    check("D5 three-way disagreement is still DIVERGED, and declares no "
+          "winner by luck of ordering: no strict plurality means NO reference "
+          "and therefore no outliers",
+          r3["verdict"] == t.DIVERGED and r3["reference"] is None
+          and r3["outliers"] == [],
+          (r3["reference"], r3["outliers"]))
     check("D6 a two-way tie is resolved DETERMINISTICALLY, so the same "
           "inputs never produce two different reports",
           t.attest({"pc": A, "github": B})["majority"]

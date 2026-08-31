@@ -34,20 +34,21 @@ What it reports:
 | 1 | the constitution's hash, computed with **no Python** — `sh`+`awk`+`sha256` | the published rules are not the rules on disk |
 | 2 | the same hash, computed by `constitution.py` | as above |
 | — | **whether 1 and 2 agree** | two implementations sharing no code diverged |
-| 3 | the **conformance root** over 11 vectors | — not cross-checked; see below |
+| 3 | the **conformance root** over 23 vectors | — not cross-checked; see below |
 | 4 | a dissent three levels down still reaching the top | the disagreement was absorbed on the way up |
 | 5 | what the structure survives, and what it does not | — it reports its own one-operator cap |
 
 Check 3 is the open one, and it is the most useful thing anyone reading this can
-do. The root `9d630fee…6f1c2784` is a claim that an **independent build, in any
+do. The root `0c398099…0f0ddcef` is a claim that an **independent build, in any
 language, sharing none of this code, produces the same number.** No second
 implementation exists yet, so that claim is untested.
 
 **You do not have to read any Python to test it.**
-[`docs/CONFORMANCE_SPEC.json`](docs/CONFORMANCE_SPEC.json) publishes all eleven
-vectors — the inputs, the expected outputs, the three roots, and the hashing
-rule — in about 400 lines of JSON. Implement the two operations it describes in
-whatever language you like, hash the results by the rule it states, and compare.
+[`docs/CONFORMANCE_SPEC.json`](docs/CONFORMANCE_SPEC.json) publishes all
+twenty-three vectors — the inputs, the expected outputs, the three roots, and
+the hashing rule — in about 1,100 lines of JSON. Implement the two operations
+it describes in whatever language you like, hash the results by the rule it
+states, and compare.
 A matching root means two implementations sharing no code agree; a different one
 is a finding, and this project would rather have it than agreement. Either
 result needs nobody's permission.

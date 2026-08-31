@@ -115,7 +115,7 @@ Claims that are defensible today, each verifiable by the recipient:
 | claim | evidence |
 |---|---|
 | three verifiers, three languages, one hash | `0f0b3162…5f`, agreeing; `test_v1` |
-| a fork can prove agreement without your code | conformance root `9d630fee…84` |
+| a fork can prove agreement without your code | conformance root `0c398099…0f0ddcef` |
 | dissent survives composition | `python scale.py` exits non-zero with the dissent named |
 | the limits are published, not hidden | `CONSTITUTION.md` V, `GOVERNANCE.md` IX |
 | the test suite is real | 64 suites, 1,826 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |

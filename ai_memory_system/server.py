@@ -51,6 +51,7 @@ from typing import Any, Dict, Tuple
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+from ethics_gate import MemoryRefused           # noqa: E402
 from memory_store import (MemoryStore, StoreFull,      # noqa: E402
                           MAX_BODY_BYTES)
 import recall                                    # noqa: E402
@@ -103,6 +104,17 @@ class RateLimiter:
             self._buckets[who] = (tokens - 1.0, now)
             return True, 0
 
+# ONE exact origin, or empty. Empty is the default and means no CORS headers
+# at all, which is correct for an API consumed by HTTP clients rather than by
+# browser pages. "*" is rejected on purpose: see _send().
+ALLOW_ORIGIN = os.environ.get("AI_MEMORY_ALLOW_ORIGIN", "").strip()
+if ALLOW_ORIGIN == "*":
+    raise SystemExit(
+        "AI_MEMORY_ALLOW_ORIGIN=* is refused.\n"
+        "  A wildcard makes every response readable by any page the operator\n"
+        "  visits, and this server is unauthenticated on loopback by default.\n"
+        "  Name one exact origin, e.g. http://localhost:5173")
+
 VERSION = "ai-memory/1.0"
 MAX_BODY = 1 << 20          # 1 MiB. A memory is a fact, not a corpus.
 _NAME = re.compile(r"^/memories/([a-z0-9][a-z0-9-]{0,79})$")
@@ -131,11 +143,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods",
-                         "GET, PUT, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers",
-                         "Content-Type, Authorization")
+        # NO WILDCARD CORS. Removed 2026-08-30 after an audit demonstrated the
+        # attack end to end against a scratch store.
+        #
+        # This server makes a token OPTIONAL on loopback, justified by "the
+        # reachable set is already processes on this machine". A BROWSER IS A
+        # PROCESS ON THIS MACHINE, and it runs JavaScript chosen by whatever
+        # page happens to be open. `Access-Control-Allow-Origin: *` made every
+        # response READABLE cross-origin, and the OPTIONS reply advertising
+        # PUT and DELETE approved the preflight for both. So any page the
+        # operator loaded could read the entire store, implant a memory at
+        # tier=core -- which recall scores +1.0 and puts unconditionally into
+        # /context -- and tombstone anything, with no credentials at all.
+        # Measured: preflight 204, PUT 200 written, implanted text present in
+        # /context, DELETE 200.
+        #
+        # Nothing that legitimately consumes this API is a browser page.
+        # Agents use HTTP clients, which ignore CORS entirely, so these
+        # headers bought nothing and cost the whole trust boundary.
+        #
+        # For a browser UI, set AI_MEMORY_ALLOW_ORIGIN to ONE exact origin.
+        # Never "*", and never reflect the request's Origin back -- reflecting
+        # it is the same hole with extra steps.
+        if ALLOW_ORIGIN:
+            self.send_header("Access-Control-Allow-Origin", ALLOW_ORIGIN)
+            self.send_header("Access-Control-Allow-Methods",
+                             "GET, PUT, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers",
+                             "Content-Type, Authorization")
+            self.send_header("Vary", "Origin")
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
@@ -199,6 +235,10 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def do_OPTIONS(self):                       # noqa: N802
+        # Answers 204 with no CORS approval unless AI_MEMORY_ALLOW_ORIGIN
+        # names an origin (_send decides). A preflight that advertises PUT
+        # and DELETE to any origin is what turns blind CSRF into full
+        # read-write-delete, so the default advertises nothing.
         self._send(204, {})
 
     # ------------------------------------------------------------- routing
@@ -338,7 +378,21 @@ class Handler(BaseHTTPRequestHandler):
                             recs.append(json.loads(line))
             except OSError:
                 pass
+            # Both checks, never merged into one verdict. The chain proves the
+            # ledger was not reordered; `content` proves the memories still
+            # say what the ledger says they said. A store can pass the first
+            # and fail the second -- that was the real state of this system
+            # until 2026-08-29, and test I4b pins it.
+            # THREE things, and they answer three different questions:
+            #   chain    -- was THIS node's ledger reordered?      (local)
+            #   content  -- do its files still match that ledger?  (local)
+            #   state    -- what does it HOLD?                     (comparable)
+            # Only `state` is meaningful across nodes: the chain head embeds
+            # each line's write time, so three nodes taking one identical
+            # write produce three different heads. Measured, not assumed.
             return self._send(200, {"chain": self.store.verify_chain(),
+                                    "content": self.store.verify_integrity(),
+                                    "state": self.store.state_root(),
                                     "entries": recs})
 
         return self._send(404, {"error": "no such route", "path": path})
@@ -393,6 +447,16 @@ class Handler(BaseHTTPRequestHandler):
             # status knows not to retry, which a 500 would invite.
             return self._send(507, {"error": "store full", "detail": str(e),
                                     "retry": False})
+        except MemoryRefused as e:
+            # 403, and never 500. A refusal is the gate WORKING, and a 500
+            # would tell a caller to retry the thing that was just refused --
+            # and would make three nodes refusing a poisoned memory look like
+            # three nodes falling over. The verdict travels with it so the
+            # caller learns which principle it hit; `retry` is false because
+            # the same bytes will be refused again.
+            return self._send(403, {"error": "refused by ethics gate",
+                                    "verdict": dict(e.verdict),
+                                    "retry": False, "written": False})
         except ValueError as e:
             return self._send(400, {"error": str(e)})
         if verdict and verdict["action"] == "SUPERSEDE" and verdict["target"]:
@@ -472,12 +536,55 @@ OPENAPI = {
 }
 
 
+def _guard(fn):
+    """Any unhandled exception becomes a 500 with a JSON body.
+
+    Without this an exception inside a handler propagated out and the
+    connection was simply DROPPED -- the caller got no status, no body, and
+    no reason, and had to time out to learn anything. Worse, one malformed
+    record on disk could make /context and /recall drop every request
+    permanently, so a single bad write became an outage of the read path.
+    Audit 2026-08-30.
+
+    The detail goes to the server log, never into the response: an exception
+    string can carry absolute paths and fragments of stored memories, and a
+    caller who triggered a crash is exactly who should not be shown them.
+    """
+    def wrapper(self):
+        try:
+            return fn(self)
+        except Exception as exc:            # noqa: BLE001
+            try:
+                self.log_message("unhandled %s: %s", type(exc).__name__, exc)
+            except Exception:               # noqa: BLE001
+                pass
+            try:
+                self._send(500, {"error": "internal error",
+                                 "detail": "logged server-side"})
+            except Exception:               # noqa: BLE001
+                pass                        # response already begun; drop it
+    wrapper.__name__ = getattr(fn, "__name__", "wrapped")
+    return wrapper
+
+
+for _m in ("do_GET", "do_PUT", "do_DELETE", "do_OPTIONS"):
+    setattr(Handler, _m, _guard(getattr(Handler, _m)))
+
+
 def serve(host: str, port: int, root: str, token: str = "",
           rate_burst: int = RATE_BURST, rate_per_sec: float = RATE_PER_SEC
           ) -> int:
     """Start the server. Refuses to bind beyond loopback without a token --
     see the module docstring for why that refusal is the design."""
-    off_loopback = host not in LOOPBACK and host != ""
+    # `host != ""` USED TO BE HERE AND WAS BACKWARDS. An empty host binds
+    # EVERY interface -- it is 0.0.0.0, the most exposed possible bind -- and
+    # the clause treated it as loopback, so `--host ""` came up reachable from
+    # the network with no token while the banner announced "auth: none
+    # (loopback only)". The server was wrong about its own exposure, which is
+    # worse than being exposed: the operator had a printed assurance.
+    # Audit 2026-08-30. Empty is now off-loopback and demands a token like any
+    # other non-loopback bind.
+    off_loopback = host not in LOOPBACK
     if off_loopback and not token:
         sys.stderr.write(
             "REFUSING TO START.\n"

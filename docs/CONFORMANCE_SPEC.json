@@ -1,6 +1,6 @@
 {
  "note": "Reproduce `root` from `input` -> `expected` in any language, sharing none of this code. Hash: sha256 over spec, then for each vector sorted by id, a NUL byte, the id, a NUL byte, and the canonical JSON of expected (sorted keys, no spaces). A differing root is a finding worth reporting, not a failure to hide.",
- "root": "9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784",
+ "root": "0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef",
  "roots": {
   "A": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "B": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -12,6 +12,81 @@
    "expected": {
     "clean": true,
     "divergences": 0,
+    "reference": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "silent_diverged": [],
+    "silent_unproven": [],
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.clean.distinct-root",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "B"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k1"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "B"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "B"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k3"
+      }
+     ],
+     "level": "allB"
+    }
+   },
+   "why": "KILLS THE CONSTANT-ROOT-UPWARD READING. Every other climb vector agrees on the single root A, so an implementation that speaks a hardcoded value upward -- or the first child's root, or the level's own name -- answers all of them identically to one that speaks what was actually agreed. This climb agrees on B and publishes, in full, the reference it speaks. A party handed a verdict must be able to check it against its own view rather than trust the verdict's word for it, and a boolean cannot be checked against anything"
+  },
+  {
+   "expected": {
+    "clean": true,
+    "divergences": 0,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [],
+    "silent_unproven": [],
     "speaks_upward": true,
     "verdict": "AGREE"
    },
@@ -81,6 +156,9 @@
    "expected": {
     "clean": true,
     "divergences": 0,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [],
+    "silent_unproven": [],
     "speaks_upward": true,
     "verdict": "AGREE"
    },
@@ -111,6 +189,9 @@
    "expected": {
     "clean": true,
     "divergences": 0,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [],
+    "silent_unproven": [],
     "speaks_upward": true,
     "verdict": "AGREE"
    },
@@ -189,6 +270,11 @@
    "expected": {
     "clean": false,
     "divergences": 1,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [
+     "k2"
+    ],
+    "silent_unproven": [],
     "speaks_upward": true,
     "verdict": "AGREE"
    },
@@ -257,7 +343,411 @@
   {
    "expected": {
     "clean": false,
+    "divergences": 3,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [
+     "k1"
+    ],
+    "silent_unproven": [],
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.divergences.split-counts-every-party",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "C"
+        }
+       ],
+       "level": "k1"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k3"
+      }
+     ],
+     "level": "split"
+    }
+   },
+   "why": "KILLS THE READING THAT A LEVEL WITH NO REFERENCE COUNTS FOR NOTHING -- the trap that the no-reference rule opens and that a naive count walks straight into. A three-way split names no outliers, correctly, since there is no reference to be an outlier FROM; so a tally taken from 'outliers' alone scores the whole split ZERO, it vanishes as the report climbs, and the summit reports clean over a hidden disagreement -- the one output this system must never produce. Every witness that answered into the split is party to it: three dissenters, and no clean summit"
+  },
+  {
+   "expected": {
+    "clean": false,
+    "divergences": 2,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [
+     "k1",
+     "k2"
+    ],
+    "silent_unproven": [],
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.divergences.two-levels",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k1"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k3"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k4"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k5"
+      }
+     ],
+     "level": "two-bad"
+    }
+   },
+   "why": "the other half of that split, and the half that stops the count being read as 'outliers at the top level'. Two DIFFERENT levels with one dissenter each also total 2, so the number is over witnesses wherever in the tree they stand. Note what the summit does: it AGREES, and it still refuses to call itself clean"
+  },
+  {
+   "expected": {
+    "clean": false,
+    "divergences": 2,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [],
+    "silent_unproven": [],
+    "speaks_upward": false,
+    "verdict": "DIVERGED"
+   },
+   "id": "S.divergences.two-outliers-one-level",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "leaf": "n0",
+       "root": "A"
+      },
+      {
+       "leaf": "n1",
+       "root": "A"
+      },
+      {
+       "leaf": "n2",
+       "root": "B"
+      },
+      {
+       "leaf": "n3",
+       "root": "C"
+      }
+     ],
+     "level": "four"
+    }
+   },
+   "why": "SPLITS 'COUNT DIVERGED LEVELS' FROM 'COUNT DISSENTING WITNESSES', which every earlier climb vector left identical because each of its diverged levels held exactly one outlier. One level over four carriers A,A,B,C: two witnesses dissent from one reference. Counting levels says 1; counting dissenters says 2. Two dissenters flattened into one number is the outvoted-into-invisibility failure happening at the tally instead of at the vote. It pins one thing more: a DIVERGED level still REPORTS its reference while SPEAKING nothing upward"
+  },
+  {
+   "expected": {
+    "clean": false,
+    "divergences": 0,
+    "reference": null,
+    "silent_diverged": [],
+    "silent_unproven": [
+     "s3",
+     "s4",
+     "s5"
+    ],
+    "speaks_upward": false,
+    "verdict": "UNPROVEN"
+   },
+   "id": "S.quorum.default-scales-at-a-level",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k1"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "leaf": "s3",
+       "root": null
+      },
+      {
+       "leaf": "s4",
+       "root": null
+      },
+      {
+       "leaf": "s5",
+       "root": null
+      }
+     ],
+     "level": "wide"
+    }
+   },
+   "why": "KILLS THE CONSTANT-QUORUM READING WHERE IT COSTS MOST: inside a federation. Five children, two agreeing, three that never answered. Under a constant 2 this level AGREES and speaks upward, so a federation of any size speaks on the word of two of its members and every level above it reads that as the whole. Under a majority of the five ASKED it is UNPROVEN and silent. It also pins a null-rooted leaf, which the two cold reimplementations split three ways: it is a SILENT witness, not a disagreeing one"
+  },
+  {
+   "expected": {
+    "clean": false,
     "divergences": 1,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [
+     "dv"
+    ],
+    "silent_unproven": [
+     "un"
+    ],
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.silence.two-kinds",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "dv"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": null
+        },
+        {
+         "leaf": "n2",
+         "root": null
+        }
+       ],
+       "level": "un"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k3"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k4"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k5"
+      }
+     ],
+     "level": "both"
+    }
+   },
+   "why": "KILLS THE READING THAT ONE SILENCE IS ENOUGH. A DIVERGED child and an UNPROVEN child both speak nothing upward, so a report that publishes only 'silent' makes them the same fact -- but 'my child disagreed internally' and 'my child could not establish anything' call for different responses, and merging them loses the difference at exactly the level where someone would act on it. This is the not_understood / infrastructure_failure distinction the project already draws, drawn here for the same reason. dv lands in silent_diverged, un in silent_unproven, and only dv's dissenter is counted -- silence is not disagreement"
+  },
+  {
+   "expected": {
+    "clean": false,
+    "divergences": 1,
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent_diverged": [],
+    "silent_unproven": [],
     "speaks_upward": false,
     "verdict": "DIVERGED"
    },
@@ -286,6 +776,80 @@
   },
   {
    "expected": {
+    "clean": true,
+    "divergences": 0,
+    "reference": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "silent_diverged": [],
+    "silent_unproven": [
+     "u"
+    ],
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.unproven.speaks-silence",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": null
+        },
+        {
+         "leaf": "n2",
+         "root": null
+        }
+       ],
+       "level": "u"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "B"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "B"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "B"
+        }
+       ],
+       "level": "k3"
+      }
+     ],
+     "level": "mixed"
+    }
+   },
+   "why": "PINS WHAT AN UNPROVEN LEVEL SPEAKS UPWARD, which no vector ever reached, so an implementation could have chosen anything. Child 'u' has one carrier answering out of three: UNPROVEN, and it holds A. Its two siblings agree on B. If UNPROVEN spoke its root the parent would see A against B and report DIVERGED with a dissenter -- reading 'could not be established' as 'established', a claim stronger than its evidence. Speaking silence, the parent agrees on B over two of the three it asked, and u is reported under silent_unproven and never under silent_diverged. This is also a CLEAN climb containing two distinct roots"
+  },
+  {
+   "expected": {
     "agreed": true,
     "answered": [
      "x",
@@ -293,6 +857,7 @@
      "z"
     ],
     "outliers": [],
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "silent": [],
     "verdict": "AGREE"
    },
@@ -315,6 +880,7 @@
      "y"
     ],
     "outliers": [],
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "silent": [
      "z"
     ],
@@ -342,6 +908,7 @@
     "outliers": [
      "z"
     ],
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "silent": [],
     "verdict": "DIVERGED"
    },
@@ -360,6 +927,7 @@
    "expected": {
     "agreed": false,
     "answered": [
+     "w",
      "x",
      "y",
      "z"
@@ -368,6 +936,58 @@
      "y",
      "z"
     ],
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent": [],
+    "verdict": "DIVERGED"
+   },
+   "id": "T.diverged.plurality-without-majority",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "w": "A",
+     "x": "A",
+     "y": "B",
+     "z": "C"
+    }
+   },
+   "why": "KILLS THE ABSOLUTE-MAJORITY READING of the reference. Four witnesses holding A,A,B,C: A has strictly more holders than any other root, but only two of four -- a strict plurality and not more than half. It is the reference, and BOTH dissenters are named. A rule demanding over half would report no reference and no outliers here, and a reader would learn nothing about who differs from whom"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [
+     "x"
+    ],
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent": [],
+    "verdict": "DIVERGED"
+   },
+   "id": "T.diverged.reference-is-tallied",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "x": "B",
+     "y": "A",
+     "z": "A"
+    }
+   },
+   "why": "KILLS THE NO-TALLYING READING -- 'the reference is the root of the first answering witness'. Every other DIVERGED vector happens to seat the most-held root on the ordinally-first witness, so an implementation that counts nothing passes all of them and the word 'majority' is never once exercised AS a majority. Here the first witness is the lone dissenter: roots B,A,A, so the reference is A, held by y and z, and the outlier is x. An implementation that does not tally returns the exact inverse"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [],
+    "reference": null,
     "silent": [],
     "verdict": "DIVERGED"
    },
@@ -380,7 +1000,93 @@
      "z": "C"
     }
    },
-   "why": "three-way disagreement declares no winner by luck of ordering"
+   "why": "three-way disagreement declares no winner by luck of ordering -- and now MEANS it. KILLS THE ORDERING READING that this vector used to enshrine: it once expected outliers ['y','z'], which silently made x's root the reference for no reason but that x sorts first, asserting the opposite of its own sentence. One holder each is no strict plurality, so there is NO reference, and with no reference nothing is an outlier -- the word means 'differs from the reference' and there is nothing to differ from"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "v",
+     "w",
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [],
+    "reference": null,
+    "silent": [],
+    "verdict": "DIVERGED"
+   },
+   "id": "T.diverged.tie-for-top",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "v": "A",
+     "w": "A",
+     "x": "B",
+     "y": "B",
+     "z": "C"
+    }
+   },
+   "why": "KILLS EVERY INVENTED TIE-BREAK, including the ordinally-lowest-root rule both cold reimplementations independently chose. Five witnesses holding A,A,B,B,C: two roots tie for most-held. A tie-break would crown A and report three outliers. There is no strict plurality, so there is NO reference and nothing is an outlier. Choosing between equally-held roots would be a DECISION, and this mechanism reports evidence and decides nothing -- the same reason it never overwrites the party it disagrees with"
+  },
+  {
+   "expected": {
+    "agreed": true,
+    "answered": [
+     "v",
+     "w",
+     "x"
+    ],
+    "outliers": [],
+    "reference": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "silent": [
+     "y",
+     "z"
+    ],
+    "verdict": "AGREE"
+   },
+   "id": "T.quorum.default-met-at-five",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "v": "A",
+     "w": "A",
+     "x": "A",
+     "y": null,
+     "z": null
+    }
+   },
+   "why": "the far side of the same bracket, without which the rule above could be read as 'five witnesses can never agree'. Three of five answering DOES clear the derived quorum. With T.unproven.too-few and T.agree.one-silent fixing it at 2 for three witnesses, the two brackets together admit a majority of those asked and admit no constant, no unanimity rule, and no count of the answerers"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "v",
+     "w"
+    ],
+    "outliers": [],
+    "reference": null,
+    "silent": [
+     "x",
+     "y",
+     "z"
+    ],
+    "verdict": "UNPROVEN"
+   },
+   "id": "T.quorum.default-scales-with-witnesses",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "v": "A",
+     "w": "A",
+     "x": null,
+     "y": null,
+     "z": null
+    }
+   },
+   "why": "KILLS THE CONSTANT-QUORUM READING, and the majority-of-those-PRESENT reading with it, in one case. Five witnesses asked, two answer and agree. A constant 2 calls that agreement for all five; so does a majority of the two who ANSWERED. A majority of the five ASKED is 3, so this is UNPROVEN. Two of a hundred witnesses must not be able to speak for the hundred, and silencing witnesses must never make agreement EASIER -- a mechanism where suppressing others is what wins you the verdict is exactly the transaction at another's expense this project refuses"
   },
   {
    "expected": {
@@ -391,6 +1097,7 @@
      "z"
     ],
     "outliers": [],
+    "reference": null,
     "silent": [],
     "verdict": "UNPROVEN"
    },
@@ -413,6 +1120,7 @@
      "x"
     ],
     "outliers": [],
+    "reference": null,
     "silent": [
      "y",
      "z"

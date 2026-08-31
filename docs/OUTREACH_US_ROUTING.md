@@ -133,7 +133,7 @@ Costs one email. Liveness unproven; treat a non-reply as uninformative, not as r
 
 ### Stage 2 — released by *either* of two events
 
-- **Event A (§5, the only one that changes anything):** someone independent reproduces the conformance root `9d630fee…6f1c2784` from `docs/CONFORMANCE_SPEC.json`, in a language that is not Python, sharing no source.
+- **Event A (§5, the only one that changes anything):** someone independent reproduces the conformance root `0c398099…0f0ddcef` from `docs/CONFORMANCE_SPEC.json`, in a language that is not Python, sharing no source.
 - **Event B (weaker, sufficient for one door):** the Zero Drafts submission is filed and produces *any* traceable result — an acknowledgement, a docket line, a reply.
 
 Released by A **or** B:
@@ -210,4 +210,4 @@ It also clears every barrier at once: no entity, no clearance, no account beyond
 
 So the honest answer is not a ranking, it is a pairing. **Send both, the same week, and they do not conflict** — one is a public issue on a laboratory's repository, the other a filing at a standards agency; no shared inbox, no shared reader, no campaign smell. Zero Drafts is the filing that makes the rest of the map usable. MAITE is the one with a person on the other end.
 
-And the flat truth underneath all of it, which §8 states already and which this map only confirms: **the letters are not the bottleneck.** Nothing that could be written this week changes any of these outcomes. What changes them is one licence file, one real entry in `peers.txt`, and one stranger reproducing `9d630fee…6f1c2784`. Two of those three are code, and the third is what the two sends above are actually for.
+And the flat truth underneath all of it, which §8 states already and which this map only confirms: **the letters are not the bottleneck.** Nothing that could be written this week changes any of these outcomes. What changes them is one licence file, one real entry in `peers.txt`, and one stranger reproducing `0c398099…0f0ddcef`. Two of those three are code, and the third is what the two sends above are actually for.

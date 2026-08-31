@@ -131,6 +131,17 @@ def _canon(obj: Any) -> str:
 #           never the sugar, so the published artefact carries no rule a
 #           reader has to be told about separately.
 #   attest  {"op": "attest", "roots": {witness: root}, "quorum": int}
+#           `quorum` is OPTIONAL. When it is ABSENT the implementation must
+#           supply its own default. That default is deliberately NOT restated
+#           here -- a rule written in two places is a rule that drifts, which
+#           is the failure this whole file exists to catch. It is PINNED BY
+#           THE VECTORS instead, which is the only form of statement that
+#           cannot go stale: T.unproven.too-few and T.agree.one-silent
+#           bracket it at 2 for three witnesses,
+#           T.quorum.default-scales-with-witnesses and
+#           T.quorum.default-met-at-five bracket it at 3 for five, and
+#           S.quorum.default-scales-at-a-level shows the same default is what
+#           a climb level uses. No constant satisfies all five.
 #   climb   {"op": "climb", "tree": node}
 #
 # Every vector asks about SEMANTICS: what verdict, which witnesses counted,
@@ -176,16 +187,41 @@ def _run(inp):
 
     op = inp.get("op")
     if op == "attest":
+        # `quorum` is passed through EXACTLY as the vector gives it, absence
+        # included. It used to default to 2 here, which meant a vector written
+        # to exercise the implementation's own default was handed a constant
+        # and tested nothing -- the harness quietly answering the question it
+        # was built to ask.
         r = T.attest({k: ROOTS[v] for k, v in inp["roots"].items()},
-                     scale="", quorum=inp.get("quorum", 2))
+                     scale="", quorum=inp.get("quorum"))
         return {"verdict": r["verdict"], "agreed": r["agreed"],
                 "answered": r["answered"], "silent": r["silent"],
+                # THE REFERENCE, IN FULL. Not decoration: without it, "which
+                # root won" is never published, so an implementation that does
+                # no tallying at all -- or one that names a root by the
+                # alphabet -- is indistinguishable from one that counts. It
+                # also makes the `roots` map load-bearing rather than
+                # scenery: a checker comparing the bare symbols "A"/"B" now
+                # produces a different value here.
+                "reference": r["reference"],
                 "outliers": r["outliers"]}
     if op == "climb":
         up, rep = S.climb(_build(inp["tree"], S))
         return {"verdict": rep["verdict"],
                 "speaks_upward": bool(up),
+                # What the level TALLIED, beside whether it SPOKE. They are
+                # not the same fact: a DIVERGED level with a strict plurality
+                # has a reference and still speaks silence, and publishing
+                # only the boolean leaves which root an agreeing level speaks
+                # entirely unconstrained.
+                "reference": rep.get("reference"),
                 "divergences": len(rep.get("divergences", [])),
+                # The two silences, kept apart. "My child disagreed
+                # internally" and "my child could not establish anything" are
+                # different facts, and a parent that cannot tell them apart
+                # cannot respond to either.
+                "silent_diverged": rep.get("silent_diverged", []),
+                "silent_unproven": rep.get("silent_unproven", []),
                 "clean": S.overall(rep)[0]}
     raise ValueError("unknown op %r -- a vector this build cannot run is a "
                      "vector it must not silently pass" % (op,))
@@ -208,12 +244,78 @@ VECTORS = [
      "why": "one differing witness is DIVERGED and the outlier is named",
      "input": {"op": "attest", "roots": {"x": "A", "y": "A", "z": "B"}}},
     {"id": "T.diverged.three-way",
-     "why": "three-way disagreement declares no winner by luck of ordering",
+     "why": "three-way disagreement declares no winner by luck of ordering -- "
+            "and now MEANS it. KILLS THE ORDERING READING that this vector "
+            "used to enshrine: it once expected outliers ['y','z'], which "
+            "silently made x's root the reference for no reason but that x "
+            "sorts first, asserting the opposite of its own sentence. One "
+            "holder each is no strict plurality, so there is NO reference, and "
+            "with no reference nothing is an outlier -- the word means "
+            "'differs from the reference' and there is nothing to differ from",
      "input": {"op": "attest", "roots": {"x": "A", "y": "B", "z": "C"}}},
     {"id": "T.quorum.raised",
      "why": "a raised quorum is honoured",
      "input": {"op": "attest", "roots": {"x": "A", "y": "A", "z": "A"},
                "quorum": 4}},
+
+    # -- what the default quorum IS, since a constant answers every vector
+    #    above and is wrong ---------------------------------------------------
+    {"id": "T.quorum.default-scales-with-witnesses",
+     "why": "KILLS THE CONSTANT-QUORUM READING, and the majority-of-those-"
+            "PRESENT reading with it, in one case. Five witnesses asked, two "
+            "answer and agree. A constant 2 calls that agreement for all five; "
+            "so does a majority of the two who ANSWERED. A majority of the "
+            "five ASKED is 3, so this is UNPROVEN. Two of a hundred witnesses "
+            "must not be able to speak for the hundred, and silencing "
+            "witnesses must never make agreement EASIER -- a mechanism where "
+            "suppressing others is what wins you the verdict is exactly the "
+            "transaction at another's expense this project refuses",
+     "input": {"op": "attest",
+               "roots": {"v": "A", "w": "A", "x": None, "y": None,
+                         "z": None}}},
+    {"id": "T.quorum.default-met-at-five",
+     "why": "the far side of the same bracket, without which the rule above "
+            "could be read as 'five witnesses can never agree'. Three of five "
+            "answering DOES clear the derived quorum. With T.unproven.too-few "
+            "and T.agree.one-silent fixing it at 2 for three witnesses, the "
+            "two brackets together admit a majority of those asked and admit "
+            "no constant, no unanimity rule, and no count of the answerers",
+     "input": {"op": "attest",
+               "roots": {"v": "A", "w": "A", "x": "A", "y": None,
+                         "z": None}}},
+
+    # -- that a tally actually happens, and what it may not invent ------------
+    {"id": "T.diverged.reference-is-tallied",
+     "why": "KILLS THE NO-TALLYING READING -- 'the reference is the root of "
+            "the first answering witness'. Every other DIVERGED vector happens "
+            "to seat the most-held root on the ordinally-first witness, so an "
+            "implementation that counts nothing passes all of them and the "
+            "word 'majority' is never once exercised AS a majority. Here the "
+            "first witness is the lone dissenter: roots B,A,A, so the "
+            "reference is A, held by y and z, and the outlier is x. An "
+            "implementation that does not tally returns the exact inverse",
+     "input": {"op": "attest", "roots": {"x": "B", "y": "A", "z": "A"}}},
+    {"id": "T.diverged.plurality-without-majority",
+     "why": "KILLS THE ABSOLUTE-MAJORITY READING of the reference. Four "
+            "witnesses holding A,A,B,C: A has strictly more holders than any "
+            "other root, but only two of four -- a strict plurality and not "
+            "more than half. It is the reference, and BOTH dissenters are "
+            "named. A rule demanding over half would report no reference and "
+            "no outliers here, and a reader would learn nothing about who "
+            "differs from whom",
+     "input": {"op": "attest",
+               "roots": {"w": "A", "x": "A", "y": "B", "z": "C"}}},
+    {"id": "T.diverged.tie-for-top",
+     "why": "KILLS EVERY INVENTED TIE-BREAK, including the ordinally-lowest-"
+            "root rule both cold reimplementations independently chose. Five "
+            "witnesses holding A,A,B,B,C: two roots tie for most-held. A "
+            "tie-break would crown A and report three outliers. There is no "
+            "strict plurality, so there is NO reference and nothing is an "
+            "outlier. Choosing between equally-held roots would be a DECISION, "
+            "and this mechanism reports evidence and decides nothing -- the "
+            "same reason it never overwrites the party it disagrees with",
+     "input": {"op": "attest",
+               "roots": {"v": "A", "w": "A", "x": "B", "y": "B", "z": "C"}}},
 
     # -- composition, and the invariant that makes it safe -----------------
     {"id": "S.compose.agree",
@@ -250,6 +352,109 @@ VECTORS = [
          {"level": "k1", "carriers": ["A", "A", "A"]},
          {"level": "k2", "carriers": ["A", "A", "A"]},
          {"level": "k3", "carriers": ["A", "A", "A"]}]}}},
+
+    # -- the same four questions again, INSIDE the climb, where getting them
+    #    wrong is worth more and shows less ------------------------------------
+    {"id": "S.quorum.default-scales-at-a-level",
+     "why": "KILLS THE CONSTANT-QUORUM READING WHERE IT COSTS MOST: inside a "
+            "federation. Five children, two agreeing, three that never "
+            "answered. Under a constant 2 this level AGREES and speaks "
+            "upward, so a federation of any size speaks on the word of two of "
+            "its members and every level above it reads that as the whole. "
+            "Under a majority of the five ASKED it is UNPROVEN and silent. It "
+            "also pins a null-rooted leaf, which the two cold "
+            "reimplementations split three ways: it is a SILENT witness, not "
+            "a disagreeing one",
+     "input": {"op": "climb", "tree": {"level": "wide", "children": [
+         {"level": "k1", "carriers": ["A", "A", "A"]},
+         {"level": "k2", "carriers": ["A", "A", "A"]},
+         {"leaf": "s3", "root": None},
+         {"leaf": "s4", "root": None},
+         {"leaf": "s5", "root": None}]}}},
+    {"id": "S.divergences.two-outliers-one-level",
+     "why": "SPLITS 'COUNT DIVERGED LEVELS' FROM 'COUNT DISSENTING "
+            "WITNESSES', which every earlier climb vector left identical "
+            "because each of its diverged levels held exactly one outlier. "
+            "One level over four carriers A,A,B,C: two witnesses dissent from "
+            "one reference. Counting levels says 1; counting dissenters says "
+            "2. Two dissenters flattened into one number is the "
+            "outvoted-into-invisibility failure happening at the tally instead "
+            "of at the vote. It pins one thing more: a DIVERGED level still "
+            "REPORTS its reference while SPEAKING nothing upward",
+     "input": {"op": "climb",
+               "tree": {"level": "four", "carriers": ["A", "A", "B", "C"]}}},
+    {"id": "S.divergences.two-levels",
+     "why": "the other half of that split, and the half that stops the count "
+            "being read as 'outliers at the top level'. Two DIFFERENT levels "
+            "with one dissenter each also total 2, so the number is over "
+            "witnesses wherever in the tree they stand. Note what the summit "
+            "does: it AGREES, and it still refuses to call itself clean",
+     "input": {"op": "climb", "tree": {"level": "two-bad", "children": [
+         {"level": "k1", "carriers": ["A", "A", "B"]},
+         {"level": "k2", "carriers": ["A", "A", "B"]},
+         {"level": "k3", "carriers": ["A", "A", "A"]},
+         {"level": "k4", "carriers": ["A", "A", "A"]},
+         {"level": "k5", "carriers": ["A", "A", "A"]}]}}},
+    {"id": "S.divergences.split-counts-every-party",
+     "why": "KILLS THE READING THAT A LEVEL WITH NO REFERENCE COUNTS FOR "
+            "NOTHING -- the trap that the no-reference rule opens and that a "
+            "naive count walks straight into. A three-way split names no "
+            "outliers, correctly, since there is no reference to be an outlier "
+            "FROM; so a tally taken from 'outliers' alone scores the whole "
+            "split ZERO, it vanishes as the report climbs, and the summit "
+            "reports clean over a hidden disagreement -- the one output this "
+            "system must never produce. Every witness that answered into the "
+            "split is party to it: three dissenters, and no clean summit",
+     "input": {"op": "climb", "tree": {"level": "split", "children": [
+         {"level": "k1", "carriers": ["A", "B", "C"]},
+         {"level": "k2", "carriers": ["A", "A", "A"]},
+         {"level": "k3", "carriers": ["A", "A", "A"]}]}}},
+    {"id": "S.unproven.speaks-silence",
+     "why": "PINS WHAT AN UNPROVEN LEVEL SPEAKS UPWARD, which no vector ever "
+            "reached, so an implementation could have chosen anything. Child "
+            "'u' has one carrier answering out of three: UNPROVEN, and it "
+            "holds A. Its two siblings agree on B. If UNPROVEN spoke its root "
+            "the parent would see A against B and report DIVERGED with a "
+            "dissenter -- reading 'could not be established' as 'established', "
+            "a claim stronger than its evidence. Speaking silence, the parent "
+            "agrees on B over two of the three it asked, and u is reported "
+            "under silent_unproven and never under silent_diverged. This is "
+            "also a CLEAN climb containing two distinct roots",
+     "input": {"op": "climb", "tree": {"level": "mixed", "children": [
+         {"level": "u", "carriers": ["A", None, None]},
+         {"level": "k2", "carriers": ["B", "B", "B"]},
+         {"level": "k3", "carriers": ["B", "B", "B"]}]}}},
+    {"id": "S.silence.two-kinds",
+     "why": "KILLS THE READING THAT ONE SILENCE IS ENOUGH. A DIVERGED child "
+            "and an UNPROVEN child both speak nothing upward, so a report that "
+            "publishes only 'silent' makes them the same fact -- but 'my child "
+            "disagreed internally' and 'my child could not establish anything' "
+            "call for different responses, and merging them loses the "
+            "difference at exactly the level where someone would act on it. "
+            "This is the not_understood / infrastructure_failure distinction "
+            "the project already draws, drawn here for the same reason. dv "
+            "lands in silent_diverged, un in silent_unproven, and only dv's "
+            "dissenter is counted -- silence is not disagreement",
+     "input": {"op": "climb", "tree": {"level": "both", "children": [
+         {"level": "dv", "carriers": ["A", "A", "B"]},
+         {"level": "un", "carriers": ["A", None, None]},
+         {"level": "k3", "carriers": ["A", "A", "A"]},
+         {"level": "k4", "carriers": ["A", "A", "A"]},
+         {"level": "k5", "carriers": ["A", "A", "A"]}]}}},
+    {"id": "S.clean.distinct-root",
+     "why": "KILLS THE CONSTANT-ROOT-UPWARD READING. Every other climb vector "
+            "agrees on the single root A, so an implementation that speaks a "
+            "hardcoded value upward -- or the first child's root, or the "
+            "level's own name -- answers all of them identically to one that "
+            "speaks what was actually agreed. This climb agrees on B and "
+            "publishes, in full, the reference it speaks. A party handed a "
+            "verdict must be able to check it against its own view rather than "
+            "trust the verdict's word for it, and a boolean cannot be checked "
+            "against anything",
+     "input": {"op": "climb", "tree": {"level": "allB", "children": [
+         {"level": "k1", "carriers": ["B", "B", "B"]},
+         {"level": "k2", "carriers": ["B", "B", "B"]},
+         {"level": "k3", "carriers": ["B", "B", "B"]}]}}},
 ]
 
 

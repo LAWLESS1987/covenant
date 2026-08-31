@@ -146,8 +146,15 @@ if ($py -and (Test-Path 'conformance.py')) {
     $out = (& $py conformance.py 2>$null) -join "`n"
     $rc = $LASTEXITCODE
     $h = Hashes $out
+    # READ THE COUNT, NEVER RESTATE IT -- see the same fix in check.sh. This
+    # said "11 vectors" beside a live root over a different number, which is
+    # the failure conformance.py's docstring names: a root over 11 vectors and
+    # a root over 300 are different claims, and quoting one as the other turns
+    # a true number into a false statement.
+    $vn = ([regex]::Match($out, '(?m)^\s*vectors\s*:\s*(\d+)')).Groups[1].Value
+    if (-not $vn) { $vn = '?' }
     if ($rc -eq 0 -and $h.Count -ge 1 -and (IsRoot $h[0])) {
-        "  [3] conformance root                  11 vectors, behaviour not prose"
+        "  [3] conformance root                  $vn vectors, behaviour not prose"
         "      $($h[0])"
         "      NOT CROSS-CHECKED: no second implementation exists yet."
         "      This is the number an independent build must reproduce, in"

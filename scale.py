@@ -86,8 +86,16 @@ def leaf(name: str, root: Optional[str]) -> Dict[str, Any]:
 
 
 def level(name: str, children: List[Dict[str, Any]],
-          quorum: int = 2) -> Dict[str, Any]:
-    """A carrier whose root is the verdict of the carriers beneath it."""
+          quorum: Optional[int] = None) -> Dict[str, Any]:
+    """A carrier whose root is the verdict of the carriers beneath it.
+
+    QUORUM DEFAULTS TO NOTHING, not to 2. A constant here would silently
+    defeat the default attest() derives -- a level with a hundred children
+    would call two of them agreement for all hundred -- and it would do so
+    from the one place a caller is least likely to look. None means "you
+    decide", and attest decides by majority of the carriers asked. A caller
+    that knows better still passes its own number and is obeyed.
+    """
     return {"name": name, "children": children, "quorum": quorum}
 
 
@@ -105,15 +113,23 @@ def climb(node: Dict[str, Any], depth: int = 0) -> Tuple[Optional[str], Dict[str
                              "than recursed into, because this is far more "
                              "likely to be a cycle than a hierarchy"
                              % MAX_DEPTH,
-                      "divergences": [], "children": [], "depth": depth}
+                      "divergences": [], "children": [], "depth": depth,
+                      "reference": None, "silent_diverged": [],
+                      "silent_unproven": []}
 
     if "children" not in node:
+        # A leaf's reference is simply what it holds: the same field name for
+        # the same thing at every scale, so a reader never has to know whether
+        # they are looking at a leaf or a federation to find what it speaks.
         return node.get("root"), {"name": node.get("name", "?"),
                                   "verdict": AGREE if node.get("root") else UNPROVEN,
                                   "why": ("holds a root" if node.get("root")
                                           else "did not answer"),
                                   "divergences": [], "children": [],
-                                  "depth": depth, "leaf": True}
+                                  "depth": depth, "leaf": True,
+                                  "reference": node.get("root"),
+                                  "silent_diverged": [],
+                                  "silent_unproven": []}
 
     roots: Dict[str, Optional[str]] = {}
     child_reports = []
@@ -126,12 +142,67 @@ def climb(node: Dict[str, Any], depth: int = 0) -> Tuple[Optional[str], Dict[str
         # levels down is still named at the summit.
         divergences.extend(rep.get("divergences", []))
 
-    v = attest(roots, scale=node.get("name", ""), quorum=node.get("quorum", 2))
+    # node.get("quorum") -- never a constant fallback. A level built by hand,
+    # without the helper above, must get the same derived majority as one
+    # built with it, or the defect just moves to whoever writes a dict.
+    v = attest(roots, scale=node.get("name", ""), quorum=node.get("quorum"))
 
     if v["verdict"] == DIVERGED:
-        divergences.append("%s: %s hold one root, %s differ"
-                           % (node.get("name", "?"),
-                              v["majority"]["held_by"], v["outliers"]))
+        # ONE ENTRY PER DISSENTING WITNESS, AND EACH ONE NAMED.
+        #
+        # This was one entry per diverged LEVEL, so `len(divergences)` counted
+        # levels. Two dissenters in one ledger and one dissenter in another
+        # both totalled the same number, which is the "outvoted into
+        # invisibility" failure this file exists to prevent, happening at the
+        # tally instead of at the vote. A count of levels answers "where",
+        # never "how many", and the second question is the one a reader of a
+        # summit report is actually asking.
+        #
+        # Named, not merely counted, for the same reason attest names its
+        # outliers: a number cannot be checked by the party it is about.
+        name = node.get("name", "?")
+
+        # PER CAPITA, AND WHY IT IS NOT A THRESHOLD.
+        #
+        # A raw count across a tree is distorted in both directions. One
+        # dissenter out of three is a split; one out of a hundred reads the
+        # same in a total. Worse, a raw count REWARDS SIZE: an operator
+        # running a hundred nodes generates a hundred times the dissent
+        # volume of an operator running one, so the summit tally measures
+        # who has more machines rather than who is right. That is an
+        # advantage taken from others by being large rather than by being
+        # correct, which is the shape of transaction the one condition
+        # forbids -- so every dissent is reported WITH the population it
+        # occurred in, and levels of different sizes become comparable.
+        #
+        # WHAT IT MUST NEVER DO. The proportion is never a threshold. There
+        # is no fraction below which a dissent stops counting, and 1-of-100
+        # leaves this level DIVERGED exactly as 1-of-3 does. Discounting a
+        # lone dissenter for being lonely is the "outvoted into invisibility"
+        # failure arriving through arithmetic instead of through a vote, and
+        # arriving that way makes it harder to see, not more legitimate.
+        # This reports the denominator. It never divides by it.
+        asked = len(v["answered"]) + len(v["silent"])
+
+        if v["reference"] is None:
+            # No strict plurality, so attest names no outliers -- correctly,
+            # since there is no reference to be an outlier from. But the level
+            # DIVERGED, and a divergence that contributes nothing to the count
+            # would vanish as the report climbs, which is the one thing this
+            # file forbids. Every witness that answered is party to the split;
+            # none of them holds a reference, because there is not one.
+            for w in v["answered"]:
+                divergences.append(
+                    "%s/%s: party to a split with no strict plurality, so no "
+                    "root here is the reference [%d of %d asked at this level]"
+                    % (name, w, len(v["answered"]), asked))
+        else:
+            for w in v["outliers"]:
+                divergences.append(
+                    "%s/%s: differs from the reference held by %s "
+                    "[%d of %d asked at this level]"
+                    % (name, w, v["majority"]["held_by"],
+                       len(v["outliers"]), asked))
 
     # THE INVARIANT. Only a level that genuinely agreed speaks upward, and what
     # it speaks is THE AGREED ROOT ITSELF, unchanged.
@@ -156,10 +227,33 @@ def climb(node: Dict[str, Any], depth: int = 0) -> Tuple[Optional[str], Dict[str
     # them is saying is "the content is this". WHO said it is the tally's job,
     # and attest() already keeps that separately -- which is precisely why it
     # does not belong in the value.
+    #
+    # DIVERGED and UNPROVEN both speak SILENCE. Either one speaking its root
+    # would let the parent read "we could not establish this" as "we
+    # established this", a claim stronger than its evidence in the one
+    # direction that matters. What a level speaks is now taken from attest's
+    # `reference` rather than re-derived by scanning the children, so the root
+    # that goes up is the same value the verdict published -- one source, and
+    # nothing to drift.
     if v["verdict"] == AGREE:
-        up = next((r for r in roots.values() if r), None)
+        up = v["reference"]
     else:
         up = None
+
+    # BUT THE TWO SILENCES ARE NOT THE SAME FACT, and the parent must be able
+    # to tell them apart: "my child disagreed internally" and "my child could
+    # not establish anything" call for different responses, and merging them
+    # loses the difference at exactly the level where someone would act on it.
+    # This is the distinction the project already draws between
+    # not_understood and infrastructure_failure, drawn here for the same
+    # reason. `silent` is kept whole as attest reported it; these two partition
+    # it, so no reader has to choose which field to trust.
+    silent_diverged = sorted(r["name"] for r in child_reports
+                             if roots.get(r["name"]) is None
+                             and r["verdict"] == DIVERGED)
+    silent_unproven = sorted(r["name"] for r in child_reports
+                             if roots.get(r["name"]) is None
+                             and r["verdict"] != DIVERGED)
 
     rep = {
         "name": node.get("name", "?"),
@@ -168,7 +262,14 @@ def climb(node: Dict[str, Any], depth: int = 0) -> Tuple[Optional[str], Dict[str
         "why": v["why"],
         "answered": v["answered"],
         "silent": v["silent"],
+        "silent_diverged": silent_diverged,
+        "silent_unproven": silent_unproven,
         "outliers": v["outliers"],
+        # Which root this level actually speaks upward, in full and stated
+        # rather than inferred. A parent -- or a party reading the report --
+        # can check the value against its own view instead of trusting that
+        # the right one was passed along.
+        "reference": v["reference"],
         "divergences": divergences,
         "children": child_reports,
         "depth": depth,
@@ -185,10 +286,14 @@ def overall(report: Dict[str, Any]) -> Tuple[bool, str]:
     it is the one that any naive implementation produces by default.
     """
     if report.get("divergences"):
+        # The number is DISSENTING WITNESSES, not diverged levels. Two
+        # dissenters are two, wherever they stand, and a reader who is told
+        # "one divergence" when three witnesses dissented has been given the
+        # smallest true-sounding number instead of the fact.
         return False, ("NOT CLEAN. The top-level verdict is %s, and %d "
-                       "divergence(s) below it are named. A clean summit over "
-                       "a hidden disagreement is the one output this must "
-                       "never produce."
+                       "dissenting witness(es) below it are named. A clean "
+                       "summit over a hidden disagreement is the one output "
+                       "this must never produce."
                        % (report.get("verdict"), len(report["divergences"])))
     if report.get("verdict") != AGREE:
         return False, ("NOT CLEAN. Top-level verdict is %s -- %s"

@@ -12,7 +12,7 @@ This is input to the TEVV zero draft, on one narrow case: evaluating a system wh
 
 I have published a working demonstration of three mechanisms, each checkable in about ten minutes. I am asking for them to be broken, not adopted.
 
-1. Conformance proved by behaviour. Fixed vectors run through the governance primitives; the semantic results are hashed, never the prose. Two implementations sharing no source produce the same root, or they do not. `docs/CONFORMANCE_SPEC.json` publishes all 11 vectors -- inputs, outputs, hashing rule, 434 lines -- so an independent build reproduces root 9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784 without reading any Python. No second implementation exists yet, so that claim is untested; the root covers 11 vectors, nothing more.
+1. Conformance proved by behaviour. Fixed vectors run through the governance primitives; the semantic results are hashed, never the prose. Two implementations sharing no source produce the same root, or they do not. `docs/CONFORMANCE_SPEC.json` publishes all 23 vectors -- inputs, outputs, hashing rule, 1,142 lines -- so an independent build reproduces root 0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef without reading any Python. No second implementation exists yet, so that claim is untested; the root covers 23 vectors, nothing more.
 
 2. Disagreement survives composition. A level that disagrees internally reports silence upward rather than its majority, so one dissent reaches the top instead of being outvoted into invisibility. `scale.py` exits non-zero naming a dissent three levels down.
 
@@ -71,9 +71,9 @@ I am writing about one narrow technical problem, and I want to be exact about ho
 
 When two parties must cooperate and neither can adopt the other's software, neither has a cheap way to show it follows the same rules. Audit and contract are slow; a shared codebase is a shared vulnerability.
 
-I have published a working demonstration, Apache-2.0, of a fourth option: compare the computation, not the artefact. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose; two implementations sharing no source produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all eleven vectors in 434 lines, so an independent build in any language reproduces the published root without reading any Python:
+I have published a working demonstration, Apache-2.0, of a fourth option: compare the computation, not the artefact. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose; two implementations sharing no source produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all twenty-three vectors in 1,142 lines, so an independent build in any language reproduces the published root without reading any Python:
 
-9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784
+0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef
 
 No second implementation exists yet, so that claim is untested.
 
@@ -106,12 +106,12 @@ github.com/LAWLESS1987/covenant
 NO ISRAELI ADDRESS IS VERIFIED. Nothing here asserts one. On the day of sending: (1) find the person's current page on their own institution's site, not on a directory, a conference listing or a paper's header; (2) take the address and the exact title from that page and fill [name, title]; (3) confirm they are still at that institution. An address that was right last year is not evidence it is right today -- the CAISI RFI this project's US draft was built around closed on 9 March 2026 and nothing announced it.
 
 Three checks that must pass before the letter goes, because the body asserts each one:
-- Clone fresh and run `sh check.sh`. Confirm the conformance root is still 9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784.
-- Re-copy those 64 characters MECHANICALLY out of docs/CONFORMANCE_SPEC.json into the mail client. Do not retype them, and do not copy them from README.md -- README.md line 42 is where the scrambled truncation in the previous draft came from. I corrected it in the working copy from `9d630fee...1f2c784` to
+- Clone fresh and run `sh check.sh`. Confirm the conformance root is still 0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef, and that the vector count `check.sh` prints is still 23. **The root moved once already** -- it was 9d630fee...f1c2784 over 11 vectors until 2026-08-31, when twelve vectors were added to pin semantics the old suite left open. A root is not a constant; re-read it, never remember it.
+- Re-copy those 64 characters MECHANICALLY out of docs/CONFORMANCE_SPEC.json into the mail client. Do not retype them, and do not copy them from README.md -- README.md is where the scrambled truncation in the previous draft came from, and it publishes an abbreviated form (`0c398099…0f0ddcef`) rather than the full 64.
 
 **Omitted:** Jeffrey Epstein -- per the brief; he would dominate a letter whose whole strength is that it is about a hash.
 
-The truncated root. Both fatal findings were the same defect: `9d630fee...1f2c784` is not a suffix of the published root, which ends f1c2784. In a letter arguing that hashes make silent divergence impossible, the author failing to transmit his own hash intact is the one thing this reader can falsify without cloning. I removed the truncation entirely rather than correcting it, because a truncation is a second artefact that can drift; the full 64 characters now appear once, on their own line.
+The truncated root. *(Historical: this records a review of the 2026-08-31 draft, when the published root was `9d630fee…f1c2784` over 11 vectors. That root is superseded — see the must-check block above. The finding is left as written; the lesson is not root-specific.)* Both fatal findings were the same defect: `9d630fee...1f2c784` is not a suffix of the then-published root, which ended f1c2784. In a letter arguing that hashes make silent divergence impossible, the author failing to transmit his own hash intact is the one thing this reader can falsify without cloning. I removed the truncation entirely rather than correcting it, because a truncation is a second artefact that can drift; the full 64 characters now appear once, on their own line.
 
 "The first half of it" as an offer to the recipient. The old pair -- "I am not asking you to be that party. An independent reproduction ... is the first half of it" -- has "it" pointing back a
 
@@ -134,7 +134,7 @@ I am writing about one narrow mechanism, and one argument for why it matters. Th
 
 The problem: two institutions run their own systems, each claims to follow the same rules, and neither has a cheap way to demonstrate that to the other. Today that is settled by audit, treaty language, or both sides running identical software, which makes one implementation everyone's dependency.
 
-The mechanism compares what each side computes on fixed, published test cases, so agreement is shown without either adopting the other's code. It hashes the semantic results, never the prose. docs/CONFORMANCE_SPEC.json publishes all eleven vectors, so an independent build in any language reproduces the root without reading Python. No second implementation exists yet, so that claim is untested. A level that disagrees internally reports silence upward rather than its majority, so one dissent reaches the top instead of being outvoted into invisibility. The binding text is hashed and published, so amendment stays possible and silent amendment does not. The conformance check is adapted from Jens Egholm Pedersen and colleagues' Neuromorphic Intermediate Representation, credited in the repository.
+The mechanism compares what each side computes on fixed, published test cases, so agreement is shown without either adopting the other's code. It hashes the semantic results, never the prose. docs/CONFORMANCE_SPEC.json publishes all twenty-three vectors, so an independent build in any language reproduces the root without reading Python. No second implementation exists yet, so that claim is untested. A level that disagrees internally reports silence upward rather than its majority, so one dissent reaches the top instead of being outvoted into invisibility. The binding text is hashed and published, so amendment stays possible and silent amendment does not. The conformance check is adapted from Jens Egholm Pedersen and colleagues' Neuromorphic Intermediate Representation, credited in the repository.
 
 Trust by sameness, of code, law or identity, caps cooperation at the size of the group that shares it. Verification by behaviour does not: it checks what a party computes, never who they are, so each side keeps its own language, law, implementation and review. Expansion means cooperating with strangers, so the cap binds exactly the case that matters; the alternative to verifying behaviour is sorting people by group. The rule underneath is mutual benefit for everyone a system touches, human and machine, rather than one party at another's expense: a prohibition on a shape of transaction, not a goal, naming no quantity to maximise. The rule and the reasoning behind it are in docs/GOVERNANCE.md.
 
@@ -179,7 +179,7 @@ I am writing to you because of your work on [specific paper or area], and I want
 
 I have published a working demonstration, under Apache-2.0, of three mechanisms. Each is checkable in about ten minutes.
 
-1. Conformance is proved by behaviour, not by source. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose. Two implementations sharing no code produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all eleven vectors in 434 lines, so a build in any language reproduces root 9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784 without reading any Python. No second implementation exists yet, so that claim is untested.
+1. Conformance is proved by behaviour, not by source. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose. Two implementations sharing no code produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all twenty-three vectors in 1,142 lines, so a build in any language reproduces root 0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef without reading any Python. No second implementation exists yet, so that claim is untested.
 
 2. Disagreement survives composition. A nested level that disagrees internally reports silence upward rather than forwarding its majority, so one dissent reaches the top instead of being outvoted into invisibility. scale.py exits non-zero naming a dissent three levels down.
 

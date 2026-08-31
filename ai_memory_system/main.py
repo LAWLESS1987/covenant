@@ -111,14 +111,44 @@ def main(argv=None) -> int:
         return 0
 
     if a.cmd == "verify":
+        # TWO CHECKS, REPORTED SEPARATELY, because they fail for different
+        # reasons and one passing says nothing about the other. The chain can
+        # verify perfectly on a store whose memories have all been rewritten
+        # on disk -- that was true here until 2026-08-29 and is pinned by
+        # test I4b. Printing them as one "ok" would hide exactly that.
         chain = store.verify_chain()
-        print(json.dumps(chain, indent=1, sort_keys=True))
+        content = store.verify_integrity()
+        print(json.dumps({"chain": chain, "content": content},
+                         indent=1, sort_keys=True))
+        rc = 0
         if not chain["ok"]:
             print("\nAUDIT CHAIN BROKEN -- the ledger was edited after the "
                   "fact, or a line was lost. The memories may still be "
                   "correct; what is gone is the proof.", file=sys.stderr)
-            return 1
-        return 0
+            rc = 1
+        if content["drifted"]:
+            print("\nMEMORIES CHANGED ON DISK since they were written:",
+                  file=sys.stderr)
+            for d in content["drifted"]:
+                why = d.get("why") or ("content differs from the digest "
+                                       "recorded for it")
+                print(f"  {d['name']}: {why}", file=sys.stderr)
+            rc = 1
+        if content["missing"]:
+            print("\nWRITTEN THEN REMOVED without a tombstone: "
+                  + ", ".join(content["missing"]), file=sys.stderr)
+            rc = 1
+        if content["unverifiable"]:
+            # NOT an error and NOT counted against the exit code. These are
+            # memories written before content digests existed. A thing we
+            # cannot check is not a thing we caught, and conflating the two
+            # is how a verifier becomes noise.
+            print(f"\n{len(content['unverifiable'])} memory(ies) predate "
+                  "content digests and cannot be checked either way: "
+                  + ", ".join(content["unverifiable"][:10])
+                  + ("..." if len(content["unverifiable"]) > 10 else ""),
+                  file=sys.stderr)
+        return rc
 
     if a.cmd == "import":
         # Adopt a directory of existing memory files -- e.g. a Claude session

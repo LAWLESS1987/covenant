@@ -167,14 +167,27 @@ if [ -n "$PY" ] && [ -f conformance.py ]; then
     OUT=$("$PY" conformance.py 2>&1)
     RC=$?
     ROOT=$(hashes_of "$OUT" | head -n 1)
+    # READ THE COUNT, NEVER RESTATE IT. This line said "11 vectors" while
+    # printing a live root over a different number, which is the exact failure
+    # conformance.py's own docstring names: a root over 11 vectors and a root
+    # over 300 are different claims, and quoting one as the other is how a
+    # true number becomes a false statement. A count copied by hand goes stale
+    # the first time somebody adds a vector, and nothing here would say so.
+    VN=$(printf '%s\n' "$OUT" | sed -n 's/^ *vectors *: *\([0-9][0-9]*\).*/\1/p' \
+         | head -n 1)
+    [ -n "$VN" ] || VN="?"
     if [ $RC -eq 0 ] && [ -n "$ROOT" ]; then
-        say "  [3] conformance root               11 vectors, behaviour not prose"
+        say "  [3] conformance root               $VN vectors, behaviour not prose"
         say "      $ROOT"
-        say "      NOT CROSS-CHECKED: no second implementation exists yet."
-        say "      This is the number an independent build must reproduce, in"
-        say "      any language, sharing none of this code. Reproducing it is"
-        say "      the single most useful thing a reader of this repository"
-        say "      can do, and it needs nobody's permission."
+        say "      NOT INDEPENDENTLY REPRODUCED. Two builds written from the"
+        say "      published spec alone -- conformance_check.ps1 and"
+        say "      conformance_check.sh -- reproduced the PREVIOUS root on"
+        say "      2026-08-31. They also showed five WRONG readings could"
+        say "      reproduce it, which is why twelve vectors were added and"
+        say "      this root is different. Nobody outside has reproduced"
+        say "      THIS one. Doing so is the single most useful thing a"
+        say "      reader of this repository can do, in any language,"
+        say "      sharing none of this code, and it needs no permission."
         PASS=$((PASS + 1))
     else
         say "  [3] conformance root               FAIL (exit $RC)"
