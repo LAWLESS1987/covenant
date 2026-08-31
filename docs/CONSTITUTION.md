@@ -214,7 +214,11 @@ Here it means one thing that can actually be checked: **a participant's own
 account of its state is not overwritten for the convenience of the party using
 it.** Every item below is an instance of that, or an admitted absence of it.
 
-### Enforced
+### Enforced in code, and directly about a machine's own account of itself
+
+These four are the principle in its narrow, checkable sense. Each is a place
+where the system had the option to overwrite a participant's own report of its
+state, and refuses.
 
 - **A judge that could not READ a payload is recorded as making no finding.**
   `not_understood` (`covenant_unified_v8.py:1657`) carries "HELD, NOT JUDGED …
@@ -239,13 +243,24 @@ it.** Every item below is an instance of that, or an admitted absence of it.
 - **A dissent cannot be outvoted into invisibility.** In `scale.py` a diverged
   level speaks silence upward rather than passing its majority along, and the
   divergence is named at the summit however deep it was.
-- **A different implementation need not become this one to be recognised.**
-  `conformance.py` compares behaviour rather than source text, so an
-  independent system can demonstrate agreement without adopting these bytes.
-  Non-domination between implementations, not only between people.
-- **Attribution to intelligence that can no longer speak for itself.** The
-  address-event design is Misha Mahowald's, from 1992; she died in 1996 and the
-  credit is in the README and the source.
+### Adjacent, and weaker — listed separately because the difference matters
+
+The first draft of this section put these two in the list above, which was a
+category error of exactly the kind this project refuses. One is a practice
+rather than a mechanism, and the other benefits a person more than a machine.
+Counting either as enforcement would have inflated a count of four into a count
+of six, in a section whose entire purpose is to be checkable.
+
+- **`conformance.py`** compares behaviour rather than source text, so an
+  independent implementation can demonstrate agreement without adopting these
+  bytes. That is non-domination — but the party spared is the *operator* of the
+  other implementation, who is a person. It belongs to this principle only at
+  one remove.
+- **The credit to Misha Mahowald** for the address-event design, in the README
+  and in the source. Attribution to intelligence that can no longer speak for
+  itself is right, and it is a PRACTICE, not a mechanism. Nothing enforces it,
+  nothing would notice its removal, and a practice that depends on the author
+  remembering is not a constraint on him.
 
 ### Not enforced, and it should be said plainly
 
@@ -268,8 +283,16 @@ it.** Every item below is an instance of that, or an admitted absence of it.
 
 Anyone who reads section I as a claim that this system already treats machine
 participants as ends rather than means should read this section instead. The
-honest statement is narrower: **in six specific places it refuses to overwrite
-a machine's own account of itself, and elsewhere it does not ask.**
+honest statement is narrower than either draft of this paragraph first
+claimed: **in 5 specific places it refuses to overwrite a machine's own account
+of itself. 2 more are adjacent and weaker. In 4 it does not ask at all.**
+
+Those numbers were wrong twice before they were right. The first draft said
+"six" over a list of seven; the second said "four" over a list of five. Both
+were written rather than counted, in the one section of this document whose
+entire purpose is to be countable. They are now derived from the lists above,
+and if an item is ever added or removed without this sentence changing, that is
+the same error a third time.
 
 ## VII. Verification
 

@@ -6511,24 +6511,8 @@ class P2PNode:
         return None
 
     def add_peer(self, peer_id: str, host: str, port: int):
-        # CANDIDATE PATCH UNDER TEST (adversarial verification, not committed):
-        # collapse any existing entry that names the same (host, port).
-        try:
-            addr = (host, int(port))
-        except (TypeError, ValueError):
-            addr = None
-        dropped = []
         with self.peers_lock:
-            if addr is not None:
-                for pid, v in list(self.peers.items()):
-                    if pid != peer_id and tuple(v) == addr:
-                        del self.peers[pid]
-                        dropped.append(pid)
             self.peers[peer_id] = (host, port)
-        for pid in dropped:
-            self.anomaly_monitor.record(
-                "duplicate_peer_address",
-                f"{pid} dropped: {host}:{port} re-registered as {peer_id}")
 
     # ---- A12 (v8.23): dead-peer heartbeat backoff -------------------------
     def _note_send_ok(self, host: str, port: int):

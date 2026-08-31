@@ -689,6 +689,18 @@ IN_PLACE = [
      "hashes the DELIVERY against MANIFEST.sha256 -- a copy is not the delivery"),
     ("test_p18_version_collision.py", 180,
      "walks the tree for other copies of the core -- a copy has a different tree"),
+    # G1 belongs here for the reason stated at the top of SUITES: it is a claim
+    # about THE FOLDER's documents, and running it from the scratch copy
+    # measures the scratch copy. It failed 11/13 in the sweep before this move,
+    # and the reason is instructive -- stage() copies .py/.bat/.html/.json/.sh
+    # and the docs/ tree, but NOT root .md files, so CONTRIBUTING.md (which
+    # holds the protected text) never arrived. Its P1-P3 then passed VACUOUSLY,
+    # because "the phrase is absent from the rule" trivially satisfies "if it
+    # is in the rule it must be in the doc". P4 exists precisely to catch that
+    # and did: it was the check that failed, not the ones it protects.
+    ("test_g1_doc_consistency.py", 120,
+     "compares the documents to the protected text -- a claim about the FOLDER, "
+     "and the scratch copy does not carry root .md files"),
 ]
 
 

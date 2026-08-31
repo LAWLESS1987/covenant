@@ -54,8 +54,9 @@ having made no finding rather than an accusation. A judge that could not be
 reached did not disagree. Each judge's own words survive the tally that
 collapses them into a verdict.
 
-[`CONSTITUTION.md`](CONSTITUTION.md) section VI lists the six places this is
-enforced, with file references, and the four places it is not — including the
+[`CONSTITUTION.md`](CONSTITUTION.md) section VI lists the five places this is
+enforced, with file references, the two that are adjacent and weaker, and the
+four places it is not — including the
 largest: the operative test *"who is worse off if this works?"* has in practice
 only ever been answered about people.
 

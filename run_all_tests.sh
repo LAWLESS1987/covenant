@@ -619,6 +619,11 @@ run test_e2_chain_serialisation.py 60
 # Y2 (2026-08-30) pins supply conservation: 5000 blocks mint EXACTLY their
 # intent. Before v8.12 that scenario over-issued by 270 billion per cent.
 run test_y2_supply_conservation.py 60
+# G1 (2026-08-30) pins that the documents do not contradict the binding rule,
+# and that counts stated in prose match the lists they describe. Run from the
+# LIVE folder: the protected text lives in CONTRIBUTING.md at the root, and a
+# scratch copy that omits root .md files makes G1 pass vacuously.
+run test_g1_doc_consistency.py 60
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.
