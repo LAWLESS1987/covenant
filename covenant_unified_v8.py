@@ -4196,12 +4196,19 @@ class StakingPool:
             if denom <= 0:
                 return {}
             rewards_distribution = {}
+            touched = []
             for pubkey, stake in self.stakes.items():
                 reward = block_reward * (stake.amount / denom)
                 stake.amount += reward
                 stake.claimed_rewards += reward
                 rewards_distribution[pubkey] = reward
-                self.db.update_stake(stake)
+                touched.append(stake)
+            # ONE connection and ONE transaction for the whole distribution,
+            # instead of one per staker. The in-memory credits above are
+            # unchanged and still happen first, so `denom` stays the snapshot
+            # taken before the loop -- the property that stops the mirror-image
+            # 0.2% under-issue, pinned by test_y2's S1.
+            self.db.update_stakes(touched)
             return rewards_distribution
 
 
@@ -5254,6 +5261,37 @@ class Database:
         with _db(self.db_path) as conn:
             conn.execute("UPDATE stakes SET amount = ?, claimed_rewards = ?, last_claim_time = ? WHERE stake_id = ?",
                          (stake.amount, stake.claimed_rewards, stake.last_claim_time, stake.get_id()))
+
+    def update_stakes(self, stakes) -> None:
+        """update_stake for many, on ONE connection and ONE transaction.
+
+        distribute_block_rewards credits every staker in a loop and called
+        update_stake once per staker, each opening its own connection. Measured
+        per-connection cost on this build: connect 1.54 ms, first statement
+        1.37 ms, commit 2.34 ms, close 2.00 ms. The close is the surprising
+        term -- each _db() is the only connection to the file, so closing it
+        checkpoints the WAL and unlinks -wal/-shm, and the next call rebuilds
+        them.
+
+        Same statement, same order, one transaction. Precedent is
+        add_succession_guardians, fixed the same way earlier today for the same
+        reason.
+
+        HONEST SCALE. The live staking pool is empty, so at the size this runs
+        today this saves nothing at all. It is here because the test suite pays
+        the cost on every run -- test_security_audit distributes over 10 stakes
+        x 2000 blocks -- and because a pool that ever fills would pay it per
+        block, forever. Not an optimisation for production; an optimisation for
+        the thing that runs a hundred times a day.
+        """
+        rows = [(st.amount, st.claimed_rewards, st.last_claim_time, st.get_id())
+                for st in stakes]
+        if not rows:
+            return
+        with _db(self.db_path) as conn:
+            conn.executemany(
+                "UPDATE stakes SET amount = ?, claimed_rewards = ?, "
+                "last_claim_time = ? WHERE stake_id = ?", rows)
 
     def close_stake(self, stake_id: str, closed_at: float):
         """NEW v8.4 -- see PATCH LOG item L. An UPDATE, not a DELETE --

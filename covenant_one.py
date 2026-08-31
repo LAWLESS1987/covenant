@@ -153,12 +153,17 @@ SUITES = [
     # outside the credit loop -- the mirror-image 0.2% under-issue introduced
     # by the first fix -- and that NaN/Inf/negative are refused before touching
     # a stake. 13/13 before wiring.
-    # 300s, not 120. Y2 mines 5,000 reward distributions because the defect it
-    # pins was INVISIBLE at small scale -- only a long run separates exact
-    # issuance from a feedback loop. It measures 116s on a quiet machine, which
-    # is 97% of a 120s budget, and it duly TIMED OUT at 120.4s during a sweep
-    # that shared the box with 36 review agents. A budget a suite can only meet
-    # when nothing else is running is a budget that manufactures false failures.
+    # 300s. Y2 runs 5,000 reward distributions because the defect it pins was
+    # INVISIBLE at small scale -- only a long run separates exact issuance from
+    # a feedback loop.
+    #
+    # It measured 116s against a 120s budget and duly TIMED OUT at 120.4s in a
+    # sweep sharing the box with 36 review agents; a budget a suite can only
+    # meet when nothing else runs manufactures false failures. Raised to 300s
+    # for that reason -- and then update_stakes batching took the same run to
+    # 8.0s, a 14.5x reduction, because 5,000 distributions over N stakers had
+    # been opening 5,000 x N sqlite connections. The headroom stays: the budget
+    # should survive a loaded machine, not just describe a quiet one.
     ("test_y2_supply_conservation.py",   300,  "SECURITY"),
     # M1 (2026-08-30). mine() called compute_hash() ~65,536 times per block and
     # every attempt re-ran asdict over every transaction, re-serialised and
