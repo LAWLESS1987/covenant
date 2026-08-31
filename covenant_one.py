@@ -153,7 +153,13 @@ SUITES = [
     # outside the credit loop -- the mirror-image 0.2% under-issue introduced
     # by the first fix -- and that NaN/Inf/negative are refused before touching
     # a stake. 13/13 before wiring.
-    ("test_y2_supply_conservation.py",   120,  "SECURITY"),
+    # 300s, not 120. Y2 mines 5,000 reward distributions because the defect it
+    # pins was INVISIBLE at small scale -- only a long run separates exact
+    # issuance from a feedback loop. It measures 116s on a quiet machine, which
+    # is 97% of a 120s budget, and it duly TIMED OUT at 120.4s during a sweep
+    # that shared the box with 36 review agents. A budget a suite can only meet
+    # when nothing else is running is a budget that manufactures false failures.
+    ("test_y2_supply_conservation.py",   300,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     # E2 (2026-08-30). /chain served the whole chain on every request via

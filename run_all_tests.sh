@@ -618,7 +618,7 @@ run test_c4_bounded_resources.py 60
 run test_e2_chain_serialisation.py 60
 # Y2 (2026-08-30) pins supply conservation: 5000 blocks mint EXACTLY their
 # intent. Before v8.12 that scenario over-issued by 270 billion per cent.
-run test_y2_supply_conservation.py 60
+run test_y2_supply_conservation.py 300
 # G1 (2026-08-30) pins that the documents do not contradict the binding rule,
 # and that counts stated in prose match the lists they describe. Run from the
 # LIVE folder: the protected text lives in CONTRIBUTING.md at the root, and a
