@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 redundancy.py -- at every scale, how many can be cut away before it stops?
 
@@ -49,7 +50,7 @@ THE CLAUSE THAT BOUNDS IT
 USE
   python redundancy.py
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

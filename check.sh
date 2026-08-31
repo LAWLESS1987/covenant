@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # check.sh -- ONE command that checks everything a stranger can check.
 #
 # WHY THIS FILE EXISTS
@@ -33,7 +34,7 @@
 # USE:  sh check.sh          (no arguments, nothing to configure)
 # EXIT: 0 everything that could run agreed. 1 something disagreed.
 #       2 nothing could be checked at all.
-# LICENCE: public domain.
+# LICENCE: Apache-2.0.
 
 set -u
 

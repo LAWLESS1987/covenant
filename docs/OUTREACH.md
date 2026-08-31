@@ -119,7 +119,7 @@ in-app feedback or published research contact.
 >
 > The fix is narrow: retain corrections as first-class records attached to the
 > claim they correct, not to the conversation. A reference implementation, one
-> file, standard library only, public domain — no attribution wanted:
+> file, standard library only, Apache-2.0 — no attribution wanted:
 > github.com/LAWLESS1987/covenant → refutable.py
 >
 > Full write-up: docs/WHAT_WE_FOUND.md

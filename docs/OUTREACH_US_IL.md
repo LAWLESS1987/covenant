@@ -55,7 +55,7 @@ behaviour is a verification method; addressing it to a verification framework is
 the whole of the argument, and needs no stretching to make the case.
 
 **Submissions become part of the public record.** That is an advantage here, not
-a risk — the repository is public domain and the point is to be checked — but it
+a risk — the repository is Apache-2.0 and the point is to be checked — but it
 should be a decision made knowingly rather than discovered afterwards.
 
 **Verify all of this on nist.gov on the day of sending.** Everything above was
@@ -77,7 +77,7 @@ which is a security property as much as a commercial one: a single
 implementation is a single point of compromise, and a monoculture cannot be
 checked against anything.
 
-I have published a working demonstration, public domain, of three mechanisms.
+I have published a working demonstration, under Apache-2.0, of three mechanisms.
 Each is verifiable in about ten minutes on a laptop, and I am asking for them to
 be broken rather than believed.
 
@@ -106,7 +106,7 @@ silence, which is smaller and achievable.
 **What it is not, stated because you will check.** This is not a governance
 system ready for use, and its own documentation says so in those words. Every
 node is run by one person; a single-operator network is not governed, it is
-owned. It has no legislative mechanism. Most of an earlier fifteen-defect audit
+owned. Amendment by quorum is an intention, not a mechanism. Most of an earlier fifteen-defect audit
 remains unverified. The verifier runs on the same machine as the thing it
 verifies, so it makes tampering detectable and never preventable.
 `docs/CONSTITUTION.md` section V lists these, and it is the section I would read
@@ -172,7 +172,7 @@ The usual answers are audit, contract, or a common codebase. The first two are
 slow and periodic. The third creates exactly the dependency the boundary
 existed to prevent — and a shared implementation is also a shared vulnerability.
 
-I have published, public domain, a working demonstration of a fourth option:
+I have published, under Apache-2.0, a working demonstration of a fourth option:
 **compare the computation, not the artefact.** Fixed vectors run through the
 governance primitives, and the semantic results are hashed — never the wording.
 Two systems sharing no source code produce the same root, or they do not, and
@@ -196,7 +196,7 @@ repository, because taking an idea without saying where it came from is the
 thing this project is against.
 
 **What it is not.** Not a governance system ready for use. One operator holds
-every key; no legislative mechanism exists; most of an earlier fifteen-defect
+every key; amendment by quorum is an intention, not a mechanism; most of an earlier fifteen-defect
 audit is unverified; the verifier runs on the machine it verifies, so tampering
 is detectable and not preventable. All of that is in section V of the
 constitution, which is the section I would read first.
@@ -210,7 +210,7 @@ git clone https://github.com/LAWLESS1987/covenant && cd covenant && sh check.sh
 (`powershell -ExecutionPolicy Bypass -File check.ps1` on Windows. Neither needs
 Python, and both name what they could not check.)
 
-**I am not asking for adoption.** The repository is public domain; forking needs
+**I am not asking for adoption.** The repository is Apache-2.0; forking needs
 no permission and no notice to me. I am asking whether the mechanisms break
 under examination by people who would know. If they do, that finding is worth
 more to me than agreement — the project keeps a public record of its own

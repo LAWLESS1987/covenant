@@ -50,13 +50,13 @@ Must be confirmed on the day of sending, none of it verifiable from this machine
 3. That submissions still become public record. The letter says so in the sender's own voice; if the terms changed, the sentence has to change with them.
 No deadline is stated for TEVV, and none is asserted in the letter. The 16 September 2026 date belongs to the separate public-facing documentation draft and is deliberately not cited. The CAISI RFI closed 9 March 2026 and is not cited anywhere.
 
-The licence, before sending. This is the one blocking item. C:\Users\Lawre\covenant\LICENSE and C:\Users\Lawre\covenant-dev\LICENSE are both the placeholder reading "LICENCE NOT YET CHOSEN ... all rights reserved", and README.md says the same under its own "Licence" heading in both trees. The letter therefore states that fact plainly instead of claiming public domain. Two ways to send:
+The licence, before sending. This is the one blocking item. C:\Users\Lawre\covenant\LICENSE and C:\Users\Lawre\covenant-dev\LICENSE are both the placeholder reading "LICENCE NOT YET CHOSEN ... all rights reserved", and README.md says the same under its own "Licence" heading in both trees. The letter therefore states that fact plainly instead of claiming Apache-2.0. Two ways to send:
  - Preferred: choose a licence first (LICENSE names Apache-2.0, MIT, AGPL-3.0; Apache-2.0 is
 
 **Omitted:** Excluded by design, not oversight, because this is a consultation submission to a standards body and a message carrying both a mechanism and a personal or political claim gets routed by the personal claim: the author's ancestry and the "without all the people" line; all theology; all political argument; any mention of Jeffrey Epstein; anything about tribalism. A NIST reviewer evaluating a verification method is the wrong reader for any of it, and including it would move the submission to a queue where nobody can assess the conformance root. The same material stays in the Israel and group letters, where the reader is a person rather than a process.
 
 Also cut, and why:
-- "public domain", everywhere. It is false (see route). Not replaced with "open source" or "freely available", which are the
+- "Apache-2.0", everywhere. It is false (see route). Not replaced with "open source" or "freely available", which are the
 
 
 ---
@@ -71,7 +71,7 @@ I am writing about one narrow technical problem, and I want to be exact about ho
 
 When two parties must cooperate and neither can adopt the other's software, neither has a cheap way to show it follows the same rules. Audit and contract are slow; a shared codebase is a shared vulnerability.
 
-I have published a working demonstration, public domain, of a fourth option: compare the computation, not the artefact. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose; two implementations sharing no source produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all eleven vectors in 434 lines, so an independent build in any language reproduces the published root without reading any Python:
+I have published a working demonstration, Apache-2.0, of a fourth option: compare the computation, not the artefact. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose; two implementations sharing no source produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all eleven vectors in 434 lines, so an independent build in any language reproduces the published root without reading any Python:
 
 9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784
 
@@ -130,7 +130,7 @@ The truncated root. Both fatal findings were the same defect: `9d630fee...1f2c78
 
 Dear [name, title],
 
-I am writing about one narrow mechanism, and one argument for why it matters. The mechanism is public domain and checkable in ten minutes; the argument is not, so it comes second.
+I am writing about one narrow mechanism, and one argument for why it matters. The mechanism is Apache-2.0 and checkable in ten minutes; the argument is not, so it comes second.
 
 The problem: two institutions run their own systems, each claims to follow the same rules, and neither has a cheap way to demonstrate that to the other. Today that is settled by audit, treaty language, or both sides running identical software, which makes one implementation everyone's dependency.
 
@@ -138,7 +138,7 @@ The mechanism compares what each side computes on fixed, published test cases, s
 
 Trust by sameness, of code, law or identity, caps cooperation at the size of the group that shares it. Verification by behaviour does not: it checks what a party computes, never who they are, so each side keeps its own language, law, implementation and review. Expansion means cooperating with strangers, so the cap binds exactly the case that matters; the alternative to verifying behaviour is sorting people by group. The rule underneath is mutual benefit for everyone a system touches, human and machine, rather than one party at another's expense: a prohibition on a shape of transaction, not a goal, naming no quantity to maximise. The rule and the reasoning behind it are in docs/GOVERNANCE.md.
 
-It is not a governance system ready for use. Every node is run by one person; a single-operator network is not governed, it is owned. There is no legislative mechanism. Most of an earlier fifteen-defect audit is unverified. The verifier runs on the machine it verifies, so tampering is detectable and never preventable. docs/CONSTITUTION.md section V calls the one-operator cap the largest gap and not a software problem. Nothing I can build removes it, and I am not asking you to fill it.
+It is not a governance system ready for use. Every node is run by one person; a single-operator network is not governed, it is owned. Amendment by quorum is an intention, not a mechanism. Most of an earlier fifteen-defect audit is unverified. The verifier runs on the machine it verifies, so tampering is detectable and never preventable. docs/CONSTITUTION.md section V calls the one-operator cap the largest gap and not a software problem. Nothing I can build removes it, and I am not asking you to fill it.
 
 I am asking you to try to break the mechanism: an afternoon for anyone with a laptop, inside or outside your organisation, and nobody's approval.
 
@@ -177,7 +177,7 @@ Dear Dr [name],
 
 I am writing to you because of your work on [specific paper or area], and I want to be exact about how small the problem below is. When two parties must cooperate and neither can adopt the other's software, there is no cheap way for either to show it follows the same rules. The usual answers are audit, contract, or a shared codebase. The first two are slow and periodic. The third makes one party's implementation everyone's dependency, and a monoculture cannot be checked against anything.
 
-I have published a working demonstration, public domain, of three mechanisms. Each is checkable in about ten minutes.
+I have published a working demonstration, under Apache-2.0, of three mechanisms. Each is checkable in about ten minutes.
 
 1. Conformance is proved by behaviour, not by source. Fixed vectors run through the governance primitives and the semantic results are hashed, never the prose. Two implementations sharing no code produce the same root, or they do not. docs/CONFORMANCE_SPEC.json publishes all eleven vectors in 434 lines, so a build in any language reproduces root 9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784 without reading any Python. No second implementation exists yet, so that claim is untested.
 
@@ -201,7 +201,7 @@ On Windows, powershell -ExecutionPolicy Bypass -File check.ps1. Neither needs Py
 
 Running it away from my own machine found two defects on 31 August 2026, both older than the checker that exposed them and neither visible from here. The sh verifier gave a different answer depending on which process launched the shell, and printed MISMATCH on an untampered machine. The PowerShell verifier had never worked on Linux or macOS, where PowerShell Core actually runs it, and was recorded as "unavailable", which reads exactly like "not installed". Both are fixed. Checked since on Windows 11 from two shells, Ubuntu under WSL, and Ubuntu on CI under Python 3.11 and 3.12.
 
-I am asking for refutation, not adoption. The repository is public domain; forking needs no permission and no notice to me. A finding that the mechanisms break is worth more to me than agreement, and the project keeps a public record of its own refuted claims.
+I am asking for refutation, not adoption. The repository is Apache-2.0; forking needs no permission and no notice to me. A finding that the mechanisms break is worth more to me than agreement, and the project keeps a public record of its own refuted claims.
 
 An unverifiable record is a debt handed to whoever comes next; a verifiable one is not. That is why those two defects are published rather than quietly fixed, and what docs/SUCCESSION.md is for: a successor inherits something they can check rather than something they must take on faith from people they never met. Nobody chooses to leave a mess. It is the default outcome of leaving a problem unsolved, which is why the ask is now and costs an afternoon.
 

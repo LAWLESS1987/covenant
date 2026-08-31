@@ -42,7 +42,7 @@ USE
 Exit 0 disarmed (nothing can be booked), 1 ARMED, 2 could not determine --
 and 2 is never read as 0.
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

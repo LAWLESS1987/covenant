@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 preflight_deps.py -- name the missing dependency BEFORE it becomes four
 mysterious failures.
@@ -56,7 +57,7 @@ USE
   python preflight_deps.py            # report, exit 0 if nothing is missing
   python preflight_deps.py --quiet    # only complain
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

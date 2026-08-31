@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 scale.py -- governance with no top and no bottom.
 
@@ -60,7 +61,7 @@ WHAT IT DOES NOT DO
 USE
   python scale.py            a worked example, including a hidden divergence
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

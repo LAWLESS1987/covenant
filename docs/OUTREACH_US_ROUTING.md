@@ -10,7 +10,7 @@ Governing rules applied: OUTREACH_STRATEGY.md §2 (the binding constraint is **c
 
 `C:\Users\Lawre\covenant-dev\LICENSE` says **"COVENANT — LICENCE NOT YET CHOSEN … Under the Berne Convention, code with no licence is all rights reserved. Nobody may copy, modify or redistribute this repository until its author chooses a licence."** `README.md` line 365 repeats it.
 
-`docs/OUTREACH_STRATEGY.md` §4 says the opposite — "the repository is public domain, so a fork costs them nothing" — and so does the framing of this whole outreach. A verifier found the "public domain" assertion in at least **six** files: `CONTRIBUTING.md:55`, `docs/CONSTITUTION.md:150`, `docs/OUTREACH.md:122`, `docs/OUTREACH_INSTITUTIONAL.md:32` and `:67`, `docs/OUTREACH_STRATEGY.md:81`, `docs/OUTREACH_US_IL.md:58/80/175/213`.
+`docs/OUTREACH_STRATEGY.md` §4 says the opposite — "the repository is Apache-2.0, so a fork costs them nothing" — and so does the framing of this whole outreach. A verifier found the "Apache-2.0" assertion in at least **six** files: `CONTRIBUTING.md:55`, `docs/CONSTITUTION.md:150`, `docs/OUTREACH.md:122`, `docs/OUTREACH_INSTITUTIONAL.md:32` and `:67`, `docs/OUTREACH_STRATEGY.md:81`, `docs/OUTREACH_US_IL.md:58/80/175/213`.
 
 Why this is not a footnote: **the ask on every channel below is "clone it and run it."** Today the repository's own licence file says nobody may. The first door on the list is CISA's *open source security* office, whose readers open LICENSE first; the second is a *procurement* channel. This is §7's second failure mode exactly — overclaimed, then checked, then discounted — the only one that also destroys the next attempt.
 
@@ -118,12 +118,12 @@ Why this is not a footnote: **the ask on every channel below is "clone it and ru
 ## 3. SEND ORDER, AND THE EVENT THAT RELEASES EACH STEP
 
 ### Step 0 — today, before any send
-Choose a licence, commit it, and fix the six documents that assert public domain. **Release condition for everything below.** This is not a letter task.
+Choose a licence, commit it, and fix the six documents that assert Apache-2.0. **Release condition for everything below.** This is not a letter task.
 
 ### Stage 1 — NOW (§6: named researchers and open consultations)
 
 **1a. NIST Zero Drafts TEVV** → `ai-standards+tevvzd [at] nist.gov`
-The only channel that turns this into a **filed, categorised document**, which is §2's whole constraint. No deadline pressure, so it can go the day the licence lands. State the limits in the letter, early — one operator, no legislative mechanism, unverified audit, verifier runs on the machine it verifies. A reader who is handed those reads the rest as calibrated (§7).
+The only channel that turns this into a **filed, categorised document**, which is §2's whole constraint. No deadline pressure, so it can go the day the licence lands. State the limits in the letter, early — one operator, amendment by quorum an intention rather than a mechanism, unverified audit, verifier runs on the machine it verifies. A reader who is handed those reads the rest as calibrated (§7).
 
 **1b. MAITE GitHub issue** → `github.com/mit-ll-ai-technology/maite/issues`
 The §6 "named researcher" tier, in institutional clothing. Frame it as a finding in *their* problem space — "here is a method for proving two independent implementations of a spec agree; MAITE exists to make independently-built T&E tools interoperate; tell me where this breaks" — never as "please evaluate my project."
@@ -177,7 +177,7 @@ OSTP `engagement@`, the whitehouse.gov contact form, the State Department (any r
 **IARPA (5).** Four things, all time-sensitive:
 1. **The cutoff is the final calendar day of the month at 12:00 noon ET**, and the announcement urges submitting at least three business days early. Today's has passed.
 2. **The deliverable is not a letter.** Section VII of the announcement: *"Videos must be no longer than five (5) minutes (5:00) in length"* — a compliance-rejection criterion, not a guideline — plus **a slide package conforming to Appendix C is required alongside it**, plus hard specs (HD 1920×1080, .mp4 under 1.0 GB, Rec709/sRGB).
-3. **Four required elements**, one of which is a **pricing model**. "Free, public domain, no funding request" may be a valid answer but must be written deliberately — and the licence must actually say so first.
+3. **Four required elements**, one of which is a **pricing model**. "Free, Apache-2.0, no funding request" may be a valid answer but must be written deliberately — and the licence must actually say so first.
 4. **UEI is optional at submission** (*"If you do not have a SAM.gov profile at time of video submission, leave this field blank"*) — but **award-stage entity requirements are a separate question and are not resolved.** The assessment is open to him; an award is not established as open.
 Also re-confirm the notice is still `latest` (there is a superseded parent record, `6e62317…`) and that the announcement PDF is still attached to it.
 

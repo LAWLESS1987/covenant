@@ -29,7 +29,7 @@ to the other. Today this is settled by audit, by treaty language, or by both
 sides agreeing to run identical software — and the last of those means one
 party's implementation becomes everyone's dependency.
 
-**What I have built and published.** A working demonstration, public domain,
+**What I have built and published.** A working demonstration, Apache-2.0,
 of three mechanisms that address that problem and can be checked in about ten
 minutes by anyone with a laptop:
 
@@ -57,14 +57,14 @@ minutes by anyone with a laptop:
 **What it is not, stated plainly because you will check.** This is not a
 governance system ready for use, and its own documentation says so in those
 words. Every node is run by one person; a single-operator network is not
-governed, it is owned. It has no legislative mechanism at all. Most of an
+governed, it is owned. Amendment by quorum is an intention, not a mechanism. Most of an
 earlier fifteen-defect audit remains unverified. The verifier runs on the same
 machine as the thing it verifies, so it makes tampering *detectable* and never
 *preventable*. `docs/CONSTITUTION.md` section V lists these and more, and it is
 the section I would read first in your position.
 
 **What I am asking for.** Not adoption. Take the mechanisms, or one of them,
-and try to break them — the repository is public domain and forking requires
+and try to break them — the repository is Apache-2.0 and forking requires
 no permission from me and no notice to me. If you find where they fail, that
 finding is worth more to me than agreement, and the project keeps a public
 record of its own refuted claims for exactly that reason.

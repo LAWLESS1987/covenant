@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 conformance.py -- prove you compute the same thing, not that you have the same
 file.
@@ -78,7 +79,7 @@ USE
                                     # Committed at docs/CONFORMANCE_SPEC.json
                                     # and checked for drift by test N1 X5.
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

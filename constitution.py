@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 constitution.py -- make the rules that bind the operator tamper-evident.
 
@@ -39,7 +40,7 @@ USE
   python constitution.py verify    # compare against the committed anchor
   python constitution.py show      # print exactly what is protected
 
-LICENCE: public domain, like refutable.py. Take it.
+LICENCE: Apache-2.0, like refutable.py. Take it.
 """
 from __future__ import annotations
 

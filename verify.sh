@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # verify.sh -- check the constitution WITHOUT PYTHON.
 #
 # WHY THIS EXISTS
@@ -38,7 +39,7 @@
 # Exit 0 the anchor matches, 1 it does not, 2 the check could not be run --
 # and 2 is never quietly treated as 0.
 #
-# LICENCE: public domain.
+# LICENCE: Apache-2.0.
 
 set -u
 HERE=$(dirname "$0")

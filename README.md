@@ -39,7 +39,7 @@ What it reports:
 | 5 | what the structure survives, and what it does not | — it reports its own one-operator cap |
 
 Check 3 is the open one, and it is the most useful thing anyone reading this can
-do. The root `9d630fee…1f2c784` is a claim that an **independent build, in any
+do. The root `9d630fee…6f1c2784` is a claim that an **independent build, in any
 language, sharing none of this code, produces the same number.** No second
 implementation exists yet, so that claim is untested.
 

@@ -52,7 +52,7 @@ negotiable.
 
 ## Attribution
 
-Not required, anywhere, for anything. `refutable.py` is public domain. Take it,
+Not required, anywhere, for anything. `refutable.py` is Apache-2.0. Take it,
 rename it, strip the history, ship it inside something else. Adoption is the
 point; credit is not the currency.
 

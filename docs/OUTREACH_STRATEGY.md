@@ -11,7 +11,8 @@ Getting this wrong makes every later decision wrong, so it is settled first.
 
 **Not offered:** a governance system. `CONSTITUTION.md` V says in its own words
 that this is not ready to govern anything of consequence — one operator, no
-legislative mechanism, most of a fifteen-defect audit unverified, the verifier
+no amendment mechanism (amendment by quorum is an intention), most of a
+fifteen-defect audit unverified, the verifier
 running on the machine it verifies.
 
 **Offered:** three mechanisms, each checkable in about ten minutes.
@@ -78,7 +79,7 @@ consulting anyone. It also selects for exactly the readers worth having, since
 the people who enjoy breaking things are the people whose agreement means
 something.
 
-And the asymmetry is total: the repository is public domain, so a fork costs
+And the asymmetry is total: the repository is Apache-2.0, so a fork costs
 them nothing, needs no permission, and creates no obligation in either
 direction.
 
@@ -92,7 +93,7 @@ outcome — **will this person run the check?** — and anything that does not s
 that is decoration.
 
 That implies: the command in the letter, not behind a link. Ten minutes, stated.
-No signup, no dependencies, public domain. All true, so all sayable.
+No signup, no dependencies, Apache-2.0. All true, so all sayable.
 
 **Acted on, 2026-08-31.** It was four commands and a decision about whether to
 install Python, which is four opportunities to stop and one reason to. It is now

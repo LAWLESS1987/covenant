@@ -47,7 +47,7 @@ CLI
   python refutable.py demo        # a worked example, end to end
   python refutable.py selftest    # assertions that must hold
 
-LICENCE: public domain. Attribution is unnecessary. Adoption is the point.
+LICENCE: Apache-2.0. Attribution is unnecessary. Adoption is the point.
 """
 from __future__ import annotations
 

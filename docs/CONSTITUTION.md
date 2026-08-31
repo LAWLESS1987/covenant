@@ -147,7 +147,7 @@ pretending otherwise.
 3. **The reasoning, not just the ruling.** Where a decision is made, the record
    keeps what would overturn it.
 4. **Standing to object.** A refutation attaches to the claim it refutes and
-   travels with it. The mechanism is `refutable.py`; it is public domain.
+   travels with it. The mechanism is `refutable.py`; it is Apache-2.0.
 5. **The truth about limits.** Including everything in section V.
 
 ## V. What this is not, as of 2026-08-30

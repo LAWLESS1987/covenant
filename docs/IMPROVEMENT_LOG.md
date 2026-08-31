@@ -4096,3 +4096,52 @@ sandbox, and B2's single semantic judge.
 
 **Changed:** `AB_RESTART_NODES.bat`, `AE_KILL_STRAY_START_B.bat`,
 `verify_deploy.py`. **No node source touched.**
+
+## 2026-08-31 — Apache-2.0 adopted, and the contradiction that forced it
+
+`LICENSE` read **LICENCE NOT YET CHOSEN** — which under the Berne Convention
+means all rights reserved — while six documents described this work as public
+domain and every outreach letter asked a reader to clone it and run it. The
+repository was already public, so the contradiction was live rather than
+theoretical.
+
+**How it was found matters.** Not by reading the licence. It surfaced from
+adversarial review of the *outreach*, when an agent mapping US intake channels
+noticed the first door on the list was CISA's open-source-security office —
+whose readers open `LICENSE` before running anything. That is
+`OUTREACH_STRATEGY.md` §7's second failure mode exactly: overclaimed, checked,
+discounted, and the only one that also destroys the next attempt.
+
+**Apache-2.0, and the runner-up is worth recording.** AGPL-3.0 was the closer
+philosophical fit — every node's ethics gate readable by the people it judges.
+It was rejected because it would have made this repository's own documents
+false: every draft promises that forking needs no permission and creates no
+obligation in either direction, and `GOVERNANCE.md` VI promises a sovereign
+fork under its own law. Copyleft creates an obligation. MIT was rejected for
+its silence on patents, which a standards body evaluating a mechanism *for
+reimplementation* reads as unpriced risk — and reimplementation is the entire
+ask. Apache-2.0's requirement that changed files be marked is, in a different
+medium, what conformance already does.
+
+21 claims corrected across 10 documents; SPDX identifiers added to the shipped
+entry points. G1 16/16, N1 19/19, V1 17/17, `check.sh` exit 0, conformance root
+unchanged at `9d630fee…6f1c2784`.
+
+**Corrected in the same pass, and it was mine:** three letters and two commit
+messages asserted "no legislative mechanism" as a `CONSTITUTION.md` §V limit.
+The string `legislat` does not appear in that file. The accurate claim is §III's
+own — *amendment by quorum is an intention, not a mechanism*.
+
+### UNRESOLVED, and recorded rather than quietly carried
+
+`realdata/` holds **26 committed CSVs of market data fetched from Kraken's
+public API**, in a public repository. Redistribution of that data is governed by
+Kraken's terms, **not** by Apache-2.0, and those terms have not been checked.
+`LICENSE` had flagged this as an "if this ever becomes public" caution; it
+already is.
+
+The files were **not** removed in this commit, because `covenant_one.py`,
+`run_local_sweep.py`, `verify_csv.py`, `test_p18_version_collision.py` and the
+`quant/` suites all read them, and removing them blind would have turned the
+suite red for a reason that is not the node's. The fix is to ship the fetcher
+and not the data, and it needs the suites adjusted in the same commit. Open.

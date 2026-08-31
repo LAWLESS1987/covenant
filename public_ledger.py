@@ -52,7 +52,7 @@ USE
   Then close the raw node ports at the firewall and, when convenient, change
   the node's bind default from 0.0.0.0 to 127.0.0.1.
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

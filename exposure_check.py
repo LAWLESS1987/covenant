@@ -45,7 +45,7 @@ WHAT IT DOES NOT DO
 USE
   python exposure_check.py
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

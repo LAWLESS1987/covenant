@@ -15,7 +15,7 @@
 #       pwsh -File check.ps1                                 (Linux, macOS)
 # EXIT: 0 everything that could run agreed. 1 something disagreed.
 #       2 nothing could be checked at all.
-# LICENCE: public domain.
+# LICENCE: Apache-2.0.
 
 Set-Location -Path $PSScriptRoot
 

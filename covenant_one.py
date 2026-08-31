@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """covenant_one.py -- ONE command. Every task. Both platforms. Nothing hidden.
 
 WHY THIS EXISTS

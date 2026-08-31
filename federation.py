@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 federation.py -- ask other instances whether we still mean the same thing.
 
@@ -62,7 +63,7 @@ USE
   python federation.py check other.txt
   python federation.py mine                 # print this instance's hash to publish
 
-LICENCE: public domain, like the rest of the shareable layer.
+LICENCE: Apache-2.0, like the rest of the shareable layer.
 """
 from __future__ import annotations
 

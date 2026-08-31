@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """triangulate.py -- three witnesses, one truth, and nobody deciding it alone.
 
 THE SHAPE. The same state lives in three places that fail independently:

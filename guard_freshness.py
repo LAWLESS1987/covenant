@@ -50,7 +50,7 @@ USE
 Exit 0 fresh with no chronic gaps, 1 stale or chronically gapped, 2 could not
 measure -- and 2 is never read as 0.
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 

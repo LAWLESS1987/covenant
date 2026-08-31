@@ -80,7 +80,7 @@ USE
 
   Then add `fallback` to COVENANT_JUDGE_PROVIDERS.
 
-LICENCE: public domain.
+LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 
