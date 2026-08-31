@@ -4145,3 +4145,18 @@ The files were **not** removed in this commit, because `covenant_one.py`,
 `quant/` suites all read them, and removing them blind would have turned the
 suite red for a reason that is not the node's. The fix is to ship the fetcher
 and not the data, and it needs the suites adjusted in the same commit. Open.
+
+## 2026-08-31 — commit 08f70a8 carried more than its message says
+
+`git add -A` was used for expedience and swept in work that had nothing to do
+with the conformance change: `ai_memory_system/*`, `dashboard.html`,
+`RECORD.bat`, `compile_record.py` and `SWEEP_RESULTS.txt`. Nothing was lost or
+damaged and all of it is the author's own, but the commit message describes only
+the spec work, so the history is less honest than it should be.
+
+It is recorded here rather than rewritten, because the commit is pushed and
+rewriting public history to tidy a message costs more than the untidiness. The
+rule it breaks is worth stating: `git add -A` is a bet that everything dirty in
+the tree belongs to the change being made, and that bet was already known to be
+false when it was placed.
+
