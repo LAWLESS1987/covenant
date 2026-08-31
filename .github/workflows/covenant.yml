@@ -71,6 +71,41 @@ jobs:
       - name: covenant_one.py --ci
         run: python covenant_one.py --ci --out ONE_RUN_ci.txt
 
+      # WHY THIS STEP EXISTS. A failed run of this workflow said exactly one
+      # thing to anyone who could not open the log: "Process completed with
+      # exit code 1." The transcript above holds the answer and is uploaded as
+      # an artifact, but both the log and the artifact need an authenticated
+      # session to read -- so to a reader without one, and to any tool asking
+      # the public API, a red tick is undiagnosable. On 2026-08-31 that cost
+      # two blind pushes and an hour of reasoning from a reproduction that did
+      # not reproduce.
+      #
+      # ::error:: writes into the check-run ANNOTATION, which IS public. The
+      # named failures now travel with the red tick instead of behind a login.
+      # Truncated to 3,000 characters because GitHub silently drops an
+      # annotation longer than about 4,096, and a message that vanishes for
+      # being too long is the failure this step exists to remove.
+      - name: Name the failure where it can be read without a login
+        if: failure()
+        run: |
+          # The first pattern tried was a broad one and it was useless: on a
+          # real transcript "ABSENT none. Every suite this runner names
+          # exists", an optional dependency reported absent, and a PASSING
+          # check whose text contains the word ABSENT filled the whole quota
+          # and pushed the actual failures out. Measured before shipping,
+          # against a real transcript and a synthesised failing one -- a
+          # diagnostic that has only ever been run against a green tree is
+          # not a diagnostic.
+          if [ -f ONE_RUN_ci.txt ]; then
+            SUMMARY=$( { grep -E '^[[:space:]]*RESULT:' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]+(checks failed|suites not clean|suites unmeasured|runner list absent|orphaned on disk|listed but NOT SHIPPED|declared deps missing)[[:space:]]+[1-9]' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]*(FAIL|\[FAIL\])' ONE_RUN_ci.txt
+                       } | head -30 | cut -c1-160 | tr '\n' '~' | cut -c1-3000 )
+            echo "::error title=covenant_one.py --ci::${SUMMARY:-the transcript named no failure line, so the exit code came from somewhere this pattern does not look. Download the artifact.}"
+          else
+            echo "::error title=covenant_one.py --ci::no transcript was written -- the runner failed before or during covenant_one.py itself"
+          fi
+
       - name: Upload the transcript
         if: always()   # the transcript matters MOST when the run failed
         uses: actions/upload-artifact@v4
