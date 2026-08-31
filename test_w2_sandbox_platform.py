@@ -183,6 +183,13 @@ for tag, env, expect in (("w2on", {}, True), ("w2off", {"COVENANT_FORCE_NO_SANDB
         for f in (f"w2_{tag}.db", f"w2_{tag}.db.key"):
             try: os.remove(f)
             except OSError: pass
+        # The stderr log is removed only when the node CAME UP. On failure it
+        # is the whole reason the file exists, so it stays for reading. Kept
+        # unconditionally it littered the working tree after every green run,
+        # which is how it was noticed.
+        if h is not None:
+            try: os.remove(os.path.abspath(f"w2_{tag}.err"))
+            except OSError: pass
 
 print("\n" + "=" * 60)
 print(f"{P}/{P+F} passed" + (f", {F} FAILED" if F else ""))
