@@ -14,27 +14,62 @@ letter.
 
 # 1. UNITED STATES
 
-**Send it as a response to an open consultation, not as correspondence.** In
-January 2026 NIST's Center for AI Standards and Innovation (CAISI) issued a
-Request for Information on **securing AI agent systems**. CAISI is described as
-industry's primary point of contact within the US government for testing and
-collaborative research on commercial AI systems.
+**Send it as a response to an open consultation, not as correspondence.** An
+RFI response is filed, read and catalogued because a process exists to receive
+it. The identical text arriving as unsolicited mail reaches a duty officer whose
+job is to route or discard, and who has no category for it. That difference
+matters more than any wording.
 
-That matters more than the wording of the letter. An RFI response is filed,
-read and catalogued because a process exists to receive it. The identical text
-arriving as unsolicited mail reaches a duty officer whose job is to route or
-discard, and who has no category for it. **Check whether the RFI is still open
-before sending; if it has closed, wait for the next one rather than sending
-this cold.**
+### The channel this was aimed at is CLOSED. Checked 2026-08-31.
 
-> **Subject:** RFI response — verifiable agreement between AI systems that do not share an implementation
+This draft was written for CAISI's January 2026 Request for Information on
+securing AI agent systems. **That RFI closed on 9 March 2026**, and NIST has
+since published a summary analysis of the responses — so it is not merely shut,
+it is concluded. Two adjacent doors closed with it: the AI agent identity and
+authorization concept paper (2 April 2026) and the sector listening sessions,
+whose expressions of interest closed 31 March 2026.
 
-To the Center for AI Standards and Innovation:
+The draft's own instruction was to check before sending. Checking is what found
+this. Left unchecked for five months, a letter would have arrived quoting a
+consultation that no longer existed — which does not merely fail, it marks the
+sender as someone who did not look.
 
-This responds to the RFI on securing AI agent systems. It addresses one narrow
-problem within that scope: **how two systems, run by different parties, can each
-demonstrate to the other that they follow the same rules — without either
-having to run the other's code.**
+### The channel that IS open, and is a better fit
+
+**NIST's AI Standards "Zero Drafts" pilot**, page last updated 14 August 2026,
+accepting input by email and open to individuals rather than organisations only.
+It runs several drafts, and one of them is squarely this subject:
+
+- **TEVV — AI testing, evaluation, verification and validation.** A draft
+  outline exists; input goes to `ai-standards+tevvzd [at] nist.gov`. Scope, in
+  NIST's words, is a general framework for approaching TEVV "based on clear
+  concepts and conceptual relationships" rather than specific methods. No
+  deadline is stated for this one.
+- **Public-facing AI documentation**, initial public draft July 2026 — NIST
+  "will consider input received by **September 16, 2026**". A near deadline, but
+  a worse fit: this project's contribution is a verification mechanism, not a
+  documentation template.
+
+TEVV is the better target and it is the more honest one. Conformance proved by
+behaviour is a verification method; addressing it to a verification framework is
+the whole of the argument, and needs no stretching to make the case.
+
+**Submissions become part of the public record.** That is an advantage here, not
+a risk — the repository is public domain and the point is to be checked — but it
+should be a decision made knowingly rather than discovered afterwards.
+
+**Verify all of this on nist.gov on the day of sending.** Everything above was
+true on 31 August 2026 and the closed RFI is the standing demonstration of what
+five months does to a fact like this.
+
+> **Subject:** Input to the TEVV zero draft — verifying that two implementations compute the same thing, without either running the other's code
+
+To the NIST AI Standards Zero Drafts team:
+
+This is input to the TEVV zero draft. It addresses one narrow problem within
+that scope: **how two systems, run by different parties, can each demonstrate to
+the other that they follow the same rules — without either having to run the
+other's code.**
 
 Today that is settled by audit, by contract, or by both sides adopting one
 implementation. The third makes one vendor's software everyone's dependency,
@@ -51,8 +86,8 @@ through the governance primitives and the *semantic results* are hashed — neve
 the prose that explains them. An independent implementation, in another language
 and under another organisation's procurement rules, produces the same root while
 sharing no code. This distinguishes a **standard** from a **dependency**, and it
-is the mechanism most directly relevant to an agency that must certify systems
-it did not write.
+is the mechanism most directly relevant to a TEVV framework that must apply to
+systems its authors did not write.
 
 **2. Disagreement cannot be hidden as authority composes.** Where checkers are
 nested — agents into services, services into a system of record — a group that
@@ -77,18 +112,18 @@ verifies, so it makes tampering detectable and never preventable.
 `docs/CONSTITUTION.md` section V lists these, and it is the section I would read
 first in your position.
 
-**To check any of it:**
+**To check any of it — one command, no dependencies, no account:**
 
 ```
-git clone https://github.com/LAWLESS1987/covenant && cd covenant
-python conformance.py        # the behaviour root an independent build must match
-python scale.py              # exits non-zero, naming a dissent three levels down
-python constitution.py verify ; sh verify.sh   # same hash, no shared code
-python redundancy.py         # what this survives, and what it does not
+git clone https://github.com/LAWLESS1987/covenant && cd covenant && sh check.sh
 ```
 
-The last will report that the structure is capped at one operator. That is the
-true state, and I would rather you learn it from the tool than from me.
+On Windows, `powershell -ExecutionPolicy Bypass -File check.ps1`. Neither needs
+Python; with no Python installed the constitution still verifies and the checker
+names exactly what went unchecked, because a skipped check is not a passed one.
+
+It will report that the structure is capped at one operator. That is the true
+state, and I would rather you learn it from the tool than from me.
 
 Yours sincerely,
 Lawrence Adam Moskowski
@@ -166,6 +201,15 @@ audit is unverified; the verifier runs on the machine it verifies, so tampering
 is detectable and not preventable. All of that is in section V of the
 constitution, which is the section I would read first.
 
+**To check any of it — one command:**
+
+```
+git clone https://github.com/LAWLESS1987/covenant && cd covenant && sh check.sh
+```
+
+(`powershell -ExecutionPolicy Bypass -File check.ps1` on Windows. Neither needs
+Python, and both name what they could not check.)
+
 **I am not asking for adoption.** The repository is public domain; forking needs
 no permission and no notice to me. I am asking whether the mechanisms break
 under examination by people who would know. If they do, that finding is worth
@@ -180,16 +224,25 @@ github.com/LAWLESS1987/covenant
 
 ## Before either is sent
 
-**No address is asserted here.** The nearest thing to a verified route is
-`www.nist.gov/caisi` and the January 2026 RFI. Every address must be confirmed
-on the organisation's own current site on the day of sending — an office renamed
-between one year and the next is common enough that the UN's technology envoy
-did exactly that on 1 January 2025, leaving its old published address attached
-to an office that no longer exists under that name.
+**One route was checked on 2026-08-31 and one was not.** The Zero Drafts pilot
+page, its TEVV address and the 16 September 2026 documentation deadline were
+read on nist.gov that day. No Israeli address has been checked at all, and none
+is asserted below.
+
+Every address must be confirmed on the organisation's own current site on the
+day of sending. Two demonstrations of why, both from this file:
+
+- The January 2026 CAISI RFI this draft was built around **closed on 9 March
+  2026** and was still being cited here five months later. Nothing announced
+  that; it simply stopped being true.
+- An office renamed between one year and the next is common enough that the
+  UN's technology envoy did exactly that on 1 January 2025, leaving its old
+  published address attached to an office that no longer exists under that name.
 
 A wrong address does not merely fail to arrive. It marks the sender as someone
 who did not check, and mail from someone who did not check is filtered by both
-machines and people.
+machines and people. **Checked facts decay silently, so the check belongs on
+the day, not in the draft.**
 
 **Prefer a named person to an institutional inbox**, and prefer an open
 consultation to either. The earlier letters in `docs/OUTREACH.md` are that shape

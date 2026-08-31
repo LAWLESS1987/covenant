@@ -194,6 +194,27 @@ def stage():
     if os.path.isfile(_pristine):
         os.makedirs(os.path.join(WORK, "docs", "semantic"), exist_ok=True)
         shutil.copy2(_pristine, os.path.join(WORK, "docs", "semantic"))
+    # E1's H2 checks that NO SHIPPED COPY of the core puts the API key in the
+    # URL -- "the bug was in four files, so fixing one would have left three."
+    # Those copies live under pending-v8.38/ and launch/, and neither was
+    # staged. So H1 ("every shipped copy is present to check") counted 1 of 3
+    # and E1 went red in EVERY sweep while passing 15/15 standalone -- a suite
+    # reporting the staging rather than the node, which is the failure this
+    # file has now been taught four separate times.
+    #
+    # The worse half is quieter. H2 is the check that matters, and with two of
+    # the three files absent it was examining ONE copy and reporting on all of
+    # them. A green H2 meant almost nothing here. Staging the three files, not
+    # their directories -- the directories carry whole trees.
+    for rel in ("pending-v8.38/covenant_unified_v8.py",
+                "pending-v8.38/covenant_unified_v8.PROJECT-8e04a293efd9.py",
+                "launch/covenant-v8.37/covenant_unified_v8.py"):
+        parts = rel.split("/")
+        s = os.path.join(SRC, *parts)
+        if os.path.isfile(s):
+            dst = os.path.join(WORK, *parts)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(s, dst)
     for d in ("realdata", "quant", "ops"):
         s = os.path.join(SRC, d)
         if os.path.isdir(s):

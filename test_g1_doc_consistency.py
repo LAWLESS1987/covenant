@@ -166,6 +166,68 @@ def main():
           "there is not told a narrower principle than the one that binds",
           "human and machine" in norm(gov))
 
+    # ---- T: every CURRENT statement of the totals must be the same one ----
+    #
+    # Found on 2026-08-31 by reading. README.md said "60 suites, 1,765
+    # checks". docs/OUTREACH_INSTITUTIONAL.md, in a table headed "the test
+    # suite is real", said "62 suites, 1,636 checks". Both were present-tense
+    # claims about the same repository, and they disagreed by two suites and
+    # 129 checks. Nothing was lying: one was measured later and the other was
+    # never revisited. It is exactly how a reader who checks arrives at a
+    # finding the author never had -- and this project's whole argument is
+    # addressed to readers who check.
+    #
+    # HOW THE CURRENT CLAIMS ARE IDENTIFIED, and why not by reading. The
+    # README states its totals twice, so watching only the first would leave
+    # the second free to drift. But it ALSO says "It once opened with 33
+    # suites, 1,043 checks green on Linux" -- true as history, and a check
+    # that compared every occurrence would have called that an inconsistency.
+    # Separating a current claim from a past one by the words around it is
+    # prose parsing, which is the error this project keeps repeating. So the
+    # documents carry an <!--TOTALS--> marker: markup placed on purpose, not
+    # prose to be interpreted. History carries none and is left alone.
+    #
+    # WHAT IT DOES NOT DO: it does not check either number against reality.
+    # Measuring means running the whole suite, which takes minutes and does
+    # not belong here. It ensures only that the published numbers cannot
+    # DISAGREE -- the cheap failure, and the one a reader finds first.
+    TOTALS = re.compile(
+        r"<!--TOTALS-->|(\d[\d,]*)\s+suites?[^\n]{0,40}?(\d[\d,]*)\s+checks?")
+
+    def marked_totals(path):
+        """(suites, checks) for every line carrying the marker."""
+        out = []
+        if not os.path.exists(path):
+            return out
+        with open(path, encoding="utf-8") as fh:
+            for lineno, line in enumerate(fh, 1):
+                if "<!--TOTALS-->" not in line:
+                    continue
+                m = re.search(r"(\d[\d,]*)\s+suites?.{0,40}?(\d[\d,]*)\s+checks?",
+                              line)
+                out.append((os.path.basename(path), lineno,
+                            tuple(int(g.replace(",", "")) for g in m.groups())
+                            if m else None))
+        return out
+
+    marked = (marked_totals(os.path.join(HERE, "README.md"))
+              + marked_totals(os.path.join(HERE, "docs",
+                                           "OUTREACH_INSTITUTIONAL.md")))
+
+    check("T1 at least three CURRENT statements of the totals are marked. A "
+          "count that drops when a marker is deleted would let the check be "
+          "silenced by removing the thing it checks",
+          len(marked) >= 3, [(f, n) for f, n, _ in marked])
+    check("T2 every marked line actually states a suite and a check count",
+          marked and all(v is not None for _, _, v in marked),
+          [(f, n) for f, n, v in marked if v is None])
+
+    vals = {v for _, _, v in marked if v is not None}
+    check("T3 THE TWO AGREE. A document sent to an institution and the "
+          "document that institution then reads on the web must not publish "
+          "different totals for the same repository on the same day",
+          len(vals) == 1, sorted(vals))
+
     n, ok = len(results), sum(results)
     print(f"\nG1: {ok}/{n} passed")
     return 0 if ok == n else 1

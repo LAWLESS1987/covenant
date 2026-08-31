@@ -1,8 +1,16 @@
 # Institutional outreach — draft, and the honest constraints on it
 
-Status: **DRAFT. Nothing here has been sent.** Read the two sections after the
-letter before sending anything; they are the reason this draft says what it
-says.
+Status: **DRAFT. Nothing here has been sent, and by the sequencing in
+`OUTREACH_STRATEGY.md` section 6 nothing here should be sent yet.** This is a
+stage-4 recipient: a body with no technical evaluation function, which cannot
+act on a mechanism however good it is. Spending it now does not merely fail —
+it uses up the one approach such an institution will read from a stranger, and
+the second attempt reads as persistence rather than progress.
+
+It is held until stage 1 produces the only event that changes anything: somebody
+independent running `sh check.sh` and reporting what they got. Read the two
+sections after the letter before sending anything; they are the reason this
+draft says what it says.
 
 ---
 
@@ -110,7 +118,7 @@ Claims that are defensible today, each verifiable by the recipient:
 | a fork can prove agreement without your code | conformance root `9d630fee…84` |
 | dissent survives composition | `python scale.py` exits non-zero with the dissent named |
 | the limits are published, not hidden | `CONSTITUTION.md` V, `GOVERNANCE.md` IX |
-| the test suite is real | 62 suites, 1,636 checks, reproducible by `covenant_one.py` |
+| the test suite is real | 64 suites, 1,826 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
 
 ## Why there is no list of addresses attached
 

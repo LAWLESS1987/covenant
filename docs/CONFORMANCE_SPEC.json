@@ -1,0 +1,434 @@
+{
+ "note": "Reproduce `root` from `input` -> `expected` in any language, sharing none of this code. Hash: sha256 over spec, then for each vector sorted by id, a NUL byte, the id, a NUL byte, and the canonical JSON of expected (sorted keys, no spaces). A differing root is a finding worth reporting, not a failure to hide.",
+ "root": "9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784",
+ "roots": {
+  "A": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "B": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "C": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+ },
+ "spec": "covenant-conformance-v1",
+ "vectors": [
+  {
+   "expected": {
+    "clean": true,
+    "divergences": 0,
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.clean.is-reachable",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k1"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k3"
+      }
+     ],
+     "level": "ok"
+    }
+   },
+   "why": "a genuinely clean tree DOES report clean, or the check is only a machine for saying no"
+  },
+  {
+   "expected": {
+    "clean": true,
+    "divergences": 0,
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.compose.agree",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "leaf": "n0",
+       "root": "A"
+      },
+      {
+       "leaf": "n1",
+       "root": "A"
+      },
+      {
+       "leaf": "n2",
+       "root": "A"
+      }
+     ],
+     "level": "L"
+    }
+   },
+   "why": "a level whose carriers agree, agrees, and speaks upward"
+  },
+  {
+   "expected": {
+    "clean": true,
+    "divergences": 0,
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.compose.height-invariant",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "leaf": "bare",
+       "root": "A"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "one"
+      },
+      {
+       "children": [
+        {
+         "children": [
+          {
+           "leaf": "n0",
+           "root": "A"
+          },
+          {
+           "leaf": "n1",
+           "root": "A"
+          },
+          {
+           "leaf": "n2",
+           "root": "A"
+          }
+         ],
+         "level": "d"
+        },
+        {
+         "children": [
+          {
+           "leaf": "n0",
+           "root": "A"
+          },
+          {
+           "leaf": "n1",
+           "root": "A"
+          },
+          {
+           "leaf": "n2",
+           "root": "A"
+          }
+         ],
+         "level": "e"
+        }
+       ],
+       "level": "three"
+      }
+     ],
+     "level": "MH"
+    }
+   },
+   "why": "THE INVARIANCE: a bare carrier, a one-deep level and a three-deep sub-federation holding the same content all agree. A level's value must not depend on how deep it sits"
+  },
+  {
+   "expected": {
+    "clean": false,
+    "divergences": 1,
+    "speaks_upward": true,
+    "verdict": "AGREE"
+   },
+   "id": "S.divergence.survives-climb",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k1"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "B"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k2"
+      },
+      {
+       "children": [
+        {
+         "leaf": "n0",
+         "root": "A"
+        },
+        {
+         "leaf": "n1",
+         "root": "A"
+        },
+        {
+         "leaf": "n2",
+         "root": "A"
+        }
+       ],
+       "level": "k3"
+      }
+     ],
+     "level": "top"
+    }
+   },
+   "why": "a divergence three levels down is still counted at the summit, and the summit refuses to call itself clean"
+  },
+  {
+   "expected": {
+    "clean": false,
+    "divergences": 1,
+    "speaks_upward": false,
+    "verdict": "DIVERGED"
+   },
+   "id": "S.silence.upward",
+   "input": {
+    "op": "climb",
+    "tree": {
+     "children": [
+      {
+       "leaf": "n0",
+       "root": "A"
+      },
+      {
+       "leaf": "n1",
+       "root": "B"
+      },
+      {
+       "leaf": "n2",
+       "root": "A"
+      }
+     ],
+     "level": "D"
+    }
+   },
+   "why": "a DIVERGED level speaks silence upward, never its majority root -- the rule that stops disagreement laundering itself into consensus one level at a time"
+  },
+  {
+   "expected": {
+    "agreed": true,
+    "answered": [
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [],
+    "silent": [],
+    "verdict": "AGREE"
+   },
+   "id": "T.agree.all",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "x": "A",
+     "y": "A",
+     "z": "A"
+    }
+   },
+   "why": "three witnesses holding one root agree"
+  },
+  {
+   "expected": {
+    "agreed": true,
+    "answered": [
+     "x",
+     "y"
+    ],
+    "outliers": [],
+    "silent": [
+     "z"
+    ],
+    "verdict": "AGREE"
+   },
+   "id": "T.agree.one-silent",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "x": "A",
+     "y": "A",
+     "z": null
+    }
+   },
+   "why": "a witness that did not answer is not a witness that disagreed; it is named, never counted as an outlier"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [
+     "z"
+    ],
+    "silent": [],
+    "verdict": "DIVERGED"
+   },
+   "id": "T.diverged.one-outlier",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "x": "A",
+     "y": "A",
+     "z": "B"
+    }
+   },
+   "why": "one differing witness is DIVERGED and the outlier is named"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [
+     "y",
+     "z"
+    ],
+    "silent": [],
+    "verdict": "DIVERGED"
+   },
+   "id": "T.diverged.three-way",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "x": "A",
+     "y": "B",
+     "z": "C"
+    }
+   },
+   "why": "three-way disagreement declares no winner by luck of ordering"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "x",
+     "y",
+     "z"
+    ],
+    "outliers": [],
+    "silent": [],
+    "verdict": "UNPROVEN"
+   },
+   "id": "T.quorum.raised",
+   "input": {
+    "op": "attest",
+    "quorum": 4,
+    "roots": {
+     "x": "A",
+     "y": "A",
+     "z": "A"
+    }
+   },
+   "why": "a raised quorum is honoured"
+  },
+  {
+   "expected": {
+    "agreed": false,
+    "answered": [
+     "x"
+    ],
+    "outliers": [],
+    "silent": [
+     "y",
+     "z"
+    ],
+    "verdict": "UNPROVEN"
+   },
+   "id": "T.unproven.too-few",
+   "input": {
+    "op": "attest",
+    "roots": {
+     "x": "A",
+     "y": null,
+     "z": null
+    }
+   },
+   "why": "fewer answers than the quorum is UNPROVEN, never agreement with itself"
+  }
+ ]
+}

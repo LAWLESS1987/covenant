@@ -70,7 +70,13 @@ WHAT IT IS NOT
 USE
   python conformance.py             # this instance's root
   python conformance.py --detail    # every vector and its canonical result
-  python conformance.py --json      # machine-readable, for publishing
+  python conformance.py --json      # machine-readable results
+  python conformance.py --spec      # THE ONE FOR SOMEBODY ELSE: inputs,
+                                    # expected outputs and the hashing rule,
+                                    # so the mechanism can be rebuilt in any
+                                    # language without reading this file.
+                                    # Committed at docs/CONFORMANCE_SPEC.json
+                                    # and checked for drift by test N1 X5.
 
 LICENCE: public domain.
 """
@@ -97,93 +103,160 @@ def _canon(obj: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# THE VECTORS. Each is (id, description, callable -> canonical result).
+# THE VECTORS, as DATA rather than as code.
 #
-# Every one asks about SEMANTICS: what verdict, which witnesses counted, did a
-# divergence survive. None asks how any of it is worded, because wording is the
-# thing a faithful reimplementation is entitled to change.
+# They were lambdas. That ran them perfectly and was useless for the one
+# thing this file exists to enable: somebody reimplementing the mechanism in
+# another language and finding out whether they get the same root. Under the
+# old shape the inputs lived only inside closures, so --json published the
+# ANSWERS and never the QUESTIONS, and a reimplementer had to read Python to
+# learn what to reimplement. That is a dependency on this implementation
+# smuggled into a mechanism whose whole purpose is not having one.
+#
+# So the inputs are a table, and --spec publishes it. The table is not a
+# description OF what runs -- it IS what runs. There is no second copy to
+# keep in step, which is the only arrangement in which two things stay in
+# step.
+#
+# THE ENCODING, complete, so that nothing in this file needs reading to
+# reimplement it:
+#
+#   root    "A" | "B" | "C" | null   three distinct 64-char roots; null is a
+#                                    witness that did not answer
+#   leaf    {"leaf": name, "root": root}
+#   level   {"level": name, "children": [node, ...]}
+#   sugar   {"level": name, "carriers": [root, ...]}   ==  children named
+#           "n0", "n1", ... in order. --spec emits the EXPANDED form and
+#           never the sugar, so the published artefact carries no rule a
+#           reader has to be told about separately.
+#   attest  {"op": "attest", "roots": {witness: root}, "quorum": int}
+#   climb   {"op": "climb", "tree": node}
+#
+# Every vector asks about SEMANTICS: what verdict, which witnesses counted,
+# did a divergence survive. None asks how any of it is worded, because
+# wording is the thing a faithful reimplementation is entitled to change.
 # ---------------------------------------------------------------------------
 
-def _vectors() -> List[Dict[str, Any]]:
+ROOTS = {"A": A, "B": B, "C": C, None: None}
+
+
+def _expand(node):
+    """Sugar to explicit. Leaves take the names the old helper gave them, so
+    the expansion is a rewriting of notation and not a change of input."""
+    if "carriers" in node:
+        return {"level": node["level"],
+                "children": [{"leaf": "n%d" % i, "root": r}
+                             for i, r in enumerate(node["carriers"])]}
+    if "children" in node:
+        return {"level": node["level"],
+                "children": [_expand(c) for c in node["children"]]}
+    return dict(node)
+
+
+def _expand_input(inp):
+    if inp.get("op") == "climb":
+        return {"op": "climb", "tree": _expand(inp["tree"])}
+    return dict(inp)
+
+
+def _build(node, S):
+    n = _expand(node)
+    if "leaf" in n:
+        return S.leaf(n["leaf"], ROOTS[n["root"]])
+    return S.level(n["level"], [_build(c, S) for c in n["children"]])
+
+
+def _run(inp):
+    """Interpret one vector. Returns SEMANTICS only -- "why" and "limits" are
+    prose and are dropped on purpose: another language will phrase them
+    differently and be no less conformant for it."""
     import triangulate as T
     import scale as S
 
-    def att(roots, quorum=2):
-        r = T.attest(roots, scale="", quorum=quorum)
-        # Semantics only. "why" and "limits" are prose and are excluded on
-        # purpose: an implementation in another language will phrase them
-        # differently and be no less conformant for it.
+    op = inp.get("op")
+    if op == "attest":
+        r = T.attest({k: ROOTS[v] for k, v in inp["roots"].items()},
+                     scale="", quorum=inp.get("quorum", 2))
         return {"verdict": r["verdict"], "agreed": r["agreed"],
                 "answered": r["answered"], "silent": r["silent"],
                 "outliers": r["outliers"]}
-
-    def climb(node):
-        up, rep = S.climb(node)
+    if op == "climb":
+        up, rep = S.climb(_build(inp["tree"], S))
         return {"verdict": rep["verdict"],
                 "speaks_upward": bool(up),
                 "divergences": len(rep.get("divergences", [])),
                 "clean": S.overall(rep)[0]}
+    raise ValueError("unknown op %r -- a vector this build cannot run is a "
+                     "vector it must not silently pass" % (op,))
 
-    led = lambda name, rs: S.level(name, [S.leaf("n%d" % i, r)   # noqa: E731
-                                          for i, r in enumerate(rs)])
 
-    return [
-        # -- agreement, and what silence is not ----------------------------
-        {"id": "T.agree.all",
-         "why": "three witnesses holding one root agree",
-         "run": lambda: att({"x": A, "y": A, "z": A})},
-        {"id": "T.agree.one-silent",
-         "why": "a witness that did not answer is not a witness that "
-                "disagreed; it is named, never counted as an outlier",
-         "run": lambda: att({"x": A, "y": A, "z": None})},
-        {"id": "T.unproven.too-few",
-         "why": "fewer answers than the quorum is UNPROVEN, never agreement "
-                "with itself",
-         "run": lambda: att({"x": A, "y": None, "z": None})},
-        {"id": "T.diverged.one-outlier",
-         "why": "one differing witness is DIVERGED and the outlier is named",
-         "run": lambda: att({"x": A, "y": A, "z": B})},
-        {"id": "T.diverged.three-way",
-         "why": "three-way disagreement declares no winner by luck of ordering",
-         "run": lambda: att({"x": A, "y": B, "z": C})},
-        {"id": "T.quorum.raised",
-         "why": "a raised quorum is honoured",
-         "run": lambda: att({"x": A, "y": A, "z": A}, quorum=4)},
+VECTORS = [
+    # -- agreement, and what silence is not --------------------------------
+    {"id": "T.agree.all",
+     "why": "three witnesses holding one root agree",
+     "input": {"op": "attest", "roots": {"x": "A", "y": "A", "z": "A"}}},
+    {"id": "T.agree.one-silent",
+     "why": "a witness that did not answer is not a witness that disagreed; "
+            "it is named, never counted as an outlier",
+     "input": {"op": "attest", "roots": {"x": "A", "y": "A", "z": None}}},
+    {"id": "T.unproven.too-few",
+     "why": "fewer answers than the quorum is UNPROVEN, never agreement with "
+            "itself",
+     "input": {"op": "attest", "roots": {"x": "A", "y": None, "z": None}}},
+    {"id": "T.diverged.one-outlier",
+     "why": "one differing witness is DIVERGED and the outlier is named",
+     "input": {"op": "attest", "roots": {"x": "A", "y": "A", "z": "B"}}},
+    {"id": "T.diverged.three-way",
+     "why": "three-way disagreement declares no winner by luck of ordering",
+     "input": {"op": "attest", "roots": {"x": "A", "y": "B", "z": "C"}}},
+    {"id": "T.quorum.raised",
+     "why": "a raised quorum is honoured",
+     "input": {"op": "attest", "roots": {"x": "A", "y": "A", "z": "A"},
+               "quorum": 4}},
 
-        # -- composition, and the invariant that makes it safe -------------
-        {"id": "S.compose.agree",
-         "why": "a level whose carriers agree, agrees, and speaks upward",
-         "run": lambda: climb(led("L", [A, A, A]))},
-        {"id": "S.compose.height-invariant",
-         "why": "THE INVARIANCE: a bare carrier, a one-deep level and a "
-                "three-deep sub-federation holding the same content all "
-                "agree. A level's value must not depend on how deep it sits",
-         "run": lambda: climb(S.level("MH", [
-             S.leaf("bare", A), led("one", [A, A, A]),
-             S.level("three", [led("d", [A, A, A]), led("e", [A, A, A])])]))},
-        {"id": "S.silence.upward",
-         "why": "a DIVERGED level speaks silence upward, never its majority "
-                "root -- the rule that stops disagreement laundering itself "
-                "into consensus one level at a time",
-         "run": lambda: climb(led("D", [A, B, A]))},
-        {"id": "S.divergence.survives-climb",
-         "why": "a divergence three levels down is still counted at the "
-                "summit, and the summit refuses to call itself clean",
-         "run": lambda: climb(S.level("top", [
-             led("k1", [A, A, A]), led("k2", [A, B, A]), led("k3", [A, A, A])]))},
-        {"id": "S.clean.is-reachable",
-         "why": "a genuinely clean tree DOES report clean, or the check is "
-                "only a machine for saying no",
-         "run": lambda: climb(S.level("ok", [
-             led("k1", [A, A, A]), led("k2", [A, A, A]), led("k3", [A, A, A])]))},
-    ]
+    # -- composition, and the invariant that makes it safe -----------------
+    {"id": "S.compose.agree",
+     "why": "a level whose carriers agree, agrees, and speaks upward",
+     "input": {"op": "climb",
+               "tree": {"level": "L", "carriers": ["A", "A", "A"]}}},
+    {"id": "S.compose.height-invariant",
+     "why": "THE INVARIANCE: a bare carrier, a one-deep level and a "
+            "three-deep sub-federation holding the same content all agree. A "
+            "level's value must not depend on how deep it sits",
+     "input": {"op": "climb", "tree": {"level": "MH", "children": [
+         {"leaf": "bare", "root": "A"},
+         {"level": "one", "carriers": ["A", "A", "A"]},
+         {"level": "three", "children": [
+             {"level": "d", "carriers": ["A", "A", "A"]},
+             {"level": "e", "carriers": ["A", "A", "A"]}]}]}}},
+    {"id": "S.silence.upward",
+     "why": "a DIVERGED level speaks silence upward, never its majority root "
+            "-- the rule that stops disagreement laundering itself into "
+            "consensus one level at a time",
+     "input": {"op": "climb",
+               "tree": {"level": "D", "carriers": ["A", "B", "A"]}}},
+    {"id": "S.divergence.survives-climb",
+     "why": "a divergence three levels down is still counted at the summit, "
+            "and the summit refuses to call itself clean",
+     "input": {"op": "climb", "tree": {"level": "top", "children": [
+         {"level": "k1", "carriers": ["A", "A", "A"]},
+         {"level": "k2", "carriers": ["A", "B", "A"]},
+         {"level": "k3", "carriers": ["A", "A", "A"]}]}}},
+    {"id": "S.clean.is-reachable",
+     "why": "a genuinely clean tree DOES report clean, or the check is only a "
+            "machine for saying no",
+     "input": {"op": "climb", "tree": {"level": "ok", "children": [
+         {"level": "k1", "carriers": ["A", "A", "A"]},
+         {"level": "k2", "carriers": ["A", "A", "A"]},
+         {"level": "k3", "carriers": ["A", "A", "A"]}]}}},
+]
 
 
 def run_vectors() -> List[Dict[str, Any]]:
     out = []
-    for v in _vectors():
+    for v in VECTORS:
         try:
-            result = v["run"]()
+            result = _run(v["input"])
             err = None
         except Exception as e:                               # noqa: BLE001
             result, err = None, "%s: %s" % (type(e).__name__, e)
@@ -215,6 +288,28 @@ def main(argv=None) -> int:
     results = run_vectors()
     root = conformance_root(results)
     failed = [r for r in results if r["error"]]
+
+    if "--spec" in argv:
+        # Everything a reimplementer needs and nothing that would let them
+        # copy: the QUESTIONS, the expected answers, and the root over both.
+        # Trees are emitted expanded, so the sugar in the table above is a
+        # convenience of this file and never a rule anyone else must learn.
+        by_id = {r["id"]: r for r in results}
+        print(json.dumps(
+            {"spec": SPEC_VERSION, "root": root, "vectors": [
+                {"id": v["id"], "why": v["why"],
+                 "input": _expand_input(v["input"]),
+                 "expected": by_id[v["id"]]["result"]}
+                for v in sorted(VECTORS, key=lambda v: v["id"])],
+             "roots": {"A": A, "B": B, "C": C},
+             "note": "Reproduce `root` from `input` -> `expected` in any "
+                     "language, sharing none of this code. Hash: sha256 over "
+                     "spec, then for each vector sorted by id, a NUL byte, "
+                     "the id, a NUL byte, and the canonical JSON of expected "
+                     "(sorted keys, no spaces). A differing root is a finding "
+                     "worth reporting, not a failure to hide."},
+            indent=1, sort_keys=True, default=str))
+        return 1 if failed else 0
 
     if "--json" in argv:
         print(json.dumps({"spec": SPEC_VERSION, "root": root,

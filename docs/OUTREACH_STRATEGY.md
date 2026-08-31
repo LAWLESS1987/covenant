@@ -88,11 +88,17 @@ Only one: **someone independent runs the verifiers and finds they agree.**
 
 Not a reply, not a meeting, not a mention. The mechanism is either reproducible
 by a stranger or it is a claim. So every letter should be optimised for a single
-outcome — **will this person run four commands?** — and anything that does not
-serve that is decoration.
+outcome — **will this person run the check?** — and anything that does not serve
+that is decoration.
 
-That implies: commands in the letter, not behind a link. Ten minutes, stated.
+That implies: the command in the letter, not behind a link. Ten minutes, stated.
 No signup, no dependencies, public domain. All true, so all sayable.
+
+**Acted on, 2026-08-31.** It was four commands and a decision about whether to
+install Python, which is four opportunities to stop and one reason to. It is now
+`sh check.sh` — one command, no dependencies, and a real result even with no
+Python present. That is a larger change to the probability in this section than
+any wording could be, and it took less time than a letter.
 
 ## 6. Sequence, and why this order
 
@@ -147,7 +153,13 @@ separately from the system.
    a demonstration into a network of two, and two is the smallest number that is
    not one.
 3. **One independent reproduction of the conformance root.** §5's event.
-4. **An open consultation to answer.** Converts cold mail into a filed response.
+4. **An open consultation to answer.** Converts cold mail into a filed
+   response. **Found, 2026-08-31:** NIST's AI Standards "Zero Drafts" pilot is
+   open, takes email from individuals, and runs a TEVV draft — testing,
+   evaluation, verification and validation — which is this project's subject
+   exactly. The CAISI RFI the US draft was written for closed on 9 March 2026,
+   five months before anyone checked. Both facts came from twenty minutes of
+   reading, which is a poor trade against five months of a stale plan.
 
 Note that three of the four are not writing tasks. **The letters are not the
 bottleneck**, which is the most useful conclusion in this document.

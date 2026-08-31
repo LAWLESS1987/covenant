@@ -189,6 +189,75 @@ def main():
           "named -- unknown is reported as unknown, never as conformance",
           "DIVERGED" in out3 and "unknown" in out3.lower(), out3[-200:])
 
+    # ---- X: the PUBLISHED spec is sufficient on its own --------------------
+    #
+    # The point of --spec is that a stranger with no Python can reimplement
+    # the mechanism. That is only true if the published file carries the
+    # questions as well as the answers, and if the stated hashing rule is the
+    # one actually used. Both are checked here against the file itself, never
+    # against this module's internals -- a test that reached back into
+    # conformance.py would prove the two agree and say nothing about whether
+    # the ARTEFACT is enough.
+    import hashlib
+    import json as _json
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        K.main(["--spec"])
+    spec = _json.loads(buf.getvalue())
+
+    check("X1 the spec publishes every vector, with its input",
+          len(spec["vectors"]) == len(K.VECTORS) and
+          all("input" in v and "expected" in v for v in spec["vectors"]),
+          len(spec["vectors"]))
+
+    h = hashlib.sha256()
+    h.update(spec["spec"].encode())
+    for v in sorted(spec["vectors"], key=lambda v: v["id"]):
+        h.update(b"\x00")
+        h.update(v["id"].encode())
+        h.update(b"\x00")
+        h.update(_json.dumps(v["expected"], sort_keys=True,
+                             separators=(",", ":")).encode())
+    check("X2 THE CLAIM: the root rebuilds from the published file alone, "
+          "following only the rule the file states. If this fails, every "
+          "invitation to reproduce the root is an invitation to guess",
+          h.hexdigest() == spec["root"], h.hexdigest())
+
+    def sugared(node):
+        if not isinstance(node, dict):
+            return False
+        if "carriers" in node:
+            return True
+        return any(sugared(c) for c in node.get("children", []))
+
+    check("X3 no sugar survives into the published spec -- trees are emitted "
+          "expanded, so the shorthand in the table stays private to this file "
+          "and never becomes a rule a reimplementer must be told",
+          not any(sugared(v["input"].get("tree", {}))
+                  for v in spec["vectors"]))
+
+    check("X4 every published input names an op this build can run",
+          all(v["input"].get("op") in ("attest", "climb")
+              for v in spec["vectors"]),
+          sorted({v["input"].get("op") for v in spec["vectors"]}))
+
+    # The committed copy exists so the spec is readable on the web by someone
+    # who will never clone anything. A committed copy is also a SECOND copy,
+    # and second copies drift -- so its only defence is this check.
+    path = os.path.join(HERE, "docs", "CONFORMANCE_SPEC.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            on_disk = fh.read()
+        fresh = buf.getvalue()
+        check("X5 the committed docs/CONFORMANCE_SPEC.json is byte-identical "
+              "to what this build emits. It is published for readers who will "
+              "not clone, and a stale published spec is worse than none",
+              on_disk.replace("\r\n", "\n").strip() == fresh.strip(),
+              "regenerate: python conformance.py --spec > docs/CONFORMANCE_SPEC.json")
+    else:
+        check("X5 docs/CONFORMANCE_SPEC.json is committed", False, path)
+
     n, ok = len(results), sum(results)
     print(f"\nN1: {ok}/{n} passed")
     return 0 if ok == n else 1

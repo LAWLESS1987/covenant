@@ -125,9 +125,21 @@ def boot(tag, extra_env, tries=40):
     for f in (env["COVENANT_DB_PATH"], env["COVENANT_DB_PATH"] + ".key"):
         try: os.remove(f)
         except OSError: pass
+    # stderr was DEVNULL. On 2026-08-31 this failed inside a full sweep --
+    # "W2.7 node w2off came up  no /health" -- and passed three times out of
+    # three standalone, so the one thing needed to tell a flake from a defect
+    # was the node's own complaint, and it had been thrown away. The suite
+    # reported that something went wrong and destroyed the evidence of what.
+    # Keeping it costs a file; a red sweep that cannot be diagnosed costs the
+    # next seven minutes and usually the seven after that.
+    errlog = os.path.abspath(f"w2_{tag}.err")
+    try: os.remove(errlog)
+    except OSError: pass
+    efh = open(errlog, "wb")
     p = subprocess.Popen([sys.executable, "covenant_unified_v8.py", "--port", str(port),
                           "--node-id", tag],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+                         stdout=subprocess.DEVNULL, stderr=efh, env=env)
+    efh.close()
     for _ in range(tries):
         time.sleep(0.5)
         try:
@@ -145,7 +157,17 @@ for tag, env, expect in (("w2on", {}, True), ("w2off", {"COVENANT_FORCE_NO_SANDB
     proc, h = boot(tag, env)
     try:
         if h is None:
-            check(f"W2.7 node {tag} came up", False, "no /health")
+            why = ""
+            try:
+                with open(os.path.abspath(f"w2_{tag}.err"), "rb") as fh:
+                    why = fh.read().decode("utf-8", "replace").strip()
+            except OSError:
+                pass
+            why = " ".join(why.split())[-400:]
+            check(f"W2.7 node {tag} came up", False,
+                  "no /health; node stderr: " + (why or "EMPTY -- the node "
+                  "printed nothing, so it was killed or never started rather "
+                  "than crashing"))
             continue
         sub = h.get("subsystems", {})
         check(f"W2.7 {tag}: /health exposes subsystems.code_sandbox",

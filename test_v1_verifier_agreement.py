@@ -201,6 +201,104 @@ def main():
           and ("sha256sum" in sh_code or "shasum" in sh_code)
           and "System.Security.Cryptography" in ps_code)
 
+    # ---- C: the two ONE-COMMAND checkers must not drift apart --------------
+    #
+    # check.sh and check.ps1 are the front door: almost everyone who ever
+    # verifies anything here will do it by running one of them and reading
+    # nothing else. They are hand-maintained twins, so the failure to fear is
+    # that a POSIX reader and a Windows reader get DIFFERENT verdicts on the
+    # same tree and neither can tell.
+    #
+    # They are not independent verifiers and nothing here claims they are --
+    # both shell out to the same tools. What is checked is that they AGREE,
+    # and that each still fails when it should.
+    import tempfile   # the rest -- os, re, shutil, subprocess -- are module-level
+
+    def tally(out):
+        """The 'N passed, N disagreed, N skipped' line, as numbers. Behaviour,
+        not prose: comparing the two scripts' TEXT would pass while they
+        disagreed, which is the failure being guarded against."""
+        m = re.search(r"(\d+) passed, (\d+) disagreed, (\d+) skipped", out)
+        return tuple(int(g) for g in m.groups()) if m else None
+
+    def run_checker(cmd, cwd):
+        try:
+            r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                               timeout=180)
+            return r.returncode, r.stdout + r.stderr
+        except Exception as e:                               # noqa: BLE001
+            return None, "%s: %s" % (type(e).__name__, e)
+
+    sh_bin = shutil.which("sh")
+    ps_bin = shutil.which("powershell") or shutil.which("pwsh")
+
+    check("C1 both one-command checkers are present. The README, and both "
+          "outreach letters, tell a stranger to run one of these",
+          os.path.exists(os.path.join(HERE, "check.sh"))
+          and os.path.exists(os.path.join(HERE, "check.ps1")))
+
+    if sh_bin and ps_bin:
+        rc_sh, out_sh = run_checker([sh_bin, "check.sh"], HERE)
+        rc_ps, out_ps = run_checker([ps_bin, "-NoProfile", "-ExecutionPolicy",
+                             "Bypass", "-File", "check.ps1"], HERE)
+        t_sh, t_ps = tally(out_sh), tally(out_ps)
+        check("C2 the two checkers reach the SAME verdict on this tree -- same "
+              "passed/disagreed/skipped, same exit code. A Windows reader and "
+              "a POSIX reader must not be told different things about the "
+              "same repository",
+              t_sh is not None and t_sh == t_ps and rc_sh == rc_ps,
+              "sh=%s rc=%s / ps=%s rc=%s" % (t_sh, rc_sh, t_ps, rc_ps))
+    else:
+        check("C2 both checkers ran and agreed", False,
+              "NOT CHECKED: sh=%s powershell=%s. A checker that could not run "
+              "is not a checker that agreed -- same rule as N* above."
+              % (bool(sh_bin), bool(ps_bin)))
+
+    # C3/C4 -- the mutation test, run every time rather than once by hand.
+    #
+    # A check that exists, is correct and is never invoked is this project's
+    # most frequently rediscovered defect, and a mutation test verified once
+    # on an afternoon is exactly that shape. So it runs here -- in a COPY, in
+    # a temp directory. The real CONTRIBUTING.md is never touched, because a
+    # suite that mutates the repository it is testing leaves it mutated the
+    # first time it crashes.
+    if sh_bin:
+        tmp = tempfile.mkdtemp(prefix="v1_mut_")
+        try:
+            os.makedirs(os.path.join(tmp, "docs"), exist_ok=True)
+            for rel in ("check.sh", "verify.sh", "constitution.py",
+                        "CONTRIBUTING.md", "docs/CONSTITUTION_ANCHOR.json",
+                        "docs/SUCCESSION.md"):
+                src = os.path.join(HERE, rel.replace("/", os.sep))
+                if os.path.exists(src):
+                    shutil.copy2(src, os.path.join(tmp, rel.replace("/", os.sep)))
+
+            rc_clean, out_clean = run_checker([sh_bin, "check.sh"], tmp)
+            check("C3 on an unmutated copy the checker exits 0. Without this, "
+                  "C4 could pass because the checker fails on everything",
+                  rc_clean == 0, "rc=%s %s" % (rc_clean, out_clean[-200:]))
+
+            cpath = os.path.join(tmp, "CONTRIBUTING.md")
+            with open(cpath, encoding="utf-8") as fh:
+                body = fh.read()
+            head = "## What never changes"
+            i = body.index(head) + len(head)
+            with open(cpath, "w", encoding="utf-8", newline="") as fh:
+                fh.write(body[:i] + "\n\nMUTATION.\n" + body[i:])
+
+            rc_mut, out_mut = run_checker([sh_bin, "check.sh"], tmp)
+            check("C4 altering ONE protected line makes the checker exit "
+                  "non-zero and print MISMATCH. This is the property every "
+                  "invitation to verify depends on, and it is now tested on "
+                  "every run instead of once by hand",
+                  rc_mut == 1 and "MISMATCH" in out_mut,
+                  "rc=%s %s" % (rc_mut, out_mut[-200:]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    else:
+        check("C3 mutation test ran", False, "NOT CHECKED: no sh on this host")
+        check("C4 mutation test ran", False, "NOT CHECKED: no sh on this host")
+
     n, ok = len(results), sum(results)
     print(f"\nV1: {ok}/{n} passed")
     return 0 if ok == n else 1
