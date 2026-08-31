@@ -160,6 +160,17 @@ SUITES = [
     # that shared the box with 36 review agents. A budget a suite can only meet
     # when nothing else is running is a budget that manufactures false failures.
     ("test_y2_supply_conservation.py",   300,  "SECURITY"),
+    # M1 (2026-08-30). mine() called compute_hash() ~65,536 times per block and
+    # every attempt re-ran asdict over every transaction, re-serialised and
+    # re-encoded the whole block -- to change one integer. It now builds that
+    # once and splices the nonce: 10.1x/16.9x/26.8x per hash at 1/4/20 tx, and
+    # 172.96s -> 8.11s on a real 7-block POST /mine. compute_hash is UNTOUCHED,
+    # because it is what peers run. M1 pins equivalence over 2,250 (block,
+    # nonce) pairs and the hostile case: tx.data is peer-controlled, so a
+    # transaction carrying {"nonce": 0} makes the splice marker ambiguous, and
+    # an unguarded split would raise inside /mine while holding chain_lock.
+    # 15/15 before wiring.
+    ("test_m1_mine_equivalence.py",      180,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     # E2 (2026-08-30). /chain served the whole chain on every request via

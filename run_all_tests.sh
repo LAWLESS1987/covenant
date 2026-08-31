@@ -627,6 +627,9 @@ run test_g1_doc_consistency.py 60
 # V1 (2026-08-30) actually compares the three verifiers. The claim that they
 # agree was made all day on the strength of one manual check.
 run test_v1_verifier_agreement.py 120
+# M1 (2026-08-30) pins that the spliced fast miner agrees with compute_hash,
+# and that peer-controlled tx.data cannot make the splice ambiguous.
+run test_m1_mine_equivalence.py 180
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.
