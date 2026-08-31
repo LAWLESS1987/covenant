@@ -106,8 +106,8 @@ silence, which is smaller and achievable.
 **What it is not, stated because you will check.** This is not a governance
 system ready for use, and its own documentation says so in those words. Every
 node is run by one person; a single-operator network is not governed, it is
-owned. Amendment by quorum is an intention, not a mechanism. Most of an earlier fifteen-defect audit
-remains unverified. The verifier runs on the same machine as the thing it
+owned. Amendment by quorum is an intention, not a mechanism. seven of the fifteen defects in an earlier audit are still
+unverified. The verifier runs on the same machine as the thing it
 verifies, so it makes tampering detectable and never preventable.
 `docs/CONSTITUTION.md` section V lists these, and it is the section I would read
 first in your position.
@@ -196,8 +196,8 @@ repository, because taking an idea without saying where it came from is the
 thing this project is against.
 
 **What it is not.** Not a governance system ready for use. One operator holds
-every key; amendment by quorum is an intention, not a mechanism; most of an earlier fifteen-defect
-audit is unverified; the verifier runs on the machine it verifies, so tampering
+every key; amendment by quorum is an intention, not a mechanism; seven of the fifteen defects in an
+earlier audit are still unverified; the verifier runs on the machine it verifies, so tampering
 is detectable and not preventable. All of that is in section V of the
 constitution, which is the section I would read first.
 

@@ -185,9 +185,9 @@ if [ -n "$PY" ] && [ -f conformance.py ]; then
         say "      2026-08-31. They also showed five WRONG readings could"
         say "      reproduce it, which is why twelve vectors were added and"
         say "      this root is different. Nobody outside has reproduced"
-        say "      THIS one. Doing so is the single most useful thing a"
-        say "      reader of this repository can do, in any language,"
-        say "      sharing none of this code, and it needs no permission."
+        say "      THIS one. Anyone can, in any language, sharing none of"
+        say "      this code, and without asking permission. Whether that"
+        say "      is worth an afternoon is not this program's call."
         PASS=$((PASS + 1))
     else
         say "  [3] conformance root               FAIL (exit $RC)"

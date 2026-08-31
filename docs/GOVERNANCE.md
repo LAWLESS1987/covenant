@@ -302,7 +302,7 @@ form:
   2026-08-30: it refused a record for a word appearing inside a sentence saying
   the thing was *not* happening. A gate that blocks the case for innocence more
   readily than the accusation is dangerous exactly where it matters.
-- **Most of an earlier fifteen-defect audit is still unverified.** Four were
+- **seven of the fifteen defects in an earlier audit are still unverified.** Four were
   re-checked and resolved. "Not checked" and "fixed" are different words and
   only one of them is earned.
 

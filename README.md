@@ -363,5 +363,12 @@ conventions are in `CONTRIBUTING.md` and they are not stylistic.
 
 ## Licence
 
-**Not yet chosen** — see `LICENSE`. Until it is, this is all-rights-reserved by
-default and cannot be redistributed.
+**Apache-2.0** — see [`LICENSE`](LICENSE). Forking, modifying and
+redistributing need no permission and no notice to me. Chosen 2026-08-31; the
+reasoning, including why AGPL-3.0 was the runner-up and was rejected, is in the
+header of that file.
+
+This line said **Not yet chosen** until an audit of the outbound letters found
+it, six commits after the licence was actually adopted. A repository that gives
+two answers to its own licence question is the one thing a reader can falsify
+without running anything.
