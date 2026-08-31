@@ -605,6 +605,9 @@ run test_c4_bounded_resources.py 60
 # E2 (2026-08-30) pins that the faster /chain serialiser emits BYTE-IDENTICAL
 # output to asdict, and that the new range is optional and half-open.
 run test_e2_chain_serialisation.py 60
+# Y2 (2026-08-30) pins supply conservation: 5000 blocks mint EXACTLY their
+# intent. Before v8.12 that scenario over-issued by 270 billion per cent.
+run test_y2_supply_conservation.py 60
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.

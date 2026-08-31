@@ -142,6 +142,18 @@ SUITES = [
     # load-bearing, that BOTH nonce doors are guarded, and that purging removes
     # only what has expired. 21/21 before wiring.
     ("test_c4_bounded_resources.py",     120,  "SECURITY"),
+    # Y2 (2026-08-30). Supply conservation -- the precondition for every
+    # monetary claim, since a cap, a burn or deflation is a statement about a
+    # TOTAL and means nothing if issuance is inexact. Before v8.12 it was very
+    # inexact: 10 stakers, 50/block, 5000 blocks intended 250,000 and minted
+    # 676,563,839,999,194, because rewards raised the numerators and never the
+    # denominator so each block widened the gap that caused it. Y2 pins that a
+    # long run mints EXACTLY its intent, that total_staked has exactly one
+    # definition (derived, unassignable), that the denominator is snapshot
+    # outside the credit loop -- the mirror-image 0.2% under-issue introduced
+    # by the first fix -- and that NaN/Inf/negative are refused before touching
+    # a stake. 13/13 before wiring.
+    ("test_y2_supply_conservation.py",   120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
     # E2 (2026-08-30). /chain served the whole chain on every request via

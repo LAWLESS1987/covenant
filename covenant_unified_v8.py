@@ -132,7 +132,7 @@ reading it; both confirmed empirically before and after the fix)
    last_claim_time column, with an ALTER TABLE guard for dbs that
    predate this patch.
 
-STILL OPEN AFTER v7.1 — FOUND WHILE FIXING #5/#6, NOT ADDRESSED HERE
+OPEN WHEN WRITTEN AT v7.1 — **CLOSED IN v8.12**, see PATCH LOG item AK
 ----------------------------------------------------------------
 7. total_staked DRIFTS FROM sum(stake.amount for stake in stakes).
    Neither claim_rewards() nor distribute_block_rewards() updates
@@ -146,6 +146,30 @@ STILL OPEN AFTER v7.1 — FOUND WHILE FIXING #5/#6, NOT ADDRESSED HERE
    deriving total_staked on demand once the balance-ledger work (item
    1 above) exists, rather than maintaining it as a separate value that
    can drift from the thing it's supposed to describe.
+
+   **THIS WAS DONE, AND THIS HEADING WAS LEFT SAYING OTHERWISE UNTIL
+   2026-08-30.** total_staked is now a derived @property over
+   self.stakes (line ~3899); the prediction above was right on both
+   counts, and the fix is the one it proposed. Measured severity was
+   far worse than "can allocate more": 10 stakers, 50/block, 5000
+   blocks intended a mint of 250,000 and produced 676,563,839,999,194,
+   because rewards raised the numerators and never the denominator, so
+   each block widened the gap that caused it.
+
+   Re-verified 2026-08-30 against the live method, same scenario:
+   intended 250,000, actual 250,000, error 0.000000000%.
+
+   THE REASON THIS PARAGRAPH IS HERE RATHER THAN DELETED. A heading
+   that says a critical defect is STILL OPEN when it has been closed
+   for two versions is a false statement in the record, and it is the
+   inverse of the failure this project usually guards against -- it
+   understates rather than overstates. It cost real work: on
+   2026-08-30 it was read as current and a fix was begun for something
+   already fixed, and only a check of the code stopped it. Anyone
+   auditing this ledger would have drawn the same wrong conclusion,
+   and about supply, which is the thing an auditor trusts least.
+   Kept, corrected, and dated, per the same rule that keeps the wrong
+   turns everywhere else.
 
 PATCH LOG — v7.2 (balance ledger + /stake signature requirement)
 ----------------------------------------------------------------
