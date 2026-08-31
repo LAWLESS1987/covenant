@@ -232,27 +232,66 @@ def main():
     sh_bin = shutil.which("sh")
     ps_bin = shutil.which("powershell") or shutil.which("pwsh")
 
-    check("C1 both one-command checkers are present. The README, and both "
-          "outreach letters, tell a stranger to run one of these",
+    check("C1 both one-command checkers are SHIPPED. The README and both "
+          "outreach letters tell a stranger to run one of these, so a missing "
+          "file is a broken instruction on a platform this host cannot test",
           os.path.exists(os.path.join(HERE, "check.sh"))
           and os.path.exists(os.path.join(HERE, "check.ps1")))
 
-    if sh_bin and ps_bin:
-        rc_sh, out_sh = run_checker([sh_bin, "check.sh"], HERE)
-        rc_ps, out_ps = run_checker([ps_bin, "-NoProfile", "-ExecutionPolicy",
-                             "Bypass", "-File", "check.ps1"], HERE)
-        t_sh, t_ps = tally(out_sh), tally(out_ps)
-        check("C2 the two checkers reach the SAME verdict on this tree -- same "
-              "passed/disagreed/skipped, same exit code. A Windows reader and "
-              "a POSIX reader must not be told different things about the "
-              "same repository",
-              t_sh is not None and t_sh == t_ps and rc_sh == rc_ps,
-              "sh=%s rc=%s / ps=%s rc=%s" % (t_sh, rc_sh, t_ps, rc_ps))
+    # WHICH OF THE TWO CAN RUN HERE, named rather than demanded.
+    #
+    # The first version of C2 required BOTH, and there are only two checkers --
+    # one of them PowerShell -- so requiring both required Windows. It failed
+    # on both ubuntu CI jobs, which is a wrong check behaving correctly.
+    #
+    # V1 already had the answer in its own docstring: "On Linux, verify.ps1 is
+    # absent and V1 says so rather than counting it." The same rule, applied
+    # to the same problem, one section further down the same file. Cross-
+    # platform agreement can only be tested where both exist, and saying that
+    # plainly is worth more than a check that cannot pass off Windows.
+    ran = {}
+    absent = {}
+    if sh_bin:
+        rc, out = run_checker([sh_bin, "check.sh"], HERE)
+        t = tally(out)
+        if t is None:
+            absent["check.sh"] = "ran but printed no tally: " + out.strip()[-90:]
+        else:
+            ran["check.sh"] = (t, rc)
     else:
-        check("C2 both checkers ran and agreed", False,
-              "NOT CHECKED: sh=%s powershell=%s. A checker that could not run "
-              "is not a checker that agreed -- same rule as N* above."
-              % (bool(sh_bin), bool(ps_bin)))
+        absent["check.sh"] = "no sh on PATH"
+    if ps_bin:
+        rc, out = run_checker([ps_bin, "-NoProfile", "-ExecutionPolicy",
+                               "Bypass", "-File", "check.ps1"], HERE)
+        t = tally(out)
+        if t is None:
+            absent["check.ps1"] = "ran but printed no tally: " + out.strip()[-90:]
+        else:
+            ran["check.ps1"] = (t, rc)
+    else:
+        absent["check.ps1"] = "no powershell on PATH -- expected on Linux"
+
+    for name in sorted(absent):
+        print("      UNAVAILABLE %-17s %s" % (name, absent[name]))
+
+    check("C2 AT LEAST ONE checker ran here and reported a verdict. This is "
+          "the part that holds on every platform: the front door the README "
+          "sends people to must work on the host running this suite",
+          bool(ran), {"ran": sorted(ran), "absent": absent})
+
+    if len(ran) >= 2:
+        verdicts = {v for v in ran.values()}
+        check("C2b the two checkers reach the SAME verdict on this tree -- "
+              "same passed/disagreed/skipped, same exit code. A Windows "
+              "reader and a POSIX reader must not be told different things "
+              "about the same repository",
+              len(verdicts) == 1, ran)
+    else:
+        # Not a pass, not a failure: a statement about this host. Counting it
+        # as agreement would be the exact error N* exists to prevent, and
+        # counting it as disagreement is what just broke CI.
+        print("      NOT COMPARED  only %s ran here, so cross-platform "
+              "agreement was not tested on this host" % (sorted(ran) or "none"))
 
     # C3/C4 -- the mutation test, run every time rather than once by hand.
     #
