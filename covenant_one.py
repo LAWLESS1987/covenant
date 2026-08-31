@@ -701,6 +701,14 @@ IN_PLACE = [
     ("test_g1_doc_consistency.py", 120,
      "compares the documents to the protected text -- a claim about the FOLDER, "
      "and the scratch copy does not carry root .md files"),
+    # V1 runs the three verifiers and compares them. In place, because the
+    # scratch copy carries .sh but not .ps1, so from there only two of three
+    # would ever be available. V1 would still be HONEST about that -- it names
+    # what could not run and refuses to count it -- but the point of the suite
+    # is to compare all three, and only the live folder has all three.
+    ("test_v1_verifier_agreement.py", 180,
+     "runs constitution.py, verify.sh and verify.ps1 and compares their roots "
+     "-- a claim nothing checked until now"),
 ]
 
 

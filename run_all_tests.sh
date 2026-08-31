@@ -624,6 +624,9 @@ run test_y2_supply_conservation.py 60
 # LIVE folder: the protected text lives in CONTRIBUTING.md at the root, and a
 # scratch copy that omits root .md files makes G1 pass vacuously.
 run test_g1_doc_consistency.py 60
+# V1 (2026-08-30) actually compares the three verifiers. The claim that they
+# agree was made all day on the strength of one manual check.
+run test_v1_verifier_agreement.py 120
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.
