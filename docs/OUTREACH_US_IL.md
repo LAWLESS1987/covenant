@@ -104,11 +104,21 @@ interoperate with partners while ceding no control over its own systems. That is
 precisely the problem conformance-by-behaviour solves, and it is a sharper fit
 here than in a large agency.
 
-Candidate recipients, in order of likely usefulness — **all to be confirmed on
-their own current sites**: the Ministry of Innovation, Science and Technology
-(which ran the national AI programme); the Israel Innovation Authority; and a
-named academic centre — Hebrew University, the Technion, or Tel Aviv University
-— where a specific researcher is far likelier to engage than a ministry inbox.
+**Recipient order, corrected 2026-08-31 by the reasoning in
+`OUTREACH_STRATEGY.md` section 6.** This first listed the ministry, which was
+backwards. A ministry has no technical evaluation function, so it cannot act on
+a mechanism however good it is — and a first approach spent there is spent: the
+second attempt reads as persistence rather than progress.
+
+  1. **A NAMED ACADEMIC** at Hebrew University, the Technion or Tel Aviv
+     University, chosen because their published work touches verification,
+     distributed systems or AI governance. A researcher can run the vectors the
+     same afternoon and needs nobody's approval to do it.
+  2. The Israel Innovation Authority — only after (1) has produced something.
+  3. The Ministry of Innovation, Science and Technology — last, and carrying
+     whatever (1) and (2) yielded.
+
+All to be confirmed on their own current sites on the day.
 
 > **Subject:** A mechanism for verifying agreement between systems without sharing an implementation
 
