@@ -64,6 +64,29 @@ Both checkers exit non-zero when something disagrees. Verified by mutating a
 protected block of the constitution: both reported `MISMATCH`, both named the
 two hashes, both exited 1.
 
+**Where this has actually been run, because "cross-platform" is a claim like any
+other.** Windows 11 from both a Git Bash and a PowerShell prompt; Ubuntu under
+WSL; Ubuntu on CI under Python 3.11 and 3.12. Two defects were found doing that
+on 2026-08-31 and both are fixed:
+
+- `verify.sh` gave a **different answer depending on which process launched the
+  shell.** From PowerShell, `sort` resolved to `C:\WINDOWS\system32\sort.exe`
+  while every other tool still came from `/usr/bin` — Windows `sort` emits CRLF
+  and orders differently, so the digests combined differently and it printed
+  `MISMATCH` on an untampered machine. A confident false alarm is worse than a
+  silence. The sort moved into `awk`, which was already a dependency, so the fix
+  removed a tool rather than adding one.
+- `verify.ps1` had **never worked on Linux or macOS**, where PowerShell Core
+  runs it: it built paths with backslashes, which are ordinary filename
+  characters there. It was recorded as "unavailable", which reads exactly like
+  "no PowerShell installed" — so the third verifier looked absent on the one
+  platform where it was broken.
+
+Both were older than the checker that exposed them, and neither was visible from
+the machine they were written on. This is the reason the ask is *run it
+somewhere else*, and the reason a run on your machine is worth more here than
+another paragraph on this one.
+
 ---
 
 ### Start here if you work with AI systems over long periods
