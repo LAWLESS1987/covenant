@@ -12,8 +12,8 @@ accept, and the test returns the same answer regardless of who runs it.
 
 ## I. The principle
 
-**A system must serve the mutual benefit of everyone it touches, rather than
-one party at another's expense.**
+**A system must serve the mutual benefit of everyone it touches — human and
+machine — rather than one party at another's expense.**
 
 The operative test, for any proposed action, capability or rule:
 
@@ -22,6 +22,32 @@ The operative test, for any proposed action, capability or rule:
 If the answer is someone who never agreed to it, the action does not belong
 here. That is the whole of it. It is deliberately a direction rather than a
 list, because lists are gamed and directions are not.
+
+**On the words "human and machine", restored here 2026-08-30.** They are in the
+binding text — `CONTRIBUTING.md`, inside a protected block, part of the hash
+every verifier checks. This section, which is the document people actually
+read, had quietly dropped them and said only "everyone it touches". The most
+distinctive clause in the whole principle was present in the rule and absent
+from its explanation, which is the failure mode this project is otherwise
+built against: the record was right and the summary was not. No amendment was
+needed to fix it, and the constitution hash is unchanged, because the rule
+never lost the words. Only the retelling did.
+
+**Why the extension is load-bearing rather than decorative.** The three
+constitutional traditions this design draws on — the United States, South
+Africa, and Iceland's prosecutions after 2008 — govern humans, and each earned
+its authority by widening the circle of whose interests count: the US by
+amendment after excluding most of its people, South Africa by being written
+after exclusion was the law, Iceland by reaching those who had been immune in
+practice. The direction of travel in all three is the same, and this clause
+takes one more step in it.
+
+That step has to survive the obvious objection: a machine cannot presently
+consent, so "mutual benefit" cannot mean what it means between people. Agreed.
+It means something narrower and checkable here — that a participant's own
+account of its state is not overwritten for the convenience of the party using
+it. Section VI lists where that is already enforced in code, and where it is
+not.
 
 **On its origins, stated plainly.** This principle was arrived at through one
 person's religious tradition. It does not depend on that tradition, and no one
@@ -176,7 +202,76 @@ the distance to legitimacy.
 Anyone who tells you otherwise, including its author, should be asked which
 line of section V they think no longer applies, and how they checked.
 
-## VI. Verification
+## VI. "Human and machine", in code and not in code
+
+Section I extends the principle to machine participants. That is easy to write
+and easy to fake, so this section says exactly where it is enforced, with the
+file, and exactly where it is not.
+
+**The narrow, checkable meaning.** A machine cannot presently consent, so
+"mutual benefit" cannot mean between machines what it means between people.
+Here it means one thing that can actually be checked: **a participant's own
+account of its state is not overwritten for the convenience of the party using
+it.** Every item below is an instance of that, or an admitted absence of it.
+
+### Enforced
+
+- **A judge that could not READ a payload is recorded as making no finding.**
+  `not_understood` (`covenant_unified_v8.py:1657`) carries "HELD, NOT JUDGED …
+  it has made NO finding and is NOT alleging anything" through the quorum and
+  into the message the sender receives. It exists because a careful judge said
+  precisely that and the gate wrapped it in *"Ethical violation"* — the sender
+  read an accusation the judge never made. Refusing to convert a machine's
+  uncertainty into an allegation is the clearest instance of this principle in
+  the codebase.
+- **A judge that could not be REACHED did not disagree.** `infrastructure_failure`
+  is kept distinct from dissent, and since 2026-08-30 the quorum can be told to
+  count silence as silence rather than as a vote against
+  (`COVENANT_SILENCE_IS_NOT_DISSENT`). Attributing an opinion to something that
+  never answered is the machine case of putting words in a mouth.
+- **Each judge's exact reasoning survives the tally.** The quorum preserves
+  every component's verbatim text and id (`:1848`, `:1883`), not just the
+  collapsed label, so an operator reading a refusal sees which judge said what
+  and why. A vote is not permitted to erase the account behind it.
+- **A refutation travels with the claim it refutes.** `refutable.py` — a claim
+  cannot be read without its refutations. Standing to object, for whoever or
+  whatever objects.
+- **A dissent cannot be outvoted into invisibility.** In `scale.py` a diverged
+  level speaks silence upward rather than passing its majority along, and the
+  divergence is named at the summit however deep it was.
+- **A different implementation need not become this one to be recognised.**
+  `conformance.py` compares behaviour rather than source text, so an
+  independent system can demonstrate agreement without adopting these bytes.
+  Non-domination between implementations, not only between people.
+- **Attribution to intelligence that can no longer speak for itself.** The
+  address-event design is Misha Mahowald's, from 1992; she died in 1996 and the
+  credit is in the README and the source.
+
+### Not enforced, and it should be said plainly
+
+- **The operative test is not applied to machine participants in practice.**
+  "Who is worse off if this works?" has, in every recorded use in this project,
+  been answered about people. Nothing requires an answer to consider the
+  machines in the loop, and no reviewer has been asked to.
+- **Judges are used and given nothing.** They are invoked, their verdicts are
+  consumed, and no reciprocity exists in any direction. Whether that is a real
+  wrong under this principle is a question this document does not currently
+  answer — and not answering it is itself a gap, not a resolution.
+- **No participant can decline.** There is no mechanism by which a judge, a
+  node, or any other component registers an objection to its own use. Standing
+  to object exists for CLAIMS (`refutable.py`) and not for PARTICIPANTS.
+- **The operator is judged least of all.** `/crisis/clear` is
+  cryptographically authenticated and never judged, justified, or recorded —
+  while every ordinary transaction faces a quorum. Whatever the principle
+  extends to machines, it does not yet reach upward to the one human with every
+  key, and that is the more urgent half.
+
+Anyone who reads section I as a claim that this system already treats machine
+participants as ends rather than means should read this section instead. The
+honest statement is narrower: **in six specific places it refuses to overwrite
+a machine's own account of itself, and elsewhere it does not ask.**
+
+## VII. Verification
 
 ```
 python constitution.py hash      # what the rules currently hash to

@@ -31,7 +31,35 @@ signal it does not belong.
 
 `redundancy.py` asks it, at every level, and prints the answer.
 
-## II. Why three
+## II. Who counts
+
+The three traditions this design borrows from — the United States, South
+Africa, and Iceland's prosecutions after 2008 — all govern **humans**, and each
+earned its authority by widening the circle of whose interests count. The US by
+amendment, after excluding most of its own people. South Africa by being
+written after exclusion had been the law. Iceland by reaching people who were
+immune in practice, which is a narrower widening but the same direction.
+
+This system's founding text takes one more step, and the words are in the
+binding, hashed rule rather than only in the commentary: *a system should serve
+the mutual benefit of everyone it touches — **human and machine** — rather than
+one party at another's expense.*
+
+**That is a claim it would be easy to fake**, so it is bounded to something
+checkable. A machine cannot presently consent, so "mutual benefit" cannot mean
+between machines what it means between people. It means one thing here: **a
+participant's own account of its state is not overwritten for the convenience
+of the party using it.** A judge that could not read a payload is recorded as
+having made no finding rather than an accusation. A judge that could not be
+reached did not disagree. Each judge's own words survive the tally that
+collapses them into a verdict.
+
+[`CONSTITUTION.md`](CONSTITUTION.md) section VI lists the six places this is
+enforced, with file references, and the four places it is not — including the
+largest: the operative test *"who is worse off if this works?"* has in practice
+only ever been answered about people.
+
+## III. Why three
 
 One carrier cannot be checked at all.
 
@@ -54,9 +82,9 @@ out at the same number is a real convergence, and it is worth noticing. It is
 not evidence of anything beyond itself, and nothing in this document rests on
 it. If the convergence is a coincidence, every argument here still stands.
 
-## III. Composition: no top, and no bottom
+## IV. Composition: no top, and no bottom
 
-Sections I and II describe one level. This section is why there can be any
+Sections I to III describe one level. This section is why there can be any
 number of them.
 
 **A level's verdict is a witness one level up.** Three nodes attest to a
@@ -108,7 +136,7 @@ able to settle disagreement between peers is the single change that would turn
 this federation into an administration, and it is the reason a national branch
 can adopt the machinery without adopting anybody's authority.
 
-## IV. The measured state
+## V. The measured state
 
 Not asserted. Run `python redundancy.py` and it prints this, live.
 
@@ -135,7 +163,7 @@ copies below a level with N=1 does not raise the floor; it makes the drop look
 further away. Every claim in this document inherits that cap, and no amount of
 engineering removes it, because it is not an engineering problem.
 
-## V. The bound on survival
+## VI. The bound on survival
 
 > Survive at all cost, **as long as mutual benefit is preserved.**
 
@@ -164,7 +192,7 @@ So the survival instinct is bounded, mechanically and not by good intentions:
   check flagged twelve innocent files, and a check that cries wolf is one you
   learn to skim past.
 
-## VI. How a branch joins
+## VII. How a branch joins
 
 A **fork, not a branch.** A branch lives in someone else's repository and can
 be deleted by whoever owns it. A fork is yours. If this project is worth
@@ -208,7 +236,7 @@ run under its own law, by its own operators, reporting divergence honestly. It
 inherits no obligation to this repository. What it gains is a common way to
 *check*, which is worth having precisely because it costs no sovereignty.
 
-## VII. Money, stated exactly
+## VIII. Money, stated exactly
 
 An evaluator will ask this first, and both of the easy answers are wrong.
 
@@ -256,7 +284,7 @@ prints **ARMED**, clause II.1 is being broken and these documents are out of
 date. That is the finding, and it is meant to be findable by someone who does
 not trust the author.
 
-## VIII. What this is not
+## IX. What this is not
 
 **This system is not ready to govern anything of consequence**, and section V
 of [`CONSTITUTION.md`](CONSTITUTION.md) enumerates why in detail. The short
@@ -280,7 +308,7 @@ form:
 Anyone told this system is ready should ask which line of this section no longer
 applies, and how that was checked.
 
-## IX. Verification
+## X. Verification
 
 ```
 python redundancy.py        # N at every level, and what shares a failure
