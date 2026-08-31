@@ -135,6 +135,17 @@ run () {
 }
 echo "=== INTEGRITY ==="
 "$PY" verify_bundle.py 2>&1 | tail -1
+# THE RULES THEMSELVES (added 2026-08-30). Nothing ran constitution.py --
+# not this file, not CI, not verify_deploy.py, not covenant_one.py. Three
+# independent verifiers existed and all three only ran when a human typed the
+# command. A non-zero exit here is a FAILURE, because a protected rule that no
+# longer hashes to the published anchor is an amendment nobody announced.
+"$PY" constitution.py verify 2>&1 | tail -3
+if [ "${PIPESTATUS[0]}" != "0" ]; then
+  FAILED=$((FAILED+1))
+  printf "  %-30s %s
+" "constitution.py" "PROTECTED RULES DO NOT MATCH THE ANCHOR -- counted as a failure."
+fi
 # ELEVEN PHANTOM SUITES REMOVED (2026-08-27, on L's instruction).
 #
 # The lines below used to invoke eleven suites that do not exist. Checked

@@ -32,7 +32,7 @@ set STAMP=%DATE:~-4%%DATE:~4,2%%DATE:~7,2%
 
 echo.
 echo   ==========================================================
-echo    STEP 1 of 6 -- verify the record
+echo    STEP 1 of 7 -- verify the record
 echo   ==========================================================
 if not exist "%STORE%" goto NOSTORE
 set AI_MEMORY_ROOT=%STORE%
@@ -45,7 +45,21 @@ if not "%RC%"=="0" goto DRIFTED
 
 echo.
 echo   ==========================================================
-echo    STEP 2 of 6 -- three copies
+echo    STEP 2 of 7 -- do the RULES still hash to the anchor?
+echo   ==========================================================
+REM Added 2026-08-30, after discovering that NOTHING ran this. Not the node,
+REM not run_all_tests.sh, not verify_deploy.py, not CI, not covenant_one.py,
+REM and not this file -- which had six steps wired into it that same morning,
+REM none of them the constitution. Three independent verifiers were built for
+REM it and every one of them only ran when a person typed the command.
+REM A check nobody invokes is a check that is not running.
+"%PY%" constitution.py verify
+if errorlevel 1 echo      ^>^> THE PROTECTED RULES DO NOT MATCH THE PUBLISHED ANCHOR.
+if errorlevel 1 echo      ^>^> Amendment is allowed. Amendment in SILENCE is not.
+
+echo.
+echo   ==========================================================
+echo    STEP 3 of 7 -- three copies
 echo   ==========================================================
 if not exist "%USERPROFILE%\ai_memory_backups\%STAMP%" mkdir "%USERPROFILE%\ai_memory_backups\%STAMP%" >nul 2>&1
 copy /Y "%STORE%\*.md" "%USERPROFILE%\ai_memory_backups\%STAMP%\" >nul 2>&1
@@ -68,13 +82,13 @@ cd /d "%~dp0"
 
 echo.
 echo   ==========================================================
-echo    STEP 3 of 6 -- the shareable part still holds
+echo    STEP 4 of 7 -- the shareable part still holds
 echo   ==========================================================
 "%PY%" refutable.py selftest
 
 echo.
 echo   ==========================================================
-echo    STEP 4 of 6 -- is this machine exposed right now?
+echo    STEP 5 of 7 -- is this machine exposed right now?
 echo   ==========================================================
 REM The node watches its peers and its traffic; nothing in it watches
 REM its own posture. This asks the question it never asks itself.
@@ -82,7 +96,7 @@ REM its own posture. This asks the question it never asks itself.
 
 echo.
 echo   ==========================================================
-echo    STEP 5 of 6 -- is the TOP of the supervision chain running?
+echo    STEP 6 of 7 -- is the TOP of the supervision chain running?
 echo   ==========================================================
 REM The watchdog revives nodes, the guard revives the watchdog, and nothing
 REM sits above the guard. test_c2 already reads the WATCHDOG's silence; nothing
@@ -94,7 +108,7 @@ REM every time anyone looks while plugged in.
 
 echo.
 echo   ==========================================================
-echo    STEP 6 of 6 -- what could this do with funds right now?
+echo    STEP 7 of 7 -- what could this do with funds right now?
 echo   ==========================================================
 REM Both easy readings are wrong and the true one changes with a config flag,
 REM so it is measured rather than asserted. Reads no key, places nothing,

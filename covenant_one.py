@@ -717,6 +717,42 @@ def phase_integrity(say, transported=False):
             continue
         rc = run_open(say, [sys.executable, name], timeout=tmo)
         out.append((name, "ok" if rc == 0 else "FAIL rc=%s" % rc))
+
+    # THE RULES THEMSELVES. Added 2026-08-30, on discovering that NOTHING ran
+    # constitution.py: not the node (0 references in 10,715 lines), not
+    # run_all_tests.sh, not verify_deploy.py, not CI, not this runner, and not
+    # SAFEGUARD.bat -- which had six steps wired into it that same morning,
+    # none of them the constitution. Its only programmatic importer anywhere
+    # was federation.py. Three independent verifiers had been built for it, in
+    # three languages, and every one of them ran only when a person typed the
+    # command. A check nobody invokes is not a check.
+    #
+    # It runs even when --transported. That is the same reasoning as P18 and
+    # the opposite of MANIFEST.sha256: the manifest is a claim about the
+    # machine the bundle was built on, so it is N/A on a copy -- but the
+    # protected TEXT travels with the copy, so text that no longer hashes to
+    # the published anchor is exactly as wrong here as anywhere.
+    #
+    # It goes in `out`, so it is reported under folder integrity and counts in
+    # the verdict -- which it only does because --ci stopped discarding
+    # in-place failures earlier today.
+    if os.path.isfile(os.path.join(HERE, "constitution.py")):
+        say("")
+        say("  constitution.py -- do the protected rules still hash to the "
+            "published anchor?")
+        rc = run_open(say, [sys.executable, "constitution.py", "verify"],
+                      timeout=120)
+        if rc == 0:
+            out.append(("constitution.py", "ok"))
+        else:
+            say("    Amendment is allowed. Amendment in SILENCE is not, and")
+            say("    this is the noise.")
+            out.append(("constitution.py", "FAIL rc=%s" % rc))
+    else:
+        say("")
+        say("  constitution.py -- ABSENT. The rules cannot be checked, which")
+        say("  is not the same as their being intact.")
+        out.append(("constitution.py", "ABSENT"))
     return out
 
 
