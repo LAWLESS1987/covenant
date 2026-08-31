@@ -144,6 +144,16 @@ SUITES = [
     ("test_c4_bounded_resources.py",     120,  "SECURITY"),
     ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
     ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
+    # E2 (2026-08-30). /chain served the whole chain on every request via
+    # asdict(), which deep-copies recursively. Measured: 10,000 blocks = 36.7 MB
+    # and 378.7 ms, and public_ledger.py's 8 MB relay cap would have started
+    # refusing at ~2,287 blocks -- a ceiling nobody chose. Now a shallow
+    # serialiser with byte-identical output plus an optional half-open range.
+    # E2 pins that the output is IDENTICAL (a faster serialiser emitting
+    # anything different is a wire-format change), and includes a tripwire: if
+    # a second nested dataclass is ever added to Block the shortcut stops
+    # matching asdict, and that must fail here rather than in a peer's parser.
+    ("test_e2_chain_serialisation.py",    120,  "ROUTES + BOUNDS"),
     ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
     ("test_a3_bounded_reads.py",         120,  "ROUTES + BOUNDS"),
     ("test_a5_size_coherence.py",        180,  "ROUTES + BOUNDS"),

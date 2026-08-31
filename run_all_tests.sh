@@ -602,6 +602,9 @@ run test_n1_conformance.py 60
 # rate limiter's own key map (200,000 keys, 40.76 MB), and peer-supplied
 # nonces (1 MB accepted, expired rows never deleted).
 run test_c4_bounded_resources.py 60
+# E2 (2026-08-30) pins that the faster /chain serialiser emits BYTE-IDENTICAL
+# output to asdict, and that the new range is optional and half-open.
+run test_e2_chain_serialisation.py 60
 # F1 (2026-08-30) pins that silence is not dissent: an UNREACHABLE judge
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.
