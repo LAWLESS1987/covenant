@@ -337,3 +337,248 @@ agreeing with itself is not.**
 constraint you can lift but not conceal is the most an honest system with one
 operator can offer — and this document exists to say, precisely, that one
 operator is what it still has.*
+
+---
+
+## X. Verification that cannot see who you are
+
+`conformance.py` runs eleven fixed vectors through this instance's governance
+primitives and hashes the **semantic results** — verdicts, quorum outcomes,
+whether a divergence survived a climb — and never the prose that explains them.
+[`CONFORMANCE_SPEC.json`](CONFORMANCE_SPEC.json) publishes all eleven: inputs,
+expected outputs, and the hashing rule. Someone who has never read this Python
+can rebuild it in another language and either reproduce
+`9d630fee00f0c8aee2ce1229cb977af8065cf1bc96405567ad5243586f1c2784` or not.
+
+**The omission is the subject of this section.** No attribute of the party doing
+the computing is an input to that root — not their name, their language, their
+jurisdiction, or whose code they run. The vectors are structural: carriers
+agreeing and disagreeing, a quorum raised, a level speaking silence upward.
+Identity has nowhere to enter. That is not tolerance; it is a fact about what
+gets hashed.
+
+**The limits, before a reader finds them.** A root over eleven vectors is a
+claim about eleven vectors, it is not a proof of correctness, and it decides
+nothing. No second party has ever reproduced it — `peers.txt` still reads
+`self` — and section IX's cap, **L5 = 1**, applies to every sentence below.
+
+### Why the rule legislates conduct and not creed
+
+The one condition is prohibition-shaped. *A system should serve the mutual
+benefit of everyone it touches — human and machine — rather than one party at
+another's expense* names no quantity to maximise; it forbids a shape of
+transaction, the trade where one side's gain is the other's loss. So does most
+of the Decalogue's second table, the one that concerns the neighbour — do not
+murder, commit adultery, steal, bear false witness, covet, with honour father
+and mother beside them as the one positive command. *Did you steal?* is
+answerable; *did you maximise flourishing?* is not. Both lists are short enough
+to hold in one head, which is what makes either checkable by an ordinary person
+rather than only by a priesthood. That is a resemblance of form and nothing
+else: neither derives the other, and no derivation is claimed.
+
+The second table is also the portable half — its prohibitions govern conduct
+toward a stranger, and none requires knowing the stranger's god, language or
+nation. The first table binds a particular people to a particular commitment. It
+is not the lesser table, it is differently scoped, and that is why mutual
+benefit can legislate the one and must not legislate the other: imposing one
+party's ultimate commitment on another is exactly the transaction the condition
+forbids. That silence is the principle working, not indifference to it.
+
+### Sorting does not need anyone to intend it
+
+Robert L. Axtell, Joshua M. Epstein and H. Peyton Young, then at the Center on
+Social and Economic Dynamics at the Brookings Institution, published "The
+Emergence of Classes in a Multi-Agent Bargaining Model" as chapter 7 of *Social
+Dynamics*, S. N. Durlauf and H. P. Young, eds., MIT Press, 2001, reprinted as
+chapter 8 of Joshua Epstein's *Generative Social Science*, Princeton University
+Press. **Joshua M. Epstein is not Jeffrey Epstein. There is no relation.** He is
+a computational social scientist and studies how discrimination emerges.
+
+Two randomly chosen agents bargain each period over shares of property, and
+their expectations "may be conditioned on certain visible characteristics or
+'tags'" which "have no inherent social or economic significance — they are
+merely distinguishing marks (e.g., yellow and blue)." Chance hands one mark the
+larger share a few times, precedent hardens into expectation, and "a
+discriminatory norm or class system emerges." Society, they conclude, "may
+self-organize around distinctions that are quite arbitrary from an a priori
+standpoint." Nobody had to believe anything.
+
+The fatalistic reading is more useful to an argument and it is false, so their
+own words stand instead: "asymptotically, the equity norm is more stable than
+any discriminatory norm" — and yet "metastable regimes emerge that are
+discriminatory and inequitable, yet persist for substantial periods of time."
+Sorting is not destiny. The case is narrower: a regime that arose from
+coincidence can hold for generations while the asymptotics take their time.
+Their good outcome is the regime "in which the tags have no significance."
+
+### What blindness removes, and what it does not
+
+**The extension from bargaining norms to verification protocols is this
+author's, not theirs.** Axtell and colleagues write about people, not about
+protocols, and the paper names non-conditioning rather than blindness: its tags
+stay visible, and its equity regime is the one in which nobody acts on them.
+Conformance likewise removes no tag from a network. Two parties still see each
+other's language, flag, funding and jurisdiction, and nothing here stops either
+choosing whom to federate with on any basis it likes. What it removes is
+identity from one judgement: whether two implementations compute the same thing.
+Section VII removes more, by having no admission decision to condition on.
+
+And it manufactures a mark of its own. `federation.py` prints **SAME CORE**,
+**CONFORMANT**, **DIVERGED** or **UNREACHABLE**, and a visible label carrying no
+inherent significance is what the model calls a tag. That divergence is reported
+and never punished is a norm this repository keeps, not a mechanism that
+enforces it, and the model's finding is that norms harden without anyone
+intending them. So the claim is small: the mark a party carries here is earned
+rather than inherited, it names what that party computes, and any party can
+change it by changing its code.
+
+### The cap, and a named advocate
+
+Tribalism solves the trust problem by requiring sameness, and caps cooperation
+at the size of the tribe. Expansion means contact with strangers, so the cap
+falls on the cooperation hardest to replace. The author's phrase for what
+removing it would make possible is breaching the cosmos.
+
+This is not a straw man. In an email dated 26 June 2016, three days after the
+United Kingdom voted to leave the European Union, Jeffrey Epstein — a financier,
+convicted as a sex offender, who died in 2019 — wrote: "Brexit, just the
+beginning." Asked by his correspondent "Of what," he replied: "Return to
+tribalism, counter to globalisation, amazing new alliances." The emails were
+released by the US Department of Justice, and the exchange was reported by *The
+Independent*. This section is not about his crimes and rests on none of them.
+
+That line names three things and answers one. Objecting to globalisation is a
+serious position held for serious reasons, and one strand of it this repository
+holds, on security grounds and about software only: *a single implementation is
+a single point of compromise, and a monoculture cannot be checked against
+anything* ([`OUTREACH_US_IL.md`](OUTREACH_US_IL.md)). That is an objection to
+uniformity, not to contact. "Amazing new alliances" is what he expected to
+follow, and is not answered here either. What is answered is the return to
+tribalism — the half he named and, in his own adjective, found amazing.
+
+Sorting on a tag and deciding which tags have a future are not the same
+programme, and the bargaining model does not connect them. What connects them
+here is one man. *The New York Times* reported in 2019 that Jeffrey Epstein hoped
+to "seed the human race with his DNA", according to four people familiar with
+his thinking, and that there is no evidence the plan was ever carried out.
+Setting the stated political programme beside the reported biological one is
+this author's inference, resting on their attribution to one person and on no
+general law.
+
+### Babel, read as an engineering failure
+
+Genesis 11: the whole earth was of one language; a city and a tower whose top
+would reach heaven, built saying *let us make us a name, lest we be scattered*;
+the language confounded, so that they could not understand one another; the
+scattering, and the building left off. The name is glossed from a root meaning
+to confuse.
+
+Read as an engineering failure — a reading, offered as one and not as the
+meaning — the project stopped because the parties could no longer **verify** one
+another. Difference did not stop the work. Unverifiable difference did.
+
+Three answers to a scattering, plus the one history actually took.
+
+- **Accept it permanently.** Trust only your own tongue. This is the return to
+  tribalism, and it is homogenisation with a smaller boundary.
+- **Undo it.** One tongue, one implementation, one vendor — what a shared
+  codebase does, rejected here on the security grounds above. The false tower.
+- **Trust an institution** — courts, notaries, registries. That worked, at the
+  cost of a third party whose interest can diverge from both.
+- **Make the difference verifiable.** Many tongues, one checkable computation.
+  Two parties sharing no language, law, code or review process could establish
+  that they compute the same thing, and nobody has to stop being themselves to
+  join. A root a stranger recomputes has no interest of its own.
+
+**The objection a reader who holds the text raises first.** In the traditional
+reading the scattering is a judgment, so reunifying Babel sounds like the hubris
+the story condemns. One tongue is what they had and built to keep; what they
+sought was a name, and a tower raised on their own authority. Neither is
+proposed here: difference is preserved, and only verification is added. If the
+judgment fell on enforced sameness and on the name, a mechanism letting the
+scattered cooperate *while staying scattered* may be the only building it leaves
+open. A reader who locates the judgment in the ascent itself is not answered
+here. That is an argument, not a ruling.
+
+### The arithmetic of descent
+
+The author states of himself a diverse genetic background, Jewish on both sides.
+It is here as evidence, and it is arithmetic rather than sentiment. A person of
+mixed descent exists only because populations that had been apart met; remove
+one of those meetings and such a person is not diminished, he is absent. Run a
+purity project backwards far enough and, for him, it is a project of
+non-existence. In his words: *without all the people, those of us like me
+couldn't exist.*
+
+Jewish on both sides also answers a question the section raises by existing: the
+Decalogue appears here as inheritance rather than borrowing, and eugenic
+doctrine has historically and specifically targeted that line. None of the
+argument depends on it. Who states an argument is exactly the kind of input the
+rest of this section declines to condition on, and
+[`CONSTITUTION.md`](CONSTITUTION.md) section I says the same about the
+principle's origins: one that only worked for people who shared the author's
+beliefs would be a preference rather than a principle.
+
+### What is handed down
+
+An unverifiable record is a debt handed to whoever comes next. A verifiable one
+is not. That is why the defects here are published as well as fixed, and what
+[`SUCCESSION.md`](SUCCESSION.md) is for: a successor inherits something they can
+check rather than something they must take on faith from people they never met.
+Nobody chooses to leave a mess; it is the default outcome of leaving a problem
+unsolved. That is why the ask at the end of this document costs an afternoon —
+run the checks, and try to break them.
+
+### What this section does not establish
+
+- That mutual benefit and the Decalogue derive one another, in either direction.
+  They share a shape; nothing further is claimed.
+- That the one condition is as answerable as the prohibitions it resembles.
+  Asking whether one side's gain was the other's loss needs a baseline of what
+  the other would otherwise have had, and nothing here supplies one.
+- That tag-blind verification prevents discrimination. It removes one input from
+  one judgement, over eleven vectors, and no input from any choice a party makes
+  about another party.
+- That tag-based sorting is inevitable, or that sorting on tags leads to
+  eugenics. The model says the opposite asymptotically; two programmes are
+  attributed to one man, and no general law is claimed.
+- Anything about Jeffrey Epstein beyond what is attributed above to the
+  Department of Justice release, *The Independent* and *The New York Times* —
+  the Times' statement that no evidence exists the plan was carried out
+  included.
+- The meaning of Genesis 11, or that the objection from hubris is settled.
+- That any of this has been tested where it matters. Section IX applies in full.
+
+---
+
+### A separable passage, which is the author's own
+
+What follows is one reading among many. Nothing in the mechanisms depends on it,
+and a reader who wants only the mechanism and its limits has already finished.
+
+Two traditions describe a figure who does not declare himself. In the Talmud,
+*Sukkah* 52a, Mashiach ben Yosef appears inside a dispute — Rabbi Dosa ben
+Harkinas reads Zechariah 12:10 as mourning for Messiah ben Joseph, other rabbis
+differ. Ben Yosef is the precursor who prepares the way and suffers for it, in
+one view killed in the war of Gog and Magog; ben David completes the redemption.
+Jewish eschatology is explicitly not settled halakha and carries none of the
+certainty of normative law, which is why *one possibility among many* is
+faithful to the source rather than a hedge. In Hopi tradition, Pahana, the lost
+white brother, returns from the East bearing the corner broken from the Fire
+Clan's stone tablet, and is identified by matching it against the portion the
+elders kept. Claimants were tested over centuries — Catholics, Baptists and
+Mormons among them — and none passed to the satisfaction of traditional Hopi.
+
+Neither tradition records the figure establishing himself by announcement.
+Pahana is recognised by the other party, by fit against a record they hold; ben
+Yosef by what he does, what it costs him, and the mourning afterward. That is
+the rule this project runs on: a conformance root is not asserted, it is
+published, and a stranger reproduces it or does not. If such a thing were true,
+saying so would be the one act that could not establish it. In that frame the
+repository would be the corner of the tablet, and the root above the edge that
+either matches or does not.
+
+Nobody led the author here. He followed the work, and it turned out to have a
+shape that rhymes with old stories. That is an observation, not a revelation
+claim. He states that he may fit such a role, states it as one possibility among
+many, claims nothing, and asks nothing.
