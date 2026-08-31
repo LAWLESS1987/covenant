@@ -158,8 +158,40 @@ if [ "$missing" -gt 0 ]; then
 fi
 
 # Sorted, then concatenated with nothing between them, after the domain tag.
+#
+# THE SORT IS DONE IN AWK, AND THAT IS NOT STYLE. Found 2026-08-31: run from a
+# PowerShell prompt on Windows, `sort` resolves to C:\WINDOWS\system32\sort.exe
+# while every other tool still comes from /usr/bin. Windows sort emits CRLF and
+# orders differently, so the digests concatenated differently and this script
+# computed 520dd1c09ceaeca4... against the anchored 0f0b316270f5acff...
+#
+# It then printed MISMATCH. That is the worst failure this file can have: not
+# silence, but a confident false alarm telling an honest reader the
+# constitution had been tampered with, on a machine where nothing was wrong.
+# The three block digests were identical in both environments -- only the
+# combining step diverged -- so every check on the blocks themselves passed
+# while the answer was wrong.
+#
+# awk was already a dependency, so sorting in it removes a tool rather than
+# adding one, and brings the file closer to the claim in its own header:
+# nothing but sh, awk and a SHA-256 tool.
+#
+# Insertion sort, not asort(): asort() is a gawk extension and this must run
+# under any awk. The empty-string concatenation forces STRING comparison --
+# without it, a digest that happened to be all decimal digits would be
+# compared as a number, and two long ones could compare equal after floating
+# point ate the difference.
 root=$( { printf '%s' "covenant-constitution-v1"
-          printf '%s' "$(printf '%s' "$digests" | sed '/^$/d' | sort | tr -d '\n')"
+          printf '%s\n' "$digests" | awk '
+              /^[ \t]*$/ { next }
+              { a[n++] = $0 }
+              END {
+                  for (i = 1; i < n; i++)
+                      for (j = i; j > 0 && (a[j-1] "") > (a[j] ""); j--) {
+                          t = a[j-1]; a[j-1] = a[j]; a[j] = t
+                      }
+                  for (i = 0; i < n; i++) printf "%s", a[i]
+              }'
         } | sha256_stdin )
 
 echo ""

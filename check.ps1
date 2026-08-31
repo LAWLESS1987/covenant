@@ -11,7 +11,8 @@
 # somebody independent running it, so the cost of that event is the number
 # worth minimising.
 #
-# USE:  powershell -ExecutionPolicy Bypass -File check.ps1
+# USE:  powershell -ExecutionPolicy Bypass -File check.ps1   (Windows)
+#       pwsh -File check.ps1                                 (Linux, macOS)
 # EXIT: 0 everything that could run agreed. 1 something disagreed.
 #       2 nothing could be checked at all.
 # LICENCE: public domain.
@@ -19,6 +20,18 @@
 Set-Location -Path $PSScriptRoot
 
 $pass = 0; $fail = 0; $skip = 0
+
+# Resolve the running host by process, which works in Windows
+# PowerShell 5.1 and in PowerShell Core alike. The fallback exists
+# for hosts that do not report a path, and prefers pwsh because that
+# is the only one present off Windows.
+$PSHost = [System.Diagnostics.Process]::GetCurrentProcess().Path
+if (-not $PSHost) {
+    $g = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $g) { $g = Get-Command powershell -ErrorAction SilentlyContinue }
+    if ($g) { $PSHost = $g.Source }
+}
+$VerifyPs1 = Join-Path $PSScriptRoot "verify.ps1"
 
 # The leading comma is load-bearing. PowerShell unrolls a one-element array
 # on return, so a single match came back as a bare string and $h[0] indexed
@@ -51,7 +64,7 @@ if ($py) { $pyLabel = Split-Path $py -Leaf }
 "  COVENANT -- independent check, one command"
 "  =========================================="
 ""
-"  runtimes   powershell $($PSVersionTable.PSVersion) | python $pyLabel"
+"  runtimes   $($PSVersionTable.PSEdition) PowerShell $($PSVersionTable.PSVersion) | python $pyLabel"
 ""
 
 # --------------------------------------------------- 1+2. the constitution
@@ -65,7 +78,12 @@ $psHash = ''
 $pyHash = ''
 
 if (Test-Path 'verify.ps1') {
-    $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File .\verify.ps1 2>$null) -join "`n"
+    # The host this script is ALREADY running in, not a hardcoded
+    # `powershell` -- which does not exist on Linux or macOS, where the
+    # host is `pwsh`. Spawning a different PowerShell than the one
+    # interpreting this file was never right; it only ever worked
+    # because Windows has exactly one.
+    $out = (& $PSHost -NoProfile -ExecutionPolicy Bypass -File $VerifyPs1 2>$null) -join "`n"
     $rc = $LASTEXITCODE
     $h = Hashes $out
     if ($rc -eq 0 -and $h.Count -ge 2 -and (IsRoot $h[0]) -and $h[0] -eq $h[1]) {

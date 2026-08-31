@@ -34,13 +34,17 @@ param([switch]$Show)
 
 $ErrorActionPreference = "Stop"
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Anchor = Join-Path $Here "docs\CONSTITUTION_ANCHOR.json"
+# Forward slashes throughout. .NET resolves them on Windows too, so one
+# spelling works on Windows, Linux and macOS -- and a backslash here is a
+# literal character in a filename on the other two, which is exactly how
+# this file came to be broken on Linux without anyone noticing.
+$Anchor = Join-Path $Here "docs/CONSTITUTION_ANCHOR.json"
 
 # Must match constitution.py PROTECTED and verify.sh BLOCKS.
 $Protected = @(
   @{ File = "CONTRIBUTING.md";    Opens = "## Why it exists, and the one condition" },
   @{ File = "CONTRIBUTING.md";    Opens = "## What never changes" },
-  @{ File = "docs\SUCCESSION.md"; Opens = "## Layer 4 - Continuation, not just preservation" }
+  @{ File = "docs/SUCCESSION.md"; Opens = "## Layer 4 - Continuation, not just preservation" }
 )
 
 function Get-Sha256Hex([byte[]]$Bytes) {
@@ -136,7 +140,7 @@ Write-Output ""
 Write-Output ("    computed  {0}" -f $root)
 
 if (-not (Test-Path -LiteralPath $Anchor)) {
-  Write-Output "    anchor    NOT FOUND at docs\CONSTITUTION_ANCHOR.json"
+  Write-Output "    anchor    NOT FOUND at docs/CONSTITUTION_ANCHOR.json"
   Write-Output ""
   Write-Output "  Could not compare. This is not a pass."
   exit 2

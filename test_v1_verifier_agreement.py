@@ -201,6 +201,75 @@ def main():
           and ("sha256sum" in sh_code or "shasum" in sh_code)
           and "System.Security.Cryptography" in ps_code)
 
+    # ---- D4: no shell verifier may CALL a command Windows also ships ------
+    #
+    # THE BUG THIS CATCHES, found 2026-08-31 by running V1 from a PowerShell
+    # prompt instead of from Git Bash. `sort` resolved to
+    # C:\WINDOWS\system32\sort.exe while awk, sed, tr and sha256sum all still
+    # came from /usr/bin. Windows sort emits CRLF and orders differently, so
+    # verify.sh combined the block digests differently and computed
+    # 520dd1c09ceaeca4... against the anchored 0f0b316270f5acff... -- then
+    # printed MISMATCH.
+    #
+    # A confident false alarm is worse than a silence: it told an honest
+    # reader the constitution had been tampered with on a machine where
+    # nothing was wrong. Every check on the blocks themselves passed, because
+    # the three block digests were identical in both environments; only the
+    # combining step diverged. Which process launched the shell is not
+    # something a stranger will think to control, so the dependency had to go
+    # rather than be documented.
+    #
+    # THE FIRST VERSION OF THIS CHECK MADE THE EXACT ERROR IT WARNS ABOUT.
+    # It looked for the WORDS, and duly failed on `find` inside the text of an
+    # error message, on `print` inside an awk program, and on a shell variable
+    # named path. Ninth grep-instead-of-parse in this repository, and the
+    # first one committed inside the check written to prevent a different one.
+    #
+    # So it reads COMMAND POSITIONS. String literals are removed first, which
+    # deletes prose and embedded awk in one step; then each line is split on
+    # the operators that open a new command, and only the first token of each
+    # piece can be a command. Tokens containing "=" are assignments.
+    SHADOWED = ("sort", "find", "more", "timeout", "expand", "comp", "print",
+                "replace", "forfiles", "where", "tree", "fc")
+
+    STRINGS = re.compile(r"'[^']*'|\"[^\"]*\"")
+    OPENERS = re.compile(r"\||&&|\|\||;|\$\(|`|\{|\(|&")
+    WORDS = ("if", "then", "else", "elif", "fi", "for", "while", "do", "done",
+             "case", "esac", "in", "!", "[", "[[", "test", "return", "exit")
+
+    def commands_in(name):
+        """Every token that stands in a command position. Comments and string
+        literals are gone before anything is looked at."""
+        path = os.path.join(HERE, name)
+        if not os.path.exists(path):
+            return None
+        found = []
+        for ln in open(path, encoding="utf-8"):
+            stripped = ln.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            bare = STRINGS.sub(" ", stripped)
+            for piece in OPENERS.split(bare):
+                for tok in piece.split():
+                    if "=" in tok or tok in WORDS:
+                        continue
+                    found.append((tok, stripped[:70]))
+                    break
+        return found
+
+    for script in ("verify.sh", "check.sh"):
+        cmds = commands_in(script)
+        if cmds is None:
+            check("D4:%-10s exists to be read" % script, False, "absent")
+            continue
+        hits = [(t, l) for t, l in cmds if t in SHADOWED]
+        check("D4:%-10s CALLS no command that Windows System32 also "
+              "provides. On Windows the tool a shell finds depends on which "
+              "process launched it, so a verifier that calls one is a "
+              "verifier whose answer depends on its caller" % script,
+              not hits, hits[:3])
+
+
     # ---- C: the two ONE-COMMAND checkers must not drift apart --------------
     #
     # check.sh and check.ps1 are the front door: almost everyone who ever
