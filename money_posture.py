@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -73,6 +74,93 @@ def _run(cmd):
         return (p.stdout or "") + (p.stderr or "")
     except Exception:                                        # noqa: BLE001
         return ""
+
+
+# Task Scheduler's LastTaskResult is an HRESULT, and the one this file first
+# printed raw -- 2147946720 -- reads as "last run today" to anyone who does not
+# happen to know it is 0x800710E0, "the operator or administrator has refused
+# the request": the scheduler considered launching the task and declined,
+# because a condition on the task (AC power, interactive logon, idle) was not
+# met. Nothing ran. On 2026-09-02 that number sat next to a LastRunTime six
+# minutes after the laptop woke from a sleep that had swallowed the 09:00
+# trigger -- measured on 2026-09-02: the scheduler's post-resume sweep stamped
+# seven tasks in the same second, and the one attribute separating the three
+# refused from the four that ran was StartWhenAvailable=False ("run as soon
+# as possible after a missed start" unchecked). trader_log.txt had not been
+# written since the day before. A
+# checker that prints "last run <today>" over a day the trader did not run is
+# this project's failure mode with a timestamp on it. So: decode, and compare
+# against the log the run would have written.
+TASK_RESULTS = {
+    0x00000000: ("ran", "the last launch ran and exited 0"),
+    0x00041300: ("ready", "ready; has not run since it was registered"),
+    0x00041301: ("running", "an instance is running right now"),
+    0x00041302: ("disabled", "the task is disabled"),
+    0x00041303: ("never", "the task has never run"),
+    0x00041304: ("no-more-runs", "no more scheduled runs"),
+    0x00041306: ("terminated", "the last run was terminated"),
+    0x800710E0: ("refused", "the launch was REFUSED by the scheduler: a start "
+                            "that was missed (machine asleep) was rejected "
+                            "because catch-up is off, or a condition (AC "
+                            "power, logon, idle) was not met. Nothing ran."),
+}
+
+
+def decode_task_result(code):
+    """(kind, sentence) for a LastTaskResult. Unknown non-zero codes are
+    reported as such rather than guessed; a code that came back unparseable is
+    'unknown' too, never 'ran'."""
+    try:
+        n = int(str(code).strip(), 0) & 0xFFFFFFFF
+    except (TypeError, ValueError):
+        return "unknown", "result %r could not be read" % (code,)
+    if n in TASK_RESULTS:
+        return TASK_RESULTS[n]
+    if n < 0x100:
+        return "exited", ("the run started and its program exited %d -- "
+                          "read trader_log.txt" % n)
+    return "unknown", "result 0x%08X is not one this checker knows" % n
+
+
+_LOG_HEADER = re.compile(r"^==== (.*?) ====\s*$", re.M)
+_US_DATE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4})")
+
+
+def last_log_run(text):
+    """The last '==== %DATE% %TIME% ====' header TRADER_TASK.bat appends before
+    every run, or None. This is what a run leaves behind; the scheduler's
+    LastRunTime is what an ATTEMPT leaves behind, and they are not the same."""
+    heads = _LOG_HEADER.findall(text or "")
+    return heads[-1].strip() if heads else None
+
+
+def log_run_date(header):
+    """(y, m, d) from a header in the US %DATE% form, else None -- 'cannot
+    compare' is reported as such rather than as 'they match'."""
+    m = _US_DATE.search(header or "")
+    if not m:
+        return None
+    mo, d, y = (int(g) for g in m.groups())
+    return (y, mo, d)
+
+
+def attempt_vs_log(attempt_ymd, kind, log_ymd):
+    """The sentence that keeps an attempt and a run apart. attempt_ymd is
+    from the scheduler's LastRunTime; log_ymd from trader_log.txt's last
+    header; kind from decode_task_result."""
+    if attempt_ymd is None:
+        return "no attempt recorded by the scheduler."
+    if log_ymd is None:
+        return ("cannot compare with trader_log.txt (no dated run header), so "
+                "whether the attempt above produced a run is UNKNOWN.")
+    if kind == "ran" and log_ymd == attempt_ymd:
+        return "the attempt above is the run the log shows. They agree."
+    if log_ymd == attempt_ymd:
+        return ("the log shows a run that day, but the scheduler's result is "
+                "not 0 -- read trader_log.txt before believing either.")
+    return ("the attempt above did NOT produce a run -- the last run the log "
+            "shows is %04d-%02d-%02d. A day the trader was due and did not "
+            "run is silent everywhere else." % log_ymd)
 
 
 def load_venues():
@@ -136,28 +224,70 @@ def main() -> int:
 
     print()
     print("  WILL ANYTHING RUN IT WITHOUT A HUMAN?")
+    log_path = os.path.join(HERE, "trader_log.txt")
+    log_text = ""
+    if os.path.isfile(log_path):
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+                log_text = fh.read()
+        except OSError:
+            log_text = ""
+    last_run_hdr = last_log_run(log_text)
+    log_ymd = log_run_date(last_run_hdr)
     if sys.platform.startswith("win"):
         ps = ("Get-ScheduledTask -ErrorAction SilentlyContinue | ForEach-Object "
               "{ $a = ($_.Actions | ForEach-Object { $_.Execute + ' ' + "
               "$_.Arguments }) -join ' '; if ($a -match 'trader') { "
-              "$i = Get-ScheduledTaskInfo -TaskName $_.TaskName; "
-              "$_.TaskName + '|' + $_.State + '|' + $i.LastRunTime + '|' + "
-              "$i.LastTaskResult + '|' + $i.NextRunTime } }")
+              "$i = Get-ScheduledTaskInfo -TaskName $_.TaskName; $st = $_.Settings; "
+              "$lr = if ($i.LastRunTime) { $i.LastRunTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }; "
+              "$nr = if ($i.NextRunTime) { $i.NextRunTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }; "
+              "$_.TaskName + '|' + $_.State + '|' + $lr + '|' + "
+              "$i.LastTaskResult + '|' + $nr + '|' + $i.NumberOfMissedRuns + '|' + "
+              "$st.DisallowStartIfOnBatteries + '|' + $st.StartWhenAvailable + '|' + "
+              "$st.WakeToRun } }")
         out = _run(["powershell", "-NoProfile", "-Command", ps]).strip()
         if not out:
             print("      No scheduled task invokes the trader. It runs only when")
             print("      a person runs it.")
         for line in out.splitlines():
-            parts = line.strip().split("|")
-            if len(parts) >= 5:
-                print("      TASK %s  state=%s" % (parts[0], parts[1]))
-                print("           last run %s (result %s), next %s"
-                      % (parts[2], parts[3], parts[4]))
-                print("           SO: this runs WITHOUT a human. What it does when")
-                print("           it runs is decided entirely by 'armed' above.")
+            parts = [x.strip() for x in line.strip().split("|")]
+            if len(parts) < 5:
+                continue
+            name, state, last, code, nxt = parts[:5]
+            missed = parts[5] if len(parts) > 5 else "?"
+            no_batt = parts[6] if len(parts) > 6 else "?"
+            catch_up = parts[7] if len(parts) > 7 else "?"
+            wake = parts[8] if len(parts) > 8 else "?"
+            kind, why = decode_task_result(code)
+            try:
+                n = int(code, 0) & 0xFFFFFFFF
+                code_hex = "0x%08X" % n
+            except (TypeError, ValueError):
+                code_hex = repr(code)
+            attempt_ymd = None
+            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", last)
+            if m:
+                attempt_ymd = tuple(int(g) for g in m.groups())
+            print("      TASK %s  state=%s" % (name, state))
+            print("           last ATTEMPT %s -> %s (%s)"
+                  % (last or "none", kind.upper(), code_hex))
+            print("           %s" % why)
+            print("           last RUN per trader_log.txt: %s"
+                  % (last_run_hdr or "none found"))
+            print("           %s" % attempt_vs_log(attempt_ymd, kind, log_ymd))
+            print("           next %s; scheduler's missed-run counter %s"
+                  % (nxt or "none", missed))
+            print("           conditions: no start on battery=%s, catch up a "
+                  "missed start=%s, wake to run=%s" % (no_batt, catch_up, wake))
+            print("           SO: it runs WITHOUT a human -- on a day this machine")
+            print("           is awake, logged on and on mains at the trigger time.")
+            print("           A day it is not is skipped, and the counter above")
+            print("           stays 0. What it does when it runs is decided")
+            print("           entirely by 'armed' above.")
     else:
         print("      Not Windows -- cannot read the task scheduler here. UNKNOWN,")
         print("      which is not the same as 'nothing is scheduled'.")
+        print("      last RUN per trader_log.txt: %s" % (last_run_hdr or "none found"))
 
     print()
     print("  VENUES -- every order adapter, and what its dry run reaches")

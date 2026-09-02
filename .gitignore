@@ -196,3 +196,15 @@ covenant-memory-backup/
 .covenant-keys/
 audit.jsonl
 guard_state.json
+
+# --- trade history read from the venue's own site (2026-09-02) -------------
+# coinbase_history*.csv is L's ACTUAL transaction history, transcribed from
+# coinbase.com/transactions in his own logged-in browser. It is holdings by
+# another name -- every buy, sell and receipt with dates -- and is not published.
+coinbase_history*.csv
+*_history.csv
+
+# --- private working folder (2026-09-02) ------------------------------------
+# Strategy notes that name L's actual positions, and anything else that is
+# holdings by another name. Nothing under private/ is published.
+private/

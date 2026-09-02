@@ -30,7 +30,10 @@ SKIP_DIR = {"logs", "__pycache__", ".venv", ".git", ".claude", "judge_queue",
             # pending-v8.38 is skipped, so its snapshots must be too
             # (2026-08-29: the 08:15 manifest hashed PRE-LAND as source).
             "pending-v8.38.BACKUP-2026-08-29", "PRE-LAND-2026-08-29",
-            "_to_delete", "_stage"}
+            "_to_delete", "_stage",
+            # private/ is holdings by another name (gitignored, 2026-09-02);
+            # a manifest of the DELIVERY must not even list it.
+            "private"}
 SKIP_EXT = {".pyc", ".db", ".key", ".msi"}
 
 # A MANIFEST MUST CONTAIN ONLY INPUTS.
@@ -67,6 +70,15 @@ OUTPUTS = {
     "ONE_RETEST_gates.txt", "ONE_UP.txt", "PROBE_WIN_CONNECT.txt", "GIT_SETUP.txt", "ONE_RUN_ci.txt", "GITHUB_PUSH.txt", "GH_LOGIN.txt", "GH_CODE.txt",
     # ops
     "ACL_RESULT.txt",
+    # the scheduled trader appends here on EVERY run (TRADER_TASK.bat:
+    # `>> trader_log.txt`), so hashing it guaranteed the manifest went stale
+    # the morning after it was written (2026-09-02: 12 changed, 11 of them
+    # committed edits and this one a log). Same landmine as ONE_RUN.txt.
+    "trader_log.txt",
+    # balance sidecars and venue history: state, gitignored, holdings by
+    # another name. Not delivery.
+    "coinbase_balance.json", "kraken_balance.json", "coinbase_balance.txt",
+    "kraken_balance.txt", "coinbase_history.csv", "kraken_history.csv",
     # state that is deliberately not source: the chain's own genesis is an
     # input and IS tracked; these two are created by the operator and by a
     # live testnet submission, and are the XRP gate's own state.
@@ -80,6 +92,10 @@ def shipped():
         dns[:] = [d for d in dns if d not in SKIP_DIR]
         for fn in sorted(fns):
             if fn.lower() in SKIP_NAME:
+                continue
+            # holdings.txt and its timestamped backups are L's actual
+            # positions (gitignored). A public manifest must not list them.
+            if fn.lower().startswith("holdings.txt"):
                 continue
             if os.path.splitext(fn)[1] in SKIP_EXT:
                 continue

@@ -177,6 +177,47 @@ def main():
     check("P8 the checker reads its true value again after the mutations",
           rc4 == expect, f"rc={rc4}")
 
+    # ---- A: an ATTEMPT is not a RUN ----------------------------------------
+    # 2026-09-02: the scheduler recorded LastRunTime 14:48:55 with result
+    # 2147946720 (0x800710E0, "refused") six minutes after the laptop woke
+    # from a sleep that swallowed the 09:00 trigger. Nothing ran;
+    # trader_log.txt was last written the day before. The checker printed
+    # "last run 09/02/2026 14:48:55 (result 2147946720)". These pin the pure
+    # helpers that now keep the two apart.
+    check("A1 0x800710E0 decodes as REFUSED, not as a run",
+          MP.decode_task_result("2147946720")[0] == "refused")
+    check("A2 0 decodes as RAN", MP.decode_task_result("0")[0] == "ran")
+    check("A3 0x41301 decodes as RUNNING, 0x41303 as NEVER",
+          MP.decode_task_result("267009")[0] == "running"
+          and MP.decode_task_result("267011")[0] == "never")
+    check("A4 a small non-zero code is the program's own exit status, and "
+          "says so", MP.decode_task_result("2")[0] == "exited")
+    check("A5 an unreadable or unknown code is UNKNOWN -- never 'ran'",
+          MP.decode_task_result("garbage")[0] == "unknown"
+          and MP.decode_task_result("0x80070005")[0] == "unknown")
+    sample = ("junk\n==== Mon 09/01/2026  9:00:39.16 ====\n  PLAN\n"
+              "  Disarmed.\n")
+    hdr = MP.last_log_run(sample)
+    check("A6 the last run header is found in trader_log.txt's format",
+          hdr == "Mon 09/01/2026  9:00:39.16", hdr)
+    check("A7 ...and its date parses (US %DATE%)",
+          MP.log_run_date(hdr) == (2026, 9, 1), MP.log_run_date(hdr))
+    check("A8 a log with no header yields None, not a guessed date",
+          MP.last_log_run("no headers here") is None
+          and MP.log_run_date(None) is None)
+    msg = MP.attempt_vs_log((2026, 9, 2), "refused", (2026, 9, 1))
+    check("A9 a refused attempt on 09-02 against a log ending 09-01 says the "
+          "attempt did NOT produce a run, and names the real last run",
+          "did NOT produce a run" in msg and "2026-09-01" in msg, msg)
+    check("A10 a 0 result on the same day as the log's last run reads as "
+          "agreement", "agree" in MP.attempt_vs_log((2026, 9, 1), "ran",
+                                                     (2026, 9, 1)))
+    check("A11 an undated log makes the comparison UNKNOWN, not a match",
+          "UNKNOWN" in MP.attempt_vs_log((2026, 9, 2), "ran", None))
+    check("A12 the live output prints 'last ATTEMPT' and 'last RUN per "
+          "trader_log.txt' as two separate lines",
+          "last attempt" in low and "last run per trader_log.txt" in low)
+
     # ---- T: the trader's armed gate ----------------------------------------
     tsrc = ""
     try:
