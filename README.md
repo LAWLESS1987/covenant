@@ -166,7 +166,9 @@ Three things, in one process:
   What is easy to miss is that this repository *does* hold Kraken, Coinbase
   and Robinhood order adapters (`venues.py`), a planner (`covenant_trader.py`)
   that runs against all three, and a scheduled task that runs the planner
-  **daily, without a human**. Where the venue offers a server-side dry run —
+  **daily, without a human** — on a day the machine is awake, logged on and on
+  mains at 09:00; a day it sleeps through is skipped silently, which
+  `trader_freshness.py` reports and the scheduler's own counter does not. Where the venue offers a server-side dry run —
   Kraken `validate=true`, Coinbase `/orders/preview` — every order it builds
   goes there and is priced and rejected without booking. Robinhood publishes
   no preview endpoint, so its dry run is local only and is marked

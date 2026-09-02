@@ -244,7 +244,10 @@ An evaluator will ask this first, and both of the easy answers are wrong.
 **The capability to place a real order exists**, in this repository, wired to
 three real venues. `venues.py` holds Kraken, Coinbase and Robinhood order
 adapters, `covenant_trader.py` plans orders against all three, and the
-`CovenantTrader` scheduled task runs it **daily, with no human involved**.
+`CovenantTrader` scheduled task runs it **daily, with no human involved** — on a
+day the machine is awake, logged on and on mains at 09:00; it neither wakes the
+machine nor catches up a missed start, so a day it sleeps through is skipped
+silently (measured 2026-09-02; `trader_freshness.py` exits 1 on such a day).
 
 **Nothing has ever been booked.** Where the venue offers a server-side dry run —
 Kraken `validate=true`, Coinbase `/orders/preview` — every order is sent there

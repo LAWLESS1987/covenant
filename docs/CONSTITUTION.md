@@ -70,7 +70,13 @@ governs whoever runs it. These are the constraints on the operator:
    capability to place a real order exists in this repository and is wired to
    three real venues. `venues.py` holds Kraken, Coinbase and Robinhood order
    adapters, `covenant_trader.py` plans orders against all three, and a
-   scheduled task (`CovenantTrader`) runs it **daily, without a human**.
+   scheduled task (`CovenantTrader`) runs it **daily, without a human** — on
+   a day this machine is awake, logged on and on mains at 09:00. The task
+   neither wakes the machine nor catches up a missed start, so a day it sleeps
+   through is skipped in silence (measured 2026-09-02: the scheduler recorded
+   a refused attempt at 14:48:55 and nothing ran; `money_posture.py` now
+   reports the last *attempt* and the last *run* as two different facts, and
+   `trader_freshness.py` exits 1 on a missed day).
 
    It books nothing. Where the venue offers a server-side dry run — Kraken's
    `validate=true`, Coinbase's `/orders/preview` — every order goes there and

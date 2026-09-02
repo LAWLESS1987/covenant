@@ -122,6 +122,12 @@ REM Neither may read as green. Batch's `if errorlevel N` means "N or more".
 if errorlevel 2 echo      ^>^> COULD NOT DETERMINE the money posture (exit %ERRORLEVEL%).
 if errorlevel 2 echo      ^>^> The checker is missing or cannot see the venues. NOT green.
 if errorlevel 1 if not errorlevel 2 echo      ^>^> ARMED. CONSTITUTION.md II.1 is being broken.
+REM ...and did the scheduled trader actually RUN today? The scheduler's own
+REM counter says 0 missed on a day it refused to launch (2026-09-02); only the
+REM log the run writes can answer. Exit 1 = a due run did not happen.
+"%PY%" trader_freshness.py
+if errorlevel 2 echo      ^>^> Trader freshness UNKNOWN -- trader_log.txt unreadable or undated.
+if errorlevel 1 if not errorlevel 2 echo      ^>^> THE TRADER DID NOT RUN TODAY. Not a fault -- but not green either.
 
 echo.
 echo   ==========================================================
