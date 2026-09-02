@@ -68,16 +68,21 @@ governs whoever runs it. These are the constraints on the operator:
    **What that promise is holding back, disclosed — because a commitment you
    cannot see the shape of is not a commitment, it is a reassurance.** The
    capability to place a real order exists in this repository and is wired to
-   two real exchanges. `venues.py` holds Kraken and Coinbase order adapters,
-   `covenant_trader.py` plans orders, and a scheduled task (`CovenantTrader`)
-   runs it **daily, without a human**.
+   three real venues. `venues.py` holds Kraken, Coinbase and Robinhood order
+   adapters, `covenant_trader.py` plans orders against all three, and a
+   scheduled task (`CovenantTrader`) runs it **daily, without a human**.
 
-   It books nothing. Every order goes to the venue's own dry-run endpoint —
-   Kraken's `validate=true`, Coinbase's `/orders/preview` — which prices and
-   rejects an order without placing it. The trader is disarmed
-   (`armed: false`), and even armed it is bounded by a halt file, a $25
-   per-order cap, a $50 daily cap, two orders per day, and a requirement that
-   the decision be sealed to the chain first.
+   It books nothing. Where the venue offers a server-side dry run — Kraken's
+   `validate=true`, Coinbase's `/orders/preview` — every order goes there and
+   is priced and rejected without being placed. Robinhood publishes no such
+   endpoint, so its dry run is local: the adapter checks what it can, marks
+   the result `venue_validated: false`, and no matching engine ever sees it.
+   That is a weaker guarantee in the same shape, and it is stated here because
+   the first version of this paragraph — and of the checker below — described
+   two venues and one uniform guarantee, the day after the third was added.
+   The trader is disarmed (`armed: false`), and even armed it is bounded by a
+   halt file, a $25 per-order cap, a $50 daily cap, two orders per day, and a
+   requirement that the decision be sealed to the chain first.
 
    Both easy readings are wrong. *"It cannot trade"* is false — the code, the
    credentials path and the schedule are all present. *"It is trading"* is also
@@ -91,8 +96,14 @@ governs whoever runs it. These are the constraints on the operator:
    python money_posture.py
    ```
 
-   It reads no key, places nothing, and arms nothing. If it ever prints
-   **ARMED**, clause 1 is being broken and this section is out of date.
+   It reads no key, places nothing, and arms nothing. It counts the adapters
+   from `venues.py` rather than naming them, and each adapter must declare
+   what its dry run reaches; one that declares nothing makes the checker exit
+   2, which is never read as 0. If it ever prints **ARMED**, clause 1 is being
+   broken and this section is out of date. `test_g2_promised_commands.py`
+   checks that this command exists and that this paragraph names every
+   adapter the code holds — because on 2026-09-02 the checker was found
+   deleted from disk while four documents went on promising it.
 
 2. **No claim of profit edge**, and no security control weakened to make a test
    pass.

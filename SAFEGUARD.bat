@@ -115,6 +115,13 @@ REM so it is measured rather than asserted. Reads no key, places nothing,
 REM arms nothing. If it ever prints ARMED, CONSTITUTION.md II.1 is being
 REM broken and the documents are out of date.
 "%PY%" money_posture.py
+REM 2026-09-02: this file was found DELETED from disk, and this step carried
+REM on past Python's "can't open file" to STILL OPEN as if it had run. Exit 2
+REM is "could not determine" (missing, or cannot see venues.py); 1 is ARMED.
+REM Neither may read as green. Batch's `if errorlevel N` means "N or more".
+if errorlevel 2 echo      ^>^> COULD NOT DETERMINE the money posture (exit %ERRORLEVEL%).
+if errorlevel 2 echo      ^>^> The checker is missing or cannot see the venues. NOT green.
+if errorlevel 1 if not errorlevel 2 echo      ^>^> ARMED. CONSTITUTION.md II.1 is being broken.
 
 echo.
 echo   ==========================================================

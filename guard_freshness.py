@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 guard_freshness.py -- is the thing at the TOP of the supervision chain
 actually running?
 

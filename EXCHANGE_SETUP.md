@@ -1,4 +1,4 @@
-# Wiring Kraken and Coinbase into the daily loop
+# Wiring Kraken, Coinbase and Robinhood into the daily loop
 
 Written 2026-08-28. Replaces the setup notes that lived in `kraken/`, a folder
 that was never committed to git and is no longer on disk.
@@ -142,3 +142,33 @@ This loop **never places an order.** It has no trade permission, asks for none,
 and the setup above tells you to withhold it. Every order is yours, by hand, in
 the exchange's own interface — the decision recorded in
 `docs/EXECUTION_ARCHITECTURE.md`, unchanged.
+
+The *order* adapters (`venues.py`, used by `covenant_trader.py`) are a separate
+layer with its own boundary: `docs/CONSTITUTION.md` II.1, measured by
+`python money_posture.py`. Read that before reading anything below as
+permission.
+
+---
+
+## 6. Robinhood — the third venue, and the one difference
+
+`venues.py` gained a Robinhood Crypto adapter on 2026-08-29. It follows the
+same contract as the other two, read-only key first, with **one difference that
+is stated rather than smoothed over**: Kraken and Coinbase have a server-side
+dry run (`validate=true`, `/orders/preview`) and **Robinhood does not**. With
+`live=False` the Robinhood adapter can only check what it can see locally —
+size against minimum, pair status — and it says so: every dry run from it
+carries `venue_validated: false`. No matching engine and no balance check has
+seen the order.
+
+Robinhood also requires auth for market data, so nothing on this venue answers
+without a key. If you choose to add one, it lives where the others do:
+
+```
+%USERPROFILE%\.robinhood\credentials
+```
+
+as JSON with `api_key` and `private_key_b64` (the base64 seed issued when the
+key was created), created by you in Robinhood's own interface with the
+narrowest scope it offers. Nothing here will ask you for it, type it, or paste
+it.

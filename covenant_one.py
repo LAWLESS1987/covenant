@@ -95,6 +95,12 @@ SUITES = [
     # have, which is this project's whole disease in one function. Measured
     # 25/25 before wiring, so it is not turning the sweep red on arrival.
     ("test_k2_tally_arithmetic.py",      120,  "SECURITY"),
+    # V2 (2026-09-02). venues.py's "one rule" (live defaults False) and the
+    # checker CONSTITUTION.md II.1 names (money_posture.py) had no test. The
+    # checker had named two of three adapters by hand since the day it was
+    # written. V2 measures the venue layer, and mutation-tests that the
+    # checker exits 2 -- never 0 -- for an adapter that declares nothing.
+    ("test_v2_venue_guarantee.py",       120,  "SECURITY"),
     # D1 (2026-08-30). Same family as K2 above: a claim about the RUNNER
     # rather than about the node. K2 pins that a failure is not counted as a
     # pass; D1 pins that a MISSING DECLARED DEPENDENCY names itself instead of
@@ -736,6 +742,15 @@ IN_PLACE = [
     ("test_g1_doc_consistency.py", 120,
      "compares the documents to the protected text -- a claim about the FOLDER, "
      "and the scratch copy does not carry root .md files"),
+    # G2 (2026-09-02). money_posture.py -- the command four documents and
+    # SAFEGUARD.bat step 7 tell a reader to run -- was deleted from the
+    # working tree and nothing noticed. G2 resolves every `python X.py` the
+    # governing documents promise, compiles it, runs the money checker, and
+    # requires the money documents to name every adapter venues.py holds. In
+    # place for G1's reason: it is a claim about THE FOLDER's documents.
+    ("test_g2_promised_commands.py", 180,
+     "resolves the commands the documents promise against the FOLDER, and the "
+     "scratch copy does not carry root .md files or SAFEGUARD.bat"),
     # V1 runs the three verifiers and compares them. In place, because the
     # scratch copy carries .sh but not .ps1, so from there only two of three
     # would ever be available. V1 would still be HONEST about that -- it names

@@ -57,9 +57,32 @@ def _round_down(x, decimals):
     return int(x * f) / f
 
 
+
+# --------------------------------------------------------------- the dry run
+# WHAT live=False ACTUALLY REACHES, DECLARED PER VENUE.
+#
+#   Robinhood landed on 2026-08-29 with no server-side preview, and said so in
+#   its own docstring. Every document describing this repository's money
+#   posture -- README, CONSTITUTION II.1, GOVERNANCE VIII -- and the checker
+#   they all point to (money_posture.py, written the NEXT day) still described
+#   two venues and one uniform guarantee. Nothing contradicted anything; the
+#   guarantee was simply narrower than the sentence, and no check compared them.
+#
+#   So the guarantee is now a value a venue must state, not an adjective a
+#   document may assume:
+#     "venue"  the exchange's own endpoint priced and rejected the order
+#     "local"  only the checks in venues.py ran; no matching engine saw it
+#
+#   A venue class with no DRY_RUN is UNKNOWN, and UNKNOWN is reported as a
+#   failure rather than defaulted -- so a FOURTH adapter cannot inherit a
+#   promise it does not keep just by being added. test_v2_venue_guarantee.py
+#   pins that, and money_posture.py reads it instead of a hardcoded pair.
+
 # --------------------------------------------------------------------- Kraken
 class KrakenVenue:
     name = "kraken"
+    DRY_RUN = "venue"
+    DRY_RUN_ENDPOINT = "AddOrder validate=true"
     CRED = os.path.join(HOME, ".kraken", "credentials")
 
     def __init__(self):
@@ -201,6 +224,8 @@ class KrakenVenue:
 # ------------------------------------------------------------------- Coinbase
 class CoinbaseVenue:
     name = "coinbase"
+    DRY_RUN = "venue"
+    DRY_RUN_ENDPOINT = "/api/v3/brokerage/orders/preview"
     CRED_DIR = os.environ.get("COINBASE_CRED_DIR", os.path.join(HOME, ".coinbase"))
     HOST = "api.coinbase.com"
 
@@ -370,6 +395,8 @@ class RobinhoodVenue:
     live=True.
     """
     name = "robinhood"
+    DRY_RUN = "local"          # no preview endpoint exists to call
+    DRY_RUN_ENDPOINT = None
     CRED = os.path.join(HOME, ".robinhood", "credentials")
     HOST = "https://trading.robinhood.com"
 

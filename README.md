@@ -163,14 +163,17 @@ Three things, in one process:
   different thing from a loop deciding to move it, and only the second is
   forbidden. Keeping those two apart is the whole point of stating either.
 
-  What is easy to miss is that this repository *does* hold Kraken and Coinbase
-  order adapters (`venues.py`), a planner (`covenant_trader.py`), and a
-  scheduled task that runs the planner **daily, without a human**. Every order
-  it builds goes to the venue's own dry-run endpoint — Kraken `validate=true`,
-  Coinbase `/orders/preview` — which prices and rejects an order without
-  booking it. The trader is disarmed; armed, it would still be bounded by a
-  halt file, $25 per order, $50 per day, two orders per day, and a requirement
-  that the decision be sealed to the chain first.
+  What is easy to miss is that this repository *does* hold Kraken, Coinbase
+  and Robinhood order adapters (`venues.py`), a planner (`covenant_trader.py`)
+  that runs against all three, and a scheduled task that runs the planner
+  **daily, without a human**. Where the venue offers a server-side dry run —
+  Kraken `validate=true`, Coinbase `/orders/preview` — every order it builds
+  goes there and is priced and rejected without booking. Robinhood publishes
+  no preview endpoint, so its dry run is local only and is marked
+  `venue_validated: false`; no matching engine sees it. The trader is
+  disarmed; armed, it would still be bounded by a halt file, $25 per order,
+  $50 per day, two orders per day, and a requirement that the decision be
+  sealed to the chain first.
 
   So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
   between them is a commitment — `docs/CONSTITUTION.md` II.1 — rather than an

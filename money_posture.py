@@ -12,13 +12,24 @@ WHY IT EXISTS
   it needs a checker rather than a paragraph:
 
     * Read CONSTITUTION.md II.1 -- "No trades placed by automation" -- and you
-      would conclude no such capability exists. It does. venues.py holds Kraken
-      and Coinbase order adapters, covenant_trader.py plans orders, and a
-      scheduled task runs it DAILY against the real venues.
+      would conclude no such capability exists. It does. venues.py holds order
+      adapters (Kraken, Coinbase, Robinhood at the time of writing -- but this
+      file COUNTS them rather than naming them, see below), covenant_trader.py
+      plans orders, and a scheduled task runs it DAILY against the real venues.
     * Look at the scheduled task and the AddOrder call and you would conclude
-      the thing is trading. It is not. Every order goes to Kraken's
-      validate=true and Coinbase's /orders/preview, which price and reject an
-      order without booking it, and the trader is disarmed besides.
+      the thing is trading. It is not. Where the venue offers a server-side
+      dry run (Kraken validate=true, Coinbase /orders/preview) every order
+      goes there and is priced and rejected without booking; where it does
+      not (Robinhood), the dry run is local and says so. The trader is
+      disarmed besides.
+
+  THE FIRST VERSION OF THIS FILE WAS WRONG THE DAY IT WAS WRITTEN. It named
+  Kraken and Coinbase by hand and said "both default to the venue's own
+  dry-run endpoint". Robinhood had been added to venues.py the day before,
+  with no venue-side dry run at all. The checker meant to replace a paragraph
+  had inherited the paragraph's blind spot. So the venue list is now read
+  from venues.py, each adapter declares what its dry run reaches (DRY_RUN),
+  and an adapter that declares nothing makes this exit 2 rather than 0.
 
   Both readings are wrong, and a document cannot fix that because the answer
   changes with a config flag. So this reports the LIVE state, and it is meant
@@ -62,6 +73,20 @@ def _run(cmd):
         return (p.stdout or "") + (p.stderr or "")
     except Exception:                                        # noqa: BLE001
         return ""
+
+
+def load_venues():
+    """The adapters, from the module that defines them. Importing venues.py
+    runs no network call and opens no credential: it defines classes whose
+    constructors set a few Nones. If it cannot be imported that is reported
+    as UNKNOWN rather than as 'no venues'."""
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    try:
+        import venues as V                                   # noqa: N812
+        return list(V.all_venues()), None
+    except Exception as e:                                   # noqa: BLE001
+        return [], "venues.py could not be imported: %s" % e
 
 
 def load_cfg():
@@ -135,20 +160,45 @@ def main() -> int:
         print("      which is not the same as 'nothing is scheduled'.")
 
     print()
-    print("  VENUES -- which have credentials on this machine?")
-    found = False
-    for name, mod in (("Kraken", "kraken_balance.py"),
-                      ("Coinbase", "coinbase_balance.py")):
-        if os.path.isfile(os.path.join(HERE, mod)):
-            found = True
-            print("      %-9s reader present (%s)" % (name, mod))
-    if os.path.isfile(os.path.join(HERE, "venues.py")):
-        print("      order adapters present (venues.py): Kraken AddOrder and")
-        print("      Coinbase /orders -- both default to the venue's own")
-        print("      dry-run endpoint (validate=true / orders/preview), which")
-        print("      prices and rejects an order without booking it.")
-    if not found:
-        print("      none found")
+    print("  VENUES -- every order adapter, and what its dry run reaches")
+    # Enumerated from venues.py itself, never from a list written here. The
+    # first version of this file named two venues by hand the day AFTER a
+    # third had been added, and nothing noticed -- see the note at the top
+    # of venues.py. has_credentials() is os.path.exists and nothing more;
+    # no key is opened.
+    venues, verr = load_venues()
+    undeclared = []
+    if verr:
+        print("      UNKNOWN -- %s" % verr)
+        print("      A checker that cannot see the adapters cannot vouch for")
+        print("      them, and this one will not guess.")
+    for v in venues:
+        cred = ("credential file present" if v.has_credentials()
+                else "no credential on this machine")
+        mode = getattr(v, "DRY_RUN", None)
+        if mode == "venue":
+            how = ("dry run = VENUE-SIDE (%s): the exchange prices and"
+                   % getattr(v, "DRY_RUN_ENDPOINT", "?"))
+            tail = "rejects the order without booking it."
+        elif mode == "local":
+            how = "dry run = LOCAL ONLY: no preview endpoint exists, so"
+            tail = "no matching engine or balance check ever sees it."
+        else:
+            undeclared.append(v.name)
+            how = "dry run = UNDECLARED -- this adapter does not say what"
+            tail = "live=False reaches, and this checker will not assume."
+        print("      %-10s %s" % (v.name, cred))
+        print("      %-10s %s" % ("", how))
+        print("      %-10s %s" % ("", tail))
+    if venues:
+        weakest = ("local" if any(getattr(v, "DRY_RUN", None) == "local"
+                                  for v in venues) else "venue")
+        print("      %d adapter(s). Weakest dry run: %s."
+              % (len(venues), weakest))
+        if weakest == "local":
+            print("      So a venue-side dry run is true of SOME orders, and a")
+            print("      document saying that EVERY order reaches one is out of")
+            print("      date.")
 
     print()
     print("  WHAT THE LAST RUN ACTUALLY DID")
@@ -172,15 +222,28 @@ def main() -> int:
         print("  CONSTITUTION.md II.1 describes. If this reads ARMED, that")
         print("  clause needs rewriting before anyone is told otherwise.")
         return 1
-    print("  DISARMED. Orders are built and sent to the venues' own dry-run")
-    print("  endpoints, which price and reject them without booking. Nothing")
-    print("  can move funds in this state.")
+    if verr or undeclared:
+        # The docstring promises exit 2 is never read as 0. A posture this
+        # checker could not fully see is not a posture it can call DISARMED.
+        print("  COULD NOT DETERMINE. armed=%s and the halt file is %s, so no"
+              % (armed, "present" if halted else "absent"))
+        print("  order is being booked -- but the venue layer is only partly")
+        print("  visible (%s), and a checker that reports a"
+              % (verr or "undeclared dry run: " + ", ".join(undeclared)))
+        print("  guarantee it did not read is the failure this file exists to")
+        print("  catch. Exit 2, which is never read as 0.")
+        return 2
+    print("  DISARMED. Orders are built and, where the venue offers it, sent")
+    print("  to its own dry-run endpoint, which prices and rejects them")
+    print("  without booking. Nothing can move funds in this state.")
     print()
     print("  Stated plainly, because both mistakes are easy: the capability to")
-    print("  place a real order EXISTS, is wired to two real exchanges, and")
-    print("  runs daily. It is bounded by a flag, a halt file, per-order and")
-    print("  per-day caps, and a seal requirement. 'It cannot' would be false;")
-    print("  'it is trading' would also be false. This is the true sentence.")
+    print("  place a real order EXISTS, is wired to %d real venue(s) (%s),"
+          % (len(venues), ", ".join(v.name for v in venues)))
+    print("  and runs daily. It is bounded by a flag, a halt file, per-order")
+    print("  and per-day caps, and a seal requirement. 'It cannot' would be")
+    print("  false; 'it is trading' would also be false. This is the true")
+    print("  sentence.")
     return 0
 
 

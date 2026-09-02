@@ -241,16 +241,19 @@ inherits no obligation to this repository. What it gains is a common way to
 
 An evaluator will ask this first, and both of the easy answers are wrong.
 
-**The capability to place a real order exists**, in this repository, wired to two
-real exchanges. `venues.py` holds Kraken and Coinbase order adapters,
-`covenant_trader.py` plans orders, and the `CovenantTrader` scheduled task runs
-it **daily, with no human involved**.
+**The capability to place a real order exists**, in this repository, wired to
+three real venues. `venues.py` holds Kraken, Coinbase and Robinhood order
+adapters, `covenant_trader.py` plans orders against all three, and the
+`CovenantTrader` scheduled task runs it **daily, with no human involved**.
 
-**Nothing has ever been booked.** Every order is sent to the venue's own dry-run
-endpoint — Kraken `validate=true`, Coinbase `/orders/preview` — which prices and
-rejects it without placing it. The trader is disarmed. Armed, it would still be
-bounded by a halt file, $25 per order, $50 per day, two orders per day, and a
-requirement that the decision be sealed to the chain first.
+**Nothing has ever been booked.** Where the venue offers a server-side dry run —
+Kraken `validate=true`, Coinbase `/orders/preview` — every order is sent there
+and priced and rejected without being placed. Robinhood publishes no preview
+endpoint, so its dry run is local only: the adapter checks size and pair
+status, marks the result `venue_validated: false`, and no matching engine sees
+it. The trader is disarmed. Armed, it would still be bounded by a halt file,
+$25 per order, $50 per day, two orders per day, and a requirement that the
+decision be sealed to the chain first.
 
 So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
 between them is [`CONSTITUTION.md`](CONSTITUTION.md) II.1 — a commitment, not an
