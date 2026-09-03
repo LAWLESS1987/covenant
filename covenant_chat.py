@@ -145,8 +145,15 @@ def system_prompt(state):
 
 
 def chat(messages, model=MODEL, timeout=300):
-    body = {"model": model, "stream": False, "think": False,
-            "options": {"temperature": 0.3, "num_predict": 700}, "messages": messages}
+    # num_ctx 8192: the system prompt is ~2.3k tokens and the window keeps the
+    # last 20 turns, so 8k fits; Ollama's default here was 40,960, which alone
+    # made the load 11 GB and every prompt slow. keep_alive keeps the model warm
+    # for the session so turn two does not pay the reload (and the identical
+    # system prefix is reused from the KV cache); COVENANT_CHAT.bat unloads on
+    # exit is not needed -- it expires after 20 minutes idle.
+    body = {"model": model, "stream": False, "think": False, "keep_alive": "20m",
+            "options": {"temperature": 0.3, "num_predict": 700, "num_ctx": 8192},
+            "messages": messages}
     req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:

@@ -53,6 +53,27 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
 LOG = os.path.join(HERE, "ops", "judge_route.log")
 DEFAULT_MODELS = os.environ.get("COVENANT_ROUTE_MODELS", "qwen3:8b")
+# TIERS (2026-09-02). This laptop runs the judge on CPU (Ryzen 5 5625U, 6 cores,
+# no usable GPU): qwen3:8b took 34 s for a 300-char judgment and 138 s for a
+# 9.5k-char summary, and a 24.6k-char one timed out. Two copies of the same 8B
+# model would each run at half speed. What helps: a smaller model for the
+# bounded, low-stakes tasks (summarize, rank), a right-sized context instead
+# of Ollama's 40,960 default (which alone made the load 11 GB), keeping the
+# model warm between calls, and chunking long inputs. judge/refute stay on the
+# 8B: those are the calls whose quality matters.
+LIGHT_MODEL = os.environ.get("COVENANT_ROUTE_LIGHT", "qwen3:4b")
+LIGHT_TASKS = {"summarize", "rank"}
+NUM_CTX = {"judge": 4096, "refute": 6144, "rank": 6144, "summarize": 6144}
+KEEP_ALIVE = os.environ.get("COVENANT_ROUTE_KEEP_ALIVE", "20m")
+CHUNK_CHARS = 9000            # a summarize input above this is split and reduced
+
+
+def have_model(name):
+    try:
+        with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=6) as r:
+            return any(m.get("name") == name for m in json.loads(r.read().decode()).get("models", []))
+    except Exception:                                            # noqa: BLE001
+        return False
 
 SYSTEM = ("You are a judge inside a system whose one rule is mutual benefit: honesty "
           "over green-looking results. Answer ONLY with a JSON object in exactly the "
@@ -67,11 +88,12 @@ def _post(path, body, timeout):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
-def ask(model, prompt, timeout=240):
+def ask(model, prompt, timeout=240, num_ctx=6144):
     """One model, JSON-only output, no chain-of-thought (qwen3 emits <think>
     otherwise -- covenant_judge_ollama.py measured that). Returns (obj, raw)."""
     body = {"model": model, "stream": False, "format": "json", "think": False,
-            "options": {"temperature": 0, "num_predict": 900},
+            "keep_alive": KEEP_ALIVE,
+            "options": {"temperature": 0, "num_predict": 900, "num_ctx": num_ctx},
             "messages": [{"role": "system", "content": SYSTEM},
                          {"role": "user", "content": prompt}]}
     res = _post("/api/chat", body, timeout)
@@ -88,6 +110,23 @@ def ask(model, prompt, timeout=240):
             return json.loads(raw2), raw2
         except ValueError:
             return None, raw2
+
+
+def reduce_chunks(text, a):
+    """Map-reduce for long inputs: summarise each chunk with the light model,
+    join the partial summaries, and let the final call summarise those. The
+    partials are logged like any other call."""
+    models = [m for m in a.models.split(",") if m.strip()]
+    light = LIGHT_MODEL if have_model(LIGHT_MODEL) else models[0]
+    parts = [text[i:i + CHUNK_CHARS] for i in range(0, len(text), CHUNK_CHARS)][:12]
+    partial = []
+    for k, chunk in enumerate(parts, 1):
+        prompt = ("TASK: summarise part %d/%d in at most 120 words and list its hard facts.\n\n%s\n\n"
+                  "Answer as JSON: {\"summary\": \"...\", \"facts\": [\"...\"]}" % (k, len(parts), chunk))
+        rec, ok = route("summarize-part", prompt, "summary", [light], 1, a.allow_cloud, a.timeout)
+        if ok:
+            partial.append("PART %d: %s FACTS: %s" % (k, ok[0].get("summary", ""), "; ".join(map(str, ok[0].get("facts", [])[:6]))))
+    return "\n".join(partial) or text[:CHUNK_CHARS]
 
 
 def build_prompt(task, a):
@@ -108,9 +147,11 @@ def build_prompt(task, a):
                 "\"reason\": \"...\"}" % (a.criteria, cands[:60000])), "ranking"
     if task == "summarize":
         text = open(a.file, encoding="utf-8", errors="replace").read()
+        if len(text) > CHUNK_CHARS:
+            text = reduce_chunks(text, a)
         return ("TASK: summarise in at most %d words, then list the hard facts (numbers, "
                 "names, times) as strings.\n\n%s\n\nAnswer as JSON: {\"summary\": \"...\", "
-                "\"facts\": [\"...\"]}" % (a.max_words, text[:80000])), "summary"
+                "\"facts\": [\"...\"]}" % (a.max_words, text[:CHUNK_CHARS])), "summary"
     raise SystemExit("unknown task " + task)
 
 
@@ -122,7 +163,7 @@ def route(task, prompt, primary, models, quorum, allow_cloud, timeout):
             continue
         t0 = time.time()
         try:
-            obj, raw = ask(m, prompt, timeout)
+            obj, raw = ask(m, prompt, timeout, NUM_CTX.get(task, 6144))
         except Exception as e:                                   # noqa: BLE001
             views.append({"model": m, "error": "%s: %s" % (type(e).__name__, e)})
             continue
@@ -186,7 +227,10 @@ def main():
     if not a.task:
         ap.error("task required (judge|refute|rank|summarize) or --selftest")
     prompt, primary = build_prompt(a.task, a)
-    rec, ok = route(a.task, prompt, primary, [m.strip() for m in a.models.split(",") if m.strip()],
+    models = [m.strip() for m in a.models.split(",") if m.strip()]
+    if a.task in LIGHT_TASKS and a.models == DEFAULT_MODELS and have_model(LIGHT_MODEL):
+        models = [LIGHT_MODEL]
+    rec, ok = route(a.task, prompt, primary, models,
                     a.quorum, a.allow_cloud, a.timeout)
     out = {"outcome": rec["outcome"], "answer": ok[0] if ok else None,
            "views": rec["views"], "log": LOG}
