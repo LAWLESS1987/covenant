@@ -761,6 +761,10 @@ IN_PLACE = [
     # CI found it on 2026-09-03.
     ("test_n2_independent_root.py", 300,
      "it reads docs/CONFORMANCE_SPEC.json and conformance_indep/, which the scratch copy lacks"),
+    # M3 (2026-09-03): the phone node's scripts and setup page stay true to the
+    # node. In place because it reads mobile/ (not staged) and the node's --help.
+    ("test_m3_mobile.py", 180,
+     "it reads mobile/, which the scratch copy lacks"),
     ("test_g2_promised_commands.py", 180,
      "resolves the commands the documents promise against the FOLDER, and the "
      "scratch copy does not carry root .md files or SAFEGUARD.bat"),

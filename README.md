@@ -199,6 +199,13 @@ Three things, in one process:
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
 
+## On a phone
+
+An Android phone can run the same node with its own, smaller judge and peer to your PC:
+[mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md) (Termux; one script, `sh mobile/covenant_phone.sh`).
+The judge tier and what it costs in strictness are stated there. An iPhone can only be a
+client of a PC node; it cannot carry a judge.
+
 ## Talking to the covenant, and the tools around it
 
 Everything below runs on this machine, on the covenant's own local judge (Ollama,

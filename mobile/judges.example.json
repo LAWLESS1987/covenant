@@ -1,0 +1,4 @@
+{
+  "pc_qwen": {"url": "http://127.0.0.1:11434/v1/chat/completions", "model": "qwen3:8b"},
+  "phone":   {"url": "http://100.64.0.7:11434/v1/chat/completions", "model": "qwen3:1.7b"}
+}
