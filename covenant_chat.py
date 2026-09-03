@@ -101,13 +101,30 @@ def live_state():
             % (time.strftime("%Y-%m-%d %H:%M"), posture[-2200:], fresh[-400:], gates[-1200:], last_block))
 
 
-def memory_text(limit=6000):
-    """The covenant's own memory: dated facts it was told or extracted from past
-    sessions. Newest last; the tail is what fits the prompt. This is how it
-    evolves: nothing here is rewritten silently, and a wrong line is visible
-    in the file and can be struck by hand."""
-    t = _read(os.path.join("ops", "chat", "MEMORY.md"), 400000)
-    return t[-limit:] if t else "(no memory yet -- this is the first session)"
+def memory_text(limit=7000):
+    """The covenant's own memory, selected by what matters rather than by
+    recency alone. MEMORY.md carries lines tagged [Lawrence] (said outright),
+    [lesson] (its own mistakes), [session] (facts a session established),
+    [scenario] (the standing loop's weights) and [x-video <id>] (one per
+    video). A plain tail of the file was, by 2026-09-03, 105 video lines deep
+    and pushed out everything he had said and everything it had learned.
+    Selection: every [Lawrence] and [lesson] line (newest first, capped), the
+    last 6 [session], the last 3 [scenario], the last 10 [x-video]. Nothing is
+    rewritten; a wrong line is visible in the file and can be struck by hand."""
+    t = _read(os.path.join("ops", "chat", "MEMORY.md"), 2000000)
+    if not t:
+        return "(no memory yet -- this is the first session)"
+    lines = [l for l in t.splitlines() if l.startswith("- ")]
+    def tagged(tag):
+        return [l for l in lines if ("[%s" % tag) in l]
+    picked = tagged("Lawrence")[-40:] + tagged("lesson")[-20:] + tagged("session")[-6:] \
+        + tagged("scenario")[-3:] + tagged("x-video")[-10:]
+    seen, out = set(), []
+    for l in picked:
+        if l not in seen:
+            seen.add(l); out.append(l)
+    text = "\n".join(out)
+    return text[-limit:] if text else "(memory file exists but holds no tagged lines)"
 
 
 def remember(fact, source):

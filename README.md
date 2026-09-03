@@ -192,6 +192,32 @@ Three things, in one process:
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
 
+## Talking to the covenant, and the tools around it
+
+Everything below runs on this machine, on the covenant's own local judge (Ollama,
+the model the nodes' ethics gate calls). Nothing leaves the PC unless a line says so.
+
+```
+python covenant_chat.py            # a conversation with the covenant: its binding text,
+                                   # the live checker state and its own memory in front of it;
+                                   # speaks its replies; !help for commands
+python covenant_route.py --selftest  # judge / refute / rank / summarize a bounded task locally
+python covenant_scenarios.py --show  # the standing loop: nine scenarios, re-weighed every 4 h
+python trader_freshness.py         # did the scheduled trader actually run today? (exit 1 = no)
+python covenant_align_set.py --no-judge  # input->output pairs that teach a model to answer as the covenant does
+python covenant_gemini.py --selftest     # Gemini as an opt-in data source (a question LEAVES the PC when on)
+```
+
+What each refuses, by construction: the chat never places an order, holds no key, and
+proposes changes to its own prompt or tools into a file it does not apply
+(CONSTITUTION II.3); the router refuses any `:cloud` model unless told otherwise, because
+that name means the prompt is forwarded off the machine; the Gemini adapter answers
+"not configured" until a person puts a key outside the repository, and never asks for
+one; the scenario loop labels every probability a stated credence, never a measurement,
+and flags a weight that moved without a cited change. `test_t1_tooling.py` measures the
+model-free parts of all of them in the sweep; each tool's `--selftest` measures the rest
+against the judge.
+
 ## Suite coverage
 
 **64 suites · 1,826 checks · 0 failed**, win32, 2026-08-31 <!--TOTALS-->
