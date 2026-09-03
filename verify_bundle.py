@@ -116,8 +116,30 @@ def sha(rel):
     return h.hexdigest()
 
 
+def tracked():
+    """What git ships. A manifest written from the raw disk listed untracked
+    residue (.fuse_hidden*, *.PRE-LAUNCHBUNDLE, C2_RESULT.txt) and a clean
+    checkout in CI reported every one of them MISSING (2026-09-02, run
+    33697588403). None if git is unavailable -- then the walk is all there is."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "ls-files", "-z"], cwd=HERE, capture_output=True,
+                             timeout=30).stdout.decode("utf-8", "replace")
+    except Exception:                                        # noqa: BLE001
+        return None
+    names = {n for n in out.split("\0") if n}
+    return names or None
+
+
 def main():
     files = sorted(shipped())
+    if "--write" in sys.argv:
+        t = tracked()
+        if t is not None:
+            dropped = [f for f in files if f not in t]
+            files = [f for f in files if f in t]
+            print("--write: %d files git tracks; %d on disk but not shipped, skipped"
+                  % (len(files), len(dropped)))
     if "--write" in sys.argv:
         with open(MAN, "w", encoding="utf-8", newline="\n") as fh:
             fh.write("# covenant bundle manifest -- sha256 of every shipped file.\n")

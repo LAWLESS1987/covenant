@@ -287,7 +287,8 @@ def main() -> int:
     else:
         print("      Not Windows -- cannot read the task scheduler here. UNKNOWN,")
         print("      which is not the same as 'nothing is scheduled'.")
-        print("      last RUN per trader_log.txt: %s" % (last_run_hdr or "none found"))
+        print("           last ATTEMPT unknown (no scheduler read on this platform)")
+        print("           last RUN per trader_log.txt: %s" % (last_run_hdr or "none found"))
 
     print()
     print("  VENUES -- every order adapter, and what its dry run reaches")

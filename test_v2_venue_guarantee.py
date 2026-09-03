@@ -215,7 +215,8 @@ def main():
     check("A11 an undated log makes the comparison UNKNOWN, not a match",
           "UNKNOWN" in MP.attempt_vs_log((2026, 9, 2), "ran", None))
     check("A12 the live output prints 'last ATTEMPT' and 'last RUN per "
-          "trader_log.txt' as two separate lines",
+          "trader_log.txt' as two separate lines -- on every platform (on "
+          "non-Windows the attempt reads 'unknown', never a run)",
           "last attempt" in low and "last run per trader_log.txt" in low)
 
     # ---- T: the trader's armed gate ----------------------------------------

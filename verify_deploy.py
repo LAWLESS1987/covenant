@@ -49,14 +49,18 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 10297
+EXPECTED_LINES = 10924
 MANIFEST = {
+    # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
+    # of 2026-08-31 that changed the core, run_all_tests.sh and
+    # run_local_sweep.py without moving these pins) and a full sweep on the
+    # merged tree. The pins move in the SAME change as the files (M53).
     # v8.40 (2026-08-29): the semantic-judge layer, landed. The pin below is
     # the SAME digest the candidate sweep printed for its staged core
     # (525f235134f5 "as STAGED") -- what was swept is what shipped, provable
     # from the two files carrying one hash.
     "covenant_unified_v8.py":
-        "525f235134f59f25f80643154ab688db0c49311858169b3cf3f386c72d4c8845",
+        "8f219285f26807de9811c48dd34e8e826c337c7112932be85ce7fb16e2a65518",
     "test_a3s_send_bounds.py":
         "bd0ab67ae2f62a12b6a0253926511ca7cffa6155e3a74bb6633d3875006d1d7c",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
@@ -83,7 +87,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "7eaeb0cdf83d477fed5ce2ad1404ca801d80e98d666583fc7b00b0cb118c0098",
+        "8c9bec22c6a57e3ead7dc28a1c54e036cbe8fc388a7478738b743adbbed09f3c",
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -106,7 +110,7 @@ MANIFEST = {
     # since 00:40Z, and the first v8.40 deployed sweep went red on all four
     # semantic suites from that asymmetry. P19 23/23 after each move.
     "run_local_sweep.py":
-        "b8f381abd39a5f450b22f278d57f8989a17162f20216a09845159b3bbe274f39",
+        "d0197dc3c0d64d0088b0dff2b46635b4ba0cccf48ed08b094d2b5c199ea1764b",
     "test_p19_overlay_guard.py":
         "ed76c4497594d56b48ea7724a4aeed24bf1e9a38959fa705d9071812e07d4ed7",
     # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
