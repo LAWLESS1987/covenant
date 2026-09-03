@@ -42,7 +42,8 @@ def main():
         except Exception as e:                                   # noqa: BLE001
             check(f"I:{name:<22} imports", False, e)
     for name in ("covenant_route.py", "covenant_chat.py", "covenant_gemini.py", "covenant_align_set.py",
-                 "covenant_thesis.py", "covenant_scenarios.py", "trader_freshness.py"):
+                 "covenant_thesis.py", "covenant_scenarios.py", "trader_freshness.py",
+                 "readme_totals.py", "covenant_roundtable_local.py"):
         p = subprocess.run([sys.executable, os.path.join(HERE, name), "--help"], capture_output=True, text=True, timeout=60)
         check(f"H:{name:<22} --help exits 0", p.returncode == 0, (p.stderr or p.stdout)[-160:])
 

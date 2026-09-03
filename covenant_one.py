@@ -144,6 +144,7 @@ SUITES = [
     # behaviour root that is blind to prose and mutation-tested against two
     # real semantic breaks. 14/14 before wiring.
     ("test_n1_conformance.py",           120,  "SECURITY"),
+    ("test_c3_independent_root.py",      300,  "SECURITY"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

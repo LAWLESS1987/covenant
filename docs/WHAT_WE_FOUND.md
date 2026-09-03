@@ -237,3 +237,15 @@ custody apart from verification — is the only form of permanence that requires
 nobody to take the author's word.
 
 *Take what is useful. Check it against something outside this page.*
+
+## Addendum, 2026-09-03
+
+The finding got two more instances, from readers of this file. A system that opened
+four files of this repository wrote that the repository "does not name" things that are
+in files it did not open; the covenant's own local judge wrote that it had "read" files
+it cannot read. Both are recorded, with the check of each, in
+[ROUNDTABLE_2026-09-03.md](ROUNDTABLE_2026-09-03.md). The same roundtable produced the
+first run of `check.sh` by a party other than the author (5 passed), and two
+corrections to this project's own wording: the count of refuted claims above is two,
+not the "four" some documents said, and "Lamport sequence numbers" overstated a
+"Lamport-style" sequence number.

@@ -60,7 +60,7 @@ correspondence to a published author about his own subject.
 > evidence about the model. It is testable in about ten minutes — ask any system
 > with persistent memory to name an occasion it was shown to be wrong.
 >
-> Write-up, with the four claims of mine that did *not* survive checking recorded
+> Write-up, with the two claims of mine that did *not* survive checking recorded
 > alongside those that did:
 > github.com/LAWLESS1987/covenant → docs/WHAT_WE_FOUND.md
 >
@@ -156,7 +156,7 @@ For a forum, a mailing list, or anyone who asks what you have been doing.
 > "fragment." Expect confident, specific, wrong detail exactly where a source is
 > partly informed.
 >
-> Write-up, including four of my own claims that did not survive checking:
+> Write-up, including two of my own claims that did not survive checking:
 > github.com/LAWLESS1987/covenant → docs/WHAT_WE_FOUND.md
 
 ---

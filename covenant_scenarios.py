@@ -66,7 +66,7 @@ def _read(path, limit=None):
         return ""
 
 
-def ask(system, user, num_ctx=12288, timeout=900):
+def ask(system, user, num_ctx=8192, timeout=1500):
     body = {"model": MODEL, "stream": False, "think": False, "format": "json", "keep_alive": "20m",
             "options": {"temperature": 0.2, "num_predict": 1600, "num_ctx": num_ctx},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
@@ -88,12 +88,23 @@ def live_state():
     return "\n".join(out)
 
 
+KNOWLEDGE_CHARS = 9000   # total; the judge's context is small and its clock is slow
+
+
 def knowledge():
-    parts = []
-    for name in sorted(os.listdir(PRIV)) if os.path.isdir(PRIV) else []:
-        if name.startswith("THESIS") and name.endswith(".md"):
-            parts.append("## %s\n%s" % (name, _read(os.path.join(PRIV, name), 9000)))
-    parts.append("## MEMORY (tail)\n" + _read(MEMORY, 5000))
+    names = sorted(os.listdir(PRIV)) if os.path.isdir(PRIV) else []
+    def judges_own(n):   # THESIS_<date>.md and nothing else
+        return n.startswith("THESIS_") and n[17:] == ".md" and n[7:17].replace("-", "").isdigit()
+    order = ([n for n in names if n.startswith("THESIS_COMPARE")]
+             + [n for n in names if judges_own(n)]
+             + [n for n in names if n.startswith("THESIS_") and n.endswith("_claude.md")])
+    parts, left = [], KNOWLEDGE_CHARS
+    for name in order:
+        if "mapraw" in name or not name.endswith(".md") or left < 800:
+            continue
+        body = _read(os.path.join(PRIV, name), min(4000, left))
+        parts.append("## %s\n%s" % (name, body)); left -= len(body)
+    parts.append("## MEMORY (tail)\n" + _read(MEMORY, 2500))
     return "\n\n".join(parts)
 
 
@@ -134,7 +145,8 @@ def main():
               "\"introspection\": [\"a previous weight or claim of yours that looks like confirmation "
               "bias or is unmeasured, and the correction\"], \"new_variable\": \"one scenario worth adding, or ''\"}")
     user = ("SCENARIOS:\n%s\n\nPREVIOUS WEIGHTS:\n%s\n\nWHAT IS KNOWN NOW:\n%s\n\nLIVE STATE:\n%s\n\nDate: %s"
-            % (json.dumps(t["scenarios"], ensure_ascii=False), prev_w, knowledge()[-22000:], live_state(), stamp))
+            % (json.dumps(t["scenarios"], ensure_ascii=False), prev_w, knowledge(), live_state()[-1600:], stamp))
+    print("prompt %d chars; judge %s" % (len(system) + len(user), MODEL), flush=True)
     t0 = time.time()
     try:
         res = ask(system, user)
