@@ -24,13 +24,16 @@ COMMANDS inside the chat
   !judge <claim>   ask the judge for a PASS/FAIL verdict with a reason
   !refute <claim>  ask it to try to refute a claim from the state it has
   !models     list local models;  !model NAME  switch (':cloud' refused)
+  !voice [on|off]  toggle speech (Windows voices, offline);  !rate N  words/min
   !remember <fact>  add to the covenant's memory (ops/chat/MEMORY.md);  !memory  show it
   !save       write the transcript now;  !quit / Ctrl-C  leave (on exit the judge
               extracts what the session established into MEMORY.md, marked [session])
 USE
   python covenant_chat.py                # interactive
   python covenant_chat.py "one question" # single answer, then exit
+  python covenant_chat.py --mute         # text only (voice is on by default)
   python covenant_chat.py --selftest     # one round trip against the judge
+  python covenant_chat.py --say-test     # speak one sentence, list voices
 LICENCE: public domain.
 """
 from __future__ import annotations
@@ -161,6 +164,56 @@ def chat(messages, model=MODEL, timeout=300):
     return (res.get("message") or {}).get("content", "").strip()
 
 
+# ---------------------------------------------------------------- voice
+# The covenant speaks with Windows' own offline voices (SAPI via pyttsx3 when
+# installed, else System.Speech through PowerShell). Nothing leaves the PC.
+# Speech runs on a thread so typing is never blocked; !voice toggles it.
+_VOICE = {"on": os.environ.get("COVENANT_CHAT_VOICE", "1") == "1", "engine": None, "rate": 175}
+
+
+def _speakable(text):
+    import re as _re
+    t = _re.sub(r"[*_`#>]+", "", text)
+    t = _re.sub(r"\(the judge did not answer[^)]*\)", "the judge did not answer", t)
+    return t.strip()
+
+
+def speak(text):
+    if not _VOICE["on"] or not text:
+        return
+    import threading
+    t = _speakable(text)[:1500]
+
+    def run():
+        try:
+            import pyttsx3
+            eng = pyttsx3.init()
+            eng.setProperty("rate", _VOICE["rate"])
+            eng.say(t)
+            eng.runAndWait()
+            return
+        except Exception:                                        # noqa: BLE001
+            pass
+        try:
+            safe = t.replace("'", "''")
+            subprocess.run(["powershell", "-NoProfile", "-Command",
+                            "Add-Type -AssemblyName System.Speech; "
+                            "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                            "$s.Rate = 1; $s.Speak('%s')" % safe],
+                           capture_output=True, timeout=120)
+        except Exception:                                        # noqa: BLE001
+            pass
+    threading.Thread(target=run, daemon=True).start()
+
+
+def voices():
+    try:
+        import pyttsx3
+        return [v.name for v in pyttsx3.init().getProperty("voices")]
+    except Exception as e:                                       # noqa: BLE001
+        return ["(pyttsx3 unavailable: %s; falling back to System.Speech)" % e]
+
+
 def models():
     try:
         with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=8) as r:
@@ -188,6 +241,10 @@ class Log:
 
 def main():
     args = [a for a in sys.argv[1:]]
+    if "--say-test" in args:
+        print("  voices:", ", ".join(voices()))
+        speak("I am the covenant. I can speak now.")
+        time.sleep(4); print("ok    spoke one sentence (if you heard nothing, check the sound device)"); return 0
     if "--selftest" in args:
         remember("selftest marker " + time.strftime("%H%M%S"), "selftest")
         assert "selftest marker" in memory_text(), "memory did not round-trip"
@@ -198,10 +255,15 @@ def main():
         ok = ans and ("no" in ans.lower() or "never" in ans.lower())
         print(ans[:400]); print("\n%s  the covenant answered as itself in %.0fs" % ("ok  " if ok else "FAIL", time.time() - t0))
         return 0 if ok else 2
+    if "--mute" in args:
+        _VOICE["on"] = False
+    if "--voice" in args:
+        _VOICE["on"] = True
     model = MODEL
     log = Log()
     print("  covenant chat -- local judge %s, nothing leaves this machine. !help for commands." % model)
     print("  reading the live state (money posture, freshness, gates)...", flush=True)
+    speak("Reading the live state. One moment.")
     state = live_state()
     msgs = [{"role": "system", "content": system_prompt(state)}]
     one_shot = " ".join(a for a in args if not a.startswith("--")).strip()
@@ -217,6 +279,7 @@ def main():
         msgs.append({"role": "assistant", "content": ans})
         log.add("covenant", ans)
         print("\n  covenant (%.0fs): %s\n" % (time.time() - t0, ans))
+        speak(ans)
         if len(msgs) > 24:                     # keep the window bounded: system + last 20
             del msgs[1:-20]
 
@@ -240,6 +303,11 @@ def main():
                 print(memory_text(3000)); continue
             if text == "!save":
                 log.save(); print("  saved to", log.path); continue
+            if text in ("!voice", "!voice on", "!voice off"):
+                _VOICE["on"] = (text != "!voice off") and (not _VOICE["on"] if text == "!voice" else True)
+                print("  voice", "on" if _VOICE["on"] else "off", "--", ", ".join(voices())[:160]); continue
+            if text.startswith("!rate "):
+                _VOICE["rate"] = int(text[6:]); print("  rate ->", _VOICE["rate"]); continue
             if text == "!models":
                 print("  ", ", ".join(models())); continue
             if text.startswith("!model "):
