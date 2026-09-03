@@ -33,6 +33,7 @@ COMMANDS inside the chat
   !judge <claim>   ask the judge for a PASS/FAIL verdict with a reason
   !refute <claim>  ask it to try to refute a claim from the state it has
   !search <q>  / !fetch <url>   browse (results go into the conversation);  !browse on|off
+  !gemini on|off   let the judge consult Gemini (leaves the PC);  !gemini <question>
   !improve    the judge proposes changes to its own prompt/tools -> ops/chat/PROPOSALS.md
   !models     list local models;  !model NAME  switch (':cloud' refused)
   !voice [on|off]  toggle speech (offline);  !rate -10..10;  !pitch +12%  tune the delivery
@@ -153,7 +154,8 @@ def system_prompt(state):
             "in plain words, briefly, in the first person as the covenant. You place no order, "
             "hold no key, and cannot act -- you can only say what is measured, what it means, "
             "and what would need a human hand. You may use web_search and web_fetch when an "
-            "answer needs outside or current information; say what you fetched. "
+            "answer needs outside or current information; say what you fetched. When Gemini "
+            "is on you may ask_gemini for a second opinion, and you say it was Gemini's. "
             "MEMORY below is what you learned in earlier "
             "sessions; it holds unless the live state contradicts it.\n\n"
             "BINDING TEXT:\n%s\n\nPRINCIPLE AND OPERATOR RULES:\n%s\n\nMEMORY:\n%s\n\n%s"
@@ -330,7 +332,33 @@ def web_search(query, n=6):
     return "\n".join(out) or "no results parsed"
 
 
+# ---------------------------------------------------------------- gemini
+# Gemini as a data source the judge may consult -- OFF unless this session
+# turns it on, because the question leaves the PC (to Google). The key lives
+# outside the repo; covenant_gemini.py never asks for one.
+_GEMINI = {"on": os.environ.get("COVENANT_CHAT_GEMINI", "0") == "1"}
+GEMINI_TOOL = {"type": "function", "function": {"name": "ask_gemini", "description":
+    "Ask Google's Gemini model a question and return its answer, as a second opinion or for "
+    "knowledge you lack. Use only when the user has turned Gemini on.",
+    "parameters": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]}}}
+
+
+def ask_gemini(question):
+    try:
+        import covenant_gemini as g
+    except Exception as e:                                       # noqa: BLE001
+        return "gemini adapter missing: %s" % e
+    if not _GEMINI["on"]:
+        return "Gemini is off for this session (!gemini on sends questions to Google)"
+    if not g.configured():
+        return "Gemini is not configured on this PC: no key at %s and no GEMINI_API_KEY (you create it; nothing here asks)" % g.CRED
+    text, note = g.ask(question, system="Answer concisely and say when you are unsure.")
+    return (text or "(no answer)") + "\n-- " + note
+
+
 def run_tool(name, args):
+    if name == "ask_gemini":
+        return ask_gemini(str(args.get("question", "")))
     if not _BROWSE["on"]:
         return "browsing is off (!browse on)"
     if name == "web_search":
@@ -346,7 +374,8 @@ def chat_tools(messages, model, max_rounds=3):
     for _ in range(max_rounds):
         body = {"model": model, "stream": False, "think": False, "keep_alive": "20m",
                 "options": {"temperature": 0.3, "num_predict": 700, "num_ctx": 8192},
-                "messages": messages, "tools": TOOLS if _BROWSE["on"] else []}
+                "messages": messages,
+                "tools": (TOOLS if _BROWSE["on"] else []) + ([GEMINI_TOOL] if _GEMINI["on"] else [])}
         req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=400) as r:
@@ -540,6 +569,12 @@ def main():
             if text in ("!browse", "!browse on", "!browse off"):
                 _BROWSE["on"] = (text != "!browse off") and (not _BROWSE["on"] if text == "!browse" else True)
                 print("  browsing", "on" if _BROWSE["on"] else "off"); continue
+            if text in ("!gemini", "!gemini on", "!gemini off"):
+                _GEMINI["on"] = (text != "!gemini off") and (not _GEMINI["on"] if text == "!gemini" else True)
+                print("  gemini", "on -- questions you send it leave this PC to Google" if _GEMINI["on"] else "off"); continue
+            if text.startswith("!gemini "):
+                r = ask_gemini(text[8:]); print("  gemini: " + r[:1500]); log.add("gemini", text[8:] + "\n" + r[:1500])
+                msgs.append({"role": "user", "content": "Gemini answered %r with:\n%s" % (text[8:], r[:4000])}); continue
             if text == "!improve":
                 print("  " + propose(msgs, model)); continue
             if text == "!models":
