@@ -214,3 +214,4 @@ ops/judge_route.log
 
 # covenant_chat.py transcripts and the covenant's own memory: private conversations
 ops/chat/
+ops/gemini.log
