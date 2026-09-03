@@ -77,6 +77,10 @@ OUTPUTS = {
     "trader_log.txt",
     # balance sidecars and venue history: state, gitignored, holdings by
     # another name. Not delivery.
+    # ops/ state the watchdog and guard rewrite every round (2026-09-02: the
+    # self-eval ledger is appended hourly and tripped G1 an hour after --write)
+    "SELF_EVAL.md", "SELF_EVAL.md.prev", "watchdog.pid", "guard_state.json",
+    "judge_route.log",   # covenant_route.py appends one line per local-judge call
     "coinbase_balance.json", "kraken_balance.json", "coinbase_balance.txt",
     "kraken_balance.txt", "coinbase_history.csv", "kraken_history.csv",
     # state that is deliberately not source: the chain's own genesis is an

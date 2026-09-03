@@ -208,3 +208,6 @@ coinbase_history*.csv
 # Strategy notes that name L's actual positions, and anything else that is
 # holdings by another name. Nothing under private/ is published.
 private/
+
+# covenant_route.py's local-judge ledger: state, appended per call
+ops/judge_route.log
