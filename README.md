@@ -202,7 +202,8 @@ Three things, in one process:
 ## On a phone
 
 An Android phone can run the same node with its own, smaller judge and peer to your PC:
-[mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md) (Termux; one script, `sh mobile/covenant_phone.sh`).
+[mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md): Termux from F-Droid, then one line,
+`curl -sL https://raw.githubusercontent.com/LAWLESS1987/covenant/main/mobile/install.sh | sh`.
 The judge tier and what it costs in strictness are stated there. An iPhone can only be a
 client of a PC node; it cannot carry a judge.
 

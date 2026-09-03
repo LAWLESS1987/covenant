@@ -9,6 +9,26 @@ What you do not get: an iPhone version. iOS does not allow a background Python s
 local model server that other programs can call, so an iPhone can only be a client of the PC
 node (its dashboard in Safari over Tailscale) and cannot carry a judge. This page is Android.
 
+## The short way: two steps, one of them a command
+
+1. Install Termux from F-Droid: https://f-droid.org/packages/com.termux/ (not the Play Store build).
+2. Open it and paste one line:
+
+```bash
+curl -sL https://raw.githubusercontent.com/LAWLESS1987/covenant/main/mobile/install.sh | sh
+```
+
+That installs the packages, clones or updates this repository, pulls the judge model, puts a
+button on your home screen (with Termux:Widget), and starts the node. Put `PC_PEER=10.0.0.174:5001`
+(your PC's address) in front of it to peer with a PC on the same Wi-Fi; without it the node
+runs alone from the canonical genesis and converges when a peer appears. This project would
+rather you read before you run: `curl -sLO .../mobile/install.sh`, then `less install.sh`,
+then `sh install.sh`.
+
+Why there is no true one-tap install: Android will not run a Python node and a model server
+from a link. It needs a terminal app, and Termux is that app. A packaged APK that bundles both
+is possible and is not built; it is a project, not a script.
+
 ## Requirements
 
 - Android 8 or newer, arm64, at least 6 GB RAM (8 GB to run the 4B judge).
@@ -70,7 +90,7 @@ defaults at the top of the script:
 
 | variable | default | meaning |
 |---|---|---|
-| `PC_PEER` | `192.168.1.10:5001` | your PC node's P2P address (API port plus one) |
+| `PC_PEER` | empty | a peer's P2P address (API port plus one), e.g. `10.0.0.174:5001`; empty runs the node alone until a peer appears |
 | `PHONE_PORT` | `5000` | the phone node's API port; it also takes 5001 and 5010 |
 | `JUDGE_MODEL` | `qwen3:1.7b` | the phone judge; `qwen3:4b` on an 8 GB phone |
 | `NODE_ID` | `phone` | the name the node signs with |

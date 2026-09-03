@@ -36,7 +36,7 @@ def read(rel):
 
 
 def main():
-    scripts = ["mobile/covenant_phone.sh", "mobile/covenant_phone_check.sh", "mobile/widget/covenant-phone-start.sh"]
+    scripts = ["mobile/install.sh", "mobile/covenant_phone.sh", "mobile/covenant_phone_check.sh", "mobile/widget/covenant-phone-start.sh"]
     for s in scripts + ["mobile/TERMUX_SETUP.md", "mobile/judges.example.json"]:
         check("M3.0 %s is in the tree" % s, os.path.exists(os.path.join(HERE, s)))
 
