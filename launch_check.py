@@ -568,35 +568,60 @@ def g11():
 # --------------------------------------------------------------- G12 suites
 @gate("G12", "When did the suites last run, and on which platform?")
 def g12():
-    # The archived win32 name was HARDCODED to the 2026-08-24 file until
-    # 2026-08-27, so every sweep archived after it was invisible here and this
-    # gate kept reporting a date three days stale while a fresher result sat
-    # in the same directory. A gate that cannot see the artefact it exists to
-    # date is the same failure as a suite no runner calls: it reads as
-    # coverage. Newest wins, and the name is still printed so the platform
-    # claim stays visible rather than being averaged into one date.
-    cands = [("SWEEP_RESULTS.txt", "local sweep")]
-    arch = sorted(glob.glob(os.path.join(HERE, "docs", "results",
-                                         "SWEEP_RESULTS_*_win32.txt")),
-                  key=os.path.getmtime)
-    if arch:
-        cands.append((os.path.relpath(arch[-1], HERE).replace(chr(92), "/"),
-                      "win32 sweep"))
-    found = []
-    for rel, what in cands:
-        p = os.path.join(HERE, rel)
-        if os.path.exists(p):
-            found.append("%s: %s (%s)" % (what, rel,
-                         time.strftime("%Y-%m-%d %H:%M",
-                                       time.localtime(os.path.getmtime(p)))))
-    if not found:
-        return R("G12", g12._title, UNKNOWN, "no sweep results in this folder.",
-                 "python run_local_sweep.py")
+    # Until 2026-09-02 this gate could only ever say UNKNOWN: a filename is not
+    # a claim about the platform or the source. But the runner's own transcript
+    # IS -- covenant_one.py prints the platform, the core's sha256 and the
+    # tally at the top and bottom of every sweep. So read the newest full
+    # sweep transcript and MEASURE: same core as on disk, this platform, zero
+    # failed, and not older than a week. Anything short of all four is still
+    # UNKNOWN, with the reason, never PASS.
+    import hashlib
+    cands = [os.path.join(HERE, n) for n in ("ONE_SWEEP.txt", "ONE_RUN.txt", "ONE_RUN_stdout.txt")]
+    cands += glob.glob(os.path.join(HERE, "docs", "results", "SWEEP_RESULTS_*_win32.txt"))
+    cands = [c for c in cands if os.path.exists(c)]
+    if not cands:
+        return R("G12", g12._title, UNKNOWN, "no sweep transcript in this folder.",
+                 "python covenant_one.py --out ONE_SWEEP.txt")
+    core = os.path.join(HERE, "covenant_unified_v8.py")
+    try:
+        disk = hashlib.sha256(open(core, "rb").read()).hexdigest()[:12]
+    except OSError:
+        disk = "?"
+    is_win = sys.platform.startswith("win")
+    reasons = []
+    for path in sorted(cands, key=os.path.getmtime, reverse=True):
+        try:
+            text = open(path, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        rel = os.path.relpath(path, HERE)
+        age_d = (time.time() - os.path.getmtime(path)) / 86400.0
+        m_sha = re.search(r"sha256 ([0-9a-f]{12})", text)
+        m_plat = re.search(r"platform\s+(.+)", text)
+        m_run = re.search(r"suites run\s+(\d+)", text)
+        m_fail = re.search(r"checks failed\s+(\d+)", text)
+        sha = m_sha.group(1) if m_sha else "?"
+        plat = m_plat.group(1).strip() if m_plat else "?"
+        ran = int(m_run.group(1)) if m_run else 0
+        failed = int(m_fail.group(1)) if m_fail else -1
+        plat_ok = (("Windows" in plat) == is_win) if plat != "?" else False
+        when = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(path)))
+        if ran > 0 and failed == 0 and sha == disk and plat_ok and age_d <= 7:
+            return R("G12", g12._title, PASS,
+                     "%s: %d suites, 0 failed, core %s == disk, platform %s, %s (%.1f d old)."
+                     % (rel, ran, sha, plat, when, age_d))
+        why = []
+        if ran == 0: why.append("no sweep tally (a --check transcript?)")
+        if failed > 0: why.append("%d failed" % failed)
+        if failed < 0: why.append("no tally line")
+        if sha != disk: why.append("core %s != disk %s" % (sha, disk))
+        if not plat_ok: why.append("platform '%s' is not this one" % plat)
+        if age_d > 7: why.append("%.0f days old" % age_d)
+        reasons.append("%s (%s): %s" % (rel, when, "; ".join(why)))
     return R("G12", g12._title, UNKNOWN,
-             "; ".join(found) + ". A result is a claim about the platform it "
-             "ran on (M29) and about the source it ran against -- neither is "
-             "checkable from a filename. Re-run before launch.",
-             "python run_local_sweep.py")
+             "no transcript proves a green sweep of THIS core on THIS platform within a week -- "
+             + " | ".join(reasons[:3]),
+             "python covenant_one.py --out ONE_SWEEP.txt")
 
 
 def main():
