@@ -307,8 +307,8 @@ def web_search(query, n=6):
     out = []
     try:
         raw = _get("https://lite.duckduckgo.com/lite/?q=" + q)
-        links = _re.findall(r"<a rel=\"nofollow\" href=\"([^\"]+)\" class='result-link'>(.*?)</a>", raw, _re.S)
-        snips = _re.findall(r"<td class='result-snippet'>(.*?)</td>", raw, _re.S)
+        links = _re.findall(r'''<a rel="nofollow" href="([^"]+)" class='result-link'>(.*?)</a>''', raw, _re.S)
+        snips = _re.findall(r'''<td class='result-snippet'>(.*?)</td>''', raw, _re.S)
         for k, (href, title) in enumerate(links[:n]):
             snip = _html_text(snips[k]) if k < len(snips) else ""
             out.append("%s\n  %s\n  %s" % (_html_text(title), href, snip[:200]))
