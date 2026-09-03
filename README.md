@@ -218,6 +218,21 @@ and flags a weight that moved without a cited change. `test_t1_tooling.py` measu
 model-free parts of all of them in the sweep; each tool's `--selftest` measures the rest
 against the judge.
 
+## Support this work
+
+For the last two months I've been building this in the open: a small system that governs
+whoever runs it — including me. A public ledger with an ethics gate that fails closed, a
+constitution whose one rule is mutual benefit for people and machines, and tests that catch
+the system's own lies — 65 suites, zero failing, and anyone can run them in about ten
+minutes. Along the way I found something researchers can use: a reproducible reason AI
+systems seem to recognise your work across sessions when they don't
+([`docs/WHAT_WE_FOUND.md`](docs/WHAT_WE_FOUND.md)).
+
+I need to get financially stable to keep doing this full time. Ten thousand dollars clears
+my debts and buys the room to focus. I'm not asking for charity; I'm asking people who can
+check the work — the command is at the top of this page — to back it directly. Nothing here
+claims a profit edge or promises a return; it claims what a reader can verify.
+
 ## Suite coverage
 
 **64 suites · 1,826 checks · 0 failed**, win32, 2026-08-31 <!--TOTALS-->
