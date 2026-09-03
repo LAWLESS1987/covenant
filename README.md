@@ -4,8 +4,8 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `8f219285f268` · 10,924 lines · **65 suites, 1,883 checks, 0 failed** on win32 <!--TOTALS-->
-Totals re-measured 2026-09-02 by `covenant_one.py --all`; version, hash and
+**v8.40** · source `8f219285f268` · 10,924 lines · **66 suites, 1,913 checks, 0 failed** on win32 <!--TOTALS-->
+Totals re-measured 2026-09-03 by `covenant_one.py --all`; version, hash and
 line count re-verified 2026-08-30 against a live restarted chain. What
 that number does and does not cover is in [Suite coverage](#suite-coverage), and it is
 worth reading before quoting it.
@@ -110,8 +110,8 @@ several systems, each holds a fragment and each will confidently complete it.
 It also documents why models appear to agree across vendors and months (stored
 memory retains your claims and discards their corrections), why demanding
 honesty produces compliance while supplying a checkable contradiction does not,
-and why fluency can never distinguish a sound claim from a generated one. Four
-claims that did **not** survive checking are recorded alongside those that did.
+and why fluency can never distinguish a sound claim from a generated one. Two
+claims of the author's that did **not** survive checking are recorded alongside those that did.
 
 No names, no personal data, nothing that requires trusting the author.
 
@@ -242,7 +242,7 @@ claims a profit edge or promises a return; it claims what a reader can verify.
 
 ## Suite coverage
 
-**65 suites · 1,883 checks · 0 failed**, win32, 2026-09-02 <!--TOTALS-->
+**66 suites · 1,913 checks · 0 failed**, win32, 2026-09-03 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.

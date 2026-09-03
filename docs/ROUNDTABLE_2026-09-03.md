@@ -155,8 +155,10 @@ a judge's account of the repository is never used as evidence about the reposito
   `readme_totals.py` reads the newest sweep transcript and rewrites every line marked
   `<!--TOTALS-->`; the marked lines say 65 suites, 1,883 checks, 0 failed, win32,
   2026-09-02, and the support paragraph no longer quotes a second, undated number.
-- "Four claims that did not survive checking" became "two", in the README and in
-  `docs/OUTREACH.md`, because section 7 of WHAT_WE_FOUND writes out two.
+- "Four claims that did not survive checking" became "two", in the README (two
+  places), `CONTRIBUTING.md` and `docs/OUTREACH.md`, because section 7 of WHAT_WE_FOUND
+  writes out two. The first pass missed two of the four places; a verification pass on
+  the case study found them.
 - `covenant_roundtable_local.py` puts the same message to the local judge, so the
   covenant's own answer sits beside the others every time this is repeated.
 - The conformance root reproduction Grok asked for: done the same day. Two implementations were written from a copy of the spec file in an

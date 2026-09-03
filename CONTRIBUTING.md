@@ -30,7 +30,7 @@ Not a feature. Showing where this is wrong.
 
 The record is built to survive that. `refutable.py` implements a store in which
 a claim cannot be read without its refutations, and `docs/WHAT_WE_FOUND.md`
-records four of the author's own claims that did **not** survive checking,
+records two of the author's own claims that did **not** survive checking,
 alongside those that did. Nothing here is defended because it is his.
 
 If a finding does not reproduce, say so and how. If the reasoning in

@@ -76,13 +76,13 @@
 <script src="vendor/three.min.js"></script>
 <script>
 const DATA = {
- "generated_utc": "2026-08-31T07:06:40Z",
- "generated_local": "Mon 31 Aug 03:06:40",
- "generated_epoch": 1788160000,
+ "generated_utc": "2026-09-03T10:10:47Z",
+ "generated_local": "Thu 03 Sep 06:10:47",
+ "generated_epoch": 1788430247,
  "host": "SALES",
- "free_mb": 6408,
+ "free_mb": 6065,
  "total_mb": 15679,
- "judge_model": null,
+ "judge_model": "qwen3:8b",
  "nodes": [
   {
    "id": "A",
@@ -102,10 +102,12 @@ const DATA = {
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 370,
+   "tip_gossip_seen": 2,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [],
-   "anomalies": 23,
+   "anomaly_kinds": [
+    "peer_message_error"
+   ],
+   "anomalies": 1,
    "spike": false,
    "subsystems": {
     "brainflow": false,
@@ -137,10 +139,12 @@ const DATA = {
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 740,
+   "tip_gossip_seen": 4,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [],
-   "anomalies": 41,
+   "anomaly_kinds": [
+    "peer_message_error"
+   ],
+   "anomalies": 1,
    "spike": false,
    "subsystems": {
     "brainflow": false,
@@ -171,10 +175,10 @@ const DATA = {
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 370,
+   "tip_gossip_seen": 2,
    "peer_ahead_seen": 0,
    "anomaly_kinds": [],
-   "anomalies": 15,
+   "anomalies": 0,
    "spike": false,
    "subsystems": {
     "brainflow": false,
@@ -190,13 +194,15 @@ const DATA = {
  ],
  "links": [],
  "watchdog": {
-  "last": null,
-  "ok": null,
+  "last": "2026-09-03T10:10:11Z",
+  "ok": false,
   "ticks": 0,
   "founder": null,
   "nodeb": null,
   "agree": null,
-  "alerts": []
+  "alerts": [
+   "node C: only 4729 MB of memory available against a judge model needing 4983 MB (ollama) -- the model will load by paging, and the judge sits inside co"
+  ]
  },
  "converged": true
 };
