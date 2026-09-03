@@ -26,6 +26,12 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+  # 2026-09-02: the sweep also runs on GitHub's runners every day at 09:30 UTC,
+  # so the tree is re-verified even when the laptop that lands it is asleep.
+  # A scheduled run measures the SAME source (main) on ubuntu; it is evidence
+  # about that platform, not about the Windows box (M29) -- G12 stays local.
+  schedule:
+    - cron: "30 9 * * *"
 
 permissions:
   contents: read
