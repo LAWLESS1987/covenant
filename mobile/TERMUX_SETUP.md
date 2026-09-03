@@ -17,7 +17,9 @@ node (its dashboard in Safari over Tailscale) and cannot carry a judge. This pag
   and Termux:Boot (start at boot), also from F-Droid.
 - Your PC node reachable from the phone: same Wi-Fi, or Tailscale on both. The PC node A
   listens for peers on port 5001 (API port 5000 plus one); Windows Firewall must allow
-  inbound TCP 5001 for python.
+  inbound TCP 5001. On the PC, once, in an administrator PowerShell:
+  `New-NetFirewallRule -DisplayName "covenant peer 5001" -Direction Inbound -Protocol TCP -LocalPort 5001 -Action Allow`
+  (a security setting; you run it, not the assistant).
 
 ## Install (once, about fifteen minutes on Wi-Fi; the model is the big download)
 
@@ -43,6 +45,12 @@ judge tries Ollama's `/api/chat` first and falls back to `/v1/chat/completions` 
 | PC | `qwen3:8b` (the digest the nodes have always pinned) | about 5 GB | the reference judge |
 | phone, 8 GB | `qwen3:4b` | about 3 GB | close to the PC's verdicts in the alignment set; slower |
 | phone, 6 GB | `qwen3:1.7b` | about 1.5 GB | a weaker gate: it still fails CLOSED when it cannot decide, but its verdicts are coarser |
+| phone, 12 GB (Galaxy S25+) | `qwen3:8b` | about 5 GB | the same model and digest as the PC: the same gate, a few times slower on a phone CPU; `qwen3:4b` if you want verdicts in seconds rather than a minute |
+
+For a Galaxy S25+ (12 GB), start with `JUDGE_MODEL=qwen3:4b sh mobile/covenant_phone.sh` and
+move to `qwen3:8b` once it runs clean; Samsung's One UI puts background apps to "deep sleep",
+so add Termux to Settings > Battery > Never sleeping apps, or the node stops when the
+screen does.
 
 The gate's promise does not change with the model: no reachable judge, or no verdict, means
 every transaction is rejected. What changes is the quality of the verdicts, and the phone
