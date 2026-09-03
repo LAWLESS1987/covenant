@@ -1,0 +1,39 @@
+COVENANT
+Copyright 2026 Lawrence Adam Moskowski
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+WHY THIS ONE, recorded because the choice is load-bearing rather than clerical.
+
+  The ask this project makes of a stranger is: REIMPLEMENT THIS AND SEE WHETHER
+  YOU GET THE SAME ROOT. Apache-2.0 grants patent rights explicitly, and a
+  standards body evaluating a mechanism for reimplementation reads MIT's silence
+  on patents as an unpriced risk. Its requirement that changed files be marked
+  is also, in a different medium, what conformance already does.
+
+  AGPL-3.0 was the closer philosophical fit -- every node's ethics gate readable
+  by the people it judges -- and was rejected because it would have made this
+  repository's own documents false. Every outreach draft promises that forking
+  needs no permission and creates no obligation in either direction, and
+  GOVERNANCE.md VI promises a sovereign fork under its own law. Copyleft creates
+  an obligation. The promise was made in writing before the licence was chosen,
+  so the licence was chosen to keep it.
+
+  Until 2026-08-31 this file read LICENCE NOT YET CHOSEN, which under the Berne
+  Convention means all rights reserved -- while six documents described the work
+  as public domain and every letter asked a reader to clone it and run it. That
+  contradiction was found by adversarial review of the OUTREACH, not by reading
+  the licence, and it would have been found first by whoever opened this file
+  before running anything.
+
+SEPARATELY, AND NOT COVERED BY THIS LICENCE: realdata/ holds market data fetched
+from Kraken's public API. Its redistribution is governed by Kraken's terms, not
+by anything chosen here. Recorded in docs/IMPROVEMENT_LOG.md and unresolved.
+
+--------------------------------------------------------------------------------
+
+
