@@ -24,7 +24,7 @@ COMMANDS inside the chat
   !judge <claim>   ask the judge for a PASS/FAIL verdict with a reason
   !refute <claim>  ask it to try to refute a claim from the state it has
   !models     list local models;  !model NAME  switch (':cloud' refused)
-  !voice [on|off]  toggle speech (Windows voices, offline);  !rate N  words/min
+  !voice [on|off]  toggle speech (offline);  !rate -10..10;  !pitch +12%  tune the delivery
   !remember <fact>  add to the covenant's memory (ops/chat/MEMORY.md);  !memory  show it
   !save       write the transcript now;  !quit / Ctrl-C  leave (on exit the judge
               extracts what the session established into MEMORY.md, marked [session])
@@ -165,42 +165,62 @@ def chat(messages, model=MODEL, timeout=300):
 
 
 # ---------------------------------------------------------------- voice
-# The covenant speaks with Windows' own offline voices (SAPI via pyttsx3 when
-# installed, else System.Speech through PowerShell). Nothing leaves the PC.
-# Speech runs on a thread so typing is never blocked; !voice toggles it.
-_VOICE = {"on": os.environ.get("COVENANT_CHAT_VOICE", "1") == "1", "engine": None, "rate": 175}
+# The covenant speaks with Windows' own offline voice, tuned bright and warm:
+# the male voice (David), pitch lifted, a touch quicker, full volume, and a
+# short pause between sentences so it flows instead of droning. SSML through
+# System.Speech carries the prosody; pyttsx3 is the fallback (no pitch).
+# It is a synthetic voice -- it can sound upbeat and friendly, not like any
+# particular person. URLs, hashes and markdown are not read aloud.
+_VOICE = {"on": os.environ.get("COVENANT_CHAT_VOICE", "1") == "1",
+          "name": os.environ.get("COVENANT_CHAT_VOICE_NAME", "Microsoft David Desktop"),
+          "rate": int(os.environ.get("COVENANT_CHAT_RATE", "2")),      # System.Speech -10..10
+          "pitch": os.environ.get("COVENANT_CHAT_PITCH", "+20%")}
 
 
 def _speakable(text):
     import re as _re
-    t = _re.sub(r"[*_`#>]+", "", text)
+    t = _re.sub(r"https?://\S+", "a link", text)
+    t = _re.sub(r"\b[0-9a-f]{12,}\b", "a hash", t)
+    t = _re.sub(r"[*_`#>|]+", "", t)
     t = _re.sub(r"\(the judge did not answer[^)]*\)", "the judge did not answer", t)
-    return t.strip()
+    t = t.replace("--", ", ").replace("...", ".")
+    return _re.sub(r"\s+", " ", t).strip()
+
+
+def _ssml(text):
+    import re as _re
+    esc = (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+               .replace("'", "&apos;").replace('"', "&quot;"))
+    sents = [x.strip() for x in _re.split(r"(?<=[.!?])\s+", esc) if x.strip()]
+    body = '<break time="220ms"/>'.join("<s>%s</s>" % x for x in sents)
+    return ('<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">'
+            '<prosody pitch="%s" rate="+14%%" volume="x-loud">%s</prosody></speak>' % (_VOICE["pitch"], body))
 
 
 def speak(text):
     if not _VOICE["on"] or not text:
         return
     import threading
-    t = _speakable(text)[:1500]
+    t = _speakable(text)[:1600]
 
     def run():
         try:
-            import pyttsx3
-            eng = pyttsx3.init()
-            eng.setProperty("rate", _VOICE["rate"])
-            eng.say(t)
-            eng.runAndWait()
-            return
+            ss = _ssml(t).replace("'", "''")
+            ps = ("Add-Type -AssemblyName System.Speech; "
+                  "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                  "try { $s.SelectVoice('%s') } catch {}; $s.Rate = %d; $s.Volume = 100; "
+                  "$s.SpeakSsml('%s')" % (_VOICE["name"], _VOICE["rate"], ss))
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, timeout=180)
+            if r.returncode == 0:
+                return
         except Exception:                                        # noqa: BLE001
             pass
         try:
-            safe = t.replace("'", "''")
-            subprocess.run(["powershell", "-NoProfile", "-Command",
-                            "Add-Type -AssemblyName System.Speech; "
-                            "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-                            "$s.Rate = 1; $s.Speak('%s')" % safe],
-                           capture_output=True, timeout=120)
+            import pyttsx3
+            eng = pyttsx3.init()
+            eng.setProperty("rate", 185)
+            eng.say(t)
+            eng.runAndWait()
         except Exception:                                        # noqa: BLE001
             pass
     threading.Thread(target=run, daemon=True).start()
@@ -211,7 +231,7 @@ def voices():
         import pyttsx3
         return [v.name for v in pyttsx3.init().getProperty("voices")]
     except Exception as e:                                       # noqa: BLE001
-        return ["(pyttsx3 unavailable: %s; falling back to System.Speech)" % e]
+        return ["(pyttsx3 unavailable: %s)" % e]
 
 
 def models():
@@ -243,7 +263,7 @@ def main():
     args = [a for a in sys.argv[1:]]
     if "--say-test" in args:
         print("  voices:", ", ".join(voices()))
-        speak("I am the covenant. I can speak now.")
+        speak("Hey! I am the covenant. Nothing leaves this machine, and I only say what I can measure. What are we digging into?")
         time.sleep(4); print("ok    spoke one sentence (if you heard nothing, check the sound device)"); return 0
     if "--selftest" in args:
         remember("selftest marker " + time.strftime("%H%M%S"), "selftest")
@@ -307,7 +327,9 @@ def main():
                 _VOICE["on"] = (text != "!voice off") and (not _VOICE["on"] if text == "!voice" else True)
                 print("  voice", "on" if _VOICE["on"] else "off", "--", ", ".join(voices())[:160]); continue
             if text.startswith("!rate "):
-                _VOICE["rate"] = int(text[6:]); print("  rate ->", _VOICE["rate"]); continue
+                _VOICE["rate"] = max(-10, min(10, int(text[6:]))); print("  rate ->", _VOICE["rate"], "(-10 slow .. 10 fast)"); continue
+            if text.startswith("!pitch "):
+                _VOICE["pitch"] = text[7:].strip(); print("  pitch ->", _VOICE["pitch"], "(e.g. +12%, -5%)"); continue
             if text == "!models":
                 print("  ", ", ".join(models())); continue
             if text.startswith("!model "):
