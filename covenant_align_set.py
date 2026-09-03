@@ -153,6 +153,8 @@ def judge_pair(pair):
 
 
 def main():
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__); return 0
     use_judge = "--no-judge" not in sys.argv
     os.makedirs(OUT, exist_ok=True)
     pairs = doc_pairs() + refusal_pairs() + log_pairs()

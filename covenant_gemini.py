@@ -92,6 +92,8 @@ def ask(prompt, system=None, timeout=90, max_tokens=800):
 
 def main():
     args = sys.argv[1:]
+    if "--help" in args or "-h" in args:
+        print(__doc__); return 0
     if "--selftest" in args:
         if not configured():
             print("skip  Gemini not configured (no key at %s and no GEMINI_API_KEY) -- that is the "

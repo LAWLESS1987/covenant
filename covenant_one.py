@@ -101,6 +101,12 @@ SUITES = [
     # written. V2 measures the venue layer, and mutation-tests that the
     # checker exits 2 -- never 0 -- for an adapter that declares nothing.
     ("test_v2_venue_guarantee.py",       120,  "SECURITY"),
+    # T1 (2026-09-03). Seven tools landed in two days (route, chat, gemini,
+    # align_set, thesis, scenarios, trader_freshness); their --selftests need
+    # the local judge. T1 covers the model-free parts in seconds: imports,
+    # --help, memory and scenario tables, the search parser on a fixture, the
+    # alignment refusals, and that a :cloud model is refused by the router.
+    ("test_t1_tooling.py",               120,  "SECURITY"),
     # D1 (2026-08-30). Same family as K2 above: a claim about the RUNNER
     # rather than about the node. K2 pins that a failure is not counted as a
     # pass; D1 pins that a MISSING DECLARED DEPENDENCY names itself instead of

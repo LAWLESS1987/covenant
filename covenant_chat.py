@@ -481,6 +481,8 @@ class Log:
 
 def main():
     args = [a for a in sys.argv[1:]]
+    if "--help" in args or "-h" in args:
+        print(__doc__); return 0
     if "--say-test" in args:
         print("  voices:", ", ".join(voices()))
         speak("Hey! I am the covenant. Nothing leaves this machine, and I only say what I can measure. What are we digging into?")
