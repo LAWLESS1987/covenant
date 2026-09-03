@@ -162,7 +162,11 @@ def main():
                                                          and str(w.get("moved_by", "")).lower().startswith("nothing")) else ""
         lines.append("- **%s** p=%s%s%s -- %s | would move it: %s" % (s["name"], p, delta, flag,
                      str(w.get("moved_by", ""))[:220], str(w.get("would_move_it", ""))[:160]))
-    lines += ["", "Introspection:"] + ["- %s" % x[:300] for x in res.get("introspection", [])[:4]]
+    def as_text(x):   # the judge sometimes returns objects where strings were asked for
+        return x if isinstance(x, str) else json.dumps(x, ensure_ascii=False)
+    intro = [as_text(x) for x in (res.get("introspection") or [])][:4]
+    res["introspection"] = intro
+    lines += ["", "Introspection:"] + ["- %s" % x[:300] for x in intro]
     if res.get("new_variable"):
         lines.append("Proposed new variable (not added automatically): %s" % str(res["new_variable"])[:200])
     lines.append("")
@@ -173,7 +177,7 @@ def main():
     try:
         top = sorted(((s["name"], float(weights.get(s["name"], {}).get("p", 0) or 0)) for s in t["scenarios"]), key=lambda x: -x[1])[:3]
         io.open(MEMORY, "a", encoding="utf-8").write("- %s [scenario] pass: %s; introspection: %s\n"
-            % (stamp[:10], ", ".join("%s %.2f" % x for x in top), (res.get("introspection") or [""])[0][:160]))
+            % (stamp[:10], ", ".join("%s %.2f" % x for x in top), (intro or [""])[0][:160]))
     except OSError:
         pass
     # a weight that moved 0.15+ on a CITED change is a breakthrough: notate it
