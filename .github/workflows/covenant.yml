@@ -103,10 +103,19 @@ jobs:
           # diagnostic that has only ever been run against a green tree is
           # not a diagnostic.
           if [ -f ONE_RUN_ci.txt ]; then
+            # 2026-09-03: a suite that failed on Linux and passed on Windows
+            # produced one annotation -- "suites not clean 1 -> <name>" -- and
+            # nothing that said WHICH check, because a suite's own FAIL lines
+            # are indented under its transcript entry and a crash prints a
+            # Traceback, which no pattern here looked for. Now: the suite's
+            # status line, its FAIL lines at any indent, and the last lines of
+            # any traceback, so the cause is readable without the artifact.
             SUMMARY=$( { grep -E '^[[:space:]]*RESULT:' ONE_RUN_ci.txt
                          grep -E '^[[:space:]]+(checks failed|suites not clean|suites unmeasured|runner list absent|orphaned on disk|listed but NOT SHIPPED|declared deps missing)[[:space:]]+[1-9]' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]*test_[a-z0-9_]+\.py[[:space:]]+(FAIL|ERROR|CRASH|not clean|timeout)' ONE_RUN_ci.txt
                          grep -E '^[[:space:]]*(FAIL|\[FAIL\])' ONE_RUN_ci.txt
-                       } | head -30 | cut -c1-160 | tr '\n' '~' | cut -c1-3000 )
+                         grep -E '^[[:space:]]*[A-Za-z]+(Error|Exception)(:|$)|Traceback' ONE_RUN_ci.txt | tail -6
+                       } | head -40 | cut -c1-200 | tr '\n' '~' | cut -c1-3600 )
             echo "::error title=covenant_one.py --ci::${SUMMARY:-the transcript named no failure line, so the exit code came from somewhere this pattern does not look. Download the artifact.}"
           else
             echo "::error title=covenant_one.py --ci::no transcript was written -- the runner failed before or during covenant_one.py itself"

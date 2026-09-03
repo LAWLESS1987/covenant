@@ -183,7 +183,7 @@ if [ -n "$PY" ] && [ -f conformance.py ]; then
         say "      on 2026-09-03: conformance_indep/conformance_ps.ps1 and"
         say "      conformance_py.py, each written from the spec file alone"
         say "      by an AI agent forbidden to read this tree, audited for"
-        say "      that, and rerun by test_c3_independent_root.py on every"
+        say "      that, and rerun by test_n2_independent_root.py on every"
         say "      sweep. History: two earlier builds (conformance_check.*)"
         say "      reproduced the PREVIOUS root on 2026-08-31 and showed five"
         say "      WRONG readings could too, so twelve vectors were added."

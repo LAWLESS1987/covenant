@@ -144,7 +144,6 @@ SUITES = [
     # behaviour root that is blind to prose and mutation-tested against two
     # real semantic breaks. 14/14 before wiring.
     ("test_n1_conformance.py",           120,  "SECURITY"),
-    ("test_c3_independent_root.py",      300,  "SECURITY"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed
@@ -755,6 +754,13 @@ IN_PLACE = [
     # governing documents promise, compiles it, runs the money checker, and
     # requires the money documents to name every adapter venues.py holds. In
     # place for G1's reason: it is a claim about THE FOLDER's documents.
+    # N2 (2026-09-03): the conformance root reproduced by two builds that share no
+    # code with this tree (conformance_indep/). In place because the scratch copy
+    # carries neither the .ps1 build nor conformance_indep/, and because it is a
+    # claim about THE FOLDER's spec; from a scratch copy it crashed, which is how
+    # CI found it on 2026-09-03.
+    ("test_n2_independent_root.py", 300,
+     "it reads docs/CONFORMANCE_SPEC.json and conformance_indep/, which the scratch copy lacks"),
     ("test_g2_promised_commands.py", 180,
      "resolves the commands the documents promise against the FOLDER, and the "
      "scratch copy does not carry root .md files or SAFEGUARD.bat"),

@@ -9,7 +9,7 @@ Two implementations of the two operations in `docs/CONFORMANCE_SPEC.json`, writt
 | `conformance_py.py` | Python 3.12, standard library only | a second AI agent, separately, same rules | 23 / 23 match | equal to the published root |
 
 The outputs of the first runs are kept beside them (`*_output_2026-09-03.txt`).
-`test_c3_independent_root.py` reruns both against the current spec on every sweep.
+`test_n2_independent_root.py` reruns both against the current spec on every sweep.
 
 ## What "independent" means here, exactly
 

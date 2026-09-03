@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""test_c3_independent_root.py -- the conformance root, reproduced by builds that
+"""test_n2_independent_root.py -- the conformance root, reproduced by builds that
 share no code with this tree, on every sweep.
 
 check.sh's Check 3 prints the root of docs/CONFORMANCE_SPEC.json and, since it was
@@ -14,7 +14,10 @@ What it proves: the builds and the spec still agree. What it does not prove: tha
 builds are correct in the parts no vector pins (conformance_indep/README.md lists ten).
 If someone adds a vector, this suite fails until the builds agree with it -- which is
 the point; a spec that drifts from its independent builds is worse than no spec.
-Exit 0 = all checks pass; 1 = a check failed.
+Runs IN PLACE (covenant_one.py IN_PLACE), not from the scratch copy: it is a claim
+about THE FOLDER's spec and builds, and the scratch copy carries neither the .ps1
+build nor conformance_indep/ (from a scratch copy it crashed; CI found that on
+2026-09-03). Exit 0 = all checks pass; 1 = a check failed.
 """
 from __future__ import annotations
 
@@ -59,16 +62,16 @@ def main():
     spec = json.load(io.open(SPEC, encoding="utf-8"))
     published = spec["root"]
     n = len(spec["vectors"])
-    check("C3.0 spec has a 64-hex root and vectors", bool(HEX64.fullmatch(published)) and n > 0, "%s %d" % (published, n))
+    check("N2.0 spec has a 64-hex root and vectors", bool(HEX64.fullmatch(published)) and n > 0, "%s %d" % (published, n))
     for f in ("conformance_py.py", "conformance_ps.ps1", "README.md"):
-        check("C3.1 %s is in the tree" % f, os.path.exists(os.path.join(BUILDS, f)))
+        check("N2.1 %s is in the tree" % f, os.path.exists(os.path.join(BUILDS, f)))
 
     # independence, cheaply: neither build names a covenant module or leaves its directory
     for f in ("conformance_py.py", "conformance_ps.ps1"):
         src = io.open(os.path.join(BUILDS, f), encoding="utf-8", errors="replace").read()
         code = "\n".join(l for l in src.splitlines() if not l.strip().startswith(("#", "//", "<#")))
         bad = re.findall(r"(?i)covenant_[a-z0-9_]+|conformance\.py|import-module|sys\.path|Lawre", code)
-        check("C3.2 %s references no covenant module and no path outside itself" % f, not bad, ", ".join(bad[:4]))
+        check("N2.2 %s references no covenant module and no path outside itself" % f, not bad, ", ".join(bad[:4]))
 
     tmp = tempfile.mkdtemp(prefix="c3_indep_")
     try:
@@ -78,26 +81,26 @@ def main():
 
         rc, out = run([sys.executable, os.path.join(tmp, "conformance_py.py")], tmp)
         roots = roots_in(out, "py")
-        check("C3.3 python build exits 0", rc == 0, out)
-        check("C3.4 python build prints a root over its own outputs", bool(roots), out)
-        check("C3.5 python build's root equals the published root", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
+        check("N2.3 python build exits 0", rc == 0, out)
+        check("N2.4 python build prints a root over its own outputs", bool(roots), out)
+        check("N2.5 python build's root equals the published root", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
         m = re.search(r"(\d+)\s*/\s*(\d+)", out)
-        check("C3.6 python build matched every vector (%d)" % n, bool(m) and m.group(1) == m.group(2) == str(n), m.group(0) if m else out[-200:])
+        check("N2.6 python build matched every vector (%d)" % n, bool(m) and m.group(1) == m.group(2) == str(n), m.group(0) if m else out[-200:])
 
         if sys.platform == "win32" and shutil.which("powershell"):
             rc, out = run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(tmp, "conformance_ps.ps1")], tmp, timeout=300)
             roots = roots_in(out, "ps")
-            check("C3.7 powershell build ran", rc == 0, out)
-            check("C3.8 powershell build's root equals the published root", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
+            check("N2.7 powershell build ran", rc == 0, out)
+            check("N2.8 powershell build's root equals the published root", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
             m = re.search(r"(\d+)\s*/\s*(\d+)", out)
-            check("C3.9 powershell build matched every vector (%d)" % n, bool(m) and m.group(1) == m.group(2) == str(n), m.group(0) if m else out[-200:])
+            check("N2.9 powershell build matched every vector (%d)" % n, bool(m) and m.group(1) == m.group(2) == str(n), m.group(0) if m else out[-200:])
         else:
-            print("skip  C3.7-9 powershell build (not win32 or no powershell) -- unchecked here, not claimed")
+            print("skip  N2.7-9 powershell build (not win32 or no powershell) -- unchecked here, not claimed")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
     passed, total = sum(results), len(results)
-    print("\nC3: %d/%d passed" % (passed, total))
+    print("\nN2: %d/%d passed" % (passed, total))
     return 0 if passed == total else 1
 
 

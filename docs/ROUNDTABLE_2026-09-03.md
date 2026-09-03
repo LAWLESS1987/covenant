@@ -164,7 +164,7 @@ a judge's account of the repository is never used as evidence about the reposito
   forbidden to read this tree; a third agent audited both for any reference to the
   repository and re-ran them. Both reproduce the published root over all 23 vectors.
   They live in `conformance_indep/`, with their provenance, the auditor's evidence, and
-  ten points the vectors do not pin; `test_c3_independent_root.py` reruns them on every
+  ten points the vectors do not pin; `test_n2_independent_root.py` reruns them on every
   sweep. The implementers were AI systems under instructions, not strangers: they had not
   seen the tree, and the audit shows they did not read it, which is the property the
   claim needs. A human implementation is still open.
