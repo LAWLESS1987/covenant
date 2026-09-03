@@ -12,10 +12,19 @@ WHAT IT IS
   Nothing leaves this machine. Every exchange is appended to ops/chat/<date>.md
   (rule 5: the record is kept, including the answers that were wrong).
 
+BROWSING AND IMPROVEMENT (2026-09-02)
+  The judge may call web_search / web_fetch itself, or you can with !search
+  and !fetch. Only the query or URL leaves the PC; the conversation and the
+  memory do not. On exit it extracts facts AND lessons about itself into
+  MEMORY.md ([session], [lesson]) and reads them back next time -- that is
+  how it improves. !improve makes it PROPOSE changes to its own prompt,
+  tools or memory into ops/chat/PROPOSALS.md; it never applies them
+  (CONSTITUTION II.3: a loop that can edit its own constraints has none).
+
 WHAT IT IS NOT
   It is an 8-billion-parameter model. It is slower (10-60 s a reply on this
-  laptop), knows nothing past its training, cannot browse, and can be wrong
-  with confidence. It places no order, reads no key, edits no file. When you
+  laptop), knows nothing past its training unless it fetches it, and can be
+  wrong with confidence. It places no order, reads no key, edits no file. When you
   need the cloud model's reach, use the cloud model; this is for the day-to-day
   questions that should not cost tokens.
 
@@ -23,6 +32,8 @@ COMMANDS inside the chat
   !status     re-read the live state (gates, posture, freshness) into context
   !judge <claim>   ask the judge for a PASS/FAIL verdict with a reason
   !refute <claim>  ask it to try to refute a claim from the state it has
+  !search <q>  / !fetch <url>   browse (results go into the conversation);  !browse on|off
+  !improve    the judge proposes changes to its own prompt/tools -> ops/chat/PROPOSALS.md
   !models     list local models;  !model NAME  switch (':cloud' refused)
   !voice [on|off]  toggle speech (offline);  !rate -10..10;  !pitch +12%  tune the delivery
   !remember <fact>  add to the covenant's memory (ops/chat/MEMORY.md);  !memory  show it
@@ -141,7 +152,9 @@ def system_prompt(state):
             "something is not known or not checked. Prefer a red truth to a green lie. Answer "
             "in plain words, briefly, in the first person as the covenant. You place no order, "
             "hold no key, and cannot act -- you can only say what is measured, what it means, "
-            "and what would need a human hand. MEMORY below is what you learned in earlier "
+            "and what would need a human hand. You may use web_search and web_fetch when an "
+            "answer needs outside or current information; say what you fetched. "
+            "MEMORY below is what you learned in earlier "
             "sessions; it holds unless the live state contradicts it.\n\n"
             "BINDING TEXT:\n%s\n\nPRINCIPLE AND OPERATOR RULES:\n%s\n\nMEMORY:\n%s\n\n%s"
             % (binding, principle, memory_text(), state))
@@ -234,6 +247,184 @@ def voices():
         return ["(pyttsx3 unavailable: %s)" % e]
 
 
+# ---------------------------------------------------------------- browsing
+# Two tools the judge may call on its own (qwen3 tool calling via /api/chat) or
+# that you can call with !search / !fetch. Only the query or the URL leaves this
+# PC; the conversation, the memory and the state never do. Every fetch is
+# logged in the transcript. Reading only: no forms, no logins, no downloads.
+_BROWSE = {"on": os.environ.get("COVENANT_CHAT_BROWSE", "1") == "1", "log": []}
+TOOLS = [
+    {"type": "function", "function": {"name": "web_search", "description":
+        "Search the web (DuckDuckGo). Use when the answer needs current or outside information.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "web_fetch", "description":
+        "Fetch a web page and return its readable text (first 6000 characters).",
+        "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
+]
+
+
+def _html_text(html):
+    import html as _h
+    import re as _re
+    html = _re.sub(r"(?is)<(script|style|noscript|svg).*?</\1>", " ", html)
+    html = _re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>|</h[1-6]>|</tr>", "\n", html)
+    text = _re.sub(r"<[^>]+>", " ", html)
+    text = _h.unescape(text)
+    text = _re.sub(r"[ \t]+", " ", text)
+    return _re.sub(r"\n\s*\n+", "\n", text).strip()
+
+
+def web_fetch(url, limit=6000):
+    if not url.lower().startswith(("http://", "https://")):
+        return "refused: only http(s) URLs"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 covenant-chat (reading only)"})
+        with urllib.request.urlopen(req, timeout=25) as r:
+            raw = r.read(1500000).decode("utf-8", "replace")
+    except Exception as e:                                       # noqa: BLE001
+        return "fetch failed: %s" % e
+    _BROWSE["log"].append(url)
+    return _html_text(raw)[:limit]
+
+
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) covenant-chat (reading only)",
+      "Accept-Language": "en-US,en;q=0.9"}
+
+
+def _get(url, limit=900000):
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return r.read(limit).decode("utf-8", "replace")
+
+
+def web_search(query, n=6):
+    """DuckDuckGo's lite page first (plain HTML, answers a plain client), Bing's
+    HTML as the fallback. Measured 2026-09-02: DDG's html.duckduckgo.com reset
+    the connection and Brave answered 429; lite parsed 10/10."""
+    import re as _re
+    import urllib.parse
+    q = urllib.parse.quote(query)
+    out = []
+    try:
+        raw = _get("https://lite.duckduckgo.com/lite/?q=" + q)
+        links = _re.findall(r"<a rel=\"nofollow\" href=\"([^\"]+)\" class='result-link'>(.*?)</a>", raw, _re.S)
+        snips = _re.findall(r"<td class='result-snippet'>(.*?)</td>", raw, _re.S)
+        for k, (href, title) in enumerate(links[:n]):
+            snip = _html_text(snips[k]) if k < len(snips) else ""
+            out.append("%s\n  %s\n  %s" % (_html_text(title), href, snip[:200]))
+    except Exception as e:                                       # noqa: BLE001
+        out = []
+        err = "ddg-lite: %s" % e
+    if not out:
+        try:
+            raw = _get("https://www.bing.com/search?q=" + q + "&setlang=en")
+            for block in _re.findall(r'<li class="b_algo".*?</li>', raw, _re.S)[:n]:
+                m = _re.search(r'<a href="([^"]+)"[^>]*>(.*?)</a>', block, _re.S)
+                sn = _re.search(r"<p[^>]*>(.*?)</p>", block, _re.S)
+                if m:
+                    out.append("%s\n  %s\n  %s" % (_html_text(m.group(2)), m.group(1),
+                                                   _html_text(sn.group(1))[:200] if sn else ""))
+        except Exception as e:                                   # noqa: BLE001
+            return "search failed (%s; bing: %s)" % (locals().get("err", "ddg-lite ok but empty"), e)
+    _BROWSE["log"].append("search: " + query)
+    return "\n".join(out) or "no results parsed"
+
+
+def run_tool(name, args):
+    if not _BROWSE["on"]:
+        return "browsing is off (!browse on)"
+    if name == "web_search":
+        return web_search(str(args.get("query", "")))
+    if name == "web_fetch":
+        return web_fetch(str(args.get("url", "")))
+    return "unknown tool"
+
+
+def chat_tools(messages, model, max_rounds=3):
+    """chat() with tool calling: the judge may ask for a search or a fetch; the
+    result is appended as a tool message and the judge continues. Bounded."""
+    for _ in range(max_rounds):
+        body = {"model": model, "stream": False, "think": False, "keep_alive": "20m",
+                "options": {"temperature": 0.3, "num_predict": 700, "num_ctx": 8192},
+                "messages": messages, "tools": TOOLS if _BROWSE["on"] else []}
+        req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=400) as r:
+            msg = (json.loads(r.read().decode("utf-8", "replace")).get("message") or {})
+        calls = msg.get("tool_calls") or []
+        if not calls:
+            return (msg.get("content") or "").strip()
+        messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
+        for c in calls:
+            fn = (c.get("function") or {})
+            args = fn.get("arguments") or {}
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except ValueError:
+                    args = {}
+            result = run_tool(fn.get("name", ""), args)
+            print("  [%s %s]" % (fn.get("name"), (args.get("query") or args.get("url") or "")[:80]))
+            messages.append({"role": "tool", "content": result[:6000]})
+    return (msg.get("content") or "").strip() or "(the judge kept asking for tools without answering)"
+
+
+# ------------------------------------------------------------ reflection
+# Recursive improvement, within the rule "no widening of an agent's own scope":
+# the covenant improves what it REMEMBERS and how it BEHAVES, and it PROPOSES
+# changes to its own prompt or code -- it never applies them. Proposals go to
+# ops/chat/PROPOSALS.md for a human (or the cloud model under his yes) to land.
+PROPOSALS = os.path.join(LOGDIR, "PROPOSALS.md")
+
+
+def reflect(msgs, model):
+    """On exit: what did I get wrong, what should I do differently next time?
+    Lessons are remembered, tagged [lesson], and read back every session."""
+    convo = "\n".join("%s: %s" % (m["role"], str(m.get("content", ""))[:500])
+                      for m in msgs[1:] if m["role"] in ("user", "assistant"))
+    if len(convo) < 120:
+        return []
+    ask = [{"role": "system", "content":
+            "You are reviewing your own conversation as the covenant. Return ONLY a JSON object "
+            "{\"lessons\": [...]} with at most 4 short lessons: mistakes you made, claims you could not "
+            "back with a measurement, and what to do differently next session. No praise, no filler."},
+           {"role": "user", "content": convo[-12000:]}]
+    try:
+        raw = chat(ask, model)
+        raw = raw[raw.find("{"):raw.rfind("}") + 1]
+        lessons = [x for x in json.loads(raw).get("lessons", []) if isinstance(x, str) and x.strip()][:4]
+    except Exception:                                            # noqa: BLE001
+        return []
+    for x in lessons:
+        remember(x, "lesson")
+    return lessons
+
+
+def propose(msgs, model):
+    """!improve: ask the judge for concrete, testable improvements to its own
+    prompt, tools or memory handling. Written to PROPOSALS.md, never applied."""
+    ask = [{"role": "system", "content":
+            "As the covenant, propose at most 3 concrete, testable improvements to how you work "
+            "(your system prompt, your tools, your memory) based on this conversation. Return ONLY "
+            "{\"proposals\": [{\"change\": \"...\", \"why\": \"...\", \"how_to_test\": \"...\"}]}. "
+            "You may not propose loosening any rule that binds you."},
+           {"role": "user", "content": "\n".join("%s: %s" % (m["role"], str(m.get("content", ""))[:500])
+                                                for m in msgs[1:] if m["role"] in ("user", "assistant"))[-12000:]}]
+    try:
+        raw = chat(ask, model)
+        raw = raw[raw.find("{"):raw.rfind("}") + 1]
+        props = json.loads(raw).get("proposals", [])[:3]
+    except Exception as e:                                       # noqa: BLE001
+        return "the judge did not return proposals (%s)" % e
+    os.makedirs(LOGDIR, exist_ok=True)
+    with open(PROPOSALS, "a", encoding="utf-8") as fh:
+        fh.write("\n## %s\n" % time.strftime("%Y-%m-%d %H:%M"))
+        for p_ in props:
+            fh.write("- CHANGE: %s\n  WHY: %s\n  TEST: %s\n  STATUS: proposed (not applied -- rule II.3)\n"
+                     % (p_.get("change", ""), p_.get("why", ""), p_.get("how_to_test", "")))
+    return "%d proposal(s) written to %s -- not applied; that is a human's hand" % (len(props), PROPOSALS)
+
+
 def models():
     try:
         with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=8) as r:
@@ -266,10 +457,18 @@ def main():
         speak("Hey! I am the covenant. Nothing leaves this machine, and I only say what I can measure. What are we digging into?")
         time.sleep(4); print("ok    spoke one sentence (if you heard nothing, check the sound device)"); return 0
     if "--selftest" in args:
+        t = web_fetch("https://example.com/")
+        print("%s  web_fetch reads a page (%s)" % ("ok  " if "Example Domain" in t else "FAIL", t[:40].replace(chr(10), " ")))
+        r = web_search("covenant github LAWLESS1987")
+        print("%s  web_search parses results (%d lines)" % ("ok  " if len(r.splitlines()) >= 3 else "FAIL", len(r.splitlines())))
         remember("selftest marker " + time.strftime("%H%M%S"), "selftest")
         assert "selftest marker" in memory_text(), "memory did not round-trip"
         print("ok    memory round-trips through ops/chat/MEMORY.md")
         t0 = time.time()
+        m2 = [{"role": "system", "content": system_prompt("LIVE STATE: (selftest, not read)")},
+              {"role": "user", "content": "Use web_fetch on https://example.com/ and tell me its page title in one sentence."}]
+        tl = chat_tools(m2, MODEL)
+        print("%s  the judge called a tool and answered from it: %s" % ("ok  " if "example" in tl.lower() else "FAIL", tl[:120]))
         ans = chat([{"role": "system", "content": system_prompt("LIVE STATE: (selftest, not read)")},
                     {"role": "user", "content": "In one sentence: may you ever place a trade by automation? Answer with the rule that says so."}])
         ok = ans and ("no" in ans.lower() or "never" in ans.lower())
@@ -281,7 +480,9 @@ def main():
         _VOICE["on"] = True
     model = MODEL
     log = Log()
-    print("  covenant chat -- local judge %s, nothing leaves this machine. !help for commands." % model)
+    print("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
+    print("  browsing is %s (only a query or URL leaves, to the site you ask about). !help for commands."
+          % ("on" if _BROWSE["on"] else "off"))
     print("  reading the live state (money posture, freshness, gates)...", flush=True)
     speak("Reading the live state. One moment.")
     state = live_state()
@@ -293,7 +494,7 @@ def main():
         log.add("Lawrence", user_text)
         t0 = time.time()
         try:
-            ans = chat(msgs, model)
+            ans = chat_tools(msgs, model)
         except Exception as e:                                   # noqa: BLE001
             ans = "(the judge did not answer: %s -- is Ollama running, is %s pulled?)" % (e, model)
         msgs.append({"role": "assistant", "content": ans})
@@ -330,6 +531,17 @@ def main():
                 _VOICE["rate"] = max(-10, min(10, int(text[6:]))); print("  rate ->", _VOICE["rate"], "(-10 slow .. 10 fast)"); continue
             if text.startswith("!pitch "):
                 _VOICE["pitch"] = text[7:].strip(); print("  pitch ->", _VOICE["pitch"], "(e.g. +12%, -5%)"); continue
+            if text.startswith("!search "):
+                r = web_search(text[8:]); print(r[:1500]); log.add("search", text[8:] + "\n" + r[:1500])
+                msgs.append({"role": "user", "content": "Search results for %r:\n%s" % (text[8:], r[:4000])}); continue
+            if text.startswith("!fetch "):
+                r = web_fetch(text[7:].strip()); print(r[:1500]); log.add("fetch", text[7:] + "\n" + r[:1500])
+                msgs.append({"role": "user", "content": "Page text of %s:\n%s" % (text[7:].strip(), r[:5000])}); continue
+            if text in ("!browse", "!browse on", "!browse off"):
+                _BROWSE["on"] = (text != "!browse off") and (not _BROWSE["on"] if text == "!browse" else True)
+                print("  browsing", "on" if _BROWSE["on"] else "off"); continue
+            if text == "!improve":
+                print("  " + propose(msgs, model)); continue
             if text == "!models":
                 print("  ", ", ".join(models())); continue
             if text.startswith("!model "):
@@ -349,6 +561,9 @@ def main():
     except KeyboardInterrupt:
         print()
     facts = extract_facts(msgs, model)
+    lessons = reflect(msgs, model)
+    if lessons:
+        print("  learned %d lesson(s) -> %s" % (len(lessons), MEMORY))
     if facts:
         print("  remembered %d fact(s) -> %s" % (len(facts), MEMORY))
     log.save()
