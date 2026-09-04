@@ -28,11 +28,12 @@ HOW IT AUTHENTICATES
 
 LATENCY
   A hosted runner boots, installs Ollama and pulls the model before it can
-  think: expect 2-5 minutes per call cold, less when the model cache hits.
+  think: measured 2026-09-04 with qwen3:4b, 107 s cold and 94 s with the model
+  cached (45 s of that is the runner installing Ollama); the answer itself ~19 s.
   This is a fallback for bounded questions, not a chat you sit in front of.
 
 USE
-  python covenant_github_judge.py --prompt "..." [--model qwen3:4b] [--json]
+  python covenant_github_judge.py --prompt "..." [--model qwen2.5:3b] [--json]
   python covenant_github_judge.py --prompt-file q.txt --system-file s.txt
   python covenant_github_judge.py --selftest
   from covenant_github_judge import ask, available
@@ -57,7 +58,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 API = "https://api.github.com"
 WORKFLOW = "judge.yml"
-DEFAULT_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen3:4b")
+DEFAULT_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:3b")   # no thinking mode; see judge.yml
 LOG = os.path.join(HERE, "ops", "judge_route.log")
 
 

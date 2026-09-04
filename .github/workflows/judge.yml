@@ -23,7 +23,7 @@ on:
       model:
         description: "Ollama model to answer with"
         required: false
-        default: "qwen3:4b"
+        default: "qwen2.5:3b"
         type: string
       prompt_b64:
         description: "base64 UTF-8: either the prompt text, or a JSON array of chat messages"
@@ -98,7 +98,7 @@ jobs:
           if os.environ["MODEL"].startswith("qwen3") and messages and messages[-1].get("role") == "user":
               messages[-1]["content"] = messages[-1]["content"].rstrip() + chr(10) + "/no_think"
           body = {"model": os.environ["MODEL"], "stream": False, "think": False,
-                  "options": {"temperature": 0, "num_predict": 900, "num_ctx": 8192},
+                  "options": {"temperature": 0, "num_predict": 1200, "num_ctx": 8192},
                   "messages": messages}
           if os.environ.get("JSON_ONLY", "false") == "true":
               body["format"] = "json"
@@ -108,7 +108,13 @@ jobs:
           with urllib.request.urlopen(req, timeout=1200) as r:
               res = json.loads(r.read().decode("utf-8", "replace"))
           import re
-          content = re.sub(r"<think>.*?</think>\s*", "", (res.get("message") or {}).get("content", ""), flags=re.S).strip()
+          content = (res.get("message") or {}).get("content", "")
+          # Two runs (2026-09-04) showed the registry's qwen3:4b reasoning in the open with no
+          # opening tag and /no_think ignored (a 2507-thinking build, not the hybrid this PC
+          # has), so the default moved to qwen2.5:3b, which has no thinking mode. Belt and
+          # braces for any model: keep only what follows the last </think>.
+          content = re.sub(r"<think>.*?</think>", "", content, flags=re.S)
+          content = content.rsplit("</think>", 1)[-1].strip()
           t_start = int(open("t_start").read())
           out = {"tag": os.environ["TAG"], "model": os.environ["MODEL"], "place": "github-actions",
                  "seconds_answer": round(time.time() - t0, 1),

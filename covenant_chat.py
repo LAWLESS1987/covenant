@@ -500,7 +500,7 @@ def chat_github(messages, model_hint):
     Actions runner. The conversation window leaves this PC. Returns the answer
     prefixed so the transcript shows where it was made."""
     import covenant_github_judge as gh
-    gm = os.environ.get("COVENANT_GITHUB_MODEL", "qwen3:4b")
+    gm = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:3b")
     print("  [Ollama is not answering -> asking the GitHub runner (%s); 2-5 minutes, this turn leaves the PC]" % gm,
           flush=True)
     window = [m for m in messages if m.get("role") in ("system", "user", "assistant")][-9:]

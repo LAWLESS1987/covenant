@@ -76,7 +76,7 @@ NUM_CTX = {"judge": 4096, "refute": 6144, "rank": 6144, "summarize": 6144}
 KEEP_ALIVE = os.environ.get("COVENANT_ROUTE_KEEP_ALIVE", "20m")
 CHUNK_CHARS = 9000            # a summarize input above this is split and reduced
 GITHUB = os.environ.get("COVENANT_ROUTE_GITHUB", "auto").lower()   # auto | off | always
-GITHUB_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen3:4b")
+GITHUB_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:3b")
 CONNECT_ERRORS = ("URLError", "ConnectionRefusedError", "ConnectionResetError", "RemoteDisconnected",
                   "TimeoutError", "timed out", "10061", "10054", "actively refused")
 
