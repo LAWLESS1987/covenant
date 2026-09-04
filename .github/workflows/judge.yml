@@ -98,7 +98,7 @@ jobs:
           if os.environ["MODEL"].startswith("qwen3") and messages and messages[-1].get("role") == "user":
               messages[-1]["content"] = messages[-1]["content"].rstrip() + chr(10) + "/no_think"
           body = {"model": os.environ["MODEL"], "stream": False, "think": False,
-                  "options": {"temperature": 0, "num_predict": 1200, "num_ctx": 8192},
+                  "options": {"temperature": 0, "num_predict": 3000, "num_ctx": 16384},
                   "messages": messages}
           if os.environ.get("JSON_ONLY", "false") == "true":
               body["format"] = "json"
