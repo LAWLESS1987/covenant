@@ -113,9 +113,13 @@ def _req(path, tok, data=None, method=None, timeout=30):
                                           "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json",
                                           "User-Agent": "covenant-github-judge"},
                                  method=method or ("POST" if data is not None else "GET"))
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        raw = r.read()
-        return r.status, (json.loads(raw.decode("utf-8", "replace")) if raw.strip() else {})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read()
+            return r.status, (json.loads(raw.decode("utf-8", "replace")) if raw.strip() else {})
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")[:300]
+        raise RuntimeError("GitHub answered HTTP %d on %s: %s" % (e.code, path.split("?")[0], body)) from None
 
 
 def _get(path, tok):
@@ -126,11 +130,12 @@ def dispatch(tok, tag, model, prompt, system="", json_only=False, ref="main"):
     inputs = {"tag": tag, "model": model,
               "prompt_b64": base64.b64encode(prompt.encode("utf-8")).decode(),
               "system_b64": base64.b64encode(system.encode("utf-8")).decode(),
-              "json_only": bool(json_only)}
+              "json_only": "true" if json_only else "false"}   # the API wants strings, even for a boolean input
     total = sum(len(str(v)) for v in inputs.values())
     if total > 65000:
         raise ValueError("inputs are %d chars; GitHub caps workflow inputs at 65,535 -- shorten the prompt" % total)
-    status, _ = _req("/repos/%s/actions/workflows/%s/dispatches" % (repo(), WORKFLOW), tok, inputs)
+    status, _ = _req("/repos/%s/actions/workflows/%s/dispatches" % (repo(), WORKFLOW), tok,
+                     {"ref": ref, "inputs": inputs})
     return status
 
 

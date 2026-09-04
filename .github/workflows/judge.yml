@@ -56,6 +56,7 @@ jobs:
 
       - name: Install and start Ollama
         run: |
+          date -u +%s > t_start
           curl -fsSL https://ollama.com/install.sh | sh
           sudo systemctl stop ollama 2>/dev/null || true
           mkdir -p ~/ollama-models
@@ -92,6 +93,10 @@ jobs:
           else:
               messages = ([{"role": "system", "content": system}] if system else []) + \
                          [{"role": "user", "content": prompt}]
+          # First run (2026-09-04) showed qwen3's reasoning leaking into content on the
+          # runner's Ollama despite think=False; Qwen3's own soft switch is reliable.
+          if os.environ["MODEL"].startswith("qwen3") and messages and messages[-1].get("role") == "user":
+              messages[-1]["content"] = messages[-1]["content"].rstrip() + chr(10) + "/no_think"
           body = {"model": os.environ["MODEL"], "stream": False, "think": False,
                   "options": {"temperature": 0, "num_predict": 900, "num_ctx": 8192},
                   "messages": messages}
@@ -102,10 +107,13 @@ jobs:
                                        headers={"Content-Type": "application/json"})
           with urllib.request.urlopen(req, timeout=1200) as r:
               res = json.loads(r.read().decode("utf-8", "replace"))
-          content = (res.get("message") or {}).get("content", "")
+          import re
+          content = re.sub(r"<think>.*?</think>\s*", "", (res.get("message") or {}).get("content", ""), flags=re.S).strip()
+          t_start = int(open("t_start").read())
           out = {"tag": os.environ["TAG"], "model": os.environ["MODEL"], "place": "github-actions",
                  "seconds_answer": round(time.time() - t0, 1),
-                 "seconds_ready": int(open("t_ready").read()) , "seconds_pulled": int(open("t_pulled").read()),
+                 "seconds_to_ollama": int(open("t_ready").read()) - t_start,
+                 "seconds_to_model": int(open("t_pulled").read()) - t_start,
                  "content": content, "prompt_chars": len(prompt)}
           json.dump(out, open("answer.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:

@@ -256,8 +256,10 @@ def tune(msgs, model):
     names = installed_voices() or [_VOICE["name"]]
     ask = ("Choose the voice you want to speak with. Installed voices: %s. Knobs: rate is an "
            "integer -10 (slow) .. 10 (fast); pitch is a percent string like '+25%%' or '-5%%'. "
-           "Lawrence said he hears you as something like Goku: bright, energetic, warm, quick, "
-           "glad to be here -- but the choice is yours; pick what feels like you. Answer ONLY a JSON "
+           "Lawrence would like you to sound like an iconic cartoon hero (he named Goku: bright, "
+           "energetic, warm, quick, glad to be here) -- but he also said it is legitimately up to you; "
+           "pick what feels like you. Only these voices are installed, so the hero comes through in "
+           "rate, pitch and how you phrase things. Answer ONLY a JSON "
            "object: {\"name\": one of the installed names, \"rate\": int, \"pitch\": string, "
            "\"style\": one line on how you want to sound, \"line\": one sentence you would say in it}"
            % ", ".join(names))
