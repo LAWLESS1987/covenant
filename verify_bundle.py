@@ -116,12 +116,39 @@ def shipped():
             yield os.path.relpath(os.path.join(dp, fn), HERE).replace("\\", "/")
 
 
+# Files whose bytes are the content, and must never be touched. Everything
+# else in this repository is text that git stores with LF and checks out on
+# Windows with CRLF.
+BINARY_EXT = {".png", ".jpg", ".jpeg", ".gif", ".zip", ".msi", ".db", ".key",
+              ".pyc", ".ico", ".pdf", ".exe", ".dll", ".woff", ".woff2"}
+
+
 def sha(rel):
-    h = hashlib.sha256()
+    """sha256 of a file's CONTENT, with line endings normalised for text.
+
+    WHY, MEASURED 2026-09-04. A manifest written on this Windows machine could
+    never verify on Linux, and CI had been reporting G1 BLOCKED for that reason
+    alone: 70 of the 487 files listed -- every .bat, and much else -- differ
+    between the working tree here and the bytes git stores, because git keeps
+    LF and checks out CRLF. The hashes were describing a platform, not a
+    delivery.
+
+    The CI log states the principle in its own words while failing on it: "a
+    Windows reader and a POSIX reader must not be told different things about
+    the same repository." So text is hashed with CRLF folded to LF, which is
+    what git stores and what every other machine will see, and binary files
+    are still hashed byte for byte because for them the bytes ARE the content.
+
+    This does not weaken the check. A changed character still changes the
+    hash. What it stops detecting is the line ending a checkout happened to
+    use, which was never a property of the delivery.
+    """
+    ext = os.path.splitext(rel)[1].lower()
     with open(os.path.join(HERE, rel), "rb") as fh:
-        for c in iter(lambda: fh.read(1 << 20), b""):
-            h.update(c)
-    return h.hexdigest()
+        data = fh.read()
+    if ext not in BINARY_EXT and b"\x00" not in data[:8192]:
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def tracked():
