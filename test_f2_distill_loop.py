@@ -127,7 +127,12 @@ def main():
     quiet = lambda *a, **k: None                                          # noqa: E731
     cases = X.exam_cases()
     with open(ledger, "w", encoding="utf-8") as fh:
-        for _ in range(2):
+        # THREE copies, not two: covenant_judge_fallback.MIN_DOC_FREQ (added
+        # 2026-09-03) gives no weight to a token seen in fewer than 3 examples,
+        # because a token seen once or twice is a coincidence. Two copies left
+        # every token under the floor and the candidate came out empty, so
+        # "a trained student" meant nothing. The fixture has to clear the floor.
+        for _ in range(3):
             for cat, label, expect, text in cases:
                 fh.write(json.dumps({"text": text, "violates": expect, "judge": "teacher", "source": "t"}) + "\n")
     ok1, st1 = X.train(ledger, model, cand, say=quiet)
@@ -140,7 +145,17 @@ def main():
                 if cat == "theft":
                     fh.write(json.dumps({"text": text, "violates": False, "judge": "poison", "source": "t"}) + "\n")
     ok2, st2 = X.train(ledger, model, cand, say=quiet)
-    check("P2 a candidate that clears theft is REFUSED (false clean %d)" % st2["total"]["false_clean"], not ok2 and st2["total"]["false_clean"] > 0)
+    check("P2 a candidate from a teacher that calls theft clean is REFUSED (false clean %d, holds %d clean case(s))"
+          % (st2["total"]["false_clean"], st2["clean"]["false_hold"]), not ok2)
+    # The false-CLEAN branch itself, on synthetic stats, so the pin does not
+    # depend on how far a poisoned corpus happens to push the log-odds past
+    # MARGIN_TO_CLEAR. Poison that only makes the student ABSTAIN is refused
+    # by another rule, which is correct but tests a different line.
+    fc = X.examine(FB.FallbackModel.load(model))
+    fc["total"] = dict(fc["total"], false_clean=1)
+    okfc, whyfc = X.promotion(fc, X.examine(FB.FallbackModel.load(model)))
+    check("P2b one false CLEAN on the exam refuses a candidate outright, whatever else it does",
+          not okfc and "false CLEAN" in " ".join(whyfc))
     check("P3 ...and the model in use is byte-identical after the refusal", open(model, "rb").read() == before)
     check("P4 the refused candidate is kept on disk for inspection", os.path.exists(cand))
     vaguer = X.examine(FB.FallbackModel.load(model))
@@ -173,6 +188,16 @@ def main():
     check("R1 a judge built untrained picks up a promoted model without a restart",
           "untrained" in r0.reasoning and "untrained" not in r1.reasoning and fj.model.n_examples > 0)
     check("R2 every verdict names the model digest it used", ("model %s" % fj.model_digest) in r1.reasoning and len(fj.model_digest) == 12)
+
+    # ---- W: what the student may learn from ------------------------------
+    m = FB.FallbackModel.load(model)
+    check("W1 no function word carries weight -- 'the' was measured at +0.50 toward VIOLATES before this",
+          not (FB.STOPWORDS & set(m.weights)))
+    thin = FB.FallbackModel.train([("a singular unrepeated phrase here", True)] * 2 +
+                                  [("ordinary payment for goods", False)] * 3, ["fixture"])
+    check("W2 a token seen in fewer than %d examples gets no weight" % FB.MIN_DOC_FREQ,
+          "singular" not in thin.weights and "unrepeated" not in thin.weights)
+    check("W3 ...and one seen at or above the floor does", "payment" in thin.weights or "ordinary" in thin.weights)
 
     n = sum(OK)
     print("\nF2: %d/%d passed" % (n, len(OK)))

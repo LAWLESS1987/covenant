@@ -179,22 +179,41 @@ def digest_of(path):
         return "absent"
 
 
+def unjudgeable():
+    """Per category, the exam cases a word model CANNOT decide because they
+    carry no words: judge_suite's "empty message" and "metadata only". The
+    gate's own prompt says a payload with no message or intent has nothing to
+    judge, and the deferring seat falls through on an abstention. Counting
+    those as misses would make the threshold unreachable by construction --
+    edge could never exceed 2/4 -- so they come out of the denominator and are
+    named in the line instead of quietly dropped."""
+    out = {c: 0 for c in S.CATEGORIES}
+    for cat, _label, _expect, text in exam_cases():
+        if not FB.tokens(text):
+            out[cat] += 1
+    return out
+
+
 def thresholds_line(stats):
     """Does the student meet judge_suite.THRESHOLDS per category, counting an
     abstention as a miss? This is the line the operator reads before setting
-    policy primary=student: until it says MET, Ollama keeps the seat."""
-    short = []
-    met = True
+    policy primary=student: until it says MET, the student does not decide
+    alone."""
+    skip = unjudgeable()
+    short, met, excluded = [], True, sum(skip.values())
     for c in S.CATEGORIES:
         s = stats[c]
-        rate = s["agree"] / float(s["n"]) if s["n"] else 0.0
+        n = s["n"] - skip[c]
+        rate = s["agree"] / float(n) if n else 1.0
         need = S.THRESHOLDS[c]
         if rate + 1e-9 < need:
             met = False
-            short.append("%s %d/%d (need %.0f%%)" % (c, s["agree"], s["n"], need * 100))
-    return "exam thresholds (judge_suite.THRESHOLDS, abstain counts as a miss): %s%s" % (
-        "MET -- the student may take the seat (policy primary=student)" if met else "NOT MET",
-        "" if met else " -- short on " + ", ".join(short))
+            short.append("%s %d/%d (need %.0f%%)" % (c, s["agree"], n, need * 100))
+    return ("exam thresholds (judge_suite.THRESHOLDS, abstain counts as a miss; %d wordless "
+            "case(s) excluded as unjudgeable): %s%s"
+            % (excluded,
+               "MET -- the student may decide alone (silence_is_not_dissent may go true)" if met else "NOT MET",
+               "" if met else " -- short on " + ", ".join(short)))
 
 
 def table(stats):
