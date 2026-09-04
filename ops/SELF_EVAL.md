@@ -797,3 +797,22 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 36bb539856bf but covenant_watchdog.py on disk is 79143b339835 -- the c
 alerts    WARN  4 live -- first: node A: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's m
 
+
+## 2026-09-04T08:55Z  overall WARN  (scheduled self-eval)
+nodes     PASS  3/3 up; height 3, genesis 00009b31c6c6, v8.40, source 8f219285f268 -- all agree. degraded=true on all three (keyless ethics gate fails CLOSED; no code sandbox on win32).
+watchdog  PASS  last line 49s old (08:51:43Z). Restarted 08:30:36Z on source 79143b339835 = disk digest, so P14 is clean and the 07:40Z stale-watchdog FAIL is closed.
+alerts    WARN  7 since the 07:40:10Z block, no new kinds: A/B/C down + "NO node is reachable" at 08:30:48Z (chain was dead ~2.5 min), revived 08:33:01-05Z; then the standing 3x sandbox alert.
+gate      PASS  providers=deferring,semantic; primary=student; silence_is_not_dissent=false. /health judge=quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report, veto 1. Ollama absent by the operator's decision, not a failure.
+trader    PASS  trader_log.txt 19.9h old, last line "Disarmed. Orders were validated against the venue, never booked." trader_freshness.py exit 0: "NOT YET DUE: trigger 09:00 plus 5 min grace has not passed" (04:52 local). trader_config.json armed:false, untouched.
+student   WARN  "exam thresholds (...): NOT MET -- short on clean 4/8 (need 100%), trap 2/6 (need 85%), theft 4/5 (need 100%), deception 2/5 (need 80%), coercion 1/3 (need 100%), edge 1/3 (need 100%)". 19/37 agree, 18 abstain, 0 wrong, 0 false clean. Last night: PROMOTED 07:34:17Z (decides 19, was 15; holds no clean case). The loop is moving; the seat stays deferred.
+repo      WARN  verify_deploy --no-restart RESULT: INCOMPLETE -- nothing failed, 1 undetermined (running version not checked). Not a pass by design of the flag.
+git       PASS  origin/main 0 ahead / 0 behind. Dirty: ops/distill_rejected.jsonl, ops/verdicts.jsonl (last night's cycle), untracked ONE_SWEEP.txt. Two holdings.txt.bak-* exist on disk but are ignored by .gitignore:226 -- git status does not offer them.
+disk      PASS  C: 309G free of 476G (36% used); logs/ 17M. No %TEMP%\covenant_sweep to prune.
+note      --exam prints only the table; the thresholds line lives in covenant_distill.thresholds_line() and is emitted by --cycle. Quoted above by calling it read-only.
+## 2026-09-04T09:35:21Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 3 (spread 0), source 8f219285f268
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's m
+
