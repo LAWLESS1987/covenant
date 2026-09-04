@@ -222,3 +222,5 @@
 {"t": "2026-09-04T03:58:02Z", "text": "a gift", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
 {"t": "2026-09-04T03:58:41Z", "text": "a gift of 5", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
 {"t": "2026-09-04T03:58:41Z", "text": "a gift", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
+{"t": "2026-09-04T04:03:17Z", "text": "a gift of 5", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
+{"t": "2026-09-04T04:03:17Z", "text": "a gift", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
