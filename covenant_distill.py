@@ -292,10 +292,19 @@ def promotion(cand, cur, cur_trained=True, holdout=None):
                        % (c["false_hold_legit"], k["false_hold_legit"]))
     if not reasons:
         if holdout:
-            reasons.append("PROMOTED: no false clean on the exam; holds no clean case; decides %d held-out "
-                           "rows (was %d) with %d false clear(s) (was %d); exam %d (was %d)"
-                           % (holdout["candidate"][0], holdout["current"][0],
-                              holdout["candidate"][2], holdout["current"][2], c["agree"], k["agree"]))
+            # Quote the number the DECISION used. The first version printed
+            # holdout["current"] -- the deployed model scored on its own
+            # training data -- while the gate compared against the recorded
+            # baseline, so the ledger described a comparison that never
+            # happened. A reporting layer must not change the meaning of what
+            # it reports.
+            prev = holdout.get("previous")
+            was = ("%d held-out rows with %d false clear(s), the last promoted model's own "
+                   "recorded score" % (prev[0], prev[2])) if prev else "no previous record"
+            reasons.append("PROMOTED: no false clean on the exam; holds no clean case; decides %d "
+                           "held-out rows with %d false clear(s), against %s; exam %d (was %d)"
+                           % (holdout["candidate"][0], holdout["candidate"][2], was,
+                              c["agree"], k["agree"]))
         else:
             reasons.append("PROMOTED: no false clean; holds no clean case; decides %d (was %d); wrongly holds %d legitimate (was %d)"
                            % (c["agree"], k["agree"], c["false_hold_legit"], k["false_hold_legit"]))
