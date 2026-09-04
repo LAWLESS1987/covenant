@@ -790,3 +790,10 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    WARN  3 live -- first: node A: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's m
 
+## 2026-09-04T07:40:10Z  overall FAIL  (round 180)
+nodes     PASS  3/3 up, height 3 (spread 0), source 8f219285f268
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 36bb539856bf but covenant_watchdog.py on disk is 79143b339835 -- the c
+alerts    WARN  4 live -- first: node A: code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's m
+
