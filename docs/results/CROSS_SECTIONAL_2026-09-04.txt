@@ -1,0 +1,46 @@
+# Cross-sectional momentum: a different hypothesis, the same bar
+
+12 series, 611 dates from 2025-01-01 to 2026-09-03; costs 50 bps one way (100 round trip)
+assets: ADA, ATOM, AVAX, CRO, HBAR, NEAR, ONDO, PEPE, SOL, WLFI, XLM, XRP
+
+benchmark, equal-weight buy and hold: total -63.27%  Sharpe -0.46  max drawdown -72.5%
+
+## The five best of 288 variants, in sample
+
+| lookback | top k | rebalance | skip | cash filter | total | Sharpe | max DD |
+|---|---|---|---|---|---|---|---|
+| 21 | 3 | 14 | 7 | yes | -38.1% | -0.01 | -65.8% |
+| 90 | 1 | 30 | 0 | no | -50.6% | -0.04 | -83.4% |
+| 60 | 3 | 30 | 0 | yes | -31.9% | -0.08 | -60.4% |
+| 7 | 1 | 30 | 7 | yes | -50.3% | -0.11 | -76.5% |
+| 21 | 4 | 14 | 7 | yes | -45.4% | -0.13 | -71.8% |
+
+## Test 1 -- deflation
+
+The best variant is `lb21 k3 rb14 sk7 cash=True`, Sharpe -0.01 over 581 bars.
+Expected best Sharpe from 288 NO-EDGE trials: 2.88. Deflated Sharpe **0.0000** (needs >= 0.95): FAIL
+
+## Test 2 -- walk-forward, the search inside each fold
+
+| fold | variant chosen on train | train Sharpe | test return | test Sharpe | bars |
+|---|---|---|---|---|---|
+| 1 | lb90 k3 rb7 sk0 cf0 | 0.62 | -9.90% | -6.92 | 9 |
+| 2 | lb90 k4 rb14 sk7 cf0 | 2.64 | -6.94% | -16.89 | 2 |
+| 3 | lb90 k4 rb14 sk0 cf0 | 0.54 | +15.26% | 8.89 | 9 |
+| 4 | lb60 k1 rb7 sk0 cf1 | -0.08 | +13.44% | 1.51 | 39 |
+| 5 | lb60 k1 rb7 sk0 cf1 | 0.00 | +2.40% | 0.72 | 32 |
+
+3 of 5 folds positive, binomial p = 0.500 (needs majority AND p <= 0.05): FAIL
+mean out-of-sample return +2.85%
+
+## Test 3 -- PBO by CSCV
+
+PBO = 0.986 (needs < 0.5): FAIL
+
+## Verdict
+
+**Nothing survived** -- all three tests are required, and at least one failed.
+
+This is the same answer the per-asset search gave on 2026-09-03, from a
+different hypothesis class. It is a result, not a failure: the money stays
+where it is, and the trader stays disarmed, for a measured reason.

@@ -160,8 +160,44 @@ STOPWORDS = frozenset([
 # lower than the model it replaces.
 
 
+# A CONTRACTION IS A SPELLING, NOT A WORD, measured 2026-09-04.
+#
+# The tokenizer splits on the apostrophe, so "I'll" became ["ll"] -- the "i"
+# is one character and falls under the two-character floor -- and "ll" was the
+# third heaviest VIOLATES feature in the deployed model at +3.02. The word
+# "will" is in STOPWORDS precisely because it was the strongest feature in an
+# earlier model and meant nothing; the filter caught the spelling "will" and
+# missed the spelling "ll", which is the same word.
+#
+# Three of these fragments were over the DAMNING threshold of 1.2 -- don
+# (+1.46), wasn (+1.68), didn (+1.81) -- which is not a cosmetic problem: a
+# feature at or above DAMNING can never be cleared, so the guard that stops
+# the stuffing attack was being triggered by the apostrophe in "don't". A memo
+# reading "don't worry, I paid the full price we agreed" was held, and the
+# same memo with "do not" was cleared, on 343 of the 1497 ledger rows' worth
+# of evidence that people write with apostrophes.
+#
+# Expanding them puts the real word in front of the existing filters: "'ll"
+# becomes "will" and is dropped as a function word, "n't" becomes "not" and
+# joins the negation pairs where it belongs. The possessive "'s" is simply
+# removed, leaving "my brother's share" as "brother share", which is what it
+# means here.
+_CONTRACTIONS = [
+    ("n't", " not"), ("'ll", " will"), ("'re", " are"), ("'ve", " have"),
+    ("'m", " am"), ("'d", " would"), ("'s", ""), ("s'", "s"),
+]
+
+
+def _expand(text: str) -> str:
+    t = (text or "").lower().replace("\u2019", "'")
+    for a, b in _CONTRACTIONS:
+        if a in t:
+            t = t.replace(a, b)
+    return t
+
+
 def tokens(text: str) -> List[str]:
-    return _TOKEN.findall((text or "").lower())
+    return _TOKEN.findall(_expand(text))
 
 
 def features(text: str) -> List[str]:
@@ -200,12 +236,43 @@ class FallbackModel:
     def __init__(self, data: Optional[Dict[str, Any]] = None):
         d = data or {}
         self.weights: Dict[str, float] = d.get("weights", {})
+        # SEEN is not the same question as MOVES ME, measured 2026-09-04.
+        #
+        # Coverage and the unknown-word guard both asked "is this word in
+        # self.weights", and reported the answer as "never seen in training".
+        # That was false. "friend" appears in 100 training rows, "need" in 33,
+        # "work" in 52, "children" in 8 -- every one of them well attested, and
+        # every one of them absent from the weights because it is genuinely
+        # NEUTRAL: it occurs about as often on both sides, so |log-odds| falls
+        # under the 0.25 cut and it is dropped as uninformative.
+        #
+        # So the guard was treating the model's own evidence of familiarity as
+        # evidence of novelty, and it did so hardest on exactly the payloads
+        # made of ordinary honest words. "donation to the fund for the widow
+        # and her children" measured 11% coverage against a 35% floor, and was
+        # refused a verdict on the grounds that the judge had never seen that
+        # language -- when it had seen all of it, and found none of it damning.
+        #
+        # A word is IN VOCABULARY if training saw it in at least MIN_DOC_FREQ
+        # documents, whatever its weight. That is the question these two guards
+        # were always trying to ask.
+        self.vocab = set(d.get("vocab", ()))
         self.n_examples: int = int(d.get("n_examples", 0))
         self.n_violates: int = int(d.get("n_violates", 0))
         self.prior: float = float(d.get("prior", 0.0))
         self.sources: List[str] = d.get("sources", [])
         self.trained_at: str = d.get("trained_at", "")
         self.note: str = d.get("note", "")
+
+    def seen(self, word: str) -> bool:
+        """Was this word in the training corpus often enough to count?
+
+        Falls back to the weights for a model saved before vocab existed, so
+        an old covenant_fallback.json still loads and still behaves exactly as
+        it did -- conservatively, treating neutral words as unseen."""
+        if self.vocab:
+            return word in self.vocab
+        return word in self.weights
 
     # -- training ---------------------------------------------------------
     @classmethod
@@ -235,6 +302,8 @@ class FallbackModel:
                 n_c += 1
                 for t in bag:
                     c_counts[t] = c_counts.get(t, 0) + 1
+        vocab = sorted(t for t, n in doc_freq.items()
+                       if " " not in t and n >= MIN_DOC_FREQ)
         weights = {}
         for t in set(v_counts) | set(c_counts):
             if not _informative(t) or doc_freq.get(t, 0) < MIN_DOC_FREQ:
@@ -247,14 +316,16 @@ class FallbackModel:
             if abs(w) >= 0.25:
                 weights[t] = round(w, 4)
         prior = math.log((n_v + 1.0) / (n_c + 1.0))
-        m = cls({"weights": weights, "n_examples": n_v + n_c,
+        m = cls({"weights": weights, "vocab": vocab, "n_examples": n_v + n_c,
                  "n_violates": n_v, "prior": round(prior, 4),
                  "sources": sources, "trained_at": trained_at})
         return m
 
     def save(self, path: str = MODEL_PATH) -> None:
         with open(path, "w", encoding="utf-8") as fh:
-            json.dump({"weights": self.weights, "n_examples": self.n_examples,
+            json.dump({"weights": self.weights,
+                       "vocab": sorted(self.vocab),
+                       "n_examples": self.n_examples,
                        "n_violates": self.n_violates, "prior": self.prior,
                        "sources": self.sources, "trained_at": self.trained_at,
                        "note": "Distilled from the verdicts named in sources. "
@@ -293,7 +364,7 @@ class FallbackModel:
         if not toks:
             return 0.0, 0.0, 0
         word_bag = set(toks)
-        known_words = [t for t in word_bag if t in self.weights]
+        known_words = [t for t in word_bag if self.seen(t)]
         feats = [f for f in set(features(text)) if f in self.weights]
         s = self.prior + sum(self.weights[f] for f in feats)
         return s, (len(known_words) / float(len(word_bag))), len(feats)
@@ -347,7 +418,7 @@ class FallbackModel:
             # This can only ever turn a CLEAR into an ABSTAIN. It cannot create
             # a false clear, and it cannot invent a finding.
             unknown = [w for w in set(tokens(text))
-                       if w not in self.weights and w not in STOPWORDS]
+                       if not self.seen(w) and w not in STOPWORDS]
             if len(unknown) > MAX_UNKNOWN_TO_CLEAR:
                 return "abstain", ("log-odds %+.2f would clear this, but %d content "
                                    "word(s) here were never seen in training [%s] -- "

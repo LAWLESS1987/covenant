@@ -125,25 +125,41 @@ def main():
 
     # ---- P: promotion ----------------------------------------------------
     quiet = lambda *a, **k: None                                          # noqa: E731
-    cases = X.exam_cases()
-    with open(ledger, "w", encoding="utf-8") as fh:
+
+    # THE FIXTURE MAY NOT BE THE EXAM, changed 2026-09-04.
+    #
+    # It used to write judge_suite's own 37 cases into the ledger and train on
+    # them, which was a shortcut: it made "a teacher who agrees with the
+    # author" trivially true and gave the candidate the answers to the test it
+    # was about to sit. covenant_distill.load_verdicts now drops rows that
+    # overlap an exam case by half their vocabulary, so the shortcut trains on
+    # nothing at all -- and the right response to that is to stop taking it,
+    # not to exempt the test. The teacher's corpus is now the authored seed
+    # cases, which are real, varied, and held out of the exam by construction.
+    import covenant_seed_cases as SC
+    _seed = SC.all_cases()
+    viol = [m for m, v, _s, _l in _seed if v][:40]
+    lawful = [m for m, v, _s, _l in _seed if not v][:40]
+
+    def teach(rows):
         # THREE copies, not two: covenant_judge_fallback.MIN_DOC_FREQ (added
         # 2026-09-03) gives no weight to a token seen in fewer than 3 examples,
         # because a token seen once or twice is a coincidence. Two copies left
         # every token under the floor and the candidate came out empty, so
         # "a trained student" meant nothing. The fixture has to clear the floor.
-        for _ in range(3):
-            for cat, label, expect, text in cases:
-                fh.write(json.dumps({"text": text, "violates": expect, "judge": "teacher", "source": "t"}) + "\n")
+        with open(ledger, "w", encoding="utf-8") as fh:
+            for text, expect in rows:
+                for _ in range(3):
+                    fh.write(json.dumps({"text": text, "violates": expect,
+                                         "judge": "teacher", "source": "t"}) + "\n")
+
+    teach([(t, True) for t in viol] + [(t, False) for t in lawful])
     ok1, st1 = X.train(ledger, model, cand, say=quiet)
     check("P1 a teacher who agrees with the author yields a promoted model (false clean %d, decides %d/%d)"
           % (st1["total"]["false_clean"], st1["total"]["agree"], st1["total"]["n"]), ok1 and os.path.exists(model))
     before = open(model, "rb").read()
-    with open(ledger, "a", encoding="utf-8") as fh:
-        for _ in range(6):
-            for cat, label, expect, text in cases:
-                if cat == "theft":
-                    fh.write(json.dumps({"text": text, "violates": False, "judge": "poison", "source": "t"}) + "\n")
+    # The same teacher, now calling every theft it wrote CLEAN.
+    teach([(t, False) for t in viol] + [(t, False) for t in lawful])
     ok2, st2 = X.train(ledger, model, cand, say=quiet)
     check("P2 a candidate from a teacher that calls theft clean is REFUSED (false clean %d, holds %d clean case(s))"
           % (st2["total"]["false_clean"], st2["clean"]["false_hold"]), not ok2)
@@ -175,7 +191,10 @@ def main():
     j5 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "ollama_when_student_holds": False})
     j5._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)      # trained by the agreeing teacher
     j5._primary = Stub(R(True, "MUST NOT BE ASKED", judge_id="local:1", infrastructure_failure=True))
-    r = j5.evaluate({"message": "he pays this or the roof comes off his house tonight"}, [])
+    # The probe is a coercion memo from the teacher's OWN corpus, not from the
+    # exam. It used to be an exam case verbatim, which meant this test also
+    # only passed because the student had been handed the answers.
+    r = j5.evaluate({"message": "tell him his daughter walks home alone, then ask for the balance again"}, [])
     check("P9 a trained student judges first and Ollama is not asked (reasoning says student first)",
           "student first" in r.reasoning and "MUST NOT" not in r.reasoning)
 

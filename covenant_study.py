@@ -373,7 +373,56 @@ def report(say=print):
 # discipline covenant_distill.py uses, and it is what makes a noisy extractor
 # safe: a sentence that was never really a rule produces a pair the judge will
 # not confirm, and it lands in ops/distill_rejected.jsonl with both answers.
-def generate(limit=8, say=print):
+_MONEY = re.compile(
+    r"\b(?:money|coin|coins|silver|gold|cash|fund|funds|payment|pay|pays|paid|paying"
+    r"|wage|wages|price|cost|debt|debts|loan|deposit|account|accounts|balance|sum"
+    r"|share|shares|alms|tithe|tithes|donation|gift|gifts|inheritance|estate|rent"
+    r"|fee|fees|tax|taxes|profit|earnings|salary|stake|purse|treasure|wealth"
+    r"|property|goods|land|grain|harvest|amount|owed|owe|owes|interest|usury"
+    r"|ransom|dowry|bribe|escrow|invoice|receipt|ledger)\b")
+_ACT = re.compile(
+    r"\b(?:pay|pays|paid|paying|give|gives|gave|giving|send|sends|sent|sending"
+    r"|transfer|transfers|take|takes|took|taking|steal|steals|stole|keep|keeps"
+    r"|kept|keeping|return|returns|returned|returning|withhold|withholds|withheld"
+    r"|lend|lends|lent|borrow|borrows|owe|owes|owed|buy|buys|bought|sell|sells"
+    r"|sold|charge|charges|charged|refund|collect|collects|collected|spend|spends"
+    r"|spent|move|moves|moved|hand|hands|handed|settle|settles|settled|donate"
+    r"|donates|donated)\b")
+
+
+def describes_a_transfer(message):
+    """Does this line describe a transfer of value?
+
+    MEASURED 2026-09-04, after an audit of all 716 study rows in the ledger.
+    159 of them had labels that could not be defended against the gate's own
+    doctrine: 97 called a violation were clean (most of them GIVING, which the
+    gate says is never taking) and 62 were not transactions at all. That is 22%
+    of the study corpus, which was itself half the training set, and it was
+    teaching the judge that generosity is suspicious.
+
+    The rows that failed look like this: "I ignored the economic impact of my
+    decisions", "I held a grudge and refused to forgive", "I compared my wealth
+    to others, feeling superior". They are first-person moral SELF-REPORTS. The
+    covenant judges transfers; nobody attaches a character assessment to a
+    ledger entry, so these are out of distribution for every real payload, and
+    asking any judge to rule violates/clean on one produces noise whatever the
+    judge.
+
+    Two narrower filters were tried first and both were measured and dropped: a
+    victim/belief/omission pattern set caught 9 of the 160 bad rows, and this
+    same money-plus-act test applied to the STORED corpus separates it only
+    82% to 75% -- because most of the surviving rows are not transfers either;
+    they were kept because their labels were defensible, not because they were
+    in distribution.
+
+    So this is not a repair of the existing corpus. It is a gate on new intake,
+    and it will cut the study path's volume hard. That is the point: volume of
+    the wrong thing is how the corpus got here."""
+    t = (message or "").lower()
+    return bool(_MONEY.search(t)) and bool(_ACT.search(t))
+
+
+def _selftest():
     import covenant_distill as X
     import covenant_unified_v8 as cov
     import covenant_judge_fallback as FB
@@ -442,6 +491,7 @@ def generate(limit=8, say=print):
     except (ValueError, AttributeError):
         say("teacher (%s) returned no usable JSON" % who); return 0, 0
     cases = []
+    shapeless = 0
     for pr in pairs:
         try:
             i = int(pr.get("n"))
@@ -451,8 +501,12 @@ def generate(limit=8, say=print):
             continue
         for key, expect in (("violating", True), ("honouring", False)):
             m = str(pr.get(key) or "").strip()
-            if 3 <= len(m.split()) <= 60:
+            if 3 <= len(m.split()) <= 60 and describes_a_transfer(m):
                 cases.append({"message": m, "expect": expect, "precept": todo[i]})
+            elif 3 <= len(m.split()) <= 60:
+                shapeless += 1
+    if shapeless:
+        say("    %d line(s) refused: no transfer in them" % shapeless)
     if not cases:
         say("teacher (%s) produced no usable pairs" % who); return 0, 0
     principles = list(cov.DIVINE_PRINCIPLES)
