@@ -5,7 +5,7 @@
  "ollama_when_student_holds": true,
  "silence_is_not_dissent": false,
  "github_when_local_down": true,
- "github_model": "qwen2.5:3b",
+ "github_model": "qwen2.5:7b",
  "github_timeout_s": 240,
  "decided_by": "Lawrence, 2026-09-03: 'create a semantic judge to defer to if others not available to keep running and recursive improve'; then 'ollama keeps freezing ... get rid of it and derive our own, more compact but more efficient'; then 'clear any clutter ... including ollama after'",
  "_order": "student (the distilled fallback, microseconds, no RAM) first; when it holds: Ollama if it answers, else the GitHub runner, else HELD. The student gives real verdicts only once covenant_distill.py's exam line says MET; until then this order means Ollama is never required.",

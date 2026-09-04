@@ -58,7 +58,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 API = "https://api.github.com"
 WORKFLOW = "judge.yml"
-DEFAULT_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:3b")   # no thinking mode; see judge.yml
+DEFAULT_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:7b")   # no thinking mode; see judge.yml
 LOG = os.path.join(HERE, "ops", "judge_route.log")
 
 

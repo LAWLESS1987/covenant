@@ -23,7 +23,7 @@ on:
       model:
         description: "Ollama model to answer with"
         required: false
-        default: "qwen2.5:3b"
+        default: "qwen2.5:7b"
         type: string
       prompt_b64:
         description: "base64 UTF-8: either the prompt text, or a JSON array of chat messages"
