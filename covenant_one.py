@@ -274,6 +274,16 @@ SUITES = [
     # BOTH modes -- the untouched default, and that relaxed mode still blocks a
     # genuine dissent and still admits nothing when nothing answered.
     ("test_f1_fallback_silence.py",      120,  "JUDGE"),
+    # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
+    # student. F2 pins the seat and the promotion rule; F3 runs the three
+    # judges COMPOSED, offline, and pins that no violation is admitted with
+    # no Ollama, no runner and no network. They were on disk and in
+    # run_all_tests.sh but in no entry here, so CI called them ORPHANED --
+    # which is the exact class this file exists to make impossible, and it
+    # caught me rather than the other way round.
+    ("test_f2_distill_loop.py",           90,  "JUDGE"),
+    ("test_f3_gate_end_to_end.py",       300,  "JUDGE"),
+    ("covenant_quiet.py",                 30,  "JUDGE"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40
