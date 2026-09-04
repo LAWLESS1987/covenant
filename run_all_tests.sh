@@ -642,6 +642,7 @@ run test_f3_gate_end_to_end.py 300
 run covenant_quiet.py 30
 run test_f4_capability.py 120
 run test_f5_reserve.py 90
+run test_f6_stuffing.py 120
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.

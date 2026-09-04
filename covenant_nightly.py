@@ -50,8 +50,12 @@ REPORT = os.path.join(HERE, "ops", "NIGHTLY.md")
 # assembled gate, and the two the ledger feeds. Not the whole sweep -- that
 # needs the chain stopped for its ports, and a nightly job must not take the
 # chain down to prove it is healthy.
+# Every suite that a learning pass can break. F6 especially: a pass retrains
+# the model, and the stuffing defence is a property OF the trained model --
+# a corpus that stopped teaching "drain" would quietly reopen the hole.
 GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
-                "test_f3_gate_end_to_end.py", "covenant_quiet.py"]
+                "test_f3_gate_end_to_end.py", "test_f4_capability.py",
+                "test_f5_reserve.py", "test_f6_stuffing.py", "covenant_quiet.py"]
 
 
 def verify_green(say):

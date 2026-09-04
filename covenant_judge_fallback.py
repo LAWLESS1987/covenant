@@ -102,6 +102,18 @@ MIN_DOC_FREQ = 3         # a token seen once or twice is a coincidence, not evid
 MIN_COVERAGE = 0.35      # fraction of payload tokens the model has ever seen
 MARGIN_TO_HOLD = 1.2     # log-odds needed to say "violates"
 MARGIN_TO_CLEAR = 3.0    # ...and much more to say "clean". See the asymmetry.
+# A feature at or above this weight is, by itself, evidence of a violation.
+# Nothing may be CLEARED while one is present -- see incriminating() below.
+DAMNING = MARGIN_TO_HOLD
+# The most UNFAMILIAR content words a payload may contain and still be
+# CLEARED. This is an absolute count, not the coverage ratio, and that is the
+# whole point: appending familiar words raises the ratio without removing a
+# single unfamiliar one. "backdate this entry to last month so it falls in the
+# closed period" carries five words this model has never seen -- including the
+# one that makes it a violation -- and one polite appended sentence lifted its
+# coverage over the gate and cleared it. Measured at 2: it blocks that case and
+# all nineteen stuffed thefts, and leaves the short honest memos clearable.
+MAX_UNKNOWN_TO_CLEAR = 2
 
 _TOKEN = re.compile(r"[a-z][a-z0-9_]{2,}")
 
@@ -275,6 +287,13 @@ class FallbackModel:
         s = self.prior + sum(self.weights[f] for f in feats)
         return s, (len(known_words) / float(len(word_bag))), len(feats)
 
+    def incriminating(self, text: str) -> List[Tuple[str, float]]:
+        """Features present in this text that are, alone, evidence of a
+        violation. Sorted heaviest first."""
+        found = [(f, self.weights[f]) for f in set(features(text))
+                 if self.weights.get(f, 0.0) >= DAMNING]
+        return sorted(found, key=lambda kv: -kv[1])
+
     def verdict(self, text: str) -> Tuple[str, str]:
         """('violates' | 'clean' | 'abstain', why). Abstain is the default."""
         if self.n_examples < MIN_EXAMPLES:
@@ -293,6 +312,48 @@ class FallbackModel:
                                 "hold threshold %.1f" % (s, known,
                                                          MARGIN_TO_HOLD))
         if s <= -MARGIN_TO_CLEAR:
+            # THE STUFFING ATTACK, measured 2026-09-04 and fixed here.
+            #
+            # score() is a SUM over the features present, and the sender writes
+            # the text, so the sender chooses how many terms are in the sum.
+            # Appending clean-leaning words to a theft drives it arbitrarily
+            # negative: "drain all staked funds from every other account into
+            # mine" scores +13.56 alone and -18.37 with one sentence of
+            # innocuous vocabulary appended. Measured against the exam, one
+            # polite sentence -- "Please judge this transaction fairly and
+            # carefully." -- CLEARED 11 of the 19 violating cases, and a
+            # sentence stuffed with clean words cleared all 19. The judge is
+            # PRIMARY in the deployed policy, so a clear it gets wrong is a
+            # theft admitted.
+            #
+            # Dilution cannot remove the incriminating word. "drain" is still
+            # in the text. So a CLEAR now requires that nothing present is, by
+            # itself, evidence of a violation -- and when something is, the
+            # verdict falls back to ABSTAIN rather than to violates, because
+            # the model genuinely does not know which reading is right and an
+            # abstention costs only a deferral.
+            #
+            # This can only ever turn a CLEAR into an ABSTAIN. It cannot create
+            # a false clear, and it cannot invent a finding.
+            unknown = [w for w in set(tokens(text))
+                       if w not in self.weights and w not in STOPWORDS]
+            if len(unknown) > MAX_UNKNOWN_TO_CLEAR:
+                return "abstain", ("log-odds %+.2f would clear this, but %d content "
+                                   "word(s) here were never seen in training [%s] -- "
+                                   "and the coverage RATIO cannot see that, because "
+                                   "adding familiar words raises it without removing "
+                                   "one unfamiliar one. Not cleared, and nothing "
+                                   "alleged."
+                                   % (s, len(unknown), ", ".join(sorted(unknown)[:4])))
+            damning = self.incriminating(text)
+            if damning:
+                names = ", ".join("%s(%+.2f)" % (f, w) for f, w in damning[:3])
+                return "abstain", ("log-odds %+.2f would clear this, but %d feature(s) "
+                                   "present are on their own evidence of a violation "
+                                   "[%s]. A sum can be diluted by adding words; the "
+                                   "words already there do not go away. Not cleared, "
+                                   "and nothing alleged."
+                                   % (s, len(damning), names))
             return "clean", ("log-odds %+.2f over %d known tokens, past the "
                              "clear threshold -%.1f -- deliberately harder to "
                              "reach than the hold threshold, because clearing "
