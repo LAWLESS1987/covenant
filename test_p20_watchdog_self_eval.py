@@ -129,11 +129,24 @@ def main():
           str(layers["mycelium"]))
 
     # E6 -----------------------------------------------------------------
+    # 2026-09-03: with ops/quorum_policy.json naming a deferring seat the judge
+    # row is WARN, not FAIL (F2). The pin below runs with NO policy; E6b pins
+    # the deferring wording.
+    os.environ["COVENANT_QUORUM_POLICY_PATH"] = os.path.join(tempfile.mkdtemp(), "absent.json")
     block, overall = ev(judge={})
     _, layers = parse(block)
     check("E6 judge without a baseline is FAIL and names fail-closed",
           layers["judge"][0] == "FAIL"
           and "closed" in layers["judge"][1], str(layers["judge"]))
+    _pol = os.path.join(tempfile.mkdtemp(), "quorum_policy.json")
+    with open(_pol, "w", encoding="utf-8") as _fh:
+        _fh.write('{"providers": "deferring,semantic", "silence_is_not_dissent": true}')
+    os.environ["COVENANT_QUORUM_POLICY_PATH"] = _pol
+    block, overall = ev(judge={})
+    _, layers = parse(block)
+    check("E6b with a DEFERRING policy the judge row is WARN and names the deferral, not fail-closed",
+          layers["judge"][0] == "WARN" and "defers" in layers["judge"][1], str(layers["judge"]))
+    os.environ["COVENANT_QUORUM_POLICY_PATH"] = os.path.join(tempfile.mkdtemp(), "absent.json")
 
     # E7 -----------------------------------------------------------------
     drift = ["WATCHDOG SOURCE DRIFT: running aaaa, disk bbbb"]

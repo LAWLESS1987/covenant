@@ -24,6 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import covenant_unified_v8 as cov
 import covenant_judge_local    # noqa: F401 -- registers local/deepseek/mistral
 import covenant_judge_ollama   # noqa: F401 -- re-registers "local" as the tuned judge
+import covenant_judge_fallback # noqa: F401 -- registers "fallback", the distilled floor (covenant_distill.py trains it)
+import covenant_judge_defer    # noqa: F401 -- registers "deferring": Ollama, else the GitHub runner, else the fallback
 
 os.environ.setdefault("COVENANT_LOCAL_JUDGE_URL",
                       "http://127.0.0.1:11434/v1/chat/completions")
@@ -34,11 +36,20 @@ os.environ.setdefault("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:8b")
 os.environ.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "300")
 os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
 
+# v8.40: local (ollama) + semantic (the deterministic lexical judge) -- two
+# INDEPENDENT opinions, which is what B2 requires the quorum to have.
+# 2026-09-03: ops/quorum_policy.json is the operator's standing decision about the
+# quorum (providers, and whether a silent seat is a dissent). It is applied here,
+# after whatever env the watchdog or covenant_prod.bat passed in, so every start
+# path -- operator, watchdog revival, guard -> watchdog -> node -- runs the same
+# gate. COVENANT_JUDGE_PROVIDERS_OVERRIDE still beats everything. No policy file
+# -> exactly the v8.40 wiring below.
+_policy = covenant_judge_defer.apply_policy()
+if _policy:
+    print("[ollama-judge] " + _policy, file=sys.stderr, flush=True)
 os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
-    # v8.40: local (ollama) + semantic (the deterministic lexical judge)
-    # -- two INDEPENDENT opinions, which is what B2 requires the quorum
-    # to have and what providers="local" alone never gave it.
-    "COVENANT_JUDGE_PROVIDERS_OVERRIDE", "local,semantic")
+    "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
+    os.environ["COVENANT_JUDGE_PROVIDERS"] if _policy else "local,semantic")
 # never silently fall back to keyword matching
 os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
 

@@ -87,7 +87,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "8c9bec22c6a57e3ead7dc28a1c54e036cbe8fc388a7478738b743adbbed09f3c",
+        "e223f5659dfb1ab680d971d1558c498b3708dbc239624ed1d90e61bb2ce70f8f",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -116,7 +116,7 @@ MANIFEST = {
     # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
     # runners name is part of the delivery (M53).
     "test_p15_judge_identity.py":
-        "15b12fe9a8b17c0b316a536e93fbb27844c2d388166de9f738241ca896b64e9f",
+        "3cf62e36f9020a5354515d8d9318c1ee5fcb5c8588793feb512a263886ad2ae1",   # 2026-09-03: R4d/R5c pin the deferring-policy wording (F2); moved with the file (M53)
 }
 # file -> module it imports that must sit in the same directory
 COMPANIONS = {

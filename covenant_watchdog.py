@@ -608,6 +608,16 @@ def judge_identity_report(ident, prev, expected_model=None, root=None):
 
     if not isinstance(ident, dict) or not ident.get("reachable"):
         err = ident.get("error") if isinstance(ident, dict) else None
+        pol = _quorum_policy()
+        if _seat_defers(pol):
+            infos.append(
+                f"judge: local endpoint {root} not answering ({err}); the local "
+                f"seat DEFERS per ops/quorum_policy.json (providers="
+                f"{pol.get('providers')}, silence_is_not_dissent="
+                f"{pol.get('silence_is_not_dissent')}): GitHub runner if "
+                f"allowed, else the distilled fallback. The gate does not fail "
+                f"closed on this alone.")
+            return alerts, infos, prev
         alerts.append(
             f"JUDGE UNREACHABLE: the ethics gate's endpoint {root} did not "
             f"answer ({err}) -- the gate fails closed, so every transaction "
@@ -619,7 +629,12 @@ def judge_identity_report(ident, prev, expected_model=None, root=None):
     served = ident.get("served") if isinstance(ident.get("served"), dict) \
         else {}
     digest = served.get(expected_model) or None
-    if digest is None:
+    if digest is None and _seat_defers():
+        infos.append(
+            f"judge: '{expected_model}' not among the model(s) served at {root} "
+            f"({sorted(served) or 'none'}); the local seat defers per "
+            f"ops/quorum_policy.json, so this is disclosed, not fatal.")
+    elif digest is None:
         alerts.append(
             f"JUDGE MODEL MISSING: '{expected_model}' is not among the "
             f"model(s) served at {root} ({sorted(served) or 'none'}) -- the "
@@ -644,6 +659,25 @@ def judge_identity_report(ident, prev, expected_model=None, root=None):
 
 
 _judge_prev = {}
+
+
+def _quorum_policy():
+    """ops/quorum_policy.json (2026-09-03): the operator's standing decision.
+    Read only to DESCRIBE the gate truthfully -- with a deferring seat, a silent
+    Ollama does not make the gate fail closed, and an alert that says it does
+    is a false alert. Nothing here restarts, relaxes or reconfigures."""
+    path = os.environ.get("COVENANT_QUORUM_POLICY_PATH") or os.path.join(HERE, "ops", "quorum_policy.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            p = json.load(fh)
+        return p if isinstance(p, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _seat_defers(pol=None):
+    pol = _quorum_policy() if pol is None else pol
+    return "deferring" in str(pol.get("providers", ""))
 
 
 # --------------------------------------------------------------------------
@@ -733,6 +767,10 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
     if isinstance(judge, dict) and judge.get("digest"):
         layer("judge", "PASS", f"baseline digest {str(judge['digest'])[:19]}, "
                                f"{len(judge.get('served') or {})} model(s)")
+    elif _seat_defers():
+        layer("judge", "WARN", "no local judge baseline; the seat defers per "
+                               "ops/quorum_policy.json (GitHub runner, then the "
+                               "distilled fallback; silence is not dissent)")
     else:
         layer("judge", "FAIL", "no judge identity baseline -- unreachable or "
                                "expected model never seen (gate fails closed)")
@@ -843,6 +881,19 @@ def start_node(node):
     # revives must judge with the same quorum a node the operator starts
     # does, or a restart silently changes the gate (P17's hazard sideways).
     env["COVENANT_JUDGE_PROVIDERS"] = "local,semantic"
+    # 2026-09-03: the operator's standing quorum decision, ops/quorum_policy.json,
+    # read here so a node this watchdog revives is wired like one the operator
+    # starts (the runner applies the same file again; this only keeps the env
+    # honest for anyone reading it). Disclosure of a decision, not a decision.
+    try:
+        with open(os.path.join(HERE, "ops", "quorum_policy.json"), encoding="utf-8") as _fh:
+            _pol = json.load(_fh)
+        if _pol.get("providers"):
+            env["COVENANT_JUDGE_PROVIDERS"] = str(_pol["providers"])
+        if _pol.get("silence_is_not_dissent") is True:
+            env["COVENANT_SILENCE_IS_NOT_DISSENT"] = "1"
+    except (OSError, ValueError, AttributeError):
+        pass
     env.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
     os.makedirs(LOGDIR, exist_ok=True)
     out = open(os.path.join(LOGDIR, f"node{node['id']}.log"), "a",

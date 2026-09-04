@@ -38,6 +38,11 @@ REM hint ('add it to COVENANT_JUDGE_PROVIDERS to use it') -- a judge
 REM shipped and wired to nothing is the defect class this repo keeps
 REM finding in itself, caught this time BEFORE the restart.
 set COVENANT_JUDGE_PROVIDERS=local,semantic
+REM 2026-09-03: ops\quorum_policy.json overrides the line above at node start
+REM (run_with_ollama_judge.py applies it; the watchdog reads it too). Today it
+REM says "deferring,semantic": the local seat is Ollama, else a judge on a
+REM GitHub runner, else the distilled fallback covenant_distill.py trains from
+REM the judges' own verdicts. Delete that file to get exactly the line above.
 set "COVENANT_INSECURE_MOCK_JUDGE="
 set COVENANT_OLLAMA_NUM_PREDICT=96
 set COVENANT_OLLAMA_NUM_CTX=2048
@@ -56,19 +61,33 @@ call :stamp "start requested, model %COVENANT_LOCAL_JUDGE_MODEL%"
 if exist ".venv\Scripts\activate.bat" call ".venv\Scripts\activate.bat"
 
 REM -- preflight: Ollama ------------------------------------------------------
+REM 2026-09-03: with ops\quorum_policy.json present the local seat DEFERS when
+REM Ollama is silent (GitHub runner, then the distilled fallback) and the gate
+REM no longer fails closed on that alone -- so a silent Ollama is disclosed,
+REM not fatal, and the fit check is skipped. Without the policy file the v8.40
+REM abort below stands unchanged.
+set COVENANT_QUORUM_POLICY=
+if exist "ops\quorum_policy.json" set COVENANT_QUORUM_POLICY=1
 curl -s -m 8 http://127.0.0.1:11434/api/tags >nul 2>nul
-if %errorlevel% neq 0 (
-  call :stamp "ABORT: Ollama not answering on 11434. A judge that cannot be reached fails CLOSED - every transaction rejected."
-  echo Ollama is not running. Start it, then re-run.
-  exit /b 1
-)
+if %errorlevel% equ 0 goto OLLAMA_OK
+if defined COVENANT_QUORUM_POLICY goto OLLAMA_SILENT_DEFERS
+call :stamp "ABORT: Ollama not answering on 11434. A judge that cannot be reached fails CLOSED - every transaction rejected."
+echo Ollama is not running. Start it, then re-run.
+exit /b 1
 
+:OLLAMA_SILENT_DEFERS
+call :stamp "WARN: Ollama not answering on 11434; ops\quorum_policy.json is present, so the local seat defers - starting anyway"
+goto FIT_SKIP
+
+:OLLAMA_OK
+if defined COVENANT_QUORUM_POLICY goto FIT_SKIP
 REM -- preflight: does the model fit? -----------------------------------------
 python -c "import sys,os;sys.path.insert(0,'.');from judge_bench import fit_check,OUT;ok=fit_check();print('\n'.join(OUT));sys.exit(0 if ok else 1)"
 if %errorlevel% neq 0 (
   call :stamp "ABORT: model does not fit or is not installed - see above"
   exit /b 1
 )
+:FIT_SKIP
 
 REM -- first run only: create the databases. NEVER delete an existing one. ----
 if not exist "genesis.json"      ( call :stamp "ABORT: genesis.json missing" & exit /b 1 )

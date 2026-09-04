@@ -173,12 +173,18 @@ class FallbackModel:
     @classmethod
     def load(cls, path: str = MODEL_PATH) -> "FallbackModel":
         try:
-            with open(path, "r", encoding="utf-8") as fh:
-                return cls(json.load(fh))
+            with open(path, "rb") as fh:
+                raw = fh.read()
+            m = cls(json.loads(raw.decode("utf-8")))
+            import hashlib
+            m.digest = hashlib.sha256(raw).hexdigest()[:12]
+            return m
         except Exception:                                    # noqa: BLE001
             # An unreadable model is an UNTRAINED model, never a crash and
             # never a default verdict. Untrained means abstain on everything.
-            return cls(None)
+            m = cls(None)
+            m.digest = "untrained"
+            return m
 
     # -- deciding, or declining to ----------------------------------------
     def score(self, text: str) -> Tuple[float, float, int]:
@@ -242,7 +248,7 @@ def _payload_text(data: Any) -> str:
         return data
     if isinstance(data, dict):
         parts = []
-        for k in ("description", "reason", "memo", "text", "purpose", "body"):
+        for k in ("message", "description", "reason", "memo", "text", "purpose", "body"):
             v = data.get(k)
             if isinstance(v, str):
                 parts.append(v)
@@ -264,9 +270,32 @@ try:
         def __init__(self, judge_id: str = "fallback:0",
                      model_path: str = MODEL_PATH):
             self.judge_id = judge_id
+            self.model_path = model_path
+            self._mtime = self._stat()
             self.model = FallbackModel.load(model_path)
 
+        def _stat(self):
+            try:
+                return os.path.getmtime(self.model_path)
+            except OSError:
+                return None
+
+        def _refresh(self):
+            # covenant_distill.py promotes a new model by writing this file. A
+            # judge that kept the old one until the next restart would be
+            # running a model its own file no longer describes (P14's shape).
+            # Reload on change, and every verdict names the digest it used.
+            mt = self._stat()
+            if mt != self._mtime:
+                self._mtime = mt
+                self.model = FallbackModel.load(self.model_path)
+
+        @property
+        def model_digest(self):
+            return getattr(self.model, "digest", "untrained")
+
         def evaluate(self, data, principles):
+            self._refresh()
             # NOTHING in here may raise. A judge that raises is counted as a
             # violation by QuorumJudge.evaluate, and the entire purpose of this
             # class is to be the member that never turns into a phantom
@@ -278,18 +307,18 @@ try:
                 v, why = "abstain", "fallback judge error, abstaining: %s" % e
             if v == "clean":
                 return cov.JudgmentResult(
-                    False, "fallback (distilled, local): clean -- %s" % why,
+                    False, "fallback (distilled, local, model %s): clean -- %s" % (self.model_digest, why),
                     judge_id=self.judge_id)
             if v == "violates":
                 return cov.JudgmentResult(
-                    True, "fallback (distilled, local): VIOLATES -- %s. This "
+                    True, "fallback (distilled, local, model " + self.model_digest + "): VIOLATES -- %s. This "
                           "is a compressed model, not a reasoning judge; treat "
                           "it as a flag to review, never as a finding." % why,
                     judge_id=self.judge_id)
             # ABSTAIN -> the existing HELD channel: blocks nothing on its own,
             # alleges nothing, and reads truthfully to the sender.
             return cov.JudgmentResult(
-                True, "fallback (distilled, local): HELD, NOT JUDGED -- %s. It "
+                True, "fallback (distilled, local, model " + self.model_digest + "): HELD, NOT JUDGED -- %s. It "
                       "has made NO finding and is NOT alleging anything." % why,
                 judge_id=self.judge_id, not_understood=True)
 

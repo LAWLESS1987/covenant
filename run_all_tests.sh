@@ -637,6 +637,7 @@ run test_b6_balance_batching.py 120
 # was counted alongside genuine dissent, so one stopped Ollama refused every
 # transaction AND every peer block. Off by default -- F1 pins both modes.
 run test_f1_fallback_silence.py 60
+run test_f2_distill_loop.py 90
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
 # FINDINGS: n. Any n > 0 means a closed hole has reopened.

@@ -61,7 +61,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
 LOG = os.path.join(HERE, "ops", "judge_route.log")
-DEFAULT_MODELS = os.environ.get("COVENANT_ROUTE_MODELS", "qwen3:8b")
+DEFAULT_MODELS = os.environ.get("COVENANT_ROUTE_MODELS", "qwen3:4b")
 # TIERS (2026-09-02). This laptop runs the judge on CPU (Ryzen 5 5625U, 6 cores,
 # no usable GPU): qwen3:8b took 34 s for a 300-char judgment and 138 s for a
 # 9.5k-char summary, and a 24.6k-char one timed out. Two copies of the same 8B

@@ -151,6 +151,11 @@ a4, _, st4 = wd.judge_identity_report(CH, st3, expected_model="qwen3:8b",
 check("R3b baseline moves after being said once -- alert does not re-fire",
       a4 == [] and st4.get("digest") == "0feedbeef012")
 
+# 2026-09-03: ops/quorum_policy.json can make the local seat DEFER (F2), and
+# then "fails closed" would be a false alert. The fail-closed pins below run
+# with NO policy (the core default); R4d/R5c pin the deferring wording.
+import tempfile as _tf
+os.environ["COVENANT_QUORUM_POLICY_PATH"] = os.path.join(_tf.mkdtemp(), "absent.json")
 DOWN = {"reachable": False, "error": "URLError", "served": {}, "loaded": []}
 a5, i5, st5 = wd.judge_identity_report(DOWN, st4, expected_model="qwen3:8b",
                                        root=R)
@@ -172,6 +177,18 @@ check("R5a expected tag missing -> ALERT", any("MISSING" in x for x in a6),
       str(a6))
 check("R5b vanished tag keeps old digest as baseline",
       st6.get("digest") == "0feedbeef012")
+_pol = os.path.join(_tf.mkdtemp(), "quorum_policy.json")
+with open(_pol, "w", encoding="utf-8") as _fh:
+    json.dump({"providers": "deferring,semantic", "silence_is_not_dissent": True}, _fh)
+os.environ["COVENANT_QUORUM_POLICY_PATH"] = _pol
+a5d, i5d, st5d = wd.judge_identity_report(DOWN, st4, expected_model="qwen3:8b", root=R)
+check("R4d with a DEFERRING policy, unreachable is disclosed as INFO naming the deferral, never 'fails closed'",
+      a5d == [] and any("DEFERS" in x and "quorum_policy" in x for x in i5d) and st5d.get("digest") == "0feedbeef012",
+      str(a5d) + str(i5d))
+a6c, i6c, _ = wd.judge_identity_report(GONE, st5, expected_model="qwen3:8b", root=R)
+check("R5c with a DEFERRING policy, a missing tag is disclosed, not alerted",
+      not any("MISSING" in x for x in a6c) and any("not among" in x for x in i6c), str(a6c) + str(i6c))
+os.environ["COVENANT_QUORUM_POLICY_PATH"] = os.path.join(_tf.mkdtemp(), "absent.json")
 BACK = {"reachable": True, "error": None,
         "served": {"qwen3:8b": "aaaa2222bbbb"}, "loaded": []}
 a7, _, _ = wd.judge_identity_report(BACK, st6, expected_model="qwen3:8b",

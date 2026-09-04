@@ -38,9 +38,19 @@ REM  So: ask FIRST, and refuse to stop what cannot be started. This can only
 REM  ever decline to act -- it never starts, kills or changes anything.
 REM ---------------------------------------------------------------------------
 echo Checking the ethics judge is reachable BEFORE stopping anything ...
+REM 2026-09-03: with ops\quorum_policy.json the local seat defers when Ollama
+REM is silent, and covenant_prod.bat starts anyway -- so P17's premise (a stop
+REM that would not be followed by a start) no longer holds, and the restart
+REM may proceed. Without the policy file the guard below stands unchanged.
+if exist "ops\quorum_policy.json" goto POLICY_DEFERS
 curl -s -m 8 http://127.0.0.1:11434/api/tags >nul 2>nul
 if %errorlevel% neq 0 goto NO_JUDGE
 echo   Ollama answers on 11434. Safe to restart.
+goto JUDGE_OK
+
+:POLICY_DEFERS
+echo   ops\quorum_policy.json is present: the local seat defers when Ollama is
+echo   silent, so covenant_prod.bat will start without it. Safe to restart.
 goto JUDGE_OK
 
 :NO_JUDGE

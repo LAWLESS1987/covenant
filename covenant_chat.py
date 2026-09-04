@@ -67,7 +67,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
-MODEL = os.environ.get("COVENANT_CHAT_MODEL", "qwen3:8b")
+MODEL = os.environ.get("COVENANT_CHAT_MODEL", "qwen3:4b")   # 2026-09-03: the 8b is gone (it froze the PC); 4b stays for local chat
 LOGDIR = os.path.join(HERE, "ops", "chat")
 MEMORY = os.path.join(LOGDIR, "MEMORY.md")   # what the covenant has learned; read every session
 
