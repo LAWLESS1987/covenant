@@ -54,6 +54,7 @@ import urllib.error
 import urllib.request
 import uuid
 import zipfile
+import covenant_quiet                                    # no console window on Windows (covenant_quiet.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 API = "https://api.github.com"
@@ -62,15 +63,30 @@ DEFAULT_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:7b")   # no thi
 LOG = os.path.join(HERE, "ops", "judge_route.log")
 
 
+# The token and the repo name are asked for ONCE per process and remembered.
+#
+# WHY, MEASURED 2026-09-04. token() shells out to `git credential fill`, and on
+# this machine that starts Git Credential Manager -- a separate GUI program.
+# Under a parent with no console (a scheduled task under pythonw, or the
+# detached watchdog) it puts a WINDOW on screen, and it was being called on
+# every single request to the runner, several times a learning pass, for
+# hours. That is the flicker he reported three times. Neither answer changes
+# while the process runs, so asking again was pure cost with a window attached.
+_CACHE = {}
+
+
 def repo():
     r = os.environ.get("COVENANT_GITHUB_REPO")
     if r:
         return r
+    if "repo" in _CACHE:
+        return _CACHE["repo"]
     try:
-        url = subprocess.run(["git", "remote", "get-url", "origin"], cwd=HERE,
+        url = covenant_quiet.run(["git", "remote", "get-url", "origin"], cwd=HERE,
                              capture_output=True, text=True, timeout=10).stdout.strip()
         tail = url.split("github.com")[-1].lstrip(":/")
-        return tail[:-4] if tail.endswith(".git") else tail
+        _CACHE["repo"] = tail[:-4] if tail.endswith(".git") else tail
+        return _CACHE["repo"]
     except Exception:                                            # noqa: BLE001
         return "LAWLESS1987/covenant"
 
@@ -79,12 +95,15 @@ def token():
     t = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if t:
         return t
+    if "token" in _CACHE:
+        return _CACHE["token"]
     try:
-        p = subprocess.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n",
+        p = covenant_quiet.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n",
                            capture_output=True, text=True, timeout=20)
         for line in p.stdout.splitlines():
             if line.startswith("password="):
-                return line[9:].strip()
+                _CACHE["token"] = line[9:].strip()
+                return _CACHE["token"]
     except Exception:                                            # noqa: BLE001
         pass
     return ""

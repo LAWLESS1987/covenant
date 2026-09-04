@@ -44,6 +44,7 @@ import os
 import py_compile
 import re
 import subprocess
+import covenant_quiet                                    # no console window on Windows
 import sys
 import time
 
@@ -164,7 +165,7 @@ def decide(gap_s, gap_dead_s, pid_alive, last_attempt_age_s, cooldown_s,
 def pid_alive_windows(pid):
     """Is PID alive AND a python process? tasklist, stdlib only."""
     try:
-        out = subprocess.run(
+        out = covenant_quiet.run(
             ["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV",
              "/NH"], capture_output=True, text=True, timeout=30).stdout
         return "python" in out.lower()

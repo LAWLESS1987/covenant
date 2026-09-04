@@ -36,6 +36,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import covenant_quiet                                    # no console window on Windows (covenant_quiet.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
@@ -81,7 +82,7 @@ def live_state():
     out = []
     for cmd in (["money_posture.py"], ["trader_freshness.py"]):
         try:
-            p = subprocess.run([sys.executable] + cmd, cwd=HERE, capture_output=True, text=True, timeout=90)
+            p = covenant_quiet.run([sys.executable] + cmd, cwd=HERE, capture_output=True, text=True, timeout=90)
             out.append(((p.stdout or "") + (p.stderr or ""))[-1200:])
         except Exception as e:                                   # noqa: BLE001
             out.append("(%s: %s)" % (cmd[0], e))

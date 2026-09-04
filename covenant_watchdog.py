@@ -60,6 +60,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import covenant_quiet                                    # no console window on Windows
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -853,7 +854,7 @@ def balance(db, of_key, timeout=45):
     """Read a balance straight out of a database file. SQLite WAL allows a
     reader while the node holds it open."""
     try:
-        p = subprocess.run(
+        p = covenant_quiet.run(
             [sys.executable, "covenant_client.py", "balance",
              "--db", db, "--of-key", of_key],
             cwd=HERE, capture_output=True, text=True, timeout=timeout)

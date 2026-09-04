@@ -64,6 +64,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import covenant_quiet                                    # no console window on Windows (covenant_quiet.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
@@ -90,7 +91,7 @@ def _section(text, head, limit=3500):
 
 def _run(cmd, timeout=90):
     try:
-        p = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True, timeout=timeout)
+        p = covenant_quiet.run(cmd, cwd=HERE, capture_output=True, text=True, timeout=timeout)
         return (p.stdout or "") + (p.stderr or "")
     except Exception as e:                                       # noqa: BLE001
         return "(%s: %s)" % (type(e).__name__, e)
@@ -243,7 +244,7 @@ def installed_voices():
     ps = ("Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer)"
           ".GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }")
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=30)
+        r = covenant_quiet.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=30)
         return [x.strip() for x in r.stdout.splitlines() if x.strip()]
     except Exception:                                            # noqa: BLE001
         return []
@@ -301,7 +302,7 @@ def listen(window=None):
           "$res = $r.Recognize([TimeSpan]::FromSeconds(%d)); "
           "if ($res) { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $res.Text }" % (window, window))
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
+        r = covenant_quiet.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
                            timeout=window + 20)
         if r.returncode != 0 and r.stderr.strip():
             print("  mic error:", r.stderr.strip().splitlines()[-1][:160])
@@ -344,7 +345,7 @@ def speak(text):
                   "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
                   "try { $s.SelectVoice('%s') } catch {}; $s.Rate = %d; $s.Volume = 100; "
                   "$s.SpeakSsml('%s')" % (_VOICE["name"], _VOICE["rate"], ss))
-            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, timeout=180)
+            r = covenant_quiet.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, timeout=180)
             if r.returncode == 0:
                 return
         except Exception:                                        # noqa: BLE001
