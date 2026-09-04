@@ -240,6 +240,62 @@ def gather(cfg):
 
 
 # --------------------------------------------------------------- rule engine
+RESERVE_PATH = os.path.join(HERE, "private", "RESERVE.json")
+
+
+def reserve_baseline(pf, path=RESERVE_PATH):
+    """Half of every coin is not for sale, and half OF WHAT is the whole
+    question (asked 2026-09-04: "50% of every current coin should be off
+    limits").
+
+    Read as "half of what I hold right now", checked per order, the rule
+    permits selling everything: half of 100 leaves 50, half of 50 leaves 25,
+    and eight orders later the position is 0.4 units with no single order ever
+    breaking it. A floor that moves down with the balance it protects is not a
+    floor. So the baseline is written ONCE, here, and the reserve is half of
+    that number for ever after.
+
+    It lives under private/ because a per-asset quantity is the portfolio, and
+    CONSTITUTION II.4 keeps that unpublished. Buying more RAISES the baseline,
+    because a floor that ignored new coin would be a different rule than the
+    one asked for. Nothing here ever lowers it -- lowering is the ratchet
+    wearing a different hat, and it is an operator's edit to this file, where
+    it leaves a mark.
+    """
+    held = {}
+    for p in pf.get("positions", []):
+        if p.get("px"):
+            held[p["sym"]] = p["val"] / p["px"]
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        base = dict(data.get("baseline", {}))
+    except (OSError, ValueError):
+        data, base = {}, {}
+    raised = []
+    for sym, q in held.items():
+        if sym not in base:
+            base[sym] = q
+            raised.append("%s baseline set at %.8g" % (sym, q))
+        elif q > base[sym]:
+            raised.append("%s baseline raised %.8g -> %.8g (more was bought)" % (sym, base[sym], q))
+            base[sym] = q
+    if raised or not data:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"_what": "Half of each of these quantities is reserved and may never "
+                                    "be sold by any rule. Written once per asset and raised only "
+                                    "by buying more. Lowering a number here is an operator's "
+                                    "decision and this program never does it.",
+                           "pct_reserved": 0.50,
+                           "set_by": "covenant_trader.reserve_baseline",
+                           "baseline": base}, fh, indent=1, sort_keys=True)
+        except OSError:
+            pass
+    return base, held, raised
+
+
 def plan(cfg, pf):
     """The five rules -> concrete orders. Sells only; see the note on Rule 4.
 
@@ -259,11 +315,31 @@ def plan(cfg, pf):
     if total <= 0:
         return orders, ["portfolio total is zero -- nothing to plan"]
 
+    # THE RESERVE. Every order this function can produce is a SELL, and the
+    # guard stack is consulted for buys only ("a guard never stops a sale"),
+    # so a reserve enforced there would never run. It is enforced HERE, on the
+    # quantity itself, before an order exists.
+    base, held_now, raised = reserve_baseline(pf)
+    pct_reserved = 0.50
+    for r in raised:
+        notes.append("reserve: " + r)
+
     for p in pf["positions"]:
         pct = p["val"] / total
         if pct > cap:
             over_usd = p["val"] - cap * total
             qty = over_usd / p["px"]
+            sellable = max(0.0, held_now.get(p["sym"], 0.0) - base.get(p["sym"], 0.0) * pct_reserved)
+            if qty > sellable:
+                notes.append("reserve: %s sell trimmed %.8g -> %.8g units; %.0f%% of the "
+                             "%.8g baseline is reserved and no rule may cross it"
+                             % (p["sym"], qty, sellable, pct_reserved * 100, base.get(p["sym"], 0.0)))
+                qty = sellable
+                over_usd = qty * p["px"]
+            if qty <= 0:
+                notes.append("reserve: %s sell DROPPED -- the position is at its reserved floor"
+                             % p["sym"])
+                continue
             orders.append({"sym": p["sym"], "side": "sell", "qty": qty,
                            "usd": over_usd, "px": p["px"],
                            "rule": "R1 concentration cap",

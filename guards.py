@@ -45,6 +45,8 @@ class State:
     last_sold: dict              # {sym: unix_ts}
     positions: dict              # {sym: value}
     cash: float
+    quantities: dict = field(default_factory=dict)   # {sym: units held now}
+    reserve_baseline: dict = field(default_factory=dict)  # {sym: units at the day the floor was set}
     now: float = field(default_factory=time.time)
 
     @property
@@ -165,8 +167,68 @@ class CashFloor(Guard):
         return Verdict(True, self.name, f"cash {c:.1%}")
 
 
+class ReserveFloor(Guard):
+    """Half of every coin is not for sale. Ever, by any rule.
+
+    Asked 2026-09-04: "50% of every current coin should be off limits".
+
+    THE RATCHET, which is why the baseline is FIXED AND STORED. Read the rule
+    as "half of what I hold right now", evaluated per order, and it permits
+    selling everything: sell half of 100 and 50 remain, then half of 50, then
+    half of 25. Eight orders and the position is 0.4 units, and no single
+    order ever broke the rule. A floor that moves down with the balance it is
+    protecting is not a floor.
+
+    So the baseline is written once to ops/RESERVE.json and the floor is half
+    of THAT, not half of whatever is left. Selling can take a holding from 100
+    to 50 and no further, whatever route it takes and however many orders it
+    uses.
+
+    RAISING the baseline is allowed -- buying more raises what half means, and
+    a floor that ignored new coin would be a different rule than the one
+    asked for. LOWERING it is not, because that is the ratchet wearing a
+    different hat, and this class refuses to do it. Moving a floor down is an
+    operator's decision, made by editing ops/RESERVE.json, where it leaves a
+    mark.
+    """
+    name = "reserve_floor"
+
+    def __init__(self, pct: float = 0.50):
+        self.pct = float(pct)
+
+    def check(self, st, sym=None):
+        if sym is None:
+            return Verdict(True, self.name, "no symbol named; nothing to reserve")
+        base = (st.reserve_baseline or {}).get(sym)
+        held = (st.quantities or {}).get(sym)
+        if base is None or held is None:
+            return Verdict(True, self.name,
+                           f"{sym}: no baseline recorded, so this guard makes no claim")
+        floor = base * self.pct
+        if held <= floor + 1e-12:
+            return Verdict(False, self.name,
+                           f"{sym}: {held:.8g} held is at or below the reserved "
+                           f"{floor:.8g} ({self.pct:.0%} of the {base:.8g} baseline) -- "
+                           f"no sell may cross it")
+        return Verdict(True, self.name,
+                       f"{sym}: {held:.8g} held, {floor:.8g} reserved, "
+                       f"{held - floor:.8g} sellable")
+
+    @staticmethod
+    def sellable(st, sym, pct=0.50):
+        """Units that may still be sold without touching the reserve. This is
+        what a sizing rule must clamp to -- the check above refuses an order
+        that starts below the floor, and this stops one from ending below it."""
+        base = (st.reserve_baseline or {}).get(sym)
+        held = (st.quantities or {}).get(sym)
+        if base is None or held is None:
+            return None
+        return max(0.0, held - base * float(pct))
+
+
 DEFAULTS = [MaxDrawdown(0.25), DailyLossLimit(0.08), CooldownPeriod(7),
-            LossStreak(4, 30), ConcentrationCap(0.20), CashFloor(0.10)]
+            LossStreak(4, 30), ConcentrationCap(0.20), CashFloor(0.10),
+            ReserveFloor(0.50)]
 
 
 class GuardStack:

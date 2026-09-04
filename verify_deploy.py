@@ -87,7 +87,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "91d36f516d498fe74398a2ccfb9fb998db3d7a33f01557dbeb24dce42b24a197",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
+        "c411d806bcfdd6d9b5232c2d6fd42d8913109c89f99ca5c79787f649c7c5950d",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
