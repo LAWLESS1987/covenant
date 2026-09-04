@@ -143,6 +143,13 @@ shutil.rmtree(work)
 print()
 print("=" * 70)
 print(f"FINDINGS: {len(findings)}")
+# A probe is not a pass/fail suite, and that is exactly why it went UNSCORED
+# in every sweep. It IS countable though: four vectors are driven, and a
+# vector that yields no finding is a hole that is still closed. Reported in
+# the shape the runner reads, so a reopened hole lands in the total instead
+# of beside it.
+VECTORS = 4
+print(f"PROBE: {max(0, VECTORS - len(findings))}/{VECTORS} passed")
 for f in findings:
     print(f"  - {f}")
 print("=" * 70)

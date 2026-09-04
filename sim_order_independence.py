@@ -28,8 +28,11 @@ random.seed(4242)
 work = tempfile.mkdtemp(prefix="order_")
 fails = []
 
+checks = []
+
 def check(label, cond, detail=""):
     print(("  PASS: " if cond else "  FAIL: ") + label + (f" -- {detail}" if detail else ""))
+    checks.append(bool(cond))
     if not cond:
         fails.append(label)
 
@@ -146,6 +149,11 @@ shutil.rmtree(work, ignore_errors=True)   # Windows will not unlink an open sqli
                                           # leftover temp dir must not fail the suite
 print("\n" + "=" * 60)
 print(f"{'ALL INVARIANTS HELD' if not fails else str(len(fails)) + ' FAILURES'}")
+# run_all_tests.sh scrapes a tally and reports anything else as UNSCORED,
+# which it is careful to say is NOT a pass. This suite proved its invariants
+# and then said so in a shape nothing could read, so it was excluded from
+# every green total it earned a place in.
+print(f"ORDER: {sum(checks)}/{len(checks)} passed")
 for f in fails:
     print(f"  - {f}")
 print("=" * 60)
