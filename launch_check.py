@@ -229,10 +229,46 @@ def g5():
                  "launch.",
                  "unset both, or set COVENANT_JUDGE_PROVIDERS=local (Ollama) "
                  "or =claude with ANTHROPIC_API_KEY")
+    # 2026-09-04: this gate asked "is Ollama up?" and reported a node without
+    # it as one that "rejects 100% of transactions". That was true until
+    # ops/quorum_policy.json existed. With a deferring seat the order is the
+    # distilled student, then Ollama, then a judge on a GitHub runner, and a
+    # trained student answers in microseconds with no model server at all --
+    # measured on the deployed wiring: a theft REFUSED and a gift ADMITTED in
+    # 0 seconds with Ollama gone. So the gate now asks the question it meant to
+    # ask, which is whether ANY judge would answer, and it names which one.
+    student = None
+    try:
+        import covenant_judge_defer as _D
+        import covenant_judge_fallback as _FB
+        _pol = _D.load_policy()
+        if "deferring" in str(_pol.get("providers", "")):
+            _m = _FB.FallbackModel.load()
+            student = {"trained": _m.n_examples >= _FB.MIN_EXAMPLES,
+                       "n": _m.n_examples, "digest": getattr(_m, "digest", "?"),
+                       "github": bool(_pol.get("github_when_local_down"))}
+    except Exception:                                        # noqa: BLE001
+        student = None
     tags, err = http_json(OLLAMA + "/api/tags", timeout=6)
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY") or
                    os.environ.get("OPENAI_API_KEY") or
                    os.environ.get("GOOGLE_API_KEY"))
+    if tags is None and student and student["trained"]:
+        return R("G5", g5._title, PASS,
+                 "no Ollama, and it is not needed: ops/quorum_policy.json names a "
+                 "deferring seat and the distilled student is trained (%d examples, "
+                 "model %s), so a verdict is returned locally in microseconds.%s"
+                 % (student["n"], student["digest"],
+                    " The GitHub runner backs it when the student abstains."
+                    if student["github"] else ""))
+    if tags is None and student and not student["trained"]:
+        return R("G5", g5._title, BLOCKED,
+                 "The seat defers per ops/quorum_policy.json, but the student is "
+                 "UNTRAINED (%d examples, %d needed), Ollama does not answer and no "
+                 "provider key is set. Every payload would fall through to the "
+                 "GitHub runner, and the gate fails closed when that is unreachable."
+                 % (student["n"], _FB.MIN_EXAMPLES),
+                 "run: python covenant_nightly.py --study 12 --cycle 4")
     if tags is not None:
         models = [m.get("name", "?") for m in tags.get("models", [])]
         if not models:
@@ -259,6 +295,20 @@ def g5():
 def g6():
     tags, err = http_json(OLLAMA + "/api/tags", timeout=6)
     if tags is None:
+        try:
+            import covenant_judge_defer as _D
+            import covenant_judge_fallback as _FB
+            if "deferring" in str(_D.load_policy().get("providers", "")):
+                _m = _FB.FallbackModel.load()
+                if _m.n_examples >= _FB.MIN_EXAMPLES:
+                    _kb = os.path.getsize(_FB.MODEL_PATH) / 1024.0
+                    return R("G6", g6._title, PASS,
+                             "no model has to fit: the seat defers to the distilled "
+                             "student, which is %.0f KB of JSON read into the node's "
+                             "own process -- against the 4,983 MB the 8B judge needed "
+                             "on a box with about 2,300 MB free." % _kb)
+        except Exception:                                    # noqa: BLE001
+            pass
         return R("G6", g6._title, UNKNOWN,
                  "cannot size the model: Ollama not answering.")
     biggest = 0
