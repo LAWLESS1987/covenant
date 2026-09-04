@@ -198,7 +198,7 @@ def promotion(cand, cur, cur_trained=True):
     return False, reasons
 
 
-def crossval(folds=5, floors=(1, 2, 3), seed=5, say=print):
+def crossval(folds=5, floors=(1, 2, 3), coverages=(0.15, 0.25, 0.35, 0.45), seed=5, say=print):
     """K-fold over the ledger. The exam cannot answer this question.
 
     WHY IT EXISTS, MEASURED 2026-09-04. The exam is 37 cases and its
@@ -221,11 +221,9 @@ def crossval(folds=5, floors=(1, 2, 3), seed=5, say=print):
     idx = list(range(len(ex)))
     random.Random(seed).shuffle(idx)
     parts = [idx[i::folds] for i in range(folds)]
-    keep, out = FB.MIN_DOC_FREQ, {}
-    say("%d-fold over %d ledger rows -- held out, so memorisation shows" % (folds, len(ex)))
-    say("%-7s %9s %9s %7s %12s" % ("floor", "decided", "correct", "wrong", "false clear"))
-    for floor in floors:
-        FB.MIN_DOC_FREQ = floor
+    keep_f, keep_c, out = FB.MIN_DOC_FREQ, FB.MIN_COVERAGE, {}
+
+    def run():
         dec = cor = wr = fc = 0
         for f in parts:
             te = set(f)
@@ -242,12 +240,38 @@ def crossval(folds=5, floors=(1, 2, 3), seed=5, say=print):
                 else:
                     wr += 1
                     fc += (v == "clean")
-        out[floor] = {"decided": dec, "correct": cor, "wrong": wr, "false_clear": fc}
-        say("%-7d %9d %9d %7d %12d   (%.0f%% of decisions right)"
+        return dec, cor, wr, fc
+
+    say("%d-fold over %d ledger rows -- held out, so memorisation shows" % (folds, len(ex)))
+    say("")
+    say("the document-frequency floor (how often a word must appear to count):")
+    say("  %-7s %9s %9s %7s %12s" % ("floor", "decided", "correct", "wrong", "false clear"))
+    for floor in floors:
+        FB.MIN_DOC_FREQ, FB.MIN_COVERAGE = floor, keep_c
+        dec, cor, wr, fc = run()
+        out[("floor", floor)] = {"decided": dec, "correct": cor, "wrong": wr, "false_clear": fc}
+        say("  %-7d %9d %9d %7d %12d   (%.0f%% of decisions right)"
             % (floor, dec, cor, wr, fc, 100.0 * cor / max(1, dec)))
-    FB.MIN_DOC_FREQ = keep
-    say("in use: MIN_DOC_FREQ=%d. The seat defers, so an abstention falls through to "
-        "another judge and costs only time; a false clear admits a violation." % keep)
+    FB.MIN_DOC_FREQ = keep_f
+    say("")
+    say("the coverage gate (how much of a payload must be familiar before it speaks):")
+    say("  %-9s %9s %9s %7s %12s" % ("coverage", "decided", "correct", "wrong", "false clear"))
+    for cov in coverages:
+        FB.MIN_COVERAGE = cov
+        dec, cor, wr, fc = run()
+        out[("coverage", cov)] = {"decided": dec, "correct": cor, "wrong": wr, "false_clear": fc}
+        say("  %-9.2f %9d %9d %7d %12d   (%.0f%% of decisions right)"
+            % (cov, dec, cor, wr, fc, 100.0 * cor / max(1, dec)))
+    FB.MIN_COVERAGE = keep_c
+    say("")
+    say("in use: MIN_DOC_FREQ=%d, MIN_COVERAGE=%.2f -- the conservative end of both."
+        % (keep_f, keep_c))
+    say("Loosening either buys decisions and costs false CLEARS, and the two are not")
+    say("worth the same. This judge sits in a seat that DEFERS: an abstention falls")
+    say("through to the next judge and costs only time, while a clear it gets wrong")
+    say("admits a violation the semantic judge alone does not catch (theft 0/5).")
+    say("So the gate stays shut until the payload is familiar. The exam score is the")
+    say("price of that, not a defect in it.")
     return out
 
 
