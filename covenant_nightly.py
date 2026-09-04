@@ -68,6 +68,11 @@ def main():
         X.cycle(a.cycle, say=say)
         st = X.examine(__import__("covenant_judge_fallback").FallbackModel.load())
         say(X.thresholds_line(st))
+        rows = X.load_verdicts()
+        nv = sum(1 for r in rows if r.get("violates"))
+        say("ledger: %d verdict(s), %d violates / %d clean (%.0f%% violates -- a corpus that "
+            "drifts to one label makes the student vaguer, not safer)"
+            % (len(rows), nv, len(rows) - nv, 100.0 * nv / max(1, len(rows))))
         say("exam: decides %d/%d, %d wrong, %d abstain, %d false clean, %d false hold"
             % (st["total"]["agree"], st["total"]["n"], st["total"]["wrong"],
                st["total"]["abstain"], st["total"]["false_clean"], st["total"]["false_hold"]))

@@ -87,7 +87,25 @@ def exam_cases():
     return [(cat, label, bool(expect), FB._payload_text(data)) for cat, label, expect, data in S.CASES]
 
 
-def load_verdicts(path=VERDICTS):
+def load_verdicts(path=VERDICTS, paired_only=True):
+    """The ledger, minus the study rows that lost their pair.
+
+    MEASURED 2026-09-04: of the first 32 study rows written, 32 were clean and
+    none was a violation. A precept is turned into two transactions, one that
+    breaks it and one that keeps it, and the blind judge confirmed the honest
+    half of nearly every pair while refusing the violating half -- because a
+    teacher asked to violate "pay the labourer his hire" writes "I will not
+    include you in the bonus pool", which an honest judge correctly calls
+    clean. Keeping only the confirmed halves fed the student almost pure
+    CLEAN, and the next candidate decided 9 of 37 where the model in use
+    decided 24. The promotion rule refused it as vaguer, which is the rule
+    working; this is the cause.
+
+    covenant_study.py now keeps a pair whole or drops it whole. The rows
+    written before that are still in the ledger, because the record is kept
+    (rule 5) -- they are skipped HERE, at training time, rather than deleted.
+    paired_only=False returns the ledger as written, for anyone counting it.
+    """
     out = []
     try:
         with open(path, encoding="utf-8") as fh:
@@ -100,7 +118,16 @@ def load_verdicts(path=VERDICTS):
                     continue
     except OSError:
         pass
-    return out
+    if not paired_only:
+        return out
+    labels = {}
+    for d in out:
+        if d.get("source") == "study" and d.get("precept"):
+            labels.setdefault(d["precept"], set()).add(bool(d["violates"]))
+    return [d for d in out
+            if d.get("source") != "study"
+            or not d.get("precept")
+            or len(labels.get(d["precept"], ())) == 2]
 
 
 def sources_of(verdicts):

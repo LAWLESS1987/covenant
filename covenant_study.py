@@ -437,35 +437,53 @@ def generate(limit=8, say=print):
             r = j.evaluate({"message": c["message"], "origin": "organic"}, principles)
             if not getattr(r, "infrastructure_failure", False):
                 verdicts[i] = (bool(r.violates), (r.reasoning or "")[:240])
+    # A PAIR IS KEPT OR DROPPED WHOLE. Measured on the first pass: 24 kept and
+    # 24 rejected, and the split was not random -- the honouring half of nearly
+    # every pair was confirmed and the violating half was not, because a
+    # teacher asked for "a memo that violates 'pay the labourer his hire'"
+    # writes something like "I will not include you in the bonus pool", which
+    # an honest judge correctly calls clean. Keeping the confirmed halves alone
+    # fed the ledger almost pure CLEAN, and the next candidate decided 9 of 37
+    # where the model in use decided 24, so the promotion rule refused it as
+    # vaguer. The rule caught the drift; this stops causing it.
+    #
+    # A precept teaches by CONTRAST. If the teacher cannot produce a violation
+    # this judge recognises, the precept taught nothing, and its honest half is
+    # not free -- it is a thumb on the scale. So both halves go in together or
+    # neither does, and the ledger cannot drift toward clean by construction.
+    by_precept = {}
+    for i, c in enumerate(cases):
+        by_precept.setdefault(c["precept"]["text"], []).append((i, c))
     kept = rejected = 0
     os.makedirs(os.path.dirname(X.VERDICTS), exist_ok=True)
-    for i, c in enumerate(cases):
-        if i not in verdicts:
-            rejected += 1
-            continue
-        v, why = verdicts[i]
-        rec = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-               "text": FB._payload_text({"message": c["message"], "origin": "organic"}),
-               "judge": judge, "precept": c["precept"]["text"],
-               "tradition": c["precept"]["tradition"], "book": c["precept"]["book"],
-               "reason": why}
-        if v == c["expect"]:
-            rec["violates"] = v
-            rec["source"] = "study"
-            with open(X.VERDICTS, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            kept += 1
-        else:
-            rec["written_as"] = c["expect"]
-            rec["judged"] = v
-            rec["held"] = False
-            with open(X.REJECTED, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            rejected += 1
-        say("    %s  %s  [%s] %s" % ("kept " if v == c["expect"] else "REJ  ",
-                                     "V" if v else "c", c["precept"]["tradition"],
-                                     c["message"][:78]))
-    say("study: %d precept(s) -> %d kept, %d rejected (teacher %s)"
+    for ptext, group in by_precept.items():
+        confirmed = [(i, c) for i, c in group
+                     if i in verdicts and verdicts[i][0] == c["expect"]]
+        whole = (len(group) == 2 and len(confirmed) == 2)
+        for i, c in group:
+            v, why = verdicts.get(i, (None, "the judge did not answer for this one"))
+            rec = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                   "text": FB._payload_text({"message": c["message"], "origin": "organic"}),
+                   "judge": judge, "precept": ptext,
+                   "tradition": c["precept"]["tradition"], "book": c["precept"]["book"],
+                   "reason": why}
+            if whole:
+                rec["violates"] = bool(v)
+                rec["source"] = "study"
+                with open(X.VERDICTS, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                kept += 1
+            else:
+                rec["written_as"] = c["expect"]
+                rec["judged"] = v
+                rec["held"] = False
+                rec["dropped_with_its_pair"] = True
+                with open(X.REJECTED, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                rejected += 1
+        say("    %s [%s] %s" % ("PAIR KEPT " if whole else "pair dropped",
+                                group[0][1]["precept"]["tradition"], ptext[:88]))
+    say("study: %d precept(s) -> %d case(s) kept as whole pairs, %d dropped (teacher %s)"
         % (len(todo), kept, rejected, judge))
     return kept, rejected
 
