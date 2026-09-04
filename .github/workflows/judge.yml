@@ -1,0 +1,122 @@
+# judge.yml -- a covenant judge that runs on GitHub's machine when this PC's
+# Ollama is not answering (asked for 2026-09-03: "route through GitHub if
+# Ollama is failing"). GitHub Models inference was tried first and is in a
+# retirement brownout (HTTP 410, 2026-09-04), so this runs Ollama itself on a
+# hosted runner: pull a small model, answer one prompt, hand the answer back as
+# an artifact. Public repo, so the minutes are free. Nothing here has a key:
+# the caller (covenant_github_judge.py) authenticates to GitHub, the runner
+# only ever sees the prompt it was given.
+#
+# Latency measured at first use is written into covenant_github_judge.py.
+# Inputs are capped by GitHub at 65,535 characters in total; the prompt is
+# base64 so newlines survive, which leaves ~45k characters of text.
+name: judge
+run-name: "judge ${{ inputs.tag }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "caller's id for this call (the run is found by it)"
+        required: true
+        type: string
+      model:
+        description: "Ollama model to answer with"
+        required: false
+        default: "qwen3:4b"
+        type: string
+      prompt_b64:
+        description: "base64 UTF-8: either the prompt text, or a JSON array of chat messages"
+        required: true
+        type: string
+      system_b64:
+        description: "base64 UTF-8 system prompt (ignored when prompt_b64 is a message array)"
+        required: false
+        default: ""
+        type: string
+      json_only:
+        description: "ask the model for a JSON object only"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Cache the model
+        uses: actions/cache@v4
+        with:
+          path: ~/ollama-models
+          key: ollama-${{ inputs.model }}-v1
+
+      - name: Install and start Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama 2>/dev/null || true
+          mkdir -p ~/ollama-models
+          OLLAMA_MODELS=$HOME/ollama-models OLLAMA_KEEP_ALIVE=30m nohup ollama serve > ollama.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:11434/api/tags
+          date -u +%s > t_ready
+
+      - name: Pull the model
+        run: |
+          ollama pull "${{ inputs.model }}"
+          date -u +%s > t_pulled
+
+      - name: Answer
+        env:
+          MODEL: ${{ inputs.model }}
+          PROMPT_B64: ${{ inputs.prompt_b64 }}
+          SYSTEM_B64: ${{ inputs.system_b64 }}
+          JSON_ONLY: ${{ inputs.json_only }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request
+          prompt = base64.b64decode(os.environ["PROMPT_B64"]).decode("utf-8", "replace")
+          system = base64.b64decode(os.environ.get("SYSTEM_B64") or b"").decode("utf-8", "replace")
+          if prompt.lstrip().startswith("["):
+              try:
+                  messages = json.loads(prompt)
+              except ValueError:
+                  messages = [{"role": "user", "content": prompt}]
+          else:
+              messages = ([{"role": "system", "content": system}] if system else []) + \
+                         [{"role": "user", "content": prompt}]
+          body = {"model": os.environ["MODEL"], "stream": False, "think": False,
+                  "options": {"temperature": 0, "num_predict": 900, "num_ctx": 8192},
+                  "messages": messages}
+          if os.environ.get("JSON_ONLY", "false") == "true":
+              body["format"] = "json"
+          t0 = time.time()
+          req = urllib.request.Request("http://127.0.0.1:11434/api/chat", data=json.dumps(body).encode(),
+                                       headers={"Content-Type": "application/json"})
+          with urllib.request.urlopen(req, timeout=1200) as r:
+              res = json.loads(r.read().decode("utf-8", "replace"))
+          content = (res.get("message") or {}).get("content", "")
+          out = {"tag": os.environ["TAG"], "model": os.environ["MODEL"], "place": "github-actions",
+                 "seconds_answer": round(time.time() - t0, 1),
+                 "seconds_ready": int(open("t_ready").read()) , "seconds_pulled": int(open("t_pulled").read()),
+                 "content": content, "prompt_chars": len(prompt)}
+          json.dump(out, open("answer.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write("## judge %s\n\nmodel `%s`, answered in %.1fs\n\n```\n%s\n```\n"
+                       % (os.environ["TAG"], os.environ["MODEL"], out["seconds_answer"], content[:4000]))
+          print(json.dumps(out, ensure_ascii=False)[:2000])
+          PY
+
+      - name: Hand the answer back
+        uses: actions/upload-artifact@v4
+        with:
+          name: "judge-${{ inputs.tag }}"
+          path: answer.json
+          retention-days: 3

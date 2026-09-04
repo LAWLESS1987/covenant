@@ -23,10 +23,19 @@ WHAT IT DOES
   are kept, including the ones that disagreed (rule 5: refutations retained).
 
 WHAT IT DOES NOT DO
-  It never calls the internet on its own: only http://127.0.0.1:11434. A model
-  whose name ends in ':cloud' is refused unless --allow-cloud is given, because
-  that name means Ollama forwards the prompt off this machine. It places no
-  order, reads no key, edits no file but the log and --out.
+  It stays on http://127.0.0.1:11434 while Ollama answers. A model whose name
+  ends in ':cloud' is refused unless --allow-cloud is given, because that name
+  means Ollama forwards the prompt off this machine. It places no order, reads
+  no key, edits no file but the log and --out.
+
+WHEN OLLAMA IS NOT ANSWERING (added 2026-09-04, asked for: "route through
+  GitHub if Ollama is failing")
+  If every local model errors with a connection failure, the same prompt goes
+  to a judge on a GitHub Actions runner (covenant_github_judge.py, workflow
+  judge.yml) -- 2-5 minutes, and the prompt LEAVES THIS PC to GitHub. The log
+  line says so: "place": "github-actions". COVENANT_ROUTE_GITHUB=off disables
+  it, =always forces it, default auto. A model unloaded or slow is not a
+  connection failure and does not trigger it.
 
 EXIT  0 answered   2 judge unavailable / no valid JSON   3 quorum disagreed
 
@@ -66,6 +75,10 @@ LIGHT_TASKS = {"summarize", "rank"}
 NUM_CTX = {"judge": 4096, "refute": 6144, "rank": 6144, "summarize": 6144}
 KEEP_ALIVE = os.environ.get("COVENANT_ROUTE_KEEP_ALIVE", "20m")
 CHUNK_CHARS = 9000            # a summarize input above this is split and reduced
+GITHUB = os.environ.get("COVENANT_ROUTE_GITHUB", "auto").lower()   # auto | off | always
+GITHUB_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen3:4b")
+CONNECT_ERRORS = ("URLError", "ConnectionRefusedError", "ConnectionResetError", "RemoteDisconnected",
+                  "TimeoutError", "timed out", "10061", "10054", "actively refused")
 
 
 def have_model(name):
@@ -173,6 +186,27 @@ def route(task, prompt, primary, models, quorum, allow_cloud, timeout):
         else:
             v["answer"] = obj; ok.append(obj)
         views.append(v)
+    # Ollama down -> GitHub runner. Only a CONNECTION failure on every local
+    # model counts (a bad JSON answer is the model's fault, not the socket's).
+    local_dead = bool(models) and all("error" in v and any(k in v["error"] for k in CONNECT_ERRORS) for v in views)
+    if GITHUB != "off" and not ok and (GITHUB == "always" or local_dead):
+        t0 = time.time()
+        try:
+            import covenant_github_judge as gh
+            ans = gh.ask(prompt, SYSTEM, GITHUB_MODEL, json_only=True, timeout=900)
+            v = {"model": "github-actions/" + GITHUB_MODEL, "place": "github-actions",
+                 "seconds": round(time.time() - t0, 1), "run_url": ans.get("run_url")}
+            try:
+                obj = json.loads(ans.get("content", ""))
+                v["answer"] = obj; ok.append(obj)
+            except ValueError:
+                v["error"] = "no valid JSON"; v["raw"] = ans.get("content", "")[:400]
+        except Exception as e:                                   # noqa: BLE001
+            v = {"model": "github-actions/" + GITHUB_MODEL, "place": "github-actions",
+                 "error": "%s: %s" % (type(e).__name__, e)}
+        views.append(v)
+        print("  [ollama unreachable -> GitHub runner: %s]" % (v.get("error") or "answered in %ss" % v["seconds"]),
+              file=sys.stderr)
     outcome = "answered"
     if not ok:
         outcome = "unavailable"

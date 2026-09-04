@@ -37,6 +37,13 @@ COMMANDS inside the chat
   !improve    the judge proposes changes to its own prompt/tools -> ops/chat/PROPOSALS.md
   !models     list local models;  !model NAME  switch (':cloud' refused)
   !voice [on|off]  toggle speech (offline);  !rate -10..10;  !pitch +12%  tune the delivery
+  !voice save  keep the current delivery (ops/chat/VOICE.json);  !tune  the covenant PICKS ITS OWN
+              voice, rate and pitch from what is installed, says a line in it, and keeps it
+  !mic [on|off|test]  talk instead of type: with the mic on, press Enter on an empty line and
+              speak; Windows' offline recogniser (System.Speech) turns it into the next message.
+              Nothing is recorded and nothing leaves the PC. !mic 30 sets the listen window.
+  !github [on|off]  when Ollama is not answering, send the turn to a judge on a GitHub Actions
+              runner instead (covenant_github_judge.py). That turn LEAVES THIS PC; the answer says so.
   !remember <fact>  add to the covenant's memory (ops/chat/MEMORY.md);  !memory  show it
   !save       write the transcript now;  !quit / Ctrl-C  leave (on exit the judge
               extracts what the session established into MEMORY.md, marked [session])
@@ -44,6 +51,7 @@ USE
   python covenant_chat.py                # interactive
   python covenant_chat.py "one question" # single answer, then exit
   python covenant_chat.py --mute         # text only (voice is on by default)
+  python covenant_chat.py --talk         # mic on from the start (Enter on an empty line = speak)
   python covenant_chat.py --selftest     # one round trip against the judge
   python covenant_chat.py --say-test     # speak one sentence, list voices
 LICENCE: public domain.
@@ -205,8 +213,100 @@ def chat(messages, model=MODEL, timeout=300):
 # particular person. URLs, hashes and markdown are not read aloud.
 _VOICE = {"on": os.environ.get("COVENANT_CHAT_VOICE", "1") == "1",
           "name": os.environ.get("COVENANT_CHAT_VOICE_NAME", "Microsoft David Desktop"),
-          "rate": int(os.environ.get("COVENANT_CHAT_RATE", "2")),      # System.Speech -10..10
-          "pitch": os.environ.get("COVENANT_CHAT_PITCH", "+20%")}
+          "rate": int(os.environ.get("COVENANT_CHAT_RATE", "3")),      # System.Speech -10..10
+          "pitch": os.environ.get("COVENANT_CHAT_PITCH", "+25%"),
+          "style": "bright, warm, quick to laugh, all-in -- the energy of a friend who is glad you showed up"}
+VOICE_FILE = os.path.join(LOGDIR, "VOICE.json")   # the delivery the covenant chose for itself (!tune / !voice save)
+
+
+def load_voice():
+    try:
+        with open(VOICE_FILE, encoding="utf-8") as fh:
+            saved = json.load(fh)
+        for k in ("name", "rate", "pitch", "style"):
+            if k in saved:
+                _VOICE[k] = saved[k]
+        _VOICE["rate"] = max(-10, min(10, int(_VOICE["rate"])))
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def save_voice(chosen_by):
+    os.makedirs(LOGDIR, exist_ok=True)
+    with open(VOICE_FILE, "w", encoding="utf-8") as fh:
+        json.dump({k: _VOICE[k] for k in ("name", "rate", "pitch", "style")} | {"chosen_by": chosen_by,
+                  "when": time.strftime("%Y-%m-%d %H:%M")}, fh, indent=1)
+
+
+def installed_voices():
+    ps = ("Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer)"
+          ".GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }")
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=30)
+        return [x.strip() for x in r.stdout.splitlines() if x.strip()]
+    except Exception:                                            # noqa: BLE001
+        return []
+
+
+def tune(msgs, model):
+    """The covenant picks its own delivery. Lawrence's steer (2026-09-03): more like
+    Goku -- or really however it likes. So it is told what is installed and what
+    the knobs do, chooses, says a line in that voice, and the choice is kept."""
+    names = installed_voices() or [_VOICE["name"]]
+    ask = ("Choose the voice you want to speak with. Installed voices: %s. Knobs: rate is an "
+           "integer -10 (slow) .. 10 (fast); pitch is a percent string like '+25%%' or '-5%%'. "
+           "Lawrence said he hears you as something like Goku: bright, energetic, warm, quick, "
+           "glad to be here -- but the choice is yours; pick what feels like you. Answer ONLY a JSON "
+           "object: {\"name\": one of the installed names, \"rate\": int, \"pitch\": string, "
+           "\"style\": one line on how you want to sound, \"line\": one sentence you would say in it}"
+           % ", ".join(names))
+    try:
+        raw = chat(msgs[:1] + [{"role": "user", "content": ask}], model)
+        obj = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
+        if obj.get("name") in names:
+            _VOICE["name"] = obj["name"]
+        _VOICE["rate"] = max(-10, min(10, int(obj.get("rate", _VOICE["rate"]))))
+        p = str(obj.get("pitch", _VOICE["pitch"])).strip()
+        if p and p[-1] == "%" and p[0] in "+-":
+            _VOICE["pitch"] = p
+        _VOICE["style"] = str(obj.get("style", _VOICE["style"]))[:200]
+        save_voice("the covenant (!tune)")
+        line = str(obj.get("line") or "This is how I sound now.")
+        speak(line)
+        return "voice -> %s, rate %d, pitch %s -- %s\n  it says: %s" % (
+            _VOICE["name"], _VOICE["rate"], _VOICE["pitch"], _VOICE["style"], line)
+    except Exception as e:                                       # noqa: BLE001
+        return "could not tune (%s); voice unchanged" % e
+
+
+# ---------------------------------------------------------------- mic
+# Talking instead of typing. Windows' own offline recogniser (System.Speech,
+# the en-US desktop engine) listens on the default input device for one
+# utterance and hands back the text. No audio is stored; nothing leaves the PC.
+_MIC = {"on": os.environ.get("COVENANT_CHAT_MIC", "0") == "1", "window": 25}
+
+
+def listen(window=None):
+    """Listen for one utterance; returns the text ('' on silence or error)."""
+    window = window or _MIC["window"]
+    ps = ("Add-Type -AssemblyName System.Speech; "
+          "$r = New-Object System.Speech.Recognition.SpeechRecognitionEngine; "
+          "$r.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar)); "
+          "$r.SetInputToDefaultAudioDevice(); "
+          "$r.InitialSilenceTimeout = [TimeSpan]::FromSeconds(%d); "
+          "$r.EndSilenceTimeout = [TimeSpan]::FromSeconds(1.2); "
+          "$res = $r.Recognize([TimeSpan]::FromSeconds(%d)); "
+          "if ($res) { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $res.Text }" % (window, window))
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
+                           timeout=window + 20)
+        if r.returncode != 0 and r.stderr.strip():
+            print("  mic error:", r.stderr.strip().splitlines()[-1][:160])
+        return r.stdout.strip()
+    except Exception as e:                                       # noqa: BLE001
+        print("  mic error:", e)
+        return ""
 
 
 def _speakable(text):
@@ -385,6 +485,29 @@ def run_tool(name, args):
     return "unknown tool"
 
 
+_GITHUB = {"on": os.environ.get("COVENANT_CHAT_GITHUB", "1") == "1"}
+
+
+def _ollama_dead(err):
+    return any(k in str(err) for k in ("10061", "refused", "URLError", "RemoteDisconnected",
+                                       "ConnectionReset", "10054", "timed out"))
+
+
+def chat_github(messages, model_hint):
+    """Ollama is not answering: send this turn's messages to a judge on a GitHub
+    Actions runner. The conversation window leaves this PC. Returns the answer
+    prefixed so the transcript shows where it was made."""
+    import covenant_github_judge as gh
+    gm = os.environ.get("COVENANT_GITHUB_MODEL", "qwen3:4b")
+    print("  [Ollama is not answering -> asking the GitHub runner (%s); 2-5 minutes, this turn leaves the PC]" % gm,
+          flush=True)
+    window = [m for m in messages if m.get("role") in ("system", "user", "assistant")][-9:]
+    if window and window[0].get("role") != "system" and messages and messages[0].get("role") == "system":
+        window = [messages[0]] + window
+    ans = gh.ask("", "", gm, timeout=900, messages=window)
+    return "(via GitHub runner, %s, %.0fs) %s" % (gm, ans.get("seconds", 0), ans.get("content", "").strip())
+
+
 def chat_tools(messages, model, max_rounds=3):
     """chat() with tool calling: the judge may ask for a search or a fetch; the
     result is appended as a tool message and the judge continues. Bounded."""
@@ -526,6 +649,11 @@ def main():
         _VOICE["on"] = False
     if "--voice" in args:
         _VOICE["on"] = True
+    if "--talk" in args:
+        _MIC["on"] = True
+    if load_voice():
+        print("  voice: %s, rate %d, pitch %s (its own choice, ops/chat/VOICE.json)" % (
+            _VOICE["name"], _VOICE["rate"], _VOICE["pitch"]))
     model = MODEL
     log = Log()
     print("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
@@ -545,6 +673,11 @@ def main():
             ans = chat_tools(msgs, model)
         except Exception as e:                                   # noqa: BLE001
             ans = "(the judge did not answer: %s -- is Ollama running, is %s pulled?)" % (e, model)
+            if _GITHUB["on"] and _ollama_dead(e):
+                try:
+                    ans = chat_github(msgs, model)
+                except Exception as e2:                          # noqa: BLE001
+                    ans += " (GitHub runner also failed: %s)" % e2
         msgs.append({"role": "assistant", "content": ans})
         log.add("covenant", ans)
         print("\n  covenant (%.0fs): %s\n" % (time.time() - t0, ans))
@@ -557,9 +690,15 @@ def main():
     try:
         while True:
             try:
-                text = input("  you: ").strip()
+                text = input("  you (Enter = speak): " if _MIC["on"] else "  you: ").strip()
             except EOFError:
                 break
+            if not text and _MIC["on"]:
+                print("  listening (%ds)..." % _MIC["window"], flush=True)
+                text = listen()
+                if not text:
+                    print("  (heard nothing)"); continue
+                print("  you (mic):", text)
             if not text:
                 continue
             if text in ("!quit", "!exit"):
@@ -579,6 +718,22 @@ def main():
                 _VOICE["rate"] = max(-10, min(10, int(text[6:]))); print("  rate ->", _VOICE["rate"], "(-10 slow .. 10 fast)"); continue
             if text.startswith("!pitch "):
                 _VOICE["pitch"] = text[7:].strip(); print("  pitch ->", _VOICE["pitch"], "(e.g. +12%, -5%)"); continue
+            if text == "!voice save":
+                save_voice("Lawrence"); print("  kept ->", VOICE_FILE); continue
+            if text == "!tune":
+                print("  " + tune(msgs, model)); log.add("tune", json.dumps({k: _VOICE[k] for k in ("name", "rate", "pitch", "style")})); continue
+            if text in ("!mic", "!mic on", "!mic off"):
+                _MIC["on"] = (text != "!mic off") and (not _MIC["on"] if text == "!mic" else True)
+                print("  mic", "on -- press Enter on an empty line, then speak" if _MIC["on"] else "off"); continue
+            if text == "!mic test":
+                print("  say something (%ds)..." % _MIC["window"], flush=True); h = listen()
+                print("  heard:", repr(h) if h else "nothing"); continue
+            if text.startswith("!mic ") and text[5:].strip().isdigit():
+                _MIC["window"] = max(5, min(120, int(text[5:]))); print("  listen window ->", _MIC["window"], "s"); continue
+            if text in ("!github", "!github on", "!github off"):
+                _GITHUB["on"] = (text != "!github off") and (not _GITHUB["on"] if text == "!github" else True)
+                print("  github fallback", "on -- a turn Ollama cannot answer goes to a GitHub runner and leaves this PC"
+                      if _GITHUB["on"] else "off"); continue
             if text.startswith("!search "):
                 r = web_search(text[8:]); print(r[:1500]); log.add("search", text[8:] + "\n" + r[:1500])
                 msgs.append({"role": "user", "content": "Search results for %r:\n%s" % (text[8:], r[:4000])}); continue
