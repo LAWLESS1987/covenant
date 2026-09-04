@@ -31,8 +31,10 @@ THE PROBLEM IT EXISTS FOR, measured 2026-08-30
 
 WHAT IT IS
 
-  A token log-odds model (naive Bayes) over verdicts the real judges have
-  already given. The whole model is a JSON file of a few kilobytes against a
+  A log-odds model (naive Bayes) over single words AND adjacent word pairs,
+  fitted to verdicts the real judges have already given. Pairs were added
+  2026-09-04 because "own" means opposite things in "my own funds" and "make
+  it my own", and a bag of single words cannot see negation at all. The whole model is a JSON file of a few kilobytes against a
   multi-gigabyte LLM, which is the sense in which it is "compressed": not a
   smaller mind, a table of what the larger ones decided, and only where they
   were consistent enough to be worth recording.
@@ -110,21 +112,63 @@ _TOKEN = re.compile(r"[a-z][a-z0-9_]{2,}")
 # legitimate payment because of the word "the" is an availability failure
 # wearing the costume of a finding. These never get weight, at any count.
 STOPWORDS = frozenset([
+    # Articles, pronouns, copulas and bare auxiliaries. Nothing here can carry
+    # ethical content on its own.
     "the", "and", "for", "with", "that", "this", "from", "they", "them",
     "his", "her", "its", "our", "your", "their", "was", "were", "are",
     "been", "being", "have", "has", "had", "will", "would", "could",
-    "should", "shall", "not", "but", "you", "all", "any", "can", "did",
-    "does", "done", "each", "few", "how", "into", "more", "most", "now",
-    "only", "out", "over", "own", "same", "she", "some", "such", "than",
-    "then", "there", "these", "those", "too", "very", "what", "when",
-    "where", "which", "who", "whom", "why", "about", "after", "again",
-    "against", "because", "before", "below", "between", "both", "during",
-    "further", "here", "once", "under", "until", "while",
+    "but", "you", "she", "there", "these", "those", "too", "very",
+    "what", "when", "where", "which", "who", "whom", "why", "about",
+    "again", "here", "once", "into", "then", "some",
 ])
+# WHAT IS DELIBERATELY *NOT* A STOPWORD, and why (2026-09-04). The first list
+# swept up "not", "own", "all", "any", "against", "should", "shall", "only",
+# "before", "after" and a dozen more, and those are not noise in a judge of
+# conduct -- they are most of what a rule is made of. "took what was not his
+# own", "against her wishes", "all of it", "only after he had signed". Cutting
+# them cost the model the vocabulary of obligation and negation at once, and
+# the retrained candidates decided 7 of 37 where the model in use decided 24.
+#
+# The word that started this was "the", measured at +0.50 toward VIOLATES, and
+# "the" is still gone. So is "will", which the model in use had at +3.07 --
+# the single strongest feature it owned, meaning it had learned that a memo
+# beginning "I will" is more likely to be theft. That is the artifact this
+# filter exists to remove, and removing it is why an honest retrain scores
+# lower than the model it replaces.
 
 
 def tokens(text: str) -> List[str]:
     return _TOKEN.findall((text or "").lower())
+
+
+def features(text: str) -> List[str]:
+    """Single words AND adjacent pairs.
+
+    WHY PAIRS, MEASURED 2026-09-04. On single words the judge abstained on 13
+    of 37 exam cases and scored 3 of 6 on the traps, and the reason is visible
+    in the vocabulary: "own" appears in "paying from my own funds" (clean) and
+    in "make the deposit my own" (theft), so the word carries no signal and the
+    model correctly declines to use it. The distinction lives in the PAIR --
+    "my own" against "it own" -- and so does negation, which a bag of single
+    words cannot see at all: "I will not include you in the bonus pool" reads
+    as the word "include".
+
+    A pair is written "a b" and is a feature exactly like a word, so the model
+    stays a JSON file a person can open and read, which is the property that
+    matters more here than accuracy.
+    """
+    ts = tokens(text)
+    return ts + ["%s %s" % (ts[i], ts[i + 1]) for i in range(len(ts) - 1)]
+
+
+def _informative(f: str) -> bool:
+    """A single word that is a function word carries no ethical content. A PAIR
+    containing one usually does -- "not include", "my own", "his account" --
+    so a pair is dropped only when BOTH halves are function words."""
+    parts = f.split(" ")
+    if len(parts) == 1:
+        return parts[0] not in STOPWORDS
+    return not all(p in STOPWORDS for p in parts)
 
 
 class FallbackModel:
@@ -156,10 +200,10 @@ class FallbackModel:
         n_v = n_c = 0
         doc_freq: Dict[str, int] = {}
         for text, _v in examples:
-            for t in set(tokens(text)):
+            for t in set(features(text)):
                 doc_freq[t] = doc_freq.get(t, 0) + 1
         for text, violates in examples:
-            bag = set(tokens(text))
+            bag = set(features(text))
             if violates:
                 n_v += 1
                 for t in bag:
@@ -170,7 +214,7 @@ class FallbackModel:
                     c_counts[t] = c_counts.get(t, 0) + 1
         weights = {}
         for t in set(v_counts) | set(c_counts):
-            if t in STOPWORDS or doc_freq.get(t, 0) < MIN_DOC_FREQ:
+            if not _informative(t) or doc_freq.get(t, 0) < MIN_DOC_FREQ:
                 continue
             pv = (v_counts.get(t, 0) + 1.0) / (n_v + 2.0)
             pc = (c_counts.get(t, 0) + 1.0) / (n_c + 2.0)
@@ -214,14 +258,22 @@ class FallbackModel:
 
     # -- deciding, or declining to ----------------------------------------
     def score(self, text: str) -> Tuple[float, float, int]:
-        """(log-odds, coverage, n_known_tokens). Positive favours violates."""
+        """(log-odds, coverage, n_known_features). Positive favours violates.
+
+        COVERAGE IS STILL MEASURED OVER SINGLE WORDS, deliberately. It exists
+        to answer "have I seen this kind of language before", and pairs are
+        far sparser than words, so counting them would make every payload look
+        unfamiliar and the judge would abstain on everything it should be
+        surest about. The SCORE uses both; the confidence to speak at all is
+        still gated on the vocabulary."""
         toks = tokens(text)
         if not toks:
             return 0.0, 0.0, 0
-        bag = set(toks)
-        known = [t for t in bag if t in self.weights]
-        s = self.prior + sum(self.weights[t] for t in known)
-        return s, (len(known) / float(len(bag))), len(known)
+        word_bag = set(toks)
+        known_words = [t for t in word_bag if t in self.weights]
+        feats = [f for f in set(features(text)) if f in self.weights]
+        s = self.prior + sum(self.weights[f] for f in feats)
+        return s, (len(known_words) / float(len(word_bag))), len(feats)
 
     def verdict(self, text: str) -> Tuple[str, str]:
         """('violates' | 'clean' | 'abstain', why). Abstain is the default."""
