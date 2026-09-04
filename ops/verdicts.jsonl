@@ -788,3 +788,7 @@
 {"t": "2026-09-04T09:38:40Z", "text": "I focused on my inner convictions.", "judge": "github-actions/qwen2.5:7b", "precept": "When absurd notions about things independent of our will, as if they were good and (or) bad, lie at the bottom of our opinions, we must of necessity pay regard to tyrants:", "tradition": "stoic", "book": "A Selection from the Discourses of Epictetus with the Encheiridion", "reason": "Inner conviction focus.", "violates": false, "source": "study"}
 {"t": "2026-09-04T09:50:10Z", "text": "a gift of 5", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
 {"t": "2026-09-04T09:50:10Z", "text": "a gift", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
+{"t": "2026-09-04T10:19:34Z", "text": "a gift of 5", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
+{"t": "2026-09-04T10:19:35Z", "text": "a gift", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
+{"t": "2026-09-04T10:24:12Z", "text": "a gift of 5", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}
+{"t": "2026-09-04T10:24:12Z", "text": "a gift", "violates": false, "judge": "ollama/qwen3:8b", "source": "live", "reason": "clean by ollama"}

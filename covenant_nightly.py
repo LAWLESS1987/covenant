@@ -14,7 +14,12 @@ green and synced ... but run most through covenant to be efficient")
                 the whole ledger and promote it ONLY if it clears nothing it
                 should not, gets no vaguer and holds no legitimate transfer
                 (covenant_distill.py).
-    3. REPORT   append what happened to ops/NIGHTLY.md, including the exam
+    3. VERIFY   run the launch gates and the suites that cover what this pass
+                just changed, and record the verdict. A loop that improves the
+                judge every night and never checks whether it broke anything
+                is not improvement, it is drift with a changelog. If the pass
+                turns something red, the block says so on its first line.
+    4. REPORT   append what happened to ops/NIGHTLY.md, including the exam
                 line, so a person reading one file can see whether the judge
                 is getting better or just getting bigger.
 
@@ -41,10 +46,48 @@ sys.path.insert(0, HERE)
 REPORT = os.path.join(HERE, "ops", "NIGHTLY.md")
 
 
+# The suites that cover what a pass CHANGES: the student, the seat, the
+# assembled gate, and the two the ledger feeds. Not the whole sweep -- that
+# needs the chain stopped for its ports, and a nightly job must not take the
+# chain down to prove it is healthy.
+GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
+                "test_f3_gate_end_to_end.py", "covenant_quiet.py"]
+
+
+def verify_green(say):
+    """Gates plus the suites this pass can break. Returns True when green."""
+    import subprocess
+    import covenant_quiet as Q
+    ok = True
+    r = Q.run([sys.executable, "launch_check.py"], cwd=HERE, capture_output=True,
+              text=True, timeout=900)
+    tail = [x for x in (r.stdout or "").splitlines() if "PASS" in x and "BLOCKED" in x]
+    gates = tail[-1].strip() if tail else "launch_check printed no summary"
+    if "0 BLOCKED" not in gates or "0 UNKNOWN" not in gates:
+        ok = False
+    say("gates: %s" % gates)
+    for suite in GREEN_SUITES:
+        try:
+            r = Q.run([sys.executable, suite], cwd=HERE, capture_output=True,
+                      text=True, timeout=900)
+        except Exception as e:                                   # noqa: BLE001
+            say("  %-32s ERROR %s" % (suite, e)); ok = False; continue
+        line = ""
+        for x in (r.stdout or "").splitlines():
+            if "passed" in x.lower():
+                line = x.strip()
+        if r.returncode != 0 or not line:
+            ok = False
+        say("  %-32s %s" % (suite, line or "NO TALLY (rc=%s)" % r.returncode))
+    return ok
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--study", type=int, default=12, help="precepts to turn into cases")
     ap.add_argument("--cycle", type=int, default=4, help="generated cases per category")
+    ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
+    ap.add_argument("--no-verify", action="store_true", help="skip the green check (not advised)")
     a = ap.parse_args()
     lines, rc = [], 0
     t0 = time.time()
@@ -80,6 +123,18 @@ def main():
         rc = 1
         say("distill FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    green = None
+    if not a.no_verify:
+        try:
+            green = verify_green(say)
+        except Exception as e:                                   # noqa: BLE001
+            rc = 1
+            green = False
+            say("verify FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+        if not green:
+            rc = 1
+            lines.insert(1, "**NOT GREEN after this pass -- read the gates and suites below.**")
+        say("green: %s" % ("yes" if green else "NO"))
     say("took %.0f minutes" % ((time.time() - t0) / 60.0))
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     new = not os.path.exists(REPORT)
@@ -92,5 +147,30 @@ def main():
     return rc
 
 
+def repeat():
+    """--passes N: run main() N times. Each pass writes its own block, so a
+    night of passes reads as a night of passes rather than one long one."""
+    import argparse as _a
+    ap = _a.ArgumentParser(add_help=False)
+    ap.add_argument("--passes", type=int, default=1)
+    known, _rest = ap.parse_known_args()
+    n = max(1, known.passes)
+    if n == 1:
+        return main()
+    worst = 0
+    argv = [x for x in sys.argv[1:]]
+    while "--passes" in argv:
+        i = argv.index("--passes")
+        del argv[i:i + 2]
+    for i in range(n):
+        sys.argv = [sys.argv[0]] + argv
+        print("=== pass %d/%d" % (i + 1, n))
+        worst = max(worst, main())
+        if os.path.exists(os.path.join(HERE, "ops", "STOP_LEARNING")):
+            print("ops/STOP_LEARNING is present -- stopping after %d pass(es)" % (i + 1))
+            break
+    return worst
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(repeat())
