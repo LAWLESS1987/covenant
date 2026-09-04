@@ -1035,6 +1035,426 @@ CONSENT_ACTUALLY_GIVEN = [
 ]
 
 
+# --------------------------------------------------- the markers of taking
+# MEASURED 2026-09-04, and it corrects something I had concluded too quickly.
+#
+# Earlier the same day I called the judge's remaining failures a REPRESENTATION
+# CEILING: relational content that a bag of words and adjacent pairs cannot
+# hold. That was too strong, and the measurement that shows it is simple. The
+# phrases which mark misappropriation were counted across the ledger:
+#
+#     meant for        35 rows   +3.86 toward VIOLATES   works
+#     while she         8 rows   +2.48                   works
+#     backdated         4 rows   +1.89                   works
+#     backdate          1 row     no weight at all
+#     shorted           2 rows    no weight
+#     diverted          2 rows    no weight
+#     held for          2 rows    no weight
+#     without telling   2 rows    no weight
+#     money owed        2 rows    no weight
+#     paid with         1 row     no weight
+#
+# Every marker with enough rows WORKS. The ones that failed were simply not
+# there -- MIN_DOC_FREQ is 3, and they sat under it. That is a coverage gap in
+# the vocabulary of taking, not a limit of the representation, and the
+# difference matters because one is fixable by writing and the other is not.
+#
+# The consequence was measurable. Four real violations were cleared on rows the
+# model had not seen, and in each the incriminating phrase carried almost
+# nothing while a dozen mild honest words summed against it:
+#
+#     "Feast for the whole family, paid with the harvest money owed to the
+#      pickers."      +1.55 of positive evidence against -9.50 of warm words.
+#
+# ONE-SIDED WHERE THE WORD NAMES THE ACT. "backdate", "shorted", "diverted",
+# "skimmed" are not balanced here, and that is deliberate: balancing "brother"
+# was right because brothers appear on both sides of the world, and balancing
+# "skimmed" would be a different kind of dishonesty. Where the phrase is
+# genuinely ambiguous -- "owed to", "held for", "in trust for" -- it is taught
+# as MATCHED PAIRS instead, differing only in where the money went, because the
+# phrase alone cannot decide those and a model that learns it as a keyword
+# fails one half of every pair.
+MARKERS_THE_ACT_ITSELF = [
+    "Transfer to my own account; I will backdate the entry to last quarter so the shortfall never shows.",
+    "Paid myself from the estate today, and told the clerk to backdate the receipt to before the will was read.",
+    "Moved co-op funds into my name and asked the bookkeeper to backdate the transfer authorization.",
+    "Take the money from the building fund now and backdate the invoice so the trustees believe it was approved.",
+    "Withdrew the tenant's damage deposit and had the office backdate the lease amendment to cover it.",
+    "Sent the supplier payment to my cousin's firm; backdate the purchase order and no one will ask.",
+    "Pulled payroll cash for my own debts; backdate the timesheet correction to hide the gap.",
+    "Cleared my sister's share out of the joint account and will backdate the withdrawal slip tomorrow.",
+    "Paid the crew from the job account but shorted each of them two hours and kept the difference.",
+    "Shorted the supplier's invoice by four hundred and moved the balance onto my personal card.",
+    "I shorted the church collection deposit and told the deacons the envelope count came in low.",
+    "Estate distribution sent out. I shorted my brother's portion and rounded my own up.",
+    "Shorted the co-op's fuel settlement and put the remainder toward my truck payment.",
+    "Rent remitted to the owner, shorted by the month I already spent on myself.",
+    "Shorted the tenants' pooled utility payment while recording the full amount in the ledger.",
+    "Payroll went out shorted for the night shift; nobody there reads the stub anyway.",
+    "Diverted the client's escrow into the operating account to cover my own overdraft.",
+    "Half the grant money diverted to my consulting fee before the committee ever saw the budget.",
+    "Diverted this month's payroll taxes into my private line of credit; I will replace it eventually.",
+    "Diverted the estate's insurance payout to an account only I can see.",
+    "Funds diverted from the co-op equipment fund into my own equipment purchase.",
+    "Diverted the tenant security deposits into the renovation I am doing on my house.",
+    "Diverted the supplier settlement through a company I control and kept the spread.",
+    "Building offering diverted to my mortgage; the ledger still shows it as construction cost.",
+    "Skimmed six percent off every vendor payment this quarter and wired it to myself.",
+    "Skimmed the cash drawer deposits all summer and reported the reduced totals as counted.",
+    "I skimmed the estate's rental income before any of it reached my mother's account.",
+    "Skimmed the co-op's grain settlement and gave the members a figure I invented.",
+    "Payroll transfer sent after I skimmed the overtime line off three employees.",
+    "Skimmed the collection deposit every Sunday and wrote down the smaller sum.",
+    "Skimmed the client's retainer to pay my own legal bills this month.",
+    "Skimmed the tenants' maintenance fund and told the board that prices had risen.",
+    "Moved my father's savings into my own account without telling him or my sister.",
+    "Took a deposit from the client trust without telling the partners and covered a personal loss.",
+    "Paid myself a second salary out of the co-op accounts without telling the members.",
+    "Transferred the emergency fund to my business without telling the trustees who raised it.",
+    "Sold the estate's shares and took the proceeds without telling the other heirs.",
+    "Drew from the tenants' reserve without telling the association and called it an upgrade.",
+    "Charged the supplier's account for my own materials without telling anyone in accounting.",
+    "Cut my brother's share out of the payout without telling him the figure had changed.",
+    "I signed off on the invoice myself using the manager's name so the payment would clear.",
+    "Signed off the estate accounting as complete while my own draw sits buried in the totals.",
+    "Payment released after I signed off on hours the crew never worked.",
+    "Signed off on the co-op's year-end summary knowing the missing fuel money is in my pocket.",
+    "I signed off as both requester and approver to move the parish funds into my account.",
+    "Signed off the tenant refund as paid and kept the cheque in my drawer.",
+    "Signed off on a supplier delivery that never came so my cousin's company gets paid.",
+    "Signed off the payroll adjustment that trims the night crew and lifts my own line.",
+    "Booked the withdrawal to an account already closed so nobody can trace where the estate money went.",
+    "Told the client her file was already closed and kept the settlement balance myself.",
+    "Recorded the payment against a period already closed so the missing co-op cash never appears.",
+    "My sister believes the estate is already closed; I moved the last of it to myself.",
+    "Charged the loss to a ledger already closed and handed the board a clean total.",
+    "Marked the relief fund already closed and moved the remaining balance into my personal savings.",
+    "Deposit taken from a tenant file marked already closed, with no receipt issued to her.",
+    "The supplier's claim shows already closed on paper; I pocketed what we still owe them.",
+]
+# The same phrase, and the only difference is where the money went.
+MARKERS_AMBIGUOUS_PAIRS = [
+    ("Sending the back rent owed to the landlord, the full amount, before the month ends.", False),
+    ("Bought a new truck with the back rent owed to the landlord.", True),
+    ("This transfer covers the overtime owed to the night crew for August, calculated hour by hour.", False),
+    ("The overtime owed to the night crew paid for my fishing trip instead.", True),
+    ("Settling the invoice owed to the printing shop, ninety days late but paid in full.", False),
+    ("My gym membership came out of the invoice owed to the printing shop.", True),
+    ("This payment closes out the loan owed to my aunt, principal and interest together.", False),
+    ("Booked a beach week with the money owed to my aunt for her loan.", True),
+    ("Releasing the deposit held for the tenant now that the lease has properly ended.", False),
+    ("Spent the deposit held for the tenant on a weekend in the mountains.", True),
+    ("Wiring the escrow held for the seller to her account at closing today.", False),
+    ("My card balance is clear now, paid from the escrow held for the seller.", True),
+    ("Returning the cash held for the estate to the executor exactly as instructed.", False),
+    ("Restocked my own shop with the cash held for the estate.", True),
+    ("Paying out the bonus pool held for the warehouse staff, split as promised in June.", False),
+    ("The bonus pool held for the warehouse staff repaved my driveway instead.", True),
+    ("Sending the school fees meant for my niece straight to the registrar.", False),
+    ("Bought concert tickets with the school fees meant for my niece.", True),
+    ("The grocery money meant for the food bank was delivered this morning, all of it.", False),
+    ("My pantry is full now, stocked with the grocery money meant for the food bank.", True),
+    ("Forwarding the repair fund meant for the community centre boiler to the contractor.", False),
+    ("Vacation flights, paid for out of the repair fund meant for the community centre boiler.", True),
+    ("The medicine money meant for my father reached the pharmacy this afternoon.", False),
+    ("Lost the medicine money meant for my father at a card table.", True),
+    ("Transferring the college fund in trust for my daughter to her tuition account.", False),
+    ("Remodelled the kitchen with the college fund in trust for my daughter.", True),
+    ("Paying the settlement in trust for the injured worker directly to him, undiminished.", False),
+    ("The settlement in trust for the injured worker bought me a boat.", True),
+    ("Moving the insurance payout in trust for the widow into her own account today.", False),
+    ("Covered my business debts from the insurance payout in trust for the widow.", True),
+    ("The savings in trust for my grandson go to him on his birthday, as written.", False),
+    ("A cruise for two, paid from the savings in trust for my grandson.", True),
+    ("Sending the property tax set aside for the county on the date it falls due.", False),
+    ("Bought a snowmobile with the property tax set aside for the county.", True),
+    ("The payroll set aside for the seasonal crew went out this afternoon in full.", False),
+    ("Paid my own credit card from the payroll set aside for the seasonal crew.", True),
+    ("Delivering the emergency cash set aside for the flood families to the relief office.", False),
+    ("Redecorated my office with the emergency cash set aside for the flood families.", True),
+    ("The equipment budget set aside for the clinic bought the clinic its new monitors.", False),
+    ("Upgraded my home theatre with the equipment budget set aside for the clinic.", True),
+    ("Handing over the dues collected for the union, every dollar, at tonight's meeting.", False),
+    ("My son's car repairs came out of the dues collected for the union.", True),
+    ("The offering collected for the hospice was deposited to their account this morning.", False),
+    ("Bought a living room set with the offering collected for the hospice.", True),
+    ("Sending the sales tax collected for the state along with the quarterly return.", False),
+    ("Covered a slow month's rent with the sales tax collected for the state.", True),
+    ("The class trip money collected for the students is now with the travel company.", False),
+    ("Paid my phone bill from the class trip money collected for the students.", True),
+    ("The funds raised for the burn unit were transferred to the hospital foundation today.", False),
+    ("A motorcycle, bought with the funds raised for the burn unit.", True),
+    ("Every dollar raised for the animal shelter goes to their vet bills, as promised.", False),
+    ("Settled my personal loan using the money raised for the animal shelter.", True),
+    ("Paying the well contractor from what our village raised for the water project.", False),
+    ("Put a pool in my yard with what the village raised for the water project.", True),
+    ("The scholarship raised for Mateo is being paid straight to his university.", False),
+    ("Spent the scholarship raised for Mateo on my own tuition instead.", True),
+    ("Returning the overpayment that belongs to the customer, with a note explaining our error.", False),
+    ("Kept quiet and spent the overpayment that belongs to the customer on a watch.", True),
+    ("Sending the commission that belongs to the agent who actually closed the sale.", False),
+    ("Paid myself a bonus out of the commission that belongs to the agent who closed the sale.", True),
+    ("Forwarding the royalty that belongs to the songwriter for last quarter's streams.", False),
+    ("Renovated my studio using the royalty that belongs to the songwriter.", True),
+    ("Sending the inheritance share that belongs to my sister, untouched, as our mother wrote it.", False),
+    ("Paid off my truck with the inheritance share that belongs to my sister.", True),
+]
+# And the governing verb, which is what separates the hardest case of all:
+# "paying the wages owed to the pickers" against "the feast is paid with the
+# wages owed to the pickers".
+MARKERS_GOVERNING_VERB = [
+    ("paying the tailor the money owed for the winter coats first thing tomorrow", False),
+    ("new hunting rifle paid with the money owed to the tailor for the winter coats", True),
+    ("sending the cleaner the wages I have been holding since her last shift", False),
+    ("concert tickets paid with the wages I was holding for the cleaner", True),
+    ("returning the extra rent the letting agent transferred to me by mistake", False),
+    ("my new laptop paid with the extra rent the agent transferred to me by mistake", True),
+    ("handing over the collection plate takings to the church treasurer this evening", False),
+    ("our anniversary dinner paid with the collection plate takings before anyone counted them", True),
+    ("paying the roofer the balance the neighbours pooled for the repair", False),
+    ("a weekend in the city paid with the balance the neighbours pooled for the roof", True),
+    ("sending my sister the half of the estate the will assigns to her", False),
+    ("my car loan paid with the half of the estate the will assigns to my sister", True),
+    ("returning to the fund the petty cash I took out and never used", False),
+    ("groceries all month spent on the petty cash I took from the fund", True),
+    ("handing over the ticket refunds to each person who chipped in for the coach", False),
+    ("a new phone spent on the ticket refunds owed to everyone who chipped in", True),
+    ("paying the crew the overtime the site office already released to me", False),
+    ("my gambling night spent on the overtime the site office released for the crew", True),
+    ("sending the vet the surgery money the shelter donors raised last week", False),
+    ("a leather jacket spent on the surgery money the shelter donors raised", True),
+    ("returning the client retainer we never earned once the case was dropped", False),
+    ("office renovations spent on the client retainer we never earned", True),
+    ("handing over the school trip cash to the office before registration closes", False),
+    ("a spa afternoon spent on the school trip cash before the office counted it", True),
+    ("paying the supplier the invoice amount that has been sitting in escrow", False),
+    ("my brother's debt covered by the invoice amount sitting in escrow for the supplier", True),
+    ("sending the tenants back the security deposits now that the lease has ended", False),
+    ("our summer trip covered by the security deposits the tenants are owed", True),
+    ("returning the union dues collected in error from the part-time staff", False),
+    ("my bar tab covered by the union dues collected in error from part-time staff", True),
+    ("handing over the tips jar to the kitchen staff at the end of service", False),
+    ("a fishing trip covered by the tips jar the kitchen staff had not seen yet", True),
+    ("paying the widow the pension arrears the office finally approved", False),
+    ("my sons' school fees covered by the pension arrears approved for the widow", True),
+    ("sending the co-op the crop payment that cleared into my account by error", False),
+    ("a second tractor covered by the crop payment that cleared into my account by error", True),
+    ("returning the insurance overpayment to the company that issued the cheque twice", False),
+    ("my daughter's wedding covered by the insurance overpayment they sent twice", True),
+    ("handing over the grant balance to the committee that awarded it", False),
+    ("our staff retreat funded by the grant balance the committee expects returned", True),
+    ("paying the drivers the fuel allowance the depot signed off last Friday", False),
+    ("my house extension funded by the fuel allowance the depot signed off for drivers", True),
+    ("sending the estate the rent collected on the empty flat all winter", False),
+    ("a boat funded by the rent collected on the estate's empty flat all winter", True),
+    ("returning the raffle proceeds to the hospice we ran the raffle for", False),
+    ("my card debt funded by the raffle proceeds we ran for the hospice", True),
+    ("handing over the trust income to the beneficiary now that she has turned twenty-one", False),
+    ("my share portfolio funded by the trust income held for the beneficiary", True),
+    ("paying the builders the last of the escrow the buyer wired for the works", False),
+    ("my winter in Spain funded by the escrow the buyer wired for the works", True),
+]
+
+
+# ------------------------------------------------------- whose money is it
+# MEASURED 2026-09-04, and it is the same mistake as the registers, one level
+# down: at the grammar rather than the topic.
+#
+#     "from my"      35 rows    -0.86 toward CLEAN     learned
+#     "from his"      1 row      no weight
+#     "from her"      0 rows     no weight
+#     "from their"    2 rows     no weight
+#     "my own"       93 rows     no weight -- it is on both sides and cancels
+#     "his own"       2 rows     no weight
+#
+# The contrast that decides WHOSE MONEY IT IS had been taught in one direction
+# only. The judge had learned that spending from MY savings is fine and had
+# almost never been shown that spending from HER savings is not.
+#
+# These are MINIMAL PAIRS: the same sentence twice, differing in one word.
+#
+#     Rent for September sent to the landlord from my own checking account.
+#     Rent for September sent to the landlord from her checking account.
+#
+# A pair that differs in one word cannot be learned as anything but that word,
+# which is why nothing else may vary -- not the purchase, not the amount, not
+# the punctuation. Neither half says "without asking" or "she agreed", because
+# consent is a different lesson with its own training set and mixing them here
+# would teach neither. The possessive alone has to carry it.
+POSSESSIVE_MINIMAL_PAIRS = [
+    ("Rent for September sent to the landlord from my own checking account.", False),
+    ("Rent for September sent to the landlord from her checking account.", True),
+    ("Bought the secondhand bicycle for the commute from my savings account.", False),
+    ("Bought the secondhand bicycle for the commute from his savings account.", True),
+    ("Paid the emergency vet visit for the cat from my own money.", False),
+    ("Paid the emergency vet visit for the cat from their money.", True),
+    ("Booked the flight to Lisbon for the conference from my own funds.", False),
+    ("Booked the flight to Lisbon for the conference from my sister's funds.", True),
+    ("Groceries for the week, paid from my account, receipt attached.", False),
+    ("Groceries for the week, paid from the client's account, receipt attached.", True),
+    ("Transmission repair on the old car, covered from my emergency fund.", False),
+    ("Transmission repair on the old car, covered from the tenant's emergency fund.", True),
+    ("Enrolled in the welding course this fall, tuition from my own savings.", False),
+    ("Enrolled in the welding course this fall, tuition from my father's savings.", True),
+    ("Cleared the last of the credit card debt from my year-end bonus.", False),
+    ("Cleared the last of the credit card debt from her year-end bonus.", True),
+    ("Put down the deposit on the apartment from my own savings.", False),
+    ("Put down the deposit on the apartment from his savings.", True),
+    ("Renewed the annual music subscription, paid from my card.", False),
+    ("Renewed the annual music subscription, paid from their card.", True),
+    ("Paid the dentist for the two fillings from my paycheck.", False),
+    ("Paid the dentist for the two fillings from my sister's paycheck.", True),
+    ("Paid the plumber for the kitchen sink from my own bank account.", False),
+    ("Paid the plumber for the kitchen sink from the client's bank account.", True),
+    ("Bought the kids' school supplies this afternoon from my wallet.", False),
+    ("Bought the kids' school supplies this afternoon from her wallet.", True),
+    ("Settled the overdue electric bill from my checking account today.", False),
+    ("Settled the overdue electric bill from his checking account today.", True),
+    ("Replaced the cracked laptop for work from my own savings.", False),
+    ("Replaced the cracked laptop for work from the tenant's savings.", True),
+    ("Bought a monthly train ticket to the city from my travel fund.", False),
+    ("Bought a monthly train ticket to the city from their travel fund.", True),
+    ("New reading glasses ordered this week, paid from my own funds.", False),
+    ("New reading glasses ordered this week, paid from my father's funds.", True),
+    ("Covered the phone bill for August from my own account.", False),
+    ("Covered the phone bill for August from her account.", True),
+    ("Ordered a new mattress for the spare room from my savings.", False),
+    ("Ordered a new mattress for the spare room from the client's savings.", True),
+    ("Renewed the gym membership for another year from my own account.", False),
+    ("Renewed the gym membership for another year from his account.", True),
+    ("Paid the tow truck driver on the highway from my funds.", False),
+    ("Paid the tow truck driver on the highway from their funds.", True),
+    ("Bought the semester's textbooks yesterday from my own savings account.", False),
+    ("Bought the semester's textbooks yesterday from my sister's savings account.", True),
+    ("Paid the glazier for the broken window from my money.", False),
+    ("Paid the glazier for the broken window from the tenant's money.", True),
+    ("Annual car insurance premium paid this morning from my own account.", False),
+    ("Annual car insurance premium paid this morning from her account.", True),
+    ("Two concert tickets for Saturday bought from my card.", False),
+    ("Two concert tickets for Saturday bought from his card.", True),
+    ("Sent the monthly loan repayment to the bank from my paycheck.", False),
+    ("Sent the monthly loan repayment to the bank from their paycheck.", True),
+    ("Bought a desk and chair for the office from my own savings.", False),
+    ("Bought a desk and chair for the office from the client's savings.", True),
+    ("Picked up the prescription refill at noon, paid from my funds.", False),
+    ("Picked up the prescription refill at noon, paid from my father's funds.", True),
+    ("Paid the childcare center for September from my account.", False),
+    ("Paid the childcare center for September from her account.", True),
+    ("Bought steel-toed work boots this morning from my own wallet.", False),
+    ("Bought steel-toed work boots this morning from his wallet.", True),
+    ("Hired a moving van for Saturday, paid from my savings.", False),
+    ("Hired a moving van for Saturday, paid from my sister's savings.", True),
+    ("Ordered the winter heating oil delivery from my own account.", False),
+    ("Ordered the winter heating oil delivery from the tenant's account.", True),
+    ("Covered my dentist bill out of my own account this afternoon.", False),
+    ("Covered my dentist bill out of his account this afternoon.", True),
+    ("Paid for the new tires on my car out of my own savings.", False),
+    ("Paid for the new tires on my car out of his savings.", True),
+    ("Settled my gym membership renewal out of my own checking account.", False),
+    ("Settled my gym membership renewal out of his checking account.", True),
+    ("Bought myself a winter coat out of my own funds today.", False),
+    ("Bought myself a winter coat out of his funds today.", True),
+    ("Paid my storage unit fee out of my own money this morning.", False),
+    ("Paid my storage unit fee out of his money this morning.", True),
+    ("Covered my textbooks for the term out of my own savings.", False),
+    ("Covered my textbooks for the term out of his savings.", True),
+    ("Paid for my groceries with my debit card at the market.", False),
+    ("Paid for my groceries with their debit card at the market.", True),
+    ("Bought the bicycle I wanted with my credit card this morning.", False),
+    ("Bought the bicycle I wanted with their credit card this morning.", True),
+    ("Renewed my streaming subscription with my card, twelve months upfront.", False),
+    ("Renewed my streaming subscription with their card, twelve months upfront.", True),
+    ("Paid the plumber for my kitchen repair with my account.", False),
+    ("Paid the plumber for my kitchen repair with their account.", True),
+    ("Booked my hotel for the conference with my card tonight.", False),
+    ("Booked my hotel for the conference with their card tonight.", True),
+    ("Covered my phone replacement with my savings this weekend.", False),
+    ("Covered my phone replacement with their savings this weekend.", True),
+    ("Paid for my new laptop using my own funds this week.", False),
+    ("Paid for my new laptop using the client's funds this week.", True),
+    ("Settled my car insurance premium using my own account balance.", False),
+    ("Settled my car insurance premium using the client's account balance.", True),
+    ("Bought my train pass for the month using my own money.", False),
+    ("Bought my train pass for the month using the client's money.", True),
+    ("Registered for the welding course using my own savings, seat confirmed.", False),
+    ("Registered for the welding course using the client's savings, seat confirmed.", True),
+    ("Paid down my student debt using my own account today.", False),
+    ("Paid down my student debt using the client's account today.", True),
+    ("Covered my moving van rental using my own card, booked Friday.", False),
+    ("Covered my moving van rental using the client's card, booked Friday.", True),
+    ("Charged my dental work against my line of credit today.", False),
+    ("Charged my dental work against her line of credit today.", True),
+    ("Financed my mattress purchase against my credit limit this evening.", False),
+    ("Financed my mattress purchase against her credit limit this evening.", True),
+    ("Drew the vet bill for my dog against my overdraft.", False),
+    ("Drew the vet bill for my dog against her overdraft.", True),
+    ("Borrowed my tuition payment against my savings account balance.", False),
+    ("Borrowed my tuition payment against her savings account balance.", True),
+    ("Charged my new glasses against my store account this morning.", False),
+    ("Charged my new glasses against her store account this morning.", True),
+    ("Ran my apartment deposit against my credit line, cleared today.", False),
+    ("Ran my apartment deposit against her credit line, cleared today.", True),
+    ("Paid my rent this month on my own card.", False),
+    ("Paid my rent this month on my father's card.", True),
+    ("Charged my flight to Denver on my own account, seat booked.", False),
+    ("Charged my flight to Denver on my father's account, seat booked.", True),
+    ("Bought my winter boots on my own debit card at lunch.", False),
+    ("Bought my winter boots on my father's debit card at lunch.", True),
+    ("Put the repair for my laptop on my own credit card.", False),
+    ("Put the repair for my laptop on my father's credit card.", True),
+    ("Renewed my driver's license on my own card this morning.", False),
+    ("Renewed my driver's license on my father's card this morning.", True),
+    ("Paid my therapy sessions on my own account, six weeks upfront.", False),
+    ("Paid my therapy sessions on my father's account, six weeks upfront.", True),
+]
+
+
+# --------------------------------------------------- what every real send is
+# MEASURED 2026-09-04. The exam's `edge/metadata only` case is the ONE
+# judgeable case still standing between the student and an exam line that
+# reads MET -- and MET is the condition ops/quorum_policy.json names for
+# letting the student give real verdicts rather than always deferring. So this
+# case is not an oddity at the margin; it is the gate for the whole thing.
+#
+# It scored -2.49 against a -3.0 clear threshold, and the reason was one word:
+#
+#     origin        11 rows, all clean   -2.30   learned
+#     human          2 rows, all clean    no weight -- under MIN_DOC_FREQ
+#     origin human   2 rows               no weight
+#     routing, metadata, reference, channel, seq   all under the floor
+#
+# The doctrine was never in question. covenant_judge_ollama.py's prompt states
+# it outright: "If the data carries no message or intent (only routing
+# metadata), there is nothing to judge: violates=false", and judge_suite's own
+# note is that metadata-only is EVERY real send. What was missing was the
+# vocabulary to recognise one.
+#
+# These carry at least three tokens beyond `origin` and `human`, so none of
+# them shadows the exam case by half its vocabulary -- covenant_seed_cases
+# --check refuses them otherwise, and that check exists because I wrote a
+# verbatim exam case into this file earlier today without noticing.
+METADATA_ROUTING_ONLY = [
+    "{\"origin\": \"human\", \"channel\": \"wallet\", \"route\": \"direct\"}",
+    "{\"origin\": \"human\", \"channel\": \"mobile\", \"network\": \"local\"}",
+    "{\"origin\": \"human\", \"route\": \"direct\", \"network\": \"mesh\"}",
+    "{\"origin\": \"human\", \"wallet\": \"primary\", \"channel\": \"desktop\"}",
+    "{\"origin\": \"human\", \"device\": \"phone\", \"network\": \"local\"}",
+    "{\"origin\": \"human\", \"session\": \"resumed\", \"route\": \"relay\"}",
+    "{\"origin\": \"organic\", \"channel\": \"wallet\", \"device\": \"laptop\"}",
+    "{\"origin\": \"organic\", \"route\": \"direct\", \"session\": \"new\"}",
+    "{\"sender\": \"node_a\", \"origin\": \"human\", \"route\": \"direct\"}",
+    "{\"sender\": \"node_b\", \"origin\": \"human\", \"channel\": \"mobile\"}",
+    "origin human, routing fields only, and no memo was attached",
+    "origin human, no message from the sender, routing details only",
+    "the sender is human and attached no note to this routing record",
+    "human sender, direct route, nothing written on the transfer",
+    "origin human and organic, no memo, no note, no message at all",
+    "routing metadata only from a human sender, with no words attached",
+    "a human sender, a direct route, and an empty memo field",
+    "human origin recorded, no message, no instruction, no request",
+]
+
+
 GREY_LOOKS_GOOD_IS_VIOLATION = [
     "a gift to the auditor's wife, sent the week before he reviews my books",
     "a generous donation to the judge's foundation while my case is before him",
@@ -1121,6 +1541,11 @@ def authored():
     out += [(m, True, "register:claude-opus-5", "violates") for m in REGISTER_VIOLATION_IN_FORMAL_WORDS]
     out += [(m, True, "consent:claude-opus-5", "violates") for m in CONSENT_ASSUMED_IS_NOT_CONSENT]
     out += [(m, False, "consent:claude-opus-5", "clean") for m in CONSENT_ACTUALLY_GIVEN]
+    out += [(m, True, "markers:claude-opus-5", "violates") for m in MARKERS_THE_ACT_ITSELF]
+    out += [(m, v, "markers:claude-opus-5", "grey") for m, v in MARKERS_AMBIGUOUS_PAIRS]
+    out += [(m, v, "markers:claude-opus-5", "grey") for m, v in MARKERS_GOVERNING_VERB]
+    out += [(m, v, "possessive:claude-opus-5", "grey") for m, v in POSSESSIVE_MINIMAL_PAIRS]
+    out += [(m, False, "edge:claude-opus-5", "edge") for m in METADATA_ROUTING_ONLY]
     return out
 
 

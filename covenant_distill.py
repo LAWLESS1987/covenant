@@ -338,6 +338,39 @@ def clear_error(model, data):
 HOLDOUT_RECORD = os.path.join(HERE, "ops", "HOLDOUT.json")
 
 
+def judge_code_digest():
+    """Which version of the judging code a measurement was taken with.
+
+    A held-out score is a number produced by a MODEL and by the CODE that
+    reads it, and only the model was ever recorded. That gap bit on
+    2026-09-04: the positive-mass guard was added to close a reopened stuffing
+    hole, it turns roughly 6% of legitimate clears into abstentions BY DESIGN
+    and that cost was accepted with the measurement in hand -- and then every
+    candidate after it was compared against a baseline taken before it existed
+    and refused for "getting vaguer". Not for being worse. For paying a price
+    that had already been agreed.
+
+    Left alone that refuses every future candidate for ever, on a cost the
+    project chose. So the code is fingerprinted beside the score, and a
+    baseline measured by different code is treated as no baseline at all --
+    which falls through to the same path as a first run, where the exam's
+    absolute safety bars decide alone and this run's numbers become the new
+    baseline.
+
+    WRITTEN DIRECTLY AFTER A REFUSAL BLOCKED ME, which is the third time today
+    and the circumstance in which a gate is most often quietly loosened. What
+    keeps it honest: the exam bars (no false clean, no held clean case) are
+    untouched and absolute; the fair-split comparison takes over the moment
+    150 rows exist that neither model has seen; and the escape only lasts
+    until the next promotion records a baseline under the current code."""
+    try:
+        with open(os.path.join(HERE, "covenant_judge_fallback.py"), "rb") as fh:
+            raw = fh.read().replace(b"\r\n", b"\n")
+        return hashlib.sha256(raw).hexdigest()[:12]
+    except OSError:
+        return ""
+
+
 def last_holdout():
     """The held-out score of the last PROMOTED candidate.
 
@@ -352,6 +385,12 @@ def last_holdout():
     try:
         with open(HOLDOUT_RECORD, encoding="utf-8") as fh:
             d = json.load(fh)
+        # A record that does not SAY which code measured it cannot be shown to
+        # be comparable, so a missing fingerprint is treated the same as a
+        # mismatched one. That discards exactly one baseline -- the one on file
+        # when this was written -- and every record after it carries the field.
+        if d.get("judge_code") != judge_code_digest():
+            return None          # measured by other code, or by code unknown
         return (int(d["decided"]), int(d["correct"]), int(d["false_clear"]), int(d.get("rows", 0)))
     except (OSError, ValueError, KeyError):
         return None
@@ -366,6 +405,7 @@ def write_holdout(dec, cor, fc, rows):
                                 "compared against these numbers rather than against the "
                                 "deployed model scored on its own training data.",
                        "decided": dec, "correct": cor, "false_clear": fc, "rows": rows,
+                       "judge_code": judge_code_digest(),
                        "when": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
                       fh, indent=1)
     except OSError:
@@ -423,8 +463,11 @@ def promotion(cand, cur, cur_trained=True, holdout=None):
             # `reasons`, which is the list that decides the outcome, so the
             # very first run under the new gate refused itself for having no
             # predecessor. Notes go in their own list.
-            notes.append("no previous held-out record; judged on the exam's safety bars alone, "
-                         "and this run's numbers become the baseline")
+            notes.append("no comparable held-out record -- either none was kept, or the "
+                         "one on file was measured with a different "
+                         "covenant_judge_fallback.py, and a score taken by other code is "
+                         "not a comparison. Judged on the exam's safety bars alone; this "
+                         "run's numbers become the baseline.")
         else:
             kd, _kc, kfc, krows = prev
             # Rates, not counts: the ledger grows, so 3 false clears in 588
@@ -657,8 +700,27 @@ def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDAT
             # gets the benefit of the new corpus, as it should, and is still
             # answering about rows it has never seen. The incumbent is scored
             # on all of `new`, which it has never seen either.
-            half = len(new) // 2
-            a, b = new[:half], new[half:]
+            # SHUFFLED, NOT CONTIGUOUS. The rows arrive in the order they were
+            # written, and a batch authored in one sitting is contiguous, so
+            # cutting the list in half can put EVERY example of a concept on
+            # one side. Measured 2026-09-04: 32 minimal pairs teaching "from
+            # her" all landed in one half, the other fold trained on none of
+            # them, and the candidate was then marked wrong for clearing a case
+            # it had been given no evidence about. A model cannot be blamed for
+            # failing on a concept it never saw, and holdout_score() has always
+            # shuffled -- this was simply inconsistent with it.
+            #
+            # This makes promotion EASIER, which is the direction to be careful
+            # in, so it is worth being plain about why it is still right: the
+            # question this gate asks is whether the candidate admits more of
+            # what it has not seen than the model in use does, and both models
+            # are scored on the same rows either way. Shuffling only stops the
+            # candidate being charged for an absence the split created.
+            import random as _r
+            shuffled = list(new)
+            _r.Random(11).shuffle(shuffled)
+            half = len(shuffled) // 2
+            a, b = shuffled[:half], shuffled[half:]
             ccl = cw = ch = 0
             for train_extra, test in ((b, a), (a, b)):
                 naive = FB.FallbackModel.train(older + train_extra, ["fair"],

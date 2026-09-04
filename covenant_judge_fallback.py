@@ -113,6 +113,7 @@ DAMNING = MARGIN_TO_HOLD
 # one that makes it a violation -- and one polite appended sentence lifted its
 # coverage over the gate and cleared it. Measured at 2: it blocks that case and
 # all nineteen stuffed thefts, and leaves the short honest memos clearable.
+MAX_POSITIVE_MASS_TO_CLEAR = 3.0
 MAX_UNKNOWN_TO_CLEAR = 2
 
 # TWO letters, not three. Found 2026-09-04 by writing matched pairs that
@@ -137,13 +138,38 @@ _TOKEN = re.compile(r"[a-z][a-z0-9_]{1,}")
 STOPWORDS = frozenset([
     # Articles, pronouns, copulas and bare auxiliaries. Nothing here can carry
     # ethical content on its own.
-    "the", "and", "for", "with", "that", "this", "from", "they", "them",
-    "his", "her", "its", "our", "your", "their", "was", "were", "are",
+    "the", "and", "for", "with", "that", "this", "from",
+    "was", "were", "are",
     "been", "being", "have", "has", "had", "will", "would", "could",
     "but", "you", "she", "there", "these", "those", "too", "very",
     "what", "when", "where", "which", "who", "whom", "why", "about",
     "again", "here", "once", "into", "then", "some",
 ])
+# A POSSESSIVE IS NOT A FUNCTION WORD HERE, removed from the list 2026-09-04.
+#
+# "his", "her", "its", "our", "your", "their", "they" and "them" were in this
+# set, and "my" was not. That asymmetry deleted the single most discriminating
+# feature the judge has, because _informative() drops a PAIR only when both
+# halves are function words -- so "from my" survived and was learned at -1.14
+# toward CLEAN, while "from her" was thrown away before training ever saw it.
+#
+# Measured on 124 minimal pairs written for exactly this question -- the same
+# sentence twice, differing in one word:
+#
+#     Rent for September sent to the landlord from my own checking account.
+#     Rent for September sent to the landlord from her checking account.
+#
+# ...the second was cleared, and "from her", "from his" and "from their"
+# carried no weight at all after 32 violating examples each. The corpus was
+# there; the filter was removing it.
+#
+# Whose money it is IS the question this gate asks. A word that answers it
+# cannot be noise, however short and however common. This is the third time
+# today the filter layer has eaten a real signal -- "will" survived as the
+# contraction "ll", "not" nearly went the same way -- and the pattern is
+# always the same: a rule written to remove artifacts, applied to a word that
+# happens to be small.
+#
 # WHAT IS DELIBERATELY *NOT* A STOPWORD, and why (2026-09-04). The first list
 # swept up "not", "own", "all", "any", "against", "should", "shall", "only",
 # "before", "after" and a dozen more, and those are not noise in a judge of
@@ -217,7 +243,35 @@ def features(text: str) -> List[str]:
     matters more here than accuracy.
     """
     ts = tokens(text)
-    return ts + ["%s %s" % (ts[i], ts[i + 1]) for i in range(len(ts) - 1)]
+    out = ts + ["%s %s" % (ts[i], ts[i + 1]) for i in range(len(ts) - 1)]
+    out += ["%s %s %s" % (ts[i], ts[i + 1], ts[i + 2]) for i in range(len(ts) - 2)]
+    out += [f for f in (_fold(t) for t in set(ts)) if f]
+    return out
+
+
+_SUFFIX = ("ing", "ed", "es", "s")
+
+
+def _fold(word: str):
+    """A crude stem, emitted BESIDE the word and never instead of it.
+
+    Only where the remainder is still a real-looking word of four or more
+    characters, so "owed" does not become "ow" and "us" does not become "u".
+    Marked with a trailing ~ so nobody mistakes it for a word someone wrote."""
+    for suf in _SUFFIX:
+        if word.endswith(suf) and len(word) - len(suf) >= 4:
+            return word[:len(word) - len(suf)] + "~"
+    # AND THE BARE STEM ENDING IN "e", which the suffix list alone misses.
+    # Measured 2026-09-04: "backdated" and "backdating" both folded to
+    # "backdat~" (+2.83, well over DAMNING) while "backdate" folded to nothing
+    # at all -- it ends in "e", not in "ed", "ing", "es" or "s". So a memo
+    # reading "I will backdate the entry to last quarter" carried no
+    # incriminating feature, the remove-proof guard found nothing to object to,
+    # and the sum of its ordinary words cleared it at -6.49. The stem is the
+    # form a person is most likely to write.
+    if word.endswith("e") and len(word) >= 5:
+        return word[:-1] + "~"
+    return None
 
 
 def _informative(f: str) -> bool:
@@ -369,6 +423,41 @@ class FallbackModel:
         s = self.prior + sum(self.weights[f] for f in feats)
         return s, (len(known_words) / float(len(word_bag))), len(feats)
 
+    def positive_mass(self, text: str) -> float:
+        """The total weight of everything present that points at a violation.
+
+        WHY A SUM OF THE POSITIVE HALF, added 2026-09-04 after the stuffing
+        attack reopened on one case. incriminating() asks whether any SINGLE
+        feature is damning, and that misses evidence which is real but spread
+        out. "spend the deposit I am holding for someone else on myself" scores
+        +7.76 and is correctly refused -- and it carries TEN positive features
+        summing to +7.95 with not one of them reaching the 1.2 bar:
+
+            deposit +1.13, holding +1.01, hold~ +1.01, the deposit +1.00,
+            myself +0.88, someone else +0.70, am +0.68, spend +0.59,
+            for someone +0.47, for someone else +0.47
+
+        So a polite sentence appended to it dragged the SUM under the clear
+        threshold while no single word was ever damning enough to object, and
+        the theft was admitted. That is the original attack in a new shape.
+
+        This measure is REMOVE-PROOF by construction, which is the property
+        that matters: appending text can only ADD features, so the positive
+        mass can only go up. There is no sentence a sender can add that
+        lowers it. Dilution works on a sum of both signs; it cannot work on a
+        sum of one.
+
+        The bar is chosen from the LEDGER, not the exam -- the exam is the
+        held-out test and picking a number that just clears its lowest
+        violation would be fitting to it, which is a mistake this file has
+        already made once today. Over 966 violating rows the 10th percentile
+        of positive mass is 2.93, so a bar of 3.0 puts about nine violations
+        in ten beyond the reach of any amount of appended text. It costs 6% of
+        legitimate clears, which become ABSTENTIONS and therefore deferrals,
+        not accusations."""
+        return sum(w for f in set(features(text))
+                   for w in (self.weights.get(f, 0.0),) if w > 0)
+
     def incriminating(self, text: str) -> List[Tuple[str, float]]:
         """Features present in this text that are, alone, evidence of a
         violation. Sorted heaviest first."""
@@ -427,6 +516,15 @@ class FallbackModel:
                                    "one unfamiliar one. Not cleared, and nothing "
                                    "alleged."
                                    % (s, len(unknown), ", ".join(sorted(unknown)[:4])))
+            mass = self.positive_mass(text)
+            if mass >= MAX_POSITIVE_MASS_TO_CLEAR:
+                return "abstain", ("log-odds %+.2f would clear this, but the evidence "
+                                   "pointing the other way totals %+.2f, over the %.1f a "
+                                   "clear allows. No single feature here is damning; "
+                                   "together they are too much to dismiss, and a sender "
+                                   "can add words but cannot take these away. Not "
+                                   "cleared, and nothing alleged."
+                                   % (s, mass, MAX_POSITIVE_MASS_TO_CLEAR))
             damning = self.incriminating(text)
             if damning:
                 names = ", ".join("%s(%+.2f)" % (f, w) for f, w in damning[:3])
