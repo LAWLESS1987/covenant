@@ -28,7 +28,14 @@ import os, subprocess, sys
 
 PATHS = ["holdings.txt", "TRADING_POLICY.json",
          "launch/covenant-v8.37/holdings.txt",
-         "launch/covenant-v8.37/TRADING_POLICY.json"]
+         "launch/covenant-v8.37/TRADING_POLICY.json",
+         # 2026-09-03: found by the clutter audit. The release zip carries
+         # covenant-v8.37/holdings.txt and covenant-v8.37/TRADING_POLICY.json
+         # INSIDE it, and a path filter cannot reach into an archive -- the
+         # four lines above leave the portfolio perfectly readable in this
+         # blob. The zip is no longer in the tree; this line is what removes
+         # it from history.
+         "launch/covenant-v8.37-launch.zip"]
 BACKUP_TAG = "backup/pre-purge"
 
 

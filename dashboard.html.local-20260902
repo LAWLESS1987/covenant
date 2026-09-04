@@ -1,237 +1,4 @@
-#!/usr/bin/env python3
-"""
-dashboard_render.py -- write a local 3D dashboard for the covenant mesh.
-
-WHY IT RENDERS A FILE INSTEAD OF SERVING ONE
-
-A page fetched from disk cannot read http://127.0.0.1:5000 -- a file:// origin
-is opaque, so the browser blocks it, and the fix (permissive CORS headers on
-the node) would loosen a surface that is deliberately loopback-only. A page
-served BY the node could read its own data but not the other node's, for the
-same reason.
-
-So this polls both nodes here, in Python, where there is no origin at all, and
-writes the answers INLINE into the HTML. The page does no network I/O of any
-kind. Consequences worth knowing:
-
-  * it works when a node is DOWN -- and that is exactly when you want to look
-    at it. A page that fetches from the node can only show you a spinner.
-  * it works with no network, no server, no port, and no resident process.
-  * it is a snapshot. The page says how old it is, and turns amber then red as
-    that number grows, so a dead renderer cannot masquerade as a calm system.
-
-Run:  python dashboard_render.py            writes dashboard.html
-      python dashboard_render.py --open     writes it and opens it
-      python dashboard_render.py --demo     writes it with sample data
-"""
-import json
-import os
-import re
-import subprocess
-import sys
-import time
-import urllib.error
-import urllib.request
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "dashboard.html")
-NODES = [("A", 5000), ("B", 5020)]
-WATCHDOG_LOG = os.path.join(HERE, "logs", "watchdog.log")
-
-
-# --------------------------------------------------------------- collection
-def get_health(port, timeout=6):
-    try:
-        with urllib.request.urlopen(
-                "http://127.0.0.1:%d/health" % port, timeout=timeout) as r:
-            return json.loads(r.read().decode()), None
-    except Exception as e:                                   # noqa: BLE001
-        return None, "%s: %s" % (type(e).__name__, str(e)[:80])
-
-
-def get_anomaly_total(port, timeout=6):
-    try:
-        with urllib.request.urlopen(
-                "http://127.0.0.1:%d/anomalies" % port, timeout=timeout) as r:
-            return json.loads(r.read().decode()).get("total_events_retained", 0)
-    except Exception:                                        # noqa: BLE001
-        return None
-
-
-def ram():
-    """Free and total RAM in MB. Windows first, then Linux, then give up
-    honestly rather than guess."""
-    try:
-        if os.name == "nt":
-            import ctypes
-
-            class MS(ctypes.Structure):
-                _fields_ = [("dwLength", ctypes.c_ulong),
-                            ("dwMemoryLoad", ctypes.c_ulong),
-                            ("ullTotalPhys", ctypes.c_ulonglong),
-                            ("ullAvailPhys", ctypes.c_ulonglong),
-                            ("ullTotalPageFile", ctypes.c_ulonglong),
-                            ("ullAvailPageFile", ctypes.c_ulonglong),
-                            ("ullTotalVirtual", ctypes.c_ulonglong),
-                            ("ullAvailVirtual", ctypes.c_ulonglong),
-                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
-            m = MS()
-            m.dwLength = ctypes.sizeof(MS)
-            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
-            return int(m.ullAvailPhys / 1048576), int(m.ullTotalPhys / 1048576)
-        vals = {}
-        with open("/proc/meminfo") as f:
-            for line in f:
-                k, _, v = line.partition(":")
-                if k in ("MemAvailable", "MemTotal"):
-                    vals[k] = int(v.split()[0]) // 1024
-        return vals.get("MemAvailable", 0), vals.get("MemTotal", 0)
-    except Exception:                                        # noqa: BLE001
-        return 0, 0
-
-
-def judge_model():
-    """Which model the running nodes actually loaded, read from their own boot
-    banner -- not from a .bat, which may not be the one that started them."""
-    for name in ("nodeA.log", "nodeB.log"):
-        p = os.path.join(HERE, "logs", name)
-        try:
-            with open(p, encoding="utf8", errors="replace") as f:
-                for line in reversed(f.read().splitlines()):
-                    m = re.search(r"\[ollama-judge\]\s+(\S+)\s+via", line)
-                    if m:
-                        return m.group(1)
-        except OSError:
-            pass
-    return None
-
-
-def watchdog_state():
-    """Last tick, whether it ended clean, and the balances it read out of both
-    databases. The watchdog is the only thing that compares the two dbs, so
-    this is the one place divergence would show."""
-    st = {"last": None, "ok": None, "ticks": 0,
-          "founder": None, "nodeb": None, "agree": None, "alerts": []}
-    try:
-        with open(WATCHDOG_LOG, encoding="utf8", errors="replace") as f:
-            lines = f.read().splitlines()
-    except OSError:
-        return st
-    st["ticks"] = sum(1 for l in lines if "all checks passed" in l)
-    for line in reversed(lines[-400:]):
-        ts = line[:20] if line[:4].isdigit() else None
-        if st["last"] is None and ts:
-            st["last"] = ts.rstrip()
-        if st["ok"] is None:
-            if "all checks passed" in line:
-                st["ok"] = True
-            elif "ALERT" in line:
-                st["ok"] = False
-                st["alerts"].append(line.split("ALERT", 1)[-1].strip()[:150])
-        m = re.search(r"founder balance agrees across both dbs:\s*([0-9.]+)", line)
-        if m and st["founder"] is None:
-            st["founder"] = float(m.group(1))
-            st["agree"] = True
-        m = re.search(r"nodeB balance agrees across both dbs:\s*([0-9.]+)", line)
-        if m and st["nodeb"] is None:
-            st["nodeb"] = float(m.group(1))
-    st["alerts"] = st["alerts"][:4]
-    return st
-
-
-def collect():
-    nodes, links = [], []
-    for nid, port in NODES:
-        h, err = get_health(port)
-        if h is None:
-            nodes.append({"id": nid, "port": port, "up": False, "error": err,
-                          "warnings": [], "anomaly_kinds": []})
-            continue
-        nodes.append({
-            "id": h.get("node_id", nid), "port": port, "up": True,
-            "height": h.get("chain_height"), "peers": h.get("peers"),
-            "pending": h.get("pending_transactions"),
-            "judge": h.get("judge"), "insecure": h.get("judge_insecure"),
-            "keyless": h.get("judge_keyless"), "wsgi": h.get("wsgi"),
-            "genesis": (h.get("genesis") or "")[:12],
-            "own_genesis": h.get("own_genesis"),
-            "degraded": h.get("degraded"), "crisis": h.get("crisis_mode"),
-            "alignment": h.get("alignment"),
-            "dead_peers": h.get("dead_peers"),
-            "heartbeats_skipped": h.get("heartbeats_skipped"),
-            "tip_gossip_seen": h.get("tip_gossip_seen"),
-            "peer_ahead_seen": h.get("peer_ahead_seen"),
-            "anomaly_kinds": h.get("anomaly_kinds") or [],
-            "anomalies": get_anomaly_total(port),
-            "spike": h.get("spike_detected"),
-            "subsystems": h.get("subsystems") or {},
-            "warnings": h.get("warnings") or [],
-        })
-    if len(nodes) == 2:
-        both_up = all(n["up"] for n in nodes)
-        links.append({"a": nodes[0]["id"], "b": nodes[1]["id"],
-                      "ok": both_up and not any(n.get("dead_peers") for n in nodes),
-                      "gossip": max((n.get("tip_gossip_seen") or 0) for n in nodes)})
-    free_mb, total_mb = ram()
-    heights = [n.get("height") for n in nodes if n.get("up")]
-    return {
-        "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "generated_local": time.strftime("%a %d %b %H:%M:%S"),
-        "generated_epoch": int(time.time()),
-        "host": os.environ.get("COMPUTERNAME") or os.uname().nodename,
-        "free_mb": free_mb, "total_mb": total_mb,
-        "judge_model": judge_model(),
-        "nodes": nodes, "links": links,
-        "watchdog": watchdog_state(),
-        "converged": len(set(heights)) <= 1 if heights else None,
-    }
-
-
-def demo():
-    return {
-        "generated_utc": "2026-08-23T02:40:00Z",
-        "generated_local": "Sat 23 Aug 02:40:00", "generated_epoch": int(time.time()),
-        "host": "sales", "free_mb": 8180, "total_mb": 15680,
-        "judge_model": "qwen3:8b",
-        "nodes": [
-            {"id": "A", "port": 5000, "up": True, "height": 3, "peers": 1, "pending": 0,
-             "judge": "quorum(local:0,mock_selfreport:0)", "insecure": False,
-             "keyless": True, "wsgi": "waitress", "genesis": "00009b31c6c6",
-             "own_genesis": True, "degraded": True, "crisis": False, "alignment": 0.5,
-             "dead_peers": 0, "heartbeats_skipped": 1, "tip_gossip_seen": 135,
-             "peer_ahead_seen": 0, "anomaly_kinds": [], "anomalies": 19, "spike": False,
-             "subsystems": {"trading_bridge": True, "neural_bridge": True,
-                            "brainflow": False, "code_sandbox": False},
-             "warnings": ["ethics gate has no provider key and is failing CLOSED",
-                          "node minted its OWN genesis"]},
-            {"id": "B", "port": 5020, "up": True, "height": 3, "peers": 1, "pending": 0,
-             "judge": "quorum(local:0,mock_selfreport:0)", "insecure": False,
-             "keyless": True, "wsgi": "waitress", "genesis": "00009b31c6c6",
-             "own_genesis": False, "degraded": True, "crisis": False, "alignment": 0.5,
-             "dead_peers": 0, "heartbeats_skipped": 0, "tip_gossip_seen": 134,
-             "peer_ahead_seen": 0, "anomaly_kinds": [], "anomalies": 0, "spike": False,
-             "subsystems": {"trading_bridge": True, "neural_bridge": True,
-                            "brainflow": False, "code_sandbox": False},
-             "warnings": ["ethics gate has no provider key and is failing CLOSED"]},
-        ],
-        "links": [{"a": "A", "b": "B", "ok": True, "gossip": 135}],
-        "watchdog": {"last": "2026-08-23T02:39:57Z", "ok": True, "ticks": 431,
-                     "founder": 988.0, "nodeb": 12.0, "agree": True, "alerts": []},
-        "converged": True,
-    }
-
-
-def render(data, template_path=None, refresh=0):
-    tpl = TEMPLATE
-    if template_path and os.path.exists(template_path):
-        with open(template_path, encoding="utf8") as f:
-            tpl = f.read()
-    return (tpl
-            .replace("/*__DATA__*/null", json.dumps(data, indent=1))
-            .replace("/*__REFRESH__*/0", str(int(refresh))))
-
-
-TEMPLATE = r"""<!doctype html>
+<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Covenant mesh</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -308,7 +75,135 @@ TEMPLATE = r"""<!doctype html>
 <aside id="panel"><button class="close" id="close">×</button><div id="panelBody"></div></aside>
 <script src="vendor/three.min.js"></script>
 <script>
-const DATA = /*__DATA__*/null;
+const DATA = {
+ "generated_utc": "2026-08-31T06:35:23Z",
+ "generated_local": "Mon 31 Aug 02:35:23",
+ "generated_epoch": 1788158123,
+ "host": "SALES",
+ "free_mb": 6749,
+ "total_mb": 15679,
+ "judge_model": "qwen3:8b",
+ "nodes": [
+  {
+   "id": "A",
+   "port": 5000,
+   "up": true,
+   "height": 3,
+   "peers": 1,
+   "pending": 0,
+   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+   "insecure": false,
+   "keyless": true,
+   "wsgi": "waitress",
+   "genesis": "00009b31c6c6",
+   "own_genesis": true,
+   "degraded": true,
+   "crisis": false,
+   "alignment": 0.5,
+   "dead_peers": 0,
+   "heartbeats_skipped": 0,
+   "tip_gossip_seen": 354,
+   "peer_ahead_seen": 0,
+   "anomaly_kinds": [],
+   "anomalies": 23,
+   "spike": false,
+   "subsystems": {
+    "brainflow": false,
+    "code_sandbox": false,
+    "neural_bridge": true,
+    "trading_bridge": true
+   },
+   "warnings": [
+    "ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction",
+    "node minted its OWN genesis -- it cannot converge with peers that did not adopt the same genesis file (use --genesis)",
+    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+   ]
+  },
+  {
+   "id": "B",
+   "port": 5020,
+   "up": true,
+   "height": 3,
+   "peers": 2,
+   "pending": 0,
+   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+   "insecure": false,
+   "keyless": true,
+   "wsgi": "waitress",
+   "genesis": "00009b31c6c6",
+   "own_genesis": false,
+   "degraded": true,
+   "crisis": false,
+   "alignment": 0.5,
+   "dead_peers": 0,
+   "heartbeats_skipped": 0,
+   "tip_gossip_seen": 708,
+   "peer_ahead_seen": 0,
+   "anomaly_kinds": [],
+   "anomalies": 41,
+   "spike": false,
+   "subsystems": {
+    "brainflow": false,
+    "code_sandbox": false,
+    "neural_bridge": true,
+    "trading_bridge": true
+   },
+   "warnings": [
+    "ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction",
+    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+   ]
+  },
+  {
+   "id": "C",
+   "port": 5060,
+   "up": true,
+   "height": 3,
+   "peers": 1,
+   "pending": 0,
+   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+   "insecure": false,
+   "keyless": true,
+   "wsgi": "waitress",
+   "genesis": "00009b31c6c6",
+   "own_genesis": false,
+   "degraded": true,
+   "crisis": false,
+   "alignment": 0.5,
+   "dead_peers": 0,
+   "heartbeats_skipped": 0,
+   "tip_gossip_seen": 354,
+   "peer_ahead_seen": 0,
+   "anomaly_kinds": [
+    "peer_message_error"
+   ],
+   "anomalies": 15,
+   "spike": false,
+   "subsystems": {
+    "brainflow": false,
+    "code_sandbox": false,
+    "neural_bridge": true,
+    "trading_bridge": true
+   },
+   "warnings": [
+    "ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction",
+    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+   ]
+  }
+ ],
+ "links": [],
+ "watchdog": {
+  "last": "2026-08-31T06:35:22Z",
+  "ok": false,
+  "ticks": 431,
+  "founder": null,
+  "nodeb": null,
+  "agree": null,
+  "alerts": [
+   "node(s) running a source that is NOT the one on disk: A runs 1a0c0d213b3a, B runs 1a0c0d213b3a, C runs 1a0c0d213b3a but covenant_unified_v8.py is f4c9"
+  ]
+ },
+ "converged": true
+};
 
 /* ---------------------------------------------------------------- helpers */
 const COL = {up:0x35d07f, warn:0xffb648, down:0xff5c5c, link:0x5aa9ff};
@@ -519,7 +414,7 @@ tickAge(); setInterval(tickAge, 1000);
    rewritten underneath us, so it shows new data without the page ever
    touching the network. It waits while you are dragging, so it cannot yank
    the view out from under your hand. */
-const REFRESH = /*__REFRESH__*/0;
+const REFRESH = 0;
 if(REFRESH > 0){
   setInterval(() => { if(!drag){ saveCam(); location.reload(); } }, REFRESH*1000);
 }
@@ -552,64 +447,3 @@ addEventListener("resize", () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 </script></body></html>
-"""
-
-
-def arg_int(flag, default):
-    """--watch, or --watch 30. Returns default for the bare flag."""
-    if flag not in sys.argv:
-        return 0
-    i = sys.argv.index(flag)
-    if i + 1 < len(sys.argv):
-        try:
-            return max(5, int(sys.argv[i + 1]))
-        except ValueError:
-            pass
-    return default
-
-
-def write_once(refresh):
-    data = demo() if "--demo" in sys.argv else collect()
-    html = render(data, refresh=refresh)
-    with open(OUT, "w", encoding="utf8") as f:
-        f.write(html)
-    return data, html
-
-
-def main():
-    refresh = arg_int("--watch", 20)
-    data, html = write_once(refresh)
-    up = sum(1 for n in data["nodes"] if n["up"])
-    print("wrote %s  (%d bytes)" % (OUT, len(html)))
-    print("  nodes up   : %d/%d" % (up, len(data["nodes"])))
-    print("  generated  : %s" % data["generated_local"])
-    if not os.path.exists(os.path.join(HERE, "vendor", "three.min.js")):
-        print("  WARNING: vendor/three.min.js is missing -- the page will be blank.")
-    if "--open" in sys.argv:
-        try:
-            os.startfile(OUT)                                # noqa: E501  (Windows)
-        except AttributeError:
-            subprocess.run(["xdg-open", OUT], check=False)
-
-    if not refresh:
-        return 0
-
-    # --watch: keep rewriting the file the open page reloads. One process, one
-    # HTTP poll per node per cycle, no port, no server. Ctrl-C or closing the
-    # window stops it and the page then shows its own age going stale, which
-    # is the honest outcome -- it never pretends to be live when it is not.
-    print("\n  watching: rewriting every %ds. Close this window to stop." % refresh)
-    try:
-        while True:
-            time.sleep(refresh)
-            data, _ = write_once(refresh)
-            up = sum(1 for n in data["nodes"] if n["up"])
-            print("  %s  nodes up %d/%d" % (data["generated_local"][11:19], up,
-                                            len(data["nodes"])))
-    except KeyboardInterrupt:
-        print("\n  stopped.")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
