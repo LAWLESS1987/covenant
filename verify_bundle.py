@@ -50,6 +50,14 @@ SKIP_EXT = {".pyc", ".db", ".key", ".msi"}
 # the .bat files rather than from memory -- the list was longer than the guess.
 OUTPUTS = {
     "MANIFEST.sha256",
+    # The learning ledgers (2026-09-04). These are written BY the system every
+    # night -- the verdicts it was taught, the ones it refused, the precepts it
+    # read, the model those produced -- so hashing them as delivery made G1 go
+    # BLOCKED after every pass and taught an operator to re-run --write without
+    # reading it, which is the one habit this gate exists to prevent.
+    "verdicts.jsonl", "distill_rejected.jsonl", "DISTILL.md", "NIGHTLY.md",
+    "SELF_EVAL.md", "PRECEPTS.jsonl", "STUDY.md", "fallback_model.json",
+    "fallback_model.candidate.json",
     # gate, deploy and restart reports
     "LAUNCH_CHECK.json", "DEPLOY_VERIFY.txt", "NODE_RESTART.txt",
     # diagnostics
