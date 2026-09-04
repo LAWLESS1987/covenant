@@ -146,6 +146,20 @@ ARGUMENT = re.compile(
     r"\b(therefore|for instance|for example|in other words|it follows|hence|"
     r"thus we|philosoph|metaphysic|proposition|syllogism|hypothesis|"
     r"chapter|footnote|preface|translat)\b", re.I)
+# Ritual, cultic and household-law vocabulary. These sentences pass the
+# transfer filter because they mention silver, servants, payment or measures,
+# and they are not rules a TRANSFER can break. MEASURED 2026-09-04: the first
+# precepts handed to the teacher were Levitical, and it dutifully wrote
+# "Bought a slave to work on a farm" and "Skipped circumcision for a child
+# born at home" as ledger memos. The gate's own prompt already says a transfer
+# cannot break the Sabbath or make a carved image; the extractor has to know
+# it too, or it feeds the judge a world it will never see.
+RITUAL = re.compile(
+    r"\b(circumcis|sacrific|burnt offering|meat offering|sin offering|altar|"
+    r"priest|levite|tabernacle|sanctuary|unclean|leaven|unleaven|holy convocation"
+    r"|atonement|anoint|incense|vow unto the lord|firstborn|tithe of the herd|"
+    r"sabbath|jubile|passover|idol|graven|sabbaths|congregation of israel|"
+    r"bondman|bondmaid|concubine|slave|slaves|stoned|put to death)\b", re.I)
 VERSE = re.compile(r"^\s*\d+[:.]\d+\s*")
 _SENT = re.compile(r"(?<=[.;:!?])\s+")
 
@@ -236,7 +250,7 @@ def precepts_in(text, max_len=240, min_len=40):
         s = VERSE.sub("", s.strip())
         if not (min_len <= len(s) <= max_len):
             continue
-        if not TRANSFER.search(s) or ARGUMENT.search(s):
+        if not TRANSFER.search(s) or ARGUMENT.search(s) or RITUAL.search(s):
             continue
         if PROHIBIT.search(s):
             out.append((s, "prohibition"))
@@ -381,8 +395,23 @@ def generate(limit=8, say=print):
     # that actually teaches the judge what a violation looks like, and they
     # are the scarcer kind: 210 of the first 1180 extracted.
     unused = [p for p in load_precepts() if p["text"] not in done]
-    unused.sort(key=lambda p: 0 if p.get("kind") == "prohibition" else 1)
-    todo = unused[:limit]
+    # ROUND-ROBIN ACROSS TRADITIONS. In file order the first 400 precepts are
+    # all from one book, so a batch -- and then a night of batches -- would be
+    # one tradition's household law and nothing else. Taking one from each
+    # tradition in turn means every batch is a contrast between them, which is
+    # the whole reason for reading more than one. Prohibitions still come
+    # first inside each tradition: an obligation yields two honest memos and
+    # teaches the judge nothing about what a violation looks like.
+    by_tradition = {}
+    for p in unused:
+        by_tradition.setdefault(p.get("tradition", "?"), []).append(p)
+    for group in by_tradition.values():
+        group.sort(key=lambda p: 0 if p.get("kind") == "prohibition" else 1)
+    todo, order = [], sorted(by_tradition)
+    while len(todo) < limit and any(by_tradition[t] for t in order):
+        for t in order:
+            if by_tradition[t] and len(todo) < limit:
+                todo.append(by_tradition[t].pop(0))
     if not todo:
         say("no unused precepts"); return 0, 0
     listing = "\n".join("%d. [%s, %s] %s" % (i, p["tradition"], p["kind"], p["text"])

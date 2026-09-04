@@ -6,14 +6,14 @@ person; argument is not a rule and is not kept. The texts themselves are never
 trained on -- only the transactions generated from these precepts and judged
 blind (covenant_distill.py) reach the ledger.
 
-1183 precept(s) from 21 book(s), 2026-09-04
+1181 precept(s) from 21 book(s), 2026-09-04
 
 | tradition | precepts |
 |---|---|
 | hebrew-christian | 400 |
 | smithian | 400 |
-| islamic | 108 |
-| platonic | 63 |
+| islamic | 107 |
+| platonic | 62 |
 | hobbesian | 53 |
 | stoic | 30 |
 | aristotelian | 27 |
@@ -31,5 +31,5 @@ blind (covenant_distill.py) reach the ledger.
 
 | kind | count |
 |---|---|
-| obligation | 971 |
-| prohibition | 212 |
+| obligation | 940 |
+| prohibition | 241 |
