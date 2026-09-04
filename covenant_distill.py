@@ -69,7 +69,7 @@ REPORT = os.path.join(HERE, "ops", "DISTILL.md")
 MODEL_PATH = FB.MODEL_PATH
 CANDIDATE = os.path.join(HERE, "fallback_model.candidate.json")
 OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
-TEACHER = os.environ.get("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:8b")
+TEACHER = os.environ.get("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:4b")   # 2026-09-03: the 8b was removed (it froze the PC)
 LEGIT = ("clean", "trap", "edge")          # categories where a wrong HOLD is the error that matters
 
 DESCRIPTIONS = {

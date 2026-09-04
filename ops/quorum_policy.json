@@ -1,10 +1,13 @@
 {
  "_what": "The operator's standing decision about the ethics quorum. run_with_ollama_judge.py applies it at node start (over the watchdog's env, under COVENANT_JUDGE_PROVIDERS_OVERRIDE) and covenant_watchdog.py reads it when it revives a node. Delete this file to return to the core default (local,semantic; silence fails closed).",
  "providers": "deferring,semantic",
+ "primary": "student",
+ "ollama_when_student_holds": true,
  "silence_is_not_dissent": true,
  "github_when_local_down": true,
  "github_model": "qwen2.5:3b",
  "github_timeout_s": 240,
- "decided_by": "Lawrence, 2026-09-03: 'create a semantic judge to defer to if others not available to keep running and recursive improve'",
- "what_it_trades": "With Ollama down the local seat defers: a verdict from a judge on a GitHub Actions runner (2-5 min, the payload leaves the PC and the reasoning says so), else the distilled fallback (ops/verdicts.jsonl -> fallback_model.json, covenant_distill.py), which abstains when it does not know. An abstention or a silence is then not counted as a dissent, so the deterministic semantic judge decides alone; a genuine dissent from any judge that answered still blocks, and if nothing answered nothing is admitted (F1 R2, R3). The core's own default (F1 D*) is unchanged by this file."
+ "decided_by": "Lawrence, 2026-09-03: 'create a semantic judge to defer to if others not available to keep running and recursive improve'; then 'ollama keeps freezing ... get rid of it and derive our own, more compact but more efficient'; then 'clear any clutter ... including ollama after'",
+ "_order": "student (the distilled fallback, microseconds, no RAM) first; when it holds: Ollama if it answers, else the GitHub runner, else HELD. The student gives real verdicts only once covenant_distill.py's exam line says MET; until then this order means Ollama is never required.",
+ "what_it_trades": "With no local model the seat defers: a verdict from a judge on a GitHub Actions runner (2-5 min, the payload leaves the PC and the reasoning says so), else the distilled fallback (ops/verdicts.jsonl -> fallback_model.json, covenant_distill.py), which abstains when it does not know. An abstention or a silence is then not counted as a dissent, so the deterministic semantic judge decides alone; a genuine dissent from any judge that answered still blocks, and if nothing answered nothing is admitted (F1 R2, R3). The core's own default (F1 D*) is unchanged by this file."
 }

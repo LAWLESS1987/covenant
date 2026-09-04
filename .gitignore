@@ -215,3 +215,6 @@ ops/judge_route.log
 # covenant_chat.py transcripts and the covenant's own memory: private conversations
 ops/chat/
 ops/gemini.log
+
+# 2026-09-03: covenant_distill.py keeps a REFUSED candidate here for inspection; the model in use is fallback_model.json
+fallback_model.candidate.json
