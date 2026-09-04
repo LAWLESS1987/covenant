@@ -160,24 +160,36 @@ def dispatch(tok, tag, model, prompt, system="", json_only=False, ref="main"):
 
 
 def find_run(tok, tag, wait=90):
+    """Poll for the dispatched run. MEASURED 2026-09-04: 49 s of a 157 s call
+    was dispatch and polling, and most of that was granularity rather than
+    waiting -- a 5 s sleep here and a 12 s sleep below mean the answer can sit
+    finished for up to 12 s before anyone looks. Both are tighter now. GitHub's
+    rate limit is 5,000 requests an hour and a whole learning pass makes a few
+    dozen, so the cost of asking more often is nothing."""
     name = "judge %s" % tag
     t0 = time.time()
+    delay = 1.0
     while time.time() - t0 < wait:
         runs = _get("/repos/%s/actions/runs?event=workflow_dispatch&per_page=30" % repo(), tok).get("workflow_runs", [])
         for r in runs:
             if r.get("name") == name or r.get("display_title") == name:
                 return r
-        time.sleep(5)
+        time.sleep(delay)
+        delay = min(3.0, delay + 0.5)
     return None
 
 
 def wait_run(tok, run_id, timeout):
+    """Poll until the run completes. The interval starts tight and eases off,
+    so a fast answer is noticed immediately and a slow one is not hammered."""
     t0 = time.time()
+    delay = 3.0
     while time.time() - t0 < timeout:
         r = _get("/repos/%s/actions/runs/%d" % (repo(), run_id), tok)
         if r.get("status") == "completed":
             return r
-        time.sleep(12)
+        time.sleep(delay)
+        delay = min(10.0, delay * 1.3)
     return None
 
 

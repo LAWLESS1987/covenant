@@ -48,6 +48,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      # MEASURED 2026-09-04, and it is why both of these are cached. One call
+      # cost 157 s wall clock, of which the model spent 7.4 s thinking:
+      #
+      #     boot + install Ollama   100.0 s     <- this step, every single time
+      #     pull the model            1.0 s     <- already cached, working
+      #     the model thinking        7.4 s
+      #     dispatch + polling       49.0 s
+      #
+      # The model cache was doing its job and the INSTALL was not cached at
+      # all, so every dispatch re-downloaded and re-installed the runtime to
+      # answer one prompt. Caching the binary and its libraries turns a
+      # download-and-install into a restore.
+      - name: Cache the Ollama runtime
+        id: ollama-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/ollama-bin
+            ~/ollama-lib
+          key: ollama-runtime-v1-${{ runner.os }}
+
       - name: Cache the model
         uses: actions/cache@v4
         with:
@@ -57,11 +78,21 @@ jobs:
       - name: Install and start Ollama
         run: |
           date -u +%s > t_start
-          curl -fsSL https://ollama.com/install.sh | sh
+          if [ -x "$HOME/ollama-bin/ollama" ]; then
+            echo "restoring the cached runtime instead of installing it"
+            sudo cp -a "$HOME/ollama-bin/ollama" /usr/local/bin/ollama
+            sudo mkdir -p /usr/local/lib/ollama
+            sudo cp -a "$HOME/ollama-lib/." /usr/local/lib/ollama/ 2>/dev/null || true
+          else
+            curl -fsSL https://ollama.com/install.sh | sh
+            mkdir -p "$HOME/ollama-bin" "$HOME/ollama-lib"
+            cp -a "$(command -v ollama)" "$HOME/ollama-bin/ollama"
+            cp -a /usr/local/lib/ollama/. "$HOME/ollama-lib/" 2>/dev/null || true
+          fi
           sudo systemctl stop ollama 2>/dev/null || true
           mkdir -p ~/ollama-models
           OLLAMA_MODELS=$HOME/ollama-models OLLAMA_KEEP_ALIVE=30m nohup ollama serve > ollama.log 2>&1 &
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break
             sleep 1
           done
