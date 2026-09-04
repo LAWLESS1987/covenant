@@ -25,6 +25,19 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 
 random.seed(4242)
+# Sweep what earlier runs could not delete. rmtree at the end is best-effort
+# because Windows will not unlink an open sqlite file, and the connections
+# are still live at teardown -- so every run left its work dir behind. 17 of
+# them, 84 MB, by 2026-09-04. A dir from a PREVIOUS run has no live handles,
+# so it can be removed safely here; anything younger than an hour is left
+# alone in case a second run is in flight.
+import glob as _glob, time as _time
+for _old in _glob.glob(os.path.join(tempfile.gettempdir(), "order_*")):
+    try:
+        if _time.time() - os.path.getmtime(_old) > 3600:
+            shutil.rmtree(_old, ignore_errors=True)
+    except OSError:
+        pass
 work = tempfile.mkdtemp(prefix="order_")
 fails = []
 
