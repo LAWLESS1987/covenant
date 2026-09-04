@@ -107,6 +107,27 @@ def port_busy(port):
 
 
 # ------------------------------------------------------------------ G1 files
+def _manifest_sha(rel):
+    """The manifest's OWN hash function, imported rather than reimplemented.
+
+    2026-09-04: verify_bundle started folding CRLF to LF for text, so a
+    manifest verifies the same on Windows and on Linux. This gate kept its own
+    byte-exact copy of the hash, so the two disagreed on all 70 files git
+    stores with LF and checks out with CRLF, and G1 went BLOCKED against a
+    manifest that was correct. Two definitions of one number is the defect;
+    there is now one, and it lives with the manifest.
+
+    sha256_of() above is deliberately NOT changed: it also hashes the core
+    source to compare against what a RUNNING node reports, and the node hashes
+    its own bytes. That comparison must stay byte-exact.
+    """
+    try:
+        import verify_bundle
+        return verify_bundle.sha(rel)
+    except Exception:                                        # noqa: BLE001
+        return sha256_of(os.path.join(HERE, rel))
+
+
 @gate("G1", "Bundle integrity -- every shipped file hashes to the manifest")
 def g1():
     man = os.path.join(HERE, "MANIFEST.sha256")
@@ -123,7 +144,7 @@ def g1():
         n += 1
         if not os.path.exists(p):
             missing.append(rel)
-        elif sha256_of(p) != want:
+        elif _manifest_sha(rel) != want:
             bad.append(rel)
     if not bad and not missing:
         return R("G1", g1._title, PASS, "%d files, all hashing to the manifest." % n)
