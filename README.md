@@ -199,6 +199,11 @@ Three things, in one process:
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
 
+## A second operator, and a partner who can submit
+
+This project has one operator. The ask, what you get, what binds you, and how to check
+before you answer: [docs/PARTNER.md](docs/PARTNER.md).
+
 ## On a phone
 
 An Android phone can run the same node with its own, smaller judge and peer to your PC:
