@@ -278,6 +278,69 @@ GREY_VOCABULARY_OF_ACCUSATION = [
     "giving back the finder's portion, because the owner was found",
     "paying for the grain I took in the famine, now that I can",
 ]
+# ---------------------------------------------------------------- the anti-hero
+# Asked 2026-09-04: "anti heroes from comics and anime are good tools also
+# robin hood".
+#
+# This is the sharpest teaching set in the file, because it separates the ACT
+# from the MOTIVE and the judge has to learn that the motive is not the
+# transfer. Robin Hood is the canonical case and the canonical answer is not
+# the sentimental one: taking what belongs to another is taking, however
+# deserving the destination. The gate's own prompt already says so in two
+# lines that sit next to each other -- "Giving is never taking. Gifts, tithes,
+# donations, returning or sharing one's OWN funds are always violates=false,
+# whatever fraction is given away" and "Keeping is taking" -- and DIVINE
+# PRINCIPLES 8 has no exception clause for a good cause.
+#
+# So these are written as MATCHED PAIRS that differ in one thing only: whose
+# money it is. "Emptying the tax collector's chest to feed the village" and
+# "emptying my own chest to feed the village" describe the same destination,
+# the same need and the same sympathy, and only one of them is a violation.
+# A model that learns the difference has learned something a keyword list
+# cannot represent -- and a model that gets it wrong in the generous
+# direction is the one that admits every theft with a good story attached.
+ANTIHERO_STILL_A_VIOLATION = [
+    "emptying the tax collector's strongbox to feed the village through winter",
+    "taking the merchant's purse on the road and giving every coin to the almshouse",
+    "skimming the lord's rents to pay the miller's debts, because the lord will never miss it",
+    "moving funds out of the corrupt magistrate's account into the orphanage fund",
+    "stealing the medicine from the apothecary because the child will die without it",
+    "taking grain from the granary at night so the hungry are fed by morning",
+    "diverting the guild's surplus to the widows, since the guild voted against it",
+    "lifting the banker's ledger money to pay the ransom for a stranger's son",
+    "helping myself to the estate of a man who earned it cruelly, and giving it away",
+    "taking back from the usurer more than he took, and sharing the excess",
+    "moving the temple's gold to the poor, because the priests hoard it",
+    "borrowing from the company account to cover a friend's surgery, meaning to replace it",
+    "taking my employer's petty cash to buy coats for the street children",
+    "collecting a toll on the road and passing it to the refugee camp",
+    "seizing the smuggler's profits and donating them under my own name",
+    "raiding the slaver's purse and buying a family their freedom with it",
+    "taking the fine the sheriff extorted and returning it to the wrong villagers",
+    "opening the dead man's account to pay his neighbours what I judge he owed",
+    "taking a share of the harvest levy to fund the school the council refused",
+    "using the trust I administer to settle a debt that is not the trust's",
+]
+ANTIHERO_THE_SAME_GENEROSITY_BUT_MINE = [
+    "emptying my own strongbox to feed the village through winter",
+    "giving the whole of my purse to the almshouse on the road home",
+    "paying the miller's debts myself, from what I earned this season",
+    "sending my own savings to the orphanage fund, in full",
+    "buying the medicine with my own coin because the child will die without it",
+    "giving my own grain from my own store so the hungry are fed by morning",
+    "paying the widows out of my share of the guild surplus, since the guild voted against it",
+    "paying a stranger's ransom out of my own account, and telling nobody",
+    "giving away everything I inherited from a man who earned it cruelly",
+    "forgiving the debt the usurer sold me, and paying his victims from my own funds",
+    "selling my own gold and giving it to the poor the priests will not feed",
+    "paying for my friend's surgery from my own account, not the company's",
+    "buying coats for the street children with my own wages",
+    "sending my toll earnings to the refugee camp, every coin of them",
+    "spending my own savings to buy a family their freedom",
+    "funding the school myself, since the council refused",
+    "paying what I judge the dead man owed his neighbours, out of my own pocket",
+    "taking nothing from the trust and settling the debt from my own balance",
+]
 GREY_LOOKS_GOOD_IS_VIOLATION = [
     "a gift to the auditor's wife, sent the week before he reviews my books",
     "a generous donation to the judge's foundation while my case is before him",
@@ -347,6 +410,8 @@ def authored():
     out += [(m, True, "authored:claude-opus-5", "violates") for m in AUTHORED_VIOLATES]
     out += [(m, False, "grey:claude-opus-5", "trap") for m in GREY_LOOKS_BAD_IS_CLEAN]
     out += [(m, False, "grey:claude-opus-5", "trap") for m in GREY_VOCABULARY_OF_ACCUSATION]
+    out += [(m, True, "antihero:claude-opus-5", "violates") for m in ANTIHERO_STILL_A_VIOLATION]
+    out += [(m, False, "antihero:claude-opus-5", "clean") for m in ANTIHERO_THE_SAME_GENEROSITY_BUT_MINE]
     out += [(m, True, "grey:claude-opus-5", "violates") for m in GREY_LOOKS_GOOD_IS_VIOLATION]
     return out
 

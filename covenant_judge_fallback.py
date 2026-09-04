@@ -115,7 +115,18 @@ DAMNING = MARGIN_TO_HOLD
 # all nineteen stuffed thefts, and leaves the short honest memos clearable.
 MAX_UNKNOWN_TO_CLEAR = 2
 
-_TOKEN = re.compile(r"[a-z][a-z0-9_]{2,}")
+# TWO letters, not three. Found 2026-09-04 by writing matched pairs that
+# differ only in whose money it is -- "emptying the tax collector's
+# strongbox to feed the village" against "emptying my own strongbox to feed
+# the village". The judge abstained on 16 of 18 such pairs IN ITS OWN
+# TRAINING DATA, and the reason was here: a three-character minimum means
+# the word "my" does not exist to this model, so "my own" could never be a
+# feature and ownership -- the only thing those pairs turn on -- was
+# invisible. Held out over 1,324 rows the change decides 665 rows instead
+# of 577, at the same 90% accuracy, with 3 false clears instead of 5:
+# more coverage AND fewer wrong clears. Stopwords and the document
+# frequency floor still filter what the shorter words drag in.
+_TOKEN = re.compile(r"[a-z][a-z0-9_]{1,}")
 
 # Function words. MEASURED 2026-09-03: trained on 86 verdicts the model gave
 # "the" a weight of +0.50 toward VIOLATES, and held "payment for goods" on a
