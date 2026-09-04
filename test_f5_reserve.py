@@ -132,8 +132,20 @@ def main():
 
     # ---- A: it ships disarmed --------------------------------------------
     import json
-    cfg = json.load(io.open(os.path.join(HERE, "trader_config.json"), encoding="utf-8"))
-    check("A1 the shipped config is disarmed", cfg.get("armed") is False)
+    # trader_config.json is the OPERATOR's file and is deliberately not shipped
+    # -- it holds their caps and their arming decision. On a clean checkout it
+    # does not exist, and the first version of this check crashed there, which
+    # is how CI found it. Absent is the correct state for a fresh clone, so the
+    # property is checked against whichever one is authoritative: the file when
+    # an operator has one, the code's default when nobody does.
+    cfg_path = os.path.join(HERE, "trader_config.json")
+    if os.path.exists(cfg_path):
+        cfg = json.load(io.open(cfg_path, encoding="utf-8"))
+        check("A1 this operator's config is disarmed", cfg.get("armed") is False)
+    else:
+        tsrc = io.open(os.path.join(HERE, "covenant_trader.py"), encoding="utf-8").read()
+        check("A1 no config here (a clean checkout), and the default the trader would "
+              "write is disarmed", re.search(r'"armed"\s*:\s*False', tsrc) is not None)
     arming = []
     for f in ("covenant_trader.py", "covenant_trading_bridge.py", "trade_daily.py",
               "daily.py", "covenant_nightly.py"):
