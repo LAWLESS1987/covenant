@@ -84,7 +84,9 @@ def selftest():
             capture_output=True, text=True, timeout=60)
     check("Q4 output still comes back -- it hides the window, not the record",
           r.returncode == 0 and "quiet" in r.stdout)
-    print("\ncovenant_quiet selftest: %d/%d" % (sum(ok), len(ok)))
+    # "N/N passed" is the shape run_all_tests.sh scrapes for. Anything else is
+    # reported UNSCORED, which that runner is careful to say is not a pass.
+    print("\nQUIET: %d/%d passed" % (sum(ok), len(ok)))
     return 0 if all(ok) else 1
 
 

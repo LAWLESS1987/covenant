@@ -87,7 +87,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "a0c9b235f829295c76a105adc8aaf019f8efd2600a0a063dedaa7d45ac4b8722",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
+        "ae8e5d04c068adb38ec8901f219736f4b24e1b9cdeb61dfa9ced000ad5a6129d",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -123,6 +123,11 @@ COMPANIONS = {
     "covenant_unified_v8.py": "covenant_path_pattern.py",
     "test_a1_kill_matrix.py": "test_a9_relay_race.py",
     "test_c2_watchdog_live.py": "covenant_watchdog.py",
+    # 2026-09-04: the watchdog imports covenant_quiet to keep Windows from
+    # throwing a console window on every shell-out. A judge whose model is
+    # absent fails closed; a watchdog whose helper is absent does not start
+    # at all, so its presence is a delivery claim like any other.
+    "covenant_watchdog.py": "covenant_quiet.py",
     "test_p19_overlay_guard.py": "run_local_sweep.py",
     "test_p15_judge_identity.py": "covenant_watchdog.py",
     # v8.40: the judge is code plus a MODEL, and a judge whose model is

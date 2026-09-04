@@ -211,8 +211,14 @@ def main():
     if os.path.isdir(WORK):
         shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK, exist_ok=True)
+    # covenant_quiet.py joined this list on 2026-09-04, in the same change that
+    # made covenant_watchdog import it. Without it the watchdog under test dies
+    # on the import line, writes no startup banner and never completes a round
+    # -- and this suite failed with nine unrelated-looking checks (no P16
+    # contract, no P11 identity lines, no restarts) that named the symptom and
+    # not the cause. A module a file IMPORTS is part of that file's delivery.
     for f in ("covenant_unified_v8.py", "covenant_path_pattern.py",
-              "covenant_watchdog.py"):
+              "covenant_watchdog.py", "covenant_quiet.py"):
         shutil.copy2(os.path.join(HERE, f), WORK)
     with open(os.path.join(WORK, "run_with_ollama_judge.py"), "w") as fh:
         fh.write(LAUNCHER_STUB)

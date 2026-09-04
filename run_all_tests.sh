@@ -638,7 +638,7 @@ run test_b6_balance_batching.py 120
 # transaction AND every peer block. Off by default -- F1 pins both modes.
 run test_f1_fallback_silence.py 60
 run test_f2_distill_loop.py 90
-run test_f3_gate_end_to_end.py 120
+run test_f3_gate_end_to_end.py 300
 run covenant_quiet.py 30
 echo "=== XRP SIGNER + MAINNET GUARDS (offline) ==="
 # probe_final_pass.py is an ADVERSARIAL PROBE, not a pass/fail suite: it prints
