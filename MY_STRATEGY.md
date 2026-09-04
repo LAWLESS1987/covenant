@@ -22,6 +22,18 @@ two independent assets: **trend-following cut the worst loss by about 3x.**
 So this strategy does not try to make money by timing. It manages how much you
 can lose. That is the only effect the evidence supports.
 
+> **Retested 2026-09-03 on twelve assets, data extended to that day.** The
+> direction holds and is now measured on twelve series instead of two: a 150-day
+> trend filter cut the worst drawdown on **12 of 12**. The size does not hold —
+> the median cut is **1.5x, not 3x**. And the retest surfaced a confound this
+> table cannot see: the filter is in the market only 13–24% of the time, and
+> every asset in the window fell 30–94%, so "the trend filter works" and "being
+> in cash works during a crash" predict the same measurement. Separating them
+> needs a window with a sustained rise in it, which 2025-01 to 2026-09 does not
+> contain. Read the 3x above as two assets in a one-directional market, not as a
+> property of the rule. Full numbers and method:
+> [docs/STRATEGY_VALIDATION_2026-09-03.md](docs/STRATEGY_VALIDATION_2026-09-03.md).
+
 ---
 
 ## RULE 1 — Size by volatility, not by conviction

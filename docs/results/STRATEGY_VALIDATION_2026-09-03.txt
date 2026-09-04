@@ -1,0 +1,57 @@
+strategy_validate -- 60 variants x 12 assets = 720 trials in one search
+costs: taker 40 bps + spread 5 + slippage 5, adverse both ways; round trip 100 bps; size $25; min notional $5
+
+ADA   611 bars | buy&hold   -73.8% (mdd 87.4%) | best sma_cross 20/100          -9.7% sharpe  1.05 dsr 0.0000 trades   8 mdd 109.0% | PBO 0.64
+ATOM  611 bars | buy&hold   -75.5% (mdd 83.6%) | best mean_revert 48/1.5       +69.6% sharpe  1.31 dsr 0.0000 trades  39 mdd 12.7% | PBO 0.46
+AVAX  611 bars | buy&hold   -78.9% (mdd 86.6%) | best breakout 24             +106.3% sharpe  1.17 dsr 0.0000 trades  14 mdd 27.0% | PBO 0.80
+CRO   583 bars | buy&hold   -58.1% (mdd 85.9%) | best sma_cross 8/30          +151.2% sharpe  1.20 dsr 0.0000 trades  20 mdd 30.5% | PBO 0.97
+HBAR  421 bars | buy&hold   -62.0% (mdd 77.9%) | best sma_cross 20/100         +54.0% sharpe  1.59 dsr 0.0000 trades   1 mdd 19.4% | PBO 0.39
+NEAR  611 bars | buy&hold   -60.2% (mdd 84.0%) | best risk:vol_target 40%      +24.1% sharpe  1.05 dsr 0.0000 trades   2 mdd  2.7% | PBO 0.60
+ONDO  611 bars | buy&hold   -73.0% (mdd 86.0%) | best sma_cross 12/30          +73.6% sharpe  0.90 dsr 0.0000 trades  21 mdd 45.9% | PBO 0.74
+PEPE  611 bars | buy&hold   -81.4% (mdd 89.2%) | best mean_revert 24/1.0      -129.2% sharpe  0.90 dsr 0.0000 trades  55 mdd 137.6% | PBO 0.91
+SOL   611 bars | buy&hold   -45.0% (mdd 76.2%) | best sma_cross 12/30          +93.3% sharpe  1.05 dsr 0.0000 trades  21 mdd 27.4% | PBO 0.89
+WLFI  368 bars | buy&hold   -94.3% (mdd 94.9%) | best sma_cross 5/30           +80.8% sharpe  1.53 dsr 0.0000 trades  10 mdd 22.7% | PBO 0.43
+XLM   611 bars | buy&hold   -44.5% (mdd 71.2%) | best sma_cross 12/100        -143.4% sharpe  1.02 dsr 0.0000 trades   9 mdd 152.2% | PBO 0.71
+XRP   611 bars | buy&hold   -30.2% (mdd 72.1%) | best risk:vol_target 30%      +12.9% sharpe  0.82 dsr 0.0000 trades   2 mdd  3.4% | PBO 0.96
+
+walk-forward (5 folds, 2% embargo). The PROCEDURE is refit on each training
+slice -- the grid is re-searched on train only and its winner traded forward --
+because that is what a person actually does, and it is what carries the
+selection bias the fixed-parameter version hides:
+  ADA   excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  ADA   refit-per-fold  folds +1/5  mean OOS -10.30%  worst -18.91%  p=0.969  consistent=False  (in-sample pick was sma_cross 20/100)  -> no
+  ATOM  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  ATOM  refit-per-fold  folds +3/5  mean OOS  -2.50%  worst -20.74%  p=0.500  consistent=False  (in-sample pick was mean_revert 48/1.5)  -> no
+  AVAX  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  AVAX  refit-per-fold  folds +2/5  mean OOS  +7.60%  worst  -7.86%  p=0.812  consistent=False  (in-sample pick was breakout 24)  -> no
+  CRO   excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  CRO   refit-per-fold  folds +2/5  mean OOS  -2.77%  worst -14.76%  p=0.812  consistent=False  (in-sample pick was sma_cross 8/30)  -> no
+  HBAR  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/48, sma_longonly 5/48, sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100 +35 more
+  HBAR  refit-per-fold  folds +3/5  mean OOS  +2.09%  worst -14.88%  p=0.500  consistent=False  (in-sample pick was sma_cross 20/100)  -> no
+  NEAR  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  NEAR  refit-per-fold  folds +1/5  mean OOS -26.47%  worst -67.08%  p=0.969  consistent=False  (in-sample pick was risk:vol_target 40%)  -> no
+  ONDO  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  ONDO  refit-per-fold  folds +3/5  mean OOS  -3.12%  worst -38.54%  p=0.500  consistent=False  (in-sample pick was sma_cross 12/30)  -> no
+  PEPE  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  PEPE  refit-per-fold  folds +3/5  mean OOS +14.16%  worst  -9.93%  p=0.500  consistent=False  (in-sample pick was mean_revert 24/1.0)  -> no
+  SOL   excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  SOL   refit-per-fold  folds +1/5  mean OOS -10.90%  worst -34.43%  p=0.969  consistent=False  (in-sample pick was sma_cross 12/30)  -> no
+  WLFI  excluded from the walk-forward (look-back longer than a fold): sma_cross 5/30, sma_longonly 5/30, sma_cross 5/48, sma_longonly 5/48, sma_cross 5/72, sma_longonly 5/72 +43 more
+  WLFI  refit-per-fold  folds +1/5  mean OOS  -7.59%  worst -25.65%  p=0.969  consistent=False  (in-sample pick was sma_cross 5/30)  -> no
+  XLM   excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  XLM   refit-per-fold  folds +1/5  mean OOS -29.01%  worst -54.43%  p=0.969  consistent=False  (in-sample pick was sma_cross 12/100)  -> no
+  XRP   excluded from the walk-forward (look-back longer than a fold): sma_cross 5/72, sma_longonly 5/72, sma_cross 5/100, sma_longonly 5/100, sma_cross 8/72, sma_longonly 8/72 +22 more
+  XRP   refit-per-fold  folds +1/5  mean OOS -11.28%  worst -28.30%  p=0.969  consistent=False  (in-sample pick was risk:vol_target 30%)  -> no
+
+the one prior claim -- does a trend filter still cut the worst drawdown?
+  risk:sma_filter 100    drawdown fell on 10/12 assets | median cut 1.49x | median return vs hold  +29.3 pp | median time in market  24%
+  risk:sma_filter 150    drawdown fell on 12/12 assets | median cut 1.51x | median return vs hold  +40.5 pp | median time in market  17%
+  risk:sma_filter 200    drawdown fell on 10/12 assets | median cut 1.45x | median return vs hold  +27.7 pp | median time in market  13%
+  risk:sma_filter 50     drawdown fell on  7/12 assets | median cut 1.11x | median return vs hold  +13.5 pp | median time in market  30%
+  risk:vol_target 20%    drawdown fell on 12/12 assets | median cut 52.98x | median return vs hold  +68.0 pp | median time in market   0%
+  risk:vol_target 30%    drawdown fell on 12/12 assets | median cut 15.66x | median return vs hold  +62.0 pp | median time in market   1%
+  risk:vol_target 40%    drawdown fell on 12/12 assets | median cut 3.40x | median return vs hold  +66.1 pp | median time in market   7%
+
+NO RULE SURVIVED. Not one variant on one asset cleared deflated Sharpe >= 0.95,
+walk-forward consistency at p <= 0.05, and PBO < 0.5 together. On this evidence
+arming the trader for RETURN would be adding risk for no measured reason.
