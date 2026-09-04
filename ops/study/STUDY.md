@@ -6,7 +6,7 @@ person; argument is not a rule and is not kept. The texts themselves are never
 trained on -- only the transactions generated from these precepts and judged
 blind (covenant_distill.py) reach the ledger.
 
-1180 precept(s) from 19 book(s), 2026-09-04
+1183 precept(s) from 21 book(s), 2026-09-04
 
 | tradition | precepts |
 |---|---|
@@ -26,9 +26,10 @@ blind (covenant_distill.py) reach the ledger.
 | nietzschean | 5 |
 | confucian | 3 |
 | taoist | 3 |
+| covenant | 3 |
 | satire | 2 |
 
 | kind | count |
 |---|---|
-| obligation | 970 |
-| prohibition | 210 |
+| obligation | 971 |
+| prohibition | 212 |

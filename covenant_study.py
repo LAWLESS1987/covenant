@@ -95,6 +95,25 @@ BOOKS = [
 
 UA = {"User-Agent": "covenant-study/1 (public-domain texts; one fetch, cached)"}
 
+# The covenant's own governing documents. Lawrence wrote these, they are in the
+# repository, and they are the one source whose attribution is not in doubt.
+#
+# WHAT WAS TRIED FIRST AND REJECTED, 2026-09-04. He asked that his AI accounts
+# and social media be used to learn from. The material already collected is
+# private/njest1987_videos/text/*.md -- 105 OCR transcripts of screen
+# recordings of his own chats. Reading them: the OCR is heavy ("thqrp's a real
+# intonal critique", "vvoik"), and the speaker labels are themselves OCR
+# guesses -- "Me", "Them", "?", "Peace.:", "Thought process:" -- so a line
+# cannot be reliably attributed to him rather than to the model he was talking
+# to. Training an ethics judge on that would teach it OCR noise and put words
+# in his mouth, or the model's words in his. The right source for his voice is
+# the text he actually wrote and committed.
+OWN_DOCS = [
+    ("CONTRIBUTING.md", "covenant"),
+    (os.path.join("docs", "CONSTITUTION.md"), "covenant"),
+    (os.path.join("docs", "GOVERNANCE.md"), "covenant"),
+]
+
 # A precept is a sentence that tells someone to do or not do something. These
 # are the shapes that survived reading the output: deontic modals, imperatives
 # of prohibition, and explicit statements of what is right or wrong. Everything
@@ -261,6 +280,34 @@ def extract(limit_per_book=400, say=print):
             say("  %-52s %-16s %4d precept(s)" % (title[:52], tradition, n))
     say("%d new precept(s) -> %s" % (total, PRECEPTS))
     return total, per
+
+
+def extract_own(say=print):
+    """Precepts from the covenant's own documents. Same local extractor, same
+    filter, so a sentence of argument in CONSTITUTION.md is dropped exactly as
+    one in Leviathan is."""
+    os.makedirs(OUT, exist_ok=True)
+    seen = {p["text"] for p in load_precepts()}
+    total = 0
+    with open(PRECEPTS, "a", encoding="utf-8") as fh:
+        for rel, tradition in OWN_DOCS:
+            p = os.path.join(HERE, rel)
+            if not os.path.exists(p):
+                say("  %-32s missing" % rel); continue
+            with open(p, encoding="utf-8", errors="replace") as df:
+                found = precepts_in(df.read())
+            n = 0
+            for text, kind in found:
+                if text in seen:
+                    continue
+                seen.add(text); n += 1
+                fh.write(json.dumps({"text": text, "kind": kind, "book": rel,
+                                     "tradition": tradition, "gutenberg": None},
+                                    ensure_ascii=False) + "\n")
+            say("  %-32s %-10s %3d precept(s)" % (rel, tradition, n))
+            total += n
+    say("%d precept(s) from the covenant's own documents" % total)
+    return total
 
 
 def load_precepts(path=PRECEPTS):
@@ -430,10 +477,11 @@ def main():
     ap.add_argument("--extract", action="store_true")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--verify", action="store_true")
+    ap.add_argument("--own", action="store_true", help="extract precepts from the covenant's own documents")
     ap.add_argument("--generate", type=int, metavar="N", help="turn N unused precepts into judged transactions")
     ap.add_argument("--limit", type=int, default=len(BOOKS))
     a = ap.parse_args()
-    if a.list or not (a.fetch or a.extract or a.report or a.verify or a.generate):
+    if a.list or not (a.fetch or a.extract or a.report or a.verify or a.generate or a.own):
         print("%d books on the reading list:" % len(BOOKS))
         for gid, title, tradition in BOOKS:
             state = "cached" if os.path.exists(book_path(gid)) else "-"
@@ -447,6 +495,8 @@ def main():
             time.sleep(1.0)                                      # be a good guest
     if a.extract:
         extract()
+    if a.own:
+        extract_own()
     if a.generate:
         generate(a.generate)
     if a.report:
