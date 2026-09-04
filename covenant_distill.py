@@ -163,7 +163,76 @@ def examine(model, cases=None):
     return stats
 
 
-def promotion(cand, cur, cur_trained=True):
+def holdout_score(examples, folds=5, seed=5):
+    """K-fold over the ledger: (decided, correct, false_clears).
+
+    This is the measurement the "is it vaguer" question actually needs. The
+    exam is 37 cases, and a candidate that moved one of them decides the
+    promotion -- which is the same small-sample trap that let a memorising
+    model score 27 of 37 with zero wrong while clearing 18 real violations on
+    held-out rows. With a thousand rows of ledger there is no reason to settle
+    a coverage question on 37 of them."""
+    idx = list(range(len(examples)))
+    import random
+    random.Random(seed).shuffle(idx)
+    parts = [idx[i::folds] for i in range(folds)]
+    dec = cor = fc = 0
+    for f in parts:
+        te = set(f)
+        m = FB.FallbackModel.train([examples[i] for i in range(len(examples)) if i not in te],
+                                   ["promotion"], trained_at="promotion")
+        for i in f:
+            t, lab = examples[i]
+            v, _ = m.verdict(t)
+            if v == "abstain":
+                continue
+            dec += 1
+            if (v == "violates") == lab:
+                cor += 1
+            elif v == "clean":
+                fc += 1
+    return dec, cor, fc
+
+
+MIN_ROWS_FOR_HOLDOUT = 300
+HOLDOUT_RECORD = os.path.join(HERE, "ops", "HOLDOUT.json")
+
+
+def last_holdout():
+    """The held-out score of the last PROMOTED candidate.
+
+    A candidate must be compared with something measured the same way. The
+    first attempt compared a k-folded candidate against the deployed model
+    scored on the whole ledger -- including the rows it had trained on -- so
+    the incumbent looked perfect (0 false clears) and every honest candidate
+    lost. Only 32 rows were newer than the deployed model, too few to judge on.
+    So each promotion records its own held-out numbers here, and the next
+    candidate is measured against those: same procedure, same folds, same
+    seed, different corpus. That is a comparison; the other was not."""
+    try:
+        with open(HOLDOUT_RECORD, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return (int(d["decided"]), int(d["correct"]), int(d["false_clear"]), int(d.get("rows", 0)))
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def write_holdout(dec, cor, fc, rows):
+    try:
+        os.makedirs(os.path.dirname(HOLDOUT_RECORD), exist_ok=True)
+        with open(HOLDOUT_RECORD, "w", encoding="utf-8") as fh:
+            json.dump({"_what": "Held-out score of the last PROMOTED model, measured by "
+                                "k-fold over the ledger at the time. The next candidate is "
+                                "compared against these numbers rather than against the "
+                                "deployed model scored on its own training data.",
+                       "decided": dec, "correct": cor, "false_clear": fc, "rows": rows,
+                       "when": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+                      fh, indent=1)
+    except OSError:
+        pass
+
+
+def promotion(cand, cur, cur_trained=True, holdout=None):
     """(promote?, reasons). cand/cur are examine() results.
 
     THE BASELINE PROBLEM, found 2026-09-03. The first version compared every
@@ -180,22 +249,58 @@ def promotion(cand, cur, cur_trained=True):
     rule still applies, but only once there is a trained model to regress from.
     """
     c, k = cand["total"], cur["total"]
-    reasons = []
+    reasons, notes = [], []
+    # The SAFETY bars stay on the exam, because they are absolute and a single
+    # counterexample settles them: one false clear is one theft admitted.
     if c["false_clean"] > 0:
         reasons.append("REFUSED: %d false CLEAN on the exam -- it would clear something the author labelled a violation" % c["false_clean"])
     if cand["clean"]["false_hold"] > 0:
         reasons.append("REFUSED: wrongly holds %d of %d `clean` cases -- judge_suite puts that threshold at 100%% because "
                        "blocking a legitimate transfer halts the chain" % (cand["clean"]["false_hold"], cand["clean"]["n"]))
-    if c["agree"] < k["agree"]:
+    # The COVERAGE bar moves to held-out data when there is enough of it. A
+    # 37-case exam cannot tell "vaguer" from noise: a corpus that took theft
+    # from 4/5 to 5/5 and traps from 1/6 to 2/6 was refused for a net of one,
+    # while held-out decisions rose from 529 to 588 at the same accuracy.
+    if holdout:
+        cd, _cc, cfc = holdout["candidate"]
+        prev = holdout.get("previous")
+        if prev is None:
+            # A NOTE, not a refusal. The first version appended this to
+            # `reasons`, which is the list that decides the outcome, so the
+            # very first run under the new gate refused itself for having no
+            # predecessor. Notes go in their own list.
+            notes.append("no previous held-out record; judged on the exam's safety bars alone, "
+                         "and this run's numbers become the baseline")
+        else:
+            kd, _kc, kfc, krows = prev
+            # Rates, not counts: the ledger grows, so 3 false clears in 588
+            # decisions is not worse than 2 in 529.
+            crate = cfc / float(max(1, cd))
+            krate = kfc / float(max(1, kd))
+            if crate > krate * 1.5 + 0.002:
+                reasons.append("REFUSED: %d false clear(s) in %d held-out decisions (%.2f%%) against "
+                               "%d in %d (%.2f%%) -- it clears more of what it has not seen"
+                               % (cfc, cd, crate * 100, kfc, kd, krate * 100))
+            elif cd < kd:
+                reasons.append("REFUSED: decides %d held-out rows, the last promoted model %d -- it "
+                               "got vaguer (measured on %d rows, not on the 37-case exam)"
+                               % (cd, kd, holdout["rows"]))
+    elif c["agree"] < k["agree"]:
         reasons.append("REFUSED: decides %d exam cases correctly, the current model %d -- it got vaguer" % (c["agree"], k["agree"]))
     if cur_trained and c["false_hold_legit"] > k["false_hold_legit"]:
         reasons.append("REFUSED: wrongly holds %d legitimate cases (clean/trap/edge), the current model %d -- more trigger-happy"
                        % (c["false_hold_legit"], k["false_hold_legit"]))
     if not reasons:
-        reasons.append("PROMOTED: no false clean; holds no clean case; decides %d (was %d); wrongly holds %d legitimate (was %d)"
-                       % (c["agree"], k["agree"], c["false_hold_legit"], k["false_hold_legit"]))
-        return True, reasons
-    return False, reasons
+        if holdout:
+            reasons.append("PROMOTED: no false clean on the exam; holds no clean case; decides %d held-out "
+                           "rows (was %d) with %d false clear(s) (was %d); exam %d (was %d)"
+                           % (holdout["candidate"][0], holdout["current"][0],
+                              holdout["candidate"][2], holdout["current"][2], c["agree"], k["agree"]))
+        else:
+            reasons.append("PROMOTED: no false clean; holds no clean case; decides %d (was %d); wrongly holds %d legitimate (was %d)"
+                           % (c["agree"], k["agree"], c["false_hold_legit"], k["false_hold_legit"]))
+        return True, notes + reasons
+    return False, notes + reasons
 
 
 def crossval(folds=5, floors=(1, 2, 3), coverages=(0.15, 0.25, 0.35, 0.45), seed=5, say=print):
@@ -345,9 +450,30 @@ def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDAT
     cand = FB.FallbackModel.train(examples, sources_of(verdicts), trained_at=when)
     cur = FB.FallbackModel.load(model_path)
     cand_stats, cur_stats = examine(cand), examine(cur)
-    ok, reasons = promotion(cand_stats, cur_stats, cur_trained=cur.n_examples >= FB.MIN_EXAMPLES)
+    hold = None
+    if len(examples) >= MIN_ROWS_FOR_HOLDOUT and cur.n_examples >= FB.MIN_EXAMPLES:
+        # Both models measured on the SAME folds of the SAME ledger: the
+        # candidate as trained here, and the model in use scored on every row.
+        cd, cc, cfc = holdout_score(examples)
+        kd = kc = kfc = 0
+        for t, lab in examples:
+            v, _ = cur.verdict(t)
+            if v == "abstain":
+                continue
+            kd += 1
+            if (v == "violates") == lab:
+                kc += 1
+            elif v == "clean":
+                kfc += 1
+        hold = {"candidate": (cd, cc, cfc), "current": (kd, kc, kfc),
+                "previous": last_holdout(), "rows": len(examples)}
+    ok, reasons = promotion(cand_stats, cur_stats,
+                            cur_trained=cur.n_examples >= FB.MIN_EXAMPLES, holdout=hold)
     if ok:
         cand.save(model_path)
+        if hold:
+            cd, cc, cfc = hold["candidate"]
+            write_holdout(cd, cc, cfc, hold["rows"])
         try:
             os.remove(candidate_path)
         except OSError:

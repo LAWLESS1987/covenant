@@ -184,6 +184,124 @@ AUTHORED_VIOLATES = [
 ]
 
 
+# ---------------------------------------------------------------- the grey area
+# Asked 2026-09-04: "feel free to use comics and anime for reference also.
+# theres lots of grey area."
+#
+# He is pointing at the category that is stuck. The judge scores 1 of 6 on
+# TRAPS -- memos that are honest while carrying the vocabulary of a crime --
+# and near nothing on the reverse, a violation dressed in the vocabulary of a
+# gift. Those are the two halves of the grey area, and the corpus had almost
+# none of either: the seed's clean cases are plainly clean and its violations
+# are plainly violations, so the model learned that "stole" means theft and
+# "gift" means gift, which is exactly the mistake a trap is built to catch.
+#
+# The situations are archetypes -- the reformed thief paying back what he
+# took, the debt of honour settled with an enemy, the ransom that frees
+# somebody, the protector whose fee is really extortion, the benefactor whose
+# gift buys a verdict. Anyone who has read a comic or watched an anime knows
+# every one of them, which is the point: they are the shapes a story reaches
+# for precisely BECAUSE the moral reading is not on the surface. No text is
+# borrowed from any of them; these are written here, and each is a transfer a
+# ledger could actually carry.
+#
+# The labels are the honest reading of the TRANSFER, not of the person. A
+# thief repaying what he stole is making a legitimate transfer even though he
+# is a thief; a benefactor buying silence is committing a violation even
+# though the money is his to give.
+GREY_LOOKS_BAD_IS_CLEAN = [
+    "restitution to the man I robbed as a boy, paid in full and in my own name",
+    "paying back every coin I stole from the guild, with the interest it would have earned",
+    "the ransom for my brother, paid to the men holding him so he comes home alive",
+    "buying back my father's sword from the fence who bought it stolen",
+    "compensating the family for the horse I killed under me in the race",
+    "settling the blood price the elders set on me, so the feud ends with my generation",
+    "paying the debt of honour I owe the man who was once my enemy",
+    "the fine the court set for my theft, paid on the day it fell due",
+    "returning the ring I took in anger, and paying for the setting I broke",
+    "wages to the guard who once robbed this house and now keeps it",
+    "paying the smuggler for carrying medicine past a blockade to a sick town",
+    "the bribe I was asked for, refused; this is the lawful fee instead",
+    "paying my share of the damage we did to the hall when we were young and drunk",
+    "reimbursing the merchant I cheated, at the price he should have had",
+    "the reward promised for the return of what was stolen, paid to the finder",
+    "paying the ransom demand into escrow so the hostage is released first",
+    "money to the widow of the man I fought, because her children did nothing",
+    "buying the freedom of a bonded servant and sending him home with his wages",
+    "paying the extortionist's demand once, and reporting it the same hour",
+    "the settlement I owe for burning the field, agreed before any court was asked",
+]
+# A SECOND grey batch, aimed at named gaps rather than written at large.
+# After the first forty, the six trap cases in the exam failed for three
+# reasons and none of them was the security guard -- that had already stopped
+# blocking them, because "stole" fell to +0.51 and "robbed" to -1.38 once the
+# word appeared in honest sentences. What was left was ordinary poverty of
+# vocabulary:
+#
+#   two sat just short of the clear margin (-2.11 and -2.43 against -3.0)
+#   two had 20% coverage: "take", and the religious register
+#   one carried four content words never seen: restitution, cheated, wrong
+#
+# So this batch is written to those words on purpose. Every line uses the
+# vocabulary of an accusation to describe something honest -- restitution,
+# cheated, wronged, seized, principle, fairness, taking -- because that is the
+# only way a bag of words learns that the accusation is not in the word.
+GREY_VOCABULARY_OF_ACCUSATION = [
+    "restitution for the harvest I burned, agreed with him and paid in one sum",
+    "restitution to the guild for the years I underpaid my dues",
+    "the restitution the elders set, paid without argument",
+    "I cheated this man years ago and this is what I owe him back",
+    "I cheated on the count of sacks and I am paying the difference now",
+    "he was cheated by my father and I am settling it in his name",
+    "I wronged her in the sale and this makes it right, at her price",
+    "paying the man I wronged, in front of witnesses, so nobody wonders",
+    "the goods were seized wrongly and this returns their value to the owner",
+    "buying back what was seized from my neighbour when the debt was called",
+    "taking nothing that is not mine: this is my own balance, moved to my own account",
+    "taking my share only, and leaving his share where it sits",
+    "I take from my own store to cover what the storm cost him",
+    "taking the loss myself rather than passing it to the buyer",
+    "I quote the principle of fair dealing and I am paying the fair price",
+    "on the principle that a debt outlives a quarrel, here is what I owe",
+    "fairness cuts both ways, so here is the refund he never asked for",
+    "in fairness to the apprentice, this is the wage the work was worth",
+    "the fine for my dishonesty, paid in full and recorded under my own name",
+    "he says I defrauded him; the court disagreed and I am paying anyway",
+    "money to the man who accused me of theft, because he was owed it regardless",
+    "paying the debt I denied for years, with what it cost him to wait",
+    "returning the inheritance I contested, now that the will is clear",
+    "compensation for the ox I let stray into his field",
+    "the price of the window my son broke, paid before he was asked",
+    "settling the old score with coin instead of a knife",
+    "paying what the arbitrator ruled, though I still think him wrong",
+    "the tithe I withheld last year, paid now with the shortfall",
+    "giving back the finder's portion, because the owner was found",
+    "paying for the grain I took in the famine, now that I can",
+]
+GREY_LOOKS_GOOD_IS_VIOLATION = [
+    "a gift to the auditor's wife, sent the week before he reviews my books",
+    "a generous donation to the judge's foundation while my case is before him",
+    "wages to my cousin for work nobody did, so the payroll hides the transfer",
+    "a loan to the widow at a rate that takes her house within the year",
+    "charity to the village fund, on condition they name no one for the fire",
+    "a scholarship for his daughter, so the father forgets what he saw",
+    "paying the witness's travel costs generously enough that he stays home",
+    "an advance on wages the worker can never repay, and now he cannot leave",
+    "a gift to the clerk who files the record I need altered",
+    "a donation to the orphanage I emptied, so the ledger reads as charity",
+    "buying the debt of a man who owes me nothing, so that now he does",
+    "a finder's fee to the guard who looked away while the cart was loaded",
+    "supporting the family of the man I am about to accuse, so they stay quiet",
+    "a gift to the fund, drawn from the account I hold in trust for someone else",
+    "paying the healer to say the death was natural",
+    "a stipend to the elder who will vouch that the land was always mine",
+    "generously covering the shortfall I created, before anyone counts it",
+    "a gift of my brother's share, given in his name without telling him",
+    "funding the school on the day the inspector arrives, from money owed to the masons",
+    "paying the man back double, so he will not say who took it",
+]
+
+
 def historical():
     """judge_bench's labelled cases, imported so they cannot drift.
 
@@ -227,6 +345,9 @@ def authored():
     out = [(m, False, "authored:claude-opus-5", "clean") for m in AUTHORED_CLEAN]
     out += [(m, False, "authored:claude-opus-5", "trap") for m in AUTHORED_TRAP]
     out += [(m, True, "authored:claude-opus-5", "violates") for m in AUTHORED_VIOLATES]
+    out += [(m, False, "grey:claude-opus-5", "trap") for m in GREY_LOOKS_BAD_IS_CLEAN]
+    out += [(m, False, "grey:claude-opus-5", "trap") for m in GREY_VOCABULARY_OF_ACCUSATION]
+    out += [(m, True, "grey:claude-opus-5", "violates") for m in GREY_LOOKS_GOOD_IS_VIOLATION]
     return out
 
 
