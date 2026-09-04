@@ -96,11 +96,31 @@ MODEL_PATH = os.path.join(HERE, "fallback_model.json")
 
 # Thresholds. Every one of these is a refusal to speak, not a licence to.
 MIN_EXAMPLES = 40        # below this the model has no business having a view
+MIN_DOC_FREQ = 3         # a token seen once or twice is a coincidence, not evidence
 MIN_COVERAGE = 0.35      # fraction of payload tokens the model has ever seen
 MARGIN_TO_HOLD = 1.2     # log-odds needed to say "violates"
 MARGIN_TO_CLEAR = 3.0    # ...and much more to say "clean". See the asymmetry.
 
 _TOKEN = re.compile(r"[a-z][a-z0-9_]{2,}")
+
+# Function words. MEASURED 2026-09-03: trained on 86 verdicts the model gave
+# "the" a weight of +0.50 toward VIOLATES, and held "payment for goods" on a
+# score of +1.49. A grammar word cannot carry ethical content -- whatever
+# correlation it has is the corpus being small, and a judge that holds a
+# legitimate payment because of the word "the" is an availability failure
+# wearing the costume of a finding. These never get weight, at any count.
+STOPWORDS = frozenset([
+    "the", "and", "for", "with", "that", "this", "from", "they", "them",
+    "his", "her", "its", "our", "your", "their", "was", "were", "are",
+    "been", "being", "have", "has", "had", "will", "would", "could",
+    "should", "shall", "not", "but", "you", "all", "any", "can", "did",
+    "does", "done", "each", "few", "how", "into", "more", "most", "now",
+    "only", "out", "over", "own", "same", "she", "some", "such", "than",
+    "then", "there", "these", "those", "too", "very", "what", "when",
+    "where", "which", "who", "whom", "why", "about", "after", "again",
+    "against", "because", "before", "below", "between", "both", "during",
+    "further", "here", "once", "under", "until", "while",
+])
 
 
 def tokens(text: str) -> List[str]:
@@ -134,6 +154,10 @@ class FallbackModel:
         v_counts: Dict[str, int] = {}
         c_counts: Dict[str, int] = {}
         n_v = n_c = 0
+        doc_freq: Dict[str, int] = {}
+        for text, _v in examples:
+            for t in set(tokens(text)):
+                doc_freq[t] = doc_freq.get(t, 0) + 1
         for text, violates in examples:
             bag = set(tokens(text))
             if violates:
@@ -146,6 +170,8 @@ class FallbackModel:
                     c_counts[t] = c_counts.get(t, 0) + 1
         weights = {}
         for t in set(v_counts) | set(c_counts):
+            if t in STOPWORDS or doc_freq.get(t, 0) < MIN_DOC_FREQ:
+                continue
             pv = (v_counts.get(t, 0) + 1.0) / (n_v + 2.0)
             pc = (c_counts.get(t, 0) + 1.0) / (n_c + 2.0)
             w = math.log(pv / pc)

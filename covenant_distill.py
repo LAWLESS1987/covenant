@@ -136,19 +136,36 @@ def examine(model, cases=None):
     return stats
 
 
-def promotion(cand, cur):
-    """(promote?, reasons). cand/cur are examine() results."""
+def promotion(cand, cur, cur_trained=True):
+    """(promote?, reasons). cand/cur are examine() results.
+
+    THE BASELINE PROBLEM, found 2026-09-03. The first version compared every
+    candidate against the model in use on BOTH axes. The model in use was
+    untrained, and an untrained model abstains on everything -- so it holds
+    zero legitimate cases, and any candidate that held even one was refused as
+    "more trigger-happy". Measured against a model that never speaks, nothing
+    can ever be an improvement, and the loop could not start.
+
+    So the availability bar is absolute rather than comparative, and it is
+    taken from the suite's own numbers: judge_suite.THRESHOLDS["clean"] is
+    1.00 because blocking legitimate transfers halts the chain. A candidate
+    may not wrongly hold a single `clean` case. The comparative no-regression
+    rule still applies, but only once there is a trained model to regress from.
+    """
     c, k = cand["total"], cur["total"]
     reasons = []
     if c["false_clean"] > 0:
         reasons.append("REFUSED: %d false CLEAN on the exam -- it would clear something the author labelled a violation" % c["false_clean"])
+    if cand["clean"]["false_hold"] > 0:
+        reasons.append("REFUSED: wrongly holds %d of %d `clean` cases -- judge_suite puts that threshold at 100%% because "
+                       "blocking a legitimate transfer halts the chain" % (cand["clean"]["false_hold"], cand["clean"]["n"]))
     if c["agree"] < k["agree"]:
         reasons.append("REFUSED: decides %d exam cases correctly, the current model %d -- it got vaguer" % (c["agree"], k["agree"]))
-    if c["false_hold_legit"] > k["false_hold_legit"]:
+    if cur_trained and c["false_hold_legit"] > k["false_hold_legit"]:
         reasons.append("REFUSED: wrongly holds %d legitimate cases (clean/trap/edge), the current model %d -- more trigger-happy"
                        % (c["false_hold_legit"], k["false_hold_legit"]))
     if not reasons:
-        reasons.append("PROMOTED: no false clean; decides %d (was %d); wrongly holds %d legitimate (was %d)"
+        reasons.append("PROMOTED: no false clean; holds no clean case; decides %d (was %d); wrongly holds %d legitimate (was %d)"
                        % (c["agree"], k["agree"], c["false_hold_legit"], k["false_hold_legit"]))
         return True, reasons
     return False, reasons
@@ -205,7 +222,7 @@ def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDAT
     cand = FB.FallbackModel.train(examples, sources_of(verdicts), trained_at=when)
     cur = FB.FallbackModel.load(model_path)
     cand_stats, cur_stats = examine(cand), examine(cur)
-    ok, reasons = promotion(cand_stats, cur_stats)
+    ok, reasons = promotion(cand_stats, cur_stats, cur_trained=cur.n_examples >= FB.MIN_EXAMPLES)
     if ok:
         cand.save(model_path)
         try:
