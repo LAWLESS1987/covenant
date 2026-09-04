@@ -210,17 +210,33 @@ def main() -> int:
     print("      halt file (TRADER_HALT) : %s"
           % ("PRESENT -- everything blocked regardless" if halted else "absent"))
 
-    if cfg:
-        print()
-        print("  BOUNDS, if it were armed")
-        for k, label in (("max_order_usd", "per order"),
-                         ("max_daily_notional_usd", "per day"),
-                         ("max_orders_per_day", "orders per day"),
-                         ("min_order_usd", "minimum order"),
-                         ("min_sealed_signals", "sealed signals required first"),
-                         ("seal_required", "decision must be sealed to chain")):
-            if k in cfg:
-                print("      %-32s %s" % (label, cfg[k]))
+    # BOUNDS ARE REPORTED EVEN WITHOUT A CONFIG. This used to print nothing
+    # when trader_config.json was absent -- which is the normal state, since
+    # the file is per-operator and deliberately unshipped -- while the caps
+    # were being enforced from guards.CAP_DEFAULTS all the same. A posture
+    # report that says nothing about the bounds in force is the exact failure
+    # this file exists to catch: a document claiming less than the code does is
+    # as misleading as one claiming more.
+    try:
+        import guards as _g
+        fallback = dict(_g.CAP_DEFAULTS)
+    except Exception:                                              # noqa: BLE001
+        fallback = {}
+    print()
+    print("  BOUNDS, if it were armed")
+    for k, label in (("max_order_usd", "per order"),
+                     ("max_daily_notional_usd", "per day"),
+                     ("max_orders_per_day", "orders per day"),
+                     ("min_order_usd", "minimum order"),
+                     ("min_sealed_signals", "sealed signals required first"),
+                     ("seal_required", "decision must be sealed to chain")):
+        if cfg and k in cfg:
+            print("      %-32s %s" % (label, cfg[k]))
+        elif k in fallback:
+            print("      %-32s %s   (guards.CAP_DEFAULTS; no trader_config.json)"
+                  % (label, fallback[k]))
+        else:
+            print("      %-32s unset" % label)
 
     print()
     print("  WILL ANYTHING RUN IT WITHOUT A HUMAN?")

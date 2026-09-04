@@ -211,6 +211,36 @@ print("\nS  daily.py state journal -- what makes the breakers real")
 
 tmp = tempfile.mkdtemp()
 daily.STATE_PATH = os.path.join(tmp, "daily_state.json")
+
+# THE MONEY RULES ARE NOT THIS SUITE'S SUBJECT, AND ITS FILES ARE NOT REAL.
+#
+# guards gained BuyBudget and FiatBuyPermission on 2026-09-04, and both read
+# files outside this process: private/RESERVE.json for the starting book, and
+# ~/.covenant/trader_state.json for what has been bought. This suite drives
+# daily.main() in-process against a FABRICATED $44 book, so left alone it would
+# read the operator's real files -- and, until daily.py was corrected, could
+# have WRITTEN the real starting book from that fake total. It did not, only
+# because a real run happened to go first.
+#
+# So both paths are redirected here, beside daily.STATE_PATH, and the fixtures
+# put the two money guards deliberately out of the way: a budget far larger
+# than anything this suite spends, and fiat buying permitted. D3 is about the
+# circuit breakers -- drawdown, cooldown, concentration, cash floor -- and a
+# suite that silently started failing on a rule it was not written to test
+# would be reporting the wrong thing. The money rules are pinned by
+# test_f7_caps.py, which is written for them.
+guards.RESERVE_PATH = os.path.join(tmp, "RESERVE.json")
+guards.TRADER_STATE = os.path.join(tmp, "trader_state.json")
+guards.CONFIG_PATH = os.path.join(tmp, "trader_config.json")
+with open(guards.RESERVE_PATH, "w", encoding="utf-8") as _fh:
+    json.dump({"starting_total_usd": 100000.0, "pct_buyable": 0.50}, _fh)
+with open(guards.TRADER_STATE, "w", encoding="utf-8") as _fh:
+    json.dump({"day": time.strftime("%Y-%m-%d"), "orders_today": [],
+               "bought_total_usd": 0.0}, _fh)
+with open(guards.CONFIG_PATH, "w", encoding="utf-8") as _fh:
+    json.dump({"allow_fiat_buys": True, "max_order_usd": 100.0,
+               "max_daily_notional_usd": 300.0, "max_orders_per_day": 4,
+               "min_order_usd": 5.0}, _fh)
 s0 = daily.load_state()
 check("S1 a missing state file loads as empty, not an exception",
       s0["equity"] == [] and s0["last_sold"] == {} and s0["closed_trades"] == [])

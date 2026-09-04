@@ -110,3 +110,10 @@ future run:
   deliberately written to `~/.covenant/daily_state.json`, **outside** the synced
   folder, for the same two reasons: the folder leaves the machine, and a file
   that changes on every run would break the seal daily.
+- **`trader_state.json`.** Since 2026-09-04 the breakers read a second file,
+  `~/.covenant/trader_state.json`, for the same reasons and in the same place.
+  It holds the orders placed today, which is what the per-trade and per-day caps
+  are about, and only `covenant_trader.py` writes it — `daily.py` reads it so
+  that the morning report enforces the same caps the trader does. A missing file
+  means the trader has never run, so no orders exist; a file that will not parse
+  is *unknown*, and both cap guards block on unknown rather than assuming zero.

@@ -287,6 +287,7 @@ SUITES = [
     ("test_f4_capability.py",            120,  "JUDGE"),
     ("test_f5_reserve.py",                90,  "JUDGE"),
     ("test_f6_stuffing.py",              120,  "JUDGE"),
+    ("test_f7_caps.py",                   60,  "MONEY"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40

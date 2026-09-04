@@ -420,11 +420,40 @@ def guard_state(st, total, cash, positions, now=None):
     if not st.get("closed_trades"):
         notes.append("no closed trades recorded -- the loss-streak guard can only "
                      "ever say ok until sells are logged with --sold")
+
+    # THE DAY'S ORDERS COME FROM THE TRADER'S OWN STATE, not this journal.
+    # covenant_trader.py records what it places; daily.py records prices and
+    # equity. The per-trade and per-day caps are about orders actually sent, so
+    # they have to read the file that holds them. A missing file means the
+    # trader has never run and no orders exist; a file that will not parse is
+    # unknown, and both cap guards block on unknown.
+    orders = _guards.orders_today_now(now=now)
+    if orders is None:
+        notes.append("the trader's state file could not be read -- the per-trade "
+                     "and per-day caps cannot evaluate and will block")
+
+    # THE BUY BUDGET'S TWO NUMBERS, BOTH READ AND NEITHER WRITTEN HERE.
+    # covenant_trader.py is the only writer of the starting book: it is the
+    # thing that buys, it reads the portfolio from the venues, and this file is
+    # driven by a test harness with a fabricated book. A report may not set the
+    # number that decides how much of someone's money may be spent.
+    started = _guards.starting_total()
+    spent_ever = _guards.bought_total_now()
+    if started is None:
+        notes.append("no starting book value recorded yet (private/RESERVE.json) "
+                     "-- the buy budget cannot evaluate and will block until "
+                     "covenant_trader.py has read the portfolio once")
+    if spent_ever is None:
+        notes.append("the lifetime buy total could not be read -- the buy budget "
+                     "cannot evaluate and will block")
+
     return _guards.State(
         equity_now=total, equity_peak=peak, equity_start_of_day=sod,
         closed_trades=list(st.get("closed_trades", [])),
         last_sold={k: float(v) for k, v in st.get("last_sold", {}).items()},
-        positions=dict(positions), cash=cash, now=now), notes
+        positions=dict(positions), cash=cash,
+        orders_today=orders, starting_total_usd=started,
+        bought_total_usd=spent_ever, now=now), notes
 
 
 def main():
@@ -608,7 +637,9 @@ def main():
         for n in notes:
             guard_lines.append(f"  ! {n}")
         portfolio = [v for v in stack.evaluate(gstate) if v.guard in
-                     ("max_drawdown", "daily_loss", "loss_streak", "cash_floor")]
+                     ("max_drawdown", "daily_loss", "loss_streak", "cash_floor",
+                      "per_day_cap", "per_trade_cap", "buy_budget",
+                      "fiat_permission")]
         for v in portfolio:
             guard_lines.append(f"  [{'ok   ' if v.allowed else 'BLOCK'}] "
                                f"{v.guard:<14} {v.reason}")
@@ -632,7 +663,12 @@ def main():
                 guard_lines.append(f"  [BLOCK] {r['sym']:<14} {why}")
 
     print()
-    print("  CIRCUIT BREAKERS (they gate 'may add' only -- never a sale)")
+    # "never a sale" stays, because no guard forces one and none ever will.
+    # "gate may add only" was dropped: ReserveFloor refuses SALES that would
+    # cross the reserved half, and the per-trade and per-day caps apply to
+    # every order. What this report asks about is adding; that is not the same
+    # claim as the guards having no view on anything else.
+    print("  CIRCUIT BREAKERS (this report asks about adding; no guard forces a sale)")
     print("  " + "-" * 64)
     for line in guard_lines:
         print(line)

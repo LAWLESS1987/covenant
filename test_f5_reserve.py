@@ -52,7 +52,7 @@ def check(name, cond, detail=""):
                         ("  " + str(detail)[:160]) if (detail and not cond) else ""))
 
 
-def state(held, base, sym="XRP"):
+def state(held, base, sym="XLM"):
     return G.State(equity_now=1000.0, equity_peak=1000.0, equity_start_of_day=1000.0,
                    closed_trades=[], last_sold={}, positions={sym: held * 5.0},
                    cash=500.0, quantities={sym: held}, reserve_baseline={sym: base})
@@ -62,24 +62,69 @@ def main():
     print("F5 -- the reserved half, and what the program cannot do\n")
     g = G.ReserveFloor(0.50)
 
+    # ---- H: hold-only -----------------------------------------------------
+    # Asked 2026-09-04: "50 percent of current holdings excluding xrp can be
+    # sold and rebought". XRP is not half-reserved, it is wholly reserved, and
+    # the R* tests below therefore use XLM -- a suite that demonstrated the
+    # fifty-percent rule on the one symbol exempt from it would be measuring
+    # nothing. That substitution is the reason these checks exist: to make sure
+    # the exemption is real and not an artefact of changing the example.
+    check("H1 no part of a hold-only asset may be sold, whatever the baseline says",
+          G.ReserveFloor.sellable(state(100.0, 100.0, "XRP"), "XRP") == 0.0)
+    check("H2 ...and the guard refuses rather than trimming",
+          not g.check(state(100.0, 100.0, "XRP"), "XRP").allowed
+          and "hold-only" in g.check(state(100.0, 100.0, "XRP"), "XRP").reason)
+    check("H3 zero sellable is KNOWN, not unknown -- None means 'no baseline "
+          "recorded' and would let a caller fall through to its own default",
+          G.ReserveFloor.sellable(state(100.0, 100.0, "XRP"), "XRP") is not None)
+    check("H4 XRP is the hold-only set, and nothing in the program adds to it",
+          G.HOLD_ONLY == ("XRP",))
+    src_g = io.open(os.path.join(HERE, "guards.py"), encoding="utf-8").read()
+    check("H5 HOLD_ONLY is assigned exactly once -- a second assignment anywhere "
+          "would mean a rule that can be widened at runtime",
+          src_g.count("HOLD_ONLY = ") == 1, src_g.count("HOLD_ONLY = "))
+    check("H6a HOLD-ONLY IS ABOUT SELLING, NOT BUYING. may_buy() must not refuse "
+          "to add XRP just because none of it may be sold -- the two are "
+          "different questions and conflating them is a rule nobody asked for",
+          G.GuardStack([G.ReserveFloor(0.50)]).may_buy(
+              state(100.0, 100.0, "XRP"), "XRP")[0])
+    check("H6b ...and the reserve still refuses the SALE it is there to refuse",
+          not G.ReserveFloor(0.50).check(state(100.0, 100.0, "XRP"), "XRP").allowed)
+    check("H6c the reserve declares itself sell-side, which is what makes the "
+          "distinction executable rather than a comment",
+          G.ReserveFloor(0.50).side == "sell"
+          and G.PerDayCap().side == "both"
+          and G.MaxDrawdown().side == "buy")
+    check("H6d ...and evaluate() still REPORTS it, so the operator sees the "
+          "reserve line whether or not it bears on the question asked",
+          any(v.guard == "reserve_floor" for v in
+              G.GuardStack([G.ReserveFloor(0.50)]).evaluate(
+                  state(100.0, 100.0, "XRP"), "XRP")))
+    check("H6 an asset that is NOT hold-only still gets the half rule",
+          G.ReserveFloor.sellable(state(100.0, 100.0, "XLM"), "XLM") == 50.0)
+    src_t = io.open(os.path.join(HERE, "covenant_trader.py"), encoding="utf-8").read()
+    check("H7 the planner clamps through guards.sellable_units rather than its own "
+          "copy of the arithmetic, so the hold-only rule reaches the order it plans",
+          "sellable_units(" in src_t)
+
     # ---- R: the ratchet ---------------------------------------------------
     held = 100.0
     for _ in range(8):
-        held -= G.ReserveFloor.sellable(state(held, 100.0), "XRP")
+        held -= G.ReserveFloor.sellable(state(held, 100.0), "XLM")
     check("R1 eight rounds of selling everything permitted leaves exactly half, not "
           "nothing (%.4f units of a 100 baseline)" % held, abs(held - 50.0) < 1e-9, held)
     check("R2 a sell is refused once the holding is at the floor",
-          not g.check(state(50.0, 100.0), "XRP").allowed)
-    check("R3 ...and below it", not g.check(state(49.0, 100.0), "XRP").allowed)
+          not g.check(state(50.0, 100.0), "XLM").allowed)
+    check("R3 ...and below it", not g.check(state(49.0, 100.0), "XLM").allowed)
     check("R4 above the floor it allows, and says how much is sellable",
-          g.check(state(100.0, 100.0), "XRP").allowed
-          and "50 sellable" in g.check(state(100.0, 100.0), "XRP").reason)
+          g.check(state(100.0, 100.0), "XLM").allowed
+          and "50 sellable" in g.check(state(100.0, 100.0), "XLM").reason)
     check("R5 buying more raises what half means",
-          G.ReserveFloor.sellable(state(120.0, 100.0), "XRP") == 70.0)
+          G.ReserveFloor.sellable(state(120.0, 100.0), "XLM") == 70.0)
     check("R6 an asset with no baseline recorded gets no claim either way, rather than "
           "a silent pass", "no baseline recorded" in
           g.check(G.State(equity_now=1.0, equity_peak=1.0, equity_start_of_day=1.0,
-                          closed_trades=[], last_sold={}, positions={}, cash=1.0), "XRP").reason)
+                          closed_trades=[], last_sold={}, positions={}, cash=1.0), "XLM").reason)
     check("R7 the floor is in the default stack, so it is on unless someone removes it",
           any(isinstance(x, G.ReserveFloor) for x in G.DEFAULTS))
 

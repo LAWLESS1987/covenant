@@ -72,8 +72,29 @@ def check(name, cond, detail=""):
 
 def main():
     print("F3 -- the assembled gate, offline\n")
+    # THE WORST HONEST CASE, AND IT HAS TO BE MADE, NOT ASSUMED.
+    #
+    # This suite says it measures the gate with "no Ollama, no network, nobody
+    # to defer to but the student and the lexicon". It switched off the GitHub
+    # runner and then relied on Ollama merely being ABSENT -- which was two
+    # defects at once, found 2026-09-04 when the sweep reported this suite as
+    # TIMEOUT at 300s rather than as a pass.
+    #
+    # The slow one: the operator's policy has ollama_when_student_holds=true,
+    # so every case where the student held tried to reach localhost:11434 and
+    # paid for discovering it was not there. Thirty-seven cases of that is
+    # minutes, and a suite that times out reports nothing at all.
+    #
+    # The serious one: on a machine where Ollama IS running, this suite would
+    # have quietly measured an EASIER condition than the one it prints -- a
+    # gate with a model server behind it, reported as a gate without one. A
+    # test whose result depends on what happens to be running is not measuring
+    # what it claims.
+    #
+    # Both are the same fix: state the condition instead of inheriting it.
     policy = dict(D.load_policy())
     policy["github_when_local_down"] = False        # the worst honest case
+    policy["ollama_when_student_holds"] = False     # ...and it must be made, not assumed
     quorum = cov.build_semantic_quorum(["deferring", "semantic"])
     for j in quorum.judges:
         if isinstance(j, D.DeferringJudge):

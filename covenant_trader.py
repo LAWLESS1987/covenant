@@ -26,8 +26,10 @@ THE PRECONDITIONS FOR A LIVE ORDER
     1. config armed = true
     2. no TRADER_HALT file in this folder      (drop one to stop everything)
     3. the order is inside max_order_usd, and today is inside
-       max_daily_notional_usd and max_orders_per_day
-    4. guards.py raises no block            (buys only -- a guard never stops a sale)
+       max_daily_notional_usd and max_orders_per_day -- these are
+       guards.PerTradeCap and guards.PerDayCap since 2026-09-04, so
+       daily.py's morning report enforces the same numbers this does
+    4. guards.py raises no other block      (buys only -- a guard never stops a sale)
     5. the decision sealed to the chain     (if seal_required)
     6. Rule 5 is satisfied: min_sealed_signals sealed signals on record
   Every failed precondition is printed with its name. Nothing is skipped
@@ -104,7 +106,7 @@ def load_state():
     except Exception:
         return {"orders_today": [], "day": "", "equity_peak": 0.0,
                 "equity_start_of_day": 0.0, "closed_trades": [], "last_sold": {},
-                "sealed_signals": 0}
+                "sealed_signals": 0, "bought_total_usd": 0.0}
 
 
 def save_state(st):
@@ -118,6 +120,29 @@ def roll_day(st):
         st["day"] = today
         st["orders_today"] = []
         st["equity_start_of_day"] = 0.0     # set once equity is known this run
+    # BACKFILL THE LIFETIME BUY TOTAL, BUT ONLY ON EVIDENCE.
+    #
+    # guards.BuyBudget measures cumulative buying against half the starting
+    # book, and it blocks when the figure is unknown -- which is right, because
+    # assuming zero would hand back a budget that may already be spent. A state
+    # file written before the figure existed is exactly that case, and it would
+    # block for ever without something to resolve it.
+    #
+    # So it is resolved from evidence rather than convenience: a file with no
+    # closed trades, no orders today and no equity peak has never seen a trade,
+    # so nothing has been bought and zero is a measurement. Any other file keeps
+    # the key ABSENT, keeps blocking, and waits for an operator who knows what
+    # was spent -- because that is a question about their money, not ours.
+    if "bought_total_usd" not in st:
+        never_traded = (not st.get("closed_trades")
+                        and not st.get("orders_today")
+                        and not st.get("equity_peak"))
+        if never_traded:
+            st["bought_total_usd"] = 0.0
+            st["bought_total_usd_note"] = (
+                "initialised to 0 by roll_day on %s: this state recorded no closed "
+                "trades, no orders and no equity peak, so nothing had been bought. "
+                "It is a measurement, not a default." % today)
     return st
 
 
@@ -329,7 +354,28 @@ def plan(cfg, pf):
         if pct > cap:
             over_usd = p["val"] - cap * total
             qty = over_usd / p["px"]
-            sellable = max(0.0, held_now.get(p["sym"], 0.0) - base.get(p["sym"], 0.0) * pct_reserved)
+            # guards.sellable_units is the one implementation, and it is what
+            # carries the hold-only rule: XRP is excluded from the tradeable
+            # half entirely, so this returns 0 for it and the order is dropped
+            # below rather than trimmed.
+            sellable = _guards.sellable_units(
+                held_now.get(p["sym"], 0.0), base.get(p["sym"], 0.0),
+                p["sym"], pct_reserved) if _guards else 0.0
+            if sellable is None:
+                sellable = 0.0
+            # ONE CONDITION, ONE NOTE. A hold-only asset produced three lines
+            # -- excluded, then "trimmed to 0", then "DROPPED" -- and the
+            # middle one was actively wrong: it read "50% of the baseline is
+            # reserved and no rule may cross it" when for this asset the
+            # reserved fraction is all of it. A note that misstates the reason
+            # is worse than no note, because it is the line someone would argue
+            # with.
+            if p["sym"] in (getattr(_guards, "HOLD_ONLY", ()) if _guards else ()):
+                notes.append("reserve: %s is hold-only -- it is excluded from the "
+                             "tradeable half entirely, so the %.8g units the "
+                             "concentration cap wanted sold are not sold"
+                             % (p["sym"], qty))
+                continue
             if qty > sellable:
                 notes.append("reserve: %s sell trimmed %.8g -> %.8g units; %.0f%% of the "
                              "%.8g baseline is reserved and no rule may cross it"
@@ -373,20 +419,40 @@ def preconditions(cfg, st, pf, order, sealed_ok, guard_blocks):
         bad.append("armed=false in trader_config.json")
     if os.path.exists(HALT):
         bad.append("TRADER_HALT file present")
-    if order["usd"] > cfg["max_order_usd"]:
-        bad.append(f"${order['usd']:,.0f} over max_order_usd "
-                   f"${cfg['max_order_usd']:,.0f}")
-    if order["usd"] < cfg["min_order_usd"]:
-        bad.append(f"${order['usd']:,.2f} under min_order_usd "
-                   f"${cfg['min_order_usd']:,.2f}")
-    done = st.get("orders_today", [])
-    if len(done) >= cfg["max_orders_per_day"]:
-        bad.append(f"{len(done)} orders already today, limit "
-                   f"{cfg['max_orders_per_day']}")
-    spent = sum(o.get("usd", 0) for o in done)
-    if spent + order["usd"] > cfg["max_daily_notional_usd"]:
-        bad.append(f"${spent + order['usd']:,.0f} would exceed daily notional "
-                   f"${cfg['max_daily_notional_usd']:,.0f}")
+    # THE CAPS ARE GUARDS NOW (guards.PerTradeCap / PerDayCap), and this asks
+    # them rather than repeating their arithmetic. They were enforced only here
+    # until 2026-09-04, which meant daily.py -- the report a person actually
+    # reads, which runs the guard stack and prints "may add" -- could not see
+    # them. One implementation, two callers, and the guards fail closed.
+    if _guards is None:
+        bad.append("guards.py unavailable -- the per-trade and per-day caps "
+                   "cannot be evaluated")
+    else:
+        gs = _guards.State(equity_now=0.0, equity_peak=0.0, equity_start_of_day=0.0,
+                           closed_trades=[], last_sold={}, positions={}, cash=0.0,
+                           orders_today=_guards.orders_today_from(st))
+        per_trade = _guards.PerTradeCap(
+            max_usd=cfg["max_order_usd"], min_usd=cfg["min_order_usd"],
+            max_orders=cfg["max_orders_per_day"],
+            max_notional=cfg["max_daily_notional_usd"])
+        per_day = _guards.PerDayCap(max_orders=cfg["max_orders_per_day"],
+                                    max_notional=cfg["max_daily_notional_usd"])
+        for v in (per_day.check(gs), per_trade.check(gs)):
+            if not v.allowed:
+                bad.append(f"{v.guard}: {v.reason}")
+        room = per_trade.largest_allowed(gs)
+        if order["usd"] < cfg["min_order_usd"]:
+            bad.append(f"${order['usd']:,.2f} under min_order_usd "
+                       f"${cfg['min_order_usd']:,.2f}")
+        elif room is not None and room > 0 and order["usd"] > room + 1e-9:
+            # `room > 0` on purpose. When the day is fully used the two guards
+            # above have already said so, in their own words, with their own
+            # numbers; adding "over the $0.00 placeable now" makes one
+            # condition read as three problems. This line earns its place only
+            # when there IS room and this order is bigger than it.
+            bad.append(f"${order['usd']:,.2f} over the ${room:,.2f} placeable now "
+                       f"(order cap ${cfg['max_order_usd']:,.2f}, daily notional "
+                       f"cap ${cfg['max_daily_notional_usd']:,.2f})")
     if cfg.get("seal_required") and not sealed_ok:
         bad.append("decision not sealed to the chain")
     if st.get("sealed_signals", 0) < cfg.get("min_sealed_signals", 0):
@@ -429,9 +495,35 @@ def execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only=False):
                             "detail": r.get("descr") or "", "txid": r.get("txid"),
                             "blocked_by": bad, "venue": v.name})
             if go_live:
+                # `side` is recorded because guards.FiatBuyPermission needs to
+                # separate what selling raised today from what buying spent;
+                # without it the two are indistinguishable and that guard
+                # fails closed.
+                #
+                # ONLY THE FIAT PORTION IS BANKED against guards.BuyBudget --
+                # the part of this buy that today's sales did not cover. A
+                # rotation (sell XLM, buy SOL with the proceeds) puts no new
+                # money in and must not consume a budget that exists to limit
+                # new money; charging it would switch off the very mechanism
+                # the operator asked for. The headroom is read BEFORE this
+                # order is appended, because appending it would count the
+                # order against itself.
+                fiat_part = float(o["usd"])
+                if o.get("side") == "buy" and _guards is not None:
+                    before = _guards.State(
+                        equity_now=0.0, equity_peak=0.0, equity_start_of_day=0.0,
+                        closed_trades=[], last_sold={}, positions={}, cash=0.0,
+                        orders_today=_guards.orders_today_from(st))
+                    room = _guards.FiatBuyPermission().headroom(before)
+                    # room is None when the day cannot be read; the whole order
+                    # is then treated as new money, which is the safe direction.
+                    fiat_part = max(0.0, float(o["usd"]) - (room or 0.0))
                 st.setdefault("orders_today", []).append(
-                    {"sym": o["sym"], "usd": o["usd"], "at": time.time(),
-                     "txid": r.get("txid")})
+                    {"sym": o["sym"], "usd": o["usd"], "side": o.get("side"),
+                     "at": time.time(), "txid": r.get("txid")})
+                if o.get("side") == "buy" and fiat_part > 0:
+                    st["bought_total_usd"] = float(
+                        st.get("bought_total_usd") or 0.0) + fiat_part
         except V.VenueError as e:
             results.append({**o, "status": "REFUSED", "detail": str(e)[:160],
                             "blocked_by": bad, "venue": v.name})
@@ -495,10 +587,22 @@ def run_once(cfg, plan_only=False):
             closed_trades=st.get("closed_trades", []),
             last_sold=st.get("last_sold", {}),
             positions={p["sym"]: p["val"] for p in pf["positions"]},
-            cash=pf["cash"])
+            cash=pf["cash"],
+            orders_today=_guards.orders_today_from(st),
+            # The ONLY place this is written, and only from a real portfolio
+            # read -- see guards.set_starting_total for what went wrong when it
+            # was two places.
+            starting_total_usd=_guards.set_starting_total(pf["total"], RESERVE_PATH),
+            bought_total_usd=st.get("bought_total_usd"))
         for vd in _guards.GuardStack().evaluate(state):
             print(f"    [{'ok  ' if vd.allowed else 'BLOCK'}] {vd.guard:<14} {vd.reason}")
-            if not vd.allowed:
+            # The two cap guards are shown here but NOT added to guard_blocks.
+            # guard_blocks is applied to buys only, and preconditions() applies
+            # the caps to every order, sells included -- a runaway loop selling
+            # costs the same 100 bps a round trip as one buying. Adding them
+            # here as well would report the same block twice for a buy and
+            # would weaken it to buys-only for a sell.
+            if not vd.allowed and vd.guard not in ("per_trade_cap", "per_day_cap"):
                 guard_blocks.append(vd.guard)
 
     orders, notes = plan(cfg, pf)
