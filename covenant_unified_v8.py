@@ -9484,7 +9484,7 @@ class CovenantUnifiedMaster:
               f"it is this node's operator credential and genesis mint key.")
         return key
 
-    def export_genesis(self, path: str):
+    def export_genesis(self, path: str, overwrite: bool = False):
         """Write this node's genesis block to a file for distribution.
 
         The founder mints once and ships this file; every other node loads it.
@@ -9494,6 +9494,18 @@ class CovenantUnifiedMaster:
         """
         if not self.node.chain:
             raise RuntimeError("no genesis to export")
+        # REFUSE TO OVERWRITE. Found 2026-09-05 by a readiness audit: the
+        # README, DEPLOYMENT.md and HANDOFF.md quick starts all told a joiner
+        # to run --export-genesis first, this opened the canonical file with
+        # mode "w" and never looked, and the joiner's node then held a genesis
+        # nobody else had -- unable to converge with anyone, silently. A
+        # founder mints ONCE. A file that already exists is the canonical one
+        # until someone deletes it on purpose.
+        if os.path.exists(path) and not overwrite:
+            raise FileExistsError(
+                "%s already exists and is the canonical genesis; a joiner never "
+                "mints one. Delete it deliberately or pass overwrite=True if you "
+                "are the founder starting a new network." % path)
         with open(path, "w") as fh:
             json.dump(asdict(self.node.chain[0]), fh, sort_keys=True, indent=2)
         return path

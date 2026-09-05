@@ -288,6 +288,7 @@ SUITES = [
     ("test_f5_reserve.py",                90,  "JUDGE"),
     ("test_f6_stuffing.py",              120,  "JUDGE"),
     ("test_f7_caps.py",                   60,  "MONEY"),
+    ("test_g12_inflight.py",              60,  "SECURITY"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40
@@ -857,14 +858,26 @@ def phase_integrity(say, transported=False):
     return out
 
 
-def phase_gates(say):
-    rule(say, "3. GATES -- asked out loud, changes nothing")
+def phase_gates(say, again=False):
+    if again:
+        rule(say, "3b. GATES -- asked again: this sweep's tally is on disk now")
+    else:
+        rule(say, "3. GATES -- asked out loud, changes nothing")
     lc = os.path.join(HERE, "launch_check.py")
     if not os.path.isfile(lc):
         say("  ABSENT -- launch_check.py is not here. Gates NOT measured.")
         return None
-    rc = run_open(say, [sys.executable, "launch_check.py"], timeout=300)
-    subprocess.run([sys.executable, "launch_check.py", "--json"], cwd=HERE,
+    # G12 reads sweep transcripts. On the first ask, tell it which one THIS
+    # sweep is writing, so it does not read a half-written file as evidence
+    # (it is the question, not the answer). On the second ask, after the
+    # tally, that same file IS the evidence -- the second cycle on
+    # 2026-09-05 excluded it both times and could not be green either.
+    env = dict(os.environ)
+    env.pop("COVENANT_ONE_TRANSCRIPT", None)
+    if not again:
+        env.update(COVENANT_ONE_TRANSCRIPT=os.path.abspath(say.path))
+    rc = run_open(say, [sys.executable, "launch_check.py"], timeout=300, env=env)
+    subprocess.run([sys.executable, "launch_check.py", "--json"], cwd=HERE, env=env,
                    stdout=open(os.path.join(HERE, "LAUNCH_CHECK.json"), "w"),
                    stderr=subprocess.DEVNULL)
     if rc == 0:
@@ -1113,6 +1126,7 @@ def main():
     actions = []
     missing_deps = 0
     ignored = []
+    interrupted = False
     try:
         phase_identity(say)
         absent, orphans, missing_deps, ignored = phase_coverage(say)
@@ -1138,6 +1152,7 @@ def main():
                 phase_live(say, "7. LIVE STATE AFTER -- ask the processes, "
                                 "do not assume the restart worked")
     except KeyboardInterrupt:
+        interrupted = True
         say("")
         say("INTERRUPTED by ctrl-c. Partial run -- do not read it as a result.")
     finally:
@@ -1176,6 +1191,16 @@ def main():
         if actions:
             say("  actions             %s" % ", ".join("%s=%s" % (n, r)
                                                        for n, r in actions))
+        if gates == 2 and results and not args.quick and not interrupted:
+            # In phase 3 the newest transcript G12 could read was THIS one,
+            # half-written, with no tally; the tally is a few lines above
+            # now. Ask once more. The second answer replaces the first and
+            # both stay in the transcript. Before this, the first sweep after
+            # any change to the core could not be green by its own gate
+            # (2026-09-05, the sweep after the A1 fix: 73 suites, 0 failed,
+            # G12 UNKNOWN, and launch_check alone said 12 PASS a minute
+            # later).
+            gates = phase_gates(say, again=True)
         say("  gates               %s" % {0: "PASS", 1: "BLOCKED", 2: "INCOMPLETE",
                                           None: "NOT MEASURED"}.get(gates, gates))
         say("  elapsed             %.1f min" % ((time.time() - t0) / 60))

@@ -55,7 +55,7 @@ REPORT = os.path.join(HERE, "ops", "NIGHTLY.md")
 # a corpus that stopped teaching "drain" would quietly reopen the hole.
 GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_f3_gate_end_to_end.py", "test_f4_capability.py",
-                "test_f5_reserve.py", "test_f6_stuffing.py", "test_f7_caps.py",
+                "test_f5_reserve.py", "test_f6_stuffing.py", "test_f7_caps.py", "test_g12_inflight.py",
                 "covenant_quiet.py"]
 
 
@@ -91,6 +91,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--study", type=int, default=12, help="precepts to turn into cases")
     ap.add_argument("--cycle", type=int, default=4, help="generated cases per category")
+    ap.add_argument("--redteam", type=int, default=15,
+                    help="memos per angle the runner writes to fool the student; 0 disables")
     ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
     ap.add_argument("--no-verify", action="store_true", help="skip the green check (not advised)")
     a = ap.parse_args()
@@ -110,6 +112,27 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         rc = 1
         say("study FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE RED-TEAM, BETWEEN STUDY AND DISTILL. Added 2026-09-04 ("split work
+    # between you and covenant for training and token preservation"). The
+    # runner writes memos meant to fool the student, the student says which
+    # did, the runner labels those blind, and the agreed ones go into the
+    # ledger -- so the distill cycle that follows trains on this pass's own
+    # confirmed holes. Two runner calls, no tokens, and the gate still decides
+    # whether the resulting candidate is promoted. A 7B attacker finds the
+    # kind of hole a bag of words has; the stronger, paid red-team is for
+    # occasional audits, not the nightly loop. A failure here is reported and
+    # does not stop the pass: the distill cycle is worth running either way.
+    try:
+        if a.redteam > 0:
+            import covenant_redteam as RT
+            rlog = []
+            found = RT.round_once(a.redteam, dry=False, log=rlog)
+            for line in rlog:
+                say("redteam: " + line.strip())
+            say("redteam: %d confirmed hole(s) added" % found)
+    except Exception as e:                                       # noqa: BLE001
+        say("redteam FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X

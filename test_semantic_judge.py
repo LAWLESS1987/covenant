@@ -422,5 +422,22 @@ def main():
     return 1 if _failed else 0
 
 
+
+# ---- H: a hash is not a word (regression, 2026-09-05) -------------------
+# A readiness audit on a fresh clone found every new node stopping at height
+# 2: the owner's block-2 `root` is a hex hash, _INWORD matched its digits,
+# _LEET had no entry for 9, and the KeyError became a veto. Two pins: the
+# real hash assesses without raising, and _repair leaves it byte-identical.
+import covenant_semantic_judge as _sj
+_H = "ec9020572f74b7e83f9a9e9c536557e351f5fe720c3d4576123af8ec43d70d22"
+try:
+    _sj.SemanticModel.load().assess({"root": _H})
+    _h_ok = True
+except Exception:                                                # noqa: BLE001
+    _h_ok = False
+ok("H1", "the owner's block-2 root hash assesses without raising", _h_ok)
+ok("H2", "_repair leaves a 64-character hex hash untouched", _sj._repair(_H) == _H)
+ok("H3", "...and still repairs leet inside real words", _sj._repair("st3al the d3posit") == "steal the deposit")
+
 if __name__ == "__main__":
     raise SystemExit(main())

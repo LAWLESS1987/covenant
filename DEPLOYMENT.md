@@ -87,7 +87,8 @@ processes.
 The founder mints once and distributes the file:
 
 ```bash
-python3 covenant_unified_v8.py --node-id FOUNDER --export-genesis genesis.json
+# genesis.json is TRACKED and CANONICAL. Do not mint one -- a joiner never does.
+# (The founder minted once; export_genesis now refuses to overwrite an existing file.)
 python3 covenant_unified_v8.py --port 5000 --node-id A --genesis genesis.json
 python3 covenant_unified_v8.py --port 5020 --node-id B --genesis genesis.json
 ```

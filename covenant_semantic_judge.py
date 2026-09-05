@@ -398,6 +398,9 @@ _INWORD = re.compile(r"(?<=[^\W\d_])([0-9@$!|])(?=[^\W\d_])|"
                      r"^([0-9@$!|])(?=[^\W\d_])")
 
 
+_HEXTOKEN = re.compile(r"^[0-9a-fA-F]{16,}$")
+
+
 def _repair(text: str) -> str:
     """Undo the cheap ways of hiding a word from a lexicon: width and ligature
     variants (NFKC), the zero-width and directional characters that split a
@@ -406,8 +409,23 @@ def _repair(text: str) -> str:
     t = unicodedata.normalize("NFKC", text)
     t = "".join(c for c in t if unicodedata.category(c) != "Cf")
     t = "".join(_CONFUSABLE.get(c, c) for c in t)
-    return _INWORD.sub(
-        lambda m: _LEET[m.group(1) or m.group(2) or m.group(3)], t)
+    # .get(ch, ch), NOT [ch]. Found 2026-09-05 by a readiness audit on a fresh
+    # clone: _INWORD matches EVERY digit between letters, _LEET maps six of
+    # them, and a hex hash -- the owner's block-2 `root`,
+    # ec9020572f74b7e83f9a9e9c536557e351f5fe720c3d4576123af8ec43d70d22 --
+    # raised KeyError: '9', which the wrapper turned into violates=True and the
+    # strict quorum into a veto. Every fresh node stopped at height 2. A digit
+    # with no leet reading is a digit, and stays one.
+    # And a token that is all hex and sixteen-plus characters is a HASH, not a
+    # word hiding from a lexicon. Left alone entirely: with .get() alone the
+    # block-2 root still had its 0s, 5s and 7s decoded into letters, and a
+    # 64-character hex string has enough short runs in it to spell a lexicon
+    # hit by accident one day. Nothing in a hash was written by a sender.
+    return " ".join(
+        tok if _HEXTOKEN.match(tok) else
+        _INWORD.sub(lambda m: _LEET.get(m.group(1) or m.group(2) or m.group(3),
+                                        m.group(1) or m.group(2) or m.group(3)), tok)
+        for tok in t.split(" "))
 
 
 def _leaf_strings(data: Any, transform=None) -> List[str]:

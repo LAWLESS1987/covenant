@@ -650,8 +650,22 @@ def g12():
     cands = [os.path.join(HERE, n) for n in ("ONE_SWEEP.txt", "ONE_RUN.txt", "ONE_RUN_stdout.txt")]
     cands += glob.glob(os.path.join(HERE, "docs", "results", "SWEEP_RESULTS_*_win32.txt"))
     cands = [c for c in cands if os.path.exists(c)]
+    # The sweep that is asking this question is writing a transcript of its
+    # own right now, and that file has no tally yet: it is not evidence, it
+    # is the question. covenant_one names it in COVENANT_ONE_TRANSCRIPT and
+    # asks the gates a second time once its tally is on disk. Without this,
+    # the first sweep after ANY core change read UNKNOWN here for a reason
+    # that pointed the wrong way ("a --check transcript?") -- 2026-09-05,
+    # the sweep after the A1 fix.
+    inflight = os.environ.get("COVENANT_ONE_TRANSCRIPT", "")
+    if inflight:
+        key = os.path.normcase(os.path.abspath(inflight))
+        cands = [c for c in cands if os.path.normcase(os.path.abspath(c)) != key]
+    note = (" The transcript this sweep is writing (%s) is not evidence until its "
+            "tally is written; covenant_one asks again then." % os.path.basename(inflight)
+            if inflight else "")
     if not cands:
-        return R("G12", g12._title, UNKNOWN, "no sweep transcript in this folder.",
+        return R("G12", g12._title, UNKNOWN, "no sweep transcript in this folder." + note,
                  "python covenant_one.py --out ONE_SWEEP.txt")
     core = os.path.join(HERE, "covenant_unified_v8.py")
     try:
@@ -691,7 +705,7 @@ def g12():
         reasons.append("%s (%s): %s" % (rel, when, "; ".join(why)))
     return R("G12", g12._title, UNKNOWN,
              "no transcript proves a green sweep of THIS core on THIS platform within a week -- "
-             + " | ".join(reasons[:3]),
+             + " | ".join(reasons[:3]) + note,
              "python covenant_one.py --out ONE_SWEEP.txt")
 
 

@@ -108,7 +108,7 @@ they *bound*.
 1. **`ANTHROPIC_API_KEY`** — preflight's only BLOCKING item. Without it the gate
    fails closed and the node **rejects every transaction while looking perfectly
    healthy**.
-2. `python3 covenant_unified_v8.py --export-genesis genesis.json` **once**. Every
+2. ~~`python3 covenant_unified_v8.py --export-genesis genesis.json` once~~ -- **superseded 2026-09-05:** `genesis.json` is tracked and canonical; a joiner never mints one, and `export_genesis` now refuses to overwrite an existing file. Every
    node then starts with `--genesis genesis.json`. Without a shared genesis,
    nodes cannot converge and each mints itself 1000.
 3. `./run_all_tests.sh` — expect all green.
