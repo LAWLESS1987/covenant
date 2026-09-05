@@ -229,7 +229,7 @@ transcript -- which is now the evidence -- and the second answer
 replaces the first. (The first version of this fix excluded the
 transcript on both asks and the second cycle was red for that; the
 suite's I9 pins the distinction.) Both answers stay in the transcript. Pinned by
-`test_g12_inflight.py` (8/8), registered in the runner, `run_all_tests.sh`
+`test_g12_inflight.py` (9/9), registered in the runner, `run_all_tests.sh`
 and the nightly's green list.
 
 **The held copy of the core must move with the core.** `pending-v8.38/`
