@@ -41,7 +41,7 @@ KrakenDesktopInstaller.msi
 # funding. Both were TRACKED until 2026-08-27, so they are still present in
 # the existing git history: untracking them protects every FUTURE commit and
 # does nothing about the past. Until that history is rewritten, any remote
-# this repo is pushed to must be PRIVATE. See claude/GITHUB_IMPROVEMENTS.
+# the history that carried it was rewritten on 2026-09-05 (tools/purge_history.py).
 holdings.txt
 TRADING_POLICY.json
 launch/*/holdings.txt

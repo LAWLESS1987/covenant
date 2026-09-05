@@ -52,9 +52,13 @@ eleven suites that were not on disk.
 ## Three things that must not be committed
 
 1. **The portfolio.** `holdings.txt` and `TRADING_POLICY.json` are gitignored.
-   They are still in the **history** from before 2026-08-27, which is why this
-   repository is **private** and must stay private until that history is
-   rewritten.
+   They were in the **history** from before 2026-08-27 -- and the same table
+   sat in `docs/DAILY_CHECK.md` in every commit -- until the history was
+   rewritten on 2026-09-05 (`tools/purge_history.py`) and the GitHub
+   repository recreated from the rewritten history. The repository is public;
+   the private corpus is not in it, and `python tools/purge_history.py
+   --verify` scans every blob of every ref to prove that on demand. See
+   docs/KNOWN_ISSUES.md issue 15.
 2. **Launcher outputs.** Anything a `.bat` writes into this folder —
    `ONE_RUN.txt`, `DEPLOY_VERIFY.txt`, `LAUNCH_CHECK.json`, `NODE_RESTART.txt`,
    `GIT_SETUP.txt`, and so on. Tracking an output as an input means every run

@@ -56,6 +56,42 @@ stick.
 
 Nothing has been shared. This is written before, not after.
 
+## AMENDMENT 2026-09-05 -- the route was run, and it was larger than written
+
+The repository had been public since 2026-08-29 with the history intact, so
+this file's precondition was already broken when a 16-agent audit measured
+the exposure (each finding reproduced by a skeptic agent before it counted):
+
+- `docs/DAILY_CHECK.md` carried the same ten-position table as
+  `holdings.txt` -- quantity and average buy -- **at HEAD, in every commit**,
+  and inside the release zip. A path purge cannot touch a file that must stay.
+- `PLAN.md`, `docs/TRADING_READINESS.md`, `docs/IMPROVEMENT_LOG.md`,
+  `covenant_scenarios.py` and `strategy_validate.py` quoted the locked book
+  value or the sleeve amount in prose.
+- The release zip sat in 172 of the 221 commits on `origin/main`.
+- 110 of 280 commits were signed with the owner's personal email address.
+- **GitHub serves commits by SHA that no branch or tag reaches.** Measured:
+  the raw portfolio file was fetched, HTTP 200, at a commit outside every
+  advertised ref. So step 3 below is not caution; force-push cannot unpublish.
+
+`tools/purge_history.py` now does the whole job: paths, the table rows and
+prose amounts in every blob, every distinctive number from the ignored
+private files (built at run time, never stored), the email map, and a
+verification that scans every object of every ref. It runs on
+`git-filter-repo` when present and on git's built-in `filter-branch`
+otherwise (an install was refused by policy on the day; that is not a reason
+to stay exposed). Step 1 is therefore:
+
+    python tools/purge_history.py                        # dry run
+    git clone --mirror . ../covenant-backup-DATE/covenant-mirror.git
+    python tools/purge_history.py --run --backup ../covenant-backup-DATE/covenant-mirror.git
+
+Step 3 stands, with the mechanics that exist on this machine: delete the
+repository in the browser (Settings -> Danger Zone), then GitHub Desktop ->
+Publish repository -> `covenant`, public. Then push `dev` and the tags from a
+Windows shell. What was already cloned or cached elsewhere is beyond reach;
+what is publicly reachable is closed.
+
 ## The route, in order. Do not reorder.
 
 ### 1. Purge the four paths from history
