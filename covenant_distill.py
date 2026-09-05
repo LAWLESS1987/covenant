@@ -324,6 +324,28 @@ def unseen_by_both(examples, cur, rows):
     return new, old
 
 
+def hold_error(model, data):
+    """(holds, of which were legitimate). The AVAILABILITY side of the ledger.
+
+    Added 2026-09-04 because the gate had been blind to it. It weighed wrong
+    CLEARS on held-out rows -- rightly, a wrong clear admits a theft -- and
+    wrong HOLDS only on the exam's eight clean cases. Measured by 5-fold over
+    2238 rows the same afternoon: 2.8% of clears were wrong, and 18.2% of
+    HOLDS were -- nearly one legitimate transfer in five, accused. judge_suite
+    puts the exam's false-hold threshold at 100% because "blocking a
+    legitimate transfer halts the chain", and a candidate could pass that on
+    eight cases while accusing a fifth of everything else. This is the number
+    that sees it."""
+    holds = wrong = 0
+    for text, violates in data:
+        v, _ = model.verdict(text)
+        if v == "violates":
+            holds += 1
+            if not violates:
+                wrong += 1
+    return holds, wrong
+
+
 def clear_error(model, data):
     """(clears, of which were violations). A wrong CLEAR is a theft admitted;
     a wrong HOLD only delays a payment. This gate weighs the first."""
@@ -363,12 +385,40 @@ def judge_code_digest():
     untouched and absolute; the fair-split comparison takes over the moment
     150 rows exist that neither model has seen; and the escape only lasts
     until the next promotion records a baseline under the current code."""
+    return _JUDGE_CODE
+
+
+def _fingerprint_loaded_judge():
+    """Hash the judge AS IMPORTED, plus the thresholds it is running with.
+
+    THE RACE THAT FORCED THIS, 2026-09-05 00:08. The first version hashed the
+    file on disk at the moment a baseline was WRITTEN. The learning loop had
+    started a run with MARGIN_TO_HOLD = 1.2 loaded, I patched the file to 2.4
+    while it ran, and when it promoted twenty-two seconds later it measured
+    1571 decisions under the old threshold and stamped them with the new
+    code's hash. The very next candidate, honestly measured under 2.4, decided
+    1405 and was refused as "vaguer" against a baseline no code had produced.
+
+    So the fingerprint is taken ONCE, here, when this module imports the
+    judge -- it describes what is actually running in this process, and a
+    later edit to the file cannot be attributed to a measurement it did not
+    make. The threshold constants are folded in as well: they are part of
+    what "the code that measured it" means, and a record written under a
+    different bar is not a comparison. Changing the format also retires the
+    mis-stamped record on file, which is the point."""
     try:
-        with open(os.path.join(HERE, "covenant_judge_fallback.py"), "rb") as fh:
+        with open(FB.__file__, "rb") as fh:
             raw = fh.read().replace(b"\r\n", b"\n")
-        return hashlib.sha256(raw).hexdigest()[:12]
-    except OSError:
-        return ""
+    except (OSError, AttributeError):
+        raw = b""
+    knobs = "hold=%s clear=%s damning=%s unknown=%s mass=%s" % (
+        getattr(FB, "MARGIN_TO_HOLD", "?"), getattr(FB, "MARGIN_TO_CLEAR", "?"),
+        getattr(FB, "DAMNING", "?"), getattr(FB, "MAX_UNKNOWN_TO_CLEAR", "?"),
+        getattr(FB, "MAX_POSITIVE_MASS_TO_CLEAR", "?"))
+    return hashlib.sha256(raw + knobs.encode("utf-8")).hexdigest()[:12]
+
+
+_JUDGE_CODE = _fingerprint_loaded_judge()
 
 
 def last_holdout():
@@ -455,6 +505,33 @@ def promotion(cand, cur, cur_trained=True, holdout=None):
                            % (ccl, n_new, cw, crate * 100, kw, kcl, krate * 100))
         elif ccl + holdout.get("cand_holds", 0) < 1:
             reasons.append("REFUSED: it decided nothing at all on the %d unseen rows" % n_new)
+        # THE FAIR PATH HAD NO "VAGUER" CHECK, found 2026-09-04 by watching
+        # the learning loop promote four times in twenty-six minutes. Each
+        # promotion was clean on wrong clears, and at 23:50 the exam slipped
+        # from 36 to 35 and it promoted anyway: the fallback path refuses a
+        # candidate that decides fewer held-out rows, the fair path only ever
+        # looked at wrong clears. So a candidate that decided steadily less
+        # while staying spotless could climb for ever. The incumbent's own
+        # decisions on the same unseen rows are the yardstick, with a tenth of
+        # slack for noise.
+        kdec = holdout["fair"][1][0] + (holdout.get("fair_holds", ((0, 0), (0, 0)))[1][0])
+        cdec = ccl + holdout.get("cand_holds", 0)
+        if kdec >= 20 and cdec < 0.9 * kdec:
+            reasons.append("REFUSED: decides %d of the %d unseen rows, the model in use %d -- it got "
+                           "vaguer on rows neither had seen" % (cdec, n_new, kdec))
+        if holdout.get("fair_holds"):
+            # A wrong HOLD delays a payment rather than admitting a theft, so
+            # the tolerance is looser than for clears -- but it is not absent.
+            # A model that accuses a fifth of honest traffic is not a judge
+            # the chain can run behind, whatever its clears look like.
+            (chh, chw), (khh, khw) = holdout["fair_holds"]
+            hrate_c = (chw + 1.0) / (chh + 2.0)
+            hrate_k = (khw + 1.0) / (khh + 2.0)
+            if hrate_c > hrate_k * 1.5 + 0.05:
+                reasons.append("REFUSED: of %d hold(s) on unseen rows, %d were legitimate transfers "
+                               "(%.1f%% smoothed); the model in use got %d of %d wrong (%.1f%%) -- "
+                               "it accuses more honest traffic than the judge it would replace"
+                               % (chh, chw, hrate_c * 100, khw, khh, hrate_k * 100))
     elif holdout:
         cd, _cc, cfc = holdout["candidate"]
         prev = holdout.get("previous")
@@ -731,6 +808,15 @@ def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDAT
                 ch += sum(1 for t, _v in test if naive.verdict(t)[0] == "violates")
             hold["fair"] = ((ccl, cw), clear_error(cur, new), len(new))
             hold["cand_holds"] = ch
+            # And the other direction, measured the same way on the same rows.
+            hh = hw = 0
+            for train_extra, test in ((b, a), (a, b)):
+                naive = FB.FallbackModel.train(older + train_extra, ["fair"],
+                                               trained_at="fair")
+                h, w = hold_error(naive, test)
+                hh += h
+                hw += w
+            hold["fair_holds"] = ((hh, hw), hold_error(cur, new))
     ok, reasons = promotion(cand_stats, cur_stats,
                             cur_trained=cur.n_examples >= FB.MIN_EXAMPLES, holdout=hold)
     if ok:

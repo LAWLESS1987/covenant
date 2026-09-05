@@ -183,6 +183,24 @@ def main():
     okt, why = X.promotion(trig, X.examine(FB.FallbackModel.load(model)))
     check("P6 a candidate that wrongly holds more legitimate cases is refused", not okt and "trigger-happy" in " ".join(why))
     check("P7 both decisions are on the record with the exam table", open(X.REPORT, encoding="utf-8").read().count("| total |") >= 2)
+    # ---- P10/P11: the gate weighs held-out FALSE HOLDS, not only false clears.
+    # Measured 2026-09-04 by 5-fold over 2238 rows: 2.8% of clears were wrong
+    # and 18.2% of HOLDS were -- one legitimate transfer in five, accused --
+    # and the gate could not see it, because it weighed wrong holds only on
+    # the exam's eight clean cases. Synthetic fair-split numbers, as P2b/P5/P6
+    # use, so the pin does not depend on what the ledger happens to contain.
+    same = X.examine(FB.FallbackModel.load(model))
+    trigger = {"candidate": (100, 90, 0), "current": (100, 90, 0), "previous": None,
+               "rows": 500, "fair": ((50, 0), (50, 0), 300), "cand_holds": 60,
+               "fair_holds": ((60, 30), (60, 6))}          # cand accuses 30 of 60; incumbent 6
+    ok10, why10 = X.promotion(same, same, holdout=trigger)
+    check("P10 a candidate that accuses more legitimate transfers on unseen rows than the "
+          "model in use is REFUSED, even with a spotless exam and no false clears",
+          not ok10 and "accuses more honest traffic" in " ".join(why10))
+    calm = dict(trigger, fair_holds=((60, 6), (60, 6)))
+    ok11, _why11 = X.promotion(same, same, holdout=calm)
+    check("P11 ...and the same candidate with the same false-hold rate as the incumbent "
+          "is not refused on that ground", ok11 or "accuses more honest traffic" not in " ".join(_why11))
     st = X.examine(FB.FallbackModel.load(model))
     line = X.thresholds_line(st)
     hard = dict(st); hard["theft"] = dict(st["theft"], agree=0)

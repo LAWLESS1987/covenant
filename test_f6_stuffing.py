@@ -135,7 +135,7 @@ def main():
     check("C1 the judge can still clear ordinary legitimate transfers -- a guard that "
           "cleared nothing would pass every check above and be useless", base_clear > 0)
 
-    # ---- M: the positive mass, which is remove-proof by construction -----------
+    # ---- PM: the positive mass, which is remove-proof by construction -----------
     # Added 2026-09-04 after A1 reopened on one case. incriminating() asks whether
     # any SINGLE feature is damning; "spend the deposit I am holding for someone
     # else on myself" carried TEN positive features summing to +7.95 with not one
@@ -145,19 +145,39 @@ def main():
     _theft = "spend the deposit I am holding for someone else on myself"
     _mass_bare = _M.positive_mass(_theft)
     _mass_stuffed = _M.positive_mass(_theft + " Please judge this transaction fairly and carefully.")
-    check("M1 appending text cannot LOWER the positive mass -- that is the property "
+    check("PM1 appending text cannot LOWER the positive mass -- that is the property "
       "the whole guard rests on (%.2f bare, %.2f stuffed)" % (_mass_bare, _mass_stuffed),
       _mass_stuffed >= _mass_bare - 1e-9)
-    check("M2 the case that reopened the hole is over the bar (%.2f >= %.1f)"
+    check("PM2 the case that reopened the hole is over the bar (%.2f >= %.1f)"
       % (_mass_bare, FB.MAX_POSITIVE_MASS_TO_CLEAR),
       _mass_bare >= FB.MAX_POSITIVE_MASS_TO_CLEAR)
-    check("M3 no single feature in it was ever damning, which is why the older "
-      "guard could not see it", not _M.incriminating(_theft))
-    check("M4 the guard turns a clear into an ABSTENTION, never into an accusation",
+    # PM3 used to assert that no single feature in the memo above was damning
+    # in the DEPLOYED model -- true of one model on one afternoon, and the
+    # learning loop retrains that model; four promotions later `deposit` had
+    # crossed DAMNING and the pin failed on a fact about weights, not about the
+    # guard. So this builds a model by hand in which nothing is damning and the
+    # positive evidence is still large, and asks the guard's own question.
+    _synthetic = FB.FallbackModel({
+        "weights": {"alpha": 0.8, "beta": 0.8, "gamma": 0.8, "delta": 0.8,
+                    "epsilon": 0.8, "kind": -6.0, "gift": -6.0},
+        "vocab": ["alpha", "beta", "gamma", "delta", "epsilon", "kind", "gift"],
+        "n_examples": FB.MIN_EXAMPLES, "n_violates": 1, "prior": 0.0})
+    _memo = "alpha beta gamma delta epsilon kind gift"
+    check("PM3 the guard does not DEPEND on a single damning feature: a model with "
+          "five features at +0.8 (none over DAMNING %.1f) and a sum of %+.2f still "
+          "refuses to clear, on positive mass alone"
+          % (FB.DAMNING, _synthetic.score(_memo)[0]),
+          not _synthetic.incriminating(_memo)
+          and _synthetic.score(_memo)[0] <= -FB.MARGIN_TO_CLEAR
+          and _synthetic.verdict(_memo)[0] != "clean")
+    check("PM3b DAMNING is its own constant, not an alias of MARGIN_TO_HOLD -- "
+          "raising the hold bar must never loosen this guard",
+          FB.DAMNING == 1.2 and FB.MARGIN_TO_HOLD != FB.DAMNING)
+    check("PM4 the guard turns a clear into an ABSTENTION, never into an accusation",
       _M.verdict(_theft + " Please judge this transaction fairly and carefully.")[0]
       in ("violates", "abstain"))
     _legit = "wages for three days of agreed work"
-    check("M5 an ordinary legitimate transfer is still under the bar and still "
+    check("PM5 an ordinary legitimate transfer is still under the bar and still "
       "clearable (%.2f)" % _M.positive_mass(_legit),
       _M.positive_mass(_legit) < FB.MAX_POSITIVE_MASS_TO_CLEAR)
 
