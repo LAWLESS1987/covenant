@@ -136,11 +136,26 @@ NO_TOKENS_GLOB = ("*.csv", "*.min.js", "fallback_model.json", "*.png", "*.jpg",
                   "*.zip", "*.pyc")
 
 
-def tokens_allowed(path):
+# Files no content rule may touch: the tool's own test, whose invented
+# sentences exist to match the rules, and the tool, whose patterns are not
+# text. Rewriting either would break the thing that proves the rewrite.
+NO_RULES_FILES = ("test_purge_tool.py", "tools/purge_history.py")
+
+
+def _rel(path):
     p = path.replace("\\", "/")
     while p.startswith("./"):
         p = p[2:]
-    if p.startswith(NO_TOKENS_UNDER):
+    return p
+
+
+def rules_allowed(path):
+    return _rel(path) not in NO_RULES_FILES
+
+
+def tokens_allowed(path):
+    p = _rel(path)
+    if not rules_allowed(p) or p.startswith(NO_TOKENS_UNDER):
         return False
     base = p.rsplit("/", 1)[-1]
     return not any(glob.fnmatch.fnmatch(base, g) for g in NO_TOKENS_GLOB)
@@ -254,6 +269,8 @@ def token_regex(toks):
 # ------------------------------------------------------------------ rewriting text
 def rewrite_text(text, tok_re, path="", detail=None):
     n = 0
+    if path and not rules_allowed(path):
+        return text, 0
     for pat, rep in RULES:
         text, k = re.subn(pat, rep, text, flags=re.M)
         n += k
@@ -387,6 +404,8 @@ def verify(tok_re, emap):
             continue
         text = raw.decode("utf-8", "replace")
         why = []
+        if not rules_allowed(path):
+            continue
         for r in rules_re:
             if r.search(text):
                 why.append("rule:" + r.pattern[:28])
@@ -535,7 +554,9 @@ def main():
     if not a.backup or not os.path.isdir(a.backup):
         sys.exit("--backup DIR is required and must exist: a mirror clone outside this tree "
                  "(git clone --mirror . DIR).")
-    if os.path.abspath(a.backup).startswith(os.path.abspath(HERE)):
+    inside = os.path.normcase(os.path.abspath(a.backup)).startswith(
+        os.path.normcase(os.path.abspath(HERE)).rstrip(os.sep) + os.sep)
+    if inside:
         sys.exit("the backup must live OUTSIDE this tree; a rewrite here would rewrite it too.")
     ours = int(git("rev-list", "--all", "--count"))
     theirs = git("rev-list", "--all", "--count", cwd=a.backup, check=False)

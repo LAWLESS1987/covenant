@@ -128,6 +128,14 @@ def main():
     ok("M3", "the tool contains no dollar figure of its own",
        not __import__("re").search(r"\$[0-9][0-9,]{2,}", open(PH.__file__, encoding="utf-8").read()))
 
+    ok("X1", "the tool and its own test are exempt from the content rules",
+       not PH.rules_allowed("test_purge_tool.py") and not PH.rules_allowed("tools/purge_history.py") and PH.rules_allowed("docs/DAILY_CHECK.md"))
+    out, n = PH.rewrite_text("the $1,234 sleeve", None, "test_purge_tool.py")
+    ok("X2", "a rule does nothing inside the exempt test file", n == 0 and "$1,234" in out)
+    ok("X3", "a sibling folder whose name begins with the repo name is OUTSIDE the tree",
+       not (os.path.normcase(os.path.abspath(os.path.join(HERE, "..", os.path.basename(HERE) + "-backup"))).startswith(
+            os.path.normcase(os.path.abspath(HERE)).rstrip(os.sep) + os.sep)))
+
     print("PURGE-TOOL: %d/%d passed" % (N - len(FAILS), N))
     return 1 if FAILS else 0
 
