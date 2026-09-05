@@ -94,6 +94,8 @@ def main():
     ap.add_argument("--redteam", type=int, default=15,
                     help="memos per angle the runner writes to fool the student; 0 disables")
     ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
+    ap.add_argument("--strategy", type=int, default=1,
+                    help="1 = re-run strategy_validate.py on the latest data each pass (30 min cap); 0 = skip")
     ap.add_argument("--no-verify", action="store_true", help="skip the green check (not advised)")
     a = ap.parse_args()
     lines, rc = [], 0
@@ -133,6 +135,31 @@ def main():
             say("redteam: %d confirmed hole(s) added" % found)
     except Exception as e:                                       # noqa: BLE001
         say("redteam FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # STRATEGY RE-VALIDATION (2026-09-05, "we must generate yield for
+    # usefulness to ppl"). The only honest path to yield is a rule that
+    # survives walk-forward, deflation and PBO on the latest data, and none
+    # has across three classes. That search is routine and expensive, so it
+    # runs here on the loop's time, capped, and its verdict line goes into
+    # the nightly log. It changes nothing in the trader; a surviving rule is
+    # a fact for the owner to act on, not a switch this pass flips.
+    if a.strategy:
+        try:
+            import subprocess
+            sdir = os.path.join(HERE, "ops", "strategy")
+            os.makedirs(sdir, exist_ok=True)
+            sout = os.path.join(sdir, "NIGHTLY_%s.txt" % time.strftime("%Y-%m-%d", time.gmtime()))
+            r = subprocess.run([sys.executable, os.path.join(HERE, "strategy_validate.py"), "--out", sout],
+                               cwd=HERE, capture_output=True, text=True, timeout=1800)
+            tail = [l for l in (r.stdout or "").splitlines() if l.strip()][-3:]
+            for l in tail:
+                say("strategy: " + l.strip()[:160])
+            if r.returncode:
+                say("strategy: validator exited %d" % r.returncode)
+        except subprocess.TimeoutExpired:
+            say("strategy: validator hit the 30-minute cap; no verdict this pass")
+        except Exception as e:                                   # noqa: BLE001
+            say("strategy FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X
