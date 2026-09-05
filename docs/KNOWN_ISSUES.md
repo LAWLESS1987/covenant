@@ -174,9 +174,26 @@ the stop of its parent `learn_loop2.py`, or simply finished in the same
 seconds, is not established. The hazard is real either way: a promotion
 after a "stop" rewrites `fallback_model.json` and four `ops/` files, and a
 commit made on the assumption that nothing is running ships a manifest that
-does not match them. **Before any sweep or commit:** stop the loop, then
-confirm no `covenant_nightly` or `covenant_distill` process remains
-(`Get-CimInstance Win32_Process` filtered on the command line), then check
+does not match them.
+
+**A correction to this entry's first version, same night.** It recommended
+checking for a surviving pass with a process query filtered on
+`Name='python.exe'`. On this machine every interpreter is `python3.12.exe`,
+so that query returns nothing whether or not a pass is running -- and the
+"no orphan running" conclusion that preceded the 01:15 commit was drawn from
+it. The commit happened to be safe; the check was not. Filter on the
+command line only, never on the process name:
+
+    Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'python*' -and $_.CommandLine -match 'covenant_nightly|learn_loop' }
+
+(A second correction, minutes later: filtering on the command line alone
+matched the shell running the query, whose own command line contains the
+pattern. The name prefix `python*` is required as well -- and it must be a
+prefix, not `python.exe`, for the reason above. Two wrong recommendations in
+one entry is the honest record of how easy this check is to get wrong.)
+
+**Before any sweep or commit:** stop the loop, confirm with the query above
+that no `covenant_nightly` or `learn_loop` process remains, then check
 `git status` again. The loop's rows and promotions are legitimate content
 and ride in the next commit; the failure mode is only the stale manifest.
 
