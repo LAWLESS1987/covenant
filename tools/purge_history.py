@@ -406,9 +406,14 @@ def verify(tok_re, emap):
         why = []
         if not rules_allowed(path):
             continue
-        for r in rules_re:
-            if r.search(text):
-                why.append("rule:" + r.pattern[:28])
+        # A rule counts only if it would still CHANGE the blob. Two rules
+        # (the baseline section, the sample equity row) match their own
+        # replacement text, and the first verify after the 2026-09-05
+        # rewrite reported those two clean blobs as hits.
+        for pat, rep in RULES:
+            new_text, k = re.subn(pat, rep, text, flags=re.M)
+            if k and new_text != text:
+                why.append("rule:" + pat[:28])
         if tok_re is not None and tokens_allowed(path):
             m = tok_re.search(text)
             if m:

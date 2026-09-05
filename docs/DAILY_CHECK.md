@@ -25,6 +25,9 @@ PEPE   <qty>          <avg_buy>
 CASH        <qty>          <avg_buy>
 ```
 
+(The quantities and average buys above were the owner's real positions and were redacted from every commit on 2026-09-05; the live table is the gitignored `holdings.txt`, which `daily.py` reads. See docs/KNOWN_ISSUES.md issue 15.)
+
+
 ## 2. Regime lines — recomputed 2026-08-22, and a correction to how they age
 
 `daily.py` computes the line itself from the window it just fetched, so this

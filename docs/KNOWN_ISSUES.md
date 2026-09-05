@@ -245,6 +245,53 @@ learned again from a red sweep: **a commit that changes
 `pending-v8.38/covenant_unified_v8.py`**, or P18 fails and the sweep is
 right to say so. A byte-identical copy is not a collision (V6c).
 
+### 15. The owner's portfolio was public -- resolved 2026-09-05
+
+**What was exposed.** The repository had been public since 2026-08-29
+with its history intact. A 16-agent read-only audit (each finding
+reproduced by a skeptic before it counted) and a shape scan afterwards
+found: the ten locked positions with exact quantity and average buy in
+`docs/DAILY_CHECK.md` at HEAD and in every commit; the same table plus
+`holdings.txt` and `TRADING_POLICY.json` inside the release zip in 172 of
+the 221 remote commits; the locked book value and the sleeve amount in
+`PLAN.md`, `docs/TRADING_READINESS.md`, `docs/IMPROVEMENT_LOG.md`,
+`covenant_scenarios.py` and `strategy_validate.py`; `ALERTS.md` end to end
+(position values, quantities, a cost basis, the total); the portfolio
+section of `docs/VERIFIED_BASELINE_2026-08-19.md`; portfolio totals in
+two logs; real Kraken quantities in `docs/EXECUTION_ARCHITECTURE.md`; one
+equity row in `docs/results/daily_state.SAMPLE.json`; and the owner's
+personal email address as author on 110 of 280 commits. Nothing that
+grants control -- no key, token or seed -- was ever in history; the
+Coinbase key lives outside the repository. What was exposed was
+disclosure and a targeting profile, not access.
+
+**Why it mattered beyond risk.** The constitution and `UNISON.md` said
+the private corpus is never published. That statement was false in a
+public document, and a second operator would have read it.
+
+**What was done.** `tools/purge_history.py` was rewritten to remove the
+paths, rewrite the sentences and tables in every blob, replace every
+distinctive number from the ignored private files (built at run time,
+never stored), map the email to the noreply address, and verify by
+scanning every object of every ref. It ran on git's built-in
+filter-branch (an install of git-filter-repo was refused by policy that
+day) against a mirror backup outside the tree. The GitHub repository was
+then deleted and recreated from the rewritten history, because GitHub
+serves commits by SHA that no ref reaches -- measured: the raw portfolio
+file was fetched at a commit outside every advertised ref -- so a
+force-push would have unpublished nothing. `python tools/purge_history.py
+--verify` re-proves the absence on demand; `test_purge_tool.py` pins the
+rules.
+
+**What it does not undo.** Clones or caches taken while the history was
+public are beyond reach. README.md records one outside clone. The owner
+accepted that residue knowingly.
+
+**The rule that follows.** `python tools/purge_history.py` (dry run) is
+part of any pre-publish check; the ignore rules alone are name-based and
+were never what kept the portfolio out -- nothing did. A file that is
+portfolio advice from end to end is removed, not patched.
+
 ## Second-operator readiness audit, 2026-09-05
 
 Five readers (install, peering, judge, docs, security) each audited the
@@ -342,7 +389,7 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Run tools/purge_history.py --run and republish per PUBLIC_PATH.md (delete+recreate the GitHub repo rather than force-push, since old SHAs stay reachable until GC) BEFORE onboarding any second operator.
 
-**Status:** open
+**Status:** fixed 2026-09-05 -- see issue 15
 
 ### A10. [serious / docs] DEPLOYMENT.md (README 'Start here' -> 'how it is deployed and configured') documents a judge setup the code no longer defaults to and names 7 commands that do not exist; G2 does not scan it
 
@@ -422,7 +469,7 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Owner's decision: rewrite the history as UNISON.md requires, or correct UNISON.md and START_HERE.md to say the repo is public and what remains in its history.
 
-**Status:** open
+**Status:** fixed 2026-09-05 -- see issue 15
 
 ### A18. [serious / install] There is no PC runbook for a non-owner; every PC launcher, gate and the DEPLOYMENT.md install section assume the owner's machine
 
