@@ -552,7 +552,7 @@ def stage(say):
                 shutil.copy2(p, work)
             except OSError:
                 pass
-    for d in ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools"):
+    for d in ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness"):
         s = os.path.join(HERE, d)
         if os.path.isdir(s):
             shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True)
