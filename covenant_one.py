@@ -291,6 +291,7 @@ SUITES = [
     ("test_g12_inflight.py",              60,  "SECURITY"),
     ("test_purge_tool.py",                60,  "SECURITY"),
     ("test_gate_proxy.py",                90,  "SECURITY"),
+    ("test_sentinel_gate.py",             60,  "SECURITY"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40

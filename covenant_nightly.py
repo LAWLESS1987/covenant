@@ -55,7 +55,7 @@ REPORT = os.path.join(HERE, "ops", "NIGHTLY.md")
 # a corpus that stopped teaching "drain" would quietly reopen the hole.
 GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_f3_gate_end_to_end.py", "test_f4_capability.py",
-                "test_f5_reserve.py", "test_f6_stuffing.py", "test_f7_caps.py", "test_g12_inflight.py", "test_purge_tool.py", "test_gate_proxy.py",
+                "test_f5_reserve.py", "test_f6_stuffing.py", "test_f7_caps.py", "test_g12_inflight.py", "test_purge_tool.py", "test_gate_proxy.py", "test_sentinel_gate.py",
                 "covenant_quiet.py"]
 
 

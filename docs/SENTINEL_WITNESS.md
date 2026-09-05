@@ -18,6 +18,17 @@ other files import from), `ledger.js`, `exchanges/kraken.js`,
 The README itself notes the XRP transaction-blob assembly is unimplemented.
 So nothing in that repository can place, sign or gate a trade today.
 
+**Written on this branch, 2026-09-05:** `sentinel_witness/tradeGate.js`, the
+gate the other files import, with `TIERS`, `enableAutomated()` (no
+unlimited option) and `gateTrade()`, which seals every proposed order
+through covenant's ethics gate via `sentinel_witness/seal_service.py`, a
+loopback service that signs a zero-amount self-send carrying the order and
+submits it to the node exactly as the trader does. Only an exact admitted
+answer allows; everything else refuses. `test_sentinel_gate.py` pins both
+sides. Still absent: the exchange clients, the Ledger signer, the encrypted
+storage, the grid math -- the app cannot place an order, and this branch
+does not arm anything.
+
 **This branch** carries the four real files under `sentinel_witness/` so
 they live beside the live core rather than a stale copy of it. They are
 untouched; `tierNavigation.js` still imports `TIERS` from a `tradeGate.js`
