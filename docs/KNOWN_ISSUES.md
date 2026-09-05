@@ -166,6 +166,20 @@ on this platform (win32)"; `/propose_code` refuses every proposal here. And
 "ethics gate has no provider key and is failing CLOSED" — which is the
 intended posture without a key, not a fault.
 
+### 13. Stopping the learning loop may not stop a pass in flight
+
+On 2026-09-05 the loop was stopped at about 01:07 and a promotion is
+recorded at 01:07:54. Whether the running `covenant_nightly.py` pass outlived
+the stop of its parent `learn_loop2.py`, or simply finished in the same
+seconds, is not established. The hazard is real either way: a promotion
+after a "stop" rewrites `fallback_model.json` and four `ops/` files, and a
+commit made on the assumption that nothing is running ships a manifest that
+does not match them. **Before any sweep or commit:** stop the loop, then
+confirm no `covenant_nightly` or `covenant_distill` process remains
+(`Get-CimInstance Win32_Process` filtered on the command line), then check
+`git status` again. The loop's rows and promotions are legitimate content
+and ride in the next commit; the failure mode is only the stale manifest.
+
 ---
 
 ## What was tried and is recorded as a dead end
