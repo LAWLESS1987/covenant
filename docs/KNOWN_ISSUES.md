@@ -275,11 +275,13 @@ distinctive number from the ignored private files (built at run time,
 never stored), map the email to the noreply address, and verify by
 scanning every object of every ref. It ran on git's built-in
 filter-branch (an install of git-filter-repo was refused by policy that
-day) against a mirror backup outside the tree. The GitHub repository was
-then deleted and recreated from the rewritten history, because GitHub
-serves commits by SHA that no ref reaches -- measured: the raw portfolio
-file was fetched at a commit outside every advertised ref -- so a
-force-push would have unpublished nothing. `python tools/purge_history.py
+day) against a mirror backup outside the tree. The owner chose not to delete
+the GitHub repository, so the rewritten history was force-pushed over
+it, and because GitHub keeps serving commits by SHA after a force-push
+-- measured: the raw portfolio file was fetched at a commit outside
+every advertised ref -- a GitHub Support request to purge the old
+objects is the second half of the fix; until Support acts, the old
+commits are unreachable by browsing but fetchable by anyone holding a SHA. `python tools/purge_history.py
 --verify` re-proves the absence on demand; `test_purge_tool.py` pins the
 rules.
 

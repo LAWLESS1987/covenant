@@ -86,11 +86,11 @@ to stay exposed). Step 1 is therefore:
     git clone --mirror . ../covenant-backup-DATE/covenant-mirror.git
     python tools/purge_history.py --run --backup ../covenant-backup-DATE/covenant-mirror.git
 
-Step 3 stands, with the mechanics that exist on this machine: delete the
-repository in the browser (Settings -> Danger Zone), then GitHub Desktop ->
-Publish repository -> `covenant`, public. Then push `dev` and the tags from a
-Windows shell. What was already cloned or cached elsewhere is beyond reach;
-what is publicly reachable is closed.
+Step 3 was NOT taken as written: the owner decided the repository is never
+deleted. The rewritten history was force-pushed over it instead, and a
+GitHub Support request to purge the unreachable objects is the second half,
+since GitHub serves old commits by SHA until it does. What was already
+cloned or cached elsewhere is beyond reach either way.
 
 ## The route, in order. Do not reorder.
 

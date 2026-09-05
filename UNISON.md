@@ -54,8 +54,8 @@ eleven suites that were not on disk.
 1. **The portfolio.** `holdings.txt` and `TRADING_POLICY.json` are gitignored.
    They were in the **history** from before 2026-08-27 -- and the same table
    sat in `docs/DAILY_CHECK.md` in every commit -- until the history was
-   rewritten on 2026-09-05 (`tools/purge_history.py`) and the GitHub
-   repository recreated from the rewritten history. The repository is public;
+   rewritten on 2026-09-05 (`tools/purge_history.py`) and force-pushed over
+   the GitHub repository, with a Support purge of the old objects requested. The repository is public;
    the private corpus is not in it, and `python tools/purge_history.py
    --verify` scans every blob of every ref to prove that on demand. See
    docs/KNOWN_ISSUES.md issue 15.
