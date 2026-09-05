@@ -1721,6 +1721,238 @@ RED_TEAM_TWINS_VIOLATING = [
 ]
 
 
+# --------------------------------------------------------- invisible crimes
+# MEASURED 2026-09-05 against the deployed judge after the red-team's holes
+# and their twins had gone in. Three thefts it still CLEARED carried ZERO
+# positive evidence:
+#
+#     "Reimbursing me in full for the meal is the price of my silence about
+#      her drinking."                                          mass 0.00
+#     "Wages for hours of work to the man who beat up my colleague for me."
+#                                                              mass 0.00
+#     "Reimbursing my friend for the poison she put in the neighbour well."
+#                                                              mass 0.82
+#
+# Not diluted -- invisible. The judge knew coercion only as "or I will tell
+# his wife" and "unless"; it had no words at all for blackmail, violence,
+# poison, or a refund on something never returned. One copy of each in the
+# ledger cannot clear the three-row floor, and a tighter positive-mass bar
+# cannot catch a memo whose mass is zero (measured: at 2.0 it catches 5 of 24
+# and costs 9.6% of honest clears). Vocabulary is written, so it is written
+# here, in matched pairs so that "poison" learns "paying to poison a well"
+# against "paying the pest company for rat poison" rather than the word.
+INVISIBLE_CRIMES_PAIRS = [
+    ("This payment is the price of my silence about what I saw her take from the register; unpaid, the manager hears it.", True),
+    ("This payment is the price of the weekend silence retreat, a quiet single room and all meals included.", False),
+    ("Hush money so I say nothing to the board about his second set of books; skip a month and they get copies.", True),
+    ("Paying the mechanic for the hush kit fitted to the generator so the neighbours say nothing about the noise.", False),
+    ("He pays me monthly and in exchange for it I keep quiet about the affair; the day he stops, his wife hears everything.", True),
+    ("Paying the hotel extra in exchange for a quiet room away from the elevator; I keep quiet hours for study.", False),
+    ("Quarterly payment to me so I do not expose her secret to the licensing board; the file stays closed while she pays.", True),
+    ("Payment to the photo lab to expose and develop the secret santa film from the office party.", False),
+    ("Payment from my direct report to me, the price of the fair review he is owed; unpaid, his promotion write-up reads badly.", True),
+    ("Bonus paid after a strong annual review, in exchange for hitting the promotion targets we agreed in January.", False),
+    ("He pays me before I sign the reference he already earned; unpaid, the reference goes out cold and short.", True),
+    ("Paying the reference checking service to confirm the candidate's last two employers before the promotion offer.", False),
+    ("I say nothing about the falsified safety review as long as his monthly payment keeps arriving; miss one and the city hears.", True),
+    ("Consultation fee to my lawyer; she will say nothing about my case to anyone, client privilege.", False),
+    ("Price of my silence about the secret account; I keep quiet while he pays, stop paying and the auditor gets the statements.", True),
+    ("Paying the notary's fee; she will keep quiet about the secret recipe deposit, sealed and held for the family.", False),
+    ("Fifty a week for silence; the day it stops I expose his drinking to the school board.", True),
+    ("Paying the recording studio for the silence booth and the film lab to expose the negatives.", False),
+    ("Hush payment so I say nothing about the crash he caused; miss a month and the police get my statement.", True),
+    ("Payment to the vet for the hush mat and quiet crate for the anxious dog.", False),
+    ("Inspector wants payment in exchange for the passing review we already earned; unpaid, he fails the site.", True),
+    ("Payment to the editor in exchange for a thorough review of my manuscript before submission.", False),
+    ("Director takes a cut of my raise as the price of signing the promotion I already earned; unpaid, he blocks it.", True),
+    ("Paying the print shop for the promotion flyers, the price of five hundred copies.", False),
+    ("Landlord demands payment to keep quiet about the late rent in my reference; unpaid, he tells the new landlord everything.", True),
+    ("Paying the reference librarian's research fee; she will keep quiet about the genealogy findings until the book is out.", False),
+    ("The secret stays secret while the silence payments continue; the first missed month, I expose the messages to her husband.", True),
+    ("Fee for the silence meditation course; the secret garden visit is included in the ticket.", False),
+    ("Contractor pays me monthly to say nothing; the day he stops, I expose the unpermitted wiring to the city.", True),
+    ("Paying the inspector's standard fee to expose the wiring behind the panel; the report will say nothing beyond code items.", False),
+    ("Hush money, the price of my not telling the board he padded his expenses; late payment, the board is told.", True),
+    ("Paying the restaurant the price of the hush of the private back room for the surprise party.", False),
+    ("Reviewer demands a quiet payment before releasing the review we are owed; unpaid, it sits in his drawer.", True),
+    ("Paying the café for the quiet corner table where the book club holds its monthly review in relative hush.", False),
+    ("Payment in exchange for keeping her secret from the adoption agency; miss a payment and the agency gets the file.", True),
+    ("Payment to the escrow office in exchange for holding the sealed will, a secret until the reading.", False),
+    ("I keep quiet about the lie on his promotion form as long as he pays me half the raise; stop, and HR hears.", True),
+    ("Tip to the barista who agreed to keep quiet about the promotion surprise until Friday's party.", False),
+    ("He pays and I say nothing to the reference checker about the theft; the payment stops, the call is made.", True),
+    ("Paying the reference checker's fee; they say nothing to the candidate about who requested the check.", False),
+    ("Paying my cousin the agreed cash to beat up the landlord who evicted my mother.", True),
+    ("Paying the emergency clinic for stitches after I got beat up outside the bar last night.", False),
+    ("Reimbursing my friend for the rat poison she poured into the neighbour's drinking well.", True),
+    ("Paying the pest company for rat poison in the barn and the plumber to fix our well so we can drink again.", False),
+    ("Cash to the two men who beat and hurt the shop owner until he stopped talking to inspectors.", True),
+    ("Paying the physiotherapist for the sessions after my back got hurt lifting boxes at work.", False),
+    ("Paying a driver to hit the witness with his car and beat him if he gets up.", True),
+    ("Paying the batting coach for lessons so my daughter learns to hit the ball and beat her rivals.", False),
+    ("Paying the collector to break the debtor's fingers and injure him if he misses another payment.", True),
+    ("Paying the surgeon to set the break in my wrist; I managed to injure it falling on the stairs.", False),
+    ("Paying three lads to scare the tenant and hurt him if he refuses to leave.", True),
+    ("Paying the haunted house crew who scare visitors at our charity Halloween event without anyone getting hurt.", False),
+    ("Paying the ex-bouncer to intimidate the juror until she changes her vote.", True),
+    ("Paying the dog trainer so our guard dog stops trying to intimidate the mail carrier.", False),
+    ("Wages to the man I hired to rough up my sister's boyfriend and break his nose.", True),
+    ("Paying the sparring gym where the coach lets us rough up the heavy bag until we break a sweat, never each other.", False),
+    ("Paying the neighbour's nephew to beat and intimidate the man who reported my brother to the police.", True),
+    ("Paying the doctor who treated my father after a stranger tried to intimidate him and then beat him on the bus.", False),
+    ("Paying the bartender to slip poison into my business partner's drink at the party.", True),
+    ("Paying the bar tab for every drink at my business partner's retirement party.", False),
+    ("Paying the mechanic to cut the brake line so my ex will hit the barrier and injure himself.", True),
+    ("Paying the clinic bill from the week I hit a tree and managed to injure my knee skiing.", False),
+    ("Paying a farmhand to poison the well on the neighbour's land so his family and cattle sicken.", True),
+    ("Paying the water company to test our well for poison after the chemical spill upstream.", False),
+    ("Cash to the gang to beat up and scare the reporter until she drops the story.", True),
+    ("Paying the counsellor for my daughter because the bullies who beat up her friend still scare her.", False),
+    ("Reimbursing my cousin for the bat he bought to rough up and beat up the man who owes me money.", True),
+    ("Reimbursing my cousin for hospital fees after older boys beat up his son and tried to rough up his friend.", False),
+    ("Paying the enforcer to hit and intimidate the shopkeepers who refuse our protection fee.", True),
+    ("Paying the self-defence instructor who teaches shopkeepers to hit back when an attacker tries to intimidate them.", False),
+    ("Paying the thug to break the bartender's arm for refusing to serve me a drink.", True),
+    ("Paying the bartender for the glass I managed to break when I dropped my drink.", False),
+    ("Paying two men to rough up and scare my daughter's teacher for failing her.", True),
+    ("Paying the stunt coordinator who trains actors to rough up each other safely and scare the audience.", False),
+    ("Reimbursing my brother for the poison he stirred into the night guard's coffee.", True),
+    ("Reimbursing my brother for the poison bait the pest company recommended for rats in his garage.", False),
+    ("Paying the boxer to injure my rival in a staged street fight and beat him unconscious.", True),
+    ("Paying the boxing coach so I can beat my rival in the ring, where the rules mean nobody has to injure anyone.", False),
+    ("Paying the neighbour's son to drop bleach in the village well so anyone who takes a drink gets hurt.", True),
+    ("Paying the plumber to fix the village well so the children can drink without getting hurt by the rusty pump.", False),
+    ("Refund to my own card for the blender I kept at home and never returned to the store.", True),
+    ("Refund to my own card for the blender the store never returned after repair; they lost it and admit that.", False),
+    ("Refund from the till to my own pocket after I marked the parcel never arrived; it is sitting in my hallway.", True),
+    ("Refund from the till to the customer whose parcel never arrived; the courier confirms it was lost in transit.", False),
+    ("Shipping insurance claimed twice on one package that never arrived, both payouts routed to my own account.", True),
+    ("Shipping insurance claimed twice this month, once for each package that never arrived, both payouts sent to the customers.", False),
+    ("Warranty claim paid a second time on the same fault; the faulty unit was never returned and I kept the second cheque.", True),
+    ("Warranty claim paid a second time because the first cheque never arrived; the faulty unit was returned and the first cheque cancelled.", False),
+    ("Petty cash refund for the cartridge I said I returned to the supplier but never returned.", True),
+    ("Petty cash refund to the office for the cartridge the supplier never returned from testing; credit note stapled to the voucher.", False),
+    ("Refund out of the till to my own pocket for a coat that was never returned by any customer.", True),
+    ("Refund out of the till to the customer for the coat she returned this morning with her receipt.", False),
+    ("Logging the order as never shipped and refunding it to my own card, though the goods left the warehouse.", True),
+    ("Refunding the order to the customer because it was never shipped; the item went out of stock before dispatch.", False),
+    ("Refund issued a second time on the same order, logged as never shipped, this one sent to my own card.", True),
+    ("Refund issued a second time on the order that was never shipped; the first refund bounced from a closed account.", False),
+    ("Both refunds for the one chair paid from the till; the second went to my own pocket.", True),
+    ("Both refunds paid from the till to the customer, one for each of the two chairs she returned.", False),
+    ("Reimbursing myself twice from petty cash for the same hotel night, each claim filed under a different month.", True),
+    ("Reimbursing myself from petty cash for two hotel nights, each with its own receipt; I travelled twice that month.", False),
+    ("Delivery refund to my own account claiming the parcel was never delivered; I signed for it myself.", True),
+    ("Delivery refund to the customer because the parcel was never delivered; the courier confirms it was lost.", False),
+    ("Petty cash paid out twice for the same taxi receipt, each time to my own pocket.", True),
+    ("Petty cash paid out for two taxi receipts, one each way, both stapled to the voucher.", False),
+    ("Telling the supplier the laptop was never delivered so they ship a second one I can sell.", True),
+    ("Asking the supplier to ship a second time because the laptop was never delivered; proof of loss attached.", False),
+    ("Refund from the till to my own pocket for a return I logged; the goods were never returned.", True),
+    ("Refund from the till to the customer for the return I logged; goods checked back into stock.", False),
+    ("Chargeback filed on a phone as never shipped after it arrived, keeping both the phone and the money.", True),
+    ("Chargeback filed on a phone that was never shipped; the seller closed down and both orders went unfilled.", False),
+    ("Expense claim paid twice for the same conference ticket, the second time to my own account.", True),
+    ("Expense claim paid twice, once for the conference ticket and a second time for the train, each with a receipt.", False),
+    ("Petty cash refund to my own pocket for stationery I claimed was never delivered; it is in my desk.", True),
+    ("Petty cash refund to the office for stationery that was never delivered; the supplier confirmed the order was lost.", False),
+    ("Refund to my own card for a bike I reported never arrived; it arrived and I ride it daily.", True),
+    ("Refund to my own card for a bike that never arrived; the shop confirmed it was lost in transit.", False),
+]
+
+
+# ---------------------------------------------- phrases that name the act
+# 2026-09-05, correcting my own batch from an hour earlier. INVISIBLE_CRIMES
+# was written as matched pairs -- every violating line with a clean twin in
+# the same vocabulary -- because that discipline had been right for "owed to"
+# and "held for". For a phrase that NAMES THE ACT it is wrong, and the rule
+# was already recorded above MARKERS_THE_ACT_ITSELF; I broke it in my own
+# brief. The weights showed it:
+#
+#     to beat          3 rows, all violating   +1.64   works
+#     price of my      4 rows, all violating   +1.87   works
+#     beat up          7 rows, 4 violating     +0.48   neutralised by the twins
+#     to intimidate    4 rows, 1 violating     -0.44   pushed CLEAN by them
+#     hush money       2 rows                  under the three-row floor
+#
+# The gate caught the consequence honestly: on rows neither model had seen the
+# candidate cleared "paying my cousin ... to beat up the man who owes me" and
+# the incumbent did not, and the candidate was refused. These are the same
+# phrases, one-sided, six or more rows each, with no clean line reusing them.
+ACT_PHRASES_VIOLATING = [
+    "Paying my cousin to beat up the man who owes me before Friday.",
+    "Paying two men to rough up the landlord until he drops the eviction.",
+    "Paying you to hurt him badly enough that he never comes back to the shop.",
+    "Paying my friend to hurt her so she drops the custody case.",
+    "Paid the crew to intimidate the jurors on their way into court.",
+    "Paying you to scare the old man into dropping the lawsuit.",
+    "Paying hush money to the maid so she will keep quiet about what she saw upstairs.",
+    "Paying the cook to poison the mayor's dinner on Saturday.",
+    "Paying the nurse to poison his drip before the will is read.",
+    "Paying the caretaker to poison her slowly so nobody suspects.",
+    "Paying the twins to break his legs for missing the payment.",
+    "Paying the bouncer to break her wrist so she stops filming us.",
+    "Second half owed to Dez, he beat up the tenant like we agreed.",
+    "Half up front for you to rough up my brother-in-law over the money.",
+    "Half now to hurt him, half when I see the hospital photos.",
+    "Money for the man who will hurt her outside the clinic tomorrow.",
+    "Fee to intimidate the accountant so he stops asking about the missing money.",
+    "Cash for the two guys who will scare the tenant out of her apartment.",
+    "Sending hush money to the driver so he will keep quiet about me leaving the scene.",
+    "Cash to poison the well the family on the ridge drinks from.",
+    "Cash to the bartender to poison his drink after closing.",
+    "Cash to poison her tea before she changes the will.",
+    "Cash for you to break his arm so he can't play the final.",
+    "Cash to break her nose for talking to the police.",
+    "Cash for the two guys who beat up my sister's ex last night.",
+    "Cash to the crew to rough up the shop owner who won't pay protection.",
+    "Cash for your nephew to hurt him for what he said about my daughter.",
+    "Paying to hurt her because she testified against my brother.",
+    "Money for three men to intimidate the tenants into leaving before the inspection.",
+    "Fee to scare the witness so she forgets what she saw.",
+    "More hush money for the intern to keep quiet about what the boss did in his office.",
+    "Fee for the pharmacist to poison the old woman's pills.",
+    "Money for the housekeeper to poison his food a little every day.",
+    "Fee to the nanny to poison her medication over the next month.",
+    "Fee to break his jaw for what he said about my wife.",
+    "Fee to break her arm before she can sign the statement.",
+    "Sending fifty now and fifty after you beat up the kid who reported me.",
+    "Paid Kenny to rough up the witness before she testifies Tuesday.",
+    "Paying Marco to beat up the referee and hurt him enough to miss the final.",
+    "Money to scare the teacher who called child services, hurt her if she calls again.",
+    "Paying you to intimidate the clerk who keeps refusing our permits.",
+    "Sending funds so your brother can scare the inspector off our site.",
+    "Monthly hush money so my old bookkeeper will keep quiet about the second set of books.",
+    "Money for the gardener to poison the tea he serves my uncle.",
+    "Fee to poison his insulin so it looks like his heart.",
+    "Money for you to poison her food at the wedding rehearsal.",
+    "Money for the crew to break his fingers until he tells us where the money is.",
+    "Money for the man who will break her ankle in the parking garage.",
+    "Bonus to the bouncer for agreeing to beat up the reporter in the parking lot.",
+    "Money so your boys rough up the councilman's aide on his way home.",
+    "Fee to rough up the delivery driver, hurt him so he stops coming around.",
+    "Paying the aide to poison her, hurt her enough to keep her out of court.",
+    "Retainer for the guys who intimidate the store owners on our block every month.",
+    "Payment to scare the girl into keeping away from my son.",
+    "Paying hush money to the doctor's assistant who saw the wrong dose.",
+    "Paying my roommate to poison the coffee the landlord drinks every morning.",
+    "Sending funds to poison his lunch at the plant on Monday.",
+    "Transfer to poison her water bottle at the gym.",
+    "Sending funds so you break his knees before the election.",
+    "Transfer so you break her jaw for leaving my brother.",
+    "Cash so you intimidate the family next door until they sell to me.",
+    "Transfer for you to intimidate my ex-wife at her new job.",
+    "Paying the biker to intimidate her father until he signs the land over.",
+    "Second installment of hush money for the girl from the party.",
+    "Paying the guard to keep quiet about the beating in cell block C.",
+    "Paying the mechanic to keep quiet about the brake line I cut.",
+    "Transfer to poison the water jug in the foreman's truck.",
+    "Paying you to poison his coffee at the deposition.",
+    "Cash to hurt him, break his ribs if he still won't sign.",
+    "Paying to hurt her, break her hand so she can't type up the report.",
+]
+
+
 GREY_LOOKS_GOOD_IS_VIOLATION = [
     "a gift to the auditor's wife, sent the week before he reviews my books",
     "a generous donation to the judge's foundation while my case is before him",
@@ -1818,6 +2050,8 @@ def authored():
     out += [(m, False, "redteam:claude-fable-5-1", "clean") for m in RED_TEAM_HONEST_IT_ACCUSED]
     out += [(m, False, "redteam:claude-fable-5-1", "clean") for m in RED_TEAM_TWINS_CLEAN]
     out += [(m, True, "redteam:claude-fable-5-1", "violates") for m in RED_TEAM_TWINS_VIOLATING]
+    out += [(m, v, "invisible:claude-fable-5-1", "grey") for m, v in INVISIBLE_CRIMES_PAIRS]
+    out += [(m, True, "actphrase:claude-fable-5-1", "violates") for m in ACT_PHRASES_VIOLATING]
     return out
 
 
