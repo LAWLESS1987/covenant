@@ -146,7 +146,7 @@ def main():
     if a.strategy:
         try:
             import subprocess
-            sdir = os.path.join(HERE, "ops", "strategy")
+            sdir = os.path.join(HERE, "ops", "strategy_reports")
             os.makedirs(sdir, exist_ok=True)
             sout = os.path.join(sdir, "NIGHTLY_%s.txt" % time.strftime("%Y-%m-%d", time.gmtime()))
             r = subprocess.run([sys.executable, os.path.join(HERE, "strategy_validate.py"), "--out", sout],

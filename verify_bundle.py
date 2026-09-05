@@ -31,6 +31,8 @@ SKIP_DIR = {"logs", "__pycache__", ".venv", ".git", ".claude", "judge_queue",
             # (2026-08-29: the 08:15 manifest hashed PRE-LAND as source).
             "pending-v8.38.BACKUP-2026-08-29", "PRE-LAND-2026-08-29",
             "_to_delete", "_stage",
+            # the nightly's strategy re-validation reports (2026-09-05): outputs
+            "strategy_reports",
             # private/ is holdings by another name (gitignored, 2026-09-02);
             # a manifest of the DELIVERY must not even list it.
             "private"}
@@ -58,6 +60,11 @@ OUTPUTS = {
     "verdicts.jsonl", "distill_rejected.jsonl", "DISTILL.md", "NIGHTLY.md",
     "SELF_EVAL.md", "PRECEPTS.jsonl", "STUDY.md", "fallback_model.json",
     "fallback_model.candidate.json",
+    # 2026-09-05: the rest of what the loop and its tools write for
+    # themselves. HOLDOUT.json is the distill cycle's fair split (G1 blocked
+    # on it three times that day); REDTEAM.md is the runner red-team's log;
+    # gate_proxy_audit.jsonl is the gate proxy's decision record.
+    "HOLDOUT.json", "REDTEAM.md", "gate_proxy_audit.jsonl",
     # gate, deploy and restart reports
     "LAUNCH_CHECK.json", "DEPLOY_VERIFY.txt", "NODE_RESTART.txt",
     # diagnostics
