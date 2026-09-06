@@ -45,6 +45,14 @@ def _http(req, timeout=30):
         raise VenueError(f"HTTP {e.code}: {body}") from None
     except urllib.error.URLError as e:
         raise VenueError(f"unreachable: {e.reason}") from None
+    except (TimeoutError, OSError) as e:
+        # A read timeout AFTER the request was sent is not a URLError (urllib
+        # wraps only the connect phase), so it used to escape as a bare
+        # TimeoutError, abort the trader's cycle before save_state, and leave
+        # an accepted live order unrecorded (pre-push audit 2026-09-06). It is
+        # a venue error like any other. The caller cannot know whether the
+        # order was booked; covenant_trader.execute() records it as unknown.
+        raise VenueError(f"no response: {type(e).__name__}: {e}") from None
     except json.JSONDecodeError:
         raise VenueError("response was not JSON") from None
 
@@ -222,10 +230,29 @@ class KrakenVenue:
 
 
 # ------------------------------------------------------------------- Coinbase
+
+def _ipv4_only():
+    """CDP keys carry an IPv4 allowlist; Windows prefers the IPv6 route, whose
+    address rotates and is not on the list, so every call 401s. Filter DNS to
+    A records for this process. Falls back untouched if a host has no A record."""
+    import socket
+    if getattr(socket, "_covenant_ipv4_only", False):
+        return
+    orig = socket.getaddrinfo
+
+    def v4_first(host, *a, **k):
+        res = orig(host, *a, **k)
+        v4 = [r for r in res if r[0] == socket.AF_INET]
+        return v4 or res
+    socket.getaddrinfo = v4_first
+    socket._covenant_ipv4_only = True
+
+
 class CoinbaseVenue:
     name = "coinbase"
     DRY_RUN = "venue"
     DRY_RUN_ENDPOINT = "/api/v3/brokerage/orders/preview"
+    MAKER_BY_DEFAULT = True   # post-only limit at the touch; see place()
     CRED_DIR = os.environ.get("COINBASE_CRED_DIR", os.path.join(HOME, ".coinbase"))
     HOST = "api.coinbase.com"
 
@@ -243,7 +270,7 @@ class CoinbaseVenue:
         j = os.path.join(self.CRED_DIR, "cdp_api_key.json")
         if os.path.exists(j):
             d = json.load(open(j, encoding="utf-8"))
-            name, pk = d.get("name"), d.get("privateKey")
+            name, pk = d.get("name") or d.get("id"), d.get("privateKey")
         else:
             p = os.path.join(self.CRED_DIR, "credentials")
             if not os.path.exists(p):
@@ -264,29 +291,46 @@ class CoinbaseVenue:
         return self._cred
 
     def _jwt(self, method, path):
+        """CDP JWT. PEM privateKey -> ES256 (older ECDSA download); base64
+        privateKey -> EdDSA (the portal's current Ed25519 default)."""
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import ec, utils
-        name, pem = self._creds()
-        try:
-            key = serialization.load_pem_private_key(
-                pem.replace("\\n", "\n").encode(), password=None)
-        except Exception as e:
-            raise VenueError(f"privateKey did not load as a PEM EC key "
-                             f"({type(e).__name__})") from None
+        from cryptography.hazmat.primitives.asymmetric import ec, ed25519, utils
+        name, pk = self._creds()
+        pk = pk.strip()
 
         def b64u(b):
             return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
         now = int(time.time())
-        hdr = {"alg": "ES256", "kid": name, "typ": "JWT", "nonce": secrets.token_hex(16)}
+        # The uri claim is method + host + PATH ONLY. A query string in it
+        # makes Coinbase answer 401 with no further explanation.
         pay = {"sub": name, "iss": "cdp", "nbf": now, "exp": now + 120,
-               "uri": f"{method} {self.HOST}{path}"}
+               "uri": f"{method} {self.HOST}{path.split('?', 1)[0]}"}
+        if "BEGIN" in pk:
+            try:
+                key = serialization.load_pem_private_key(
+                    pk.replace("\\n", "\n").encode(), password=None)
+            except Exception as e:
+                raise VenueError(f"privateKey did not load as a PEM EC key "
+                                 f"({type(e).__name__})") from None
+            hdr = {"alg": "ES256", "kid": name, "typ": "JWT", "nonce": secrets.token_hex(16)}
+            si = f"{b64u(json.dumps(hdr).encode())}.{b64u(json.dumps(pay).encode())}"
+            der = key.sign(si.encode(), ec.ECDSA(hashes.SHA256()))
+            r, s = utils.decode_dss_signature(der)
+            return f"{si}.{b64u(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+        try:
+            seed = base64.b64decode(pk)
+        except Exception as e:
+            raise VenueError(f"privateKey is neither PEM nor base64 ({type(e).__name__})") from None
+        if len(seed) not in (32, 64):
+            raise VenueError(f"privateKey decoded to {len(seed)} bytes; Ed25519 CDP keys are 64")
+        key = ed25519.Ed25519PrivateKey.from_private_bytes(seed[:32])
+        hdr = {"alg": "EdDSA", "kid": name, "typ": "JWT", "nonce": secrets.token_hex(16)}
         si = f"{b64u(json.dumps(hdr).encode())}.{b64u(json.dumps(pay).encode())}"
-        der = key.sign(si.encode(), ec.ECDSA(hashes.SHA256()))
-        r, s = utils.decode_dss_signature(der)
-        return f"{si}.{b64u(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+        return f"{si}.{b64u(key.sign(si.encode()))}"
 
     def _call(self, method, path, body=None):
+        _ipv4_only()
         tok = self._jwt(method, path)
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(
@@ -333,27 +377,110 @@ class CoinbaseVenue:
         js = self._call("GET", "/api/v3/brokerage/orders/historical/batch?order_status=OPEN")
         return js.get("orders", [])
 
+    def fees(self):
+        """Maker/taker rates for the account's current tier (Advanced Trade
+        pricing; the consumer app charges its own spread on top and is never
+        used here)."""
+        js = self._call("GET", "/api/v3/brokerage/transaction_summary")
+        ft = js.get("fee_tier") or {}
+        return {"maker": float(ft.get("maker_fee_rate") or 0),
+                "taker": float(ft.get("taker_fee_rate") or 0),
+                "tier": ft.get("pricing_tier"),
+                "volume_30d": float(js.get("advanced_trade_only_volume") or 0)}
+
+    def best_bid_ask(self, product_id):
+        js = self._call("GET", f"/api/v3/brokerage/best_bid_ask?product_ids={product_id}")
+        for pb in js.get("pricebooks", []):
+            bids, asks = pb.get("bids") or [], pb.get("asks") or []
+            if bids and asks:
+                return float(bids[0]["price"]), float(asks[0]["price"])
+        raise VenueError(f"{product_id}: no bid/ask in the pricebook")
+
     # -- orders -------------------------------------------------------------
-    def place(self, symbol, side, qty, live=False, ordertype="market", price=None):
+    # Maker orders rest with a deadline, not for ever. A GTC post-only limit
+    # that never fills would sit on the book unreconciled: nothing here cancels
+    # it, and balances() counts held coins as position, so the next cycle
+    # would plan the same sale again on top of it. GTD with this time-to-live
+    # means an unfilled order cancels itself before the next cycle can read
+    # its hold as position -- so it must be SHORTER than any loop interval
+    # (the default loop_seconds is 3600), not equal to it.
+    MAKER_TTL_S = 1800
+
+    @staticmethod
+    def _snap(price, increment, side):
+        """Put a price on the product's quote grid EXACTLY. float truncation
+        (int(x * 10**d) / 10**d) knocks one tick off prices that are already
+        on the grid -- 1.15 -> 1.14 at 2 dp -- which for a post-only sell at
+        the ask means a price below the ask, i.e. a taker, i.e. rejected. A buy
+        rounds down, a sell rounds up, and an on-grid price is unchanged."""
+        from decimal import Decimal, ROUND_DOWN, ROUND_UP
+        inc = Decimal(str(increment))
+        px = Decimal(str(price))
+        q = (px / inc).to_integral_value(rounding=ROUND_UP if side.upper() == "SELL" else ROUND_DOWN)
+        out = q * inc
+        # normalize() drops trailing zeros ("0.50000000" -> "0.5"); format "f"
+        # keeps it out of exponent notation ("1E+2" -> "100").
+        return format(out.normalize(), "f")
+
+    def place(self, symbol, side, qty, live=False, ordertype=None, price=None, day=None):
+        """ordertype: None -> the venue default (post-only maker at the touch when
+        MAKER_BY_DEFAULT, else market); "market" -> take, deliberately;
+        "maker" -> post-only at the touch; "limit" -> post-only GTD at `price`."""
         m = self.meta(symbol)
-        decimals = max(0, len(m["base_increment"].split(".")[-1].rstrip("0")))\
-            if "." in m["base_increment"] else 0
-        size = _round_down(float(qty), decimals)
+        # Size on the base grid the same exact way as price: Decimal, rounded
+        # down, formatted without an exponent. str(float) wrote 4.5e-05 for
+        # small sizes and _round_down's float truncation could take one
+        # increment off a size that was already on the grid.
+        size_s = self._snap(qty, m["base_increment"], "BUY")
+        size = float(size_s)
         if size <= 0:
             raise VenueError(f"{symbol}: quantity rounds to zero at the "
                              f"product's base increment {m['base_increment']}")
         if m["base_min_size"] and size < m["base_min_size"]:
             raise VenueError(f"{symbol}: {size} is below Coinbase's minimum "
                              f"{m['base_min_size']}")
-        cfg = ({"market_market_ioc": {"base_size": str(size)}} if ordertype == "market"
-               else {"limit_limit_gtc": {"base_size": str(size), "limit_price": str(price)}})
-        body = {"client_order_id": secrets.token_hex(16),
-                "product_id": m["product_id"], "side": side.upper(),
+        # FEES. Advanced Trade charges the taker rate on anything that crosses
+        # the book (every market order) and the lower maker rate on anything
+        # that rests. The default is therefore "maker": a post-only limit at
+        # the touch -- the bid for a buy, the ask for a sell. post_only makes
+        # Coinbase reject the order rather than fill it as a taker if the
+        # price moves through it, so the maker rate is guaranteed. The cost is
+        # that a resting order may not fill within MAKER_TTL_S; it then cancels
+        # itself and the next cycle re-plans. Right for a daily rebalancer,
+        # wrong for anything that must fill now: pass ordertype="market".
+        if ordertype is None:
+            ordertype = "maker" if self.MAKER_BY_DEFAULT else "market"
+        if ordertype == "maker":
+            bid, ask = self.best_bid_ask(m["product_id"])
+            price = bid if side.upper() == "BUY" else ask
+        if ordertype == "market":
+            cfg = {"market_market_ioc": {"base_size": size_s}}
+        else:
+            if price is None:
+                raise VenueError(f"{symbol}: a limit order needs a price")
+            price = self._snap(price, m["quote_increment"], side)
+            end = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + self.MAKER_TTL_S))
+            cfg = {"limit_limit_gtd": {"base_size": size_s, "limit_price": price,
+                                       "end_time": end, "post_only": True}}
+        body = {"product_id": m["product_id"], "side": side.upper(),
                 "order_configuration": cfg}
         # /preview parses and prices the order without booking it -- Coinbase's
         # equivalent of Kraken's validate=true, and the default here for the
-        # same reason.
+        # same reason. It takes the same body MINUS client_order_id, which it
+        # rejects as an unknown field (HTTP 400) -- found 2026-09-06, the first
+        # time a real key reached this line.
         path = "/api/v3/brokerage/orders" if live else "/api/v3/brokerage/orders/preview"
+        if live:
+            # Deterministic per (day, product, side, size): a retry after a
+            # timeout on an order Coinbase in fact accepted is rejected as a
+            # duplicate instead of booked twice. A fresh random id per attempt
+            # made that protection inert. The cost, accepted: a SECOND order of
+            # the same product, side and size on the same local day is refused
+            # too. The caps allow two orders a day and the planner never emits
+            # two identical trims, so that case does not arise from this code.
+            day = day or time.strftime("%Y-%m-%d")
+            body["client_order_id"] = hashlib.sha256(
+                f"covenant:{day}:{m['product_id']}:{side.upper()}:{size_s}".encode()).hexdigest()[:32]
         res = self._call("POST", path, body)
         if live and not res.get("success", True):
             raise VenueError(f"coinbase refused: {json.dumps(res)[:300]}")

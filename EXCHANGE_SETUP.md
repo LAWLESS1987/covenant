@@ -50,10 +50,46 @@ Claude will not create, type, or paste an API key. Do these yourself.
 
 ### Coinbase
 
-1. `portal.cdp.coinbase.com` → create a key with **only the READ / "View"** scope.
+1. `portal.cdp.coinbase.com` → Settings → API keys → *Create secret API key*.
+   Scopes: **View** for the balance reader alone; **View + Trade** if the
+   trader is to reach the venue's preview endpoint. Never **Transfer** --
+   nothing here moves funds between portfolios. Scope the key to a dedicated
+   Advanced Trade portfolio if you can; "Primary" is the whole account.
 2. Either drop the downloaded `cdp_api_key.json` straight into
    `%USERPROFILE%\.coinbase\`, or save `%USERPROFILE%\.coinbase\credentials` with
    `name=` and `privateKey=` lines.
+3. Lock the file to your Windows account so no other local account or
+   service can read it:
+   ```
+   icacls %USERPROFILE%\.coinbase\cdp_api_key.json /inheritance:r /grant:r %USERNAME%:(R)
+   ```
+
+**Key formats (both accepted since 2026-09-06).** The portal now issues
+**Ed25519** keys by default: the file is `{"id": "<uuid>", "privateKey":
+"<88 chars of base64>"}` and the JWT is signed `EdDSA`. Older downloads are
+ECDSA: `{"name": "organizations/.../apiKeys/...", "privateKey": "-----BEGIN EC
+PRIVATE KEY-----..."}`, signed `ES256`. The code tells them apart by whether
+the private key is PEM.
+
+**IP allowlist.** If the key has one, it is IPv4. Windows prefers the IPv6
+route to `api.coinbase.com`, whose address is not on the list, and every call
+answers `401 Unauthorized` with no further detail. `coinbase_balance.py` and
+`venues.py` pin IPv4 for their own process, so this is handled; if you call
+the API any other way, force IPv4 (`curl -4`).
+
+**Fees.** Advanced Trade charges the taker rate on market orders and the lower
+maker rate on orders that rest. `venues.CoinbaseVenue` therefore places a
+**post-only limit at the touch** by default (bid for buys, ask for sells);
+`post_only` makes Coinbase reject rather than fill as taker if the price moves
+through. The order is good-till-date with a one-hour life (`MAKER_TTL_S`), so
+one that does not fill cancels itself instead of resting unreconciled until
+the next cycle plans the same sale on top of it. Prices are snapped to the
+product's quote grid exactly (buys down, sells up); float truncation used to
+knock a tick off on-grid prices. Pass `ordertype="market"` to take
+deliberately. The live client_order_id is derived from (day, product, side,
+size), so a retry after a timeout cannot book the same order twice. Current tier is printed by
+`CoinbaseVenue().fees()`. USDC↔USD conversion on Coinbase is fee-free, and the
+USDC- and USD-quoted pairs carry the same rate.
 
 A legacy retail v2 key is **refused on purpose** — those carry broader scopes
 than "read balances", which is the opposite of the point.

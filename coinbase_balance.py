@@ -20,7 +20,7 @@ COINBASE HAS THREE APIs AND THEY DO NOT SHARE AN AUTH SCHEME. Guessing wrong
 costs you a support page and twenty minutes, so this DETECTS which credential
 you saved rather than making you know in advance:
 
-  Advanced Trade / CDP   an ES256-signed JWT from a downloaded key file.
+  Advanced Trade / CDP   a JWT (ES256 or EdDSA) from a downloaded key file.
                          Credential has  name=  and  privateKey=  (or you saved
                          the whole cdp_api_key.json).       <- most likely today
   Exchange               HMAC with THREE values: key, secret, passphrase.
@@ -162,44 +162,80 @@ def load_creds():
         f"passphrase is set when the key is created and cannot be recovered.")
 
 
+def _ipv4_only():
+    """CDP keys carry an IPv4 allowlist; Windows prefers the IPv6 route, whose
+    address rotates and is not on the list, so every call 401s. Filter DNS to
+    A records for this process. Falls back untouched if a host has no A record."""
+    import socket
+    if getattr(socket, "_covenant_ipv4_only", False):
+        return
+    orig = socket.getaddrinfo
+
+    def v4_first(host, *a, **k):
+        res = orig(host, *a, **k)
+        v4 = [r for r in res if r[0] == socket.AF_INET]
+        return v4 or res
+    socket.getaddrinfo = v4_first
+    socket._covenant_ipv4_only = True
+
+
 # ------------------------------------------------------------------ CDP (JWT)
 def _b64u(b):
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
 
-def cdp_jwt(name, private_key_pem, method, host, path):
-    """An ES256 JWT, built with `cryptography` alone.
+def cdp_jwt(name, private_key, method, host, path):
+    """A CDP JWT, built with `cryptography` alone.
 
+    Two key shapes come out of portal.cdp.coinbase.com:
+      * ECDSA (older download): privateKey is a PEM EC key  -> alg ES256
+      * Ed25519 (the portal's current default): privateKey is 88 chars of
+        base64 = 64 raw bytes (32-byte seed + 32-byte public) -> alg EdDSA
     No PyJWT dependency: the node already requires `cryptography` and adding a
     second crypto library to read a balance is a dependency nobody audited.
-    Coinbase wants the raw r||s form, not the DER that `sign()` returns."""
+    For ES256 Coinbase wants the raw r||s form, not the DER that `sign()` returns."""
     try:
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import ec, utils
+        from cryptography.hazmat.primitives.asymmetric import ec, ed25519, utils
     except ImportError:
         sys.exit("this needs the `cryptography` package: pip install cryptography")
 
-    pem = private_key_pem.replace("\\n", "\n").encode()
-    try:
-        key = serialization.load_pem_private_key(pem, password=None)
-    except Exception as e:
-        sys.exit(f"privateKey did not load as a PEM EC key ({type(e).__name__}).\n"
-                 f"Paste it exactly as downloaded, with the BEGIN/END lines and\n"
-                 f"the newlines left as literal \\n.")
-
+    pk = private_key.strip()
     now = int(time.time())
-    hdr = {"alg": "ES256", "kid": name, "typ": "JWT",
-           "nonce": secrets.token_hex(16)}
     pay = {"sub": name, "iss": "cdp", "nbf": now, "exp": now + 120,
-           "uri": f"{method} {host}{path}"}
+           "uri": f"{method} {host}{path.split('?', 1)[0]}"}  # path only, never the query
+
+    if "BEGIN" in pk:
+        pem = pk.replace("\\n", "\n").encode()
+        try:
+            key = serialization.load_pem_private_key(pem, password=None)
+        except Exception as e:
+            sys.exit(f"privateKey did not load as a PEM EC key ({type(e).__name__}).\n"
+                     f"Paste it exactly as downloaded, with the BEGIN/END lines and\n"
+                     f"the newlines left as literal \\n.")
+        hdr = {"alg": "ES256", "kid": name, "typ": "JWT",
+               "nonce": secrets.token_hex(16)}
+        signing_input = f"{_b64u(json.dumps(hdr).encode())}.{_b64u(json.dumps(pay).encode())}"
+        der = key.sign(signing_input.encode(), ec.ECDSA(hashes.SHA256()))
+        r, s = utils.decode_dss_signature(der)
+        raw = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        return f"{signing_input}.{_b64u(raw)}"
+
+    try:
+        seed = base64.b64decode(pk)
+    except Exception as e:
+        sys.exit(f"privateKey is neither a PEM EC key nor base64 ({type(e).__name__}).")
+    if len(seed) not in (32, 64):
+        sys.exit(f"privateKey decoded to {len(seed)} bytes; an Ed25519 CDP key is 64.")
+    key = ed25519.Ed25519PrivateKey.from_private_bytes(seed[:32])
+    hdr = {"alg": "EdDSA", "kid": name, "typ": "JWT",
+           "nonce": secrets.token_hex(16)}
     signing_input = f"{_b64u(json.dumps(hdr).encode())}.{_b64u(json.dumps(pay).encode())}"
-    der = key.sign(signing_input.encode(), ec.ECDSA(hashes.SHA256()))
-    r, s = utils.decode_dss_signature(der)
-    raw = r.to_bytes(32, "big") + s.to_bytes(32, "big")
-    return f"{signing_input}.{_b64u(raw)}"
+    return f"{signing_input}.{_b64u(key.sign(signing_input.encode()))}"
 
 
 def fetch_cdp(cred):
+    _ipv4_only()
     host, path = "api.coinbase.com", "/api/v3/brokerage/accounts"
     tok = cdp_jwt(cred["name"], cred["privateKey"], "GET", host, path)
     req = urllib.request.Request(f"https://{host}{path}",
