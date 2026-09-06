@@ -100,6 +100,12 @@ DEFAULT_CONFIG = {
     # The operator's own file turns it on with a number.
     "allow_fiat_buys": False,
     "weekly_fiat_budget_usd": 0.0,
+    # The durable, public half of the seal (covenant_xrpl_record.py). Off until
+    # the operator has an XRPL account for records; testnet unless he says
+    # otherwise, and mainnet needs its own second key, not just a network name.
+    "xrpl_record": False,
+    "xrpl_network": "testnet",
+    "xrpl_allow_mainnet": False,
     "contribution_min_cash_pct": 0.10,
     "contribution_symbols": [],
     "node_ports": [5000],
@@ -259,6 +265,29 @@ def seal_decision(cfg, record):
                 mined = f"; mined: HTTP {ms} {json.dumps(mresp)[:90]}"
             except Exception as e:                               # noqa: BLE001
                 mined = f"; mine failed: {type(e).__name__}: {str(e)[:80]}"
+        if st == 200 and cfg.get("xrpl_record"):
+            # THE PUBLIC HALF. The local chain is the working record; this is
+            # the one a stranger can check, which is what makes "for mutual
+            # benefit" an auditable claim instead of a promise. Only the
+            # commitment goes -- covenant_xrpl_record.publishable() refuses
+            # anything else -- and a ledger that cannot be reached is reported,
+            # never allowed to undo a decision the judges already admitted.
+            try:
+                import covenant_xrpl_record as XR
+                c = (record or {}).get("snapshot_commitment")
+                if not c:
+                    mined += "; xrpl: nothing to commit to (no snapshot_commitment)"
+                else:
+                    net = cfg.get("xrpl_network", "testnet")
+                    xr = XR.record_or_note(
+                        c, kind=(record or {}).get("kind", "trade_decision"),
+                        network=net, dry_run=False,
+                        allow_mainnet=bool(cfg.get("xrpl_allow_mainnet")))
+                    mined += f"; xrpl[{net}]: {xr.get('detail')}"
+                    if xr.get("tx_hash"):
+                        mined += f" {xr['tx_hash'][:16]}"
+            except Exception as e:                               # noqa: BLE001
+                mined += f"; xrpl unavailable: {type(e).__name__}"
         return (st == 200), f"HTTP {st}: {json.dumps(resp)[:160]}{mined}"
     except SystemExit as e:
         return False, f"node unreachable: {e}"
@@ -885,6 +914,7 @@ def cmd_status(cfg):
              if float(r.get("at", 0)) >= time.time() - 7 * 86400)
     print(f"  R6 contribution    : {'ON' if cfg.get('allow_fiat_buys') and float(cfg.get('weekly_fiat_budget_usd') or 0) > 0 else 'off'}"
           f" -- ${wk:,.2f} of ${float(cfg.get('weekly_fiat_budget_usd') or 0):,.2f} used this week")
+    print(f"  XRPL record        : {'on (' + str(cfg.get('xrpl_network')) + ')' if cfg.get('xrpl_record') else 'off'}")
     print(f"  state file         : {STATE}")
     for v in V.all_venues():
         print(f"  {v.name:<18} : credential {'installed' if v.has_credentials() else 'MISSING'}")
