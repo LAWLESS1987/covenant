@@ -218,6 +218,7 @@ ops/gemini.log
 
 # 2026-09-03: covenant_distill.py keeps a REFUSED candidate here for inspection; the model in use is fallback_model.json
 fallback_model.candidate.json
+fallback_model_2.candidate.json
 
 # 2026-09-03: holdings.txt is ignored, but its dated backups were not, and a
 # `git add -A` committed two of them. The portfolio is the one thing this file
