@@ -85,8 +85,21 @@ NODES = [
 # Documented false positives on a correct keyless single-founder setup.
 # Recorded, never alerted. See the module docstring for the line numbers.
 FALSE_POSITIVE_WARNINGS = (
-    "ethics gate has no provider key",
+    # Matched as a SUBSTRING, so keep these short and stable. The full text
+    # used to be "ethics gate has no provider key and is failing CLOSED --
+    # this node will reject every transaction"; on 2026-09-06 that sentence was
+    # corrected (it was false under the deferring seat) to "no provider key:
+    # the ethics seat is the deferring chain...". The longer pattern stopped
+    # matching, and the watchdog began ALERTing on all three nodes every pass
+    # -- a rewording turned a documented non-event into permanent noise, which
+    # is how an operator learns to ignore alerts. Match the stable fragment.
+    "provider key",
     "node minted its OWN genesis",
+    # A platform fact on Windows, not an incident: without a usable 'fork'
+    # start method the sandbox cannot enforce its limits, so /propose_code
+    # REFUSES every proposal rather than running one unbounded. It fails
+    # closed, it cannot change, and it was alerting on every node every pass.
+    "code sandbox unavailable",
 )
 
 FAIL_BEFORE_RESTART = 3
@@ -925,17 +938,31 @@ def one_pass(strict=False):
     alerts = []
     states = {}
 
-    for n in NODES:
-        h, err = health(n["port"])
+    # PROBE THE WHOLE MESH BEFORE ACTING ON ANY OF IT. The 3-strike rule is
+    # there so a node that blips during a slow verdict is not restarted out
+    # from under itself -- and that is a statement about ONE node. When every
+    # node is unreachable in the same pass, nothing is mid-verdict: the mesh
+    # is gone, and waiting two more passes is waiting for nothing. Measured
+    # 2026-09-06: a full pass takes minutes because of everything else it
+    # checks, so three consecutive misses is ten minutes or more of a dead
+    # mesh, and in a seven-minute outage that day the watchdog never reached
+    # the third strike at all. A total outage restarts on the first miss.
+    probes = [(n,) + health(n["port"]) for n in NODES]
+    all_down = all(h is None for _, h, _ in probes)
+
+    for n, h, err in probes:
         states[n["id"]] = h
         if h is None:
             if strict:
                 alerts.append(f"node {n['id']} :{n['port']} unreachable ({err})")
                 continue
             _fail_counts[n["id"]] += 1
+            threshold = 1 if all_down else FAIL_BEFORE_RESTART
             log("WARN", f"node {n['id']} :{n['port']} unreachable "
-                        f"({_fail_counts[n['id']]}/{FAIL_BEFORE_RESTART}) {err}")
-            if _fail_counts[n["id"]] >= FAIL_BEFORE_RESTART:
+                        f"({_fail_counts[n['id']]}/{threshold}"
+                        + (", whole mesh down -- not a blip" if all_down else "")
+                        + f") {err}")
+            if _fail_counts[n["id"]] >= threshold:
                 alerts.append(f"node {n['id']} down")
                 start_node(n)
                 _fail_counts[n["id"]] = 0

@@ -922,6 +922,18 @@ closed only when its own repro no longer reproduces.
 
 ---
 
+### A60. [major / watchdog] The watchdog never reached its third strike during a real outage, and a reworded warning turned a documented non-event into permanent noise
+
+**Evidence (2026-09-06):** all three nodes were down for roughly seven minutes and the watchdog, alive and logging throughout, never restarted them. Its documented behaviour is to restart a node after three consecutive misses -- but a full pass takes minutes, because of everything else it checks, so three consecutive misses is ten minutes or more. In a seven-minute outage it never got there. The guard defers node restarts to the watchdog, so nothing healed the mesh; it came back only because it was restarted by hand.
+
+**Second, self-inflicted:** `FALSE_POSITIVE_WARNINGS` matched the literal string "ethics gate has no provider key". When that /health sentence was corrected the same day (it was false under the deferring seat), the pattern stopped matching and the watchdog began ALERTing on all three nodes on every pass. A rewording elsewhere turned a documented non-event into permanent noise, which is exactly how an operator learns to ignore alerts.
+
+**Fix:** the pass now probes the whole mesh before acting on any of it. The three-strike rule exists so one node mid-verdict is not restarted out from under itself, which is a statement about one node; when **every** node is unreachable in the same pass, nothing is mid-verdict and the restart happens on the first miss. A single node blipping still gets its three strikes. The suppression list now matches short stable fragments ("provider key"), and "code sandbox unavailable" joins it as a Windows platform fact that already fails closed. Pinned by `test_watchdog_outage.py`, which also pins that suppression never reaches a safety claim: an insecure judge and an anomaly spike must still alert.
+
+**Status:** fixed 2026-09-06; live at the watchdog's next restart
+
+---
+
 ## What was tried and is recorded as a dead end
 
 So the next person does not repeat the measurement:
