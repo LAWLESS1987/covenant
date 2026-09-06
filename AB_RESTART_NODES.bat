@@ -20,6 +20,13 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 set OUT=NODE_RESTART.txt
 
+REM  DO NOT RUN THIS UNDER A TIMEOUT (measured 2026-09-06, 13:40). Invoked as
+REM  `timeout 240 cmd /c AB_RESTART_NODES.bat FORCE`, the nodes started, answered
+REM  /health at height 8 -- and then died when the timeout killed the process
+REM  tree they had been started in. The restart log said DONE and the mesh was
+REM  gone. Launch it detached instead (PowerShell Start-Process, or a scheduled
+REM  task), and poll /health separately to find out when it is up.
+REM
 REM  A HEALTHY MESH IS NOT RESTARTED (2026-09-06). Twice today all three nodes
 REM  were found down minutes after this script ran on a healthy mesh: the
 REM  watchdog owns restarts and a scripted one mid-judgement collided with it,

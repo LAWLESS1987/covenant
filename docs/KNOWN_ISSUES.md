@@ -843,6 +843,8 @@ closed only when its own repro no longer reproduces.
 
 **Fix (2026-09-06):** covenant_trader.seal_decision (1) sends the seal with benefit_score equal to the node's current alignment read from /health -- a record-keeping self-send claims neither benefit nor harm and must not move the average -- and (2) POSTs /mine right after admission, signed with the node key exactly as covenant_client.cmd_mine does, reporting the result in the SEAL line. **Verified live:** admitted, then `mined: HTTP 200`, block hash 0000a5b2..., chain_height 3 -> 4, pending 0.
 
+**A third way the mesh dies, found 2026-09-06 13:40:** running the restart script under a timeout (`timeout 240 cmd /c AB_RESTART_NODES.bat FORCE`) starts the nodes, which answer /health at height 8, and then kills them when the timeout fires on the process tree they were started in. The restart log says DONE and the mesh is gone. The script header now says so; launch it detached (PowerShell `Start-Process`) and poll /health separately.
+
 **Still open:** seals from other senders wait for the next trader cycle or a manual mine; nodes were found down twice today (13:04Z and 13:22Z, the second minutes after a scripted restart) and the guard log says the watchdog owns restarts -- a restart while the watchdog is mid-judgement may be the collision, and each restart still empties whatever is pending at that moment.
 
 **Status:** fixed 2026-09-06 -- covenant_watchdog_guard.py mines whatever is pending on every healthy two-minute pass (operator-signed), and AB_RESTART_NODES.bat refuses to restart a mesh whose three nodes answer /health unless run with FORCE
