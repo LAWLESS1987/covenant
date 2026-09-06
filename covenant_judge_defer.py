@@ -126,6 +126,15 @@ try:
             self.policy = load_policy() if policy is None else policy
             self._primary = None
             self._fallback = FB.FallbackJudge(judge_id=judge_id)
+            # The second student (covenant_second_student.py): trained on the
+            # other half of the ledger, asked only when the first holds, and
+            # never a peer in the quorum (a peer's hold would be a veto).
+            p2 = self.policy.get("second_student")
+            self._second = None
+            if p2:
+                p2 = p2 if os.path.isabs(p2) else os.path.join(HERE, p2)
+                if os.path.exists(p2):
+                    self._second = FB.FallbackJudge(judge_id=judge_id + ":second", model_path=p2)
 
         def _get_primary(self):
             if self._primary is None:
@@ -149,13 +158,27 @@ try:
                     return cov.JudgmentResult(rs.violates, "student first (policy primary=student) -- " + rs.reasoning,
                                               principle_violated=getattr(rs, "principle_violated", None),
                                               judge_id=self.judge_id, uncertain=getattr(rs, "uncertain", False))
-                if not self.policy.get("ollama_when_student_holds", True):
-                    return cov.JudgmentResult(True, "student held and the policy keeps Ollama out of the gate -- " + rs.reasoning,
+                if self._second is not None:
+                    r2s = self._second.evaluate(data, principles)
+                    if not getattr(r2s, "not_understood", False):
+                        return cov.JudgmentResult(r2s.violates, "first student held; second student (other half of the ledger) answered -- " + r2s.reasoning,
+                                                  principle_violated=getattr(r2s, "principle_violated", None),
+                                                  judge_id=self.judge_id, uncertain=getattr(r2s, "uncertain", False))
+                if not self.policy.get("ollama_when_student_holds", True) and not self.policy.get("github_when_local_down"):
+                    return cov.JudgmentResult(True, "student held and the policy keeps Ollama out of the gate (and no runner is allowed) -- " + rs.reasoning,
                                               judge_id=self.judge_id, not_understood=True)
-            try:
-                r = self._get_primary().evaluate(data, principles)
-            except Exception as e:                               # noqa: BLE001
-                r = cov.JudgmentResult(True, "local judge raised %s: %s" % (type(e).__name__, e),
+            # OLLAMA IN THE CHAIN. Asked 2026-09-06 to take it out of the
+            # equation: with "ollama_in_chain": false the seat goes from the
+            # students straight to the runner. The 404 on a model that is not
+            # installed cost ~2 s per verdict and proved nothing.
+            if self.policy.get("ollama_in_chain", True):
+                try:
+                    r = self._get_primary().evaluate(data, principles)
+                except Exception as e:                           # noqa: BLE001
+                    r = cov.JudgmentResult(True, "local judge raised %s: %s" % (type(e).__name__, e),
+                                           judge_id=self.judge_id, infrastructure_failure=True)
+            else:
+                r = cov.JudgmentResult(True, "students held; Ollama is out of the chain by policy",
                                        judge_id=self.judge_id, infrastructure_failure=True)
             if not getattr(r, "infrastructure_failure", False):
                 record_verdict(data, r, self._teacher(), "live")
@@ -164,7 +187,10 @@ try:
             if self.policy.get("github_when_local_down"):
                 try:
                     import covenant_github_judge as gh
-                    prompt = self._get_primary()._build_prompt(data, principles)
+                    try:
+                        prompt = self._get_primary()._build_prompt(data, principles)
+                    except Exception:                            # noqa: BLE001
+                        prompt = json.dumps(data, ensure_ascii=False)
                     ans = gh.ask(prompt, "", str(self.policy.get("github_model", gh.DEFAULT_MODEL)),
                                  json_only=True, timeout=int(self.policy.get("github_timeout_s", 240)))
                     obj = json.loads(ans.get("content", ""))
@@ -229,6 +255,10 @@ def _selftest():
         j._primary = Stub(cov.JudgmentResult(False, "clean", judge_id="local:1"))
         check("D1 when Ollama answers, its verdict is returned unchanged", j.evaluate({"message": "gift"}, []).violates is False)
         j._primary = Stub(cov.JudgmentResult(True, "unreachable", judge_id="local:1", infrastructure_failure=True))
+        # The premise is an UNTRAINED fallback. The repository's own model is
+        # trained now, so point this seat at a model file that does not exist.
+        j._fallback = FB.FallbackJudge(judge_id="local:1", model_path=os.path.join(d, "untrained.json"))
+        j._second = None
         r = j.evaluate({"message": "a gift of 5 units"}, [])
         check("D2 when Ollama is unreachable and the fallback is untrained, the seat says HELD (not_understood), never a finding",
               r.not_understood is True and "deferred to the distilled fallback" in r.reasoning and not r.infrastructure_failure)

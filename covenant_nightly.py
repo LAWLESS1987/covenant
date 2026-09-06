@@ -164,6 +164,11 @@ def main():
     try:
         import covenant_distill as X
         X.cycle(a.cycle, say=say)
+        try:
+            import covenant_second_student as X2
+            X2.train(say=say)
+        except Exception as e:                                   # noqa: BLE001
+            say("second student FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
         st = X.examine(__import__("covenant_judge_fallback").FallbackModel.load())
         say(X.thresholds_line(st))
         rows = X.load_verdicts()
