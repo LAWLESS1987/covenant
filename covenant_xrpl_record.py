@@ -423,6 +423,24 @@ def main() -> int:
         from xrpl.wallet import Wallet
         print(Wallet.from_seed(load_seed()).classic_address)
         return 0
+    if "--preview" in a:
+        # OFFLINE, AND THAT IS THE POINT. dry_run still signs, which needs the
+        # account to exist and a network round trip for sequence and fee -- so
+        # it cannot answer "what would this publish?" before an account exists.
+        # This can: no key, no network, no account. Look at the bytes first.
+        i = a.index("--preview")
+        c = a[i + 1] if len(a) > i + 1 else "0" * 8
+        addr = a[a.index("--as") + 1] if "--as" in a else "rBTwLga3i4gz4bV2jXcRPGGBB3hEHVdVwv"
+        tx, payload = build(c, at=0, address=addr)
+        m = tx.memos[0]
+        memo = m.memo if hasattr(m, "memo") else m
+        print(json.dumps({"payload": payload,
+                          "memo_type": bytes.fromhex(memo.memo_type).decode(),
+                          "memo_bytes": len(bytes.fromhex(memo.memo_data)),
+                          "published_text": bytes.fromhex(memo.memo_data).decode(),
+                          "transaction": tx.to_dict()}, indent=2))
+        print("\nThis is everything that would appear on a public ledger, for ever.")
+        return 0
     if "--verify" in a:
         i = a.index("--verify")
         print(json.dumps(verify(snapshot=a[i + 1]), indent=2))
@@ -444,6 +462,7 @@ def main() -> int:
     print("  --self-test   offline checks, no network and no keys")
     print("  --address     the account the seed names")
     print("  --record C [--network testnet] [--live]")
+    print("  --preview C [--as <addr>]       exactly what would be published; no key, no network")
     print("  --verify <snapshot.json>        the commitment that file produces")
     print("  --verify-commitment <number>    the snapshot that produces it")
     return 0
