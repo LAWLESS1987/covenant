@@ -843,7 +843,9 @@ closed only when its own repro no longer reproduces.
 
 **Fix (open):** something must mine on a schedule -- the watchdog every N minutes, or the trader after a successful seal -- and the health text should say "accepted, not yet mined" until then. Not changed tonight: mining policy (difficulty, rewards, who may call /mine) is the owner's.
 
-**Status:** open
+**Fix (2026-09-06, later the same day):** covenant_trader.seal_decision POSTs /mine right after an admitted /transactions and reports the result in the SEAL line. Verified: the pending decision was mined and chain_height advanced. Seals from other senders still wait for the next trader cycle or a manual /mine.
+
+**Status:** fixed for the trader's own decisions; a scheduled miner for everything else remains open
 
 ---
 

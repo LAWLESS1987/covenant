@@ -224,7 +224,19 @@ def seal_decision(cfg, record):
                 "timestamp": tx.timestamp, "benefit_score": 0.0,
                 "signature": tx.signature, "reg_nonce": reg}
         st, resp = cc.http("POST", ports[0], "/transactions", body, timeout=310)
-        return (st == 200), f"HTTP {st}: {json.dumps(resp)[:160]}"
+        mined = ""
+        if st == 200:
+            # MAKE IT DURABLE. /transactions admits to the pending pool only;
+            # nothing else mines, and a node restart empties the pool, so every
+            # seal before 2026-09-06 was lost (KNOWN_ISSUES A53). One /mine per
+            # admitted decision puts it in a block. A failed mine is reported,
+            # not hidden, and does not un-seal: the admission already happened.
+            try:
+                ms, mresp = cc.http("POST", ports[0], "/mine", {}, timeout=180)
+                mined = f"; mined: HTTP {ms} {json.dumps(mresp)[:90]}"
+            except Exception as e:                               # noqa: BLE001
+                mined = f"; mine failed: {type(e).__name__}: {str(e)[:80]}"
+        return (st == 200), f"HTTP {st}: {json.dumps(resp)[:160]}{mined}"
     except SystemExit as e:
         return False, f"node unreachable: {e}"
     except Exception as e:
