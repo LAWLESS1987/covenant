@@ -4,7 +4,8 @@ REM  FUTURE.bat -- the one click. Asked 2026-09-06: "put a one click tab on my
 REM  home screen that says future to begin".
 REM
 REM  What one click does, in order:
-REM    1. If any covenant node is down, restart all three (AB_RESTART_NODES.bat).
+REM    1. If any covenant node is down, restart all three (AB_RESTART_NODES.bat);
+REM       start the Sentinel-Witness seal service if it is not listening.
 REM    2. ARM the trader: armed=true in trader_config.json. Your click is the
 REM       arming; nothing arms it for you.
 REM    3. Run one full cycle: read the venues, plan, seal the decision to the
@@ -35,6 +36,7 @@ if "%NODES_OK%"=="1" (
   call AB_RESTART_NODES.bat >nul 2>nul
   timeout /t 8 /nobreak >nul
 )
+call SEAL_SERVICE_START.bat
 python -c "import json;p='trader_config.json';c=json.load(open(p));c['armed']=True;json.dump(c,open(p,'w'),indent=2);print('  armed: true  (your click)')"
 echo. >> trader_log.txt
 echo ==== %DATE% %TIME%  FUTURE (one click) ==== >> trader_log.txt
