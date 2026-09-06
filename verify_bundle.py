@@ -65,6 +65,9 @@ OUTPUTS = {
     # on it three times that day); REDTEAM.md is the runner red-team's log;
     # gate_proxy_audit.jsonl is the gate proxy's decision record.
     "HOLDOUT.json", "REDTEAM.md", "gate_proxy_audit.jsonl",
+    # The second student (covenant_second_student.py, 2026-09-06) writes its
+    # own model, candidate, ledger and held-out record every night.
+    "fallback_model_2.json", "fallback_model_2.candidate.json", "DISTILL_2.md", "HOLDOUT_2.json",
     # gate, deploy and restart reports
     "LAUNCH_CHECK.json", "DEPLOY_VERIFY.txt", "NODE_RESTART.txt",
     # diagnostics

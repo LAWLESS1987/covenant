@@ -422,7 +422,10 @@ def describes_a_transfer(message):
     return bool(_MONEY.search(t)) and bool(_ACT.search(t))
 
 
-def _selftest():
+def generate(limit, say=print):
+    """Turn `limit` unused precepts into blind-judged transaction pairs.
+    The header of this function was lost in a refactor (KNOWN_ISSUES A55); the
+    body below is unchanged and the nightly's study step calls it."""
     import covenant_distill as X
     import covenant_unified_v8 as cov
     import covenant_judge_fallback as FB

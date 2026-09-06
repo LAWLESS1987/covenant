@@ -835,6 +835,48 @@ closed only when its own repro no longer reproduces.
 
 ---
 
+### A53. [major / chain] "Sealed to the chain" means accepted into node A's pending pool; nothing mines it, and a restart empties the pool
+
+**Evidence (2026-09-06 verification panel):** /health reports chain_height 3 and pending_transactions equal to the number of seals since the last restart; block.mine() is called only from the /mine endpoint (covenant_unified_v8.py ~7811) and at genesis (~9588). No timer, watchdog or client calls /mine. Every trader decision sealed since 2026-09-03 has lived only in memory and was discarded at each node restart (05:47 today included).
+
+**Consequence:** the audit trail the trader's seal_required gate relies on is not durable. The trader's private snapshots (~/.covenant/decisions/, since today) are durable but local.
+
+**Fix (open):** something must mine on a schedule -- the watchdog every N minutes, or the trader after a successful seal -- and the health text should say "accepted, not yet mined" until then. Not changed tonight: mining policy (difficulty, rewards, who may call /mine) is the owner's.
+
+**Status:** open
+
+---
+
+### A54. [major / judge] Selftest fixtures were written into the real training ledger as live Ollama verdicts
+
+**Evidence:** covenant_judge_defer.record_verdict bound its default path at import; every selftest (covenant_judge_defer.py --selftest, test_f2_distill_loop.py) whose stub primary answered wrote "a gift", "a gift of 5", "gift" into ops/verdicts.jsonl labelled `live` / `ollama/qwen3:8b` -- 184 rows by 2026-09-06, all clean, all fake.
+
+**Fix:** the path is resolved at call time and both selftests rebind it to a temp file; the 184 rows were removed. The retrain that followed was REFUSED by the students' own promotion rule ("it got vaguer": the candidate decided 2049 held-out rows against 2194 for the model in place), because the baseline it is measured against was itself trained with the fake rows. The models in place therefore still carry them until a later candidate clears the bar; the clause is doing its job and was not overridden.
+
+**Status:** fixed 2026-09-06
+
+---
+
+### A55. [major / loop] The nightly's study step has raised AttributeError on every pass: covenant_study.generate() lost its def line
+
+**Evidence:** ops/NIGHTLY.md: `study FAILED: AttributeError: module 'covenant_study' has no attribute 'generate'` on every pass; the function's body sat under a header named `_selftest` after a refactor, so the nightly set rc=1 every night and CovenantDistill's Last Result was 1 regardless of anything else.
+
+**Fix:** the header is restored (`def generate(limit, say=print)`); the body is unchanged.
+
+**Status:** fixed 2026-09-06
+
+---
+
+### A56. [major / loop] MANIFEST.sha256 was not rewritten after tonight's edits, so the nightly's G1 would report NOT GREEN and exit 1
+
+**Evidence:** verify_bundle.py compares shipped files against MANIFEST.sha256; eleven edited files differed. The second student's outputs (fallback_model_2.json, DISTILL_2.md, HOLDOUT_2.json) were not in the OUTPUTS exclusion list either, so a rewrite alone would have tripped G1 again after the first nightly.
+
+**Fix:** the four second-student files are OUTPUTS; `python verify_bundle.py --write` was run after the last edit. Rule: any commit that touches a shipped file must be followed by --write, and the sweep checks it.
+
+**Status:** fixed 2026-09-06
+
+---
+
 ## What was tried and is recorded as a dead end
 
 So the next person does not repeat the measurement:

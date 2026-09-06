@@ -288,6 +288,8 @@ SUITES = [
     ("test_f5_reserve.py",                90,  "JUDGE"),
     ("test_f6_stuffing.py",              120,  "JUDGE"),
     ("test_f7_caps.py",                   60,  "MONEY"),
+    ("test_rule5_ledger.py",              60,  "MONEY"),
+    ("test_maker_orders.py",              60,  "MONEY"),
     ("test_g12_inflight.py",              60,  "SECURITY"),
     ("test_purge_tool.py",                60,  "SECURITY"),
     ("test_gate_proxy.py",                90,  "SECURITY"),

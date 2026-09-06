@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import sys
 import time
 
@@ -90,7 +91,12 @@ def payload_text(data):
     return _payload_text(data)
 
 
-def record_verdict(data, result, judge, source, path=VERDICTS):
+def record_verdict(data, result, judge, source, path=None):
+    # The path is resolved at CALL time so a test can rebind VERDICTS. With the
+    # default bound at import, every selftest whose stub primary answered
+    # wrote its fixture ("a gift of 5") into the REAL training ledger as a live
+    # Ollama verdict -- 184 rows by 2026-09-06 (KNOWN_ISSUES A54).
+    path = path or VERDICTS
     """Append an ANSWERED verdict to the ledger the fallback learns from.
     Silence, abstention and uncertainty are not verdicts and are not written.
     Returns True when a line was written."""
@@ -216,6 +222,9 @@ except Exception as _e:                                          # noqa: BLE001
 
 
 def _selftest():
+    global VERDICTS
+    import tempfile as _tmp       # the function imports tempfile again below, which would shadow the module name
+    VERDICTS = os.path.join(_tmp.mkdtemp(), "selftest_verdicts.jsonl")   # never the real ledger
     import tempfile
     ok = []
 
