@@ -85,12 +85,17 @@ XVENUE_MAXDIV = []     # (sym, divergence) for every symbol that WAS cross-check
 # than guessed at. 1.0% is ~3.4x the worst honest divergence measured.
 XVENUE_TOL = float(os.environ.get("COVENANT_XVENUE_TOL", "0.01"))
 
-# Assets we hold that Coinbase does NOT trade. Coinbase shows a price PAGE for
-# these (that is why they look listed), but there is no market and no candle
-# history, so no regime line can be computed. Saying so out loud beats printing
-# a silent "n/a" that looks like a bug.
+# Assets that can turn up in a balance read but Coinbase does NOT trade.
+# Coinbase shows a price PAGE for these (that is why they look listed), but
+# there is no market and no candle history, so no regime line can be computed.
+# Saying so out loud beats printing a silent "n/a" that looks like a bug.
 NOT_ON_COINBASE = {
     "CC": "Canton -- Coinbase says 'not tradable on Coinbase'; price page only",
+    # Measured 2026-09-06: /products/EOS-USD answers status=delisted, last
+    # daily candle 2025-12-10; Kraken answers 'Invalid asset pair'. No venue
+    # this project reads prices it, so no regime line exists. Any EOS balance
+    # is reported unpriced, which is the truth, rather than as a broken read.
+    "EOS": "EOS -- delisted from Coinbase 2025-12-10 and not on Kraken; no venue prices it",
 }
 
 
@@ -331,7 +336,9 @@ def fetch(sym, source=None, notes=None, divs=None):
         # holding -- but say which venue the number came from.
         kpx, kcloses, kwhy = fetch_kraken(sym)
         if kpx is None:
-            return None, None, why or kwhy
+            # Say the measured reason when there is one: "no price" hides a
+            # delisting behind what reads like a transient failure.
+            return None, None, why or kwhy or NOT_ON_COINBASE.get(sym) or "no venue prices it"
         _notes.append(f"{sym}: Coinbase unavailable ({why or 'no Coinbase market'}); priced on Kraken alone")
         return kpx, kcloses, None
 

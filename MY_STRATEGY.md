@@ -99,6 +99,13 @@ real money.
 If it comes back "not distinguishable from luck," that is the answer, and you
 paid nothing to learn it.
 
+Since 2026-09-06 the auto-trader keeps this record itself: `signal_ledger.py`
+seals each asset's 200-day regime call and settles it when the regime flips,
+and `covenant_trader.py` will not place a live order until 30 flips have
+settled AND the record beats the coin-flip test (p <= 0.05, positive mean
+after fees). `python signal_ledger.py` prints where it stands. Before that
+date the counter was read and never written -- see docs/KNOWN_ISSUES.md A47.
+
 ---
 
 ## What this strategy explicitly does NOT do

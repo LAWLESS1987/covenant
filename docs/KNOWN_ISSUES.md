@@ -765,6 +765,76 @@ closed only when its own repro no longer reproduces.
 
 ---
 
+### A47. [major / trader] Rule 5's counter had no writer: the 30-sealed-signal gate could never clear on evidence, only by lowering the number
+
+**Evidence:** covenant_trader.py read `sealed_signals` (preconditions, status), initialised it to 0 in load_state(), and no file in the repository incremented it. signal_watch.py, which MY_STRATEGY.md names as the scorer, was never scheduled (no task, no record file) and scores an hourly SMA cross, not the 200d regime the trader acts on. Found 2026-09-06 when asked to "refine till it clears".
+
+**Repro:** `grep -rn sealed_signals *.py` -- reads and one initialisation, no writer. `python covenant_trader.py --status` after 8 sealed daily cycles: `Rule 5 threshold : 0 / 30`.
+
+**Fix:** signal_ledger.py (2026-09-06). Each cycle records every asset's 200d regime call when first seen and settles it when the regime flips -- one signal per flip, scored after 130 bps round trip -- and the trader writes the settled count into state. The gate now also requires the record to mean something (rule5_require_significance, default true: positive mean after costs and p <= 0.05 under a no-edge coin flip), the same bar signal_watch.py sets. Pinned by test_rule5_ledger.py (20 checks). No backfill: a call sealed after its outcome is not a prediction, so the clock started at the first cycle after the fix.
+
+**Status:** fixed 2026-09-06 (branch sentinel-witness). Expect months to 30 settled flips; that is the cadence of the rule.
+
+---
+
+### A48. [minor / prices] A delisted asset is unpriceable and sits outside every rule: EOS-USD was delisted from Coinbase 2025-12-10 and Kraken has no EOS pair
+
+**Evidence:** `GET api.exchange.coinbase.com/products/EOS-USD` answers `status: delisted, trading_disabled: true`; its newest daily candle is 2025-12-10. Kraken OHLC for EOSUSD answers `EQuery:Invalid asset pair`. daily.py's fetch reported such a symbol as `NO PRICE -- newest bar is N days old -- the read is broken, not the market`, which blamed the read.
+
+**Repro:** `curl -s https://api.exchange.coinbase.com/products/EOS-USD` and `curl -s "https://api.kraken.com/0/public/OHLC?pair=EOSUSD"`.
+
+**Fix:** daily.py lists EOS in NOT_ON_COINBASE with the measured reason, so the line says what is true. An unpriced balance is excluded from the total and from every cap, which is the conservative direction. Selling one needs a venue that quotes it; none of the three configured do.
+
+**Status:** open (documented; nothing to fix in code until a venue lists it)
+
+---
+
+### A49. [major / judge] The semantic judge reads JSON literals as words: `"clears": false` in a sealed record matched "bear false witness", it abstained, and the trader's seal was refused
+
+**Evidence:** 2026-09-06 09:16Z, ops/verdicts.jsonl: the trader's daily record gained a `rule5` block with `"clears": false, "mean_after_costs": null`. SemanticModel 41bba7d7d753 assessed it `abstain`, score 194, evidence `[(194, 'false')]`, principle "You shall not bear false witness". The same payload with the boolean removed assesses `clean 0 []` (replayed offline both ways). With Ollama gone the deferring seat had no second local voice, so abstain + policy `silence_is_not_dissent: false` became "Blocked, not proven" and the decision was not sealed. The record two hours earlier, identical but for that block, was admitted.
+
+**Repro:** `python -c "import covenant_semantic_judge as S; m=S.SemanticModel.load(S.DEFAULT_MODEL_PATH); print(m.assess({'kind':'trade_decision','clears':False}).verdict)"` -> abstain. Replace `False` with `'not yet'` -> clean.
+
+**Fix (trader side, done):** covenant_trader.py spells the sealed Rule 5 block out in words and omits nulls. **Fix (judge side, open):** the lexical pass should not count JSON literals (`true`/`false`/`null`) or dict KEYS as content words when the payload is structured; only string VALUES carry meaning a principle can be evidenced by. That is a change to a deployed judge and belongs with the judge-sharpening rules: red-team it against judge_suite first, and pin it with a test that feeds `{"ok": false}`.
+
+**Status:** trader side fixed 2026-09-06; judge side open
+
+---
+
+### A50. [major / privacy] The trader's sealed decision carried the whole portfolio, and three paths carried it onward: the runner on the public repo, the tracked verdict ledger, and the students' published weights
+
+**Evidence (pre-push audit, 2026-09-06, four reviewers + two refuters per finding):** covenant_trader.py sealed `positions` in USD and `regimes` per asset. (1) When both students hold, covenant_judge_defer.py dispatches the payload as a workflow input to a GitHub Actions run on THIS public repository (covenant_github_judge.py:150-158), whose runs and artifacts are readable by anyone. (2) The runner's verdict is appended, text and all, to the tracked ops/verdicts.jsonl; the local file held 18 such rows with dollar positions (the remote's five rows had positions `{}`). (3) covenant_second_student.py trained on that ledger, and fallback_model_2.json's n-gram weights reproduced the ordered holding list and each asset's regime as one unbroken chain; the same happened to fallback_model.json after the 09:34Z retrain. No dollar value survived tokenisation (the tokenizer requires a leading letter), no credential or identifier was involved. The composition was new to the remote; ticker names individually were not.
+
+**Repro (before the fix):** `python -c "import json;d=json.load(open('fallback_model_2.json'));print([k for k in d['weights'] if 'positions' in k])"` printed the n-gram that opens with the record's first ticker and the chain of holdings that follows it.
+
+**Fix (2026-09-06, before anything was pushed):** the sealed record is a COMMITMENT: counts (n_positions, n_up, n_down, n_unpriced), the orders (rare; the audit trail needs them), the Rule 5 counts, and the SHA-256 of the full snapshot as a decimal integer (hex would be a new word to the students every day), which is written under ~/.covenant/decisions/<epoch>.json outside the synced folder and can be produced to prove what was decided. The 18 local ledger rows were rewritten to that shape (label kept, `redacted` field says so) and both students were retrained; their vocabularies now hold no ticker that was not already public. The leaking model file never reached the remote: the unpushed history was rewritten so that no commit contains it.
+
+**Still true:** the GitHub runner path exists and is the last resort of the chain. Anything it judges is visible on the public repository's Actions. With the record as it now is, that is counts and a hash; any FUTURE field added to the sealed record must pass the same test ("would I publish this?"), because the ledger and the students will publish it.
+
+**Status:** fixed 2026-09-06 for the trader; the general rule (do not seal what you would not publish) is documented here and nowhere enforced in code.
+
+---
+
+### A51. [major / trader] A lost answer on a live order escaped as a bare TimeoutError and left the order unrecorded
+
+**Evidence (pre-push re-audit, 2026-09-06, reproduced against a local socket that accepted the POST and never answered):** venues._http caught HTTPError, URLError and JSONDecodeError only; urllib wraps the connect phase in URLError but not the response read, so a read timeout raised builtins.TimeoutError, escaped place() and execute(), aborted run_once before save_state, and an order Coinbase may have booked was never written to orders_today. The per-day caps were blind to it.
+
+**Fix:** _http turns TimeoutError/OSError into a VenueError ("no response"). execute() records the intent in orders_today and writes state BEFORE the live POST; on success the row becomes PLACED with the txid; on a definite 4xx it is removed; on no answer, a 5xx or any other exception it stays as UNKNOWN and the caps count it. Pinned by test_rule5_ledger.py E1-E3 and test_maker_orders.py.
+
+**Status:** fixed 2026-09-06
+
+---
+
+### A52. [major / judge] The second student was promoted on the 37-case exam alone, without the first student's held-out and fairness clauses
+
+**Evidence:** covenant_second_student.py's first version promoted on `false_clean_new <= false_clean_old` over judge_suite only, while its CLEAN verdict is an admission in the seat. The first student's covenant_distill.promotion() also requires the held-out clauses (rows neither model has seen, the fair two-way split).
+
+**Fix:** the second student now calls covenant_distill.train() itself -- same promotion(), same exam, same held-out record -- on its half of the ledger, with its own ledger (ops/DISTILL_2.md), holdout file (ops/HOLDOUT_2.json) and candidate file.
+
+**Status:** fixed 2026-09-06
+
+---
+
 ## What was tried and is recorded as a dead end
 
 So the next person does not repeat the measurement:
