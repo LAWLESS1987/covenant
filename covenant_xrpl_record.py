@@ -49,6 +49,16 @@ THE SEED
   little for fees, and nothing else. It is not the operator's XRP holding, and
   the hold-only rule on that holding is untouched by this module.
 
+SETTING IT UP (the operator's hands: this module never creates a key)
+  1. python -c "import covenant_xrp_signer as S; S.create_testnet_seed_file(
+       r'C:/Users/Lawre/.covenant/xrpl_seed')"
+     Writes a NEW testnet seed at mode 0600, refuses to overwrite an existing
+     file, prints the address -- and does NOT fund it.
+  2. Fund that address at https://xrpl.org/xrp-testnet-faucet.html
+  3. Set "xrpl_record": true in trader_config.json. Mainnet additionally needs
+     "xrpl_network": "mainnet" AND "xrpl_allow_mainnet": true, two keys, on
+     purpose.
+
 USAGE
   python covenant_xrpl_record.py --self-test        # offline, no network, no keys
   python covenant_xrpl_record.py --address          # what account the seed names
