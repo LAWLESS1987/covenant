@@ -217,11 +217,22 @@ def seal_decision(cfg, record):
         pem = cc.pub_of_key(keypath)
         reg = cov.RegistrationPoW.generate(pem, cov.BASE_REGISTRATION_DIFFICULTY)
         data = {"origin": "covenant_trader", "kind": "trade_decision", **record}
+        # ALIGNMENT-NEUTRAL. A block's alignment_score is the mean benefit_score
+        # of its transactions and /mine refuses a block that drifts more than 5%
+        # from the governor's current figure. A record-keeping self-send claims
+        # neither benefit nor harm, so it carries the node's CURRENT alignment
+        # rather than 0.0 -- with 0.0 every block of seals drifted and was
+        # refused (409, measured 2026-09-06; KNOWN_ISSUES A53). Read live; if
+        # /health is unreadable the seal still goes out at 0.0 and says so.
+        try:
+            benefit = float(cc.http("GET", ports[0], "/health", None, timeout=15)[1].get("alignment", 0.0))
+        except Exception:                                        # noqa: BLE001
+            benefit = 0.0
         tx = cov.Transaction(sender_pubkey=pem, receiver=pem, data=data,
-                             amount=0.0, benefit_score=0.0, reg_nonce=reg)
+                             amount=0.0, benefit_score=benefit, reg_nonce=reg)
         tx.sign(sk)
         body = {"sender_pubkey": pem, "receiver": pem, "data": data, "amount": 0.0,
-                "timestamp": tx.timestamp, "benefit_score": 0.0,
+                "timestamp": tx.timestamp, "benefit_score": benefit,
                 "signature": tx.signature, "reg_nonce": reg}
         st, resp = cc.http("POST", ports[0], "/transactions", body, timeout=310)
         mined = ""

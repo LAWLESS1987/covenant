@@ -835,17 +835,17 @@ closed only when its own repro no longer reproduces.
 
 ---
 
-### A53. [major / chain] "Sealed to the chain" means accepted into node A's pending pool; nothing mines it, and a restart empties the pool
+### A53. [major / chain] "Sealed to the chain" meant accepted into node A's pending pool; nothing mined it, and a restart emptied the pool
 
-**Evidence (2026-09-06 verification panel):** /health reports chain_height 3 and pending_transactions equal to the number of seals since the last restart; block.mine() is called only from the /mine endpoint (covenant_unified_v8.py ~7811) and at genesis (~9588). No timer, watchdog or client calls /mine. Every trader decision sealed since 2026-09-03 has lived only in memory and was discarded at each node restart (05:47 today included).
+**Evidence (2026-09-06 verification panel):** chain_height had been 3 since genesis; block.mine() ran only from the operator-authenticated /mine endpoint and at genesis; no timer, watchdog or client called it. Every trader decision sealed since 2026-09-03 lived only in memory and was discarded at each node restart.
 
-**Consequence:** the audit trail the trader's seal_required gate relies on is not durable. The trader's private snapshots (~/.covenant/decisions/, since today) are durable but local.
+**Two more things stood in the way once the trader did call /mine:** an unsigned call answers 401 (operator headers required), and a signed one answered 409 "Alignment drifts > 5%" because a block's alignment_score is the mean benefit_score of its transactions and the seals carried 0.0 against the governor's 0.5.
 
-**Fix (open):** something must mine on a schedule -- the watchdog every N minutes, or the trader after a successful seal -- and the health text should say "accepted, not yet mined" until then. Not changed tonight: mining policy (difficulty, rewards, who may call /mine) is the owner's.
+**Fix (2026-09-06):** covenant_trader.seal_decision (1) sends the seal with benefit_score equal to the node's current alignment read from /health -- a record-keeping self-send claims neither benefit nor harm and must not move the average -- and (2) POSTs /mine right after admission, signed with the node key exactly as covenant_client.cmd_mine does, reporting the result in the SEAL line. **Verified live:** admitted, then `mined: HTTP 200`, block hash 0000a5b2..., chain_height 3 -> 4, pending 0.
 
-**Fix (2026-09-06, later the same day):** covenant_trader.seal_decision POSTs /mine right after an admitted /transactions and reports the result in the SEAL line. NOT yet verified: an unsigned /mine answered 401 (operator headers required); the trader now signs the call with the node key like covenant_client.cmd_mine, but the live check answered HTTP 409 and the height stayed at 3. Open until a mined block is observed.
+**Still open:** seals from other senders wait for the next trader cycle or a manual mine; nodes were found down twice today (13:04Z and 13:22Z, the second minutes after a scripted restart) and the guard log says the watchdog owns restarts -- a restart while the watchdog is mid-judgement may be the collision, and each restart still empties whatever is pending at that moment.
 
-**Status:** open -- the signed mine call is in place but unproven
+**Status:** fixed for the trader's own decisions; scheduled mining for everything else and the restart collision remain open
 
 ---
 
