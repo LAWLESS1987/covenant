@@ -460,7 +460,8 @@ def guard_state(st, total, cash, positions, now=None):
         last_sold={k: float(v) for k, v in st.get("last_sold", {}).items()},
         positions=dict(positions), cash=cash,
         orders_today=orders, starting_total_usd=started,
-        bought_total_usd=spent_ever, now=now), notes
+        bought_total_usd=spent_ever,
+        fiat_buys_week=_guards.fiat_buys_week_now(now=now), now=now), notes
 
 
 def main():

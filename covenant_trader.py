@@ -96,6 +96,12 @@ DEFAULT_CONFIG = {
     "seal_required": True,
     "min_sealed_signals": 30,
     "rule5_require_significance": True,
+    # R6 contribution (2026-09-06). Shipped OFF: no dollar buys, no budget.
+    # The operator's own file turns it on with a number.
+    "allow_fiat_buys": False,
+    "weekly_fiat_budget_usd": 0.0,
+    "contribution_min_cash_pct": 0.10,
+    "contribution_symbols": [],
     "node_ports": [5000],
     "node_key": "covenant_A.db.key",
     "loop_seconds": 3600,
@@ -133,6 +139,9 @@ def roll_day(st):
         st["day"] = today
         st["orders_today"] = []
         st["equity_start_of_day"] = 0.0     # set once equity is known this run
+    # The trailing-week record of fiat-funded buys (R6 / guards.WeeklyBudget).
+    cutoff = time.time() - 7 * 86400
+    st["fiat_buys"] = [r for r in st.get("fiat_buys", []) if float(r.get("at", 0)) >= cutoff]
     # BACKFILL THE LIFETIME BUY TOTAL, BUT ONLY ON EVIDENCE.
     #
     # guards.BuyBudget measures cumulative buying against half the starting
@@ -360,8 +369,9 @@ def reserve_baseline(pf, path=RESERVE_PATH):
     return base, held, raised
 
 
-def plan(cfg, pf):
-    """The five rules -> concrete orders. Sells only; see the note on Rule 4.
+def plan(cfg, pf, week_spent=0.0):
+    """The five rules -> concrete orders, plus R6 when the operator has set a
+    weekly contribution budget. Sells first; see the note on Rule 4.
 
     Rule 1 caps any single position at max_position_pct and holds a cash floor.
     Rule 2/3 make the 200-day line a regime switch acted on only when it FLIPS.
@@ -447,6 +457,61 @@ def plan(cfg, pf):
     below = [p["sym"] for p in pf["positions"] if p["regime"] == "DOWN"]
     if below:
         notes.append("R4: below the 200d line, do not add -- " + ", ".join(below))
+
+    # R6 CONTRIBUTION (asked 2026-09-06: "a budget of 100 a week"). NOT a
+    # timing rule -- no edge replicated, so nothing here asks "when". It asks
+    # how much and into what, under rules that already exist:
+    #   * cash floor first: nothing is put to work while cash is under the floor;
+    #   * then equal shares into held assets that are UNDER the concentration cap
+    #     and ABOVE their 200d line (Rule 4 said forwards); hold-only never;
+    #   * each share within the per-order cap, at most the day's remaining order
+    #     count, and the week's total within weekly_fiat_budget_usd, which
+    #     guards.WeeklyBudget also enforces as a backstop.
+    # Shipped OFF (allow_fiat_buys false, budget 0). Every buy it emits is
+    # fiat-funded, so FiatBuyPermission and BuyBudget apply to it unchanged.
+    weekly = float(cfg.get("weekly_fiat_budget_usd") or 0.0)
+    if cfg.get("allow_fiat_buys") and weekly > 0:
+        floor_pct = float(cfg.get("contribution_min_cash_pct", cfg.get("min_cash_pct", 0.10)))
+        cash_after = pf["cash"] + sum(o["usd"] for o in orders)   # today's trims raise cash first
+        spare = cash_after - floor_pct * total
+        room = min(weekly - float(week_spent or 0.0), spare)
+        hold_only = set(getattr(_guards, "HOLD_ONLY", ()) if _guards else ())
+        wanted = set(cfg.get("contribution_symbols") or [])
+        if spare <= 0:
+            notes.append(f"R6 contribution: cash {cash_after / total:.1%} is under the "
+                         f"{floor_pct:.0%} floor -- this week's money stays as cash")
+        elif room <= 0:
+            notes.append(f"R6 contribution: ${float(week_spent):,.2f} of the ${weekly:,.2f} "
+                         f"weekly budget already used -- nothing more this week")
+        else:
+            eligible = [p for p in pf["positions"]
+                        if p["regime"] == "UP" and p["val"] / total < cap
+                        and p["sym"] not in hold_only
+                        and (not wanted or p["sym"] in wanted)]
+            eligible.sort(key=lambda p: p["val"])                 # smallest first: equalise
+            slots = max(0, int(cfg.get("max_orders_per_day", 2)) - len(orders))
+            n = min(len(eligible), slots)
+            if not eligible:
+                notes.append("R6 contribution: no held asset is both under the cap and above "
+                             "its 200d line -- nothing qualifies to add to")
+            elif n == 0:
+                notes.append("R6 contribution: today's order count is used by the sells above")
+            else:
+                share = min(float(cfg.get("max_order_usd", 25.0)), room / n)
+                if share < float(cfg.get("min_order_usd", 5.0)):
+                    notes.append(f"R6 contribution: ${share:,.2f} per order is under the "
+                                 f"${float(cfg.get('min_order_usd', 5.0)):,.2f} minimum -- wait for cash")
+                else:
+                    for p in eligible[:n]:
+                        orders.append({"sym": p["sym"], "side": "buy", "qty": share / p["px"],
+                                       "usd": share, "px": p["px"],
+                                       "rule": "R6 contribution",
+                                       "why": (f"weekly budget ${weekly:,.0f}, ${float(week_spent):,.0f} "
+                                               f"used; above the 200d line, {p['val'] / total:.1%} of book"),
+                                       "at": p["at"]})
+                    notes.append(f"R6 contribution: ${share:,.2f} into each of "
+                                 f"{', '.join(p['sym'] for p in eligible[:n])} (${room:,.2f} room "
+                                 f"this week, floor kept)")
     return orders, notes
 
 
@@ -577,6 +642,9 @@ def execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only=False):
                 if o.get("side") == "buy" and fiat_part > 0:
                     st["bought_total_usd"] = float(
                         st.get("bought_total_usd") or 0.0) + fiat_part
+                    # the trailing-week record guards.WeeklyBudget reads
+                    st.setdefault("fiat_buys", []).append({"at": time.time(), "usd": fiat_part,
+                                                           "sym": o["sym"]})
                 save_state(st)
         except V.VenueError as e:
             msg = str(e)
@@ -670,7 +738,8 @@ def run_once(cfg, plan_only=False):
             # read -- see guards.set_starting_total for what went wrong when it
             # was two places.
             starting_total_usd=_guards.set_starting_total(pf["total"], RESERVE_PATH),
-            bought_total_usd=st.get("bought_total_usd"))
+            bought_total_usd=st.get("bought_total_usd"),
+            fiat_buys_week=list(st.get("fiat_buys", [])))
         for vd in _guards.GuardStack().evaluate(state):
             print(f"    [{'ok  ' if vd.allowed else 'BLOCK'}] {vd.guard:<14} {vd.reason}")
             # The two cap guards are shown here but NOT added to guard_blocks.
@@ -682,7 +751,9 @@ def run_once(cfg, plan_only=False):
             if not vd.allowed and vd.guard not in ("per_trade_cap", "per_day_cap"):
                 guard_blocks.append(vd.guard)
 
-    orders, notes = plan(cfg, pf)
+    week_cut = time.time() - 7 * 86400
+    week_spent = sum(float(r.get("usd", 0)) for r in st.get("fiat_buys", []) if float(r.get("at", 0)) >= week_cut)
+    orders, notes = plan(cfg, pf, week_spent=week_spent)
     print("\n  PLAN")
     for n in notes:
         print(f"    - {n}")
@@ -810,6 +881,10 @@ def cmd_status(cfg):
     r5 = signal_ledger.summary(min_signals=cfg.get("min_sealed_signals", 30))
     print(f"  Rule 5 record      : {'CLEARS' if r5['clears'] else 'not yet'} -- {r5['why']}")
     print(f"  orders placed today: {len(st.get('orders_today', []))}")
+    wk = sum(float(r.get("usd", 0)) for r in st.get("fiat_buys", [])
+             if float(r.get("at", 0)) >= time.time() - 7 * 86400)
+    print(f"  R6 contribution    : {'ON' if cfg.get('allow_fiat_buys') and float(cfg.get('weekly_fiat_budget_usd') or 0) > 0 else 'off'}"
+          f" -- ${wk:,.2f} of ${float(cfg.get('weekly_fiat_budget_usd') or 0):,.2f} used this week")
     print(f"  state file         : {STATE}")
     for v in V.all_venues():
         print(f"  {v.name:<18} : credential {'installed' if v.has_credentials() else 'MISSING'}")

@@ -69,6 +69,9 @@ class State:
     # blocks on that rather than assuming a convenient zero.
     starting_total_usd: Optional[float] = None   # the book when the floor was set
     bought_total_usd: Optional[float] = None     # cumulative buy notional since
+    # Fiat-funded buys in the trailing seven days: [{at: unix_ts, usd: float}].
+    # None means "could not be established" and WeeklyBudget blocks on it.
+    fiat_buys_week: Optional[list] = None
     now: float = field(default_factory=time.time)
 
     @property
@@ -324,6 +327,10 @@ CAP_DEFAULTS = {
     "max_daily_notional_usd": 300.0,
     "max_orders_per_day": 4,
     "min_order_usd": 5.0,
+    # R6 contribution (2026-09-06): dollars the trader may put to work in any
+    # trailing seven days. 0 is the shipped default and means NO contribution
+    # path -- the operator sets the number in trader_config.json.
+    "weekly_fiat_budget_usd": 0.0,
 }
 # Not a number, so it is not in caps() -- but it is read the same way and from
 # the same file, and it defaults to the refusing answer.
@@ -349,6 +356,27 @@ def caps(path: Optional[str] = None) -> dict:
                     out[k] = cfg[k]
     except (OSError, ValueError):
         pass
+    return out
+
+
+def fiat_buys_week_from(trader_state: Optional[dict], now: Optional[float] = None):
+    """Fiat-funded buys in the trailing seven days out of covenant_trader's
+    state file, for guards.WeeklyBudget. None if the state is unknown (a
+    reader that cannot see the week must not assume it is empty); a state
+    with no record yet is a KNOWN empty week."""
+    if trader_state is None or not isinstance(trader_state, dict):
+        return None
+    t = now if now is not None else time.time()
+    got = trader_state.get("fiat_buys", [])
+    if not isinstance(got, list):
+        return None
+    out = []
+    for r in got:
+        try:
+            if t - float(r.get("at", 0)) <= 7 * 86400:
+                out.append({"at": float(r.get("at", 0)), "usd": float(r["usd"])})
+        except (TypeError, ValueError, KeyError, AttributeError):
+            return None
     return out
 
 
@@ -380,6 +408,20 @@ def orders_today_from(trader_state: Optional[dict], now: Optional[float] = None)
 # two against each other so they cannot drift apart quietly.
 TRADER_STATE = os.environ.get("COVENANT_TRADER_STATE") or os.path.join(
     os.path.expanduser("~"), ".covenant", "trader_state.json")
+
+
+def fiat_buys_week_now(path: Optional[str] = None, now: Optional[float] = None):
+    """The trailing week's fiat-funded buys straight off disk, for WeeklyBudget.
+    Same contract as orders_today_now: a missing file is a KNOWN empty week
+    (the trader has never run), a file that will not parse is unknown."""
+    p = path or TRADER_STATE
+    if not os.path.exists(p):
+        return []
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return fiat_buys_week_from(json.load(fh), now)
+    except (OSError, ValueError):
+        return None
 
 
 def orders_today_now(path: Optional[str] = None, now: Optional[float] = None):
@@ -812,10 +854,69 @@ class FiatBuyPermission(Guard):
                        f"${bought:,.2f} spent)")
 
 
+class WeeklyBudget(Guard):
+    """Dollars put to work in any trailing seven days may not exceed the
+    operator's weekly figure (weekly_fiat_budget_usd in trader_config.json).
+
+    Asked 2026-09-06: "a budget of 100 a week". This is the ceiling the R6
+    contribution rule sizes itself under, and the backstop if it ever does
+    not. Counts fiat-funded buys only -- a rotation funded by today's sales is
+    not new money (FiatBuyPermission draws that line). Reads the figure at
+    every check, like the other caps, so a mid-week edit applies next cycle.
+    A budget of 0 -- the shipped default -- means R6 is off and this guard does
+    not constrain; the other guards still apply to any buy."""
+    name = "weekly_budget"
+    side = "buy"
+    WINDOW_S = 7 * 86400
+
+    def __init__(self, budget: Optional[float] = None, config_path: Optional[str] = None):
+        self._budget, self._config_path = budget, config_path
+
+    @property
+    def budget(self):
+        c = caps(self._config_path)
+        return float(c["weekly_fiat_budget_usd"] if self._budget is None else self._budget)
+
+    def spent(self, st) -> Optional[float]:
+        if st.fiat_buys_week is None:
+            return None
+        total = 0.0
+        for r in st.fiat_buys_week:
+            try:
+                if st.now - float(r.get("at", 0)) <= self.WINDOW_S:
+                    total += float(r["usd"])
+            except (TypeError, ValueError, KeyError):
+                return None
+        return total
+
+    def headroom(self, st) -> Optional[float]:
+        s = self.spent(st)
+        return None if s is None else max(0.0, self.budget - s)
+
+    def check(self, st, sym=None):
+        b = self.budget
+        if b <= 0:
+            # No budget means the R6 contribution path is off (it checks the
+            # same number before emitting anything). It does not mean every
+            # buy is forbidden: an operator adding by hand under the other
+            # guards is not bound by a contribution schedule that does not exist.
+            return Verdict(True, self.name,
+                           "no weekly contribution budget set (R6 off) -- not constraining")
+        s = self.spent(st)
+        if s is None:
+            return Verdict(False, self.name,
+                           "the week's fiat buys are unknown (no readable record) -- blocking")
+        if s >= b:
+            return Verdict(False, self.name,
+                           f"${s:,.2f} of the ${b:,.2f} weekly budget already used")
+        return Verdict(True, self.name,
+                       f"${s:,.2f}/${b:,.2f} of the weekly budget used, ${b - s:,.2f} left")
+
+
 DEFAULTS = [MaxDrawdown(0.25), DailyLossLimit(0.08), CooldownPeriod(7),
             LossStreak(4, 30), ConcentrationCap(0.20), CashFloor(0.10),
             ReserveFloor(0.50), PerDayCap(), PerTradeCap(), BuyBudget(0.50),
-            FiatBuyPermission()]
+            FiatBuyPermission(), WeeklyBudget()]
 
 
 class GuardStack:

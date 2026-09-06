@@ -108,6 +108,27 @@ date the counter was read and never written -- see docs/KNOWN_ISSUES.md A47.
 
 ---
 
+## RULE 6 — Contribute on a schedule, never on a signal (added 2026-09-06)
+
+Asked: "a budget of 100 a week". No timing edge replicated, so this rule never
+asks *when*. Each week's money is placed by rules that already exist:
+
+1. **Cash floor first.** Nothing is put to work while cash is under 10% of the
+   book. The week's money stays as USDC and the run says so.
+2. **Then equal shares** into held assets that are under the 20% concentration
+   cap and above their 200-day line (Rule 4 said forwards). Hold-only assets
+   (XRP) never receive a dollar.
+3. **Under the caps:** $25 per order, at most the day's remaining order count,
+   maker-only, and the week's total within `weekly_fiat_budget_usd`, which
+   `guards.WeeklyBudget` enforces as a backstop from the trader's own record.
+
+Shipped off (`allow_fiat_buys` false, budget 0). The operator's own
+`trader_config.json` turns it on with a number. Rule 5 keeps scoring the regime
+calls in the background; nothing in Rule 6 depends on it. Pinned by
+`test_r6_contribution.py`.
+
+---
+
 ## What this strategy explicitly does NOT do
 
 - It does not predict price. Nothing tested here could.

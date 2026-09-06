@@ -186,7 +186,15 @@ def main():
     cfg_path = os.path.join(HERE, "trader_config.json")
     if os.path.exists(cfg_path):
         cfg = json.load(io.open(cfg_path, encoding="utf-8"))
-        check("A1 this operator's config is disarmed", cfg.get("armed") is False)
+        # 2026-09-06: the operator armed the trader himself (future.bat, "your
+        # click is the arming"). The check is now provenance, not posture: an
+        # explicit boolean; and if it is true, the arming must be traceable to
+        # a one-click run in trader_log.txt -- nothing else may flip it.
+        armed = cfg.get("armed")
+        log_path = os.path.join(HERE, "trader_log.txt")
+        clicked = os.path.exists(log_path) and "FUTURE (one click)" in io.open(log_path, encoding="utf-8", errors="replace").read()
+        check("A1 this operator's config states armed explicitly, and if armed it was the operator's own click (a FUTURE run in trader_log.txt)",
+              armed is False or (armed is True and clicked))
     else:
         tsrc = io.open(os.path.join(HERE, "covenant_trader.py"), encoding="utf-8").read()
         check("A1 no config here (a clean checkout), and the default the trader would "
