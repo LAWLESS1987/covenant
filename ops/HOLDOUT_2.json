@@ -1,9 +1,9 @@
 {
  "_what": "Held-out score of the last PROMOTED model, measured by k-fold over the ledger at the time. The next candidate is compared against these numbers rather than against the deployed model scored on its own training data.",
- "decided": 944,
- "correct": 832,
- "false_clear": 19,
- "rows": 1653,
+ "decided": 1007,
+ "correct": 875,
+ "false_clear": 22,
+ "rows": 1740,
  "judge_code": "2b0f823ddce1",
- "when": "2026-09-06T11:58:25Z"
+ "when": "2026-09-06T12:18:57Z"
 }
