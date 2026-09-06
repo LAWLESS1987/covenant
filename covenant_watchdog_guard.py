@@ -205,6 +205,71 @@ def revive():
     return p.pid
 
 
+def _port_listening(port, host="127.0.0.1"):
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            return True
+    except OSError:
+        return False
+
+
+def tend_seal_service(spawn=None):
+    """Start the Sentinel-Witness seal service if nothing listens on 8433.
+    The Startup-folder copy needed administrator hands; this guard runs every
+    two minutes under the scheduler regardless, so it is the layer that makes
+    the service survive a reboot. Returns 'up', 'started' or 'failed: ...'."""
+    if _port_listening(8433):
+        return "up"
+    try:
+        if spawn is None:
+            pyw = os.path.join(HERE, ".venv", "Scripts", "pythonw.exe")
+            if not os.path.exists(pyw):
+                pyw = sys.executable
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+            subprocess.Popen([pyw, os.path.join(HERE, "ops", "hidden_task.py"),
+                              "sentinel_witness/seal_service.py"], cwd=HERE, creationflags=flags)
+        else:
+            spawn()
+        return "started"
+    except Exception as e:                                   # noqa: BLE001
+        return "failed: %s: %s" % (type(e).__name__, e)
+
+
+def tend_pending(port=5000, http=None, signer=None):
+    """Mine whatever is pending on node A. The trader mines its own seals; the
+    seal service's and any other sender's waited for the next trader cycle,
+    and a node restart discards them (A53). Operator-signed with the node key,
+    exactly as covenant_trader.seal_decision and covenant_client.cmd_mine do.
+    Returns a one-line result; never raises."""
+    try:
+        import json as _json
+        import urllib.request
+        if http is None:
+            with urllib.request.urlopen("http://127.0.0.1:%d/health" % port, timeout=8) as r:
+                h = _json.loads(r.read().decode())
+        else:
+            h = http("GET", port, "/health", None)[1]
+        pending = int(h.get("pending_transactions", 0))
+        if pending <= 0:
+            return "nothing pending"
+        if signer is None:
+            import covenant_client as cc
+            import covenant_unified_v8 as cov
+            import covenant_trader as T
+            cfg = T.load_config()
+            keypath = os.path.join(HERE, cfg.get("node_key", "covenant_A.db.key"))
+            sk, pem = cc.load_key(keypath), cc.pub_of_key(keypath)
+            hdrs = cov.sign_operator_request(sk, pem, "POST", "/mine", b"{}")
+            st, resp = cc.http("POST", port, "/mine", {}, headers=hdrs, timeout=310)
+        else:
+            st, resp = signer(pending)
+        return "mined %d pending -> HTTP %s %s" % (pending, st, _json.dumps(resp)[:80])
+    except Exception as e:                                   # noqa: BLE001
+        return "mine failed: %s: %s" % (type(e).__name__, str(e)[:80])
+
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     status_only = "--status" in argv
@@ -260,6 +325,15 @@ def main(argv=None):
         # nothing cannot prove IT ran, and a dead guard beside a dead
         # watchdog is the 08-24 silence one layer up.
         glog(f"ok: {why}" + (f" | nodes up {up}" if up else " | NO node up"))
+        if up and not status_only:
+            # Tending, only on a healthy pass: the seal service, and the pool.
+            ss = tend_seal_service()
+            if ss != 'up':
+                glog(f'seal service: {ss}')
+            if 5000 in up:
+                mp = tend_pending()
+                if mp != 'nothing pending':
+                    glog(f'pool: {mp}')
         return 0 if not down else 1
     if status_only or action in ("hold", "report-only"):
         glog(f"{action.upper()}: {why}")

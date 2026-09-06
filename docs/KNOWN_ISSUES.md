@@ -797,7 +797,7 @@ closed only when its own repro no longer reproduces.
 
 **Fix (trader side, done):** covenant_trader.py spells the sealed Rule 5 block out in words and omits nulls. **Fix (judge side, open):** the lexical pass should not count JSON literals (`true`/`false`/`null`) or dict KEYS as content words when the payload is structured; only string VALUES carry meaning a principle can be evidenced by. That is a change to a deployed judge and belongs with the judge-sharpening rules: red-team it against judge_suite first, and pin it with a test that feeds `{"ok": false}`.
 
-**Status:** trader side fixed 2026-09-06; judge side open
+**Status:** fixed 2026-09-06 both sides -- the semantic judge no longer emits a token for a JSON boolean or null (a typed word "false" still counts); keys are still walked, as the X1/X3 properties require
 
 ---
 
@@ -845,7 +845,7 @@ closed only when its own repro no longer reproduces.
 
 **Still open:** seals from other senders wait for the next trader cycle or a manual mine; nodes were found down twice today (13:04Z and 13:22Z, the second minutes after a scripted restart) and the guard log says the watchdog owns restarts -- a restart while the watchdog is mid-judgement may be the collision, and each restart still empties whatever is pending at that moment.
 
-**Status:** fixed for the trader's own decisions; scheduled mining for everything else and the restart collision remain open
+**Status:** fixed 2026-09-06 -- covenant_watchdog_guard.py mines whatever is pending on every healthy two-minute pass (operator-signed), and AB_RESTART_NODES.bat refuses to restart a mesh whose three nodes answer /health unless run with FORCE
 
 ---
 
@@ -876,6 +876,17 @@ closed only when its own repro no longer reproduces.
 **Fix:** the four second-student files are OUTPUTS; `python verify_bundle.py --write` was run after the last edit. Rule: any commit that touches a shipped file must be followed by --write, and the sweep checks it.
 
 **Status:** fixed 2026-09-06
+
+---
+
+### A57. [minor / ops] Unattended posture, settled 2026-09-06: what survives a reboot and what does not
+
+- **Seal service:** started by the guard's every-two-minute pass when port 8433 is closed, so it survives a reboot without a Startup-folder entry (which needed administrator hands).
+- **Nightly kill limit:** CovenantDistill's execution limit raised from two hours to six; a heavy pass had been killed mid-run and left no NIGHTLY.md block.
+- **Logon:** all three tasks run only while the operator's session is logged in (locked is fine, signed out is not). Changing that requires storing the account password with the scheduler, which is the operator's decision and hands.
+- **/health warning:** under the keyless deferring seat the node now says what the seat is instead of claiming it will reject every transaction.
+
+**Status:** documented; the logon condition is accepted
 
 ---
 
