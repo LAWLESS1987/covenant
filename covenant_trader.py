@@ -583,6 +583,9 @@ def hr(t):
     print("\n" + "=" * 74 + f"\n{t}\n" + "=" * 74)
 
 
+LAST_SEAL_OK = True   # set by run_once; main() turns a failed required seal into exit 3 so the scheduler sees it
+
+
 def run_once(cfg, plan_only=False):
     st = roll_day(load_state())
 
@@ -747,6 +750,8 @@ def run_once(cfg, plan_only=False):
         else:
             sealed_ok, seal_detail = seal_decision(cfg, record)
     print(f"\n  SEAL  {'ok' if sealed_ok else 'FAILED'} -- {seal_detail}")
+    global LAST_SEAL_OK
+    LAST_SEAL_OK = sealed_ok or not (orders or cfg.get("seal_required"))
 
     results = execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only)
     if results:
@@ -816,6 +821,11 @@ def main():
                 print(f"\n  cycle failed: {type(e).__name__}: {e}")
             time.sleep(max(60, int(cfg["loop_seconds"])))
     run_once(cfg, plan_only=a.plan_only)
+    if not LAST_SEAL_OK:
+        # A required seal that failed used to leave Last Result 0 in the
+        # scheduler and be visible only in trader_log.txt (2026-09-06 panel).
+        print("  exit 3: a required seal failed -- detail above and in trader_log.txt")
+        return 3
     return 0
 
 
