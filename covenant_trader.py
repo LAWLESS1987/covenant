@@ -232,7 +232,10 @@ def seal_decision(cfg, record):
             # admitted decision puts it in a block. A failed mine is reported,
             # not hidden, and does not un-seal: the admission already happened.
             try:
-                ms, mresp = cc.http("POST", ports[0], "/mine", {}, timeout=180)
+                # /mine is an operator endpoint: signed, nonced, timestamped with
+                # the node key, exactly as covenant_client.cmd_mine does it.
+                hdrs = cov.sign_operator_request(sk, pem, "POST", "/mine", b"{}")
+                ms, mresp = cc.http("POST", ports[0], "/mine", {}, headers=hdrs, timeout=310)
                 mined = f"; mined: HTTP {ms} {json.dumps(mresp)[:90]}"
             except Exception as e:                               # noqa: BLE001
                 mined = f"; mine failed: {type(e).__name__}: {str(e)[:80]}"
