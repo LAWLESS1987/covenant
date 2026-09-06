@@ -36,7 +36,9 @@ sys.path.insert(0, HERE)
 import covenant_unified_v8 as cov                                        # noqa: E402
 import covenant_judge_fallback as FB                                     # noqa: E402
 import covenant_judge_defer as D                                         # noqa: E402
-D.VERDICTS = os.path.join(tempfile.mkdtemp(), "f2_verdicts.jsonl")       # a stub that answers must never write the real ledger
+_f2tmp = tempfile.mkdtemp()
+D.VERDICTS = os.path.join(_f2tmp, "f2_verdicts.jsonl")                  # a stub that answers must never write the real ledger
+D.AUDIT_PATH = os.path.join(_f2tmp, "f2_audit.jsonl")                   # nor the real student audit trail
 import covenant_distill as X                                             # noqa: E402
 
 OK = []

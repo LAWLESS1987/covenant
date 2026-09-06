@@ -56,6 +56,10 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 POLICY = os.path.join(HERE, "ops", "quorum_policy.json")
 VERDICTS = os.path.join(HERE, "ops", "verdicts.jsonl")
+# What the students cleared or refused, for audit only. covenant_distill never
+# reads this file -- see the note in evaluate(). Kept separate so a student's
+# own verdict can never become a teacher label.
+AUDIT_PATH = os.path.join(HERE, "ops", "judged_by_student.jsonl")
 
 
 def load_policy(path=POLICY):
@@ -161,12 +165,25 @@ try:
             if str(self.policy.get("primary", "ollama")) == "student":
                 rs = self._fallback.evaluate(data, principles)
                 if not getattr(rs, "not_understood", False):
+                    # AUDIT, NOT TRAINING. A student verdict is deliberately not
+                    # written to ops/verdicts.jsonl: that file is the teacher
+                    # corpus, and training a student on its own output is
+                    # circular. But it was written NOWHERE, so once the students
+                    # became competent enough to answer, the gate stopped
+                    # leaving any record of what it cleared -- measured
+                    # 2026-09-06, 1 of 8 sealed decisions appeared in any ledger
+                    # (KNOWN_ISSUES A59). This is the audit trail: a separate
+                    # file the distiller never reads.
+                    record_verdict(data, rs, "student/" + str(getattr(self._fallback, "model_digest", "?")),
+                                   "student-audit", AUDIT_PATH)
                     return cov.JudgmentResult(rs.violates, "student first (policy primary=student) -- " + rs.reasoning,
                                               principle_violated=getattr(rs, "principle_violated", None),
                                               judge_id=self.judge_id, uncertain=getattr(rs, "uncertain", False))
                 if self._second is not None:
                     r2s = self._second.evaluate(data, principles)
                     if not getattr(r2s, "not_understood", False):
+                        record_verdict(data, r2s, "student2/" + str(getattr(self._second, "model_digest", "?")),
+                                       "student-audit", AUDIT_PATH)
                         return cov.JudgmentResult(r2s.violates, "first student held; second student (other half of the ledger) answered -- " + r2s.reasoning,
                                                   principle_violated=getattr(r2s, "principle_violated", None),
                                                   judge_id=self.judge_id, uncertain=getattr(r2s, "uncertain", False))
@@ -222,9 +239,11 @@ except Exception as _e:                                          # noqa: BLE001
 
 
 def _selftest():
-    global VERDICTS
+    global VERDICTS, AUDIT_PATH
     import tempfile as _tmp       # the function imports tempfile again below, which would shadow the module name
-    VERDICTS = os.path.join(_tmp.mkdtemp(), "selftest_verdicts.jsonl")   # never the real ledger
+    _d = _tmp.mkdtemp()
+    VERDICTS = os.path.join(_d, "selftest_verdicts.jsonl")      # never the real ledger
+    AUDIT_PATH = os.path.join(_d, "selftest_audit.jsonl")       # nor the real audit trail
     import tempfile
     ok = []
 

@@ -228,6 +228,11 @@ def record(commitment: str, kind: str = "trade_decision", network: str = "testne
                 "engine_result": engine, "validated": bool(res.get("validated")),
                 "ledger_index": res.get("ledger_index")})
     out["detail"] = f"{engine} in ledger {out.get('ledger_index')}"
+    if out["ok"]:
+        note_write({"c": payload["c"], "k": payload["k"], "t": payload["t"],
+                    "network": network, "tx_hash": out.get("tx_hash"),
+                    "ledger_index": out.get("ledger_index"),
+                    "account": wallet.classic_address})
     return out
 
 
@@ -242,6 +247,88 @@ def record_or_note(commitment: str, kind: str = "trade_decision", **kw) -> Dict[
     except Exception as e:                                       # noqa: BLE001
         return {"ok": False, "detail": f"{type(e).__name__}: {str(e)[:200]}",
                 "payload": None, "network": kw.get("network", "testnet")}
+
+
+# ------------------------------------------------------------------ proving it
+INDEX_PATH = os.environ.get("COVENANT_XRPL_INDEX") or os.path.join(
+    os.path.expanduser("~"), ".covenant", "xrpl_records.jsonl")
+
+DECISIONS_DIR = os.path.join(os.path.expanduser("~"), ".covenant", "decisions")
+
+
+def commitment_of_file(path: str) -> str:
+    """The commitment a snapshot file produces, recomputed from its bytes.
+
+    THIS IS THE HALF THAT MAKES THE OTHER HALF MEAN ANYTHING. Writing a hash to
+    a public ledger proves only that somebody wrote a number. What makes it
+    evidence is being able to hand a stranger the snapshot and have him derive
+    the same number himself. covenant_trader.seal_decision writes the exact
+    bytes it hashed, so this is a re-read, not a reconstruction -- there is no
+    re-serialisation step here that could disagree with the original.
+    """
+    import hashlib
+    with open(path, "rb") as fh:
+        return str(int(hashlib.sha256(fh.read()).hexdigest(), 16))
+
+
+def find_snapshot(commitment: str, decisions_dir: str = DECISIONS_DIR) -> Optional[str]:
+    """The snapshot file whose bytes produce this commitment, or None.
+
+    A ledger memo carries the commitment and its own write time, not the
+    snapshot's filename, so the link is established by recomputation rather
+    than by trusting a name. That is the correct direction: a filename can be
+    changed by anyone, a preimage cannot be invented."""
+    c = str(commitment).strip()
+    try:
+        names = sorted(os.listdir(decisions_dir), reverse=True)
+    except OSError:
+        return None
+    for n in names:
+        if not n.endswith(".json"):
+            continue
+        f = os.path.join(decisions_dir, n)
+        try:
+            if commitment_of_file(f) == c:
+                return f
+        except OSError:
+            continue
+    return None
+
+
+def note_write(entry: Dict[str, Any], path: str = INDEX_PATH) -> None:
+    """Append one successful ledger write to a local index. Best effort: the
+    ledger is the record, this is only a finding aid, and a failure to write it
+    must never look like a failure to record."""
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(entry, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
+def verify(commitment: Optional[str] = None, snapshot: Optional[str] = None,
+           decisions_dir: str = DECISIONS_DIR) -> Dict[str, Any]:
+    """Prove (or fail to prove) that a snapshot and a commitment are the same
+    decision. Give it either, or both.
+
+      --verify <file>            -> the commitment that file produces
+      --verify-commitment <n>    -> the file that produces it, if it is here
+    """
+    out: Dict[str, Any] = {"commitment": None, "snapshot": None, "matches": None}
+    if snapshot:
+        out["snapshot"] = snapshot
+        out["commitment"] = commitment_of_file(snapshot)
+        if commitment is not None:
+            out["matches"] = out["commitment"] == str(commitment).strip()
+        return out
+    if commitment:
+        out["commitment"] = str(commitment).strip()
+        f = find_snapshot(out["commitment"], decisions_dir)
+        out["snapshot"] = f
+        out["matches"] = f is not None
+        return out
+    raise XRPLRecordError("verify() needs a commitment, a snapshot path, or both")
 
 
 # ------------------------------------------------------------------ self-test
@@ -298,6 +385,28 @@ def _self_test() -> int:
     check(r["ok"] is False and "detail" in r,
           "R3 record_or_note reports a failure instead of raising into the seal path")
 
+    import hashlib
+    import tempfile
+    d = tempfile.mkdtemp()
+    snap = os.path.join(d, "1788700000.json")
+    raw = b'{"at":"2026-09-06","orders":[],"total":1}'
+    with open(snap, "wb") as fh:
+        fh.write(raw)
+    want = str(int(hashlib.sha256(raw).hexdigest(), 16))
+    check(commitment_of_file(snap) == want, "V1 a snapshot's commitment is recomputed from its bytes")
+    check(find_snapshot(want, d) == snap, "V2 a commitment finds its snapshot by recomputation, not by filename")
+    check(find_snapshot("999", d) is None, "V3 a commitment with no matching snapshot finds nothing")
+    v = verify(commitment=want, snapshot=snap)
+    check(v["matches"] is True, "V4 verify() confirms a snapshot and a commitment are the same decision")
+    v = verify(commitment="123", snapshot=snap)
+    check(v["matches"] is False, "V5 ...and says so plainly when they are not")
+    idx = os.path.join(d, "idx.jsonl")
+    note_write({"c": want, "tx_hash": "ABC"}, idx)
+    check(json.loads(open(idx, encoding="utf-8").readline())["tx_hash"] == "ABC",
+          "V6 a successful write is noted locally as a finding aid")
+    note_write({"c": "1"}, os.path.join(d, "no", "such", "dir", "x.jsonl"))
+    check(True, "V7 a failed index write is swallowed: the ledger is the record, this is not")
+
     print()
     if fails:
         print(f"{len(fails)} FAILED")
@@ -314,6 +423,15 @@ def main() -> int:
         from xrpl.wallet import Wallet
         print(Wallet.from_seed(load_seed()).classic_address)
         return 0
+    if "--verify" in a:
+        i = a.index("--verify")
+        print(json.dumps(verify(snapshot=a[i + 1]), indent=2))
+        return 0
+    if "--verify-commitment" in a:
+        i = a.index("--verify-commitment")
+        out = verify(commitment=a[i + 1])
+        print(json.dumps(out, indent=2))
+        return 0 if out["matches"] else 1
     if "--record" in a:
         i = a.index("--record")
         commitment = a[i + 1] if len(a) > i + 1 else str(int(time.time()))
@@ -326,6 +444,8 @@ def main() -> int:
     print("  --self-test   offline checks, no network and no keys")
     print("  --address     the account the seed names")
     print("  --record C [--network testnet] [--live]")
+    print("  --verify <snapshot.json>        the commitment that file produces")
+    print("  --verify-commitment <number>    the snapshot that produces it")
     return 0
 
 

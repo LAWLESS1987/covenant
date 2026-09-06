@@ -904,6 +904,22 @@ closed only when its own repro no longer reproduces.
 
 ---
 
+### A59. [major / judge] Once the students became competent enough to answer, the gate stopped recording what it cleared
+
+**Evidence (2026-09-06):** `covenant_judge_defer.DeferringJudge.evaluate` returns as soon as a student answers, and that path never called `record_verdict`. Measured against real data: of eight decision snapshots under `~/.covenant/decisions/`, exactly **one** had its commitment anywhere in `ops/verdicts.jsonl` -- the single seal that had gone out to the GitHub runner. The other seven were judged locally and left no judged record at all.
+
+**Why not simply record them into the corpus:** `ops/verdicts.jsonl` is the teacher corpus the distiller trains on. Writing a student's own verdict there would train the student on its own output, which is circular and is the failure mode that makes a model collapse. Not recording was the right instinct and the wrong implementation.
+
+**Fix:** student and second-student verdicts are appended to `ops/judged_by_student.jsonl` (`AUDIT_PATH`), a file `covenant_distill` never reads. Audit trail, never a teacher label. It is gitignored: it records whatever any submitter sends to the node, which is not this operator's content to publish, and the public half of the record is the XRPL commitment.
+
+**Caught while fixing it, same class as A54:** the module's own selftest and `test_f2_distill_loop.py` drive this path with stub payloads and were writing them into the real audit file. Both now rebind `AUDIT_PATH` to a temp directory, and the red-team rows they had already written were purged.
+
+**Takes effect at the next node restart.** The running nodes hold the module loaded at start; nothing was restarted, because the mesh is healthy and a scripted restart of a healthy mesh is what A53 records going wrong.
+
+**Status:** fixed 2026-09-06; live once the nodes next restart
+
+---
+
 ## What was tried and is recorded as a dead end
 
 So the next person does not repeat the measurement:
