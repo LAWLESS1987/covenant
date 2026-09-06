@@ -239,7 +239,13 @@ def _canonical_tokens(data: Any, transform=None) -> List[str]:
         elif isinstance(node, (list, tuple)):
             for v in node:
                 walk(v, depth + 1)
-        elif isinstance(node, (str, int, float, bool)) or node is None:
+        elif isinstance(node, bool) or node is None:
+            # A49 (2026-09-06): a JSON boolean or null is structure, not a word.
+            # {"clears": false} used to yield the token "false", which matched
+            # "bear false witness" and refused the trader's sealed record. The
+            # string "false" typed by a sender is still a word and still counts.
+            return
+        elif isinstance(node, (str, int, float)):
             raw = str(node)
             if transform is not None:
                 raw = transform(raw)

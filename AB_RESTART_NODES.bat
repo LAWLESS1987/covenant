@@ -20,6 +20,24 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 set OUT=NODE_RESTART.txt
 
+REM  A HEALTHY MESH IS NOT RESTARTED (2026-09-06). Twice today all three nodes
+REM  were found down minutes after this script ran on a healthy mesh: the
+REM  watchdog owns restarts and a scripted one mid-judgement collided with it,
+REM  and each restart empties the pending pool. If every node answers
+REM  /health, this script now exits and says so. FORCE as the first argument
+REM  overrides: AB_RESTART_NODES.bat FORCE
+if /I "%~1"=="FORCE" goto CHECKED
+set HEALTHY=1
+curl -s -m 8 -o nul http://127.0.0.1:5000/health || set HEALTHY=0
+curl -s -m 8 -o nul http://127.0.0.1:5020/health || set HEALTHY=0
+curl -s -m 8 -o nul http://127.0.0.1:5060/health || set HEALTHY=0
+if "!HEALTHY!"=="1" (
+  echo All three nodes answer /health. Refusing to restart a healthy mesh; run with FORCE to override.
+  echo ==== %DATE% %TIME% refused: mesh healthy ==== >> %OUT%
+  exit /b 0
+)
+:CHECKED
+
 REM ---------------------------------------------------------------------------
 REM  P17 GUARD, added 2026-08-26. READ THIS BEFORE REMOVING IT.
 REM
