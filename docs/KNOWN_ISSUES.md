@@ -890,6 +890,20 @@ closed only when its own repro no longer reproduces.
 
 ---
 
+### A58. [major / trader] Rule 5 blocks Rule 6, so the weekly contribution cannot fire; it was described to the operator as though it would
+
+**Evidence:** `covenant_trader.preconditions()` applies the Rule 5 gate to every order regardless of side. Measured with the operator's live config and a funded book: a `R6 contribution` buy of $25 returns `['Rule 5: 0 sealed signals on record, need 30']`. Rule 5 stands at 0/30 and clears only on settled 200-day regime flips, which are months away and may never clear on evidence.
+
+**Why it is not simply a bug:** Rule 6 step 2 adds only to assets **above their 200-day line**, which is the very signal Rule 5 exists to validate. So a contribution is not fully signal-free, and gating it is coherent. Dropping the regime filter to escape the gate would put money into assets below their line, which Rule 4 forbids.
+
+**What was said and was wrong:** when Rule 6 was delivered the operator was told "Week 5 onward: R6 spends up to $100 a week". With Rule 5 at 0/30 it spends nothing. The funded USDC accumulates as cash, which is a position and not a bad one, but it is not what was described.
+
+**The options, none taken:** (a) leave it and let the budget accumulate as cash until Rule 5 clears; (b) add a config key exempting a pure schedule from Rule 5, with the reasoning recorded, which is a deliberate loosening of a safety gate and therefore the operator's decision alone; (c) narrow Rule 6 to assets whose regime is not consulted at all, which collides with Rule 4.
+
+**Status:** open -- a decision, not a defect. Nothing has been loosened.
+
+---
+
 ## What was tried and is recorded as a dead end
 
 So the next person does not repeat the measurement:

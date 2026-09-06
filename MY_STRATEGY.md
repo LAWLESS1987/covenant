@@ -123,9 +123,19 @@ asks *when*. Each week's money is placed by rules that already exist:
    `guards.WeeklyBudget` enforces as a backstop from the trader's own record.
 
 Shipped off (`allow_fiat_buys` false, budget 0). The operator's own
-`trader_config.json` turns it on with a number. Rule 5 keeps scoring the regime
-calls in the background; nothing in Rule 6 depends on it. Pinned by
+`trader_config.json` turns it on with a number. Pinned by
 `test_r6_contribution.py`.
+
+**Rule 5 gates Rule 6, and that was not stated when Rule 6 was written.**
+Measured 2026-09-06: `preconditions()` applies the Rule 5 gate to every order,
+buys included, so a contribution order is refused with "0 sealed signals on
+record, need 30" even once the cash floor is met. That is defensible rather
+than accidental -- step 2 of Rule 6 only adds to assets **above their 200-day
+line**, which is precisely the signal Rule 5 is still scoring -- but it means
+the weekly budget accumulates as cash until Rule 5 clears. Removing the regime
+filter to escape the gate is not a fix: it would put money into assets below
+their line, which Rule 4 forbids. Whether to exempt a pure schedule from Rule 5
+is the operator's decision and has not been taken. See docs/KNOWN_ISSUES.md A58.
 
 ---
 
