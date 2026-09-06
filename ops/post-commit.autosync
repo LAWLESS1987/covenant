@@ -1,0 +1,16 @@
+#!/bin/sh
+# AUTO-SYNC hook (asked 2026-09-06: "they need to auto sync without push").
+# Install once:  cp ops/post-commit.autosync .git/hooks/post-commit
+# Every commit made on main -- by the operator, by Claude, or by the nightly
+# loop -- is pushed at once, and the sentinel-witness branch is moved to the
+# same commit and pushed too, so the two never drift and nobody types a push.
+# A failed push (offline, remote ahead) is reported and never blocks the commit.
+b=$(git branch --show-current 2>/dev/null)
+[ "$b" = "main" ] || exit 0
+git branch -f sentinel-witness main >/dev/null 2>&1
+if git push -q origin main sentinel-witness >/dev/null 2>&1; then
+  echo "post-commit: pushed main and sentinel-witness ($(git rev-parse --short HEAD))"
+else
+  echo "post-commit: push FAILED -- offline, or the remote is ahead (git pull --rebase, then commit again)" >&2
+fi
+exit 0
