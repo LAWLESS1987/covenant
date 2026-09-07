@@ -8019,7 +8019,15 @@ class CovenantAPI:
                     serialization.Encoding.PEM,
                     serialization.PublicFormat.SubjectPublicKeyInfo).decode()
             warnings = []
-            if keyless:
+            if keyless and ("local:" in judge_id or "semantic:" in judge_id):
+                # Keyless is not judgeless: the deferring seat (distilled students,
+                # then the GitHub runner) and the semantic judge are in the quorum.
+                # The old text -- "will reject every transaction" -- was false
+                # under this configuration and read as an outage (2026-09-06).
+                warnings.append("no provider key: the ethics seat is the deferring chain "
+                                "(students -> runner) plus the semantic judge; a hold fails "
+                                "CLOSED, a clean verdict admits")
+            elif keyless:
                 warnings.append("ethics gate has no provider key and is failing CLOSED -- "
                                 "this node will reject every transaction")
             if insecure:
