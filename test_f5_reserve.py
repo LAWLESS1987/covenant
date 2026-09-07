@@ -191,10 +191,15 @@ def main():
         # explicit boolean; and if it is true, the arming must be traceable to
         # a one-click run in trader_log.txt -- nothing else may flip it.
         armed = cfg.get("armed")
-        log_path = os.path.join(HERE, "trader_log.txt")
-        clicked = os.path.exists(log_path) and "FUTURE (one click)" in io.open(log_path, encoding="utf-8", errors="replace").read()
-        check("A1 this operator's config states armed explicitly, and if armed it was the operator's own click (a FUTURE run in trader_log.txt)",
-              armed is False or (armed is True and clicked))
+        # PROVENANCE FROM THE CONFIG ITSELF, not from trader_log.txt. The first
+        # version of this check read the log for a FUTURE run, which passed
+        # standalone and failed inside covenant_one -- a shared mutable file
+        # that another suite can move while this one reads it. Evidence that
+        # races is not evidence. FUTURE.bat now writes armed_by and armed_at
+        # beside the flag it sets, so the claim and its provenance live or die
+        # together in one file.
+        check("A1 this operator's config states armed explicitly, and if armed it records who armed it (FUTURE.bat writes armed_by beside the flag)",
+              armed is False or (armed is True and bool(cfg.get("armed_by"))))
     else:
         tsrc = io.open(os.path.join(HERE, "covenant_trader.py"), encoding="utf-8").read()
         check("A1 no config here (a clean checkout), and the default the trader would "

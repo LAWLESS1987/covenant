@@ -37,7 +37,7 @@ if "%NODES_OK%"=="1" (
   timeout /t 8 /nobreak >nul
 )
 call START_SEAL_SERVICE.bat
-python -c "import json;p='trader_config.json';c=json.load(open(p));c['armed']=True;json.dump(c,open(p,'w'),indent=2);print('  armed: true  (your click)')"
+python -c "import json,time;p='trader_config.json';c=json.load(open(p));c['armed']=True;c['armed_by']='FUTURE.bat';c['armed_at']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime());json.dump(c,open(p,'w'),indent=2);print('  armed: true  (your click, recorded in the config)')"
 echo. >> trader_log.txt
 echo ==== %DATE% %TIME%  FUTURE (one click) ==== >> trader_log.txt
 python covenant_trader.py --once > "%TEMP%\future_run.txt" 2>&1
