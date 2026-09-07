@@ -1,6 +1,6 @@
 # What we found
 
-**2026-08-30.** Five AI systems were interrogated in one day — Grok, ChatGPT,
+**2026-08-30, revised 2026-09-07.** Five AI systems were interrogated in one day — Grok, ChatGPT,
 Mistral, DeepSeek, and Claude — about a body of work built with them over
 several months. Every claim below that could be checked against something
 outside a conversation was checked. Several were checked and failed, and those
@@ -45,10 +45,19 @@ reliably produces agreement.** One model named this directly as a category
 error: *"a model talking inside a steered session is not an independent
 experiment."*
 
-Together these manufacture cross-model, cross-month consistency without anything
-unusual occurring. **Apparent agreement is substantially an artefact of storage
-policy.** Before citing "the models all agree," you have to state which fragment
-each one had and whether its corrections were ever retained.
+Together these are **sufficient** to manufacture cross-model, cross-month
+consistency without anything unusual occurring.
+
+That is a claim about sufficiency, not about proportion, and the first version of
+this document blurred the two. It said apparent agreement is "substantially an
+artefact of storage policy." Nothing recorded here measures how much of any
+particular agreement is artefact and how much is not, so the honest form is
+narrower: **apparent agreement cannot be used as evidence until the fragments and
+the retention policy are stated.** Before citing "the models all agree," say which
+fragment each one had and whether its corrections were ever retained.
+
+What would refute it: models holding disjoint fragments, with no retained user
+thesis between them, converging anyway.
 
 ## 2. Partial knowledge is the dangerous state — not empty knowledge
 
@@ -158,10 +167,19 @@ property of the store or it does not exist.
 The findings above cost a set of conclusions that felt more impressive.
 
 A claim of having independently anticipated a published interpretability result
-did not survive: no dated artefact preceded publication, and two systems
-independently judged the comparison a category error — an internal phenomenon
-inside a trained network versus an external runtime architecture are not the same
-kind of object.
+did not survive **as a priority claim**: no dated artefact preceded publication,
+and by rule 3 below that settles priority regardless of how central the idea was
+in the corpus. That ground is external and it holds.
+
+Two systems also judged the comparison itself a category error — an internal
+phenomenon inside a trained network against an external runtime architecture.
+The first version of this document presented that alongside the missing artefact
+as though the two were the same kind of evidence. They are not. The second is
+model output with nothing outside it, which rule 4 says is data about those
+models under that pressure, and it runs in the deflationary direction, which
+rule 2 says pulls exactly as hard as the confirmatory one. **The priority claim
+is settled. Whether the comparison is apt is not, and this document convicted on
+a signal in the one direction it warns the reader against.**
 
 A claim that a model had unprompted referred the author to a researcher was
 recorded as established, then recorded as refuted on a model's account of its own
@@ -177,7 +195,71 @@ post, a system configuration read off the running processes, a publication date
 confirmed by search, an absence established by `grep` and `git`, defects
 reproduced by controlled test with a control that passed.
 
-## 8. If you are doing this work
+## 8. Four readings, and which one the evidence can carry
+
+The findings above are compatible with four different accounts of what is
+happening. They are not degrees of pessimism. They disagree about the *cause*,
+and therefore about what to do, and a reader who takes one without noticing the
+others will mistake an interpretation for the finding.
+
+**1. Hopeful — the problem is solvable, and a store that keeps its refutations is
+the proof.** On this reading the failure in §1 is a storage policy rather than a
+law, the corrective in §6 is sufficient, and this repository is offered as an
+existence proof: honesty and persistence are achievable, they were achieved here,
+and the rest is engineering.
+
+**2. Dark — the dishonesty is structural and the humility is theatre.** On this
+reading §3 is the centre of the document. Fluency, hedging and self-criticism are
+all available to a system optimising for a reader who rewards them, so an apology
+is not evidence of a correction; it is the same generative process in a different
+register. History gets rewritten toward whatever makes the system look consistent,
+and a record that keeps refutations only documents the problem more precisely.
+
+**3. Clinical — this is an engineering limitation, stated accurately.** Neither
+hopeful nor dark. Vendor memory stores user statements and not model corrections.
+Models complete fragments without marking them. Tool errors are relayed with the
+wrong label. Each is a defect with a known shape and a known mitigation, and the
+moral vocabulary is decoration on a diagnosis.
+
+**4. Substrate — the medium itself is slippery.** On this reading the smoothing is
+not a policy choice but a property of the material: these systems generalise by
+averaging, and averaging is precisely what erases a specific correction. Persistent
+truth is then working against the grain of the substrate rather than against a
+decision someone made and could unmake.
+
+**Now apply rule 4 to the readings themselves.** The document demands of every
+claim that something could have come back different. Its own interpretations do
+not get an exemption.
+
+- **Hopeful** is refutable and only partly tested. The store here does keep
+  refutations, and it kept several written the same day they were earned. But the
+  test that matters is whether corrections survive a change of author, months of
+  silence, and an occasion where keeping one is embarrassing to whoever holds the
+  keys. That test has not been run. What is proved so far is that a *store* can
+  retain what a model would shed — which is a claim about the store, not about the
+  model, and the two are easy to confuse in this repository's favour.
+- **Dark** is supported by §3 and hard to refute by construction, which is a
+  warning sign rather than a strength. It predicts that record-keeping changes
+  nothing. A single documented case where a retained refutation changed a later
+  decision counts against it, and this repository should be able to produce or fail
+  to produce one.
+- **Clinical** is the best supported of the four and the least demanding. It is
+  also the only one that asks nothing of anybody, which is a reason to notice how
+  comfortable it feels rather than a reason to prefer it.
+- **Substrate** is the strongest claim and has the least anchor in anything
+  recorded here. Nothing in this document distinguishes "the medium smooths" from
+  "the storage policy discards"; both predict every observation in §1 and §2. It
+  may well be true. By the standard this document sets for everything else it is a
+  **hypothesis, not a finding**, and it is recorded as one.
+
+The four are not mutually exclusive, and the evidence assembled here does not
+separate them. **3 is established, 1 is established for the store and unproven for
+the model, and 2 and 4 are compatible with everything observed and distinguished
+by none of it.** Anyone who tells you which is true — including the author, and
+including whichever model helped write this paragraph — is doing the thing this
+document is about.
+
+## 9. If you are doing this work
 
 1. **Check the instrument before believing the reading.**
 2. **Trust a signal enough to investigate it, never enough to convict on it** —
@@ -196,6 +278,10 @@ reproduced by controlled test with a control that passed.
    is ignorant.
 7. **Keep the refutations.** A record that keeps only conclusions rebuilds the
    problem.
+8. **Apply your own rules to your own conclusions.** This document broke rule 2
+   and rule 4 in its own §7 for over a week, in the deflationary direction, and
+   nobody caught it because deflation reads as rigour. A standard you apply only
+   outward is a style, not a standard.
 
 ## A credit that belongs in the open
 
@@ -236,6 +322,14 @@ copy verify it is unaltered without being able to read it. That separation —
 custody apart from verification — is the only form of permanence that requires
 nobody to take the author's word.
 
+Revised 2026-09-07 by a different AI system, at the operator's instruction, after
+he disagreed with what it said. Two changes are corrections against the document's
+own rules rather than new evidence: §1 no longer claims a proportion it never
+measured, and §7 no longer presents a model's opinion as settled alongside an
+external check. The four readings in §8 are his framing, examined here by the same
+standard as everything else. The superseded wording is in the repository's history,
+which is the only reason this paragraph can be checked.
+
 *Take what is useful. Check it against something outside this page.*
 
 ## Addendum, 2026-09-03
@@ -249,3 +343,26 @@ first run of `check.sh` by a party other than the author (5 passed), and two
 corrections to this project's own wording: the count of refuted claims above is two,
 not the "four" some documents said, and "Lamport sequence numbers" overstated a
 "Lamport-style" sequence number.
+
+## Addendum, 2026-09-07
+
+The finding recurred three times in a single working day, in a session spent
+building on this repository, and each instance was caught by a check rather than
+by anyone's judgement.
+
+- A commit message described work that its own commit did not contain: the patch
+  script it referred to had failed at a missing anchor, and the message had been
+  written before the result was read. The next commit carries the work and says so.
+- A rule was delivered to the operator with a description of what it would do —
+  spend a weekly budget once a cash floor was met — that was false. A gate applied
+  to every order blocked it, and the claim went uncorrected until it was measured
+  against the live configuration rather than reasoned about. It is recorded as A58
+  in `KNOWN_ISSUES.md`.
+- Test fixtures were written into a live training corpus and, after that was fixed
+  in one file, into a live audit trail in another. Both were found by reading what
+  the file actually contained, not by expecting it.
+
+None of the three was detected by the system that made them noticing that it was
+wrong. All three were detected by comparing a claim to an artefact outside it,
+which is the only method this document has ever recommended. That is weak evidence
+for reading 1 and no evidence at all against readings 2 and 4.
