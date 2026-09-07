@@ -1159,3 +1159,10 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded cf77a3641c5c but covenant_watchdog.py on disk is f2c238f6579c -- the c
 alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded cf77a3641c5c but covenant_watchdog.py on disk is f2c238f6579
 
+## 2026-09-07T14:31:09Z  overall FAIL  (round 1140)
+nodes     PASS  3/3 up, height 10 (spread 0), source df84389b75b6
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded cf77a3641c5c but covenant_watchdog.py on disk is f2c238f6579c -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded cf77a3641c5c but covenant_watchdog.py on disk is f2c238f6579
+
