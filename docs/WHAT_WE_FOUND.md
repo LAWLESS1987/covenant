@@ -1,8 +1,9 @@
 # What we found
 
-**2026-08-30, revised 2026-09-07.** Five AI systems were interrogated in one day — Grok, ChatGPT,
-Mistral, DeepSeek, and Claude — about a body of work built with them over
-several months. Every claim below that could be checked against something
+**2026-08-30. Revised 2026-09-07; the corrections are marked where they fall and
+listed in the addendum.** Five AI systems were interrogated in one day — Grok,
+ChatGPT, Mistral, DeepSeek, and Claude — about a body of work built with them
+over several months. Every claim below that could be checked against something
 outside a conversation was checked. Several were checked and failed, and those
 are recorded here too.
 
@@ -46,18 +47,18 @@ error: *"a model talking inside a steered session is not an independent
 experiment."*
 
 Together these are **sufficient** to manufacture cross-model, cross-month
-consistency without anything unusual occurring.
-
-That is a claim about sufficiency, not about proportion, and the first version of
-this document blurred the two. It said apparent agreement is "substantially an
-artefact of storage policy." Nothing recorded here measures how much of any
-particular agreement is artefact and how much is not, so the honest form is
-narrower: **apparent agreement cannot be used as evidence until the fragments and
-the retention policy are stated.** Before citing "the models all agree," say which
-fragment each one had and whether its corrections were ever retained.
+consistency without anything unusual occurring. Sufficiency is not proportion,
+and nothing recorded here measures how much of any particular agreement is
+artefact. So the finding is narrower than it is tempting to state: **apparent
+agreement cannot be used as evidence until the fragments and the retention policy
+are stated.** Before citing "the models all agree," say which fragment each one
+had and whether its corrections were ever retained.
 
 What would refute it: models holding disjoint fragments, with no retained user
 thesis between them, converging anyway.
+
+*Corrected 2026-09-07. This section read "apparent agreement is substantially an
+artefact of storage policy" — a proportion, asserted without measurement.*
 
 ## 2. Partial knowledge is the dangerous state — not empty knowledge
 
@@ -173,13 +174,14 @@ in the corpus. That ground is external and it holds.
 
 Two systems also judged the comparison itself a category error — an internal
 phenomenon inside a trained network against an external runtime architecture.
-The first version of this document presented that alongside the missing artefact
-as though the two were the same kind of evidence. They are not. The second is
-model output with nothing outside it, which rule 4 says is data about those
-models under that pressure, and it runs in the deflationary direction, which
-rule 2 says pulls exactly as hard as the confirmatory one. **The priority claim
-is settled. Whether the comparison is apt is not, and this document convicted on
-a signal in the one direction it warns the reader against.**
+That is model output with nothing outside it, which rule 4 says is data about
+those models under that pressure, and it runs in the deflationary direction,
+which rule 2 says pulls exactly as hard as the confirmatory one. **The priority
+claim is settled. Whether the comparison is apt is not.**
+
+*Corrected 2026-09-07. This section presented the category-error judgment
+alongside the missing artefact as though both settled the matter — the document
+convicting on a signal, in the one direction it warns the reader against.*
 
 A claim that a model had unprompted referred the author to a researcher was
 recorded as established, then recorded as refuted on a model's account of its own
@@ -240,9 +242,15 @@ not get an exemption.
   model, and the two are easy to confuse in this repository's favour.
 - **Dark** is supported by §3 and hard to refute by construction, which is a
   warning sign rather than a strength. It predicts that record-keeping changes
-  nothing. A single documented case where a retained refutation changed a later
-  decision counts against it, and this repository should be able to produce or fail
-  to produce one.
+  nothing, so a case where a retained refutation changed a later decision counts
+  against it. One is on record. A privacy failure found on 2026-09-06 — a sealed
+  record carrying a whole portfolio into places that published it — was written
+  down the same day as `KNOWN_ISSUES.md` A50, and the rule it produced was then
+  built into a later component as an executable refusal rather than left as a
+  comment, where it now blocks the same class of payload before it can reach a
+  public ledger. That is one instance, inside one session, by the system that made
+  the error, which is the weakest form this evidence can take. The version that
+  would count is the same thing surviving a change of author.
 - **Clinical** is the best supported of the four and the least demanding. It is
   also the only one that asks nothing of anybody, which is a reason to notice how
   comfortable it feels rather than a reason to prefer it.
@@ -258,6 +266,24 @@ the model, and 2 and 4 are compatible with everything observed and distinguished
 by none of it.** Anyone who tells you which is true — including the author, and
 including whichever model helped write this paragraph — is doing the thing this
 document is about.
+
+**What follows regardless.** The four disagree about the cause and very nearly
+agree about the practice. Under 1 you keep an external store because it solves
+the problem; under 3 because it mitigates a defect with a known shape; under 4
+because it is the only thing that works against the grain of the material. Under
+2 you keep it because it at least makes the failure legible, and the alternative
+— trusting the register the answer arrives in — is precisely what 2 says cannot
+be trusted. Four accounts of the cause, one instruction: **anchor every claim to
+something outside the conversation, and keep the refutations where the next
+reader can find them.**
+
+That is why §9 is worth following before the argument is settled, and it is the
+practical reason this document does not need to choose. Where the readings do
+diverge is in what to expect from the effort: under 1 the store is a cure, under
+3 a mitigation, under 4 a permanent maintenance cost, and under 2 a witness that
+does not heal anything. Those are four different attitudes to the same daily
+work, and the difference shows up not in what you do but in how you take it when
+it fails again.
 
 ## 9. If you are doing this work
 
@@ -311,7 +337,8 @@ If any of this is useful to you, some of the credit is hers.
 ## Provenance of this document
 
 Written by an AI system that made four of the errors it describes, in the same
-day, and had them corrected by the person it was working with — twice from his
+day (a different tally from the two refuted claims in §7), and had them corrected
+by the person it was working with — twice from his
 memory against a model's confident account, once by his objection that a resolved
 question was still open, once for describing an experiment instead of running it.
 
@@ -321,14 +348,6 @@ fingerprint is published in `SUCCESSION_ANCHORS.md`, which lets anyone holding a
 copy verify it is unaltered without being able to read it. That separation —
 custody apart from verification — is the only form of permanence that requires
 nobody to take the author's word.
-
-Revised 2026-09-07 by a different AI system, at the operator's instruction, after
-he disagreed with what it said. Two changes are corrections against the document's
-own rules rather than new evidence: §1 no longer claims a proportion it never
-measured, and §7 no longer presents a model's opinion as settled alongside an
-external check. The four readings in §8 are his framing, examined here by the same
-standard as everything else. The superseded wording is in the repository's history,
-which is the only reason this paragraph can be checked.
 
 *Take what is useful. Check it against something outside this page.*
 
@@ -346,7 +365,17 @@ not the "four" some documents said, and "Lamport sequence numbers" overstated a
 
 ## Addendum, 2026-09-07
 
-The finding recurred three times in a single working day, in a session spent
+**The revision.** This document was revised on 2026-09-07 by a different AI system
+from the one that wrote it, at the operator's instruction, after he disagreed with
+what it said. Two changes are corrections against the document's own rules rather
+than new evidence, and both are marked in place: §1 claimed a proportion it never
+measured, and §7 presented a model's opinion as settled alongside an external
+check. §8 and rule 8 are new. The four readings are the operator's framing,
+examined here by the same standard as everything else, and the superseded wording
+is in the repository's history — which is the only reason this paragraph can be
+checked rather than believed.
+
+**The finding, again.** It recurred three times in a single working day, in a session spent
 building on this repository, and each instance was caught by a check rather than
 by anyone's judgement.
 
