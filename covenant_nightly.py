@@ -59,6 +59,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
+                "test_selfaudit.py",
                 "covenant_quiet.py"]
 
 
@@ -185,6 +186,25 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         rc = 1
         say("distill FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE SELF-AUDIT, every pass. Asked 2026-09-07: "self audits every sign its
+    # needed". The suites say whether the code is right and the gates say
+    # whether the tree is fit; this says whether the records this project
+    # produces agree with each other, which is where every failure on
+    # 2026-09-06 and 07 actually lived. It reports; it never repairs.
+    try:
+        import covenant_selfaudit as SA
+        _f = SA.run_all()
+        for _x in _f:
+            say("selfaudit %-7s %s -- %s" % (_x.status, _x.name, _x.said))
+            if _x.detail:
+                say("                  %s" % _x.detail)
+        if any(_x.status == SA.FAIL for _x in _f):
+            rc = 1
+            say("selfaudit: two records disagree; neither is assumed right.")
+    except Exception as e:                                       # noqa: BLE001
+        rc = 1
+        say("selfaudit FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     green = None
     if not a.no_verify:
