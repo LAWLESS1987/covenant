@@ -36,7 +36,7 @@ if "%NODES_OK%"=="1" (
   call AB_RESTART_NODES.bat >nul 2>nul
   timeout /t 8 /nobreak >nul
 )
-call SEAL_SERVICE_START.bat
+call START_SEAL_SERVICE.bat
 python -c "import json;p='trader_config.json';c=json.load(open(p));c['armed']=True;json.dump(c,open(p,'w'),indent=2);print('  armed: true  (your click)')"
 echo. >> trader_log.txt
 echo ==== %DATE% %TIME%  FUTURE (one click) ==== >> trader_log.txt

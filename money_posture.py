@@ -363,23 +363,34 @@ def main() -> int:
 
     print()
     print("  " + "-" * 62)
+    if verr or undeclared:
+        # ORDER MATTERS, AND IT WAS WRONG UNTIL 2026-09-07. This check used to
+        # come AFTER the armed check, so an armed trader whose venue layer
+        # could not be read printed "ARMED. Live orders can be booked within
+        # the bounds above" and returned 1 -- asserting bounds this checker had
+        # just failed to read. Being unable to see the guarantee is a statement
+        # about what was measured, and it outranks any statement about what
+        # was found. Armed AND unreadable is the worst combination available,
+        # not a milder one. test_v2_venue_guarantee P4/P6 caught this the day
+        # the trader was first armed.
+        print("  COULD NOT DETERMINE. armed=%s and the halt file is %s."
+              % (armed, "present" if halted else "absent"))
+        if armed and not halted:
+            print("  This is the ARMED case with an unreadable venue layer, which")
+            print("  is the worst of the two and is why it is reported first.")
+        else:
+            print("  No order is being booked in this state.")
+        print("  The venue layer is only partly visible (%s),"
+              % (verr or "undeclared dry run: " + ", ".join(undeclared)))
+        print("  and a checker that reports a guarantee it did not read is the")
+        print("  failure this file exists to catch. Exit 2, never read as 0.")
+        return 2
     if armed and not halted:
         print("  ARMED. Live orders can be booked within the bounds above.")
         print("  That is a legitimate state to be in, and it is NOT the state")
         print("  CONSTITUTION.md II.1 describes. If this reads ARMED, that")
         print("  clause needs rewriting before anyone is told otherwise.")
         return 1
-    if verr or undeclared:
-        # The docstring promises exit 2 is never read as 0. A posture this
-        # checker could not fully see is not a posture it can call DISARMED.
-        print("  COULD NOT DETERMINE. armed=%s and the halt file is %s, so no"
-              % (armed, "present" if halted else "absent"))
-        print("  order is being booked -- but the venue layer is only partly")
-        print("  visible (%s), and a checker that reports a"
-              % (verr or "undeclared dry run: " + ", ".join(undeclared)))
-        print("  guarantee it did not read is the failure this file exists to")
-        print("  catch. Exit 2, which is never read as 0.")
-        return 2
     print("  DISARMED. Orders are built and, where the venue offers it, sent")
     print("  to its own dry-run endpoint, which prices and rejects them")
     print("  without booking. Nothing can move funds in this state.")
