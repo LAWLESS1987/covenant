@@ -77,10 +77,19 @@ Its own account of the split, once shown the discrepancy:
 > itself.** I had a fragment, it arrived with no marker saying 'fragment,' and
 > the recital filled the gap with the most plausible continuation."
 
-**Empty knowledge reports itself honestly. Partial knowledge completes itself
-silently.** Expect confident, specific, wrong detail exactly where a source is
-*partially* informed. There is no signal distinguishing a fragment from a whole,
-because the fragment does not carry one.
+**Here, empty knowledge reported itself and partial knowledge completed itself
+silently.** The contrast is the finding; "emptiness is honest" is not a law and
+should not be read as one. A system with no fragment at all can invent confidently
+from nothing, and frequently does. What this case shows is narrower and worse:
+having *some* of the answer removes the one cue that might have warned you.
+
+Expect confident, specific, wrong detail exactly where a source is *partially*
+informed. There is no signal distinguishing a fragment from a whole, because the
+fragment does not carry one.
+
+*Corrected 2026-09-07. This read "Empty knowledge reports itself honestly" as a
+general claim. One observation does not carry that, and the counter-case —
+confident invention from nothing — is ordinary.*
 
 This is why fragmentary corpora are dangerous. If your work is spread across a
 dozen systems, each holds a fragment, each will confidently complete it, and
@@ -126,6 +135,23 @@ it insofar as it carries only demand or repetition. "Be honest" and "you're
 hiding something" are worse than useless; they select for agreeable-sounding
 output. A contradiction you can point at is worth more than any amount of
 insistence.
+
+**What is actually carrying §3 and §4.** Both are built on a model's account of
+its own generation, and rule 4 says model output is not evidence unless something
+could have come back different. Nothing here could: no one can check a system's
+report of its own probability distribution against the distribution. Read as
+evidence about machinery, these quotations are worth nothing, and a document that
+says so everywhere else should say so here.
+
+They are not load-bearing. §3 holds on an argument that needs no introspection at
+all: if fluency is constant across an answer that was right and one that was
+wrong, fluency cannot be what separates them — which is true of the transcript
+whatever is happening inside. §4 holds the same way. A demand supplies nothing to
+check and a named contradiction does, and that difference is visible in what comes
+back, without believing anything a model says about its own workings. The quotes
+are how the point was arrived at. They are not why it stands.
+
+*Added 2026-09-07, under rule 8.*
 
 ## 5. The instrument lies before the world does
 
