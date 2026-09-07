@@ -58,7 +58,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_f5_reserve.py", "test_f6_stuffing.py", "test_f7_caps.py", "test_g12_inflight.py", "test_purge_tool.py", "test_gate_proxy.py", "test_sentinel_gate.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
-                "test_watchdog_outage.py",
+                "test_watchdog_outage.py", "test_sentinels.py",
                 "covenant_quiet.py"]
 
 

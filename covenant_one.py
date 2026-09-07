@@ -293,6 +293,7 @@ SUITES = [
     ("test_r6_contribution.py",           60,  "MONEY"),
     ("test_xrpl_record.py",               60,  "MONEY"),
     ("test_watchdog_outage.py",           90,  "SECURITY"),
+    ("test_sentinels.py",                 60,  "SECURITY"),
     ("test_g12_inflight.py",              60,  "SECURITY"),
     ("test_purge_tool.py",                60,  "SECURITY"),
     ("test_gate_proxy.py",                90,  "SECURITY"),

@@ -1,0 +1,49 @@
+{
+ "_what": "Anchors for covenant_sentinels.py. TRACKED on purpose: they travel with the repository so a stranger who clones it can verify the record without trusting whoever handed it over. Rewriting them is an operator act (`python covenant_sentinels.py --anchor`), never automatic.",
+ "anchored_at": "2026-09-07T12:48:10Z",
+ "documents": {
+  "MY_STRATEGY.md": {
+   "lines": 168,
+   "markers": 0,
+   "sha256": "2bd9a811b345e2bed5a8a6b9cfdd4835406255808cde03cdc059ebd79aec98eb"
+  },
+  "docs/CONSTITUTION.md": {
+   "lines": 330,
+   "markers": 0,
+   "sha256": "3b2a8aa818ad5630cf3d3415865c09fde17e69909d07c5c32ec4dc5dacfce5e0"
+  },
+  "docs/KNOWN_ISSUES.md": {
+   "lines": 950,
+   "markers": 0,
+   "sha256": "38246822decc87fca84e0abb136c994e4109cbdab93d3c3098fd1980290f07b1"
+  },
+  "docs/WHAT_WE_FOUND.md": {
+   "lines": 424,
+   "markers": 4,
+   "sha256": "8ea5af6bcfff94c933b68132ae9f8a4c8e38d07a3c5ec9d0e89433a2e8166055"
+  }
+ },
+ "ledgers": {
+  "docs/KNOWN_ISSUES.md": {
+   "lines_at_anchor": 949,
+   "prefix_sha256": "5bf51177c32befd7108f8154b3b49037aed0bf8211a9f3bc34b34c3abc8ff286"
+  },
+  "ops/DISTILL.md": {
+   "lines_at_anchor": 1541,
+   "prefix_sha256": "eb1cf5671daf4f52c3954d13eee8a4666c1204f80b6f43beba1f9ea8b97dc860"
+  },
+  "ops/NIGHTLY.md": {
+   "lines_at_anchor": 3554,
+   "prefix_sha256": "a12dd141837bda1b9c26cba7b6b9ad8723c7636e708aacc932debc5d75ce6357"
+  },
+  "ops/SELF_EVAL.md": {
+   "lines_at_anchor": 1154,
+   "prefix_sha256": "180b2e6749faa94ffc7d84288fbf7c05f0381fb2cace2973a10d99147556b5f8"
+  },
+  "ops/verdicts.jsonl": {
+   "lines_at_anchor": 3464,
+   "prefix_sha256": "cab5af044235a554f50e9967c749c89147f2d3deb2b4c0f0e3def2f198a43157"
+  }
+ },
+ "prefix_lines": 200
+}
