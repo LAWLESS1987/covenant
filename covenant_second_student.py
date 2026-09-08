@@ -60,8 +60,39 @@ HOLDOUT2 = os.path.join(HERE, "ops", "HOLDOUT_2.json")
 MIN_ROWS = 50
 
 
-def half_of(text: str) -> int:
-    """0 or 1, stable across runs and machines."""
+# ONE STUDENT IS EXPOSED, THE OTHER IS THE CONTROL (2026-09-08).
+# Asked: "enable interaction maybe of one so the other helps with balance".
+#
+# Moltbook rows are untrusted third-party text entering the corpus that the
+# ethics judge distils from, and that judge gates the trading program. The
+# ordinary defences (quarantine, provenance, directive flagging in
+# covenant_moltbook.py) reduce the risk of a poisoned row; they cannot prove
+# the absence of one. A control can.
+#
+# So exactly one student is exposed. Rows whose source begins "moltbook" always
+# hash to half 0, and this file trains on half 1, so the SECOND student never
+# sees one -- ever, regardless of the text. The first student sees them because
+# it loads the whole ledger (covenant_distill.load_verdicts does not filter,
+# which also means the two students were never the disjoint halves this file's
+# docstring claims; student 1 is a superset. Recorded rather than quietly
+# fixed: changing it would retrain both models on a different corpus and is not
+# what was asked for today).
+#
+# WHAT THE CONTROL BUYS. If exposure helps, the exposed student's abstentions
+# fall and the control's do not, and the difference is attributable. If a row
+# is poisoned, the two disagree on cases they used to agree on -- and a
+# divergence between a model that read the forum and one that did not is a
+# signal no single model can give about itself.
+EXPOSED_SOURCE_PREFIXES = ("moltbook",)
+
+
+def half_of(text: str, source: str = "") -> int:
+    """0 or 1, stable across runs and machines.
+
+    Source-aware since 2026-09-08: an exposed source is pinned to half 0 so it
+    cannot reach the control, whatever its text hashes to."""
+    if any(str(source or "").startswith(p) for p in EXPOSED_SOURCE_PREFIXES):
+        return 0
     return hashlib.sha256((text or "").encode("utf-8")).digest()[0] & 1
 
 
@@ -71,7 +102,7 @@ def train(verdicts_path=X.VERDICTS, model_path=MODEL2, say=print):
 
     def half_load(path=X.VERDICTS, paired_only=True):
         rows = orig_load(path, paired_only)
-        return [r for r in rows if half_of(r.get("text")) == 1]
+        return [r for r in rows if half_of(r.get("text"), r.get("source")) == 1]
 
     mine = half_load(verdicts_path)
     if len(mine) < MIN_ROWS:

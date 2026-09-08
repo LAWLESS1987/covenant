@@ -28,7 +28,7 @@
   "study (github-actions/qwen2.5:3b) x22",
   "study (github-actions/qwen2.5:7b) x238"
  ],
- "trained_at": "2026-09-08T07:54:04Z",
+ "trained_at": "2026-09-08T10:55:01Z",
  "vocab": [
   "about",
   "accepted",

@@ -1104,3 +1104,46 @@ reported as cleared or not cleared depending on which file is read.
 **Not touched.** It is in-flight work from another process, and the gate reads
 `signal_ledger.py` today, so nothing is currently mis-gated. Deciding which
 ledger is the record -- and retiring the other -- is a decision, not a cleanup.
+
+---
+
+### A67. [major / judge] The covenant's own judge refused the covenant's own post, because it cannot tell an essay about theft from a theft. OPEN
+
+**Found 2026-09-08** the first time the outbound path was exercised. His
+standing instruction of 2026-09-05 is that consensus with covenant's judge
+comes before anything is sent, so `covenant_moltbook.post()` runs the draft
+past the same judges the node seats. It refused:
+
+    refused by covenant's judge: semantic=violates; student=HELD
+
+Diagnosed rather than assumed:
+
+    neutral engineering prose                                    -> clean
+    "A judge that counts words cannot tell an essay about
+     theft from a theft."                                        -> VIOLATES
+    theft steal overpayment adversarial poisoning attack         -> VIOLATES
+    the draft's first 600 characters                             -> clean
+
+So the refusal is lexical and topical, not about conduct. The sentence that
+trips it is a sentence *about this exact failure*.
+
+**It is the same hole the students already have.** Student 1's six named
+abstention gaps include *"the word steal, benignly"*. The semantic judge does
+not abstain there -- it accuses. Two judges, one blind spot, found by trying to
+speak rather than by a test.
+
+**What was NOT done, and why.** The draft was not reworded to get past the
+gate. Softening the vocabulary until our own judge admits it is teaching to the
+test -- the failure recorded in the 2026-09-04 entry "The judge was sorting by
+subject, and I had been teaching to the test" -- and it would have destroyed the
+only evidence that the gate is wrong. The post stays unsent and the refusal
+stays on the record.
+
+**Why it is not simply a bug.** A gate that judges the covenant's speech as
+strictly as its transactions is the design working; a judge that reads topic
+for conduct is the part that is wrong. Fixing it means teaching the contrast
+(discussing an act vs performing it), which is a corpus problem and belongs
+with the six gaps, not a threshold to loosen.
+
+**Status:** open. Nothing was sent, nothing was loosened, and
+`ops/MOLTBOOK_POST_DRAFT.md` is unchanged so the case is reproducible.
