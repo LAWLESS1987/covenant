@@ -69,16 +69,39 @@ def main():
     # fifty-percent rule on the one symbol exempt from it would be measuring
     # nothing. That substitution is the reason these checks exist: to make sure
     # the exemption is real and not an artefact of changing the example.
-    check("H1 no part of a hold-only asset may be sold, whatever the baseline says",
+    check("H1 at the frozen floor nothing of a hold-only asset is sellable "
+          "(100 held against a 100 baseline)",
           G.ReserveFloor.sellable(state(100.0, 100.0, "XRP"), "XRP") == 0.0)
-    check("H2 ...and the guard refuses rather than trimming",
+    # H1b IS THE 2026-09-07 RULE. "hold the current amount able to add and use
+    # for trading": the floor is the whole baseline rather than half of it, so
+    # what is bought ABOVE the floor is tradeable like any other asset. Before
+    # this date sellable_units returned a flat 0.0 for these symbols and the
+    # 40 units below would have been locked on arrival.
+    check("H1b ...but what is held ABOVE that floor is sellable (140 held "
+          "against a frozen 100 baseline leaves 40)",
+          G.ReserveFloor.sellable(state(140.0, 100.0, "XRP"), "XRP") == 40.0)
+    check("H1c a hold-only asset with NO recorded baseline fails closed at 0, "
+          "not None -- with no floor there is no 'above the floor'",
+          G.sellable_units(140.0, None, "XRP") == 0.0)
+    check("H1d ...while a 50%-reserved asset with no baseline still makes no "
+          "claim either way, so a caller cannot mistake one for the other",
+          G.sellable_units(140.0, None, "XLM") is None)
+    check("H2 ...and at the floor the guard refuses rather than trimming",
           not g.check(state(100.0, 100.0, "XRP"), "XRP").allowed
           and "hold-only" in g.check(state(100.0, 100.0, "XRP"), "XRP").reason)
+    check("H2b ...and above the floor it ALLOWS, because a rule that refused "
+          "here would make 'able to add and use for trading' unreachable",
+          g.check(state(140.0, 100.0, "XRP"), "XRP").allowed)
     check("H3 zero sellable is KNOWN, not unknown -- None means 'no baseline "
           "recorded' and would let a caller fall through to its own default",
           G.ReserveFloor.sellable(state(100.0, 100.0, "XRP"), "XRP") is not None)
-    check("H4 XRP is the hold-only set, and nothing in the program adds to it",
-          G.HOLD_ONLY == ("XRP",))
+    check("H3b the reserved fraction is 1.0 for a hold-only symbol and 0.50 "
+          "for every other, from one function rather than two branches",
+          G.reserved_pct("XRP") == 1.0 and G.reserved_pct("HBAR") == 1.0
+          and G.reserved_pct("LINK") == 1.0 and G.reserved_pct("XLM") == 0.50)
+    check("H4 XRP, HBAR and LINK are the hold-only set (HBAR and LINK added "
+          "2026-09-07), and nothing in the program adds to it",
+          G.HOLD_ONLY == ("XRP", "HBAR", "LINK"))
     src_g = io.open(os.path.join(HERE, "guards.py"), encoding="utf-8").read()
     check("H5 HOLD_ONLY is assigned exactly once -- a second assignment anywhere "
           "would mean a rule that can be widened at runtime",
@@ -148,17 +171,48 @@ def main():
     import covenant_trader as T
     tmp = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
 
-    def pf(units):
-        return {"positions": [{"sym": "XRP", "val": units * 2.0, "px": 2.0, "at": "test"}],
+    def pf(units, sym="XLM"):
+        return {"positions": [{"sym": sym, "val": units * 2.0, "px": 2.0, "at": "test"}],
                 "total": units * 2.0, "cash": 0.0}
 
     base1, _held, _r = T.reserve_baseline(pf(100.0), path=tmp)
     base2, _held, _r = T.reserve_baseline(pf(40.0), path=tmp)     # sold most of it
     base3, _held, _r = T.reserve_baseline(pf(160.0), path=tmp)    # then bought more
     check("P5 a baseline never follows a holding DOWN (100 -> sold to 40 -> baseline still %.8g)"
-          % base2.get("XRP", -1), base1["XRP"] == 100.0 and base2["XRP"] == 100.0, base2)
-    check("P6 ...and it does follow a holding UP, because new coin changes what half means "
-          "(bought to 160 -> baseline %.8g)" % base3.get("XRP", -1), base3["XRP"] == 160.0, base3)
+          % base2.get("XLM", -1), base1["XLM"] == 100.0 and base2["XLM"] == 100.0, base2)
+    check("P6 ...and for a 50%%-reserved asset it does follow a holding UP, because new coin "
+          "changes what half means (bought to 160 -> baseline %.8g)"
+          % base3.get("XLM", -1), base3["XLM"] == 160.0, base3)
+
+    # P7 IS THE OTHER HALF OF THE 2026-09-07 RULE, and it is the one that is
+    # easy to get backwards. For a hold-only symbol the floor must NOT follow a
+    # purchase up: raising it would lift the floor above the coin that was just
+    # bought and lock it on arrival, which is the exact opposite of "able to
+    # add and use for trading".
+    tmp2 = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
+    h1, _hh, _hr = T.reserve_baseline(pf(100.0, "XRP"), path=tmp2)
+    h2, _hh, _hr = T.reserve_baseline(pf(160.0, "XRP"), path=tmp2)   # bought more
+    check("P7 a hold-only baseline is FROZEN and does not follow a purchase up "
+          "(100 -> bought to 160 -> floor still %.8g)" % h2.get("XRP", -1),
+          h1["XRP"] == 100.0 and h2["XRP"] == 100.0, h2)
+    check("P8 ...so the 60 units bought above that frozen floor are tradeable",
+          G.sellable_units(160.0, h2["XRP"], "XRP") == 60.0)
+
+    # P9: reserve_baseline MERGES rather than rebuilding. guards.set_starting_total
+    # writes starting_total_usd into this same file; a fresh dict deleted it, and
+    # the next cycle then re-anchored the buy budget to that day's book -- the
+    # ratchet set_starting_total exists to prevent.
+    import json as _json
+    tmp3 = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
+    T.reserve_baseline(pf(100.0), path=tmp3)
+    d = _json.loads(io.open(tmp3, encoding="utf-8").read())
+    d["starting_total_usd"] = 6899.82
+    io.open(tmp3, "w", encoding="utf-8").write(_json.dumps(d))
+    T.reserve_baseline(pf(100.0, "ADA"), path=tmp3)                  # a new asset: writes
+    d2 = _json.loads(io.open(tmp3, encoding="utf-8").read())
+    check("P9 a later write keeps starting_total_usd instead of erasing it "
+          "(found %r)" % d2.get("starting_total_usd"),
+          d2.get("starting_total_usd") == 6899.82, d2)
 
     # ---- W: what it cannot do at all -------------------------------------
     BANK = re.compile(r"\b(withdraw\w*|payment_method\w*|ach_transfer|wire_transfer|"

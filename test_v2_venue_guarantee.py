@@ -230,8 +230,28 @@ def main():
     check("T1 covenant_trader.py passes live=go_live and nothing else to "
           "place() -- one path, one gate",
           tsrc.count("live=go_live") == 1 and "live=True" not in tsrc)
-    check("T2 go_live is 'no blocker fired', and armed=false is a blocker",
-          "go_live = not bad" in tsrc and 'bad.append("armed=false' in tsrc)
+    # T2 IS BEHAVIOURAL SINCE 2026-09-07, for the reason F5's P5 gives: the
+    # grep version asserted that covenant_trader.py CONTAINED the string
+    # bad.append("armed=false...). preconditions() moved into guards.py that
+    # day -- one implementation, asked by the trader and by
+    # sentinel_witness/seal_service.py -- and the check failed on a file that
+    # had become more consolidated, not less. Reading the prose tests where a
+    # rule is written. Running the code tests whether it holds.
+    import guards as _G
+    _order = {"side": "buy", "usd": 25.0, "sym": "XLM"}
+    _unarmed = _G.preconditions(_order, cfg={}, st={})
+    _armed = _G.preconditions(_order, cfg={"armed": True, "min_sealed_signals": 0,
+                                           "rule5_require_significance": False},
+                              st={"sealed_signals": 0})
+    check("T2 go_live is 'no blocker fired', and armed=false IS a blocker "
+          "-- run, not grepped",
+          "go_live = not bad" in tsrc
+          and any("armed=false" in r for r in _unarmed)
+          and not any("armed=false" in r for r in _armed), (_unarmed, _armed))
+    check("T2b ...and the blocker comes from the ONE implementation both the "
+          "trader and the sentinel ask, not from a copy in either",
+          "_guards.preconditions(" in tsrc
+          and 'bad.append("armed=false' not in tsrc)
     check("T3 the trader iterates all_venues() -- so the third adapter IS in "
           "the daily loop, which is why the documents had to name it",
           "V.all_venues()" in tsrc)

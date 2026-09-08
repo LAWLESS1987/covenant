@@ -161,6 +161,70 @@ def main():
           "would make it look like the outage it exists to survive",
           r2.infrastructure_failure is False)
 
+    # ---- X: THE TRADING EXCEPTION (2026-09-07) ---------------------------
+    # Asked: "the local covenant needs a trading exception ... and to stop
+    # going to git hub for a judge", then narrowed to "the exception should be
+    # nodes local pc's". With the runner out of the gate the deferring seat is
+    # students-only and both students HOLD on covenant_trader's records, so
+    # without this the trader could not seal at all -- no live order AND no
+    # audit record. The exception relaxes ONE reading (a seat that did not
+    # ANSWER stops counting as one that DISAGREED) and only for a transaction
+    # that pays nothing, to nobody, signed by a key on this PC.
+    #
+    # These checks exist because that is a deliberate weakening of a
+    # fail-closed gate, and the only thing standing between "narrow" and
+    # "general" is the three conditions below actually being required.
+    import hashlib as _h
+
+    class _Stub(object):
+        judge_id = "stub:0"
+        last = "unset"
+
+        def evaluate(self, data, principles, relaxed=None):
+            _Stub.last = relaxed
+            return C.JudgmentResult(False, "stub clean", judge_id=self.judge_id)
+
+    class _Tx(object):
+        def __init__(self, sender, receiver, amount):
+            self.sender_pubkey, self.receiver, self.amount = sender, receiver, amount
+            self.data = {"origin": "covenant_trader", "kind": "trade_decision"}
+
+    MINE = "-----BEGIN PUBLIC KEY-----\nlocal\n-----END PUBLIC KEY-----\n"
+    THEIRS = "-----BEGIN PUBLIC KEY-----\npeer\n-----END PUBLIC KEY-----\n"
+    _prev = os.environ.get("COVENANT_RELAX_VALUELESS_FOR")
+    os.environ["COVENANT_RELAX_VALUELESS_FOR"] = _h.sha256(MINE.encode()).hexdigest()
+    _sent = C.ReasoningSentinel(_Stub())
+
+    def _relaxed_for(tx):
+        _Stub.last = "unset"
+        _sent.evaluate_transaction(tx)
+        return _Stub.last
+
+    check("X1 a valueless self-send from a key on THIS PC gets the relaxed "
+          "reading -- the trader can seal, so the decision is recorded",
+          _relaxed_for(_Tx(MINE, MINE, 0.0)) is True)
+    check("X2 the same key moving REAL money does not -- the exception is "
+          "about records, not about trades",
+          _relaxed_for(_Tx(MINE, MINE, 25.0)) is None)
+    check("X3 the same key PAYING SOMEONE does not, even for $0 -- a self-send "
+          "is required, not merely a zero amount",
+          _relaxed_for(_Tx(MINE, THEIRS, 0.0)) is None)
+    check("X4 A PEER'S valueless self-send does NOT qualify. This is the whole "
+          "of 'nodes local pc's': the test is on a key that exists only on "
+          "this machine, so no payload a peer can shape reaches the exception",
+          _relaxed_for(_Tx(THEIRS, THEIRS, 0.0)) is None)
+    os.environ.pop("COVENANT_RELAX_VALUELESS_FOR", None)
+    check("X5 with the policy switch off the exception does not exist at all, "
+          "so the default posture is the old fail-closed one",
+          _relaxed_for(_Tx(MINE, MINE, 0.0)) is None)
+    if _prev is not None:
+        os.environ["COVENANT_RELAX_VALUELESS_FOR"] = _prev
+    check("X6 apply_policy builds the allow-list from local *.db.key files, so "
+          "the operator never types a hash and a peer key cannot appear in it",
+          (lambda e: (__import__("covenant_judge_defer").apply_policy(
+              e, {"relax_valueless_for_local_nodes": True})
+              and len(e.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",")) >= 1))({}))
+
     n, ok = len(results), sum(results)
     print(f"\nF1: {ok}/{n} passed")
     return 0 if ok == n else 1

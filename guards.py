@@ -215,7 +215,42 @@ class CashFloor(Guard):
 # rather than "including at fifty percent". Nothing here may sell any part of
 # it, and no rule in this program can add to this tuple: removing a symbol from
 # it is an operator's edit, in the open, like every other loosening.
-HOLD_ONLY = ("XRP",)
+#
+# REDEFINED 2026-09-07. Asked, in two messages: "everything except hbar
+# chainlink and xrp can be considered available balance for trading", then
+# "hold the current amount able to add and use for trading", confirmed as:
+# today's quantity is a FLOOR, more may be bought, and everything above the
+# floor is tradeable.
+#
+# So these three are no longer "never sellable". They are FULLY RESERVED AT
+# THE BASELINE: reserved_pct is 1.0 of the recorded baseline where every other
+# asset reserves 0.50 of it. Held == baseline (the case today) still means zero
+# sellable, which is why this reads the same from outside until something is
+# added. The difference appears the moment more is bought.
+#
+# AND THE FLOOR DOES NOT FOLLOW A PURCHASE UP. For a 50%-reserved asset,
+# buying more raises the baseline -- half of a bigger holding is a bigger
+# floor, which is the rule that was asked for in September. Applying that here
+# would make "able to add and use for trading" impossible: every coin added
+# would raise the floor above itself and be locked on arrival. So
+# covenant_trader.reserve_baseline() freezes the baseline for these symbols.
+# That is the whole content of "hold the CURRENT amount".
+#
+# WHAT THIS DOES NOT BIND. The operator, who said "unless i choose to sell
+# myself". Every floor in this file constrains the PROGRAM's rules. Nothing
+# here reaches his own hands at the exchange, and nothing should.
+HOLD_ONLY = ("XRP", "HBAR", "LINK")
+
+# The fraction of the BASELINE reserved for a HOLD_ONLY symbol. One, not a
+# half: the whole of what he holds today stays put.
+FULL_RESERVE_PCT = 1.0
+
+
+def reserved_pct(sym, pct=0.50, hold_only=None):
+    """The fraction of `sym`'s baseline that no rule may sell into."""
+    return (FULL_RESERVE_PCT
+            if sym in (HOLD_ONLY if hold_only is None else hold_only)
+            else float(pct))
 
 
 def sellable_units(held, base, sym, pct=0.50, hold_only=None):
@@ -224,11 +259,14 @@ def sellable_units(held, base, sym, pct=0.50, hold_only=None):
     covenant_trader's planner used to compute this inline with its own copy of
     the arithmetic, which is how the per-trade and per-day caps came to be
     enforced in one place and invisible in the other. Both call this now."""
-    if sym in (HOLD_ONLY if hold_only is None else hold_only):
-        return 0.0
+    full = sym in (HOLD_ONLY if hold_only is None else hold_only)
     if base is None or held is None:
-        return None
-    return max(0.0, held - base * float(pct))
+        # A fully-reserved asset with no recorded baseline FAILS CLOSED: with
+        # no floor there is no "above the floor", so nothing of it is sellable.
+        # Zero here is KNOWN and is not None -- None means "no claim either
+        # way" and would let a caller fall through to its own default.
+        return 0.0 if full else None
+    return max(0.0, held - base * reserved_pct(sym, pct, hold_only))
 
 
 class ReserveFloor(Guard):
@@ -267,23 +305,25 @@ class ReserveFloor(Guard):
     def check(self, st, sym=None):
         if sym is None:
             return Verdict(True, self.name, "no symbol named; nothing to reserve")
-        if sym in self.hold_only:
-            return Verdict(False, self.name,
-                           "%s is hold-only: no part of it may be sold by any rule, "
-                           "and it is excluded from the tradeable half" % sym)
+        full = sym in self.hold_only
         base = (st.reserve_baseline or {}).get(sym)
         held = (st.quantities or {}).get(sym)
         if base is None or held is None:
+            if full:
+                return Verdict(False, self.name,
+                               "%s is hold-only and has no recorded baseline, so "
+                               "there is no floor to be above -- refusing" % sym)
             return Verdict(True, self.name,
                            f"{sym}: no baseline recorded, so this guard makes no claim")
-        floor = base * self.pct
+        pct = reserved_pct(sym, self.pct, self.hold_only)
+        floor = base * pct
+        label = "hold-only: 100%% of the %.8g baseline" % base if full else                 "%.0f%% of the %.8g baseline" % (pct * 100, base)
         if held <= floor + 1e-12:
             return Verdict(False, self.name,
                            f"{sym}: {held:.8g} held is at or below the reserved "
-                           f"{floor:.8g} ({self.pct:.0%} of the {base:.8g} baseline) -- "
-                           f"no sell may cross it")
+                           f"{floor:.8g} ({label}) -- no sell may cross it")
         return Verdict(True, self.name,
-                       f"{sym}: {held:.8g} held, {floor:.8g} reserved, "
+                       f"{sym}: {held:.8g} held, {floor:.8g} reserved ({label}), "
                        f"{held - floor:.8g} sellable")
 
     @staticmethod
@@ -291,8 +331,10 @@ class ReserveFloor(Guard):
         """Units that may still be sold without touching the reserve. This is
         what a sizing rule must clamp to -- the check above refuses an order
         that starts below the floor, and this stops one from ending below it.
-        Returns 0 for a hold-only symbol, which is not the same as None: it is
-        known, and it is none."""
+        A hold-only symbol reserves 100% of its baseline rather than 50%, so
+        this returns whatever is held ABOVE that baseline -- zero while the
+        holding is exactly the amount that was frozen, which is not the same as
+        None: it is known, and it is none."""
         return sellable_units((st.quantities or {}).get(sym),
                               (st.reserve_baseline or {}).get(sym),
                               sym, pct, hold_only)
@@ -955,3 +997,177 @@ class GuardStack:
         blocks = [x for x in v if not x.allowed]
         print(f"    -> buying {'ALLOWED' if not blocks else 'BLOCKED by ' + ', '.join(b.guard for b in blocks)}")
         return not blocks
+
+
+# ===========================================================================
+# THE PRECONDITIONS. ONE IMPLEMENTATION, TWO CALLERS.       (2026-09-07)
+#
+# Until today covenant_trader.preconditions() was the only thing that knew
+# what may go live, and it lived in the file that places orders. The other
+# path to a real order -- sentinel_witness/tradeGate.js -> seal_service.py --
+# reached covenant_trader.seal_decision() and nothing else, so it recorded a
+# decision through the ethics gate and then applied NONE of: armed,
+# TRADER_HALT, the per-trade and per-day caps, Rule 5, or the guard stack.
+#
+# That is the same split the caps had before 2026-09-04, when they were
+# enforced in preconditions() and invisible to daily.py -- and it is the same
+# fix: move the rule here, where both callers can ask it, and leave ONE
+# implementation. The trader's copy was deleted in the same commit; a
+# consolidation that leaves the old body behind has not consolidated anything.
+#
+# WHY THIS CAN ONLY TIGHTEN. The answer is built as
+#     base reasons  +  caller-specific reasons          (APPEND ONLY)
+# so a caller may add a reason to refuse and can never remove one. The trader
+# adds nothing and therefore behaves exactly as before. The sentinel went from
+# zero checks to all of them plus two of its own, and there is no expressible
+# way for it to end up more permissive than the trader.
+#
+# WHY guards.py AND NOT covenant_trader.py. covenant_trader imports daily,
+# daily imports guards; guards importing covenant_trader would close the loop.
+# guards.py already repeats CONFIG_PATH and TRADER_STATE for that exact
+# reason, and imports only json/os/time/dataclasses/typing, so this adds
+# nothing to daily.py's dependency cone.
+# ===========================================================================
+
+HALT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "TRADER_HALT")
+
+
+def load_config(path: Optional[str] = None) -> dict:
+    """The whole trader config as a dict. Unreadable or malformed reads as {},
+    which makes `armed` false -- the posture allow_fiat_buys() already takes."""
+    try:
+        with open(path or CONFIG_PATH, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        return cfg if isinstance(cfg, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def load_trader_state(path: Optional[str] = None):
+    """covenant_trader's state, or None if it exists and will not parse.
+
+    A MISSING FILE IS A KNOWN EMPTY STATE, not an unknown one -- the rule
+    orders_today_now() already applies, for the same reason: the trader writes
+    this the first time it runs, and treating "never run" as unknown would
+    block every order until one had already been placed."""
+    p = path or TRADER_STATE
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as fh:
+            st = json.load(fh)
+        return st if isinstance(st, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def preconditions(order, cfg=None, st=None, sealed_ok=None, guard_blocks=None,
+                  caller="trader", config_path=None, state_path=None, now=None):
+    """Every reason THIS order may not go live. Empty list means clear.
+
+    order        {"side": "buy"|"sell", "usd": float, "sym": str}
+    cfg / st     loaded from disk when None
+    sealed_ok    True  -- already sealed and admitted
+                 False -- sealing was attempted and refused
+                 None  -- THE CALLER SEALS AFTER THIS AND ANDS THE ANSWER
+                          ITSELF. Only False produces the "not sealed" reason,
+                          because a caller that gates before it seals would
+                          otherwise deadlock: seal_required is true and at gate
+                          time the seal has not happened. A caller that passes
+                          None owes the conjunction. seal_service.py does NOT
+                          use this -- it seals first and passes the real
+                          answer -- but the reading has to exist, or the order
+                          of the two steps becomes load-bearing.
+    guard_blocks the guard stack's blocking reasons, or None for "the guard
+                 stack could not be evaluated" -- which is NOT the same as [].
+    caller       "trader" or "sentinel". Adds reasons, never removes them.
+    """
+    bad = []
+    cfg = load_config(config_path) if cfg is None else cfg
+    if st is None:
+        st = load_trader_state(state_path)
+    if st is None:
+        bad.append("trader state exists but will not parse -- the day's order "
+                   "count and Rule 5 cannot be read, so nothing may go live")
+        st = {}
+
+    if not cfg.get("armed"):
+        bad.append("armed=false in trader_config.json")
+    if os.path.exists(HALT):
+        bad.append("TRADER_HALT file present")
+
+    # THE CAPS ARE GUARDS, and this asks them rather than repeating their
+    # arithmetic. A number absent from cfg falls back through caps() to the
+    # shipped default, so a caller handing in a partial config still gets a
+    # cap rather than none.
+    c = caps(config_path)
+
+    def _n(key):
+        v = cfg.get(key)
+        return v if isinstance(v, (int, float)) else c[key]
+
+    gs = State(equity_now=0.0, equity_peak=0.0, equity_start_of_day=0.0,
+               closed_trades=[], last_sold={}, positions={}, cash=0.0,
+               orders_today=orders_today_from(st, now))
+    per_trade = PerTradeCap(max_usd=_n("max_order_usd"), min_usd=_n("min_order_usd"),
+                            max_orders=_n("max_orders_per_day"),
+                            max_notional=_n("max_daily_notional_usd"))
+    per_day = PerDayCap(max_orders=_n("max_orders_per_day"),
+                        max_notional=_n("max_daily_notional_usd"))
+    for v in (per_day.check(gs), per_trade.check(gs)):
+        if not v.allowed:
+            bad.append(f"{v.guard}: {v.reason}")
+    room = per_trade.largest_allowed(gs)
+    usd = float(order.get("usd") or 0.0)
+    if usd < _n("min_order_usd"):
+        bad.append(f"${usd:,.2f} under min_order_usd ${_n('min_order_usd'):,.2f}")
+    elif room is not None and room > 0 and usd > room + 1e-9:
+        # `room > 0` on purpose. When the day is fully used the two guards
+        # above have already said so, in their own words, with their own
+        # numbers; adding "over the $0.00 placeable now" makes one condition
+        # read as three problems.
+        bad.append(f"${usd:,.2f} over the ${room:,.2f} placeable now "
+                   f"(order cap ${_n('max_order_usd'):,.2f}, daily notional "
+                   f"cap ${_n('max_daily_notional_usd'):,.2f})")
+
+    if cfg.get("seal_required") and sealed_ok is False:
+        bad.append("decision not sealed to the chain")
+
+    min_sig = cfg.get("min_sealed_signals", 0)
+    if st.get("sealed_signals", 0) < min_sig:
+        bad.append(f"Rule 5: {st.get('sealed_signals', 0)} sealed signals on "
+                   f"record, need {min_sig}")
+    elif cfg.get("rule5_require_significance", True):
+        r5 = st.get("rule5") or {}
+        # The count is met; the record must also mean something. A losing or
+        # luck-shaped record with 30 rows is the answer Rule 5 exists to give,
+        # not a licence.
+        if not r5.get("clears"):
+            bad.append(f"Rule 5: {r5.get('why') or 'no scored record in state'}")
+
+    # Guards gate BUYS only -- a guard never stops a risk-reducing sale.
+    if guard_blocks and order.get("side") == "buy":
+        bad.append("guards: " + ", ".join(guard_blocks))
+
+    return bad + _caller_reasons(caller, order, guard_blocks)
+
+
+def _caller_reasons(caller, order, guard_blocks):
+    """APPEND ONLY. A caller may add a reason to refuse; it can never remove
+    one. That is what makes the sentinel provably no looser than the trader."""
+    if caller != "sentinel":
+        return []
+    out = []
+    side = order.get("side")
+    # The sentinel answers about a proposal from an app with no portfolio view,
+    # so the two portfolio-dependent rules cannot be evaluated here. They FAIL
+    # CLOSED rather than being skipped -- skipping them is precisely what this
+    # consolidation exists to stop.
+    if side == "buy" and guard_blocks is None:
+        out.append("sentinel: no portfolio was supplied, so the buy-side guards "
+                   "(cash floor, concentration, budgets) could not be evaluated")
+    if side == "sell":
+        out.append("sentinel: a sell cannot be admitted here -- the reserve floor "
+                   "is enforced on the QUANTITY by covenant_trader.plan(), and "
+                   "this path has no holdings or baseline to clamp against")
+    return out

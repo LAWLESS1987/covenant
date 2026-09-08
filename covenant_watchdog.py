@@ -899,15 +899,32 @@ def start_node(node):
     # read here so a node this watchdog revives is wired like one the operator
     # starts (the runner applies the same file again; this only keeps the env
     # honest for anyone reading it). Disclosure of a decision, not a decision.
+    # ONE IMPLEMENTATION (2026-09-07). This used to read the policy file itself
+    # and apply the two keys it happened to know about. That is fine until the
+    # policy grows a third: COVENANT_RELAX_VALUELESS_FOR (the trading
+    # exception) was added to covenant_judge_defer.apply_policy and this copy
+    # did not know it existed, so a node the WATCHDOG revived would have had
+    # the GitHub runner switched off WITHOUT the exception that makes that
+    # survivable -- every trader seal failing closed, and only on the revival
+    # path, which is the path nobody watches. That is precisely the hazard the
+    # comment above names. So this asks the same function the operator's
+    # runner asks, and a fourth key will reach both without another edit.
     try:
-        with open(os.path.join(HERE, "ops", "quorum_policy.json"), encoding="utf-8") as _fh:
-            _pol = json.load(_fh)
-        if _pol.get("providers"):
-            env["COVENANT_JUDGE_PROVIDERS"] = str(_pol["providers"])
-        if _pol.get("silence_is_not_dissent") is True:
-            env["COVENANT_SILENCE_IS_NOT_DISSENT"] = "1"
-    except (OSError, ValueError, AttributeError):
-        pass
+        import covenant_judge_defer as _defer
+        _defer.apply_policy(env)
+    except Exception:                                             # noqa: BLE001
+        # The watchdog must revive a node even if that import is broken. Fall
+        # back to the two keys, and leave the exception OFF -- the strict
+        # posture, which refuses rather than trades.
+        try:
+            with open(os.path.join(HERE, "ops", "quorum_policy.json"), encoding="utf-8") as _fh:
+                _pol = json.load(_fh)
+            if _pol.get("providers"):
+                env["COVENANT_JUDGE_PROVIDERS"] = str(_pol["providers"])
+            if _pol.get("silence_is_not_dissent") is True:
+                env["COVENANT_SILENCE_IS_NOT_DISSENT"] = "1"
+        except (OSError, ValueError, AttributeError):
+            pass
     env.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
     os.makedirs(LOGDIR, exist_ok=True)
     out = open(os.path.join(LOGDIR, f"node{node['id']}.log"), "a",

@@ -77,6 +77,35 @@ def main():
     check("Q3 the shipped policy file parses and names its decider",
           bool(D.load_policy().get("decided_by")) and D.load_policy().get("providers") == "deferring,semantic")
 
+    # Q4-Q6 (2026-09-07). THE REVIVAL PATH MUST GET THE SAME GATE.
+    # covenant_watchdog.start_node builds a node's environment when it revives
+    # one, and it used to read ops/quorum_policy.json itself and apply the two
+    # keys it happened to know about. When the trading exception added a THIRD
+    # key (COVENANT_RELAX_VALUELESS_FOR), that copy did not know it existed --
+    # so a watchdog-revived node would have had the GitHub runner switched off
+    # WITHOUT the exception that makes that survivable, and every trader seal
+    # would have failed closed. Only on the revival path, which is the path
+    # nobody watches. The file's own comment names this hazard: "a node the
+    # watchdog revives must judge with the same quorum a node the operator
+    # starts does, or a restart silently changes the gate."
+    env = {}
+    D.apply_policy(env, {"relax_valueless_for_local_nodes": True})
+    check("Q4 the exception key is filled with local node key HASHES, so the "
+          "operator never types one and no secret enters the environment",
+          len(env.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",")) >= 1
+          and all(len(h) == 64 and all(c in "0123456789abcdef" for c in h)
+                  for h in env["COVENANT_RELAX_VALUELESS_FOR"].split(",")))
+    env2 = {"COVENANT_RELAX_VALUELESS_FOR": "stale"}
+    D.apply_policy(env2, {"providers": "deferring,semantic"})
+    check("Q5 ...and it is REMOVED when the policy does not ask for it, so a "
+          "stale value cannot keep an exception alive after it is switched off",
+          "COVENANT_RELAX_VALUELESS_FOR" not in env2)
+    _wd = open(os.path.join(HERE, "covenant_watchdog.py"), encoding="utf-8").read()
+    check("Q6 the watchdog DELEGATES to apply_policy instead of keeping its own "
+          "list of policy keys -- one implementation, so a fourth key reaches "
+          "the revival path without another edit",
+          "_defer.apply_policy(env)" in _wd)
+
     # ---- L: the ledger --------------------------------------------------
     R = cov.JudgmentResult
     check("L1 an answered CLEAN is written", D.record_verdict({"message": "a gift"}, R(False, "ok"), "t", "test", ledger))

@@ -63,7 +63,37 @@ preference.
 Most systems govern their users. The harder and rarer thing is a system that
 governs whoever runs it. These are the constraints on the operator:
 
-1. **No trades placed by automation. No credentials requested or stored.**
+1. **No credentials requested or stored.** Unchanged and absolute: no API
+   secret, no exchange key, no recovery phrase, ever, by anything.
+
+   **Automated placement — AMENDED 2026-09-07. See section III.** This clause
+   read *"No trades placed by automation"* from the founding text until
+   2026-09-07. It no longer does, and the honest reason for the change is that
+   the sentence had already stopped being true: the owner armed
+   `covenant_trader.py` on **2026-09-06 at 13:42 UTC** (`trader_config.json`,
+   `armed_by: FUTURE.bat`), and on 2026-09-07, asked directly whether to leave
+   it armed or disarm it, chose to leave it armed and to have the approval
+   recorded. A document describing a state the machine left two days earlier is
+   not a constraint. It is the reassurance this section exists to refuse.
+
+   **Now permitted:** automated placement by `covenant_trader.py`, and by
+   nothing else.
+
+   **Still forbidden, and not relaxed by this amendment:** credentials, as
+   above. Any placement outside the caps and gates below. Any agent widening
+   its own scope (clause 3). Any run editing this document or
+   `docs/IMPROVEMENT_LOG.md` §0 — the amendment above was made by the operator,
+   at his instruction, and a run may not make the next one.
+
+   **The bounds, every one of which remains a hard constraint:** a halt file;
+   **$25** per order; **$50** per day; **two** orders per day; **$100** per
+   week of fiat; a 20% position cap and a 10% cash floor; the decision sealed
+   to the chain before the outcome exists; and **Rule 5** — no live order until
+   `signal_ledger.py` records **30 settled signals** whose mean return after
+   costs is positive at p ≤ 0.05. At the time of this amendment Rule 5 stood at
+   **1 of 30** and the cash floor was blocking, so the trader had placed
+   nothing and could not. **Approval is not evidence: this amendment does not
+   clear Rule 5 and must never be read as clearing it.**
 
    **What that promise is holding back, disclosed — because a commitment you
    cannot see the shape of is not a commitment, it is a reassurance.** The
@@ -86,14 +116,19 @@ governs whoever runs it. These are the constraints on the operator:
    That is a weaker guarantee in the same shape, and it is stated here because
    the first version of this paragraph — and of the checker below — described
    two venues and one uniform guarantee, the day after the third was added.
-   The trader is disarmed (`armed: false`), and even armed it is bounded by a
-   halt file, a $25 per-order cap, a $50 daily cap, two orders per day, and a
-   requirement that the decision be sealed to the chain first.
+   **The trader is ARMED** (`armed: true`, set 2026-09-06 13:42 UTC), on an
+   hourly scheduled task, bounded by the halt file, the $25 per-order cap, the
+   $50 daily cap, two orders per day, the sealed-decision requirement and
+   Rule 5. It has still booked nothing — but that is now because the gates
+   block it, not because it is switched off, and those are different
+   guarantees. Do not read the paragraph above as the older, stronger one.
 
-   Both easy readings are wrong. *"It cannot trade"* is false — the code, the
-   credentials path and the schedule are all present. *"It is trading"* is also
-   false — nothing has ever been booked. Clause 1 is what stands between those
-   two, and it is honoured today.
+   Three readings are wrong now, where two were before. *"It cannot trade"*
+   is false: the code, the credentials path and the schedule are all present
+   and it is armed. *"It is trading"* is false: nothing has ever been booked.
+   And *"the rule against automation still holds"* is false as of this
+   amendment. What holds is narrower and is stated above — bounded, gated,
+   owner-approved automated placement, with the gates unmoved.
 
    Do not take that on trust. It is a live state that a single config flag
    changes, so it is reported by a checker rather than asserted by a document:
@@ -105,8 +140,10 @@ governs whoever runs it. These are the constraints on the operator:
    It reads no key, places nothing, and arms nothing. It counts the adapters
    from `venues.py` rather than naming them, and each adapter must declare
    what its dry run reaches; one that declares nothing makes the checker exit
-   2, which is never read as 0. If it ever prints **ARMED**, clause 1 is being
-   broken and this section is out of date. `test_g2_promised_commands.py`
+   2, which is never read as 0. It prints **ARMED**, and since 2026-09-07 that
+   is the disclosed state rather than a breach: what now makes this section out
+   of date is the checker printing a cap, a gate or a schedule that disagrees
+   with the bounds listed in clause 1. `test_g2_promised_commands.py`
    checks that this command exists and that this paragraph names every
    adapter the code holds — because on 2026-09-02 the checker was found
    deleted from disk while four documents went on promising it.
@@ -155,6 +192,35 @@ no single party can satisfy alone: `k` of `n`, with `k ≥ 2` and no `k` drawn
 from parties answering to the same person. Until then, this clause describes an
 intention rather than a mechanism, and saying so is more use to you than
 pretending otherwise.
+
+### Record of amendments
+
+Amendment in silence is what this section forbids, so each one is listed here
+with its date, its author, and what it cost.
+
+**2026-09-07 — clause 1, automated placement.** Author: L (operator), by
+explicit instruction, twice, after the conflict was put to him in these terms.
+Drafted into this file by a Claude session; the decision was not the session's.
+Full record: `docs/OWNER_DECISION_2026-09-07.md`.
+
+*What this amendment did not do, stated because a partial amendment is the
+easiest kind to misread:*
+
+- **The anchored hash is unchanged.** `CONSTITUTION_ANCHOR.json` covers three
+  blocks — two in `CONTRIBUTING.md`, one in `docs/SUCCESSION.md` — and this
+  file is not among them. `python constitution.py verify` reported
+  `0f0b3162… UNCHANGED` both before and after this edit.
+- **The authoritative text was not amended.** Section II states that the
+  authoritative text of clauses 1-3 and 6 lives in `CONTRIBUTING.md`. Its
+  protected block *What never changes* still reads **"No trades placed by
+  automation"**, and still hashes to `8a761863…`.
+
+So this document and the hashed rule it restates now **disagree** about clause
+1. That is recorded rather than hidden, and it is the operator's to resolve:
+amend the `CONTRIBUTING.md` block and re-anchor with `python constitution.py
+hash`, or narrow this amendment back to match it. No run may do either — that
+block is inside `docs/IMPROVEMENT_LOG.md` §0's reach, and §0 binds runs
+absolutely whatever the operator has approved for the trader.
 
 ## IV. What anyone governed by this is owed
 

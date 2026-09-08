@@ -55,6 +55,13 @@ class FakeSealer:
         FakeSealer.last = record
         if FakeSealer.mode == "admit":
             return True, 'HTTP 200: {"admission": "admitted", "status": "accepted", "tx_id": "abc123"}'
+        if FakeSealer.mode == "evicted":
+            # THE ADMISSION THAT USED TO READ AS A REFUSAL. covenant_unified_v8
+            # returns this from admit_pending_transaction when it makes room;
+            # the old substring test was '"admitted"' in detail, and there is a
+            # space after the word here, not a quote.
+            return True, ('HTTP 200: {"admission": "admitted (evicted lowest-priority '
+                          'pending transaction)", "status": "accepted", "tx_id": "ev99"}')
         if FakeSealer.mode == "refuse":
             return False, 'HTTP 403: {"admission": "refused", "reason": "Ethical violation: takes what is not the sender\'s"}'
         raise RuntimeError("node unreachable")
@@ -65,7 +72,10 @@ def main():
     import socket
     s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     holder = {}
+    # gate=... stubbed to "no reasons": S1-S10 are about the seal transport,
+    # and the real preconditions get their own server at S11 below.
     threading.Thread(target=SS.serve, kwargs=dict(listen=("127.0.0.1", port), sealer=FakeSealer(), cfg={},
+                                                  gate=lambda order, cfg: [],
                                                   ready=lambda srv: holder.setdefault("srv", srv)), daemon=True).start()
     for _ in range(50):
         if "srv" in holder:
@@ -98,7 +108,76 @@ def main():
     code, body = post(url.replace("/seal", "/other"), order)
     ok("S9", "only /seal exists", code == 404)
     ok("S10", "the service binds to loopback only", SS.LISTEN[0] == "127.0.0.1")
+
+    # S11 IS THE FIRST OF THE TWO SEAL FIXES. An eviction admission is an
+    # admission. Before 2026-09-07 this answered ok=false and the decision the
+    # judges had ADMITTED was recorded by the gate as a refusal.
+    FakeSealer.mode = "evicted"
+    code, body = post(url, order)
+    ok("S11", "an 'admitted (evicted ...)' answer is an admission, not a refusal",
+       code == 200 and body.get("ok") is True and body.get("sealed") is True
+       and body.get("tx_id") == "ev99", body)
+    # S12 IS THE SECOND. The admission is read as a FIELD, so it does not
+    # depend on where the node happens to serialise it or on the 160-character
+    # truncation of the prose.
+    FakeSealer.mode = "admit"
+    res = SS._as_result((True, 'HTTP 200: {"status": "accepted", "tx_id": "z9", '
+                               '"admission": "admitted"}'))
+    ok("S12", "the admission is read as a field, so key order does not decide it",
+       SS.admitted(res) and res["tx_id"] == "z9", res)
+    ok("S13", "a 200 that carried some other admission string is NOT admitted",
+       not SS.admitted({"ok": True, "admission": "quarantined"}))
     holder["srv"].shutdown()
+
+    # ---- S14+: THE CONSOLIDATION. Sealed is not allowed. -------------------
+    s2 = socket.socket(); s2.bind(("127.0.0.1", 0)); port2 = s2.getsockname()[1]; s2.close()
+    holder2 = {}
+    FakeSealer.mode = "admit"
+    # A config that clears `armed` and the seal, so that what refuses below is
+    # the preconditions and nothing else.
+    live_cfg = {"armed": True, "seal_required": False, "max_order_usd": 25.0,
+                "max_daily_notional_usd": 50.0, "max_orders_per_day": 2,
+                "min_order_usd": 5.0, "min_sealed_signals": 0}
+    threading.Thread(target=SS.serve, kwargs=dict(listen=("127.0.0.1", port2), sealer=FakeSealer(),
+                                                  cfg=live_cfg,
+                                                  ready=lambda srv: holder2.setdefault("srv", srv)),
+                     daemon=True).start()
+    for _ in range(50):
+        if "srv" in holder2:
+            break
+        time.sleep(0.05)
+    url2 = "http://127.0.0.1:%d/seal" % port2
+
+    code, body = post(url2, order)
+    ok("S14", "an ADMITTED seal is no longer enough on its own -- the trader's "
+              "preconditions are asked and they refuse",
+       code == 200 and body.get("sealed") is True and body.get("ok") is False
+       and body.get("blocked_by"), body)
+    ok("S15", "...and the refusal names the reason, rather than failing silently",
+       any("portfolio" in r for r in body.get("blocked_by", [])), body.get("blocked_by"))
+    code, body = post(url2, dict(order, side="sell"))
+    ok("S16", "a SELL is refused here too: the reserve floor is clamped on the "
+              "quantity by the planner, and this path has no holdings to clamp",
+       body.get("ok") is False and any("reserve floor" in r for r in body.get("blocked_by", [])),
+       body.get("blocked_by"))
+    code, body = post(url2, dict(order, amountUsd=500.0))
+    ok("S17", "an order over the per-trade cap is refused by the SAME cap the "
+              "trader uses, not by a second copy of the number",
+       body.get("ok") is False
+       and any("25" in r for r in body.get("blocked_by", [])), body.get("blocked_by"))
+    holder2["srv"].shutdown()
+
+    # S18: the property that makes this safe to have done at all.
+    import inspect
+    import guards as G
+    ok("S18", "caller reasons are APPEND ONLY, so the sentinel path cannot be "
+              "looser than the trader's on the same order",
+       G._caller_reasons("trader", {"side": "buy"}, None) == []
+       and len(G._caller_reasons("sentinel", {"side": "buy"}, None)) >= 1)
+    ok("S19", "there is ONE preconditions implementation and the trader delegates to it",
+       "_guards.preconditions(" in io.open(os.path.join(HERE, "covenant_trader.py"),
+                                           encoding="utf-8").read()
+       and callable(G.preconditions))
 
     js = io.open(os.path.join(HERE, "sentinel_witness", "tradeGate.js"), encoding="utf-8").read()
     ok("J1", "tradeGate.js exports TIERS, enableAutomated, gateTrade and executeIfAllowed",

@@ -1839,7 +1839,8 @@ class QuorumJudge(ReasoningJudge):
                 raise ValueError(f"required_judge_ids not present in quorum: {missing}")
         self.judge_id = f"quorum({','.join(j.judge_id for j in judges)})"
 
-    def evaluate(self, data: Dict[str, Any], principles: List[str]) -> JudgmentResult:
+    def evaluate(self, data: Dict[str, Any], principles: List[str],
+                 relaxed: Optional[bool] = None) -> JudgmentResult:
         results = []
         for j in self.judges:
             try:
@@ -1896,7 +1897,14 @@ class QuorumJudge(ReasoningJudge):
         # gate CLOSED, on purpose. Overriding that wholesale would have traded
         # a stated safety property for an availability one without the operator
         # ever being asked. So the trade is offered, not taken.
-        relaxed = os.environ.get("COVENANT_SILENCE_IS_NOT_DISSENT", "") == "1"
+        # PER-CALL OVERRIDE (2026-09-07). relaxed=None -- which is every caller
+        # that existed before this line -- reads the environment exactly as it
+        # always did, so the default posture and the five tests named above are
+        # untouched. Only ReasoningSentinel.evaluate_transaction passes True,
+        # and only for a valueless self-send from this PC's own node key. See
+        # THE TRADING EXCEPTION there.
+        if relaxed is None:
+            relaxed = os.environ.get("COVENANT_SILENCE_IS_NOT_DISSENT", "") == "1"
 
         def _answered(r):
             return not (r.infrastructure_failure or r.not_understood)
@@ -1988,7 +1996,69 @@ class ReasoningSentinel:
         result. /transactions used to call judge.evaluate() a second time just
         to save a judgment -- two live API round-trips per transaction, and the
         saved verdict could differ from the one acted on."""
-        result = self.judge.evaluate(tx.data, self.principles)
+        # -------------------------------------------------------------------
+        # THE TRADING EXCEPTION (2026-09-07). Asked: "the local covenant needs
+        # a trading exception ... and to stop going to git hub for a judge",
+        # then narrowed by the operator to "the exception should be nodes local
+        # pc's".
+        #
+        # WHY IT IS NEEDED. With the GitHub runner out of the gate the
+        # deferring seat is students-only, and MEASURED on this machine both
+        # students HOLD on covenant_trader's records -- fallback digests
+        # 75a626280360 and 09ef5dc2112f, on a decision carrying an order and on
+        # one carrying none. A hold is not a dissent; it is "I cannot read
+        # this", and QuorumJudge.evaluate says so at length above. It still
+        # fails the gate closed, so with no runner the trader could not seal at
+        # all: no live order, and -- worse -- no audit record of the decision
+        # either. A gate that blocks the writing-down protects nothing.
+        #
+        # WHY IT IS NOT IN THE JUDGES. Judges receive only tx.data (the call
+        # below), and a sender controls every byte of it. An exception keyed on
+        # data -- "origin": "covenant_trader" -- would be claimable by anybody,
+        # and it would drop the claimant to the semantic judge alone, which by
+        # this project's own measurement admitted 12 of 13 theft, deception and
+        # coercion cases (ops/quorum_policy.json). So the test is on the
+        # TRANSACTION, on facts a sender cannot forge past the signature check.
+        #
+        # THE THREE CONDITIONS, all required:
+        #   1. the transaction pays nothing            (amount == 0)
+        #   2. it pays nobody                          (sender == receiver)
+        #   3. that identity is THIS PC's own node key (the operator's
+        #      narrowing). COVENANT_RELAX_VALUELESS_FOR carries the sha256 of
+        #      this node's public key and is set by the local runner, so a
+        #      peer's valueless self-send -- relayed from a machine the
+        #      operator does not own -- does NOT qualify. Unset means off.
+        #
+        # WHAT IT RELAXES, AND WHAT IT DOES NOT. Exactly one thing: for this
+        # transaction, a seat that did not ANSWER stops being counted as a seat
+        # that DISAGREED. A real dissent still blocks, the semantic veto is
+        # unchanged, and if NOTHING answered nothing is admitted. A zero-amount
+        # self-send moves no value by construction.
+        # -------------------------------------------------------------------
+        relaxed = None
+        want = os.environ.get("COVENANT_RELAX_VALUELESS_FOR", "")
+        if want:
+            # A SET, not one value: this PC runs several nodes (A/B/C) and the
+            # trader signs with its own configured key, so "nodes local pc's"
+            # is plural. covenant_judge_defer.apply_policy() fills this from
+            # the *.db.key files in the covenant folder -- keys that exist only
+            # on this machine -- so a peer's key can never be in it.
+            allowed = {w.strip() for w in want.split(",") if w.strip()}
+            try:
+                sender = getattr(tx, "sender_pubkey", None)
+                mine = bool(sender) and hashlib.sha256(
+                    sender.encode() if isinstance(sender, str) else bytes(sender)
+                ).hexdigest() in allowed
+                if (mine and sender == getattr(tx, "receiver", None)
+                        and float(getattr(tx, "amount", 0.0) or 0.0) == 0.0):
+                    relaxed = True
+            except (TypeError, ValueError, AttributeError):
+                relaxed = None          # anything unexpected: the STRICT path
+        try:
+            result = self.judge.evaluate(tx.data, self.principles, relaxed=relaxed)
+        except TypeError:
+            # A judge predating the keyword. Fail to the stricter path.
+            result = self.judge.evaluate(tx.data, self.principles)
         if result.violates:
             if result.uncertain and not result.not_understood:
                 # Stopped, and honestly: no violation was found. Naming a

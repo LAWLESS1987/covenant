@@ -289,6 +289,13 @@ SUITES = [
     ("test_f6_stuffing.py",              120,  "JUDGE"),
     ("test_f7_caps.py",                   60,  "MONEY"),
     ("test_rule5_ledger.py",              60,  "MONEY"),
+    # Registered 2026-09-07. Both arrived from the Cowork run that evening and
+    # were added to run_all_tests.sh but NOT here, so the sweep reported them
+    # as "orphaned on disk" and never ran them -- a suite in one runner and not
+    # the other is a suite nobody is accountable for. Measured before adding:
+    # breakout 61/61, paper_run exit 0.
+    ("test_paper_run.py",                300,  "MONEY"),
+    ("test_breakout_ledger.py",          180,  "MONEY"),
     ("test_maker_orders.py",              60,  "MONEY"),
     ("test_r6_contribution.py",           60,  "MONEY"),
     ("test_xrpl_record.py",               60,  "MONEY"),

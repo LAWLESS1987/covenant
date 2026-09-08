@@ -547,6 +547,45 @@ echo "=== DAILY CHECK + CIRCUIT BREAKERS (D3/D4) ==="
 # and DAILY_CHECK.md section 3's price-window verification, which daily.py had
 # never implemented. No network, no key, nothing here trades.
 run test_d3_daily_guards.py 180
+#   test_paper_run (2026-09-07) the SEALED-SIGNAL LEDGER. TRADING_READINESS.md
+#                       #4 asks for >= 30 sealed, settled signals before the
+#                       $100 sleeve leaves paper; the file that would produce
+#                       them did not exist and the count was ZERO. Records
+#                       CALLS, never orders -- no venue, no size, no side, no
+#                       key, and the suite greps the output and fails if the
+#                       words BUY or SELL ever appear. Hash-chained append-only
+#                       ledger (in ~/.covenant, OUTSIDE this folder, so it does
+#                       not break the seal daily); seal and settle are separate
+#                       records; a settled call cannot be re-scored; the whole
+#                       chain must be non-decreasing in time. Half the suite is
+#                       MUTATION testing (B1-B13): delete a guard, exec the
+#                       result, require the matching check to STOP detecting.
+#                       That is what caught this file's own D4 repeat --
+#                       regime_target(), THE RULE, defined and referenced by
+#                       nothing, in a file whose docstring cites D4. PRE-FIX
+#                       RECORDS 171/176 (buy-and-hold identity) and 196/2-then-
+#                       abort (the orphan). No network, no key, nothing trades.
+#                       270/270 x2 in this folder on the desktop Linux VM,\n#                       2026-09-07; NOT run on win32 (M29).
+run test_paper_run.py 300
+#   test_breakout_ledger (2026-09-07) forward record for the 100-day BREAKOUT
+#                       rule -- the only rule in ~2,800 tested variants that
+#                       separated from its own shuffled null (+123 to +160
+#                       points) and the first non-zero deflated Sharpe this
+#                       project has produced (0.7855 -- still under the 0.95
+#                       gate). Deliberately NOT scored like signal_ledger.py:
+#                       breakout wins 33% of its trades BY DESIGN (median trade
+#                       -2.28%, top 5 of 1,304 supply 36% of all return), and a
+#                       30-signal win-run gate rejects a WORKING version of it
+#                       98% of the time -- simulated, section D. So it scores
+#                       the MEAN with a bootstrap CI and refuses to report a
+#                       win rate as a verdict. Floor is 863 settled trades, the
+#                       80%-power number for sd/mean ~10:1, not a round figure.
+#                       Own ledger, own counter: it never touches Rule 5's
+#                       sealed_signals. Records only -- no order, no size, no
+#                       key. 50/50 x2 in this folder on the desktop Linux
+#                       VM, 2026-09-07; NOT run on win32 (M29). --record
+#                       verified live against OKX from this box the same day.
+run test_breakout_ledger.py 300
 echo "=== MULTI-NODE P2P (real processes, real sockets) ==="
 # Launches real OS processes on localhost. Slow by design: /mine is rate-limited
 # to 1/60s and the test waits that window out rather than fighting the control.

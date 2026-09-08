@@ -47,6 +47,7 @@ LICENCE: public domain.
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import tempfile
@@ -84,10 +85,56 @@ def apply_policy(env=None, policy=None):
         env["COVENANT_SILENCE_IS_NOT_DISSENT"] = "1"
     elif p.get("silence_is_not_dissent") is False:
         env.pop("COVENANT_SILENCE_IS_NOT_DISSENT", None)
+    # THE TRADING EXCEPTION (2026-09-07), narrowed by the operator to "the
+    # exception should be nodes local pc's". ReasoningSentinel.evaluate_
+    # transaction relaxes ONE reading -- a seat that did not answer stops
+    # counting as a seat that disagreed -- and only for a transaction that pays
+    # nothing, to nobody, signed by an identity in this list.
+    #
+    # The list is built from the *.db.key files in THIS folder, which exist
+    # only on this PC. A peer's key is not among them and cannot be added by
+    # anything a peer sends, so the exception is unreachable from the network
+    # however the payload is shaped. Off unless the policy says otherwise.
+    if p.get("relax_valueless_for_local_nodes") is True:
+        env["COVENANT_RELAX_VALUELESS_FOR"] = ",".join(local_node_key_hashes())
+    else:
+        env.pop("COVENANT_RELAX_VALUELESS_FOR", None)
+    # DISCLOSE THE EXCEPTION. This line is what an operator reads in
+    # logs/node*.log to see which gate a node came up with. It named providers,
+    # silence and the runner, and would have said nothing about a live trading
+    # exception -- a relaxation nobody can see in the log is the thing this
+    # project refuses everywhere else. n is the count of local keys, not the
+    # keys: the hashes are not secret but they are noise in a log line.
+    _n = len([x for x in env.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",") if x])
     return ("quorum policy (ops/quorum_policy.json): providers=%s silence_is_not_dissent=%s "
-            "github_when_local_down=%s -- decided by %s"
+            "github_when_local_down=%s trading_exception=%s -- decided by %s"
             % (env.get("COVENANT_JUDGE_PROVIDERS"), env.get("COVENANT_SILENCE_IS_NOT_DISSENT") == "1",
-               bool(p.get("github_when_local_down")), p.get("decided_by", "unrecorded")))
+               bool(p.get("github_when_local_down")),
+               ("off" if not _n else
+                "valueless self-sends from %d local node key(s)" % _n),
+               p.get("decided_by", "unrecorded")))
+
+
+def local_node_key_hashes(folder=None):
+    """sha256 of the PUBLIC key of every node key file on this PC.
+
+    Only public keys are derived, and only their hashes are returned: nothing
+    secret enters the environment, and the value is useless to anyone who does
+    not already hold the corresponding key. A key file that will not load is
+    skipped rather than guessed at."""
+    import hashlib
+    out = []
+    try:
+        import covenant_client as cc
+    except Exception:                                             # noqa: BLE001
+        return out
+    for path in sorted(glob.glob(os.path.join(folder or HERE, "*.db.key"))):
+        try:
+            pem = cc.pub_of_key(path)
+        except Exception:                                         # noqa: BLE001
+            continue
+        out.append(hashlib.sha256(pem.encode()).hexdigest())
+    return out
 
 
 def payload_text(data):

@@ -46,5 +46,27 @@ treat any answer but "admitted" as a refusal -- the pattern
 `covenant_gate_proxy.py` uses for another runtime.
 
 **What this branch does not do.** It does not arm the trader, install a
-credential, or make the app executable. The trader's six preconditions in
-`covenant_trader.py` and the owner's hands are unchanged.
+credential, or make the app executable.
+
+**Update 2026-09-07 -- the gate now asks the trader's rules, not just the
+judge.** When this document was written the sentinel path sealed a decision and
+applied none of the trader's other preconditions; see `docs/KNOWN_ISSUES.md`
+A61. `preconditions()` has since moved into `guards.py` as the one
+implementation, was deleted from `covenant_trader.py`, and
+`sentinel_witness/seal_service.py` asks it with `caller="sentinel"`. The answer
+is *base reasons + caller reasons*, append only, so this path is provably no
+looser than the trader's on the same order.
+
+Two consequences worth stating plainly:
+
+* **It refuses everything today.** A buy needs a portfolio to evaluate the cash
+  floor and the budgets; a sell needs holdings and a baseline to clamp against
+  the reserve; the app supplies neither. Refusing what it cannot evaluate is
+  the design, not a defect. Giving this path a portfolio view is open work --
+  and it must not be done by letting the seal service read exchange
+  credentials.
+* **The seal service is credential-*unused*, not credential-free.**
+  `seal_service.seal()` lazily imports `covenant_trader`, which imports
+  `venues`, so on its first seal the process can read `~/.coinbase`. There is
+  no call site. That is a property of the design, not of the process, and any
+  future work here should make it structural.

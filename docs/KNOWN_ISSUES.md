@@ -947,3 +947,160 @@ So the next person does not repeat the measurement:
 | matched pairs for phrases that *name* the act | neutralised `beat up` to +0.48 and pushed `to intimidate` negative; one-sided rows fixed it |
 | length normalisation of the score | mutes the model; clears fall from 40 to 0 |
 | a length gate on clears | wrong clears median 14 words, right ones 13 |
+
+---
+
+### A61. [major / trader+sentinel] There were two paths to a real order and only one of them applied the rules. CLOSED 2026-09-07
+
+**Evidence:** `sentinel_witness/tradeGate.js` gates every proposed order through
+`seal_service.py`, which called `covenant_trader.seal_decision()` and nothing
+else. `grep -n "preconditions\|guards\|venues\|\.place(" sentinel_witness/seal_service.py`
+returned nothing. So that path applied the ethics gate -- one of the trader's
+six preconditions -- and applied none of: `armed`, `TRADER_HALT`,
+`PerTradeCap`/`PerDayCap`, Rule 5, the guard stack. The same split the caps had
+before 2026-09-04, when they were enforced in `preconditions()` and invisible
+to `daily.py`.
+
+**Why it had not bitten:** `gateTrade`/`executeIfAllowed` have no caller and
+Sentinel-Witness has no exchange client, so the order count through that path
+is zero. It was a latent gap, not live loss -- but `covenant_watchdog.py:1164`
+restarts the seal service every two minutes, so the endpoint itself is live,
+and `armed` is now true.
+
+**Fixed:** `preconditions()` moved to `guards.py` as the one implementation and
+was DELETED from `covenant_trader.py` (60 lines), which now delegates. The seal
+service asks the same function with `caller="sentinel"`. The answer is built as
+*base reasons + caller reasons*, APPEND ONLY, so the sentinel path cannot be
+looser than the trader's on the same order. Pinned by F7 S4a-S4e and
+SENTINEL-GATE S14-S19.
+
+**What it does now, and this is the honest part:** it refuses everything. A buy
+needs a portfolio to evaluate the cash floor and the budgets; a sell needs
+holdings and a baseline to clamp against the reserve; the app supplies neither.
+Refusing what it cannot evaluate is the point. Giving that path a portfolio
+view is open work, and it must not be done by having the seal service read
+exchange credentials.
+
+---
+
+### A62. [major / sentinel] A legitimate admission read as a refusal, because the gate string-matched a truncated JSON blob. CLOSED 2026-09-07
+
+**Evidence:** `seal_service.py` tested `'"admitted"' in detail`. The node's
+other legitimate admission is `"admitted (evicted lowest-priority pending
+transaction)"` (`covenant_unified_v8.py:6579`, returned as `admission` at
+`7404`) -- a space follows the word, not a quote, so the test failed on it.
+Reproduced:
+
+    admitted                                            -> ADMITTED
+    admitted (evicted lowest-priority pending trans...) -> REFUSED
+
+**And it only worked at all by luck of key order.** `detail` is
+`json.dumps(resp)[:160]`; today's body is 124 characters and `admission`
+happens to be the first key the node serialises. Field order is not a contract.
+
+**Fail-closed, and still wrong.** Both failures turn a yes into a no, never a
+no into a yes -- but a gate that can silently refuse a decision the judges
+admitted is not an audit trail.
+
+**Fixed:** `covenant_trader.seal_decision_result()` returns the node's answer
+as fields (`ok`, `status`, `admission`, `tx_id`, `detail`, `mined`);
+`seal_decision()` is a one-line adapter keeping the old `(ok, detail)` shape
+for every existing caller. `admitted()` reads the field and accepts any
+admission. Pinned by SENTINEL-GATE S11-S13.
+
+---
+
+### A63. [major / trader] reserve_baseline rebuilt RESERVE.json from scratch and deleted starting_total_usd, re-anchoring the buy budget. CLOSED 2026-09-07
+
+**Evidence:** `reserve_baseline()` wrote a fresh four-key dict.
+`guards.set_starting_total()` writes `starting_total_usd` and `pct_buyable`
+into the SAME file, correctly, by read-modify-write. In `run_once` the order is
+`set_starting_total` then `plan()` -> `reserve_baseline`, so a cycle in which
+the baseline wrote erased the key set sixteen lines earlier. `starting_total()`
+then returns None and the next cycle re-anchors the starting book to that day's
+total -- on a book that has grown, `BuyBudget`'s ceiling grows with it, which is
+the exact ratchet `set_starting_total` exists to prevent.
+
+**Fixed:** it merges. Pinned by F5 P9.
+
+---
+
+### A64. [minor / trader] The baseline reported "more was bought" on cycles when nothing was bought. CLOSED 2026-09-07
+
+**Evidence:** `reserve_baseline()` recovered quantity as `p["val"] / p["px"]`,
+but `gather()` sets `val = qty * px` and already carries `qty`. Re-dividing a
+product by its own factor lands a few ulps away. Measured on the live book
+2026-09-07: TOSHI, VET and WLD each reported `baseline raised ... (more was
+bought)` on a cycle that bought nothing, which rewrote the floor file and
+invalidated the manifest; HBAR reported 4.6e-07 units sellable above a floor it
+was sitting exactly on.
+
+**Fixed:** it reads `p["qty"]`, and the "grew" comparison carries a 1e-9
+relative epsilon -- far below any order this program can place (minimum $5) and
+far above the noise.
+
+---
+
+### A65. [major / seal] `covenant_seal.py manifest` would now TRIPLE the manifest, because the walker does not exclude `.claude/`. OPEN
+
+**Measured 2026-09-07**, read-only, by building the manifest in memory and
+diffing it against the shipped one:
+
+    would ADD 1704, REMOVE 0, total 1704      (the shipped manifest lists 534)
+      + .claude/settings.local.json
+      + .claude/worktrees/blissful-mcclintock-9b2a24/...   (a full second checkout)
+
+`covenant_seal.walk()` skips `EXCLUDE_DIRS = {".venv", "__pycache__", ".git",
+"logs", "node_modules", ...}`. `.claude` is not in it, and Claude Code creates
+`.claude/worktrees/<name>/` as a complete duplicate of the repository. So the
+integrity manifest would absorb 1,170 files of agent scratch and a second copy
+of the core, and `SEAL_ROOT.txt` -- the number that is supposed to mean "this
+exact set of files" -- would change meaning entirely.
+
+**Why it has not bitten:** the shipped `MANIFEST.sha256` predates that
+worktree, or was built somewhere without one. Nothing has resealed since.
+
+**Consequence right now:** `verify_bundle.py` reports `10 changed or missing`
+after any edit, and the obvious remedy (reseal) is worse than the complaint.
+The ten are accounted for: nine are the 2026-09-07 consolidation
+(covenant_trader.py, guards.py, sentinel_witness/seal_service.py, the four
+suites, and two docs) and one is `run_all_tests.sh`, which the paper-run work
+edited the same evening.
+
+**The fix is one line** -- add `".claude"` to `EXCLUDE_DIRS` -- but it changes
+the seal root, and the root is the thing other records commit to, so it is the
+operator's call and not a tidy-up. Left OPEN deliberately; nothing was resealed.
+
+**Reproduce:**
+
+    python -c "import covenant_seal as S; print(len(S.build_manifest()))"
+
+against `wc -l MANIFEST.sha256`.
+
+---
+
+### A66. [major / trader] There are now TWO sealed-signal ledgers for Rule 5, scoring at different costs. OPEN
+
+**Found 2026-09-07** while checking why `run_all_tests.sh` was modified.
+`paper_run.py`, `test_paper_run.py` and `docs/PAPER_RUN.md` arrived the same
+evening from another process (untracked at the time of writing).
+
+| | `signal_ledger.py` (2026-09-06) | `paper_run.py` (2026-09-07) |
+|---|---|---|
+| ledger | `~/.covenant/regime_signals.jsonl` | `~/.covenant/paper_ledger.jsonl` |
+| round-trip cost | 130 bps (`60*2 + 10`) | 40 bps |
+| feeds the trader's gate | **yes** -- `covenant_trader` imports it and writes `sealed_signals` | no |
+
+Both describe themselves as the file that satisfies Rule 5's thirty signals.
+`paper_run.py`'s docstring says the count is "ZERO, because the file that would
+produce them did not exist", which was true before 2026-09-06 and is not true
+now -- the ledger stands at 1 settled, 13 open.
+
+**Why it matters:** the two disagree by 3.25x on the cost hurdle a signal must
+clear. A rule that looks significant at 40 bps and fails at 130 is not
+significant; whichever number is right, having both means Rule 5 can be
+reported as cleared or not cleared depending on which file is read.
+
+**Not touched.** It is in-flight work from another process, and the gate reads
+`signal_ledger.py` today, so nothing is currently mis-gated. Deciding which
+ledger is the record -- and retiring the other -- is a decision, not a cleanup.

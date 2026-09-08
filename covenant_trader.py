@@ -209,10 +209,35 @@ def node_status(ports, timeout=4):
         return list(pool.map(one, ports))
 
 
-def seal_decision(cfg, record):
+def _seal_refused(detail):
+    return {"ok": False, "status": None, "admission": None, "tx_id": None,
+            "detail": detail, "mined": ""}
+
+
+def seal_decision_result(cfg, record):
     """Write the decision to the ledger as a self-send carrying the record.
 
-    Returns (ok, detail). The ethics gate FAILS CLOSED, so a node with no
+    RETURNS THE NODE'S ANSWER AS FIELDS (2026-09-07), not only as prose:
+    {"ok", "status", "admission", "tx_id", "detail", "mined"}. Until today the
+    only structured thing here was `ok`, and everything else a caller needed
+    had to be recovered by string-matching `detail` -- which is
+    json.dumps(resp) TRUNCATED AT 160 CHARACTERS. sentinel_witness did exactly
+    that and got it wrong twice over:
+
+      * it tested `'"admitted"' in detail`, and the node's other legitimate
+        admission is "admitted (evicted lowest-priority pending transaction)"
+        (covenant_unified_v8.py:6579) -- no closing quote after the word, so a
+        real admission read as a refusal;
+      * the match only worked at all because "admission" happens to be the
+        FIRST key the node serialises. Today's body is 124 characters against
+        that 160-character truncation. Field order is not a contract.
+
+    Both failures were fail-closed, which is why nothing broke: they turn a
+    yes into a no, never a no into a yes. They are still wrong, and a gate that
+    can silently refuse a decision the judges admitted is not an audit trail.
+
+    `seal_decision()` below keeps the old (ok, detail) shape for every existing
+    caller. The ethics gate FAILS CLOSED, so a node with no
     reachable judge refuses this -- which is the designed behaviour and is
     reported, not worked around. With seal_required the refusal also stops
     live orders: an auto-trader whose audit trail is broken should not keep
@@ -221,10 +246,10 @@ def seal_decision(cfg, record):
     """
     keypath = os.path.join(HERE, cfg.get("node_key", ""))
     if not os.path.exists(keypath):
-        return False, f"no node key at {os.path.basename(keypath)}"
+        return _seal_refused(f"no node key at {os.path.basename(keypath)}")
     ports = cfg.get("node_ports") or []
     if not ports:
-        return False, "no node_ports configured"
+        return _seal_refused("no node_ports configured")
     try:
         import covenant_unified_v8 as cov
         import covenant_client as cc
@@ -288,11 +313,40 @@ def seal_decision(cfg, record):
                         mined += f" {xr['tx_hash'][:16]}"
             except Exception as e:                               # noqa: BLE001
                 mined += f"; xrpl unavailable: {type(e).__name__}"
-        return (st == 200), f"HTTP {st}: {json.dumps(resp)[:160]}{mined}"
+        # THE FIELDS COME FROM `resp`, NOT FROM THE PROSE. `detail` stays
+        # exactly as it was -- it is what trader_log.txt prints and what an
+        # operator reads -- but no caller has to parse it any more.
+        adm = resp.get("admission") if isinstance(resp, dict) else None
+        txid = resp.get("tx_id") if isinstance(resp, dict) else None
+        return {"ok": (st == 200), "status": st,
+                "admission": (str(adm) if adm is not None else None),
+                "tx_id": (str(txid) if txid is not None else None),
+                "detail": f"HTTP {st}: {json.dumps(resp)[:160]}{mined}",
+                "mined": mined}
     except SystemExit as e:
-        return False, f"node unreachable: {e}"
+        return _seal_refused(f"node unreachable: {e}")
     except Exception as e:
-        return False, f"{type(e).__name__}: {e}"
+        return _seal_refused(f"{type(e).__name__}: {e}")
+
+
+def seal_decision(cfg, record):
+    """(ok, detail), the shape every existing caller expects. One line of
+    adapter over seal_decision_result, so there is one implementation."""
+    r = seal_decision_result(cfg, record)
+    return r["ok"], r["detail"]
+
+
+def admitted(seal_result):
+    """Did the node ADMIT this decision? The one reading of that answer.
+
+    An admission is any admission: the node returns "admitted" or
+    "admitted (evicted lowest-priority pending transaction)" and both are a
+    yes. HTTP 200 alone is not enough -- a 200 that carried some other
+    admission string would be a change this function should notice rather than
+    wave through, so both halves are required."""
+    if not isinstance(seal_result, dict) or not seal_result.get("ok"):
+        return False
+    return str(seal_result.get("admission") or "").startswith("admitted")
 
 
 # ------------------------------------------------------------------ portfolio
@@ -366,33 +420,74 @@ def reserve_baseline(pf, path=RESERVE_PATH):
     """
     held = {}
     for p in pf.get("positions", []):
-        if p.get("px"):
-            held[p["sym"]] = p["val"] / p["px"]
+        # THE QUANTITY, NOT A ROUND TRIP THROUGH THE PRICE. gather() already
+        # carries qty; recovering it as val/px re-divides a product by its own
+        # factor and lands a few ulps away. Measured 2026-09-07 on the live
+        # book: TOSHI, VET and WLD each reported "more was bought" on a cycle
+        # in which nothing was bought, which rewrote the floor file and
+        # invalidated the manifest, and HBAR showed 4.6e-07 units sellable
+        # above a floor it was exactly sitting on.
+        q = p.get("qty")
+        if q is None and p.get("px"):
+            q = p["val"] / p["px"]
+        if q is not None:
+            held[p["sym"]] = q
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
         base = dict(data.get("baseline", {}))
     except (OSError, ValueError):
         data, base = {}, {}
-    raised = []
+    # FROZEN FLOORS (2026-09-07). "hold the current amount able to add and use
+    # for trading" -- for a hold-only symbol the baseline is the amount held
+    # when it was first seen and it never moves again. Raising it on a purchase
+    # is right for a 50%-reserved asset (half of more is more) and exactly
+    # wrong here: every coin added would lift the floor above itself and be
+    # locked the moment it arrived, which is the opposite of "able to add".
+    frozen = set(getattr(_guards, "HOLD_ONLY", ()) if _guards else ())
+    raised, changed = [], False
     for sym, q in held.items():
         if sym not in base:
             base[sym] = q
-            raised.append("%s baseline set at %.8g" % (sym, q))
-        elif q > base[sym]:
+            changed = True
+            raised.append("%s baseline set at %.8g%s"
+                          % (sym, q, " -- hold-only, and this floor is frozen there"
+                             if sym in frozen else ""))
+        # A RELATIVE EPSILON, because "more was bought" has to mean more was
+        # bought. 1e-9 is far below any purchase this program can make (the
+        # minimum order is $5) and far above the last-ulp noise above.
+        elif q > base[sym] * (1.0 + 1e-9) and sym in frozen:
+            # A NOTE, NOT A WRITE. The floor does not move, so nothing is
+            # persisted; a file rewritten every cycle would also invalidate
+            # covenant_seal.py's manifest daily for no change.
+            raised.append("%s is hold-only: %.8g held against a frozen %.8g floor, "
+                          "so %.8g is tradeable"
+                          % (sym, q, base[sym], q - base[sym]))
+        elif q > base[sym] * (1.0 + 1e-9):
             raised.append("%s baseline raised %.8g -> %.8g (more was bought)" % (sym, base[sym], q))
             base[sym] = q
-    if raised or not data:
+            changed = True
+    if changed or not data:
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
+            data.update({
+                "_what": "Half of each of these quantities is reserved and may never be "
+                         "sold by any rule; for a guards.HOLD_ONLY symbol the whole of it "
+                         "is, and that floor is frozen where it was first recorded so that "
+                         "anything bought above it stays tradeable. Lowering a number here "
+                         "is an operator's decision and this program never does it.",
+                "pct_reserved": 0.50,
+                "pct_reserved_hold_only": 1.0,
+                "hold_only": sorted(frozen),
+                "set_by": "covenant_trader.reserve_baseline",
+                "baseline": base})
             with open(path, "w", encoding="utf-8") as fh:
-                json.dump({"_what": "Half of each of these quantities is reserved and may never "
-                                    "be sold by any rule. Written once per asset and raised only "
-                                    "by buying more. Lowering a number here is an operator's "
-                                    "decision and this program never does it.",
-                           "pct_reserved": 0.50,
-                           "set_by": "covenant_trader.reserve_baseline",
-                           "baseline": base}, fh, indent=1, sort_keys=True)
+                # MERGE, never rebuild. guards.set_starting_total writes
+                # starting_total_usd and pct_buyable into this same file, and
+                # rebuilding the dict from scratch deleted them -- after which
+                # the next cycle re-anchored the buy budget to that day's book,
+                # which is the ratchet set_starting_total exists to prevent.
+                json.dump(data, fh, indent=1, sort_keys=True)
         except OSError:
             pass
     return base, held, raised
@@ -441,20 +536,23 @@ def plan(cfg, pf, week_spent=0.0):
                 p["sym"], pct_reserved) if _guards else 0.0
             if sellable is None:
                 sellable = 0.0
-            # ONE CONDITION, ONE NOTE. A hold-only asset produced three lines
-            # -- excluded, then "trimmed to 0", then "DROPPED" -- and the
-            # middle one was actively wrong: it read "50% of the baseline is
-            # reserved and no rule may cross it" when for this asset the
-            # reserved fraction is all of it. A note that misstates the reason
-            # is worse than no note, because it is the line someone would argue
-            # with.
-            if p["sym"] in (getattr(_guards, "HOLD_ONLY", ()) if _guards else ()):
-                notes.append("reserve: %s is hold-only -- it is excluded from the "
-                             "tradeable half entirely, so the %.8g units the "
-                             "concentration cap wanted sold are not sold"
-                             % (p["sym"], qty))
-                continue
-            if qty > sellable:
+            # ONE CONDITION, ONE NOTE. A hold-only asset used to be dropped
+            # here with its own message, because it was wholly unsellable.
+            # Since 2026-09-07 it is not: it reserves 100% of a FROZEN
+            # baseline, so anything held above that baseline is tradeable like
+            # anything else. guards.sellable_units answers both cases, so the
+            # trim below is the only path and there is no second copy of the
+            # rule -- only the wording differs, because "the reserved half"
+            # would misstate the reason for these three.
+            hold_only = p["sym"] in (getattr(_guards, "HOLD_ONLY", ()) if _guards else ())
+            if qty > sellable and hold_only:
+                notes.append("reserve: %s is hold-only -- %.8g units sit at the frozen "
+                             "floor, so of the %.8g the concentration cap wanted sold "
+                             "only %.8g is above it"
+                             % (p["sym"], base.get(p["sym"], 0.0), qty, sellable))
+                qty = sellable
+                over_usd = qty * p["px"]
+            elif qty > sellable:
                 notes.append("reserve: %s sell trimmed %.8g -> %.8g units; %.0f%% of the "
                              "%.8g baseline is reserved and no rule may cross it"
                              % (p["sym"], qty, sellable, pct_reserved * 100, base.get(p["sym"], 0.0)))
@@ -504,7 +602,11 @@ def plan(cfg, pf, week_spent=0.0):
         cash_after = pf["cash"] + sum(o["usd"] for o in orders)   # today's trims raise cash first
         spare = cash_after - floor_pct * total
         room = min(weekly - float(week_spent or 0.0), spare)
-        hold_only = set(getattr(_guards, "HOLD_ONLY", ()) if _guards else ())
+        # HOLD-ONLY IS NO LONGER EXCLUDED FROM CONTRIBUTIONS (2026-09-07,
+        # "able to add"). It never blocked buying in guards.py either --
+        # ReserveFloor declares side="sell" and may_buy() skips it, pinned by
+        # F5 H6a. What actually keeps XRP and HBAR out is the concentration cap
+        # (XRP is 80.8% of the book) and Rule 4 (HBAR is below its 200d line).
         wanted = set(cfg.get("contribution_symbols") or [])
         if spare <= 0:
             notes.append(f"R6 contribution: cash {cash_after / total:.1%} is under the "
@@ -515,7 +617,6 @@ def plan(cfg, pf, week_spent=0.0):
         else:
             eligible = [p for p in pf["positions"]
                         if p["regime"] == "UP" and p["val"] / total < cap
-                        and p["sym"] not in hold_only
                         and (not wanted or p["sym"] in wanted)]
             eligible.sort(key=lambda p: p["val"])                 # smallest first: equalise
             slots = max(0, int(cfg.get("max_orders_per_day", 2)) - len(orders))
@@ -546,63 +647,25 @@ def plan(cfg, pf, week_spent=0.0):
 
 # ------------------------------------------------------------------ execution
 def preconditions(cfg, st, pf, order, sealed_ok, guard_blocks):
-    """Every reason this specific order may not go live. Empty list = clear."""
-    bad = []
-    if not cfg.get("armed"):
-        bad.append("armed=false in trader_config.json")
-    if os.path.exists(HALT):
-        bad.append("TRADER_HALT file present")
-    # THE CAPS ARE GUARDS NOW (guards.PerTradeCap / PerDayCap), and this asks
-    # them rather than repeating their arithmetic. They were enforced only here
-    # until 2026-09-04, which meant daily.py -- the report a person actually
-    # reads, which runs the guard stack and prints "may add" -- could not see
-    # them. One implementation, two callers, and the guards fail closed.
+    """Every reason this specific order may not go live. Empty list = clear.
+
+    ONE IMPLEMENTATION SINCE 2026-09-07. The rule moved to guards.py so that
+    sentinel_witness/seal_service.py -- the other path to a real order -- asks
+    the same question instead of asking none. Roughly fifty lines of cap and
+    Rule 5 arithmetic were DELETED from here rather than copied.
+
+    The argument order every existing caller and test uses is unchanged. `pf`
+    is accepted and unused, as it always was: the portfolio reaches the
+    decision through guard_blocks, which the caller evaluated against it.
+    sealed_ok is coerced to a bool, because for this caller a missing seal is a
+    refusal -- the None reading ("I will seal afterwards and AND the answer")
+    belongs to the sentinel and must not leak in here."""
     if _guards is None:
-        bad.append("guards.py unavailable -- the per-trade and per-day caps "
-                   "cannot be evaluated")
-    else:
-        gs = _guards.State(equity_now=0.0, equity_peak=0.0, equity_start_of_day=0.0,
-                           closed_trades=[], last_sold={}, positions={}, cash=0.0,
-                           orders_today=_guards.orders_today_from(st))
-        per_trade = _guards.PerTradeCap(
-            max_usd=cfg["max_order_usd"], min_usd=cfg["min_order_usd"],
-            max_orders=cfg["max_orders_per_day"],
-            max_notional=cfg["max_daily_notional_usd"])
-        per_day = _guards.PerDayCap(max_orders=cfg["max_orders_per_day"],
-                                    max_notional=cfg["max_daily_notional_usd"])
-        for v in (per_day.check(gs), per_trade.check(gs)):
-            if not v.allowed:
-                bad.append(f"{v.guard}: {v.reason}")
-        room = per_trade.largest_allowed(gs)
-        if order["usd"] < cfg["min_order_usd"]:
-            bad.append(f"${order['usd']:,.2f} under min_order_usd "
-                       f"${cfg['min_order_usd']:,.2f}")
-        elif room is not None and room > 0 and order["usd"] > room + 1e-9:
-            # `room > 0` on purpose. When the day is fully used the two guards
-            # above have already said so, in their own words, with their own
-            # numbers; adding "over the $0.00 placeable now" makes one
-            # condition read as three problems. This line earns its place only
-            # when there IS room and this order is bigger than it.
-            bad.append(f"${order['usd']:,.2f} over the ${room:,.2f} placeable now "
-                       f"(order cap ${cfg['max_order_usd']:,.2f}, daily notional "
-                       f"cap ${cfg['max_daily_notional_usd']:,.2f})")
-    if cfg.get("seal_required") and not sealed_ok:
-        bad.append("decision not sealed to the chain")
-    if st.get("sealed_signals", 0) < cfg.get("min_sealed_signals", 0):
-        bad.append(f"Rule 5: {st.get('sealed_signals', 0)} sealed signals on "
-                   f"record, need {cfg['min_sealed_signals']}")
-    elif cfg.get("rule5_require_significance", True):
-        r5 = st.get("rule5") or {}
-        # The count is met; the record must also mean something. A losing or
-        # luck-shaped record with 30 rows is the answer Rule 5 exists to give,
-        # not a licence.
-        if not r5.get("clears"):
-            bad.append(f"Rule 5: {r5.get('why') or 'no scored record in state'}")
-    # Guards gate BUYS only. This planner emits no buys, so a guard block is
-    # recorded for the operator but does not stop a risk-reducing sale.
-    if guard_blocks and order["side"] == "buy":
-        bad.append("guards: " + ", ".join(guard_blocks))
-    return bad
+        return ["guards.py unavailable -- the per-trade and per-day caps "
+                "cannot be evaluated"]
+    return _guards.preconditions(order, cfg=cfg, st=st,
+                                 sealed_ok=bool(sealed_ok),
+                                 guard_blocks=guard_blocks, caller="trader")
 
 
 def venue_for(order, live_venues):

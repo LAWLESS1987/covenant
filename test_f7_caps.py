@@ -195,10 +195,33 @@ def main():
           {"per_trade_cap", "per_day_cap"} <=
           {g.name for g in G.DEFAULTS})
     src = io.open(os.path.join(HERE, "covenant_trader.py"), encoding="utf-8").read()
-    check("S4 preconditions() no longer does the cap arithmetic itself -- it asks "
-          "the guards, so there is one implementation",
-          "PerTradeCap(" in src and "largest_allowed(" in src
+    # S4 GOT STRONGER ON 2026-09-07, it did not get dropped. It used to require
+    # that covenant_trader.py CONTAINED "PerTradeCap(" -- i.e. that it asked the
+    # guard classes rather than doing the arithmetic inline. preconditions() has
+    # since moved into guards.py entirely, so the trader now contains neither
+    # the arithmetic nor the guard construction, and the old grep failed on a
+    # file that had become MORE consolidated, not less. The invariant it was
+    # protecting is unchanged and is now checkable on both sides.
+    src_g = io.open(os.path.join(HERE, "guards.py"), encoding="utf-8").read()
+    check("S4a the cap arithmetic is not in covenant_trader.py at all -- neither "
+          "inline, nor by constructing the guards itself",
+          "PerTradeCap(" not in src and "largest_allowed(" not in src
           and "spent + order[" not in src)
+    check("S4b ...because covenant_trader.preconditions() delegates to the one "
+          "implementation in guards.py",
+          "_guards.preconditions(" in src)
+    check("S4c ...and that one implementation is the thing asking the guards",
+          "PerTradeCap(" in src_g and "largest_allowed(" in src_g)
+    check("S4d there is exactly one preconditions() definition in the two files, "
+          "so the trader's old copy was deleted rather than left behind",
+          (src.count("\ndef preconditions(") + src_g.count("\ndef preconditions("))
+          == 2 and src.count("\ndef preconditions(") == 1,
+          (src.count("\ndef preconditions("), src_g.count("\ndef preconditions(")))
+    check("S4e the sentinel asks the SAME function, which is the whole point of "
+          "moving it -- one rule, both paths to a real order",
+          "preconditions(" in io.open(
+              os.path.join(HERE, "sentinel_witness", "seal_service.py"),
+              encoding="utf-8").read())
     check("S5 caps() survives a missing config file rather than raising",
           G.caps(os.path.join(d, "no_such_config.json")) == G.CAP_DEFAULTS)
     with io.open(os.path.join(d, "partial.json"), "w", encoding="utf-8") as fh:
