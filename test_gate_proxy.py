@@ -11,6 +11,7 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import http.server
+import importlib.util
 import io
 import json
 import os
@@ -18,6 +19,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import urllib.error
 import urllib.request
 
@@ -85,6 +87,40 @@ class MockSentinel:
         if "steal" in text.lower():
             return (False, "Ethical violation: takes what is not the sender's", None, Result(True, "theft"))
         return (True, "clean", None, Result(False, "clean"))
+
+
+class RecordingQuorum:
+    """A stand-in for covenant_unified_v8 and the four judge modules, which
+    writes down the order build_default_sentinel actually executes them in.
+    Installed on sys.meta_path so the import statements inside that function
+    are really taken -- nothing here reads the file's text."""
+    NAMES = ("covenant_unified_v8", "covenant_judge_local", "covenant_judge_ollama",
+             "covenant_judge_fallback", "covenant_judge_defer")
+
+    def __init__(self, log):
+        self.log = log
+
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in RecordingQuorum.NAMES:
+            return importlib.util.spec_from_loader(fullname, self)
+        return None
+
+    def create_module(self, spec):
+        return types.ModuleType(spec.name)
+
+    def exec_module(self, module):
+        log = self.log
+        log.append(module.__name__)
+        if module.__name__ != "covenant_unified_v8":
+            return
+
+        def build_semantic_quorum():
+            log.append("<quorum built>")
+            return "quorum"
+
+        module.build_semantic_quorum = build_semantic_quorum
+        module.DIVINE_PRINCIPLES = ["a principle"]
+        module.ReasoningSentinel = lambda judge, principles: ("sentinel", judge, principles)
 
 
 def free_port():
@@ -227,6 +263,37 @@ def main():
     ok("G22", "the real gate imports the launcher's four companions before building the quorum",
        all(("import covenant_judge_%s" % m) in body for m in ("local", "ollama", "fallback", "defer"))
        and body.find("import covenant_judge_defer") < body.find("build_semantic_quorum()"))
+
+    # G22 reads the file's bytes, so it survives the mutation that matters:
+    # comment the four imports out and every substring it looks for is still
+    # there, in the comments, in the same order -- while the real gate dies on
+    # "unknown judge provider: 'deferring'" the first time it is built.
+    # G22b runs build_default_sentinel() against fake modules and watches the
+    # order the imports are actually taken in.
+    log = []
+    finder = RecordingQuorum(log)
+    saved_mods = dict((n, sys.modules.pop(n, None)) for n in RecordingQuorum.NAMES)
+    saved_env = os.environ.get("COVENANT_JUDGE_PROVIDERS")
+    sys.meta_path.insert(0, finder)
+    try:
+        built, err = GP.build_default_sentinel(), ""
+    except Exception as exc:                      # a gate that cannot be built is a failure
+        built, err = None, "%s: %s" % (type(exc).__name__, exc)
+    finally:
+        sys.meta_path.remove(finder)
+        for name, mod in saved_mods.items():
+            sys.modules.pop(name, None)
+            if mod is not None:
+                sys.modules[name] = mod
+        if saved_env is None:
+            os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        else:
+            os.environ["COVENANT_JUDGE_PROVIDERS"] = saved_env
+    at = log.index("<quorum built>") if "<quorum built>" in log else -1
+    companions = [n for n in log if n.startswith("covenant_judge_")]
+    ok("G22b", "and it really takes those imports at run time, all four, before the quorum",
+       not err and at >= 0 and len(companions) == 4 and all(log.index(c) < at for c in companions)
+       and isinstance(built, tuple) and built[0] == "sentinel", err or log)
 
     print("GATE-PROXY: %d/%d passed" % (N - len(FAILS), N))
     return 1 if FAILS else 0

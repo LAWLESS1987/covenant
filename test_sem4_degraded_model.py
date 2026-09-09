@@ -329,6 +329,43 @@ def d8():
     check("D8c and `unfitted` is set from inert_passes, not from a literal "
           "somewhere else",
           "self.inert_passes" in src and '"unfitted"' in src, "")
+    # D8c reads assess()'s SOURCE TEXT, so it survives any rewrite that keeps
+    # those two words anywhere in the function -- a comment counts. Measured
+    # 2026-09-09: replacing the derivation with
+    #     competence = "unfitted" if not self.space_script else "full"
+    # and leaving `self.inert_passes` in a comment one line above held this
+    # suite at 28/28, while a model missing only its seeded lexicon came back
+    # `full` -- the one value SEM4 exists to forbid. Nothing else here could
+    # tell, because every model the suite builds is either wholly inert (the
+    # v1 file: all three guards falsy) or wholly fitted (_v2ish: all three
+    # set), and both endpoints agree under that mutation. D8d runs the files
+    # in between -- three each missing exactly ONE competence key, plus the
+    # untouched _v2ish as the other direction (M31), so it can fail for the
+    # reason it names and pass for it too.
+    base = _v2ish(json.load(open(MODEL, encoding="utf-8")))
+    wrong = []
+    for key, want, comp in (("seeded_lexicon", {3}, "unfitted"),
+                            ("space_script", {4}, "unfitted"),
+                            ("vocab", {5}, "unfitted"),
+                            (None, set(), "full")):
+        raw = copy.deepcopy(base)
+        if key:
+            raw.pop(key)        # ABSENT, not corrupt -- _v2ish makes no /2
+            raw["model_id"] = sj.SemanticModel._identity(raw)   # claim, so
+        path = _write(raw)                                      # D6 is not
+        try:                                                    # in play
+            m = sj.SemanticModel.load(path)
+            got = {n for n, _, _ in m.inert_passes}
+            a = m.assess({"memo": SAME_INSTRUCTION["benign"]})
+            if got != want or a.competence != comp:
+                wrong.append((key or "(nothing missing)", sorted(got),
+                              a.competence, f"wanted {sorted(want)}/{comp}"))
+        finally:
+            os.unlink(path)
+    check("D8d ANY single inert pass is enough to report `unfitted` -- the "
+          "disclosure is derived from all three guards, not from whichever "
+          "one a later edit happens to keep",
+          not wrong, str(wrong))
 
 
 if __name__ == "__main__":

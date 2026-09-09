@@ -125,6 +125,54 @@ def main():
           "COALESCE(SUM(delta), 0)" in src
           and "COALESCE(SUM(delta), 0)" in inspect.getsource(C.Database.get_balance))
 
+    # S3 asks only that both methods CONTAIN the COALESCE fragment, so every
+    # drift that keeps that fragment survives it. Appending
+    # `AND reason != 'gift_lockup'` to the batched statement and to nothing
+    # else left S3 green -- and E1 too, because E1's ledger carries one reason
+    # and four already-round numbers. Eighth time in this codebase that a
+    # check matched a fragment of the thing instead of the thing.
+    #
+    # S3b reads the statements themselves, by AST, and compares them. Kills
+    # any clause added to one reader and not the other.
+    one_sql = [n.value for n in ast.walk(
+        ast.parse(inspect.getsource(C.Database.get_balance).lstrip()))
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+        and "SELECT" in n.value.upper()]
+    check("S3b the statements are IDENTICAL, not merely both containing "
+          "COALESCE: exactly one SELECT in each method, and the same one. A "
+          "WHERE clause added to the batched reader alone is drift even when "
+          "it changes no number this suite happens to seed",
+          len(sql) == 1 and len(one_sql) == 1
+          and " ".join(sql[0].split()) == " ".join(one_sql[0].split()),
+          (one_sql, sql))
+
+    # S3c is the BEHAVIOURAL twin, because a reader can drift AFTER the SQL
+    # returns: `out[k] = round(row[0], 2)` leaves both statements identical,
+    # so S3 and S3b both pass, and E1's 100.0 / 5.5 / 0.0 / -3.0 are all
+    # round-stable so E1 passes too. This ledger is built to separate the two
+    # readers rather than to be typical -- several reasons for one key,
+    # credits AND debits, a net-negative key, a sub-cent key, and deltas that
+    # survive no rounding and no int cast.
+    drift = fresh()
+    for _k, _v, _why in (("many", 12.5, "mining_reward"),
+                         ("many", -4.25, "transfer"),
+                         ("many", 0.123456789012345, "gift"),
+                         ("many", 8.0, "stake_release"),
+                         ("owes", 3.0, "gift"),
+                         ("owes", -9.5, "transfer"),
+                         ("dust", 1e-9, "mining_reward"),
+                         ("dust", 2e-9, "gift"),
+                         ("whale", 12345678.87654321, "transfer")):
+        drift.record_ledger_entry(_k, _v, _why)
+    dkeys = ["many", "owes", "dust", "whale", "never_seen"]
+    d_one = {k: drift.get_balance(k) for k in dkeys}
+    d_many = drift.get_balances(dkeys)
+    check("S3c the two readers return the SAME float over a ledger chosen to "
+          "separate them -- many reasons per key, debits as well as credits, "
+          "a net-negative key, sub-cent deltas and full float precision. "
+          "Exact equality, because a ledger that is nearly right is wrong",
+          d_one == d_many, (d_one, d_many))
+
     # ---- F: no fail-open at the call sites --------------------------------
     core = open(os.path.join(HERE, "covenant_unified_v8.py"),
                 encoding="utf-8").read()

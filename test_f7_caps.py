@@ -99,6 +99,42 @@ def state(orders):
                    cash=500.0, orders_today=orders)
 
 
+class _StubVenue:
+    """The least thing covenant_trader.execute() will accept as a venue: it
+    holds the coin, it answers, and it books nothing anywhere real."""
+    name = "stub"
+
+    def has_credentials(self):
+        return True
+
+    def place(self, sym, side, qty, live=False):
+        return {"descr": "stub fill", "txid": "TX1"}
+
+
+def book(T, st, order):
+    """Run covenant_trader.execute() over one order and hand back the state it
+    wrote. Added 2026-09-09 so the X and R sections can measure what execute()
+    DOES instead of grepping for the lines that do it (see the comments at X8b
+    and R1b).
+
+    Three things are stubbed and each for its own reason. The venue and
+    save_state, because this suite is offline and must never touch a real
+    exchange or ~/.covenant/trader_state.json. preconditions(), because what is
+    under test here is the bookkeeping execute() performs once an order is
+    ALLOWED through -- whether it is allowed at all is S4f/S4g's job, and
+    satisfying armed + seal + Rule 5 here would test those twice and this once.
+    All three are restored on the way out, including on a failure."""
+    saved = (T.V.all_venues, T.save_state, T.preconditions)
+    T.V.all_venues = lambda: [_StubVenue()]
+    T.save_state = lambda _s: None
+    T.preconditions = lambda *a, **k: []
+    try:
+        T.execute({}, st, [dict(order, at={"stub": 1.0})], True, [])
+    finally:
+        T.V.all_venues, T.save_state, T.preconditions = saved
+    return st
+
+
 def main():
     print("F7 -- the per-trade and per-day caps\n")
 
@@ -222,6 +258,38 @@ def main():
           "preconditions(" in io.open(
               os.path.join(HERE, "sentinel_witness", "seal_service.py"),
               encoding="utf-8").read())
+    # S4f/S4g ADDED 2026-09-09, because S4b and S4c read bytes and one of them
+    # cannot fail for the reason it names. "PerTradeCap(" and "largest_allowed("
+    # are both in guards.py the moment the class exists -- `class
+    # PerTradeCap(Guard):` on one line, `def largest_allowed(self, st)` on
+    # another -- so S4c stays green with the whole cap block DELETED from
+    # preconditions() (mutation: replace the two constructions, the two
+    # check() calls and the largest_allowed() call with `room = None`; the
+    # suite stayed 56/56). S4b greps for the delegating call, so it stays green
+    # when the trader makes that call and then returns [] instead of its answer
+    # -- the enforcement point silently emptied. These two ask the functions.
+    capcfg = {"armed": True, "max_order_usd": 25.0, "min_order_usd": 5.0,
+              "max_orders_per_day": 2, "max_daily_notional_usd": 50.0,
+              "seal_required": False, "min_sealed_signals": 0,
+              "rule5_require_significance": False}
+    over = {"sym": "XRP", "side": "buy", "usd": 40.0}
+    fresh = {"day": today, "orders_today": []}
+    t_says = T.preconditions(capcfg, fresh, {}, over, True, [])
+    check("S4f the delegation is LIVE, not a mention: an order over the cap comes "
+          "back from the TRADER refused in the cap's own words, and refused with "
+          "exactly the list guards.preconditions() gives for the same order",
+          any("over the $25.00 placeable now" in r for r in t_says)
+          and t_says == G.preconditions(over, cfg=capcfg, st=fresh, sealed_ok=True,
+                                        guard_blocks=[], caller="trader"), t_says)
+    used = {"day": today, "orders_today": [{"usd": 25.0, "side": "sell"},
+                                           {"usd": 25.0, "side": "sell"}]}
+    g_says = G.preconditions(over, cfg=capcfg, st=used, sealed_ok=True,
+                             guard_blocks=[], caller="trader")
+    check("S4g ...and that one implementation really asks both cap guards: a day "
+          "already at its order limit comes back refused in their names, which "
+          "defining the classes somewhere in the file cannot produce",
+          any(r.startswith("per_day_cap:") for r in g_says)
+          and any(r.startswith("per_trade_cap:") for r in g_says), g_says)
     check("S5 caps() survives a missing config file rather than raising",
           G.caps(os.path.join(d, "no_such_config.json")) == G.CAP_DEFAULTS)
     with io.open(os.path.join(d, "partial.json"), "w", encoding="utf-8") as fh:
@@ -310,6 +378,37 @@ def main():
           '"side": o.get("side")' in src)
     check("X9 ...and accumulates the lifetime buy total the budget measures",
           'st["bought_total_usd"] = float(' in src)
+    # X8b/X9b ADDED 2026-09-09. X8 and X9 read covenant_trader.py's bytes, so a
+    # line that is present and inert satisfies them. Both of these mutations
+    # left the suite 56/56: `pending.pop("side", None)` immediately before the
+    # row is appended (the guard can then never evaluate, which is the exact
+    # harm X8 names), and dropping `+ fiat_part` from the accumulation (the
+    # lifetime spend never grows, so BuyBudget's 50% ratchet never bites).
+    # These two run execute() and read what it wrote.
+    def sold40():
+        """A day with one $40 sale on it, built fresh every time: execute()
+        appends to the very list it is handed, so a shared one would let the
+        previous check's buy count against the next check's headroom."""
+        return {"day": today,
+                "orders_today": [{"sym": "XLM", "side": "sell", "usd": 40.0}]}
+
+    rot = book(T, sold40(), {"sym": "SOL", "side": "buy",
+                             "usd": 40.0, "qty": 1.0})
+    check("X8b the row execute() actually books records `side` -- without it "
+          "FiatBuyPermission cannot tell proceeds from spending and blocks "
+          "every buy forever",
+          rot["orders_today"][-1].get("side") == "buy"
+          and rot["orders_today"][-1]["usd"] == 40.0
+          and rot["orders_today"][-1]["status"] == "PLACED",
+          rot["orders_today"][-1])
+    part = book(T, sold40(), {"sym": "SOL", "side": "buy",
+                              "usd": 60.0, "qty": 1.0})
+    check("X9b ...and the lifetime buy total really accumulates the fiat part: a "
+          "$60 buy against $40 of today's sales banks $20 -- not $0, which never "
+          "spends the budget, and not $60, which spends it on a rotation",
+          part.get("bought_total_usd") == 20.0
+          and [f["usd"] for f in part.get("fiat_buys", [])] == [20.0],
+          (part.get("bought_total_usd"), part.get("fiat_buys")))
     check("X10 both new guards are in the default stack",
           {"buy_budget", "fiat_permission"} <= {g.name for g in G.DEFAULTS})
 
@@ -330,6 +429,40 @@ def main():
           "if o.get(\"side\") == \"buy\" and fiat_part > 0:" in src)
     check("R3 an unreadable day treats the whole order as new money, which is "
           "the safe direction", "(room or 0.0)" in src)
+
+    # R1b/R2b/R3b ADDED 2026-09-09. R1's second clause uses str.index, which
+    # RAISES on an absent needle instead of returning -1, so it does catch a
+    # straight swap of the two blocks (proved: moving the fiat measurement
+    # below the append turned R1 red). The literals are the weak half. One
+    # mutation -- `room = 0.0` on the line after the headroom is measured --
+    # left R1, R2 and R3 all green while charging every rotation to the buy
+    # budget, which is the mechanism switching itself off after about
+    # sixty-nine rotations. R3's literal is worse than weak: "(room or 0.0)" is
+    # a substring of the line R1 already requires, so R3 cannot fail while R1
+    # passes; treating an unreadable day as fully covered (the unsafe
+    # direction) also left the suite 56/56. These three measure the money.
+    covered = book(T, sold40(), {"sym": "SOL", "side": "buy",
+                                 "usd": 40.0, "qty": 1.0})
+    check("R1b a rotation fully covered by today's sales banks NOTHING -- which "
+          "is only true if the headroom was measured before the row was "
+          "appended, or the order would have covered itself",
+          "bought_total_usd" not in covered and "fiat_buys" not in covered,
+          {k: covered[k] for k in ("bought_total_usd", "fiat_buys")
+           if k in covered})
+    sold = book(T, {"day": today, "orders_today": []},
+                {"sym": "XLM", "side": "sell", "usd": 40.0, "qty": 1.0})
+    check("R2b a SELL is never banked against the BUY budget, though fiat_part is "
+          "left at the full order size on the sell path and only the side test "
+          "stops it being counted",
+          "bought_total_usd" not in sold and "fiat_buys" not in sold,
+          {k: sold[k] for k in ("bought_total_usd", "fiat_buys") if k in sold})
+    unread = book(T, {"day": today},          # no orders_today key: unknown
+                  {"sym": "SOL", "side": "buy", "usd": 60.0, "qty": 1.0})
+    check("R3b a day that cannot be read banks the WHOLE order as new money, "
+          "which is the safe direction -- the budget over-charges rather than "
+          "handing back room it cannot prove is there",
+          unread.get("bought_total_usd") == 60.0,
+          unread.get("bought_total_usd"))
 
     # ---- L: the caps are read at every check, not frozen at import --------
     live = os.path.join(d, "live.json")

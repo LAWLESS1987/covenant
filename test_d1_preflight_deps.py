@@ -182,6 +182,29 @@ def main():
           (sorted(banned_imports), sorted(banned_calls)))
     check("R2 it PRINTS the install command instead of running it, so the "
           "operator acts knowingly", "pip install" in src)
+
+    # R2b exists because R2 above reads the file's BYTES. Comment out the one
+    # say() that emits the command (preflight_deps.py:296) and R2 stays green
+    # on the words left behind in the comment, while the operator running
+    # covenant_one.py --ci is told "Install it with:" and then nothing at all.
+    # This runs report() over a throwaway tree whose single declared package
+    # cannot be imported, and reads what was actually SAID.
+    d = _tree({"requirements.txt": "definitely-not-installed-d1>=1.0\n",
+               "test_uses_it.py": "import definitely_not_installed_d1\n"})
+    try:
+        said = []
+        n_missing = p.report(said.append, d)
+        cmd = [line for line in said if "pip install" in line]
+        check("R2b ...and it says so AT RUN TIME, naming the package and the "
+              "constraint the operator has to install. Reading the source for "
+              "the words proves only that they are written down somewhere; a "
+              "preflight that names the cause in a comment and not in its "
+              "output leaves the same evening spent auditing the wrong suite",
+              n_missing == 1 and cmd
+              and "definitely-not-installed-d1>=1.0" in cmd[0],
+              (n_missing, said))
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
     check("R3 stdlib only -- it must run before anything is installed, on any "
           "platform, which is the one moment a dependency of its own would "
           "make it useless",

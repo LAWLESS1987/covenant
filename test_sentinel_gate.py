@@ -7,6 +7,11 @@ refuse, raise), so no node is needed. tradeGate.js cannot run here (no node
 runtime on this machine), so its invariants are pinned by reading it: the
 only executor path is behind the gate, every failure branch is a refusal,
 and no "unlimited" limit can be expressed.
+
+Reading a file is not running it, and J3 is where that bit: it compared two
+str.find() results, which is satisfied by ABSENCE, and stayed green when the
+guard it names was deleted from the source. J3b/J3c replace the claim with a
+walk of executeIfAllowed that evaluates its guards -- see the walker below.
 LICENCE: public domain.
 """
 from __future__ import annotations
@@ -46,6 +51,133 @@ def post(url, obj, raw=None):
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read().decode() or "{}")
+
+
+# ---- the JS side has no runtime here, so executeIfAllowed is WALKED. --------
+# J3 below compares two str.find() results, and that shape is satisfied by
+# ABSENCE: str.find returns -1 for a guard that is not there, and -1 sorts
+# before the executor call, so J3 stays green when the guard is DELETED.
+# Proved by mutation 2026-09-09 -- with `if (!verdict.allowed) return` removed
+# from tradeGate.js, the only thing standing between a refused verdict and the
+# executor, this suite still reported 26/26 and J3 still said PASS. It stays
+# green for a NEUTERED guard too (`verdict.allowed === "no"`), because that
+# text is absent as well.
+#
+# So J3b/J3c do not look for the line. They split executeIfAllowed into its
+# top-level statements, EVALUATE each guard's condition -- once against a
+# refused verdict, once against an admitted one -- and report whether control
+# reaches the executor. What the walker cannot read it reports as None, which
+# fails both checks: an unreadable gate is a refusal, the same way the gate
+# itself fails closed. This is not node and does not pretend to be; it reads
+# only the shapes tradeGate.js is written in, and when it stops recognising
+# them it gets louder, never quieter.
+
+
+class _Obj:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+def _typeof(x):
+    if callable(x):
+        return "function"
+    if x is None:
+        return "undefined"
+    if isinstance(x, str):
+        return "string"
+    if isinstance(x, (int, float)):
+        return "number"
+    return "object"
+
+
+def _close(s, i):
+    """Index of the ) matching the ( at s[i]."""
+    depth = 0
+    for j in range(i, len(s)):
+        if s[j] == "(":
+            depth += 1
+        elif s[j] == ")":
+            depth -= 1
+            if depth == 0:
+                return j
+    raise ValueError("unbalanced condition: %s" % s[:60])
+
+
+def _js_truth(cond, env):
+    """Evaluate one small JS condition (!, typeof, ===, !==, &&, ||) or raise."""
+    py = cond.replace("!==", "\0").replace("!=", "\0").replace("===", "==")
+    py = re.sub(r"typeof\s+([A-Za-z_$][\w$]*)", r"_typeof(\1)", py)
+    py = py.replace("&&", " and ").replace("||", " or ").replace("!", " not ")
+    py = py.replace("\0", "!=")
+    py = re.sub(r"\btrue\b", "True", py)
+    py = re.sub(r"\bfalse\b", "False", py)
+    py = re.sub(r"\b(null|undefined)\b", "None", py)
+    return bool(eval(py, {"__builtins__": {}}, dict(env, _typeof=_typeof)))
+
+
+def _js_block(js, header):
+    """The body of the function whose signature starts with `header`."""
+    open_i = js.index("{", js.index(header))
+    depth = 0
+    for i in range(open_i, len(js)):
+        if js[i] == "{":
+            depth += 1
+        elif js[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return js[open_i + 1:i]
+    raise ValueError("unbalanced function body")
+
+
+def _js_statements(block):
+    """The top-level statements of a JS block, in order, comments dropped."""
+    block = "\n".join(x for x in block.splitlines() if not x.strip().startswith("//"))
+    out, cur, depth, quote, i = [], [], 0, "", 0
+    while i < len(block):
+        ch = block[i]
+        cur.append(ch)
+        if quote:
+            if ch == "\\" and i + 1 < len(block):
+                i += 1
+                cur.append(block[i])
+            elif ch == quote:
+                quote = ""
+        elif ch in "\"'`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0 and ch == "}":
+                out.append("".join(cur)); cur = []
+        elif ch == ";" and depth == 0:
+            out.append("".join(cur)); cur = []
+        i += 1
+    out.append("".join(cur))
+    return [x.strip() for x in out if x.strip()]
+
+
+def _js_reaches_executor(js, allowed):
+    """Walk executeIfAllowed with verdict.allowed = `allowed`. True if control
+    reaches the executor call, False if it returns first, None if unreadable."""
+    try:
+        env = {"verdict": _Obj(allowed=allowed), "order": _Obj(), "opts": None,
+               "executor": lambda *a: "filled"}
+        for st in _js_statements(_js_block(js, "export async function executeIfAllowed")):
+            if st.startswith("if"):
+                lp = st.index("(")
+                rp = _close(st, lp)
+                if not _js_truth(st[lp + 1:rp], env):
+                    continue
+                st = st[rp + 1:].strip()
+            if re.search(r"\bexecutor\s*\(", st):
+                return True
+            if st.startswith("return") or st.startswith("throw"):
+                return False
+        return False
+    except Exception as e:
+        print("      (the walker could not read executeIfAllowed: %r)" % (e,))
+        return None
 
 
 class FakeSealer:
@@ -186,6 +318,17 @@ def main():
     body_exec = js[js.find("export async function executeIfAllowed"):]
     ok("J3", "the executor runs only after allowed is checked",
        body_exec.find("if (!verdict.allowed) return") < body_exec.find("await executor(order, verdict)"))
+    # J3b/J3c ARE THE REAL FORM OF J3'S CLAIM (see the walker above). J3 is
+    # kept because it still documents the intended shape, but it is satisfied
+    # by absence and cannot carry this on its own. The pair kills: deleting the
+    # guard, inverting it, neutering its condition so it never fires, and
+    # moving the executor call above it -- and J3c is what stops the cheapest
+    # "repair" of all, refusing everything.
+    on_refused, on_admitted = _js_reaches_executor(js, False), _js_reaches_executor(js, True)
+    ok("J3b", "walked with a REFUSED verdict, no path through executeIfAllowed reaches the executor",
+       on_refused is False, on_refused)
+    ok("J3c", "...and with an ADMITTED verdict it does reach it, so the gate is not a blanket refusal",
+       on_admitted is True, on_admitted)
     body_gate = js[js.find("export async function gateTrade"):js.find("export async function executeIfAllowed")]
     ok("J4", "every failure branch in gateTrade is a refusal: unreachable, non-JSON, HTTP error, not admitted, no fetch",
        all(s in body_gate for s in ("unreachable or timed out", "answered without JSON", "answered HTTP", "not admitted", "no fetch available")))

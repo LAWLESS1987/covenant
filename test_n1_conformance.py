@@ -131,11 +131,58 @@ def main():
           "vectors and a root over 300 are different claims, and quoting one "
           "as the other is this project's recurring failure",
           '"vectors"' in src and "vectors : %d" in src)
+
+    # O2b exists because O2 above is a grep over conformance.py, and a grep
+    # cannot tell a published count from a printf template. MUTATION IT KILLS,
+    # run 2026-09-09: `print("  vectors : %d" % 999)` together with dropping
+    # the "vectors" key from the --json object. Both literals O2 looks for
+    # survive that edit -- the --spec branch still carries `"vectors"` -- so O2
+    # stayed green, the whole suite stayed 19/19, and the tool announced a root
+    # over 999 vectors it had never run while --json published no count at all.
+    # That is precisely the "quoting one as the other" failure O2 is named
+    # after. A count is only PUBLISHED WITH THE ROOT if the program says so at
+    # run time, so this one reads what conformance.py emits, never its bytes.
+    import io
+    import json as _json
+    from contextlib import redirect_stdout
+    report = io.StringIO()
+    with redirect_stdout(report):
+        K.main([])
+    printed = report.getvalue()
+    emitted = io.StringIO()
+    with redirect_stdout(emitted):
+        K.main(["--json"])
+    as_json = _json.loads(emitted.getvalue())
+    check("O2b the count the tool actually PRINTS is the true one, standing "
+          "beside the root it qualifies -- in the human report and in --json "
+          "alike. O2 can be satisfied by the literals alone; this cannot",
+          ("vectors : %d" % len(rs)) in printed and base in printed and
+          as_json.get("vectors") == len(rs) and as_json.get("root") == base,
+          (as_json.get("vectors"), as_json.get("root", "")[:16], len(rs),
+           [ln.strip() for ln in printed.splitlines() if "vectors" in ln][:2]))
     check("O3 it says plainly that it is not a proof of correctness",
           "not a proof of correctness" in src.lower())
+    # O4 REWRITTEN IN PLACE 2026-09-09. It read
+    #     K.SPEC_VERSION.encode() in b"covenant-conformance-v1" or True
+    # -- an `or True` tautology, green for every possible source, including a
+    # source with no domain separation in it whatsoever. MUTATION IT NOW KILLS:
+    # hashing the literal b"covenant-conformance-v1" in conformance_root()
+    # instead of SPEC_VERSION. Today's bytes are identical, so X2 below --
+    # which rebuilds the root from the published `spec` field -- stays green,
+    # and the old O4 stayed green, yet two different spec versions then hash to
+    # the SAME root. That is the silent collision this line is named after, and
+    # nothing else in this suite saw it. Domain separation is a fact about the
+    # hash, so ask the hash: move the version, and the root must move with it.
+    spec_was = K.SPEC_VERSION
+    try:
+        K.SPEC_VERSION = spec_was + "-successor"
+        other_spec = K.conformance_root(K.run_vectors())
+    finally:
+        K.SPEC_VERSION = spec_was
     check("O4 the spec version is domain-separated into the hash, so roots "
           "from different spec versions can never collide silently",
-          K.SPEC_VERSION.encode() in b"covenant-conformance-v1" or True)
+          other_spec != base and root() == base,
+          (base[:16], other_spec[:16]))
 
     # ---- F: federation tells a fork from a divergence ----------------------
     import json

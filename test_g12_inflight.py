@@ -32,6 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import launch_check as LC  # noqa: E402
+import covenant_one as C1  # noqa: E402
 
 NL = chr(10)
 FAILS = []
@@ -87,6 +88,120 @@ def run_g12(tmp, inflight_env):
             os.environ["COVENANT_ONE_TRANSCRIPT"] = old_env
 
 
+# --------------------------------------------------------------------------
+# I6b/I9b/I7b/I8b/I7c/I7d: the same two halves, MEASURED.
+#
+# I6/I9/I7/I8 read covenant_one.py as text. Text is not behaviour, and three
+# separate mutations proved it here on 2026-09-09: with every literal those
+# four checks grep for left byte-for-byte intact, the suite stayed 9/9 while
+# (a) run_open was handed env=None, so the transcript name never reached
+# launch_check at all; (b) an `if again:` line put the exclusion back, so the
+# second ask excluded this sweep's transcript again -- the exact second-cycle
+# failure of 2026-09-05; (c) the second ask was moved under `if False:`, so it
+# never ran. The checks below drive the real functions instead, so each of
+# those three mutations turns one of them red.
+# --------------------------------------------------------------------------
+class Say(list):
+    """Stands in for covenant_one.Tee: keeps the lines instead of printing
+    them, and carries the .path the runner names to the gates."""
+
+    def __init__(self, path):
+        list.__init__(self)
+        self.path = path
+
+    def __call__(self, line=""):
+        self.append(line)
+
+    def close(self):
+        pass
+
+
+class NoSub(object):
+    """subprocess with run() disarmed. phase_gates fires launch_check twice;
+    neither run is the thing under test, and the --json one is handed an open
+    file that Windows will not let the temp folder be removed around."""
+    DEVNULL = None
+
+    @staticmethod
+    def run(*a, **kw):
+        fh = kw.get("stdout")
+        if hasattr(fh, "close"):
+            fh.close()
+        return None
+
+
+def gates_env(tmp, again, stale=None):
+    """Ask the real phase_gates for the environment it hands launch_check,
+    without letting launch_check run. Returns (env, say)."""
+    io.open(os.path.join(tmp, "launch_check.py"), "w", encoding="utf-8").close()
+    seen = {}
+
+    def fake_run_open(say, cmd, cwd=None, env=None, timeout=None, label=None):
+        seen["env"] = env
+        return 0
+
+    say = Say(os.path.join(tmp, "ONE_SWEEP.txt"))
+    old = (C1.HERE, C1.run_open, C1.subprocess,
+           os.environ.get("COVENANT_ONE_TRANSCRIPT"))
+    C1.HERE, C1.run_open, C1.subprocess = tmp, fake_run_open, NoSub
+    if stale is None:
+        os.environ.pop("COVENANT_ONE_TRANSCRIPT", None)
+    else:
+        os.environ["COVENANT_ONE_TRANSCRIPT"] = stale
+    try:
+        C1.phase_gates(say, again=again)
+    finally:
+        C1.HERE, C1.run_open, C1.subprocess = old[0], old[1], old[2]
+        if old[3] is None:
+            os.environ.pop("COVENANT_ONE_TRANSCRIPT", None)
+        else:
+            os.environ["COVENANT_ONE_TRANSCRIPT"] = old[3]
+    return seen.get("env"), say
+
+
+def run_main(tmp, argv, answers):
+    """Run covenant_one.main() with every phase stubbed except the one under
+    test -- the gate asks. `answers` are what the stubbed phase_gates returns,
+    in order. Returns ([(again, transcript_length_at_the_ask), ...], say)."""
+    asks = []
+
+    def fake_gates(say, again=False):
+        asks.append((again, len(say)))
+        return answers[min(len(asks) - 1, len(answers) - 1)]
+
+    say = Say(os.path.join(tmp, "ONE_RUN.txt"))
+    names = ("Tee", "phase_identity", "phase_coverage", "phase_integrity",
+             "phase_gates", "phase_sweep", "phase_live", "phase_actions")
+    old = dict((n, getattr(C1, n)) for n in names)
+    old_argv, old_here = sys.argv, C1.HERE
+    C1.HERE = tmp
+    C1.Tee = lambda path: say
+    C1.phase_identity = lambda s: None
+    C1.phase_coverage = lambda s: ([], [], 0, [])
+    C1.phase_integrity = lambda s, transported=False: []
+    C1.phase_gates = fake_gates
+    C1.phase_sweep = lambda s, only=None, repeat=1, verbose=False: [
+        ("test_x.py", "PASS", 1.0, 3, 0)]
+    C1.phase_live = lambda s, title=None: None
+    C1.phase_actions = lambda s, a, gates=None: []
+    sys.argv = ["covenant_one.py"] + list(argv)
+    try:
+        C1.main()
+    finally:
+        for n in names:
+            setattr(C1, n, old[n])
+        sys.argv, C1.HERE = old_argv, old_here
+    return asks, say
+
+
+def line_at(say, prefix):
+    """Index of the first transcript line with this prefix, or -1."""
+    for i, l in enumerate(say):
+        if l.startswith(prefix):
+            return i
+    return -1
+
+
 def main():
     print("G12 in-flight transcript -- the sweep's own transcript is the question, not the answer")
 
@@ -128,6 +243,42 @@ def main():
     i_verdict = src.find('say("  gates               %s"')
     ok("I8", "and it asks AFTER the tally lines are written and BEFORE the gates verdict line",
        0 < i_tally < i_again < i_verdict, "%d < %d < %d" % (i_tally, i_again, i_verdict))
+
+    # Now the same two halves again, run rather than read.
+    with tempfile.TemporaryDirectory() as tmp:
+        env, say = gates_env(tmp, again=False)
+        got = (env or {}).get("COVENANT_ONE_TRANSCRIPT")
+        ok("I6b", "measured: the first ask really hands launch_check this sweep's transcript",
+           got == os.path.abspath(say.path), str(got))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        stale = os.path.join(tmp, "SOME_OTHER_SWEEP.txt")
+        env, say = gates_env(tmp, again=True, stale=stale)
+        # Stale on purpose: the second ask must clear an inherited exclusion,
+        # not just refrain from adding one. Excluding it both times is what
+        # kept the 2026-09-05 second cycle from being green.
+        ok("I9b", "measured: the second ask excludes nothing, even with an exclusion inherited",
+           env is not None and "COVENANT_ONE_TRANSCRIPT" not in env,
+           str((env or {}).get("COVENANT_ONE_TRANSCRIPT")))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        asks, say = run_main(tmp, [], [2, 0])
+        ok("I7b", "measured: a finished sweep with INCOMPLETE gates asks a second time, again=True",
+           [a for a, _ in asks] == [False, True], repr([a for a, _ in asks]))
+        i_tally, i_verdict = line_at(say, "  checks failed"), line_at(say, "  gates ")
+        ok("I8b", "measured: the second ask lands after the tally and before the gates verdict",
+           len(asks) == 2 and 0 <= i_tally < asks[-1][1] <= i_verdict,
+           "tally %d, ask at %d, verdict %d" % (i_tally, asks[-1][1] if asks else -1, i_verdict))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        asks, _ = run_main(tmp, [], [0])
+        ok("I7c", "measured: gates that already PASSed are not asked again",
+           len(asks) == 1, repr(asks))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        asks, _ = run_main(tmp, ["--quick"], [2, 0])
+        ok("I7d", "measured: a sweep that never ran (--quick) proves nothing, so no second ask",
+           len(asks) == 1, repr(asks))
 
     print("G12-inflight: %d/%d passed" % (N - len(FAILS), N))
     return 1 if FAILS else 0

@@ -9,6 +9,8 @@ keep doing: block on count, and block on a record that is only luck.
 
 Run:  python test_rule5_ledger.py
 """
+import contextlib
+import io
 import json
 import os
 import sys
@@ -186,6 +188,57 @@ check(res[0]["status"] == "UNKNOWN" and len(st["orders_today"]) == 1,
 src = open(os.path.join(HERE, "covenant_trader.py"), encoding="utf-8").read()
 check('st["sealed_signals"] = int(r5.get("settled", 0))' in src,
       "T5 covenant_trader.py writes sealed_signals from the ledger -- the counter has a writer")
+
+# T5 reads the file's BYTES, and the bytes survive things the behaviour does
+# not. Measured 2026-09-09: put a '#' in front of that one line and the literal
+# is still in the file, so T5 still printed ok while the counter went back to
+# having no writer -- which IS the 2026-09-06 defect this whole file exists to
+# pin. So run the writer instead of grepping for it. run_once() is driven with
+# everything it touches stubbed out (no venues, no nodes, no orders, state and
+# the decision snapshot in a temp dir) except the ledger, which is made to
+# report a settled count nobody could mistake for a default; then read the
+# state that was handed to save_state(). Two different counts, because a
+# writer that always writes 7 is not reading the ledger either.
+def rule5_state(settled):
+    tmp = tempfile.mkdtemp()
+    saved = {}
+    keep = {k: getattr(T, k) for k in ("STATE", "load_state", "node_status",
+                                       "gather", "plan", "execute", "save_state")}
+    keep_record_cycle = T.signal_ledger.record_cycle
+    try:
+        T.STATE = os.path.join(tmp, "trader_state.json")
+        T.load_state = lambda: {"orders_today": [], "day": "", "equity_peak": 0.0,
+                                "equity_start_of_day": 0.0, "closed_trades": [],
+                                "last_sold": {}, "bought_total_usd": 0.0,
+                                # -1 is a value no ledger can produce: if it
+                                # survives the cycle, nothing wrote the counter.
+                                "sealed_signals": -1}
+        T.node_status = lambda ports, timeout=4: []
+        T.gather = lambda cfg: {"positions": [], "unpriced": [], "venue_notes": [],
+                                "total": 0.0, "cash": 0.0}
+        T.plan = lambda cfg, pf, week_spent=0.0: ([], ["no orders (stub)"])
+        T.execute = lambda *a, **kw: []
+        T.save_state = lambda st: saved.update(st)
+        T.signal_ledger.record_cycle = lambda positions, **kw: {
+            "open": 2, "settled": settled, "wins": settled,
+            "mean_after_costs": 0.02, "p_value": 0.001, "clears": False,
+            "why": f"{settled} settled signals (stub)"}
+        cfg = dict(T.DEFAULT_CONFIG)
+        cfg.update({"armed": False, "seal_required": False, "node_ports": []})
+        with contextlib.redirect_stdout(io.StringIO()):   # the cycle's own report
+            T.run_once(cfg)
+    finally:
+        for k, v in keep.items():
+            setattr(T, k, v)
+        T.signal_ledger.record_cycle = keep_record_cycle
+    return saved
+
+a, b = rule5_state(7), rule5_state(12)
+check(a.get("sealed_signals") == 7 and b.get("sealed_signals") == 12,
+      "T5b a cycle actually run writes the ledger's settled count into state "
+      "(comment the writer out and this goes red, T5 does not)")
+check(a.get("rule5", {}).get("settled") == 7 and a.get("rule5", {}).get("why"),
+      "T5b ...and the record beside it carries the same count and the ledger's reason")
 
 print()
 if FAILS:

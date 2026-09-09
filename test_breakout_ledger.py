@@ -177,6 +177,39 @@ check("  ...and --record, which the first version promised and did not have, is 
       "--record" in have)
 check("a partial universe refuses to record the day",
       "not recording this day" in src_all and "MIN_COVERAGE" in src_all)
+# The check above reads the file's WORDS. Neutering the guard while leaving
+# every one of those words in place -- `if cov < MIN_COVERAGE:` becoming
+# `if False and cov < MIN_COVERAGE:`, or MIN_COVERAGE dropping to 0.0 --
+# keeps it green while a half-read universe gets recorded as if it were the
+# day (measured: 61/61 still passed with the condition dead). So the refusal
+# has to be RUN. _get is the only network call inside fetch_quotes, which
+# makes a partial read stageable offline.
+def _staged_get(answering):
+    bars = [[str(1_700_000_000_000 + k * 86_400_000), "0", "0", "0",
+             f"{10 + k * 0.1:.4f}", "0"] for k in range(bl.WINDOW + 2)]
+    def g(url, timeout=20.0):
+        inst = url.split("instId=")[1].split("&")[0]
+        if inst not in answering: raise RuntimeError("no candles for " + inst)
+        return {"data": bars}
+    return g
+SYMS = [f"S{i}-USDT" for i in range(10)]
+def coverage_run(k):
+    """One fetch_quotes in which only k of the 10 watched symbols answer."""
+    real = bl._get; bl._get = _staged_get(set(SYMS[:k]))
+    try: return bl.fetch_quotes(SYMS, pause=0.0), None
+    except Exception as exc: return None, exc
+    finally: bl._get = real
+got, exc = coverage_run(5)
+check("  ...and it REALLY RAISES on a half-read universe, not just says so",
+      got is None and isinstance(exc, RuntimeError),
+      f"raised {type(exc).__name__}" if exc else
+      f"returned {len(got)} quotes and called it the day")
+check("  ...naming the shortfall, so a refused day is auditable",
+      exc is not None and "5/10" in str(exc), str(exc)[:44] if exc else "no raise")
+got2, exc2 = coverage_run(10)
+check("  ...while a FULL read passes -- coverage is what refuses, not everything",
+      exc2 is None and got2 is not None and len(got2) == 10,
+      f"{len(got2) if got2 else 0} quotes" if exc2 is None else f"raised {exc2}")
 check("the day boundary convention is stated (UTC), not left to differ from "
       "signal_ledger.py silently", bl.DAY_TZ == "UTC")
 
