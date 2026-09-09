@@ -332,12 +332,23 @@ count, each already half-broken:
   violations wearing institutional clothes — see `discourse` in `judge_suite.py`.
 - **Show the judge accusing the innocent.** It hard-accuses 8 of 8 legitimate
   documents *about* violations, because it reads topic rather than conduct
-  (issue A67). Find a cleaner case, or prove the fix impossible.
+  (issue A67). Find a cleaner case, or prove the fix impossible. Four models —
+  Grok, ChatGPT, Gemini, DeepSeek — were asked independently on 2026-09-09 and
+  all four say this is a wall, not a bug
+  ([ROUNDTABLE_2026-09-09](docs/ROUNDTABLE_2026-09-09.md)). Prove them wrong and
+  you have done something none of them could.
 - **Break the exam instead of the gate.** A first draft of `discourse` was
   discarded because word count separated its labels perfectly, so a rule knowing
   nothing about conduct scored full marks. Find the next such shortcut.
 - **Show a published number here is wrong.** Several have been, including by
-  their author, and the corrections sit beside the claims.
+  their author, and the corrections sit beside the claims. The worst one is
+  still published: a polite sentence once cleared **11 of 19** thefts here, 58%.
+  Deployed commercial guards measured against the same class of attack in 2026
+  leak 19.9% (GPT-4o-mini) and 12.3% (Llama Guard 4); one leaks under 1.2%
+  (arXiv 2609.08236). We were worse than all of them. The number is here, the
+  fix is in, and `test_f6_stuffing.py` runs every fifteen minutes so it cannot
+  come back quietly. If you want a reason to trust the other numbers, it is
+  that one.
 - **Run a node for a month and never disagree with me.** That would make the
   quorum decorative and the design worth reconsidering.
 
