@@ -1810,3 +1810,79 @@ which the one careful agent had already invented for itself:
 **Status:** fixed as a method; the re-measurement is running. The near-miss is
 recorded rather than quietly repaired, because the value of this file is that it
 contains the things that went wrong, and this one was mine.
+
+---
+
+### A74. [serious / tests] 35 of 36 suspected guards were confirmed fake by mutation: the dominant mechanism is a check that GREPS THE SOURCE TEXT instead of running the code. Reserve clamp fixed 2026-09-09; the rest OPEN
+
+**Method.** After A73 the audit was re-run with one git worktree per verifying
+agent, so no two mutations could meet. For each candidate: run the suite clean,
+checksum the source, apply a mutation that genuinely breaks the guarded
+behaviour, prove the behaviour actually changed at runtime, re-run, checksum
+again. A guard is fake only if the suite stayed **green** while the property it
+names was broken.
+
+**Result.** 36 candidates, all measured in isolation:
+
+    CONFIRMED fake   35     (2 serious, 28 major, 5 minor)
+    GENUINE           1     (test_a24 -- the mutation correctly turned it red)
+
+**Read that honestly.** The audit *pre-selected* suites it already suspected, so
+a high confirmation rate is what a working audit looks like, not a claim that
+35 of the 95 suites are fake. It is a lower bound on the suspected set and says
+nothing about the ones nobody looked at.
+
+**The single mechanism, in almost every case.** The check reads the source as a
+*string* -- `inspect.getsource()`, `io.open(...).read()`, then `in` or `find()`
+-- and asserts that some substring is present. The mutation deletes the
+behaviour and leaves the substring, or the log line, or the docstring. Named
+variants found:
+
+  * **grep-for-a-substring** -- P1/P2/P3/P4/H7 in F5; N in C3; S4 in J1.
+  * **tautology** -- `fsrc.find("usable_tx_id") < fsrc.find('"TX_REQUEST"')` is
+    satisfied by ABSENCE, because `find` returns -1 (A3s S8d). And
+    `(refused and isinstance(...)) or refused`, which is just `refused` (K3 B2).
+  * **the test re-implements the thing it tests** -- `flagged()` in R2 is a
+    private copy of the classifier in `redundancy.py`, so the suite checks the
+    copy; T1 in F2 evaluates `math.ceil(2*0.5) == 1`, four literals and the
+    stdlib, never touching the builder it claims to pin.
+  * **the fixture hard-copies the answer** -- S5's `FORMAL` tuple is
+    byte-identical to the model's own `missing_seeds`, so "undeclared" is empty
+    by construction and can only ever go red if the DECLARATION shrinks.
+  * **measuring an absent precondition** -- E3 in B2 always takes its
+    `except` branch because the builder credentials nothing, so the armed gate
+    is never once observed ADMITTING a quorum. That is A69's repeat.
+
+**THE SERIOUS ONE, AND IT IS FIXED.** `covenant_trader.plan()` lines 576-583:
+the two `qty = sellable` clamps are the **only** enforcement of the 50% reserve
+and of the frozen `HOLD_ONLY = ("XRP", "HBAR", "LINK")` floor -- `guards.py`
+gates BUYS only, *"a guard never stops a risk-reducing sale"*, so nothing
+downstream re-checks the quantity. Delete them and F5 stayed at 35/35.
+
+Measured, clean against mutant, same fixture:
+
+    XLM, 100 units, 50-unit floor    clean 50.0 sold   MUTANT 75.0 sold
+    XRP, hold-only, frozen floor     clean  none       MUTANT 75.0 sold
+
+Worse than a silent break: the `notes.append()` lines survive, so the planner
+prints *"reserve: XLM sell trimmed 75 -> 50 units ... no rule may cross it"* and
+then attaches a 75-unit order. **The audit trail would report the floor honoured
+while it was crossed.** The trader is armed.
+
+**Fix (this issue's half): F5 now runs the planner instead of reading it.**
+`P2b` asserts the planned quantity is 50 when the cap wants 75; `H7b` asserts a
+hold-only asset at its floor is planned for no sale at all. Both verified by
+mutation in a throwaway worktree: 37/37 clean, and **35/37 with the clamps
+removed, P2b and H7b the two that fail**. The 35 pre-existing checks all still
+pass under that mutation, which is the measurement that says which half was
+doing the work.
+
+The lesson was already in this file at `P5`, whose own comment reads *"a test
+that reads the prose instead of running the code"*. It had been applied to one
+check and not to its neighbours.
+
+**Status:** the reserve clamp is closed. The other 34 are open and listed in the
+run journal; none has been acted on, and none should be quoted as a defect in
+the *code* -- every one of them is a defect in a **test**, and the guarded
+behaviour was found correct in every case that was checked. What was missing was
+the proof.

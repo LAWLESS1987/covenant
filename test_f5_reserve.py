@@ -162,6 +162,58 @@ def main():
           "sell DROPPED" in src)
     check("P4 the baseline is written under private/, because a per-asset quantity is "
           "the portfolio (CONSTITUTION II.4)", '"private", "RESERVE.json"' in src)
+
+    # ---- P2b/H7b: THE SAME CLAIMS, RUN RATHER THAN READ --------------------
+    # P1-P4 and H7 above are greps. Measured 2026-09-09 by mutation, in an
+    # isolated worktree: delete both `qty = sellable` clamps in
+    # covenant_trader.plan() and this suite stayed at 35/35, fully green.
+    #
+    # Those two lines are the ONLY enforcement of the 50% reserve and of the
+    # frozen HOLD_ONLY floor. guards.py gates BUYS only -- "a guard never stops
+    # a risk-reducing sale" -- so nothing downstream re-checks the quantity.
+    # With them gone the planner emits a 75-unit sell of a 100-unit position
+    # against a 50-unit floor, and a 75-unit sell of XRP, which must never be
+    # sellable at all. The trader is armed.
+    #
+    # It is worse than a silent break: the notes.append() lines survive the
+    # mutation, so the planner PRINTS "reserve: XLM sell trimmed 75 -> 50
+    # units ... no rule may cross it" and then attaches a 75-unit order. The
+    # operator's own audit trail would report the floor honoured while it was
+    # being crossed.
+    #
+    # The lesson was already in this file, eleven lines below, at P5: "a test
+    # that reads the prose instead of running the code". It was applied to one
+    # check and not to its neighbours. So: run the code.
+    import covenant_trader as T
+
+    def _planned_sell(sym):
+        """Units of `sym` the planner actually attaches to a plan.
+
+        Baselines are stubbed to 100 so the reserve is a known 50, and the
+        position is built over the concentration cap so a sale is wanted at
+        all: the cap asks for 75, the reserve permits 50, hold-only permits 0.
+        """
+        real = T.reserve_baseline
+        T.reserve_baseline = lambda pf, path=None: (
+            {p["sym"]: 100.0 for p in pf["positions"]},
+            {p["sym"]: 100.0 for p in pf["positions"]}, [])
+        try:
+            out = T.plan(dict(T.DEFAULT_CONFIG),
+                         {"positions": [{"sym": sym, "val": 200.0, "px": 2.0,
+                                         "qty": 100.0, "at": "t", "regime": "UP"}],
+                          "total": 250.0, "cash": 50.0})
+        finally:
+            T.reserve_baseline = real
+        orders = out[0] if isinstance(out, tuple) else out
+        return sum(o["qty"] for o in orders if o.get("side") == "sell")
+
+    _xlm = _planned_sell("XLM")
+    check("P2b the planner CLAMPS the quantity it plans -- the concentration cap wants "
+          "75 units of a 100-unit position sold and the reserve permits 50",
+          abs(_xlm - 50.0) < 1e-9, _xlm)
+    _xrp = _planned_sell("XRP")
+    check("H7b a hold-only asset at its frozen floor is planned for NO sale at all, "
+          "not merely a trimmed one", abs(_xrp) < 1e-9, _xrp)
     # P5 is BEHAVIOURAL. The first version of this check grepped the function
     # body for the word "lower" and failed on the docstring that explains why
     # it never lowers -- a test that reads the prose instead of running the
