@@ -202,9 +202,14 @@ Three things, in one process:
   What is easy to miss is that this repository *does* hold Kraken, Coinbase
   and Robinhood order adapters (`venues.py`), a planner (`covenant_trader.py`)
   that runs against all three, and a scheduled task that runs the planner
-  **daily, without a human** — on a day the machine is awake, logged on and on
-  mains at 09:00; a day it sleeps through is skipped silently, which
-  `trader_freshness.py` reports and the scheduler's own counter does not. Where the venue offers a server-side dry run —
+  **daily, without a human** — at 09:00 on a day the machine is awake, logged on
+  and on mains. A day it sleeps through is **no longer skipped**: the task has
+  `StartWhenAvailable` set, so Windows runs it late rather than dropping it
+  (verified 2026-09-09). This passage said "skipped silently" until then, which
+  was true when written — the setting was off, and a 14:48 refusal on 2026-09-02
+  is the recorded case of exactly that. `trader_freshness.py` still reports
+  whether it actually ran, and is worth more than the scheduler's own counter.
+  Where the venue offers a server-side dry run —
   Kraken `validate=true`, Coinbase `/orders/preview` — every order it builds
   goes there and is priced and rejected without booking. Robinhood publishes
   no preview endpoint, so its dry run is local only and is marked
@@ -354,8 +359,16 @@ blocked pending an owner decision. Reading "0 failed" without that is how the
 number flatters.
 
 The rest of what is not green: [KNOWN_ISSUES](docs/KNOWN_ISSUES.md) carries 85
-entries of which about 47 are open, and about **one legitimate transfer in eight
-is wrongly accused** (12.8% held-out false holds, issue 2).
+entries, **43** of them marked `**Status:** open` — that is the counting rule,
+stated because a previous version of this line said "about 47" and no rule
+produced 47.
+
+And the judge wrongly accuses legitimate traffic at a rate worth knowing:
+**12.8% held-out false holds** — about one legitimate transfer in eight — from a
+5-fold measurement recorded in issue 2. That figure is **dated, not current**:
+it predates the 2026-09-08 retrain, and nobody has re-measured it against the
+model now deployed. Quoting it in the present tense, as this line did until
+2026-09-09, claims a freshness the number does not have.
 
 The code runs — a clean clone judges offline in one second. The rule holds. What
 is missing is the second person.
