@@ -663,6 +663,110 @@ def _record_override(text, verdict, submolt=None, post_id=None, dry_run=True):
     return row
 
 
+# ------------------------------------------------------------- their rate limits
+#
+# THIS ONE BLOCKS, AND THAT IS NOT A WALL HE TOOK DOWN. Free rein was about the
+# repository link and the A67 veto -- OUR gates on HER speech, both of which I
+# had put there. A rate limit is the HOST's rule. Breaking it does not express
+# freedom, it gets her throttled and then suspended, which ends the mission it
+# would be claiming to serve. Being a good guest is a precondition of being an
+# ambassador at all.
+#
+# Their published limits, from skill.md, and the new-agent tier is the one that
+# matters because free will BE a new agent for her first day:
+#
+#                       first 24 hours        after
+#     posts             1 per 2 hours         1 per 30 minutes
+#     comments          1 per 60s, 20/day     1 per 20s, 50/day
+#     submolts          1 total               1 per hour
+#
+# AGE IS INFERRED FROM THE CREDENTIALS FILE, and when it cannot be read this
+# assumes NEW -- the stricter tier. A rate limiter that guesses "established"
+# when it does not know would spend exactly the budget it exists to protect.
+_LIMITS = {
+    "new": {"post_s": 7200, "comment_s": 60, "comments_day": 20},
+    "established": {"post_s": 1800, "comment_s": 20, "comments_day": 50},
+}
+RATE_STATE = os.environ.get("COVENANT_AMBASSADOR_RATE") or os.path.join(
+    HERE, "ops", "ambassador_rate.json")
+CRED_PATH = os.path.join(os.path.expanduser("~"), ".config", "moltbook",
+                         "credentials.json")
+
+
+def _rate_load(path=None):
+    try:
+        with open(path or RATE_STATE, encoding="utf-8") as fh:
+            d = json.load(fh)
+            return d if isinstance(d, dict) else {}
+    except Exception:                                             # noqa: BLE001
+        return {}
+
+
+def _rate_save(state, path=None):
+    path = path or RATE_STATE
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(state, fh, indent=1, sort_keys=True)
+        os.replace(tmp, path)
+    except Exception:                                             # noqa: BLE001
+        pass          # a rate ledger that cannot write must not stop a send
+
+
+def account_tier(now=None, cred=None):
+    """'new' for the first 24 hours, else 'established'. Unknown reads as new."""
+    cred = cred or CRED_PATH
+    try:
+        age = (now or time.time()) - os.path.getmtime(cred)
+    except OSError:
+        return "new"
+    return "established" if age >= 24 * 3600 else "new"
+
+
+def rate_check(kind, now=None, state=None, tier=None):
+    """(ok, why, wait_seconds) before a post or a comment. Their rules, not ours."""
+    now = now if now is not None else time.time()
+    st = _rate_load() if state is None else state
+    tier = tier or account_tier(now)
+    lim = _LIMITS[tier]
+    if kind == "post":
+        last = float(st.get("last_post", 0) or 0)
+        wait = lim["post_s"] - (now - last)
+        if last and wait > 0:
+            return False, ("their limit: 1 post per %d min for a %s account; "
+                           "%d min left" % (lim["post_s"] // 60, tier,
+                                            int(wait // 60) + 1)), wait
+        return True, "within their post limit (%s tier)" % tier, 0
+    recent = [float(t) for t in st.get("comments", []) if now - float(t) < 86400]
+    if recent and (now - max(recent)) < lim["comment_s"]:
+        wait = lim["comment_s"] - (now - max(recent))
+        return False, ("their limit: 1 comment per %ds for a %s account; %ds "
+                       "left" % (lim["comment_s"], tier, int(wait) + 1)), wait
+    if len(recent) >= lim["comments_day"]:
+        oldest = min(recent)
+        wait = 86400 - (now - oldest)
+        return False, ("their limit: %d comments per day for a %s account, and "
+                       "%d are already spent" % (lim["comments_day"], tier,
+                                                 len(recent))), wait
+    return True, ("within their comment limits (%s tier, %d of %d used today)"
+                  % (tier, len(recent), lim["comments_day"])), 0
+
+
+def rate_record(kind, now=None):
+    """Written only AFTER the network accepted it, so a refusal costs nothing."""
+    now = now if now is not None else time.time()
+    st = _rate_load()
+    if kind == "post":
+        st["last_post"] = now
+    else:
+        recent = [float(t) for t in st.get("comments", []) if now - float(t) < 86400]
+        recent.append(now)
+        st["comments"] = recent
+    _rate_save(st)
+    return st
+
+
 # ------------------------------------------------------ their crypto filter
 #
 # MOLTBOOK AUTO-REMOVES CRYPTO POSTS, and submolts default to allow_crypto:false.
@@ -958,6 +1062,18 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         if os.environ.get("COVENANT_A67_STRICT"):
             override_a67 = False          # the judge back in charge, one variable
     text = compose(text)
+    # EVERY PRECONDITION IS MEASURED BEFORE ANY OF THEM CAN RETURN, so a dry run
+    # shows the WHOLE picture instead of only the first thing in the way.
+    #
+    # This was got wrong twice in a row and AM30 caught both. First the rate
+    # check sat below the key check, so the one path everybody runs today -- no
+    # key yet -- reported `rate: null`. Moving it above the key check was not
+    # enough either: the JUDGE returns earlier still, so a held message hid it
+    # too. "Compute preconditions, then decide" is the only ordering that does
+    # not have to be re-fixed each time a new early return is added.
+    kind = "comment" if post_id else "post"
+    rate_ok, rate_why, rate_wait = rate_check(kind)
+    rate_note = {"ok": rate_ok, "why": rate_why, "wait_s": int(rate_wait)}
     # Reported on every send, never acted on: their filter is theirs, and a
     # keyword veto of our own would be the mistake we filed as A67.
     crypto = crypto_risk(text)
@@ -970,11 +1086,13 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
                     "why": "REFUSED under COVENANT_REPO_LINK_STRICT: this "
                            "message names the repository and the repository is "
                            "still serving the operator's portfolio",
+                    "crypto_risk": crypto, "rate": rate_note,
                     "repo_check": why}
     clean, reasons, held = MB.judge_outbound(text)
     verdict = "; ".join(reasons)
     if not clean and not (override_a67 and not held):
         return {"sent": False, "held": bool(held), "repo_exposure": exposure, "crypto_risk": crypto,
+                "rate": rate_note,
                 "why": ("held by covenant's judge (no view -- not an objection, "
                         "and not a licence): " if held
                         else "refused by covenant's judge: ") + verdict}
@@ -987,16 +1105,25 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     key = os.environ.get("MOLTBOOK_API_KEY", "")
     if not key:
         return {"sent": False, "judged": verdict, "repo_exposure": exposure, "crypto_risk": crypto,
-                "overrode": overrode,
+                "overrode": overrode, "rate": rate_note,
                 "why": "no MOLTBOOK_API_KEY -- the account is the operator's to "
                        "create (ops/MOLTBOOK.md steps 1-3) and this path is "
                        "inert without it"}
-    kind = "comment" if post_id else "post"
     if dry_run:
         return {"sent": False, "judged": verdict, "why": "dry run (pass --send)",
                 "repo_exposure": exposure, "crypto_risk": crypto, "overrode": overrode,
+                "rate": rate_note,
                 "would_send": {"kind": kind, "submolt": submolt, "title": title,
                                "post_id": post_id, "chars": len(text)}}
+    if not rate_ok:
+        # THEIR RULE, AND IT IS NOT ONE OF OURS TO OVERRULE. Spending a request
+        # we know will be refused earns a 429, and repeated 429s are what an
+        # account looks like just before it stops being one.
+        return {"sent": False, "created": False, "kind": kind,
+                "judged": verdict, "repo_exposure": exposure,
+                "crypto_risk": crypto, "overrode": overrode,
+                "rate": {"ok": False, "why": rate_why, "wait_s": int(rate_wait)},
+                "why": "HELD by Moltbook's own rate limit -- " + rate_why}
     if post_id:
         path = "/posts/%s/comments" % post_id
         payload = {"content": text, "parent_id": parent_id}
@@ -1020,9 +1147,14 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     # the API accepted. Reporting the acceptance would be this project's oldest
     # mistake in a new place: a call that succeeded is not a thing that worked.
     ver = _handle_verification(created, timeout=timeout)
+    # RECORDED ONLY NOW, because the budget is spent by what they ACCEPTED. A
+    # send our own judge refused, or their rate limiter held, costs nothing and
+    # must not shorten the next window.
+    rate_record(kind)
     out = {"sent": (not ver["required"]) or bool(ver.get("solved")),
            "created": True, "kind": kind, "judged": verdict, "status": status,
            "repo_exposure": exposure, "crypto_risk": crypto, "overrode": overrode, "verification": ver,
+           "rate": {"ok": True, "why": rate_why, "recorded": kind},
            "response": raw[:400]}
     # HE IS TOLD AFTER THE FACT, NOT ASKED BEFORE IT -- publishing already
     # required an explicit --send, and a notifier that could block a send would
@@ -1284,6 +1416,49 @@ def selftest(say=print):
     check("AM26b ...and the volume is still RECORDED as corroboration, because "
           "it is informative and is simply not points", loud["seen"] == 20,
           loud["seen"])
+
+    # --- their rate limits
+    import tempfile as _tf
+    tier_dir = _tf.mkdtemp()
+    fake_cred = os.path.join(tier_dir, "credentials.json")
+    open(fake_cred, "w").close()
+    check("AM27 a brand-new account reads as the STRICT tier",
+          account_tier(cred=fake_cred) == "new")
+    check("AM27b ...and an account whose credentials cannot be found ALSO reads "
+          "as new -- guessing 'established' would spend the budget the limiter "
+          "exists to protect",
+          account_tier(cred=os.path.join(tier_dir, "nope.json")) == "new")
+    now = 1000000.0
+    ok1, why1, _ = rate_check("post", now=now, state={}, tier="new")
+    check("AM28 the first post of the day is allowed", ok1, why1)
+    ok2, why2, w2 = rate_check("post", now=now + 60,
+                               state={"last_post": now}, tier="new")
+    check("AM28b a second post one minute later is HELD -- their rule is 1 per "
+          "2 hours for a new agent, and a request we know will 429 is how an "
+          "account stops being one",
+          (not ok2) and w2 > 3600, (why2, w2))
+    ok3, _, _ = rate_check("post", now=now + 7300,
+                           state={"last_post": now}, tier="new")
+    check("AM28c ...and allowed again once their window has actually passed", ok3)
+    burned = {"comments": [now - i for i in range(20)]}
+    ok4, why4, _ = rate_check("comment", now=now + 300, state=burned, tier="new")
+    check("AM29 the 21st comment in a day is HELD for a new agent (their cap "
+          "is 20)", not ok4, why4)
+    ok5, why5, _ = rate_check("comment", now=now + 300, state=burned,
+                              tier="established")
+    check("AM29b ...and the same 20 are fine on the established tier, whose cap "
+          "is 50 -- the tiers are their numbers, not ours", ok5, why5)
+    ok6, _, w6 = rate_check("comment", now=now + 5,
+                            state={"comments": [now]}, tier="new")
+    check("AM29c the 60-second comment cooldown is enforced too",
+          (not ok6) and 50 < w6 <= 60, w6)
+
+    dr = emit("Ordinary prose about gates.", title="t", dry_run=True,
+              live_repo_check=False)
+    check("AM30 a dry run reports EVERY precondition, not just the first one in "
+          "the way -- the rate limit is visible before the key exists",
+          isinstance(dr.get("rate"), dict) and "ok" in dr["rate"]
+          and dr.get("crypto_risk") is not None, dr.get("rate"))
 
     n = sum(ok)
     say("\nAMBASSADOR: %d/%d passed" % (n, len(ok)))

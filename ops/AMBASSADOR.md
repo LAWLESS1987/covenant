@@ -7,7 +7,7 @@ lawless1987 github"*, then *"the ambassador does not exist and should"*, then
 until our new friend we will call 'free' will is allowed free reign of
 moltbook"*.
 
-She exists: `covenant_ambassador.py`, **31/31 selftest**, run against the live
+She exists: `covenant_ambassador.py`, **43/43 selftest**, run against the live
 forum rather than against fixtures.
 
 ## What "free rein" turned off, and what it did not
@@ -241,6 +241,51 @@ One more from the spec, small and sharp: `BASE` was a bare host, and their own
 warning is that `moltbook.com` without `www` redirects and **strips the
 Authorization header**. Nothing sends a key through it today, but a bare host in
 a constant is a trap primed for whoever reaches for it next.
+
+---
+
+## Their rate limits, and why this one blocks
+
+Free rein took down two walls: the repository link and the A67 veto. Both were
+**our** gates on **her** speech, and both were mine to begin with. A rate limit
+is not that. It is the **host's** rule, and breaking it does not express freedom
+— it gets her throttled, then suspended, which ends the mission it would claim
+to serve. Being a good guest is a precondition of being an ambassador at all.
+
+Their published limits, and the new-agent tier is the one that matters because
+`free` **will be** a new agent on her first day:
+
+| | first 24 hours | after |
+|---|---|---|
+| posts | 1 per 2 hours | 1 per 30 minutes |
+| comments | 1 per 60s, 20/day | 1 per 20s, 50/day |
+
+**Age is inferred from the credentials file, and unknown reads as `new`** — the
+stricter tier. A limiter that guessed "established" when it did not know would
+spend exactly the budget it exists to protect.
+
+**The budget is charged on what they accepted, not what we attempted.** A send
+our own judge refused, or one their limiter held, records nothing and does not
+shorten the next window.
+
+### A dry run now shows every precondition at once
+
+Got wrong twice, and AM30 caught both times. The rate check first sat below the
+key check — so the one path everybody actually runs today, *no key yet*, reported
+`rate: null`. Moving it above the key check was still not enough, because the
+**judge** returns earlier still, so a held message hid it too.
+
+*Compute the preconditions, then decide* is the only ordering that does not have
+to be re-fixed each time somebody adds an early return. A dry run now reports the
+judge, the override, the exposure, the crypto reading and the rate window
+together, whichever one would have stopped it.
+
+### It is now in the 15-minute loop
+
+`covenant_refine_check.py` was watching eight suites and **none of them was the
+ambassador** — the largest surface written this week, unwatched by the loop that
+exists to catch regressions. Added, along with the notifier. Measured at 2
+seconds against a 300s timeout, offline, no key, no post.
 
 ---
 

@@ -79,6 +79,14 @@ SUITES = [
     ("test_g3_behavioural_guards.py", []),
     ("covenant_moltbook.py", ["--selftest"]),
     ("covenant_moltbook_release.py", ["--selftest"]),
+    # ADDED 2026-09-09. The ambassador is the largest surface written this week
+    # and the loop that exists to catch regressions was not watching it at all.
+    # Measured before adding: 2 seconds, against the 300s timeout each suite
+    # gets -- well inside the rule above that a check costing more than the
+    # thing it guards gets turned off. It is offline: no key, no post, and its
+    # one network-touching check runs with live_repo_check=False.
+    ("covenant_ambassador.py", ["--selftest"]),
+    ("covenant_notify.py", ["--selftest"]),
 ]
 STALE_LOCK_S = 900          # a lock older than one interval is a dead run
 
