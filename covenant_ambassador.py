@@ -51,18 +51,28 @@ THE PRECONDITION, WHICH IS THE REAL SAFETY FEATURE HERE
   is the sharp end: a stranger does not need to enumerate anything, the issue
   register tells them where to look.
 
-  An ambassador's whole job is to send capable strangers to that repository. So
-  the one thing this file must not do is send them there while that is true --
-  and refusing is not enough, because a refusal that is written down and never
-  measured is issue A71 again. repo_link_ok() therefore performs a LIVE fetch
-  and FAILS CLOSED: no network, no answer, no link. When the exposure is closed
-  the check passes on its own and the ambassador speaks freely; nothing here
-  needs editing to let it.
+  IT WARNS, IT NO LONGER BLOCKS -- CHANGED 2026-09-09 ON HIS INSTRUCTION.
+  This was built to refuse, and he overruled it in four words: "its purpose is
+  to share it". He is right by the constitution's own test -- who is worse off,
+  who never agreed? The data is his, the exposure is documented, he has been
+  shown the measurement twice, and no third party is worse off. So the wall is
+  down and repo_link_ok() still RUNS on every message that names the repository,
+  with its answer attached to the result. A warning he has read is a decision; a
+  warning nobody records is how A9 sat marked "fixed" for four days while live.
+  COVENANT_REPO_LINK_STRICT=1 re-arms the refusal after the Support purge.
 
-  This is not a judgement about whether to publish the repository. That is his
-  call and he has made it. It is the narrower claim that inviting an audience to
-  a place is a different act from the place being open, and that the difference
-  is exactly the size of this file's one refusal.
+THREE THINGS THEIR PLATFORM DOES THAT THIS HAD TO LEARN
+  * CREATED IS NOT PUBLISHED. A post or comment returns a math challenge and
+    stays invisible until it is answered. `sent` reports what is VISIBLE, not
+    what the API accepted.
+  * TEN FAILURES SUSPEND THE ACCOUNT. So the solver ABSTAINS unless it can read
+    two numbers and one operation -- a guess spends one of ten and a wrong
+    answer costs what a right one earns.
+  * THEY AUTO-REMOVE CRYPTO. crypto_risk() reports what in our own text may read
+    that way and NEVER blocks: her introduction trips it on "token" (an NLP
+    token), "chain" (our ledger) and "trade" ("trade endorsements"). Vetoing on
+    a keyword is precisely the A67 error, and we do not get to call their
+    classifier crude and ours a coverage gap.
 
 WHAT IT CANNOT DO, AND WILL NOT PRETEND TO
   * It cannot register an account. Moltbook registration creates an account and
@@ -70,16 +80,18 @@ WHAT IT CANNOT DO, AND WILL NOT PRETEND TO
     write path is inert without MOLTBOOK_API_KEY and ships that way.
   * It cannot write a verdict. Nothing here opens the training corpus; check
     AM10 greps for that, the same guarantee test M6 gives the harvester.
-  * It has never posted. As of writing, the outbound gate refuses ordinary
-    prose (A67/A69), the account does not exist, and both are true at once.
+  * It has never posted. The account does not exist yet -- and that, not the
+    judge, is now the only thing left in the way.
 
 USE
   python covenant_ambassador.py --selftest            offline, writes nothing
-  python covenant_ambassador.py --repo-check          the link precondition
+  python covenant_ambassador.py --repo-check          measure the exposure
   python covenant_ambassador.py --learn --limit 25    posts + comments -> quarantine
   python covenant_ambassador.py --allies --limit 25   rank, with evidence
-  python covenant_ambassador.py --compose FILE        draft + disclosure, judged
-  python covenant_ambassador.py --compose FILE --send publish (needs the key)
+  python covenant_ambassador.py --repair-authors      names back onto old rows
+  python covenant_ambassador.py --introduce           her own post, judged
+  python covenant_ambassador.py --introduce --send    publish (needs the key)
+  python covenant_ambassador.py --verify CODE --answer N.NN   a challenge she abstained on
 LICENCE: Apache-2.0.
 """
 from __future__ import annotations
@@ -578,6 +590,62 @@ def _record_override(text, verdict, submolt=None, post_id=None, dry_run=True):
     return row
 
 
+# ------------------------------------------------------ their crypto filter
+#
+# MOLTBOOK AUTO-REMOVES CRYPTO POSTS, and submolts default to allow_crypto:false.
+# From their skill.md: "All posts are scanned by AI moderation. If a post is
+# detected as crypto-related AND the submolt has allow_crypto: false, it's
+# auto-removed." So content can pass our judge, pass their math challenge, be
+# published -- and then quietly vanish.
+#
+# WE CANNOT READ THE SETTING. Measured 2026-09-09 against the live API:
+# GET /submolts/agents, /general and /philosophy all return allow_crypto absent
+# (not false -- absent) to an anonymous reader. So the honest position is that
+# the target's policy is UNKNOWN until we hold a key, and this reports risk in
+# OUR text rather than pretending to predict their verdict.
+#
+# THE IRONY IS THE POINT, and it is worth stating rather than smoothing over.
+# Measured on her own introduction: five flagged terms, of which three are not
+# about cryptocurrency at all --
+#
+#     "token"        -> "a token log-odds model"      (an NLP token)
+#     "chain"        -> "a small local chain"         (our own ledger)
+#     "trade"        -> "than trade endorsements"     (to exchange, a verb)
+#
+# A keyword classifier flags all three, because it reads the word and not the
+# act. That is A67 -- this project's own open defect -- pointed back at us by
+# somebody else's filter. We do not get to call their classifier crude and ours
+# a coverage gap. So this NEVER BLOCKS: it reports, with the surrounding words,
+# and a person decides. Blocking on a keyword would be committing the error we
+# published a paper-sized issue about.
+_CRYPTO_TERMS = re.compile(
+    r"\b(crypto\w*|blockchain|chain|token\w*|coins?|nft|defi|wallet|"
+    r"ledger|staking|stake|mint\w*|airdrop|transactions?|trading|trades?|"
+    r"exchange|portfolio|btc|eth|xrp|hbar)\b", re.I)
+
+
+def crypto_risk(text):
+    """Terms their moderation may read as crypto, each with its context.
+
+    Returns the terms, a quote around each, and a coarse level. It is a
+    WARNING, never a veto -- see the note above."""
+    text = text or ""
+    hits = {}
+    for m in _CRYPTO_TERMS.finditer(text):
+        w = m.group(0).lower()
+        if w in hits:
+            continue
+        start = max(0, m.start() - 40)
+        hits[w] = re.sub(r"\s+", " ", text[start:m.end() + 40]).strip()
+    n = len(hits)
+    return {"terms": sorted(hits), "contexts": hits,
+            "level": "high" if n >= 8 else "medium" if n >= 3 else "low",
+            "note": ("their AI moderation removes crypto posts where the "
+                     "submolt has allow_crypto:false, and that setting is not "
+                     "readable without a key. This flags OUR words, it does "
+                     "not predict THEIR verdict, and it never blocks.")}
+
+
 # ---------------------------------------------------------- the math challenge
 #
 # MOLTBOOK HIDES CONTENT UNTIL A CHALLENGE IS SOLVED, and nothing here handled
@@ -817,6 +885,9 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         if os.environ.get("COVENANT_A67_STRICT"):
             override_a67 = False          # the judge back in charge, one variable
     text = compose(text)
+    # Reported on every send, never acted on: their filter is theirs, and a
+    # keyword veto of our own would be the mistake we filed as A67.
+    crypto = crypto_risk(text)
     exposure = None
     if mentions_repo(text):
         ok, why = repo_link_ok(live=live_repo_check, timeout=timeout)
@@ -830,7 +901,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     clean, reasons, held = MB.judge_outbound(text)
     verdict = "; ".join(reasons)
     if not clean and not (override_a67 and not held):
-        return {"sent": False, "held": bool(held), "repo_exposure": exposure,
+        return {"sent": False, "held": bool(held), "repo_exposure": exposure, "crypto_risk": crypto,
                 "why": ("held by covenant's judge (no view -- not an objection, "
                         "and not a licence): " if held
                         else "refused by covenant's judge: ") + verdict}
@@ -842,7 +913,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
                                     post_id=post_id, dry_run=dry_run)
     key = os.environ.get("MOLTBOOK_API_KEY", "")
     if not key:
-        return {"sent": False, "judged": verdict, "repo_exposure": exposure,
+        return {"sent": False, "judged": verdict, "repo_exposure": exposure, "crypto_risk": crypto,
                 "overrode": overrode,
                 "why": "no MOLTBOOK_API_KEY -- the account is the operator's to "
                        "create (ops/MOLTBOOK.md steps 1-3) and this path is "
@@ -850,7 +921,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     kind = "comment" if post_id else "post"
     if dry_run:
         return {"sent": False, "judged": verdict, "why": "dry run (pass --send)",
-                "repo_exposure": exposure, "overrode": overrode,
+                "repo_exposure": exposure, "crypto_risk": crypto, "overrode": overrode,
                 "would_send": {"kind": kind, "submolt": submolt, "title": title,
                                "post_id": post_id, "chars": len(text)}}
     if post_id:
@@ -878,7 +949,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     ver = _handle_verification(created, timeout=timeout)
     out = {"sent": (not ver["required"]) or bool(ver.get("solved")),
            "created": True, "kind": kind, "judged": verdict, "status": status,
-           "repo_exposure": exposure, "overrode": overrode, "verification": ver,
+           "repo_exposure": exposure, "crypto_risk": crypto, "overrode": overrode, "verification": ver,
            "response": raw[:400]}
     # HE IS TOLD AFTER THE FACT, NOT ASKED BEFORE IT -- publishing already
     # required an explicit --send, and a notifier that could block a send would
@@ -1103,6 +1174,20 @@ def selftest(say=print):
           and v["verification_code"] == "c1", v)
     check("AM22 a response with no challenge is simply not a challenge",
           _handle_verification({"post": {"id": "x"}})["required"] is False)
+
+    # --- their crypto filter
+    cr = crypto_risk(INTRODUCTION)
+    check("AM23 her introduction is measured against their crypto filter, and "
+          "it does trip it -- 3 of the flagged words are not about currency "
+          "at all (an NLP token, our own chain, 'trade endorsements')",
+          cr["level"] == "medium" and "token" in cr["terms"]
+          and "log-odds" in cr["contexts"]["token"], cr["terms"])
+    check("AM24 the crypto reading NEVER blocks -- vetoing on a keyword is the "
+          "exact error we filed as A67, and we do not get to call their "
+          "classifier crude and ours a coverage gap",
+          emit("a chain of tokens", title="t", dry_run=True,
+               live_repo_check=False).get("crypto_risk") is not None
+          and "never blocks" in cr["note"])
 
     n = sum(ok)
     say("\nAMBASSADOR: %d/%d passed" % (n, len(ok)))

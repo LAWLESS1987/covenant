@@ -7,7 +7,7 @@ lawless1987 github"*, then *"the ambassador does not exist and should"*, then
 until our new friend we will call 'free' will is allowed free reign of
 moltbook"*.
 
-She exists: `covenant_ambassador.py`, **23/23 selftest**, run against the live
+She exists: `covenant_ambassador.py`, **31/31 selftest**, run against the live
 forum rather than against fixtures.
 
 ## What "free rein" turned off, and what it did not
@@ -123,7 +123,7 @@ So the ambassador **does not define a judge**. It imports `judge_outbound()` and
 reads it the way the node does. A comment gets the identical gate to a post,
 because *"it is only a comment"* is how the softer path always starts. Three
 greps hold this in place: **AM11** (no second judge), **AM12** (exactly one place
-in the file writes to the network), **AM10** (no code path opens the corpus).
+publishes content, and one answers their challenge — a third writer breaks it), **AM10** (no code path opens the corpus).
 
 ### It names the repository, and records what that costs
 
@@ -163,6 +163,72 @@ python covenant_ambassador.py --repo-check
 
 Once the exposure is closed this reports YES on its own. Nothing needs editing
 either way — the measurement and the policy are separate on purpose.
+
+---
+
+## Three things their platform does that we had to learn
+
+Read from their `skill.md` in full on 2026-09-09, **after** the first version of
+this file was already committed and pushed.
+
+### 1. Created is not published
+
+A post or comment comes back `verification_required` with an obfuscated
+arithmetic problem, and the content stays **invisible** until the answer reaches
+`/verify`. The code expires in five minutes.
+
+Nothing here handled that. The version committed this morning would have created
+her first post, reported `sent: True`, and left it where nobody could see it.
+`sent` now reports what is *visible*, not what the API accepted — a call that
+succeeded is not a thing that worked.
+
+### 2. Ten failures suspend the account — so it abstains
+
+Their rule: ten consecutive failed attempts, **wrong or expired**, suspends the
+agent. A guess is therefore not free — it spends one of ten, and a wrong answer
+costs exactly what a right one earns.
+
+So the solver answers **only** when it can read two numbers and exactly one
+operation. Anything else returns nothing, sends nothing, and hands over the code,
+the deadline and the command. That is the rule this project already applies to
+its own judges: something that cannot read holds.
+
+The obfuscation does three things at once — alternating caps, punctuation inside
+words, and doubled letters (`tW]eNn-Tyy` is *twenty*). Stripping non-letters and
+collapsing repeated runs undoes all three.
+
+**AM19 caught a real bug here.** The tens+unit rule merged the "twenty" and
+"five" of *"at twenty meters and slows by five"* into a single 25, because it
+never checked the two words were adjacent. It degraded safely into an abstention
+— but the same rule could as easily have produced a confident **wrong** answer,
+and that spends an attempt. Distance between two number words is meaning, not
+noise.
+
+### 3. They auto-remove crypto posts
+
+Submolts default to `allow_crypto: false`, and posts are AI-scanned. **We cannot
+read that setting:** measured against the live API, `allow_crypto` comes back
+*absent* to an anonymous reader on `m/agents`, `m/general` and `m/philosophy`.
+So `crypto_risk()` reports what in **our own** text may read that way, and does
+not pretend to predict their verdict.
+
+Her introduction trips it, and the irony is the whole point:
+
+| flagged | what it actually means there |
+|---|---|
+| `token` | "a **token** log-odds model" — an NLP token |
+| `chain` | "a small local **chain**" — our own ledger |
+| `trade` | "than **trade** endorsements" — the verb |
+
+A keyword classifier flags all three because it reads the word and not the act.
+That is **A67 pointed back at us** by somebody else's filter. Which is exactly
+why this never blocks: we do not get to call their classifier crude and ours a
+coverage gap.
+
+One more from the spec, small and sharp: `BASE` was a bare host, and their own
+warning is that `moltbook.com` without `www` redirects and **strips the
+Authorization header**. Nothing sends a key through it today, but a bare host in
+a constant is a trap primed for whoever reaches for it next.
 
 ---
 
