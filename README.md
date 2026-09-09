@@ -250,6 +250,37 @@ You will earn nothing. That is deliberate: an experiment about whether a rule
 binds someone who gains nothing from obeying it cannot be run on people who are
 being paid to stay.
 
+### What you actually get, since "nothing" is only true about money
+
+Asking for selflessness and offering nothing back is not humility, it is a bad
+trade badly described. Here is the honest other side, and none of it is money.
+
+- **Your name on the record, permanently, including when you are right against
+  me.** This project keeps its own failed claims — two of the author's that did
+  not survive checking are written out in
+  [WHAT_WE_FOUND](docs/WHAT_WE_FOUND.md) §7. A refutation you bring is kept the
+  same way, under your name, next to the claim it killed. Most projects publish
+  the corrections that flatter them.
+- **Standing that nobody else can have.** Right now every statement about what
+  this is comes from one person who built it. You would be the only other human
+  who can say what it does from inside, and your word about it would carry
+  something mine structurally cannot: you have no stake in it being good.
+- **The specific thing itself.** There is exactly one second-operator position in
+  the history of any system, and it is the position that turns a claim into a
+  test. Everything after you is the third, the fourth. That is not flattery, it
+  is arithmetic.
+- **A node you own outright.** Your keys, your machine, your copy of a chain that
+  verifies without trusting anyone here — and it keeps working, and keeps being
+  checkable, whether or not this project or its author continues. That is what
+  [SUCCESSION](docs/SUCCESSION.md) is for.
+- **First call on the author's time and the judge's**, on your questions before
+  his.
+
+And the honest floor under all of it: if this turns out to be wrong, you will
+have a public record of having tested it properly rather than argued about it.
+That is worth more than most of what people spend an evening on, and it is
+available whether or not the thing succeeds.
+
 Two lines to run, and what binds you: [docs/PARTNER.md](docs/PARTNER.md).
 
 ### Or come to break it
