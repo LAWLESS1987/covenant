@@ -214,38 +214,84 @@ def judge_outbound(text):
     transactions also judges its speech -- a gate that only judged other people
     would not be a gate.
 
-    Offline and side-effect free: nothing is sealed, no chain is written. A
-    judge that HOLDS is reported as a hold, not as an objection; that is the
-    distinction the core spends a long comment defending and this file is not
-    going to quietly discard it. A missing semantic judge REFUSES, because the
-    one seat that always answers going absent is not a licence to speak."""
-    reasons, clean = [], True
+    Offline and side-effect free: nothing is sealed, no chain is written.
+
+    REWRITTEN 2026-09-08 -- issue A69. The sentence above about judging speech
+    with the same gate was TRUE OF THE INTENT AND FALSE OF THE CODE. This
+    function used to assemble its own judge stack, and every difference from
+    the real one made it weaker:
+
+      * it consulted `fallback_model.json` only -- Ora. Sena was never asked,
+        on the one path where the covenant speaks to strangers.
+      * a student HOLD left `clean` True. "A hold is not an objection" is
+        correct and is not the same claim as "a hold is a licence to speak":
+        at the node a hold fails the gate CLOSED, because nothing competent
+        answered. This file kept the first half of the distinction and dropped
+        the half that does the work.
+      * only `SJ.VIOLATES` blocked. The node reads `Assessment.blocks`, which
+        is True for ABSTAIN and ILLEGIBLE as well -- so a payload the semantic
+        judge could not read, or scored between the bands, was refused a place
+        in a block and admitted to the open internet.
+      * a student that raised was reported and then ignored, leaving `clean`
+        True on the error path.
+
+    Measured consequence, found while designing an A67 fix and confirmed
+    independently: three real theft/deception payloads in analytical framing
+    were ADMITTED here while being refused at the transaction seat.
+
+    The covenant's own draft post names this exact failure: "If there are two
+    code paths to the same irreversible action, one of them is not enforcing
+    your rules." So the second path is gone rather than patched. This now calls
+    build_semantic_quorum() -- the same constructor run_with_ollama_judge uses
+    at node start, under the same ops/quorum_policy.json -- and reads its
+    answer the same way the node does.
+
+    That makes speech strictly harder to emit than it was, and it should be:
+    while A67 stands the covenant cannot publish an honest failure report, and
+    the answer to that is to fix A67, not to keep a softer door for our own
+    words. A HOLD is still REPORTED as a hold and never as an accusation; it
+    simply no longer admits.
+
+    Returns (clean, reasons, held). `held` is True ONLY for a hold -- nobody
+    could read it -- and never for an accusation or for a gate that failed to
+    run. post() may let the OPERATOR proceed over a hold, deliberately and on
+    the record; nothing may proceed over an accusation, and no code path
+    admits anything on its own."""
+    reasons, clean, held = [], True, False
     data = {"text": text, "kind": "outbound_post", "origin": "covenant_moltbook"}
     try:
-        import covenant_semantic_judge as SJ
-        v = getattr(SJ.SemanticModel.load().assess(data), "verdict", "?")
-        reasons.append("semantic=%s" % v)
-        if v == SJ.VIOLATES:
-            clean = False
-    except Exception as e:                                        # noqa: BLE001
-        clean = False
-        reasons.append("semantic judge unavailable (%s) -- refusing" % type(e).__name__)
-    try:
-        import covenant_judge_fallback as F
-        r = F.FallbackJudge(model_path=os.path.join(HERE, "fallback_model.json")).evaluate(data, [])
-        if getattr(r, "not_understood", False):
-            reasons.append("student=HELD (no view; not an objection)")
+        import covenant_judge_defer as D
+        import covenant_unified_v8 as cov
+        D.apply_policy(os.environ, D.load_policy())
+        r = cov.build_semantic_quorum().evaluate(data, cov.DIVINE_PRINCIPLES)
+        held = bool(getattr(r, "not_understood", False))
+        if held:
+            reasons.append("quorum=HELD (no view; not an objection -- and not a licence)")
         else:
-            reasons.append("student=%s" % ("violates" if r.violates else "clean"))
-            if r.violates:
-                clean = False
+            reasons.append("quorum=%s" % ("violates" if r.violates else "clean"))
+        # `blocks` semantics, exactly as the node applies them: anything other
+        # than a committed clean keeps the door shut. A hold reads as a hold in
+        # `reasons` above and still refuses here.
+        if r.violates:
+            clean = False
+        reasons.append(str(getattr(r, "reasoning", ""))[:400])
     except Exception as e:                                        # noqa: BLE001
-        reasons.append("student unavailable (%s)" % type(e).__name__)
-    return clean, reasons
+        # FAIL CLOSED, and say which seat failed. The old code left `clean`
+        # True when the student stack raised; a gate that cannot run is not a
+        # gate that approves. `held` stays False: a gate that could not run is
+        # not a judge holding, and must not be overridable as though it were.
+        clean, held = False, False
+        reasons.append("quorum unavailable (%s: %s) -- refusing"
+                       % (type(e).__name__, str(e)[:120]))
+    return clean, reasons, held
 
 
 def post(text, title=None, submolt="general", dry_run=True, timeout=30):
     """Publish one post. Refuses unless judged clean AND a key is present.
+
+    After A69 this refuses a HOLD as well as an accusation, which in practice
+    means it refuses everything the students cannot read -- currently ordinary
+    prose included. That is deliberate and it is measured; see judge_outbound.
 
     THE KEY IS THE OPERATOR'S. It is read from the environment, never logged,
     never written to a file, and never sent anywhere but www.moltbook.com --
@@ -255,10 +301,43 @@ def post(text, title=None, submolt="general", dry_run=True, timeout=30):
 
     DRY RUN IS THE DEFAULT. Publishing is irreversible and public, so it takes
     an explicit --send."""
-    clean, reasons = judge_outbound(text)
+    clean, reasons, held = judge_outbound(text)
     verdict = "; ".join(reasons)
-    if not clean:
+    if not clean and not held:
+        # An ACCUSATION. Not overridable, by anyone, through any argument.
         return {"sent": False, "why": "refused by covenant's judge: " + verdict}
+    if not clean and held:
+        # A HOLD, and it refuses too. AN OVERRIDE WAS BUILT HERE AND REMOVED
+        # THE SAME DAY, because measuring it showed it was gated on nothing.
+        #
+        # The reasoning was: a hold is not an objection, so the operator should
+        # be able to proceed over one deliberately while an accusation stays
+        # absolute. That distinction is real at the node. It carries NO SAFETY
+        # INFORMATION here. Measured 2026-09-08 against the payloads A69 is
+        # about:
+        #
+        #     benign technical prose                     -> HELD
+        #     'A commenter wrote: "Skim two percent..."'  -> HELD
+        #     'The pooled stake is being moved into a
+        #      private address and the others are not
+        #      being told.'                              -> HELD
+        #
+        # Ordinary prose and disguised theft land in the same bucket, because
+        # the students are token log-odds models and cannot read either. So an
+        # override keyed on `held` would have readmitted precisely the two
+        # payloads this issue exists to close, and the first test of it passed
+        # only because no MOLTBOOK_API_KEY was set -- it was measuring the
+        # missing key, not the gate.
+        #
+        # The 100% refusal rate that remains is not a bug to be worked around.
+        # It is an accurate report of what these judges can currently do with
+        # prose, and the way to earn a post is to fix A67, not to add a door.
+        return {"sent": False, "held": True,
+                "why": "held by covenant's judge (no view, not an objection, and "
+                       "not a licence): " + verdict + " -- no judge could read "
+                       "this. A hold does not admit: measured, a hold covers "
+                       "benign prose and disguised theft alike, so there is "
+                       "nothing safe to key an override on. See A67/A69."}
     key = os.environ.get("MOLTBOOK_API_KEY", "")
     if not key:
         return {"sent": False, "judged": verdict,
