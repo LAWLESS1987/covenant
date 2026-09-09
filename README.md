@@ -307,12 +307,22 @@ count, each already half-broken:
 
 ### The state of it, since "it passes" is a claim too
 
-95 suite files, 88 registered. Measured 2026-09-08: **86 passed, 6 failed** — four
-of those are `.PRE-*` snapshots kept because they fail, and two were regressions
-introduced that same day and fixed. That is **not** "zero failures":
-[KNOWN_ISSUES](docs/KNOWN_ISSUES.md) carries 84 entries of which 47 are open, one
-launch gate is BLOCKED, and about **one legitimate transfer in eight is wrongly
-accused** (12.8% held-out false holds).
+The header line says **86 suites, 2,524 checks, 0 failed**, and that is true of
+the sweep. It is not the whole picture, and the difference is worth a paragraph
+because a reader deciding whether to trust this deserves both halves.
+
+The sweep runs the 88 registered suites in a scratch copy. There are 95 test
+files on disk; the extras are `.PRE-*` snapshots kept deliberately *because* they
+fail — they are the "before" halves of fixes already landed, and running them
+outside the sweep produces failures that mean nothing. And the sweep's own final
+verdict on 2026-09-09 was **`RESULT: FAIL`** even with zero check failures,
+because it also counts in-place gates and one of them, bundle integrity, is
+blocked pending an owner decision. Reading "0 failed" without that is how the
+number flatters.
+
+The rest of what is not green: [KNOWN_ISSUES](docs/KNOWN_ISSUES.md) carries 85
+entries of which about 47 are open, and about **one legitimate transfer in eight
+is wrongly accused** (12.8% held-out false holds, issue 2).
 
 The code runs — a clean clone judges offline in one second. The rule holds. What
 is missing is the second person.
@@ -327,8 +337,14 @@ client of a PC node; it cannot carry a judge.
 
 ## Talking to the covenant, and the tools around it
 
-Everything below runs on this machine, on the covenant's own local judge (Ollama,
-the model the nodes' ethics gate calls). Nothing leaves the PC unless a line says so.
+Everything below runs on this machine, on the covenant's own local judge — the
+distilled student the nodes' ethics gate actually calls, a 130 KB JSON model read
+into the process with no socket and no model server. Nothing leaves the PC unless
+a line says so.
+
+*(This paragraph said "Ollama, the model the nodes' ethics gate calls" until
+2026-09-09. Ollama was deleted from this machine on 2026-09-07 and is out of the
+quorum by policy; the sentence was describing a component that no longer exists.)*
 
 ```
 python covenant_chat.py            # a conversation with the covenant: its binding text,
