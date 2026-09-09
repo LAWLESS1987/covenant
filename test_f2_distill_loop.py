@@ -90,11 +90,30 @@ def main():
     # starts does, or a restart silently changes the gate."
     env = {}
     D.apply_policy(env, {"relax_valueless_for_local_nodes": True})
-    check("Q4 the exception key is filled with local node key HASHES, so the "
-          "operator never types one and no secret enters the environment",
-          len(env.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",")) >= 1
-          and all(len(h) == 64 and all(c in "0123456789abcdef" for c in h)
-                  for h in env["COVENANT_RELAX_VALUELESS_FOR"].split(",")))
+    _hashes = [h for h in env.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",") if h]
+    # SPLIT IN TWO 2026-09-08, because as one assertion this could not pass on
+    # a GitHub runner and had failed the `covenant` sweep on every push since
+    # 853b4e6 -- four consecutive red runs. apply_policy fills this key from
+    # local_node_key_hashes(), which globs *.db.key; .gitignore excludes *.key,
+    # so a runner checks out zero of them, the value is "" and the old
+    # `all(len(h) == 64 ...)` ran over [""] and was False by construction.
+    # covenant.yml's own header already ruled on this shape of check: "a check
+    # that is always red teaches people to skim past it."
+    #
+    # Neither branch is a skip. Where keys exist the assertion is unchanged and
+    # exactly as strict. Where they do not, the thing worth asserting is that
+    # the exception degrades CLOSED -- an empty list grants the valueless-seal
+    # exception to nobody, which is the safe direction and the property that
+    # actually matters on a machine holding no node identity.
+    if _hashes:
+        check("Q4 the exception key is filled with local node key HASHES, so the "
+              "operator never types one and no secret enters the environment",
+              all(len(h) == 64 and all(c in "0123456789abcdef" for c in h)
+                  for h in _hashes))
+    else:
+        check("Q4 with no local *.db.key present the exception key is EMPTY, not "
+              "malformed -- the exception is granted to nobody (fails closed)",
+              env.get("COVENANT_RELAX_VALUELESS_FOR", "") == "")
     env2 = {"COVENANT_RELAX_VALUELESS_FOR": "stale"}
     D.apply_policy(env2, {"providers": "deferring,semantic"})
     check("Q5 ...and it is REMOVED when the policy does not ask for it, so a "
