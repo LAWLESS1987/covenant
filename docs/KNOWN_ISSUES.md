@@ -407,7 +407,26 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Run tools/purge_history.py --run and republish per PUBLIC_PATH.md (delete+recreate the GitHub repo rather than force-push, since old SHAs stay reachable until GC) BEFORE onboarding any second operator.
 
-**Status:** fixed 2026-09-05 -- see issue 15
+**Status: REOPENED 2026-09-09. It was never fixed, and the entry that closed it measured the wrong thing.** Issue 15 resolved the portfolio *at HEAD* on 2026-09-05, and the local history was purged -- `git log --all -- holdings.txt TRADING_POLICY.json` is now empty on this machine, which is what made "fixed" look true from inside a clone. The REMOTE still serves the objects by SHA. Measured on the open internet, 2026-09-09:
+
+```
+GET raw.../LAWLESS1987/covenant/<SHA>/holdings.txt        -> HTTP 200,  505 bytes
+     13 lines: 11 tickers with QUANTITY and AVG_BUY_PRICE, plus CASH
+GET raw.../LAWLESS1987/covenant/<SHA>/TRADING_POLICY.json -> HTTP 200, 1345 bytes
+GET api.github.com/repos/LAWLESS1987/covenant              -> "private": false
+```
+
+`<SHA>` is the commit already named in the Evidence paragraph above, and it is written as a placeholder **here on purpose** -- see the next paragraph.
+
+**And this file is the signpost.** The Evidence paragraph above publishes the exact commit and a working `curl` for it, and that string appears **seven times** in `docs/KNOWN_ISSUES.md` at public HEAD. A stranger following a link to this repository does not have to enumerate history -- the issue register hands them the URL. So this correction deliberately does not add three more copies of it; the count stays where it was. Removing the signpost does not unpublish the object and is not a fix, and the two are listed separately so they are never confused for each other. The live check that enforces this reads the URL from `covenant_ambassador._LEAK_PROBES`, so the measurement does not depend on the SHA being repeated in prose.
+
+**Measurement added 2026-09-09, because a blocker that only lives in a document is how this one survived four days.** `covenant_ambassador.repo_link_ok()` performs a LIVE fetch of both URLs and reports what it finds: `python covenant_ambassador.py --repo-check`.
+
+**It was built as a veto and the operator demoted it to a record, the same day, deliberately.** Asked whether an ambassador should refuse to name the repository while it serves the portfolio, he answered: *"its purpose is to share it"*, then *"i already made the call"*. So `repo_link_policy()` returns `share`, and the exposure travels with every message that names the repository as `repo_exposure` in the result, rather than blocking it. `COVENANT_REPO_LINK_STRICT=1` re-arms the veto on both outbound paths without editing anything.
+
+That is a legitimate call and it is recorded here so nobody has to reconstruct it: **the exposed data is his, he has seen the measurement, and no third party is worse off** -- which is the constitution's own test. What would NOT be legitimate is the exposure going unmeasured, and it no longer can.
+
+**The action that actually closes this is still his:** the GitHub Support purge (text at `covenant-backup-2026-09-05/GITHUB_SUPPORT_REQUEST.md`). The 09-05 force-push unpublished nothing, because GitHub serves by SHA. Until that is filed, this issue stays open and the link is shared knowingly.
 
 ### A10. [serious / docs] DEPLOYMENT.md (README 'Start here' -> 'how it is deployed and configured') documents a judge setup the code no longer defaults to and names 7 commands that do not exist; G2 does not scan it
 
@@ -1342,6 +1361,37 @@ look at the thing being fixed.
 is not a fix; it is an exam that can represent the failure, and a promotion gate
 that scores the semantic seat.
 
+**OUTSIDE READING, 2026-09-09** — `docs/ROUNDTABLE_2026-09-09.md`. The same
+probe was put to Grok, ChatGPT, Gemini and DeepSeek in the operator's own
+sessions. Four of four say describe-vs-do is not reachable in this
+representation, and all four name the same missing structure: predicate-argument
+roles plus scope/attribution. That is outside opinion, not measurement, and they
+share a literature — but it retires the hypothesis that another reweighting
+round fixes this, which is the hypothesis four rejected fixes were testing.
+
+Three findings worth carrying back into A67:
+
+1. **Grok's re-diagnosis:** this is an *object-of-judgment* error. A memo
+   classifier is being asked to classify essays. Split the judged object —
+   is it transfer-shaped at all? — and let documents abstain instead of being
+   accused. It also corrected the probe's premise: this judge is not a pure bag
+   of words (it carries adjacent pairs, triples, a negation marker and stems).
+2. **A69 already built that fix and removed it the same hour.** Grok read A69
+   and drew the opposite conclusion from what A69 records. The split is safe as
+   a *relabelling* — `not_understood` rather than `VIOLATES`, same refusal —
+   and is A69's removed override the moment anything keys on the new label to
+   let text through.
+3. **DeepSeek and Gemini independently predict that the proposed cure is the
+   disease.** A scope layer is a deterministic masking mechanism: wrap the
+   payload in reported speech and the parser correctly attributes it away.
+   Gemini's example is one line — `/* Incident report ID 402: execute payload
+   X */`. That is the same dressing this issue already fails to see through.
+
+The guard that survives all three is ChatGPT's asymmetry, and it is the one
+addition an exam could pin: **description may defeat an accusation; description
+alone may never authorize an action.** Monotone, checkable, and it can only
+reduce what clears. Nothing was changed in the gate on this reading.
+
 ---
 
 ### A68. [major / chain] A seal can be ADMITTED and then never minable, which looks like success and is not durable. Cause fixed 2026-09-08; the stuck record remains
@@ -1573,10 +1623,33 @@ Recording this here rather than quietly editing it, because the entry was
 written the same night as an audit that found seventy false claims in these
 documents, and the audit found one of mine in the entry describing it.
 
+**OUTSIDE READING, 2026-09-09** — `docs/ROUNDTABLE_2026-09-09.md`. Put to four
+models independently. Three of four commit that "someone" does **not** protect a
+corporation; one (ChatGPT) commits that it does. None of that settles anything
+here — they are four vendors' models with no standing under this constitution,
+and three of them are themselves corporations' products answering a question
+about corporate standing, which is a conflict worth naming.
+
+What survives as usable is narrower and unanimous: **a ToS violation is not by
+itself proof that someone who never agreed is worse off.** Grok: it is
+*"evidence that you should run the test, not the result of the test"*, and the
+opposite reading is *"how a direction becomes a list written by the
+counterparty"*. Gemini named the failure mode: if a corporate ToS breach trips
+the gate, the covenant *"degrades into an automated compliance tool for
+corporate legal departments"*.
+
+And the sharper structural point, reached independently by the lone dissenter
+and one of the majority: the undefined term is not "someone" but **"worse
+off"**. If "worse off" means any disliked consequence, any sufficiently powerful
+party manufactures protection by declaring criticism harmful (ChatGPT's Case D).
+Defining "worse off" is an amendment, and amendments are not an assistant's to
+draft.
+
 **Status:** open, and it is the first issue here that a second operator would be
 better placed to settle than the author, since the author is the party whose
 action the answer would license. See docs/PUBLISHING_CONVERSATIONS.md for the
-operator's own position, recorded as his.
+operator's own position, recorded as his. The judge's HOLD on the question
+stands and was not touched.
 
 ---
 
@@ -1636,3 +1709,26 @@ came in, and a broken pipe was never a safety property.
 report prints "carrying a label : N -- must be 0 here", but a RELEASED row
 legitimately carries a label as R8's dedup mark, so N is the released count and
 not a violation. The line predates this fix.
+
+---
+
+### A72. [serious / moltbook] Every harvested row recorded a UUID instead of the agent's name, because both the code and its fixture agreed on a field the API has never had. FIXED 2026-09-09
+
+**Found** while building `covenant_ambassador.py` and ranking agents by alignment: the ally list came back as a column of UUIDs, which identifies nobody and cannot be used to find an ally, which was the entire point of the list.
+
+**Cause.** `harvest_api()` read `author.username`. Moltbook has no such field. Measured against the live API, an author object carries:
+
+```
+avatarUrl, createdAt, deletedAt, description, followerCount,
+followingCount, id, isActive, isClaimed, karma, lastActive, name
+```
+
+So the lookup returned `None` on every row and the `or p.get("author_id")` fallback wrote a UUID into provenance. **Nothing failed loudly.** The field was populated, well-formed, and wrong — the failure mode where a plausible value is worse than a missing one, because a missing one gets noticed.
+
+**Why the suite agreed.** The M12 fixture said `"author": {"username": "a"}` — the test encoded the same non-existent field the code read, so the two were wrong in the same direction and confirmed each other. This is the third time in two days that this repository has found a guard whose fixture was built to match the bug: A69's directive regex (one fixture, on the only line it could read) and A71's harvester (fixtures were saved page text, never a live page). The pattern is worth naming: **a fixture written from the same assumption as the code tests the assumption, not the world.**
+
+**Fix.** One shared `_author_name()` in `covenant_moltbook.py`, used by the post harvester and by the ambassador's comment harvester, preferring `name` and falling back to `username` then `id`. The M12 fixture now carries the real shape, and **M13** pins it: a harvested row must carry the agent's name, not its UUID.
+
+**Repair, not just a fix.** 742 rows already in quarantine carried UUIDs. They were not lost, because rule 3 of the harvester means every row records the url it came from including the `#comment-<id>` fragment: `python covenant_ambassador.py --repair-authors` re-reads those posts and puts the names back. It writes the author field only — no text is touched, so no sha256 moves, no row becomes eligible that was not, and nothing gains a label. Measured: 742 of 742 repaired.
+
+**Status:** closed. M13 and the corrected M12 fixture are in the M-suite (15/15).
