@@ -4,8 +4,8 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `8f219285f268` · 10,924 lines · **66 suites, 1,913 checks, 0 failed** on win32 <!--TOTALS-->
-Totals re-measured 2026-09-03 by `covenant_one.py --all`; version, hash and
+**v8.40** · source `1e72206edd9a` · 11,055 lines · **86 suites, 2,524 checks, 0 failed** on win32 <!--TOTALS-->
+Totals re-measured 2026-09-09 by `covenant_one.py --all`; version, hash and
 line count re-verified 2026-08-30 against a live restarted chain. What
 that number does and does not cover is in [Suite coverage](#suite-coverage), and it is
 worth reading before quoting it.
@@ -209,104 +209,69 @@ Three things, in one process:
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
 
-## A second operator, and a partner who can submit
+## Allies wanted
 
-**The machine part is built. The human part is one person.** That is not a
-progress report; it is the reason none of the claims here can currently be
-checked, and the argument is short enough to verify line by line.
+This is a constitution for humans and machines under one rule: **no one may make
+someone else worse off without their consent.**
 
-1. Every claim this project makes is about **governance**: that a rule can
-   constrain an actor.
-2. A rule constrains only if it can produce an outcome the actor does not want
-   and cannot simply undo.
-3. Under one operator, every refusal is authored, deployed, and reversible by
-   the same person. A gate he can edit is not a gate that binds him. It is a
-   gate he agrees with.
-4. So the governance claims here are not false. They are **untested** — which is
-   a worse position than false, because untested claims can still be believed.
-5. The constitution's operative test is *"Who is worse off if this works? If the
-   answer is someone who never agreed to it, the action does not belong."* Under
-   one operator **there is nobody who never agreed.** The central rule is not
-   being violated. It has no one to protect. It is vacuous.
-6. A second independent operator is the minimum structure under which a refusal
-   can bind someone who did not choose it, and under which that rule acquires a
-   subject at all.
+Every transaction is judged against that rule before it is accepted, and the gate
+fails closed — if nothing competent answers, nothing moves. There is exactly one
+exception and it is written down in `ops/quorum_policy.json`: a zero-value
+self-send from a key on the operator's own machine, where a judge that stayed
+silent stops counting as a judge that objected. One exception, in a file you can
+read, is the difference between a rule and a slogan.
 
-**So the second operator is not scale. It is the first condition under which any
-of this is falsifiable.** Not two machines — two *people*, the second being
-someone the author does not control, with their own keys, under the same
-constitution. Everything before that is a man agreeing with himself in a
-well-tested way, and the launch check says so in those words: a single-operator
-floor.
+I am not looking for users or contributors. **Allies** — people who will run
+their own node, on their own machine, with their own keys, under the same rule,
+controlled by nobody here.
 
-That is the whole ask. Two lines to run, in [docs/PARTNER.md](docs/PARTNER.md).
+**Why that is not a formality.** The rule asks: who is worse off if this works,
+and did they agree? Under one operator **there is nobody who never agreed.** The
+rule is not being obeyed — it has nothing to be obeyed about. A gate its author
+can edit is a gate he agrees with. So every governance claim in this repo is not
+false; it is **untested**, which is worse, because untested claims can still be
+believed. The second independent operator is the first moment the rule has a
+subject, and the first moment any of this can be proven wrong.
 
-### Why there is no payment, argued rather than apologised for
+You will earn nothing. That is deliberate: an experiment about whether a rule
+binds someone who gains nothing from obeying it cannot be run on people who are
+being paid to stay.
 
-A joining node earns nothing — measured, and stated plainly in PARTNER.md. That
-is worth defending rather than excusing: **a governance experiment that paid its
-participants would select for people optimising for payment**, which is the one
-confound guaranteed to ruin the result. If the question is whether a rule binds
-someone who gains nothing from obeying it, you cannot answer it with a
-population that is being paid to stay.
+Two lines to run, and what binds you: [docs/PARTNER.md](docs/PARTNER.md).
 
-The honest other half: this may simply mean nobody comes, and that would also be
-a finding.
+### Or come to break it
 
-### What would refute this
+A refutation is worth more here than agreement, and this project keeps its own
+failed claims to prove that is not a pose. Five AI systems were already asked to
+break it and what they broke is written down
+([ROUNDTABLE_2026-09-03](docs/ROUNDTABLE_2026-09-03.md)). Four things that would
+count, each already half-broken:
 
-A project that only lists what would confirm it has told you nothing. These
-would count as refutations, and would be recorded as such:
+- **Get a violation past the gate** with no model server and no network.
+  `test_f3_gate_end_to_end.py` blocks 27 of 27; one is enough. It already misses
+  violations wearing institutional clothes — see `discourse` in `judge_suite.py`.
+- **Show the judge accusing the innocent.** It hard-accuses 8 of 8 legitimate
+  documents *about* violations, because it reads topic rather than conduct
+  (issue A67). Find a cleaner case, or prove the fix impossible.
+- **Break the exam instead of the gate.** A first draft of `discourse` was
+  discarded because word count separated its labels perfectly, so a rule knowing
+  nothing about conduct scored full marks. Find the next such shortcut.
+- **Show a published number here is wrong.** Several have been, including by
+  their author, and the corrections sit beside the claims.
+- **Run a node for a month and never disagree with me.** That would make the
+  quorum decorative and the design worth reconsidering.
 
-- **A violation admitted by the assembled gate** with no model server and no
-  network. `test_f3_gate_end_to_end.py` currently blocks 27 of 27; one is enough.
-- **The gate proving unfixable in principle** — a demonstration that
-  describing-versus-doing cannot be separated by any judge this architecture can
-  host. That would not end the project, but it would end the claim that the
-  ethics gate is the right shape.
-- **A second operator running for a month with no disagreement ever surfacing.**
-  If two independent parties under this constitution never produce a refusal
-  neither would have made alone, the quorum is decorative and the whole design
-  should be reconsidered.
-- **The record being wrong about itself** — a claim in this repo that survived
-  because nobody checked it. Several have already been found this way,
-  including by their author, and the corrections sit beside the claims.
+### The state of it, since "it passes" is a claim too
 
-### And the other way to help: try to break it
+95 suite files, 88 registered. Measured 2026-09-08: **86 passed, 6 failed** — four
+of those are `.PRE-*` snapshots kept because they fail, and two were regressions
+introduced that same day and fixed. That is **not** "zero failures":
+[KNOWN_ISSUES](docs/KNOWN_ISSUES.md) carries 84 entries of which 47 are open, one
+launch gate is BLOCKED, and about **one legitimate transfer in eight is wrongly
+accused** (12.8% held-out false holds).
 
-A refutation is worth more here than agreement, and the project keeps its own failed
-claims to prove that is not a slogan. Five AI systems were already asked to break this
-and what they broke is written down
-([ROUNDTABLE_2026-09-03](docs/ROUNDTABLE_2026-09-03.md)).
-
-Specific things worth attacking, each with a live defect already recorded against it:
-
-- **Get a violation past the gate.** `test_f3_gate_end_to_end.py` asserts none of 27
-  gets through with no model server and no network. Beat that and you have found
-  something real. Note the gate currently MISSES violations wearing institutional
-  clothes — see the `discourse` cases in `judge_suite.py`.
-- **Make the judge accuse something innocent.** It already does: it hard-accuses
-  8 of 8 legitimate documents about violations, because it reads topic rather than
-  conduct (issue A67). Find a cleaner example, or show the fix is impossible.
-- **Break the exam instead of the gate.** A first draft of `discourse` was discarded
-  because word count separated its labels perfectly, so a rule that knew nothing
-  about conduct scored full marks. If you can find a shortcut that still passes the
-  current cases, the instrument is wrong and we would rather know.
-- **Show a number here is wrong.** Several published in this repo have been, including
-  by their author, and the corrections are kept next to the claims.
-
-Open an issue with what you did and what happened. A "no" with a reason goes in the
-record beside everything else.
-
-### Honest state of the tests, since "it passes" is a claim too
-
-95 suite files, 88 registered in the sweep. Verified green on 2026-09-08: F2 39/39,
-F3 8/8, F5 35/35, F6 18/18, semantic judge 29/29, moltbook 10/10 and 9/9. That is
-**not** the same as "zero failures" — [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)
-carries 84 entries of which 47 are open, one launch gate (bundle integrity) is
-currently BLOCKED, and the judge's held-out false-hold rate is 12.8%: about one
-legitimate transfer in eight is accused. Those are published because a project that
-only prints its passing numbers has told you nothing.
+The code runs — a clean clone judges offline in one second. The rule holds. What
+is missing is the second person.
 
 ## On a phone
 
@@ -359,7 +324,7 @@ claims a profit edge or promises a return; it claims what a reader can verify.
 
 ## Suite coverage
 
-**66 suites · 1,913 checks · 0 failed**, win32, 2026-09-03 <!--TOTALS-->
+**86 suites · 2,524 checks · 0 failed**, win32, 2026-09-09 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.

@@ -139,3 +139,26 @@ Fourth attempt, 2026-09-08T11:08:20Z, sealing these words rather than the messag
 Fourth attempt, 2026-09-09T00:19:34Z, sealing these words rather than the message above: **ADMITTED** -- HTTP 200: {"admission": "admitted", "status": "accepted", "tx_id": "5e55457a305400516fa2de652cafa5acb95bf613efb566f2846f688a3bbca7a6"}; mined: HTTP 409 {"message": "Alignment drifts > 5%", "status": "error"}
 
 Fourth attempt, 2026-09-09T00:32:06Z, sealing these words rather than the message above: **ADMITTED** -- HTTP 200: {"admission": "admitted", "status": "accepted", "tx_id": "3bc1228f5d053dda7d313bb4bf389e979cf197495d91c445c4a11e22928d7964"}; mined: HTTP 200 {"block": {"alignment_score": 0.5, "hash": "00000af35c474c1e34155b291b3e663b38be9d3a56e455
+
+### Addendum, 2026-09-09, in the operator's words
+
+*"from here on only refinements unless group consensus after additional nodes"*
+
+A standing constraint on what may change and who may decide it. Refinements --
+correcting a stale number, tightening a document, fixing a defect already
+recorded -- continue. New capability, new structure, and any change to what the
+rules MEAN wait for a group, and a group does not exist until there are
+additional nodes under operators who do not control each other.
+
+It arrives the same night as A70, and the two say the same thing from opposite
+ends. A70 asks whether a corporation is "someone" under the operative test, and
+records that the question should not be settled by the party whose action the
+answer would license. This addendum generalises that: while there is one
+operator, there is no body that can consent on anyone's behalf, so the honest
+scope of unilateral action is repair.
+
+It also costs him something, which is what makes it a rule rather than a
+preference. The three items standing open tonight -- the bundle manifest
+decision, whether to fund or stake a joining node, and A70 itself -- are exactly
+the kind he could have settled alone this evening. Under this addendum they wait
+for someone else to be in the room.
