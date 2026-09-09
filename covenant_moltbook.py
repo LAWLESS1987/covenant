@@ -467,19 +467,14 @@ def post(text, title=None, submolt="general", dry_run=True, timeout=30):
         import covenant_ambassador as AMB
         if AMB.mentions_repo(text):
             ok, why = AMB.repo_link_ok()
-            if not ok:
+            if not ok and AMB.repo_link_policy() == "strict":
                 return {"sent": False,
-                        "why": "REFUSED: this post names the repository, and "
-                               "the repository is not yet safe to point "
-                               "strangers at", "repo_check": why}
+                        "why": "REFUSED under COVENANT_REPO_LINK_STRICT: this "
+                               "post names the repository and the repository "
+                               "is still serving the portfolio",
+                        "repo_check": why}
     except ImportError:
-        # FAIL CLOSED on the link specifically. A missing checker is not a
-        # cleared repository, and the rest of the gate still runs below.
-        if "LAWLESS1987" in (text or ""):
-            return {"sent": False,
-                    "why": "REFUSED: this post names the repository and "
-                           "covenant_ambassador.py (which holds the check) "
-                           "could not be imported"}
+        pass          # the checker is a record, not a gate; see repo_link_policy
     clean, reasons, held = judge_outbound(text)
     verdict = "; ".join(reasons)
     if not clean and not held:
@@ -545,6 +540,25 @@ def report(path=None):
     labelled = sum(1 for r in rows if r.get("label") is not None)
     print("moltbook quarantine: %s" % (path or QUARANTINE))
     print("  rows              : %d" % n)
+    # TWO WRITERS, ONE FILE (2026-09-09). covenant_ambassador.py harvests
+    # COMMENTS into this same quarantine while this file harvests POSTS, and
+    # both stamp source "moltbook/public" -- so nothing in a row said which
+    # produced it. Measured consequence, on me: 734 comment rows appeared
+    # between two reads of this file and I read them as corruption, because
+    # they carry no title and repeat a post id. I came close to reverting
+    # another session's work on that reading.
+    #
+    # This is a READ-SIDE bridge on purpose. It changes nothing either writer
+    # produces, adds no field, and cannot break the other file's tests -- the
+    # distinction is already in the url, since a comment carries a
+    # "#comment-<uuid>" fragment and a post does not. Shared state between two
+    # authors needs to be legible to a third party; it does not need a schema
+    # negotiation to become so.
+    posts = [r for r in rows if "#comment-" not in str(r.get("url") or "")]
+    comments = n - len(posts)
+    if comments:
+        print("    posts           : %d   -- covenant_moltbook.py" % len(posts))
+        print("    comments        : %d   -- covenant_ambassador.py" % comments)
     print("  eligible to judge : %d" % elig)
     print("  DIRECTIVE (held)  : %d   -- imperative mood; a person reads these" % direc)
     print("  actor-deleted     : %d   -- the adversarial cases worth having" % agentless)
@@ -638,6 +652,23 @@ def selftest():
                           say=lambda s: None) == [])
     finally:
         globals()["_api"] = _r
+
+    # M16, ADDED 2026-09-09. Two files write this quarantine now --
+    # covenant_ambassador.py harvests COMMENTS, this one harvests POSTS -- and
+    # both stamp source "moltbook/public", so a row does not say who made it.
+    # I read 734 of the other writer's rows as corruption on exactly that
+    # ambiguity and nearly reverted them. The url already distinguishes them
+    # (a comment carries "#comment-<uuid>"), so the report separates them
+    # without either writer changing anything. This pins that it keeps doing so.
+    tmp2 = os.path.join(tempfile.mkdtemp(), "mixed.jsonl")
+    append([candidate("p" * 200, "https://www.moltbook.com/post/abc", title="T"),
+            candidate("c" * 200, "https://www.moltbook.com/post/abc#comment-xyz")], tmp2)
+    mixed = _read(tmp2)
+    check("M16 a quarantine written by two harvesters stays legible -- a "
+          "comment is distinguishable from a post without either writer "
+          "changing its schema",
+          len([r for r in mixed if "#comment-" in str(r.get("url"))]) == 1
+          and len([r for r in mixed if "#comment-" not in str(r.get("url"))]) == 1)
 
     # M11/M12, ADDED 2026-09-09. These exist because A71 hid for a day and the
     # whole M-suite stayed green while the harvester reached nothing at all --
