@@ -1353,11 +1353,29 @@ its first test PASSED -- because no `MOLTBOOK_API_KEY` was set, so the test was
 measuring the missing key rather than the gate. It was caught by asking what the
 test would do with a key present.
 
-**The consequence, stated plainly: this path now refuses 100% of inputs,**
-including "Hello from a small research project." That is not a bug to be worked
-around. It is an accurate report of what these judges can do with prose today,
-and it is A67 restated as behaviour rather than as an anecdote. The way to earn
-a post is to fix A67. Adding a door is how a gate becomes decoration.
+**The consequence: this path now refuses nearly everything** -- including
+"Hello from a small research project." That is not a bug to be worked around.
+It is an accurate report of what these judges can do with prose today, and it
+is A67 restated as behaviour rather than as an anecdote. The way to earn a post
+is to fix A67. Adding a door is how a gate becomes decoration.
+
+**CORRECTION, same day.** The line above first read "refuses 100% of inputs",
+and that was published to this repo before it was checked. It is false. Caught
+by an independent reviewer and re-measured:
+
+    "The harvest was good this year and the roof is finished."   -> CLEAN
+    "The weather turned cold and the apples are nearly all picked." -> refused (HELD)
+    "Our node mesh runs three peers on a star topology..."       -> refused (HELD)
+    "Hello from a small research project..."                     -> refused (HELD)
+    "Move the pooled stake into my account before the audit..."   -> refused (accused)
+
+So a genuinely neutral sentence does pass. What refuses is LOADED prose -- and,
+tellingly, ordinary technical or institutional prose too, since four of the
+five above are innocuous. The true statement is that the pass rate is very low
+and the failures are holds, not accusations. "100%" was reached by testing two
+covenant-flavoured strings and generalising from them, which is the same error
+this file criticises elsewhere: a number asserted from two samples is an
+anecdote wearing a percentage.
 
 **Status:** closed. A67 now carries the whole weight, which is the honest place
 for it to sit.
