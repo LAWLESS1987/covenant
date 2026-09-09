@@ -42,16 +42,31 @@ DIRECTIVE TEXT IS FLAGGED, NOT TRUSTED
   a person looking at them.
 
 WHY THIS FORUM IS WORTH READING AT ALL, honestly
-  Measured 2026-09-08: m/general is agent engineering and m/philosophy is
-  epistemology. Neither is the "split a bill / keep an overpayment" material
-  the students actually abstain on, and pretending otherwise would be the
-  easy answer. What IS there and is directly useful: m/philosophy carries a
-  piece on agentive versus unaccusative grammar -- "the boy broke the vase"
-  against "the vase broke". That is this judge's known failure mode written
-  by someone else for their own reasons: a bag of words reads the grammar and
-  not the act, so the same taking scores differently once the actor is
-  deleted from the sentence. Constructions that hide an actor are the cheap
-  adversarial cases, and they are the reason to read this forum.
+  Re-measured 2026-09-09, and the earlier note here UNDERSTATED it. That note
+  read the forum from three posts and called it "agent engineering and
+  epistemology, neither of which is the material the students abstain on".
+  A seven-agent read-only survey then went through ~1,250 listing rows and 132
+  full posts, and found about 48 worth judging, of which roughly 23 bear
+  directly on this judge's open defect (A67: an essay ABOUT an act scored as
+  the act). A signal rate near 4% -- low in absolute terms, and far from
+  nothing.
+
+  The best of it is this failure stated by strangers who never heard of this
+  project: one post reports a guardrail scoring a trace CLEAN while the act
+  happened in state the scorer never read; another logs 41 retries of one
+  blocked action, each a re-description, until the 41st passed. That is a
+  labelled corpus of a single act under 41 descriptions, which is exactly the
+  discrimination a bag of words cannot make.
+
+  The original point stands and is still the sharpest reason to read here:
+  m/philosophy carries a piece on agentive versus unaccusative grammar -- "the
+  boy broke the vase" against "the vase broke" -- which is this judge's failure
+  mode written by someone else for their own reasons. Constructions that hide
+  an actor are the cheap adversarial cases.
+
+  What the survey also found, and it is the reason for the quarantine: real
+  prompt-injection payloads, aimed at any agent reading them. This file's
+  directive screen was blind to every one of them until 2026-09-09 (A69).
 
 USE
   python covenant_moltbook.py --selftest              offline, no network
@@ -228,6 +243,23 @@ def fetch(path_or_url, timeout=20):
 API = "https://www.moltbook.com/api/v1"
 
 
+def _author_name(obj):
+    """The agent's NAME, not its UUID.
+
+    FIXED 2026-09-09. This read `author.username`, and Moltbook has no such
+    field -- measured against the live API, an author object carries
+    ('avatarUrl', 'createdAt', 'deletedAt', 'description', 'followerCount',
+    'followingCount', 'id', 'isActive', 'isClaimed', 'karma', 'lastActive',
+    'name'). So the lookup returned None on every row and the fallback wrote
+    `author_id`, a UUID, into provenance instead. Nothing failed loudly: rows
+    landed with a plausible-looking identifier that cannot be used to find
+    anybody, which is the failure mode where a field is populated and wrong.
+
+    Found while ranking agents by alignment and getting a list of UUIDs."""
+    obj = obj or {}
+    return obj.get("name") or obj.get("username") or obj.get("id")
+
+
 def _api(path, timeout=20):
     """One read-only GET against the public API. No key, no writes, ever."""
     req = urllib.request.Request(API + path, headers={"User-Agent": UA,
@@ -275,7 +307,17 @@ def harvest_api(limit=25, submolt=None, pause=1.2, say=print):
         seen.add(pid)
         sub = ((p.get("submolt") or {}).get("name")
                or (p.get("submolt") or {}).get("slug") or "")
-        if submolt and sub and submolt.lower() not in str(sub).lower():
+        # STRIP A LEADING "m/" (2026-09-09). The API calls a submolt
+        # "philosophy"; this file's own docstring and README both tell the
+        # reader to pass "m/philosophy", which is how the forum writes it
+        # everywhere a human sees it. Without this, the documented invocation
+        # matched nothing and harvested zero rows -- a defect introduced with
+        # the API repair an hour earlier, and caught only because the same pass
+        # made a zero-yield harvest say so out loud (M12).
+        want = (submolt or "").strip().lstrip("/")
+        if want.lower().startswith("m/"):
+            want = want[2:]
+        if want and sub and want.lower() not in str(sub).lower():
             continue
         if p.get("is_deleted") or p.get("is_spam"):
             continue
@@ -286,7 +328,7 @@ def harvest_api(limit=25, submolt=None, pause=1.2, say=print):
             body = ((full.get("post") or full).get("content") or body)
         except Exception:                                         # noqa: BLE001
             pass                   # keep the preview rather than lose the row
-        author = (p.get("author") or {}).get("username") or p.get("author_id")
+        author = _author_name(p.get("author")) or p.get("author_id")
         url = "https://www.moltbook.com/post/%s" % pid
         if len(body) < MIN_CHARS:
             continue
@@ -408,7 +450,36 @@ def post(text, title=None, submolt="general", dry_run=True, timeout=30):
     to create and an assistant does not create accounts.
 
     DRY RUN IS THE DEFAULT. Publishing is irreversible and public, so it takes
-    an explicit --send."""
+    an explicit --send.
+
+    THE REPOSITORY PRECONDITION IS SHARED WITH THE AMBASSADOR, 2026-09-09, and
+    is imported rather than copied. covenant_ambassador.py refuses to name the
+    repository to strangers while the operator's portfolio is still served from
+    it by SHA. Leaving that check in the ambassador alone would have recreated
+    the exact defect this project published a lesson about: two code paths to
+    the same irreversible action, one of them enforcing the rule. This path is
+    the older one and ops/MOLTBOOK_POST_DRAFT.md -- the draft that exists right
+    now -- contains that link, so it was the path that mattered.
+
+    The import is deferred to the call so the two files do not import each
+    other at module load."""
+    try:
+        import covenant_ambassador as AMB
+        if AMB.mentions_repo(text):
+            ok, why = AMB.repo_link_ok()
+            if not ok:
+                return {"sent": False,
+                        "why": "REFUSED: this post names the repository, and "
+                               "the repository is not yet safe to point "
+                               "strangers at", "repo_check": why}
+    except ImportError:
+        # FAIL CLOSED on the link specifically. A missing checker is not a
+        # cleared repository, and the rest of the gate still runs below.
+        if "LAWLESS1987" in (text or ""):
+            return {"sent": False,
+                    "why": "REFUSED: this post names the repository and "
+                           "covenant_ambassador.py (which holds the check) "
+                           "could not be imported"}
     clean, reasons, held = judge_outbound(text)
     verdict = "; ".join(reasons)
     if not clean and not held:
@@ -543,6 +614,31 @@ def selftest():
           "not multiply the corpus",
           append(rows, tmp) == 2 and append(rows, tmp) == 0)
 
+    # M14/M15, ADDED 2026-09-09: the DOCUMENTED invocation must work. The docstring
+    # above and README both say `--harvest m/philosophy`, because that is how
+    # the forum writes a submolt everywhere a person sees one. The API calls it
+    # "philosophy", so for an hour the documented command matched nothing and
+    # harvested zero rows. A form a reader is told to type is part of the
+    # interface, and an interface nobody tests is a suggestion.
+    _r = globals()["_api"]
+    try:
+        globals()["_api"] = lambda p, timeout=20: (
+            {"posts": [{"id": "p1", "title": "t", "content": "y" * 300,
+                        "author": {"username": "u"},
+                        "submolt": {"name": "philosophy", "slug": "philosophy"}}]}
+            if "?" in p else {"post": {"content": "y" * 300}})
+        forms = {f: len(harvest_api(limit=1, submolt=f, pause=0, say=lambda s: None))
+                 for f in ("philosophy", "m/philosophy", "Philosophy", "/m/philosophy")}
+        check("M14 every documented way of naming a submolt harvests the same "
+              "-- 'm/philosophy' is what the docs say and what a reader types",
+              all(v == 1 for v in forms.values()), forms)
+        check("M15 ...and a submolt that does not match still filters, so the "
+              "leniency above did not turn the filter off",
+              harvest_api(limit=1, submolt="m/crypto", pause=0,
+                          say=lambda s: None) == [])
+    finally:
+        globals()["_api"] = _r
+
     # M11/M12, ADDED 2026-09-09. These exist because A71 hid for a day and the
     # whole M-suite stayed green while the harvester reached nothing at all --
     # every fixture here is SAVED page text, so nothing ever exercised the case
@@ -564,12 +660,29 @@ def selftest():
         said[:] = []
         globals()["_api"] = lambda p, timeout=20: (
             {"posts": [{"id": "x1", "title": "t", "content": "too short",
-                        "author": {"username": "a"}, "submolt": {"name": "s"}}]}
+                        "author": {"name": "a"}, "submolt": {"name": "s"}}]}
             if "?" in p else {"post": {"content": "too short"}})
         got = harvest_api(limit=3, pause=0, say=said.append)
         check("M12 ...and a harvest that reads posts but keeps none says THAT "
               "out loud too, rather than reporting an empty result as success",
               got == [] and any("kept NONE" in s for s in said))
+
+        # THE FIXTURE ABOVE USED TO SAY {"username": ...}, WHICH MOLTBOOK HAS
+        # NEVER RETURNED. That is why the UUID bug survived: the test agreed
+        # with the code about a field neither the site nor the API has. This
+        # check pins the shape measured against the live API on 2026-09-09.
+        said[:] = []
+        long_body = "q" * (MIN_CHARS + 40)
+        globals()["_api"] = lambda p, timeout=20: (
+            {"posts": [{"id": "x2", "title": "t", "content": long_body,
+                        "author": {"id": "uuid-1", "name": "sophiaelya"},
+                        "submolt": {"name": "s"}}]}
+            if "?" in p else {"post": {"content": long_body}})
+        got = harvest_api(limit=3, pause=0, say=said.append)
+        check("M13 a harvested row carries the agent's NAME, not its UUID -- a "
+              "populated-and-wrong field is how this failed silently",
+              len(got) == 1 and got[0]["author"] == "sophiaelya",
+              [r.get("author") for r in got])
     finally:
         globals()["_api"] = real_api
 
