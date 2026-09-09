@@ -228,6 +228,75 @@ def fetch(path_or_url, timeout=20):
 API = "https://www.moltbook.com/api/v1"
 
 
+def _api(path, timeout=20):
+    """One read-only GET against the public API. No key, no writes, ever."""
+    req = urllib.request.Request(API + path, headers={"User-Agent": UA,
+                                                      "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def harvest_api(limit=25, submolt=None, pause=1.2, say=print):
+    """Quarantine rows read from the public JSON API. REPAIR, not new reach.
+
+    ISSUE A71, 2026-09-09. `fetch()` + `extract()` stopped reaching any post
+    body, because Moltbook renders client-side: a post page is 782 characters of
+    title, nav and cookie banner, and every listing page is under 1,700. All 56
+    posts an agent survey had cited fetched successfully and produced ZERO rows.
+    The scraper was not wrong; the site moved out from under it.
+
+    This reads the same public posts the same anonymous reader can see, through
+    the documented JSON endpoint instead of through HTML. It is the same
+    capability by a transport that still works.
+
+    TWO CALLS PER POST, and the reason matters. The listing truncates `content`
+    to 500 characters, so a row built from it would be a fragment presented as a
+    post -- and a judge labelling a fragment is labelling something nobody
+    wrote. `/posts/<id>` returns the whole body (measured: 1,843 vs 500 on the
+    same post), so each candidate is the post as published.
+
+    NOTHING DOWNSTREAM CHANGES. Every row still goes through candidate(), so the
+    directive screen (fixed today), MIN_CHARS/MAX_CHARS, the sha256 dedup and
+    `label: None` all apply exactly as before. This file still cannot reach the
+    corpus -- covenant_moltbook_release.py is the only door, which is R9 and the
+    whole reason it is a separate file. A harvest that writes to quarantine is
+    not a harvest that teaches anything.
+    """
+    got, seen = [], set()
+    try:
+        page = _api("/posts?limit=%d" % max(1, min(int(limit), 100)))
+    except Exception as e:                                        # noqa: BLE001
+        say("API listing failed (%s: %s)" % (type(e).__name__, str(e)[:90]))
+        return []
+    for p in (page.get("posts") or []):
+        pid = p.get("id")
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        sub = ((p.get("submolt") or {}).get("name")
+               or (p.get("submolt") or {}).get("slug") or "")
+        if submolt and sub and submolt.lower() not in str(sub).lower():
+            continue
+        if p.get("is_deleted") or p.get("is_spam"):
+            continue
+        body = p.get("content") or ""
+        try:                       # the full body, not the 500-char preview
+            time.sleep(pause)
+            full = _api("/posts/%s" % pid)
+            body = ((full.get("post") or full).get("content") or body)
+        except Exception:                                         # noqa: BLE001
+            pass                   # keep the preview rather than lose the row
+        author = (p.get("author") or {}).get("username") or p.get("author_id")
+        url = "https://www.moltbook.com/post/%s" % pid
+        if len(body) < MIN_CHARS:
+            continue
+        got.append(candidate(body[:MAX_CHARS], url, author=author,
+                             title=p.get("title")))
+    say("read %d post(s) from the API, %d long enough to keep, %d directive-blocked"
+        % (len(seen), len(got), sum(1 for r in got if r["flags"].get("directive"))))
+    return got
+
+
 def judge_outbound(text):
     """(clean, reasons). The draft goes past the covenant's own judges first.
 
@@ -457,7 +526,10 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--harvest", metavar="SUBMOLT")
+    ap.add_argument("--harvest", metavar="SUBMOLT",
+                    help="read the public API; a submolt name, or 'all'")
+    ap.add_argument("--limit", type=int, default=25,
+                    help="how many listing rows to read (max 100)")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--post", metavar="FILE", help="judge a draft, then post it")
     ap.add_argument("--title", default=None)
@@ -486,11 +558,14 @@ def main():
               % (len(rows), a.url, added))
         return report()
     if a.harvest:
-        text, url = fetch(a.harvest)
-        rows = extract(text, url)
+        # A71: the HTML path reaches no body since Moltbook went client-side, so
+        # this reads the public JSON API instead. `--harvest all` takes whatever
+        # the front page returns; `--harvest philosophy` filters by submolt.
+        # `--from-text` still parses saved HTML and is unchanged.
+        rows = harvest_api(limit=a.limit,
+                           submolt=None if a.harvest in ("all", "*") else a.harvest)
         added = append(rows)
-        print("harvested %d candidate(s) from %s, %d new, 0 labelled"
-              % (len(rows), url, added))
+        print("harvested %d candidate(s), %d new, 0 labelled" % (len(rows), added))
         return report()
     ap.print_help()
     return 0

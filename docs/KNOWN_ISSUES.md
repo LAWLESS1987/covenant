@@ -1612,12 +1612,27 @@ passes because its fixtures are saved page text, not live pages — the same sha
 of gap as the A69 directive guard, which passed for months because its one
 fixture sat on the only line the regex could read.
 
-**Not fixed here.** The working path is Moltbook's JSON API (`/api/v1/...`),
-which is what the survey agents used to read ~1,250 posts. Wiring the harvester
-to it is new capability, not a repair, and the operator's standing instruction
-of 2026-09-09 is refinements only until a second operator exists. It is his
-call, and it is worth making: with the harvester dead, the students learn
-nothing from Moltbook, and the experiment recorded in
-`ops/MOLTBOOK_EXPERIMENT.md` cannot accumulate a bigger sample than three rows.
+**FIXED 2026-09-09**, at the operator's instruction: *"limiting info is not
+mutual benefit need flexibility to grow"*. `harvest_api()` reads the same public
+posts an anonymous reader sees, through `/api/v1/posts` instead of through HTML.
 
-**Status:** open.
+Two calls per post, deliberately: the listing truncates `content` to 500
+characters, and a row built from a fragment would present something nobody wrote
+to a judge for labelling. `/posts/<id>` returns the whole body — measured 1,843
+against 500 on the same post.
+
+**NOTHING DOWNSTREAM MOVED, and that is the point.** Every row still passes
+through `candidate()`, so the directive screen, `MIN_CHARS`/`MAX_CHARS`, the
+sha256 dedup and `label: None` apply exactly as before. R9 still holds: no code
+path in the harvester opens `ops/verdicts.jsonl` — the two mentions in that file
+are in its docstring, which is why M6 checks the body with the docstring
+stripped. Verified live: 8 posts read, all quarantined unlabelled, 0 directive,
+MOLTBOOK 10/10 and MOLTBOOK-RELEASE 11/11.
+
+The guards limit what becomes TRAINING DATA. They were never what limited what
+came in, and a broken pipe was never a safety property.
+
+**Status:** closed. One imprecision noticed while verifying and left alone: the
+report prints "carrying a label : N -- must be 0 here", but a RELEASED row
+legitimately carries a label as R8's dedup mark, so N is the released count and
+not a violation. The line predates this fix.
