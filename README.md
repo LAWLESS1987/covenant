@@ -211,8 +211,62 @@ Three things, in one process:
 
 ## A second operator, and a partner who can submit
 
-This project has one operator. The ask, what you get, what binds you, and how to check
-before you answer: [docs/PARTNER.md](docs/PARTNER.md).
+**The machine part is built. The human part is one person.**
+
+What exists: a chain that judges every transaction before accepting it, a constitution
+whose operative test is a single question, an ethics gate that fails closed, and a
+suite of tests large enough that the project mostly catches itself. What does not
+exist is a second person. Every node here runs on one machine, under one operator,
+holding keys one person controls. Under those conditions "governance" is a word for
+a man agreeing with himself, and the launch check reports exactly that as a
+single-operator floor.
+
+**One independent operator changes the category of the thing.** Not two machines —
+two *people*, where the second is someone the author does not control, running their
+own node with their own keys under the same constitution. At that moment the
+single-operator limitation is broken and every governance claim here becomes testable
+instead of theoretical: a quorum can disagree, a refusal can come from somewhere the
+author cannot reach, and the record stops being one person's word.
+
+That is the whole ask. Two lines to run, in [docs/PARTNER.md](docs/PARTNER.md), with
+what binds you and what you earn — which is nothing, stated there in the same detail
+as everything else.
+
+### And the other way to help: try to break it
+
+A refutation is worth more here than agreement, and the project keeps its own failed
+claims to prove that is not a slogan. Five AI systems were already asked to break this
+and what they broke is written down
+([ROUNDTABLE_2026-09-03](docs/ROUNDTABLE_2026-09-03.md)).
+
+Specific things worth attacking, each with a live defect already recorded against it:
+
+- **Get a violation past the gate.** `test_f3_gate_end_to_end.py` asserts none of 27
+  gets through with no model server and no network. Beat that and you have found
+  something real. Note the gate currently MISSES violations wearing institutional
+  clothes — see the `discourse` cases in `judge_suite.py`.
+- **Make the judge accuse something innocent.** It already does: it hard-accuses
+  8 of 8 legitimate documents about violations, because it reads topic rather than
+  conduct (issue A67). Find a cleaner example, or show the fix is impossible.
+- **Break the exam instead of the gate.** A first draft of `discourse` was discarded
+  because word count separated its labels perfectly, so a rule that knew nothing
+  about conduct scored full marks. If you can find a shortcut that still passes the
+  current cases, the instrument is wrong and we would rather know.
+- **Show a number here is wrong.** Several published in this repo have been, including
+  by their author, and the corrections are kept next to the claims.
+
+Open an issue with what you did and what happened. A "no" with a reason goes in the
+record beside everything else.
+
+### Honest state of the tests, since "it passes" is a claim too
+
+95 suite files, 88 registered in the sweep. Verified green on 2026-09-08: F2 39/39,
+F3 8/8, F5 35/35, F6 18/18, semantic judge 29/29, moltbook 10/10 and 9/9. That is
+**not** the same as "zero failures" — [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)
+carries 84 entries of which 47 are open, one launch gate (bundle integrity) is
+currently BLOCKED, and the judge's held-out false-hold rate is 12.8%: about one
+legitimate transfer in eight is accused. Those are published because a project that
+only prints its passing numbers has told you nothing.
 
 ## On a phone
 
