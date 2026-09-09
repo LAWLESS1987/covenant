@@ -77,7 +77,23 @@ LOGDIR = os.path.join(HERE, "logs")
 # A correction marker: the form this project uses to say "this was wrong and
 # here is what it said". Deliberately a pattern rather than a fixed string, so
 # a document may add markers freely; only losing them is the offence.
-MARKER = re.compile(r"^\*(?:Corrected|Added|Superseded|Retracted)\b", re.M)
+# WIDENED 2026-09-09, AND THE GUARD WAS BLIND UNTIL THIS. The pattern was
+# `^\*(?:Corrected|...)` -- exactly one leading asterisk. The corpus does not
+# write them that way everywhere. Measured over the four guarded documents:
+#
+#     docs/WHAT_WE_FOUND.md   *Corrected 2026-09-07.      4 counted   ok
+#     docs/KNOWN_ISSUES.md    *(Corrected 2026-09-09:     0 counted   MISSED
+#     docs/CONSTITUTION.md    **Corrected 2026-09-09.**   0 counted   MISSED
+#
+# The sentinel's rule is `now["markers"] < base["markers"]`, and both anchors
+# recorded 0. A count of zero cannot go below zero, so on KNOWN_ISSUES.md and
+# CONSTITUTION.md -- the two documents it most exists to protect -- this guard
+# could never fire, whatever anyone deleted. That is the A74 shape once more: a
+# check whose mechanism cannot reach the thing its label names.
+#
+# At least one emphasis character is still required, so ordinary prose opening
+# with "Added a field" is not a correction marker. `*(` and `**` now are.
+MARKER = re.compile(r"^[*_]{1,2}\(?(?:Corrected|Added|Superseded|Retracted)\b", re.M)
 
 GUARDED_DOCUMENTS = [
     "docs/WHAT_WE_FOUND.md",
@@ -492,33 +508,24 @@ def _self_test() -> int:
           + ("" if anchored and not _unguarded
              else " -- unguarded: " + (", ".join(_unguarded) or "no anchors at all")))
 
-    # R7 discloses a SOURCE defect this suite used to hide, and does not repair
-    # it. MARKER (:80) matches only a line beginning "*Corrected"; the corpus
-    # also writes "*(Corrected" (docs/KNOWN_ISSUES.md:16) and "**Corrected"
-    # (docs/CONSTITUTION.md:171), which it does not match. Those two documents
-    # therefore count 0 markers, are anchored at 0, and `now < base` (:204) can
-    # never be true for them -- deleting their correction notes is invisible,
-    # which is mutation (2). The old suite was green under both the shipped
-    # pattern and a corrected one, which is proof its green carried no
-    # information about the corpus. Widening MARKER is the operator's call and
-    # must be followed by `python covenant_sentinels.py --anchor`, since the
-    # shipped anchors record 0 for both files and a widened pattern alone leaves
-    # the comparison unsatisfiable. Until then this pins the gap at its known
-    # size so it cannot grow in silence. Red means the set below is out of date:
-    # either a new document arrived writing its corrections in a form the
-    # sentinel cannot see, or the pattern was widened and the anchors are stale.
-    LOOSE = re.compile(r"^[*(\s]{0,4}(?:Corrected|Added|Superseded|Retracted)\b", re.M)
-    UNCOUNTED = {"docs/KNOWN_ISSUES.md", "docs/CONSTITUTION.md"}
-    blind = set()
-    for _rel in anchored:
-        _t = (read_bytes(_rel) or b"").decode("utf-8", "replace")
-        if len(MARKER.findall(_t)) != len(LOOSE.findall(_t)):
-            blind.add(_rel)
-    check(blind == UNCOUNTED,
-          "R7 the documents whose correction notes MARKER cannot count are still "
-          "exactly the two known ones"
-          + ("" if blind == UNCOUNTED
-             else " -- now: " + (", ".join(sorted(blind)) or "none")))
+    # R7 IS RETIRED, AND IT RETIRED ITSELF CORRECTLY. It was added earlier on
+    # 2026-09-09 to DISCLOSE a source defect rather than repair it: MARKER
+    # matched only "*Corrected", while the corpus also writes "*(Corrected"
+    # (KNOWN_ISSUES.md:16) and "**Corrected" (CONSTITUTION.md:171). Those two
+    # documents counted 0 markers, were anchored at 0, and `now < base` cannot
+    # fire from 0 -- so the guard on the two documents it most exists to protect
+    # was structurally incapable of alerting, whatever anyone deleted.
+    #
+    # R7 pinned that gap at its known size, and said what would turn it red:
+    # "the pattern was widened and the anchors are stale". Both happened, in
+    # that order and on purpose -- MARKER now accepts one or two leading
+    # emphasis characters and an optional paren, `--anchor` was re-run, and both
+    # files record 1 marker instead of 0.
+    #
+    # Keeping a check that pins a defect after the defect is gone would be a
+    # test asserting the past. Its job passes to R9 below, which asks the
+    # general question (is any marker in the corpus invisible to MARKER?)
+    # instead of naming two files that would need editing forever.
 
     # R8 asserts the invariant itself over the real corpus instead of a fixture:
     # the shipped sentinel, the shipped anchors, no marker-loss alert. This is
@@ -531,6 +538,38 @@ def _self_test() -> int:
     check(not _live,
           "R8 no guarded document has lost a correction marker since the anchor"
           + ("" if not _live else " -- " + _live[0][:120]))
+
+    # R9: NO MARKER SHAPE THE CORPUS USES MAY BE INVISIBLE TO MARKER.
+    #
+    # R8 above can only see markers the pattern already counts, so it was green
+    # for years on two documents whose markers it could not see at all --
+    # `*(Corrected` in KNOWN_ISSUES.md and `**Corrected` in CONSTITUTION.md both
+    # counted 0, their anchors recorded 0, and `now < base` cannot fire from 0.
+    # The guard on the two most important documents was structurally incapable
+    # of alerting. Widening the pattern fixed those two; this stops the next
+    # shape from doing it again.
+    #
+    # It compares the shipped MARKER against a deliberately loose reading of the
+    # SAME real files: any line beginning with up to three non-word characters
+    # and then one of the four words. Loose is allowed to over-count -- that is
+    # what makes it a useful upper bound. If the two disagree, the corpus has
+    # started writing a marker the sentinel cannot see, and the sentinel says so
+    # rather than continuing to report zero.
+    _loose = re.compile(r"^\W{0,3}(?:Corrected|Added|Superseded|Retracted)\b", re.M)
+    _blind = []
+    for _d in GUARDED_DOCUMENTS:
+        _p = _d if os.path.isabs(_d) else os.path.join(HERE, _d)
+        try:
+            _t = open(_p, encoding="utf-8").read()
+        except OSError:
+            continue                      # a missing file is R5/A3's business
+        _seen, _all = len(MARKER.findall(_t)), len(_loose.findall(_t))
+        if _all > _seen:
+            _blind.append("%s: %d marker(s) the pattern cannot see" % (_d, _all - _seen))
+    check(not _blind,
+          "R9 every correction marker in the guarded corpus is one MARKER can "
+          "count -- a guard that counts zero can never report a loss"
+          + ("" if not _blind else " -- " + "; ".join(_blind)[:160]))
 
     print()
     if fails:
