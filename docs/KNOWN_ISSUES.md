@@ -1886,3 +1886,25 @@ run journal; none has been acted on, and none should be quoted as a defect in
 the *code* -- every one of them is a defect in a **test**, and the guarded
 behaviour was found correct in every case that was checked. What was missing was
 the proof.
+
+**CLOSED 2026-09-09, all 34.** One agent per suite, each in its own git
+worktree, each required to prove the same thing twice: the new check passes on
+clean source and **fails** with the guarded behaviour broken. 28 files patched,
+28 suites green, nothing weakened -- almost every repair ADDS a behavioural
+check beside the weak one, so the old check still documents intent.
+
+    test_r2_redundancy      stopped checking its own copy of the classifier
+    test_sem5_register      FORMAL was byte-identical to the model's own
+                            missing_seeds, so the gap was empty by construction
+    test_b2_quorum          E3 only ever ran its except-branch, so the armed
+                            gate had never once been seen ADMITTING a quorum
+    test_k3_owner_only      B2 was `(refused and ...) or refused` == `refused`
+    test_p20_watchdog       E10 read one function body; E10b watches at any depth
+
+**And the ratchet caught a repair that reintroduced the defect** -- G3 went red
+on its first live use, `test_c3_guard` 3 -> 6. Two of those three were a false
+positive in G3 itself: it counted `wrote = open(GUARD_LOG).read()` as source
+text, when that is the log the program under test had just WRITTEN, which is the
+best kind of behavioural assertion. Fixed: the opened path must name a `.py` or
+`__file__`. That correction cut the count 82 -> 51 and G3's honest recall from
+10 of 28 to 7 -- three had only ever been "caught" by the false positive.
