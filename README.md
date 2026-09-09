@@ -138,9 +138,19 @@ Three things, in one process:
   authorisation exists — net-zero validation alone was found to be insufficient
   and is not what authorises a transfer.
 - **An ethics gate.** Every transaction is judged before it is accepted. The
-  gate **fails closed**: a node with no reachable judge boots, serves `/chain`,
-  peers correctly, reports healthy — and rejects everything. That is deliberate,
-  and it is the single most surprising property of running this.
+  gate **fails closed**: if nothing competent answers, nothing is admitted.
+  That is deliberate, and it is the single most surprising property of running
+  this.
+
+  **Corrected 2026-09-08:** this used to say a fresh node "rejects everything",
+  and that has been false since the distilled student shipped. Measured on a
+  clean clone with no Ollama, no `GITHUB_TOKEN` and no API key (KNOWN_ISSUES
+  A37): the node came up in **one second**, ADMITTED an ordinary send, and
+  REJECTED every theft, deception and coercion case offline. The student is a
+  130 KB JSON file read into the node's own process, it is tracked in this
+  repo, and it always answers. Fail-closed describes what happens when no judge
+  answers; on a fresh clone one always does. A memo the student cannot decide
+  comes back "Held, not judged", which also fails closed.
 - **A propagation layer built as an address-event network.** A block announce is
   148 bytes because it carries an address, not a payload; the receiver fetches
   what it does not have. Link conductance is Hebbian, redundant announces are
@@ -400,8 +410,22 @@ pip install -r requirements.txt
 # genesis.json is TRACKED and CANONICAL. Do not mint one -- a joiner never does.
 # (The founder minted once; export_genesis now refuses to overwrite an existing file.)
 python launch_check.py                       # twelve gates, changes nothing
-python covenant_unified_v8.py --port 5000 --node-id A --genesis genesis.json
+python run_with_ollama_judge.py --port 5000 --node-id A --genesis genesis.json
 ```
+
+**Yes, that filename is wrong, and no, you do not need Ollama.** Ollama was
+removed from this project on 2026-09-07 and is out of the ethics quorum by
+policy; the launcher keeps its old name because the watchdog, the restart
+scripts and the running processes all identify nodes by it, and renaming it
+would be a riskier change than an honest paragraph. What it actually does is
+register the four judge modules the gate needs.
+
+Do not start the node with `python covenant_unified_v8.py` directly. That was
+the line printed here until 2026-09-08 and it produces a node that **rejects
+every transaction**: the core registers no judge on its own, so
+`COVENANT_JUDGE_PROVIDERS` falls back to `["claude"]`, which needs an API key
+nobody has configured, and the gate then fails closed on everything. The node
+looks healthy while doing it, which is the worst version of being wrong.
 
 A node binds **three** ports: `--port` (HTTP), `--port + 1` (P2P), `--port + 11`
 (bridge). Space nodes at least 20 apart. `--peers` takes each peer's **P2P**

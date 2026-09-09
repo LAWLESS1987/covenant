@@ -49,8 +49,46 @@ git clone https://github.com/LAWLESS1987/covenant && cd covenant && sh check.sh
 
 Then read [WHAT_WE_FOUND](WHAT_WE_FOUND.md) (the finding), [ROUNDTABLE_2026-09-03](ROUNDTABLE_2026-09-03.md)
 (five AI systems asked to break it, and what they broke), and the
-[constitution](CONSTITUTION.md). If you want to run a node, [mobile/TERMUX_SETUP.md](../mobile/TERMUX_SETUP.md)
-is the shortest path.
+[constitution](CONSTITUTION.md).
+
+## Running a node, and what it actually costs you
+
+Two lines, on a laptop, offline:
+
+```bash
+python launch_check.py
+python run_with_ollama_judge.py --port 5000 --node-id A --genesis genesis.json
+```
+
+**Ignore the filename — you do not need Ollama.** It was removed from this
+project on 2026-09-07 and is out of the ethics quorum by policy. The launcher
+kept its name because the watchdog and restart scripts identify nodes by it.
+
+**What judges, on your machine, with no account.** The gate answers from a
+distilled student: a 130 KB JSON file tracked in this repo and read into the
+node's own process — no socket, no model server, no key. Measured on a clean
+clone with no Ollama, no `GITHUB_TOKEN` and no API key (KNOWN_ISSUES A37): the
+node came up in **one second**, admitted an ordinary send, and rejected every
+theft, deception and coercion case offline. A memo it cannot decide comes back
+"Held, not judged", which fails closed.
+
+Older instructions here and in the phone kit said you must install Ollama and
+that the node "fails CLOSED until a judge answers". Both were false by the time
+they were written and are corrected as of 2026-09-08; see KNOWN_ISSUES A37/A38.
+
+**What you earn: nothing. Measured, not estimated.** The only reward this chain
+pays is 1% of the value *moved* in a block, and it goes exclusively to stakers.
+Nothing has ever been staked on any node, so every reward the chain has ever
+computed — 0.12 tokens across its whole history — was discarded rather than
+paid. Total supply is still exactly the 1000-token genesis mint. A node that
+joins today syncs the chain, does real proof-of-work, and receives zero for it.
+There is no faucet and no onboarding grant.
+
+That is stated plainly because the alternative is recruiting you on a
+misunderstanding. What running a node gets you is a vote in a record you can
+verify yourself, and the standing to say publicly what you saw. If that is not
+worth your electricity, that is a reasonable answer and it goes in the record
+too.
 
 ## How to say yes, or no
 

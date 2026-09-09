@@ -34,10 +34,27 @@ command -v python >/dev/null 2>&1 || { say "python missing: pkg install python";
 # 1. keep the phone from sleeping the node (Termux only; harmless elsewhere)
 command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock
 
-# 2. the judge server
-if ! command -v ollama >/dev/null 2>&1; then
-    say "ollama missing: pkg install ollama (or run any OpenAI-compatible server on 11434)"
-    say "continuing: the node will start and fail CLOSED until a judge answers"
+# 2. the judge server -- OPTIONAL SINCE 2026-09-08, and it used to say otherwise.
+#
+# This block used to tell you the node would "fail CLOSED until a judge answers"
+# and then spend most of the install pulling a multi-gigabyte model. Both halves
+# were wrong by the time anyone read them. Ollama was deleted from this project
+# on 2026-09-07 and is out of the ethics quorum by policy
+# (ops/quorum_policy.json: ollama_in_chain false), so the pull bought nothing.
+#
+# What actually judges on a fresh clone is the distilled student -- a 130 KB
+# JSON file, tracked in this repo, read into the node's own process, no socket
+# and no model server. Measured on a clean clone with no Ollama, no GITHUB_TOKEN
+# and no API key (KNOWN_ISSUES A37): the node came up in ONE SECOND, admitted an
+# ordinary send and rejected every theft, deception and coercion case offline.
+#
+# So skipping Ollama is the normal path, not a degraded one. If you have it
+# installed anyway the block below still starts it, which costs nothing.
+if [ "${COVENANT_PHONE_SKIP_OLLAMA:-1}" = "1" ]; then
+    say "skipping ollama -- the shipped distilled student judges offline (A37)"
+    say "set COVENANT_PHONE_SKIP_OLLAMA=0 if you want the old behaviour"
+elif ! command -v ollama >/dev/null 2>&1; then
+    say "ollama missing, and that is fine: the shipped student judges without it"
 else
     if ! curl -s -m 3 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
         say "starting ollama serve in the background (log: $HOME/ollama.log)"
@@ -55,6 +72,21 @@ else
 fi
 
 # 3. the node, with the judge the phone has
+#
+# COVENANT_JUDGE_PROVIDERS IS NOT WHAT DECIDES THIS, and this line has been
+# decorative since the policy file shipped. run_with_ollama_judge.py:47-52
+# applies ops/quorum_policy.json OVER the environment, and
+# covenant_judge_defer.apply_policy overwrites this variable unconditionally --
+# only COVENANT_JUDGE_PROVIDERS_OVERRIDE wins. Proven:
+#
+#   COVENANT_JUDGE_PROVIDERS=local python -c \
+#     "import run_with_ollama_judge, os; print(os.environ['COVENANT_JUDGE_PROVIDERS'])"
+#   -> deferring,semantic
+#
+# It is left set so the shape of the run command stays familiar, and so that
+# anyone who greps for it finds this note instead of believing the value. The
+# gate you actually get is the deferring seat (both distilled students) plus
+# the deterministic semantic judge. See KNOWN_ISSUES A38.
 export COVENANT_JUDGE_PROVIDERS=local
 export COVENANT_LOCAL_JUDGE_MODEL="$JUDGE_MODEL"
 export COVENANT_OLLAMA_URL="$OLLAMA_URL"
