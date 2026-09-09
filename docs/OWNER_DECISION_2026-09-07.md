@@ -17,12 +17,25 @@ someone notices the conflict.
 
 ## What this decision does
 
-- `covenant_trader.py` stays **armed**, on the hourly `TRADER_TASK.bat` loop,
-  with the caps as configured: $25/order, $50/day, 2 orders/day, $100/week
-  fiat, 20% position cap, 10% cash floor.
-- The governance ambiguity flagged in `claude/LIVE_STATE_2026-09-07.md` §2 is
-  **closed**: the automation is approved by the owner, knowingly, with the
-  conflict stated to him in those words before he answered.
+- `covenant_trader.py` stays **armed**, on the **daily** `TRADER_TASK.bat` task
+  — 09:00, repetition disabled, `--once` — with the caps as configured:
+  $25/order, $50/day, 2 orders/day, $100/week fiat, 20% position cap, 10% cash
+  floor.
+
+  *(Corrected 2026-09-09: this said "the hourly ... loop". It fires once a day
+  and is not a loop. TRADER_TASK.bat's own header gives the reason: the strategy
+  reads daily closes and a 200-day line, so a second run in the same day decides
+  on the same data. A governance record about arming a live trader should
+  describe how often it can act, and this one doubled it twenty-four-fold.)*
+- The governance ambiguity is **closed**: the automation is approved by the
+  owner, knowingly, with the conflict stated to him in those words before he
+  answered.
+
+  *(Corrected 2026-09-09: this cited `claude/LIVE_STATE_2026-09-07.md` §2. There
+  is no `claude/` directory and no such file anywhere on disk, so the single
+  external anchor in a decision record about arming a live trader pointed at
+  nothing. The decision itself stands on the record below and on
+  CONSTITUTION.md III, which do exist.)*
 
 ## What this decision does NOT do
 

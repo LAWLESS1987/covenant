@@ -38,8 +38,15 @@ control — it beats buy-and-hold on **Sharpe (0.98 vs 0.92)** and crushes it on
 The first non-zero deflated Sharpe in this project's history. Everything
 previously tested returned 0.0000.
 
-**It still fails.** `TRADING_POLICY.json` requires **≥ 0.95**. 0.7855 does not
-clear it, and the gate does not bend for the best result so far.
+**It still fails.** The 0.95 bar is not cleared by 0.7855, and the gate does not
+bend for the best result so far.
+
+*(Corrected 2026-09-09: this cited `TRADING_POLICY.json` as the file holding the
+bar. That file is not in the working tree and appears in zero commits of the
+current history — it was removed in the 2026-09-05 redaction. The threshold the
+conclusion rests on was therefore unreadable by anyone checking this document,
+which is the one thing a gauntlet write-up cannot afford. The result is
+unchanged; the citation was not.)*
 
 ## Check 3 — out of sample
 

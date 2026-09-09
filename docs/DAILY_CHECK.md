@@ -1,7 +1,15 @@
 # Daily portfolio check — standalone runbook
 
-This is executed by a scheduled task each morning in a **fresh session with no
-memory**. Everything needed is in this document. Follow it exactly.
+**CORRECTED 2026-09-09: nothing executes this.** The line above said it was
+"executed by a scheduled task each morning in a fresh session with no memory".
+No Windows task and no cloud routine runs `daily.py` or references this file —
+the only three Covenant tasks are Distill (03:30), Guard (every 2 min) and
+Trader (09:00). It is reachable by hand through `DAILY.bat`, `RUN.bat` and
+`TRADE.bat`, which is a different thing from running by itself.
+
+That matters here more than in most places: a runbook that claims to run daily
+invites the reader to treat its output as current. Everything needed IS in this
+document, and it still works when run — but somebody has to run it.
 
 Owner holds crypto on Kraken and elsewhere. **Nothing here trades.** The output
 is a suggestion the owner acts on by hand, or ignores.
