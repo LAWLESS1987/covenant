@@ -173,12 +173,31 @@ Three things, in one process:
   requires a testnet proof that does not exist. Writing "does not" and stopping
   would claim a promise nobody has made.
 
-  What has been promised is narrower and absolute, and lives in
-  `docs/CONSTITUTION.md` II.1: **no trades placed by automation, and no
-  credentials requested or stored.** That clause has no "yet" in it and is not
-  going to acquire one. Money moving under a person's deliberate hand is a
-  different thing from a loop deciding to move it, and only the second is
-  forbidden. Keeping those two apart is the whole point of stating either.
+  **CORRECTED 2026-09-09, and the correction matters more than the paragraph.**
+  This passage read: *"What has been promised is narrower and absolute, and
+  lives in `docs/CONSTITUTION.md` II.1: no trades placed by automation, and no
+  credentials requested or stored. That clause has no 'yet' in it and is not
+  going to acquire one."* Both halves of that were false by the time you read
+  them. The clause **was amended on 2026-09-07** — it acquired precisely the
+  qualification the sentence promised it never would — and the trader **has
+  been ARMED since 2026-09-06 at 13:42 UTC**.
+
+  What `docs/CONSTITUTION.md` II.1 says now, in its own words: automated
+  placement had *"already stopped being true"* as a prohibition, because the
+  owner armed `covenant_trader.py` on 09-06 and, asked directly on 09-07
+  whether to disarm it, chose to leave it armed and have the approval recorded.
+  *"A document describing a state the machine left two days earlier is not a
+  constraint. It is the reassurance this section exists to refuse."*
+
+  **Now permitted:** automated placement by `covenant_trader.py`, and by
+  nothing else. **Still forbidden and not relaxed:** credentials requested or
+  stored, any placement outside the caps below, any agent widening its own
+  scope, and any *run* editing the constitution — the amendment was made by the
+  operator, and a run may not make the next one.
+
+  Money moving under a person's deliberate hand is still a different thing from
+  a loop deciding to move it. The difference now is that the second one is
+  permitted, bounded, and written down, rather than forbidden.
 
   What is easy to miss is that this repository *does* hold Kraken, Coinbase
   and Robinhood order adapters (`venues.py`), a planner (`covenant_trader.py`)
@@ -189,18 +208,30 @@ Three things, in one process:
   Kraken `validate=true`, Coinbase `/orders/preview` — every order it builds
   goes there and is priced and rejected without booking. Robinhood publishes
   no preview endpoint, so its dry run is local only and is marked
-  `venue_validated: false`; no matching engine sees it. The trader is
-  disarmed; armed, it would still be bounded by a halt file, $25 per order,
-  $50 per day, two orders per day, and a requirement that the decision be
-  sealed to the chain first.
+  `venue_validated: false`; no matching engine sees it. **The trader is ARMED**
+  — live orders can be booked — and is bounded by a halt file (`TRADER_HALT`),
+  $25 per order, $50 per day, two orders per day, and a requirement that the
+  decision be sealed to the chain first. Those bounds are enforced in
+  `guards.py` and were verified on 2026-09-09.
 
-  So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
-  between them is a commitment — `docs/CONSTITUTION.md` II.1 — rather than an
-  absence of capability, and a promise whose shape you cannot see is not a
-  promise but a reassurance. It is a live state that one config flag changes,
-  so it is measured rather than asserted: **`python money_posture.py`**. That
-  reads no key, places nothing, and arms nothing. If it ever prints ARMED, the
-  clause is being broken and these documents are out of date.
+  So *"it cannot trade"* is false, and so is *"it is prevented from trading"*.
+  What bounds it is caps and gates, not a prohibition. It is a live state that
+  one config flag changes, so it is measured rather than asserted:
+  **`python money_posture.py`**. That reads no key, places nothing, and arms
+  nothing.
+
+  **It currently prints ARMED, and this document said it would not.** The
+  paragraph above used to end: *"If it ever prints ARMED, the clause is being
+  broken and these documents are out of date."* It printed ARMED for three days
+  while the README went on saying disarmed. The tripwire worked exactly as
+  designed and nobody ran it — which is a better argument for running the check
+  than any sentence here claiming the check exists.
+
+  What it has NOT done is trade. As of 2026-09-09 the daily planner has placed
+  no orders on any run: `cash_floor` blocks at 0.0% against a 10% floor, and
+  Rule 5 stands at 1 of 30 settled signals, with the one that settled losing
+  3.79% after costs. Armed and idle is the honest description, and both words
+  are load-bearing.
 - **It has no proven trading edge.** No timing edge survived out-of-sample
   (XRP −2.70% p=0.656; HBAR −7.06% p=0.891; rebalancing +0.45% at p=0.109).
   The regime rule is risk control, never alpha — and on three of ten assets it
@@ -311,10 +342,12 @@ The header line says **86 suites, 2,524 checks, 0 failed**, and that is true of
 the sweep. It is not the whole picture, and the difference is worth a paragraph
 because a reader deciding whether to trust this deserves both halves.
 
-The sweep runs the 88 registered suites in a scratch copy. There are 95 test
-files on disk; the extras are `.PRE-*` snapshots kept deliberately *because* they
-fail — they are the "before" halves of fixes already landed, and running them
-outside the sweep produces failures that mean nothing. And the sweep's own final
+The runner registers **93** suites — 86 it runs in a scratch copy and 7 it runs
+in place — and prints both figures on every run. There are 95 test files on
+disk; the extras are `.PRE-*` snapshots kept deliberately *because* they fail —
+they are the "before" halves of fixes already landed, and running them outside
+the sweep produces failures that mean nothing. (This paragraph said "88
+registered" until 2026-09-09, which was neither number.) And the sweep's own final
 verdict on 2026-09-09 was **`RESULT: FAIL`** even with zero check failures,
 because it also counts in-place gates and one of them, bundle integrity, is
 blocked pending an owner decision. Reading "0 failed" without that is how the

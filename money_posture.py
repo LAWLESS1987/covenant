@@ -386,10 +386,18 @@ def main() -> int:
         print("  failure this file exists to catch. Exit 2, never read as 0.")
         return 2
     if armed and not halted:
+        # UPDATED 2026-09-09. This used to say ARMED "is NOT the state
+        # CONSTITUTION.md II.1 describes" and that the clause needed rewriting.
+        # It did need rewriting, it WAS rewritten on 2026-09-07, and this
+        # message was left behind -- so the tool whose job is catching drift
+        # between the documents and the machine had drifted itself, and went on
+        # reporting a conflict that had already been resolved.
         print("  ARMED. Live orders can be booked within the bounds above.")
-        print("  That is a legitimate state to be in, and it is NOT the state")
-        print("  CONSTITUTION.md II.1 describes. If this reads ARMED, that")
-        print("  clause needs rewriting before anyone is told otherwise.")
+        print("  This is PERMITTED by CONSTITUTION.md II.1 as amended 2026-09-07:")
+        print("  'Now permitted: automated placement by covenant_trader.py, and")
+        print("  by nothing else.' Armed is a recorded, approved state -- not a")
+        print("  breach, and not a surprise. Exit 1 still marks it as the state")
+        print("  that deserves a second look every time it is read.")
         return 1
     print("  DISARMED. Orders are built and, where the venue offers it, sent")
     print("  to its own dry-run endpoint, which prices and rejects them")
