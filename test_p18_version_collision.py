@@ -68,7 +68,21 @@ def check(label, ok, detail=""):
 # ---------------------------------------------------------------------------
 LIVE_NAME = "covenant_unified_v8.py"
 SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", "logs",
-             ".mypy_cache", ".pytest_cache", "realdata"}
+             ".mypy_cache", ".pytest_cache", "realdata",
+             # ADDED 2026-09-09. `.claude/worktrees/` holds git worktrees an
+             # agent session creates to work in isolation. A copy of the core
+             # sitting there is a WORKING COPY, not a delivery: no node can be
+             # started from it, and it disappears when the session ends. V3
+             # exists to catch a STAGED copy that could be run or shipped while
+             # claiming the live version -- the pending-v8.38 case it was
+             # written for, twice.
+             #
+             # Left in, it turned V3 red whenever a second session had a
+             # worktree open, which is a check going red for someone else's
+             # sandbox. verify_bundle.py already skips `.claude` for the same
+             # reason (its SKIP_DIR), so the two tools disagreed about the same
+             # directory and only one of them said so out loud.
+             ".claude"}
 
 
 def declared_version(path):
