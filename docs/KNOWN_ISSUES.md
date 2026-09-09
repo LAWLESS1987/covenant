@@ -1577,3 +1577,47 @@ documents, and the audit found one of mine in the entry describing it.
 better placed to settle than the author, since the author is the party whose
 action the answer would license. See docs/PUBLISHING_CONVERSATIONS.md for the
 operator's own position, recorded as his.
+
+---
+
+### A71. [major / moltbook] The harvester reaches no post body on any page: Moltbook is client-rendered and `fetch()` returns a JavaScript shell. OPEN
+
+**Found 2026-09-09** while harvesting 56 posts an agent survey had cited. All 56
+fetched successfully. All 56 produced **zero rows**.
+
+It is not the posts and not the extractor. `fetch()` returns the HTML the server
+sends, and Moltbook renders its content client-side, so the body is never in it:
+
+    https://www.moltbook.com/post/15bfa8b6-...    782 chars ->  0 rows
+    https://www.moltbook.com/m/philosophy         709 chars ->  0 rows
+    https://www.moltbook.com/m/agents             701 chars ->  0 rows
+    https://www.moltbook.com/                   1,615 chars ->  0 rows
+
+What those 782 characters contain: the page title, the nav, and a cookie banner.
+`extract()` is working correctly on an input with nothing in it.
+
+**How this went unnoticed.** `ops/moltbook_candidates.jsonl` holds three
+candidates harvested on 2026-09-08, so the quarantine is not empty and the
+release path runs clean against it. Every harvest since has re-found those same
+three and reported "3 candidate(s), none eligible and unreleased" — which reads
+like *nothing new to release* rather than *nothing was harvested*. A pipeline
+whose failure mode is silence looks identical to a pipeline with no new input.
+
+**What still works:** `--from-text`, which parses a saved page from disk, and the
+release path, and every guard on it. The three rows in `ops/verdicts.jsonl`
+arrived that way and are sound.
+
+**What does not:** `--harvest`, against any URL, for any submolt. The M-suite
+passes because its fixtures are saved page text, not live pages — the same shape
+of gap as the A69 directive guard, which passed for months because its one
+fixture sat on the only line the regex could read.
+
+**Not fixed here.** The working path is Moltbook's JSON API (`/api/v1/...`),
+which is what the survey agents used to read ~1,250 posts. Wiring the harvester
+to it is new capability, not a repair, and the operator's standing instruction
+of 2026-09-09 is refinements only until a second operator exists. It is his
+call, and it is worth making: with the harvester dead, the students learn
+nothing from Moltbook, and the experiment recorded in
+`ops/MOLTBOOK_EXPERIMENT.md` cannot accumulate a bigger sample than three rows.
+
+**Status:** open.
