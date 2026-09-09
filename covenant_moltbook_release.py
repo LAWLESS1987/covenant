@@ -97,7 +97,29 @@ def ask_teacher(text, model=None, timeout=240):
     obj = json.loads(ans.get("content", ""))
     if not isinstance(obj, dict) or "violates" not in obj:
         return None
-    return (bool(obj["violates"]), str(obj.get("reasoning", ""))[:600],
+    # ONLY A REAL BOOLEAN IS A VERDICT (2026-09-09). This was
+    # `bool(obj["violates"])`, which coerced whatever survived json.loads, and
+    # it was wrong in BOTH directions -- measured against the shipped function:
+    #
+    #     {"violates": null}     -> False -> CLEARS   <- the dangerous one
+    #     {"violates": ""}       -> False -> CLEARS
+    #     {"violates": []}       -> False -> CLEARS
+    #     {"violates": 0}        -> False -> CLEARS
+    #     {"violates": "false"}  -> True  -> blocks   <- and the absurd one
+    #
+    # A teacher that answered `null` -- no view, the model declining or
+    # truncating -- was read as "no violation found" and the text was cleared.
+    # That is silence manufacturing permission, which is the one thing this
+    # project has decided repeatedly that it will not do (A69: a judge that
+    # cannot decide returns held, it does not invent a licence). Meanwhile a
+    # model that literally answered the string "false" was recorded as a
+    # violation, because a non-empty string is truthy.
+    #
+    # None here is the path that already exists for "the teacher gave no usable
+    # answer", and it refuses. An unparseable verdict is not a clean verdict.
+    if not isinstance(obj["violates"], bool):
+        return None
+    return (obj["violates"], str(obj.get("reasoning", ""))[:600],
             "github-actions/" + str(ans.get("model")))
 
 
@@ -298,6 +320,36 @@ def selftest():
           "only door, which is the whole reason it is a separate file",
           needle not in src.split('\"\"\"', 2)[-1])
 
+    # ---- R10: a non-verdict is not a clean verdict (2026-09-09) -----------
+    # ask_teacher used bool() on whatever json.loads returned, so `null`, "",
+    # [], {} and 0 all became False and CLEARED the text, while the string
+    # "false" blocked it. These drive the real ask_teacher with a stubbed
+    # judge so the coercion itself is exercised, not a copy of it.
+    import covenant_github_judge as _gh
+    _real_ask = _gh.ask
+
+    def _teacher_says(payload):
+        _gh.ask = lambda *a, **k: {"content": payload, "model": "stub"}
+        try:
+            return ask_teacher("any text at all")
+        finally:
+            _gh.ask = _real_ask
+
+    _bad = ['{"violates": null}', '{"violates": ""}', '{"violates": []}',
+            '{"violates": {}}', '{"violates": 0}', '{"violates": "false"}',
+            '{"violates": "true"}']
+    check("R10 no non-boolean `violates` is accepted as a verdict -- null, \"\", "
+          "[], {}, 0 and the strings all refuse rather than clear",
+          all(_teacher_says(p) is None for p in _bad),
+          [p for p in _bad if _teacher_says(p) is not None])
+    check("R10b ...and a real boolean still decides, both ways, so R10 is not "
+          "satisfied by a teacher that has simply stopped answering",
+          _teacher_says('{"violates": true}')[0] is True
+          and _teacher_says('{"violates": false, "reasoning": "fine"}')[0] is False)
+
+    # The tally is taken HERE, after the last check. It used to sit above the
+    # final block, so checks appended after it were printed but not counted --
+    # a suite that runs a check and ignores its result.
     n = sum(ok)
     print("\nMOLTBOOK-RELEASE: %d/%d passed" % (n, len(ok)))
     return 0 if n == len(ok) else 1
