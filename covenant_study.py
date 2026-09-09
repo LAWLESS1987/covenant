@@ -60,6 +60,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "private", "study")          # gitignored: 20 MB of public text
 OUT = os.path.join(HERE, "ops", "study")
 PRECEPTS = os.path.join(OUT, "PRECEPTS.jsonl")
+
+# How many rejections retire a precept from the queue. See the block in
+# generate() that uses it: a precept enters the `done` set only when its pair
+# was KEPT, so without this a precept whose pair keeps failing is re-served
+# every night for ever. Three, not one: a rejection can be the teacher having a
+# bad night, and retiring on a single failure would throw away precepts that
+# would have worked on the next pass.
+RETIRE_AFTER = 3
 REPORT = os.path.join(OUT, "STUDY.md")
 
 # The reading list. Public domain, Project Gutenberg ids, chosen for breadth of
@@ -447,6 +455,46 @@ def generate(limit, say=print):
     # that actually teaches the judge what a violation looks like, and they
     # are the scarcer kind: 210 of the first 1180 extracted.
     unused = [p for p in load_precepts() if p["text"] not in done]
+    # RETIRE WHAT KEEPS FAILING (2026-09-08). A precept enters `done` above only
+    # when its pair was KEPT, so a precept whose pair is rejected returns to
+    # this queue every night, for ever. Measured before this was written: of
+    # 104 precepts ever rejected, 65 had been rejected MORE THAN ONCE and the
+    # worst were on their TENTH attempt. Every one of the top offenders is
+    # abstract prose -- "This principle makes the unity of experience possible
+    # and borrows nothing from reason" -- which cannot become a judgeable
+    # transaction memo at all, so no number of retries will ever bank it.
+    #
+    # It compounded because prohibitions sort first inside each tradition
+    # below, so the same permanent failures sat at the HEAD of the round robin
+    # and were re-served ahead of 788 precepts that had never been tried once.
+    # The loop was running nightly and advancing on a shrinking fraction of its
+    # own work.
+    #
+    # Nothing is retired on a first failure, and nothing is hidden: the count is
+    # reported through `say`, because a queue that quietly shrinks is a silent
+    # cap, and this file's own standard is that a dropped input gets said out
+    # loud rather than discovered later.
+    attempts = {}
+    try:
+        with open(X.REJECTED, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                t = d.get("precept")
+                if t:
+                    attempts[t] = attempts.get(t, 0) + 1
+    except OSError:
+        pass
+    retired = [p for p in unused if attempts.get(p["text"], 0) >= RETIRE_AFTER]
+    if retired:
+        unused = [p for p in unused if attempts.get(p["text"], 0) < RETIRE_AFTER]
+        say("retired %d precept(s) rejected %d+ times; %d untried precept(s) remain"
+            % (len(retired), RETIRE_AFTER, len(unused)))
     # ROUND-ROBIN ACROSS TRADITIONS. In file order the first 400 precepts are
     # all from one book, so a batch -- and then a night of batches -- would be
     # one tradition's household law and nothing else. Taking one from each
