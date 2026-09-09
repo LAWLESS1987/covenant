@@ -161,6 +161,51 @@ def main():
           "it writes every 60s, so 180s is three missed rounds, not five",
           g.GAP_DEAD_S == 180, g.GAP_DEAD_S)
 
+    # N6/N7 added 2026-09-09, after a mutation showed the whole N section was
+    # a description of main() rather than a test of it. Deleting the entire
+    # per-pass node probe from main() -- the node_report() call, the NODES
+    # DOWN line, and the `return 0 if not down else 1` exit code -- left this
+    # suite at 26/26 green: N1-N3 drive node_report() as an isolated function,
+    # N5 reads a constant, and N4 survived on the `or` alone, its second half
+    # matched by node_report's own docstring. Nothing here ever CALLED main().
+    # So the guard could quietly go back to announcing a healthy watchdog
+    # beside a dead chain, and exiting 0 while it did -- which is the whole of
+    # the 2026-08-29 outage the N section was written for. These two RUN it:
+    # a real main() pass over a fresh fake watchdog log, with the probe
+    # stubbed so no socket is opened and the call itself can be counted.
+    tmp = tempfile.mkdtemp(prefix="c3n_")
+    saved = (g.STATE, g.GUARD_LOG, g.WD_LOG, g.WD_PID, g.node_report)
+    calls = []
+    try:
+        g.STATE = os.path.join(tmp, "guard_state.json")
+        g.GUARD_LOG = os.path.join(tmp, "guard.log")
+        g.WD_LOG = os.path.join(tmp, "watchdog.log")
+        g.WD_PID = os.path.join(tmp, "watchdog.pid")  # absent -> no live PID
+        with open(g.WD_LOG, "w", encoding="utf-8") as fh:
+            fh.write(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                     + " INFO  nodeA ok")     # fresh -> judged "healthy"
+
+        def probe():                       # two of three ports dead, no socket
+            calls.append(1)
+            return ([5000], [5020, 5060])
+
+        g.node_report = probe
+        rc = g.main([])
+        wrote = open(g.GUARD_LOG, encoding="utf-8").read()
+    finally:
+        (g.STATE, g.GUARD_LOG, g.WD_LOG, g.WD_PID, g.node_report) = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    check("N6 main() actually PROBES on every pass and writes what it saw: a "
+          "watchdog judged healthy beside two dead nodes still puts those "
+          "ports in guard.log, naming them",
+          len(calls) == 1 and "NODES DOWN" in wrote
+          and "5020" in wrote and "5060" in wrote, (calls, wrote[:120]))
+    check("N7 ...and that pass exits NON-ZERO. The exit code is the only "
+          "thing the OS scheduler reads; a healthy watchdog beside a dead "
+          "chain reporting success is the 08-29 silence with extra steps",
+          rc == 1, rc)
+
     # ---- R: report-only, by AST ------------------------------------------
     tree = ast.parse(inspect.getsource(g.decide).lstrip())
     called = set()

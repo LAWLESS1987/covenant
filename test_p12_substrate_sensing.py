@@ -23,6 +23,9 @@ CHECKS
           fails if a function that touches it also touches a consensus path.
           A future edit that wires memory pressure into a decision fails a test
           rather than passing review.
+  B3c/B3d the same boundary asserted by RUNNING /health rather than reading it,
+          over a node that is genuinely not degraded, because reading it is
+          what the source-scanning half got wrong (see the comment there).
   W1-W10  the watchdog's Adaptation and its reading of the node's own
           /anomalies -- both pure functions, so no nodes are started
 
@@ -30,7 +33,7 @@ Node env needs BOTH COVENANT_INSECURE_MOCK_JUDGE=1 and
 COVENANT_JUDGE_PROVIDERS=mock (M2).
 """
 import ast, atexit, json, os, shutil, socket, subprocess, sys, tempfile, time
-import urllib.error, urllib.request
+import types, urllib.error, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -163,6 +166,28 @@ def sensor_checks():
           s.warnings() == [] or all("memory available" not in w
                                     for w in s.warnings()), str(s.warnings()))
 
+    # S8b -- S8 above is vacuously green, and only a mutation showed it. By the
+    # time S8 runs, S3/S5/S6 have popped COVENANT_JUDGE_FOOTPRINT_MB and the
+    # judge URL, so judge_footprint_mb is None; warnings() guards on
+    # `foot is not None` and returns [] before the comparison is ever reached.
+    # S8 was measuring a missing precondition, not the property it names.
+    # Widening the trigger to `avail < foot * 10` -- a false alarm on every
+    # healthy node, which is the M34 alert-fatigue failure this suite exists to
+    # prevent, and which reaches the operator's phone through the watchdog's
+    # /health warning filter -- left S8 printing the same "[]".
+    # So: declare a model at a QUARTER of the memory just measured, which makes
+    # the node unambiguously healthy on any machine rather than tuned to this
+    # one, and assert the precondition (a footprint IS present) alongside the
+    # silence, so the vacuous pass cannot come back the next time the env drifts.
+    os.environ["COVENANT_JUDGE_FOOTPRINT_MB"] = str(
+        max(1, snap["available_memory_mb"] // 4))
+    s.sample_once()
+    check("S8b a model well under free memory is silence, not a false alarm",
+          s.snapshot()["judge_footprint_mb"] is not None and s.warnings() == [],
+          f"{s.snapshot()['judge_footprint_mb']} MB model, "
+          f"{s.snapshot()['available_memory_mb']} MB free -> {s.warnings()}")
+    os.environ.pop("COVENANT_JUDGE_FOOTPRINT_MB", None)
+
     s._snap = {"available_memory_mb": 3100, "judge_footprint_mb": 5200,
                "judge_footprint_source": "ollama", "unavailable": ""}
     s._sampled_at = time.monotonic()
@@ -227,13 +252,15 @@ def boundary_checks():
     health_fn = next((f for f in ast.walk(tree)
                       if isinstance(f, ast.FunctionDef) and f.name == "health"), None)
     branches = []
+    # Follow aliases. Mutation-tested: matching only on the literal word
+    # "substrate" is evaded by one local variable --
+    #     sub = self.node.substrate.snapshot()
+    #     if sub["available_memory_mb"] < 500: ...
+    # reads the sensor in a branch and never says "substrate" in the test.
+    # Hoisted out of the `if` below so B3b can reuse it; B3b was evaded by the
+    # same alias trick this set exists to defeat.
+    tainted = {"substrate"}
     if health_fn is not None:
-        # Follow aliases. Mutation-tested: matching only on the literal word
-        # "substrate" is evaded by one local variable --
-        #     sub = self.node.substrate.snapshot()
-        #     if sub["available_memory_mb"] < 500: ...
-        # reads the sensor in a branch and never says "substrate" in the test.
-        tainted = {"substrate"}
         for _ in range(3):                       # fixpoint; depth 3 is plenty
             for node in ast.walk(health_fn):
                 if isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -277,11 +304,88 @@ def boundary_checks():
     # B3b -- and the one that would actually hurt: `degraded` is the field a
     # monitor keys off. It must be computed from the node's own capability to do
     # its job, never from the weather on the machine.
-    deg = [ast.get_source_segment(src, n) or "" for n in ast.walk(tree)
-           if isinstance(n, ast.keyword) and n.arg is None]
-    deg_src = next((ln for ln in src.splitlines() if '"degraded"' in ln), "")
+    #
+    # REWRITTEN, because the first version could not fail. It read
+    #     next((ln for ln in src.splitlines() if '"degraded"' in ln), "")
+    # -- the FIRST line in a 10k-line file containing the token, which is the
+    # peer-digest compaction tuple
+    #     KEEP = ("v", "src", "height", "peers", "degraded", "crisis", "spike")
+    # at line 613, nothing to do with /health (the field is computed at 8250).
+    # It printed
+    # that tuple as its own PASS evidence on every run, baseline included, and
+    # never once looked at the line where the field is actually computed. It was
+    # doubly blind: even aimed correctly, a substring test for
+    # "substrate"/"memory" is evaded by one local alias, which is exactly the
+    # evasion B2's taint set above was written to defeat. Wiring
+    #     _mem = self.node.substrate.snapshot()["available_memory_mb"]
+    #     "degraded": bool(... or _mem < 500)
+    # into /health left the suite 41/41 green.
+    # Now: find the VALUE of the "degraded" key inside health() through the AST,
+    # and fail if any name in it is tainted by the sensor. `deg_val is None` is a
+    # FAIL, not a pass -- the old check treated a field it could not find as a
+    # field that was clean.
+    deg_val = None
+    if health_fn is not None:
+        deg_val = next((ast.get_source_segment(src, v)
+                        for d in ast.walk(health_fn) if isinstance(d, ast.Dict)
+                        for k, v in zip(d.keys, d.values)
+                        if isinstance(k, ast.Constant) and k.value == "degraded"), None)
+    deg_names = ({n.id for n in ast.walk(ast.parse(deg_val, mode="eval"))
+                  if isinstance(n, ast.Name)} if deg_val else set())
     check("B3b 'degraded' is not computed from the substrate",
-          "substrate" not in deg_src and "memory" not in deg_src, deg_src.strip()[:80])
+          deg_val is not None and not (deg_names & tainted)
+          and "substrate" not in deg_val and "memory" not in deg_val,
+          (deg_val or "no 'degraded' key found in health()").strip()[:90])
+
+
+# --------------------------------------- the boundary, RUN and not read --
+def degraded_runtime_checks():
+    """B3c/B3d: the same boundary, asserted by running /health.
+
+    Both source-reading guards on this field were blind in the same direction
+    and it took a mutation to see it. B3b matched the wrong line (above). H3
+    below looks right but is vacuous under this suite's own env: the node it
+    questions runs the insecure mock judge and minted its own genesis, so the
+    right-hand side of its comparison is True on every run and it can only ever
+    catch a mutation that makes `degraded` FALSE -- never one that adds a new
+    reason to degrade, which is the direction the boundary is about.
+
+    So build the real API over a node that genuinely CAN do its job -- no
+    provider key needed, no insecure judge, no chain of its own, no crisis --
+    ask the real route, then make the machine underneath look catastrophic and
+    ask again. The field must not move. Flask's test client calls the same view
+    function the port would; no listener, no threads, no ports, ~0.1s.
+    """
+    try:
+        db = cov.Database(os.path.join(TMP, "boundary.db"))
+        node = cov.P2PNode("B", "127.0.0.1", 0, None, None, db)
+        node.sentinel = types.SimpleNamespace(judge=cov.MockJudge())
+        node.governor = cov.MedianGovernor(db)
+        client = cov.CovenantAPI(node, db, "127.0.0.1", 0).app.test_client()
+        node.substrate.sample_once()
+        h = client.get("/health").get_json()
+    except Exception as e:
+        check("B3c a node that CAN do its job reports degraded=False", False,
+              f"could not run /health in-process: {type(e).__name__}: {e}")
+        return
+
+    reasons = [k for k in ("judge_keyless", "judge_insecure", "own_genesis",
+                           "crisis_mode") if h.get(k)]
+    # Without this the next check is the vacuous one all over again: if
+    # something already degrades this node, an added substrate term is invisible.
+    check("B3c a node that CAN do its job reports degraded=False",
+          h.get("degraded") is False and not reasons,
+          f"degraded={h.get('degraded')} reasons={reasons}")
+
+    node.substrate._snap = {"available_memory_mb": 1, "judge_footprint_mb": 99999,
+                            "judge_footprint_source": "declared", "unavailable": ""}
+    node.substrate._sampled_at = time.monotonic()
+    h2 = client.get("/health").get_json()
+    warned = [w for w in h2.get("warnings", []) if "memory available" in w]
+    check("B3d a catastrophic substrate WARNS and still does not degrade the node",
+          bool(warned) and h2.get("degraded") is False
+          and h2.get("substrate", {}).get("available_memory_mb") == 1,
+          f"degraded={h2.get('degraded')} warned={bool(warned)}")
 
 
 # ---------------------------------------------------------------- /health --
@@ -465,6 +569,7 @@ def main():
     if FIXED:
         sensor_checks()
         boundary_checks()
+        degraded_runtime_checks()
         health_checks()
         watchdog_checks()
     else:

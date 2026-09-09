@@ -8,9 +8,10 @@ was exposed on a route and read by NOTHING -- the same shape `/anomalies` had
 twelve hours earlier. It is also the only place the node says WHO IT IS TALKING
 TO, which makes it where a bad actor becomes visible.
 
-`POST /peers` is operator-authenticated (P1 below asserts that, so the control
-cannot quietly regress), which is what makes an unexpected peer worth an alert
-rather than a shrug: it did not arrive by accident.
+`POST /peers` is operator-authenticated (P1c below sends an UNSIGNED POST to a
+live node and requires a 401, so the control cannot quietly regress), which is
+what makes an unexpected peer worth an alert rather than a shrug: it did not
+arrive by accident.
 
 Also covers two defects found in this loop's OWN code from ninety minutes
 earlier, while reviewing the peer-input surface A20/A21 added:
@@ -26,15 +27,19 @@ earlier, while reviewing the peer-input surface A20/A21 added:
       fixed one layer up. Now recorded on change.
 
 CHECKS
-  P1        POST /peers is in PROTECTED_OPERATOR_ENDPOINTS and the hook enforces
-            it -- the control asserted, not described
+  P1        POST /peers is in PROTECTED_OPERATOR_ENDPOINTS
   P2        the route comment no longer denies the control it sits on
+  P1c       an UNSIGNED POST /peers to a LIVE node is refused and registers
+            nothing -- the control exercised, not described
   M1-M10    topology_report: unexpected peers, floored conductance, height and
             uptime regressions, and junk input
+  M4a-M4b   the floor the detector tests is the floor the node actually reaches
+  C1-C2     the payload MycelialOverlay really produces is a payload
+            topology_report can still read
   T8-T9     the two fixes above
   L1-L3     /mycelium on a live node has the shape the report expects
 """
-import atexit, json, os, shutil, socket, subprocess, sys, tempfile, time
+import atexit, json, os, shutil, socket, subprocess, sys, tempfile, threading, time
 import urllib.error, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -156,6 +161,30 @@ def report_checks(wd):
     check("M5 SOME links floored is not the signature -- no alert",
           not any("conductance floor" in x for x in a), str(a))
 
+    # M4a/M4b (2026-09-09). M4 above feeds the detector the literal 0.05,
+    # hand-copied from LinkConductance.MIN into covenant_watchdog's own
+    # CONDUCTANCE_MIN and then again into this file. Moving the NODE's floor to
+    # 0.10 left M4 green while the A11 alert became unreachable on every real
+    # payload: a link that has genuinely bottomed out now reads 0.10 and the
+    # watchdog still tests `c <= 0.05`. Nothing anywhere asserted the two
+    # constants agree. These bracket the floor from both sides using numbers
+    # the node's own attenuator produces, so neither constant can move without
+    # the other following it.
+    lc = cov.LinkConductance()
+    for _ in range(200):
+        lc.attenuate("p1")          # drive a real link to wherever it bottoms out
+    real_floor = lc.weight("p1")
+    a, _, _ = wd.topology_report("A", topo([link(cond=real_floor)]), {}, EXP)
+    check("M4a a link the node's OWN attenuator drove to the floor trips A11",
+          any("conductance floor" in x and "A11" in x for x in a),
+          f"node floor={real_floor} watchdog floor={wd.CONDUCTANCE_MIN} -> {a}")
+
+    baseline = cov.LinkConductance().weight("p1")   # a link that carried nothing
+    a, _, _ = wd.topology_report("A", topo([link(cond=baseline)]), {}, EXP)
+    check("M4b an UNUSED link at the node's baseline is not read as floored",
+          not any("conductance floor" in x for x in a),
+          f"node baseline={baseline} watchdog floor={wd.CONDUCTANCE_MIN} -> {a}")
+
     prev = {"height": 9, "uptime": 500.0, "addrs": ["127.0.0.1:5021"]}
     a, i, _ = wd.topology_report("A", topo([link()], height=7, uptime=600.0),
                                  prev, EXP)
@@ -196,6 +225,56 @@ def report_checks(wd):
                                  {}, EXP)
     check("M10 the first round cannot produce a regression alert",
           not any("BACKWARDS" in x or "restarted" in x for x in a), str(a))
+
+
+# ------------------------------------------- the producer/consumer pair ---
+class _StubNode:
+    """The minimum `MycelialOverlay.topology()` touches.
+
+    A stub of the NODE, which is the INPUT -- never of the overlay. The producer
+    exercised below is the real one, so a key renamed inside it is caught here.
+    """
+
+    def __init__(self):
+        self.node_id = "A"
+        self.peers_lock = threading.Lock()
+        self.peers = {"p1": ("127.0.0.1", 5021)}
+        self.link_conductance = cov.LinkConductance()
+        self.friendship = None
+        self.chain = [None] * 5
+
+
+def contract_checks(wd):
+    """C1/C2 (2026-09-09) -- the half of A22's stated purpose nothing tested.
+
+    M1-M10 feed `topology_report` dicts built by this file's own link() helper,
+    which hard-codes peer_id/host/port/conductance. That pins the DETECTOR and
+    nothing else. Renaming the per-link key "conductance" to "weight" in
+    `MycelialOverlay.topology()` -- the thing that actually serves /mycelium --
+    left all twenty-one checks green while the A11 floor alert became
+    structurally unreachable on any real payload: M4 went on cheerfully
+    printing an alert it had produced from its own literal. The live block
+    cannot see it either, because the node it spawns has no peers, so `links`
+    is [] and no link is ever inspected (L3's state prints `addrs: []`).
+
+    So: run the REAL producer over a stub node and hand its output to the REAL
+    consumer. No process and no socket, so this stays cheap.
+    """
+    node = _StubNode()
+    for _ in range(200):
+        node.link_conductance.attenuate("p1")
+    real = cov.MycelialOverlay(node).topology()
+    ln = (real.get("links") or [{}])[0]
+
+    a, _, _ = wd.topology_report("A", real, {}, {"127.0.0.1:5021"})
+    check("C1 a REAL /mycelium payload whose link is floored still trips A11",
+          any("conductance floor" in x and "A11" in x for x in a)
+          and not any("UNEXPECTED" in x for x in a),
+          f"link keys={sorted(ln)} conductance={ln.get('conductance')!r} -> {a}")
+
+    a, _, _ = wd.topology_report("A", real, {}, set())
+    check("C2 the same REAL payload names the peer when it is not expected",
+          any("p1" in x and "127.0.0.1:5021" in x for x in a), str(a))
 
 
 # --------------------------------------------- the two self-inflicted -----
@@ -276,6 +355,29 @@ def live_checks():
         check("L3 a real reading produces a clean state with no false alarm",
               a == [] and st.get("height") == topo_live["chain_height"],
               f"{a} {st}")
+
+        # P1c (2026-09-09). P1/P1b/P2 above are all TEXT: a membership test on
+        # a constant, a substring of the source file, and the wording of a
+        # comment. Making `operator_auth` return None on its first line
+        # disabled the control outright -- an unsigned POST registered an
+        # arbitrary peer -- and this suite still reported 21/21, exit 0,
+        # because it never sent a POST at all. Sent LAST so that a peer
+        # registered by a broken hook cannot perturb L2/L3 above.
+        body = b'{"peer_id": "a22-unsigned", "host": "10.6.6.6", "port": 6666}'
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{base}/peers", data=body,
+            headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                code = r.getcode()
+        except urllib.error.HTTPError as e:
+            code = e.code
+        with urllib.request.urlopen(f"http://127.0.0.1:{base}/peers",
+                                    timeout=10) as r:
+            table = r.read().decode()
+        check("P1c an UNSIGNED POST /peers is refused and registers nothing",
+              code == 401 and "10.6.6.6" not in table,
+              f"HTTP {code}; peer table={table[:200]}")
     finally:
         stop(p)
 
@@ -295,6 +397,7 @@ def main():
         check("W0 watchdog carries the topology reader", True)
         control_checks()
         report_checks(wd)
+        contract_checks(wd)
         selffix_checks()
         live_checks()
     ok = sum(1 for _, o, _ in results if o)

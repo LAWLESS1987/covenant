@@ -378,6 +378,42 @@ check("S4e an honest 64-char announcement IS still fetched",
 got = sink.frames[0].decode() if sink.frames else ""
 check("S4f and the request it builds carries that id",
       '"TX_REQUEST"' in got and good_id in got, got[:70])
+
+# THE BELT, CALLED DIRECTLY -- and the reason this exists. S8d was the only
+# thing standing between _fetch_announced_tx and a peer-sized frame, and S8d
+# was a substring comparison: `fsrc.find("usable_tx_id") < fsrc.find(...)` is
+# satisfied by ABSENCE, because str.find returns -1 and -1 is below every real
+# index. MUTATION 2026-09-09: delete `tx_id = usable_tx_id(tx_id)` and its
+# refusal block from _fetch_announced_tx. The suite stayed 49/49 green while a
+# direct call put 204,874 peer-chosen bytes on the wire -- the pre-fix
+# amplifier, fully restored, with no anomaly recorded. S4b-S4d cannot see it
+# because the BRACES (the ingest guard in _handle_peer) refuse the
+# announcement at :9326 and return before the fetch pool is ever handed the
+# work, so the belt is not reached over the wire. Nothing in the suite called
+# the belt itself. These two do, so the guard is pinned by what it DOES rather
+# than by how it is spelled.
+belt = Peer(mode="reply", enforce_cap=False)
+m4._fetch_announced_tx("127.0.0.1", belt.port, big_id, None)
+check("S4g the belt refuses a peer-sized id on its own: called directly, "
+      "_fetch_announced_tx opens no socket and transmits nothing",
+      belt.bytes_in == 0 and belt.conns == 0,
+      f"sent {belt.bytes_in} bytes over {belt.conns} conn(s) "
+      f"(belt deleted: 204,874 over 1)")
+# LIVENESS, and it is not decoration: without it S4g would also pass against a
+# dead listener or a belt that refused everything. Measured as a DELTA on this
+# listener, because when the belt is deleted S4g leaves a 200 KiB frame behind
+# on it -- and a liveness check that goes red on that mutation would blur which
+# check is reporting the amplifier.
+c0, f0 = belt.conns, len(belt.frames)
+m4._fetch_announced_tx("127.0.0.1", belt.port, good_id, None)
+deadline = time.time() + 5
+while time.time() < deadline and len(belt.frames) == f0:
+    time.sleep(0.05)
+gotb = belt.frames[-1].decode(errors="replace") if len(belt.frames) > f0 else ""
+check("S4h and it still fetches an honest 64-char id through that same call",
+      belt.conns == c0 + 1 and '"TX_REQUEST"' in gotb and good_id in gotb,
+      f"conns +{belt.conns - c0} {gotb[:60]}")
+belt.close()
 sink.close()
 
 # =====================================================================  S5
@@ -481,8 +517,17 @@ check("S8b the over-cap path does NOT call _note_send_failed",
 check("S8c _send_raw still has exactly three failure-recording sites",
       src.count("_note_send_failed") == 3, str(src.count("_note_send_failed")))
 fsrc = code_only(inspect.getsource(cov.CovenantUnifiedMaster._fetch_announced_tx))
+# The `0 <=` is not decoration. Written without it this read
+# `fsrc.find("usable_tx_id") < fsrc.find('"TX_REQUEST"')`, which is TRUE when
+# the belt is absent -- str.find returns -1 and -1 is below every real index --
+# so the one check pinning the call site could not fail when the call site was
+# deleted. S8a beside it already had the lower bound; this one had drifted.
+# The behavioural version of this pin is S4g; keep both, but S4g is the one
+# that survives the guard being respelled.
 check("S8d _fetch_announced_tx bounds the id before building the frame",
-      fsrc.find("usable_tx_id") < fsrc.find('"TX_REQUEST"'))
+      0 <= fsrc.find("usable_tx_id") < fsrc.find('"TX_REQUEST"'),
+      f"usable_tx_id@{fsrc.find('usable_tx_id')} "
+      f"TX_REQUEST@{fsrc.find(chr(34) + 'TX_REQUEST' + chr(34))}")
 hsrc = code_only(inspect.getsource(cov.CovenantUnifiedMaster._handle_peer))
 flat = hsrc.replace(" ", "")
 check("S8e no ingest site coerces a peer's tx_id with a bare str()",

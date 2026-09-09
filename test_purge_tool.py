@@ -13,7 +13,9 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "tools"))
@@ -31,6 +33,87 @@ def ok(tag, name, cond, detail=""):
     print("   %s  %s %s  %s" % ("PASS" if cond else "FAIL", tag, name, str(detail)[:90]))
     if not cond:
         FAILS.append(tag)
+
+
+def backup_refusal_checks():
+    """X3b/X3c -- the --backup refusal, RUN instead of re-typed.
+
+    WHY (2026-09-09, mutation audit)
+      X3 above spells the containment expression out a second time inside this
+      file and asserts against its own copy. The statement is true and the
+      `.rstrip(os.sep) + os.sep` subtlety it documents is real, but nothing
+      binds it to the tool: `if False:`, `if not inside:`, deleting
+      purge_history.py:562-565 outright, or dropping the rstrip/sep that keeps
+      a SIBLING out all left this suite 32/32 green. That refusal is the last
+      thing standing between `--run` and filter-repo destroying every SHA
+      alongside the only copy of the history, so it is checked by calling it.
+
+      These two run PH.main() against a FAKE tree: PH.HERE points at a
+      throwaway directory and every helper that would touch git or the disk is
+      substituted, so the suite reads and writes nothing outside tempdir and
+      shells out to nothing. email_map is stubbed to None deliberately -- that
+      is the refusal immediately AFTER the backup block, so a backup that is
+      correctly ACCEPTED stops one line later and can never reach a rewrite.
+      run_filter_repo/run_filter_branch are stubbed to raise as well, so if a
+      future edit ever reorders the refusals these checks go red rather than
+      rewriting the operator's repository.
+    """
+    tmp = tempfile.mkdtemp(prefix="purge-backup-check-")
+    tree = os.path.join(tmp, "covenant")
+    inside = os.path.join(tree, "mirror")
+    sibling = tree + "-backup"          # the X3 case: a sibling, NOT inside
+    os.makedirs(inside)
+    os.makedirs(sibling)
+
+    def refusal(path):
+        """main(--run --backup path) against the fake tree; its exit message."""
+        names = ("HERE", "git", "commits_containing", "build_tokens", "email_map",
+                 "emails", "scan_head", "have_filter_repo", "run_filter_repo",
+                 "run_filter_branch", "say")
+        saved = {k: getattr(PH, k) for k in names}
+        cwd, argv = os.getcwd(), sys.argv
+        # rev-parse: in a work tree. worktree list: one line, so none besides
+        # ours. status: clean. rev-list --count: the backup has our commits.
+        fake = {"rev-parse": "true", "worktree": "one line only", "status": "", "rev-list": "1"}
+
+        def never(*a, **k):
+            raise RuntimeError("main() reached the rewrite; the refusals did not stop it")
+
+        try:
+            PH.HERE = tree
+            PH.git = lambda *a, **k: fake.get(a[0], "")
+            PH.commits_containing = lambda: []
+            PH.build_tokens = lambda commits, exclude: ({}, [])
+            PH.email_map = lambda: (None, "someone@example.com")
+            PH.emails = lambda: {}
+            PH.scan_head = lambda tok_re: ([], [])
+            PH.have_filter_repo = lambda: False
+            PH.run_filter_repo = PH.run_filter_branch = never
+            PH.say = lambda s="": None
+            sys.argv = ["purge_history.py", "--run", "--backup", path]
+            try:
+                PH.main()
+                return "<no refusal at all: main() returned>"
+            except SystemExit as e:
+                return str(e.code)
+            except Exception as e:                      # noqa: BLE001
+                return "<%s: %s>" % (type(e).__name__, e)
+        finally:
+            for k, v in saved.items():
+                setattr(PH, k, v)
+            sys.argv = argv
+            os.chdir(cwd)
+
+    try:
+        a = refusal(inside)
+        b = refusal(sibling)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return [
+        ("X3b", "main() REFUSES a --backup inside the tree", "must live OUTSIDE" in a, a),
+        ("X3c", "and does NOT refuse the sibling; it goes on to the next check",
+         "must live OUTSIDE" not in b and "noreply" in b, b),
+    ]
 
 
 def main():
@@ -135,6 +218,8 @@ def main():
     ok("X3", "a sibling folder whose name begins with the repo name is OUTSIDE the tree",
        not (os.path.normcase(os.path.abspath(os.path.join(HERE, "..", os.path.basename(HERE) + "-backup"))).startswith(
             os.path.normcase(os.path.abspath(HERE)).rstrip(os.sep) + os.sep)))
+    for tag, name, cond, detail in backup_refusal_checks():
+        ok(tag, name, cond, detail)
 
     print("PURGE-TOOL: %d/%d passed" % (N - len(FAILS), N))
     return 1 if FAILS else 0

@@ -362,6 +362,12 @@ def _selftest():
     global VERDICTS, AUDIT_PATH
     import tempfile as _tmp       # the function imports tempfile again below, which would shadow the module name
     _d = _tmp.mkdtemp()
+    # KEEP THE REAL PATH AND ITS SIZE, taken BEFORE the rebinding on the next
+    # line -- after it, nothing in this function can name the real ledger again.
+    # This is the evidence D1c needs: "never the real ledger" was a comment, not
+    # a check, and a comment cannot notice when it stops being true (A54).
+    _real_verdicts = VERDICTS
+    _real_size = os.path.getsize(_real_verdicts) if os.path.exists(_real_verdicts) else -1
     VERDICTS = os.path.join(_d, "selftest_verdicts.jsonl")      # never the real ledger
     AUDIT_PATH = os.path.join(_d, "selftest_audit.jsonl")       # nor the real audit trail
     import tempfile
@@ -402,6 +408,27 @@ def _selftest():
         j = DeferringJudge(policy={})
         j._primary = Stub(cov.JudgmentResult(False, "clean", judge_id="local:1"))
         check("D1 when Ollama answers, its verdict is returned unchanged", j.evaluate({"message": "gift"}, []).violates is False)
+        # D1b/D1c ADDED: D1 is the only check in this file that reaches the
+        # record_verdict call site with NO path argument (:327), and it looks
+        # only at the returned JudgmentResult -- so it never noticed WHERE the
+        # row landed. That is the whole of KNOWN_ISSUES A54: with the default
+        # frozen at import (`def record_verdict(..., path=VERDICTS)` and no
+        # `path = path or VERDICTS` inside), the rebinding at the top of this
+        # function steers nothing and this fixture is appended to the REAL
+        # training ledger as a live Ollama verdict -- 184 rows by 2026-09-06,
+        # every selftest run printing 11/11 while it happened. L1-L5 cannot see
+        # it either: they all pass an explicit `p`, so they are insensitive to
+        # the default binding by construction. Under that mutation D1b goes red
+        # (the temp ledger is never created) and D1c goes red (the real one
+        # grows by exactly one row).
+        _rows = []
+        if os.path.exists(VERDICTS):
+            with open(VERDICTS, encoding="utf-8") as fh:
+                _rows = [json.loads(x) for x in fh if x.strip()]
+        check("D1b that verdict was written to the ledger this test rebound, not to a default frozen at import",
+              len(_rows) == 1 and _rows[0]["text"] == "gift" and _rows[0]["source"] == "live")
+        check("D1c and the real ops/verdicts.jsonl did not grow by a byte while this ran",
+              (os.path.getsize(_real_verdicts) if os.path.exists(_real_verdicts) else -1) == _real_size)
         j._primary = Stub(cov.JudgmentResult(True, "unreachable", judge_id="local:1", infrastructure_failure=True))
         # The premise is an UNTRAINED fallback. The repository's own model is
         # trained now, so point this seat at a model file that does not exist.

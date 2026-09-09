@@ -456,6 +456,82 @@ def _self_test() -> int:
     check(not os.path.isabs(GUARDED_DOCUMENTS[0]) and "Lawre" not in json.dumps(GUARDED_DOCUMENTS + GUARDED_LEDGERS),
           "U3 nothing guarded is named by an absolute or operator-specific path")
 
+    # -------------------------------------------------- the real guarded corpus
+    # WHY THIS SECTION EXISTS. Everything above runs against a temp fixture with
+    # HERE redirected, so the suite was hermetic: it never read a guarded
+    # document, and its green said nothing about the documents it guards. Two
+    # mutations proved that, and both left all 15 checks passing, exit 0:
+    #   (1) GUARDED_DOCUMENTS (:82) cut from four entries to one -- three
+    #       quarters of the guard's subjects deleted -- because U3 inspects only
+    #       GUARDED_DOCUMENTS[0] and every R*/M*/A* check hands the sentinel its
+    #       own fixture list instead.
+    #   (2) a `**Corrected` paragraph deleted from a real guarded document; the
+    #       record sentinel reported "0 -> 0 markers, 0 alert(s)".
+    # These three checks run the SHIPPED sentinel over the REAL corpus. They
+    # write nothing, contact nothing, and read four small files.
+    anchored = sorted((load_anchors().get("documents") or {}))
+
+    # R6 kills mutation (1). ops/RECORD_ANCHORS.json is TRACKED and travels with
+    # the repository, so it is an independent witness of who the subjects are:
+    # every anchored document must still be measured by the DEFAULT sentinel and
+    # must still raise the marker-loss alert when handed a baseline claiming one
+    # more marker than it has now. Drop a subject from GUARDED_DOCUMENTS and its
+    # alert vanishes from this report. (covenant_selfaudit.py C5 checks only the
+    # other direction -- a guarded document that has no anchor.)
+    _louder = {"documents": {}}
+    for _rel in anchored:
+        _m = RecordSentinel([_rel]).measure(_rel)
+        if _m:
+            _louder["documents"][_rel] = dict(_m, markers=_m["markers"] + 1)
+    _alerts = RecordSentinel().check(_louder).alerts
+    _unguarded = [r for r in anchored
+                  if not any(r in x and "correction markers went" in x for x in _alerts)]
+    check(bool(anchored) and not _unguarded,
+          "R6 every anchored document is still a subject of the shipped sentinel "
+          "and still alerts on marker loss"
+          + ("" if anchored and not _unguarded
+             else " -- unguarded: " + (", ".join(_unguarded) or "no anchors at all")))
+
+    # R7 discloses a SOURCE defect this suite used to hide, and does not repair
+    # it. MARKER (:80) matches only a line beginning "*Corrected"; the corpus
+    # also writes "*(Corrected" (docs/KNOWN_ISSUES.md:16) and "**Corrected"
+    # (docs/CONSTITUTION.md:171), which it does not match. Those two documents
+    # therefore count 0 markers, are anchored at 0, and `now < base` (:204) can
+    # never be true for them -- deleting their correction notes is invisible,
+    # which is mutation (2). The old suite was green under both the shipped
+    # pattern and a corrected one, which is proof its green carried no
+    # information about the corpus. Widening MARKER is the operator's call and
+    # must be followed by `python covenant_sentinels.py --anchor`, since the
+    # shipped anchors record 0 for both files and a widened pattern alone leaves
+    # the comparison unsatisfiable. Until then this pins the gap at its known
+    # size so it cannot grow in silence. Red means the set below is out of date:
+    # either a new document arrived writing its corrections in a form the
+    # sentinel cannot see, or the pattern was widened and the anchors are stale.
+    LOOSE = re.compile(r"^[*(\s]{0,4}(?:Corrected|Added|Superseded|Retracted)\b", re.M)
+    UNCOUNTED = {"docs/KNOWN_ISSUES.md", "docs/CONSTITUTION.md"}
+    blind = set()
+    for _rel in anchored:
+        _t = (read_bytes(_rel) or b"").decode("utf-8", "replace")
+        if len(MARKER.findall(_t)) != len(LOOSE.findall(_t)):
+            blind.add(_rel)
+    check(blind == UNCOUNTED,
+          "R7 the documents whose correction notes MARKER cannot count are still "
+          "exactly the two known ones"
+          + ("" if blind == UNCOUNTED
+             else " -- now: " + (", ".join(sorted(blind)) or "none")))
+
+    # R8 asserts the invariant itself over the real corpus instead of a fixture:
+    # the shipped sentinel, the shipped anchors, no marker-loss alert. This is
+    # the check that goes red on a genuine deletion of a COUNTED marker
+    # (docs/WHAT_WE_FOUND.md carries four). Deliberately narrow -- a missing file
+    # or a content change is `--check`'s business and is pinned by R5/A3 -- so
+    # only the offence the invariant names can fail it.
+    _live = [x for x in RecordSentinel().check(load_anchors()).alerts
+             if "correction markers went" in x]
+    check(not _live,
+          "R8 no guarded document has lost a correction marker since the anchor"
+          + ("" if not _live else " -- " + _live[0][:120]))
+
     print()
     if fails:
         print(f"{len(fails)} FAILED")

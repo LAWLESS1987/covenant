@@ -89,6 +89,28 @@ def spliced(b, nonce):
     return hashlib.sha256(pre + str(nonce).encode() + post).hexdigest()
 
 
+def compute_hash_calls(fn):
+    """Run fn() and return how many times Block.compute_hash was called.
+
+    This is the only way to see which branch mine() actually took. The slow
+    fallback calls compute_hash once per attempt; the fast splice calls it
+    exactly once, for the final self-check, however many attempts it made.
+    """
+    orig = C.Block.compute_hash
+    n = [0]
+
+    def counted(self):
+        n[0] += 1
+        return orig(self)
+
+    C.Block.compute_hash = counted
+    try:
+        fn()
+    finally:
+        C.Block.compute_hash = orig
+    return n[0]
+
+
 def main():
     print("M1 -- the fast miner must agree with the slow one\n")
     random.seed(20260830)
@@ -140,6 +162,32 @@ def main():
               "that refused to mine would be a denial of service wearing a "
               "safety jacket" % name,
               b.hash.startswith("00") and b.hash == b.compute_hash())
+
+    # ---- Hb: which branch mine() ACTUALLY ran, watched instead of asserted -
+    # WHY THIS EXISTS. Deleting `if tmpl.count(marker) == 1:` from mine()
+    # (covenant_unified_v8.py:1668) and dedenting its body left this suite at
+    # 15/15 passed, exit 0. Nothing above can see that mutation: the four H
+    # checks read `parts is None` off template() on line 70, the SUITE'S OWN
+    # copy of the serialisation, which no edit to mine() can move; the four
+    # below them only ask whether the block mined, and it mines either way;
+    # and G2 is a substring test that mine()'s own DOCSTRING satisfies. Under
+    # the mutation every hostile shape silently switched to the fast splice
+    # (measured: 48 / 6 / 733 / 328 compute_hash calls, all four -> 1). So
+    # count the calls instead of reading the source as text.
+    for name, payload in HOSTILE:
+        b = C.Block(index=5, transactions=[mktx(data=payload)],
+                    previous_hash="p" * 64)
+        n = compute_hash_calls(lambda blk=b: blk.mine(difficulty=2))
+        check("Hb:%-31s mine() REALLY ran the slow loop: compute_hash called "
+              "%d times. >= 2 is once per attempt; exactly 1 is the fast "
+              "splice, i.e. the count guard gone" % (name, n), n >= 2, n)
+
+    b = C.Block(index=6, transactions=[mktx(11), mktx(12)],
+                previous_hash="p" * 64)
+    n = compute_hash_calls(lambda blk=b: blk.mine(difficulty=2))
+    check("Hb0 an ORDINARY block still takes the FAST splice: exactly one "
+          "compute_hash call, the self-check. Without this, Hb would be just "
+          "as green if the optimisation had quietly disappeared", n == 1, n)
 
     # ---- G: the runtime guard is real ------------------------------------
     src = inspect.getsource(C.Block.mine)

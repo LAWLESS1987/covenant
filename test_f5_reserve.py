@@ -236,6 +236,33 @@ def main():
           "changes what half means (bought to 160 -> baseline %.8g)"
           % base3.get("XLM", -1), base3["XLM"] == 160.0, base3)
 
+    # P5b: THE SAME RATCHET, THROUGH THE SHAPE gather() ACTUALLY PRODUCES.
+    # Measured 2026-09-09 by mutation, in an isolated worktree: neuter
+    # `q = p.get("qty")` in covenant_trader.reserve_baseline (so the quantity
+    # falls through to the deprecated val/px round trip the comment above it
+    # calls wrong), and this suite stayed fully green. Halving what that line
+    # returns -- which records every frozen hold-only floor at half the coin
+    # held, making half of XRP, HBAR and LINK sellable -- was invisible too.
+    #
+    # The reason is pf() eleven lines up: it builds a position with no "qty"
+    # key at all, while gather() puts qty on every position it emits. So P5-P9
+    # exercise only the fallback, and the branch production actually runs is
+    # executed by nothing in this repository. The checks were real; the INPUT
+    # was a shape the program never sees.
+    #
+    # Making qty and val/px disagree is the whole fix: qty says 100 units,
+    # val/px says 150, and the floor that gets written names which one the
+    # code believed. pf() is left as it is -- it still pins the fallback, which
+    # is live code for any venue that reports value without quantity.
+    tmp1b = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
+    b1b, held1b, _r1b = T.reserve_baseline(
+        {"positions": [{"sym": "XLM", "qty": 100.0, "val": 300.0, "px": 2.0,
+                        "at": "test"}], "total": 300.0, "cash": 0.0}, path=tmp1b)
+    check("P5b the floor is the QUANTITY held, not a round trip through the price -- "
+          "given qty=100 where val/px says 150, both the baseline and the holding "
+          "it reports back to the planner read 100",
+          b1b.get("XLM") == 100.0 and held1b.get("XLM") == 100.0, (b1b, held1b))
+
     # P7 IS THE OTHER HALF OF THE 2026-09-07 RULE, and it is the one that is
     # easy to get backwards. For a hold-only symbol the floor must NOT follow a
     # purchase up: raising it would lift the floor above the coin that was just
@@ -322,8 +349,54 @@ def main():
                 continue
             if re.search(r'["\']armed["\']\s*\]?\s*=\s*True', t) or re.search(r'armed\s*=\s*True', t):
                 arming.append("%s:%d" % (f, i))
-    check("A2 nothing in the repository sets armed=True -- arming is an operator's edit "
+    # A2's label used to read "nothing in the repository sets armed=True". It
+    # reads five hand-listed files, so that is not what it measures, and the
+    # wider claim is false at HEAD: FUTURE.bat:40 sets it, which is the design
+    # (A1's comment above says so -- "your click is the arming"). Narrowed to
+    # what it does measure; the repository-wide claim is A2b's, below.
+    check("A2 nothing on the scheduled trading path -- the trader, the bridge, the "
+          "daily and nightly passes -- sets armed=True; arming is an operator's edit "
           "with an operator's key, and the trader says so itself", not arming, arming[:4])
+
+    # A2b: THE SAME CLAIM, OVER THE WHOLE TREE. Measured 2026-09-09 by
+    # mutation: add covenant_autoarm.py (a module that flips trader_config.json
+    # to armed=true, armed_by, armed_at at import time) and one line --
+    # `import covenant_autoarm` -- to covenant_nightly.py, which IS one of the
+    # five files A2 reads. The suite stayed fully green, because the arming
+    # statement lives one file over and an import line matches neither regex.
+    # A scheduled unattended pass then armed the trader with no operator action
+    # and no operator key, and covenant_selfaudit's C6 provenance check passes
+    # on any non-empty armed_by, which the mutant supplies.
+    #
+    # So the scan region is the check, not the regexes. This walks every .py,
+    # .bat and .ps1 in the tree and names FUTURE.bat as the ONE exception --
+    # an exception nobody can see is not an exception, it is a hole. .claude/
+    # is skipped because it holds worktrees, which are whole copies of the
+    # repository; the walk is ~240 files and a sixth of a second.
+    SKIP_DIRS = {".git", ".claude", "__pycache__", ".venv", "node_modules"}
+    ARMS_IT = {"FUTURE.bat"}          # the operator's one click IS the arming
+    elsewhere = []
+    for root, dirs, files in os.walk(HERE):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for f in sorted(files):
+            if (not f.endswith((".py", ".bat", ".ps1"))
+                    or f.startswith("test_") or f in ARMS_IT):
+                continue
+            fp = os.path.join(root, f)
+            try:
+                body = io.open(fp, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            for i, line in enumerate(body.splitlines(), 1):
+                t = line.strip()
+                if t.startswith("#") or t[:4].upper() == "REM ":
+                    continue
+                if (re.search(r'["\']armed["\']\s*\]?\s*=\s*True', t)
+                        or re.search(r'armed\s*=\s*True', t)):
+                    elsewhere.append("%s:%d" % (os.path.relpath(fp, HERE), i))
+    check("A2b ...and no other file ANYWHERE in the tree arms it either -- FUTURE.bat, "
+          "the operator's own click, is the only thing in this repository that can",
+          not elsewhere, elsewhere[:4])
 
     n = sum(OK)
     print("\nF5: %d/%d passed" % (n, len(OK)))

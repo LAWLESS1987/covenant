@@ -281,8 +281,34 @@ def main():
     d = copy.deepcopy(good_dict); d["transactions"][0]["extra"] = 1; shapes["unknown Transaction field"] = d
     for label, d in shapes.items():
         expect_reject(m, P2P, f"{label}: refused, height unchanged", d, None)
-    check("node still answers after malformed frames",
-          propagate(P2P, {"type": "PING"}) is not None or True)
+    # LIVENESS -- REWRITTEN (guard audit). The line here used to read
+    #     check("node still answers after malformed frames",
+    #           propagate(P2P, {"type": "PING"}) is not None or True)
+    # `or True` makes the predicate unconditional: one free PASS in the tally
+    # that could never go red. And its left operand is FALSE against this
+    # source anyway -- propagate() does not send a PING, it sends a
+    # BLOCK_PROPAGATE whose block payload is the dict {"type": "PING"};
+    # Block(**that) raises TypeError, _handle_peer falls into its except arm
+    # and closes the connection WITHOUT replying, so propagate() returns None
+    # (every shape above prints reply=None for the same reason). The label
+    # claimed a behaviour the node does not have and the `or True` hid it.
+    # Two checks that RUN the node replace it. The mutation that motivated
+    # them: wrap the `Block(**bdata, transactions=txs)` construction in
+    # _handle_peer with `except TypeError: return` -- drop a payload we cannot
+    # parse silently, no reply, no anomaly, no trace. That shuts exactly the
+    # "INBOUND ATTACK SURFACE ... visible to /anomalies" the except arm's own
+    # comment exists to keep open, and the old line stayed green under it.
+    a0 = anomalies(m)
+    r = propagate(P2P, {"type": "PING"})
+    check("a payload the Block parser cannot read is still noticed and recorded (A4.12b)",
+          delta(a0, anomalies(m), "peer_message_error") >= 1, f"reply={r}")
+    # ...and the listener is still serving. A well-formed frame -- the A4.0
+    # block, now below our height -- must come back answered. This is the
+    # liveness the old label claimed: a wedged listener leaves send_raw to
+    # time out on recv and propagate() returns None.
+    r = propagate(P2P, asdict(good))
+    check("node still answers a well-formed frame after malformed ones (A4.12c)",
+          r is not None and r.get("outcome") == "duplicate", f"reply={r}")
 
     print("\n== A4.13 index given as float / bool ==")
     b = mined_block(m, [signed_tx(k, pem)], index=2.0)

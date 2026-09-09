@@ -118,6 +118,44 @@ def selftest():
           and "none" in verdict("", (2026, 9, 2), (14, 48))[1])
     check("MUTATION: a header dated YESTERDAY does not satisfy today",
           verdict("==== Tue 09/01/2026  9:00:01.76 ====\n", (2026, 9, 2), (23, 59))[0] == 1)
+    # THE EXIT CODE ITSELF HAD NO COVERAGE (found 2026-09-09). Every check above
+    # calls verdict() directly; nothing above ever ran the program. So the suite
+    # stayed 11/11 green under two mutations that destroy the one contract this
+    # file exists for -- an exit code something can alarm on:
+    #   main(): `return code`                 -> `return 0`   (a stale log alarms at 0)
+    #   main(): `except OSError: text = None` -> `text = ""`  (an unreadable log exits 1,
+    #                                                          not the promised 2)
+    # The line above that prints "an unreadable log is UNKNOWN (exit 2), never 0"
+    # had never observed an exit code at all. These three run the file the way the
+    # scheduler runs it, through `raise SystemExit(main())`, and read the code.
+    import subprocess
+    import tempfile
+
+    def cli(log_path):
+        # --due 00:00 --grace 0 so the trigger has always passed: the fixture,
+        # not the clock, decides the verdict.
+        return subprocess.run(
+            [sys.executable, os.path.abspath(__file__), "--log", log_path,
+             "--due", "00:00", "--grace", "0"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT).returncode
+
+    with tempfile.TemporaryDirectory() as tmp:
+        stale = os.path.join(tmp, "stale.txt")
+        with open(stale, "w", encoding="utf-8") as fh:
+            fh.write("==== Wed 01/01/2020  9:00:00.00 ====\n  PLAN\n")
+        fresh = os.path.join(tmp, "fresh.txt")
+        d = dt.date.today()
+        with open(fresh, "w", encoding="utf-8") as fh:
+            fh.write("==== x %d/%d/%d  9:00:00.00 ====\n  PLAN\n" % (d.month, d.day, d.year))
+        check("EXIT CODE: the program exits 1 when the newest run in the log is "
+              "not today", cli(stale) == 1)
+        check("EXIT CODE: the program exits 2 when the log cannot be opened -- "
+              "never 1 (which would read as a plain miss) and never 0",
+              cli(os.path.join(tmp, "no-such-log.txt")) == 2)
+        check("EXIT CODE: the program exits 0 on a log holding a header dated "
+              "today, so the two lines above are not merely never-zero",
+              cli(fresh) == 0)
+
     print("\ntrader_freshness selftest: %d/%d passed" % (ok, n))
     return 0 if ok == n else 1
 

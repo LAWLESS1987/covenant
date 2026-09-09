@@ -32,9 +32,11 @@ WHAT E1 PINS:
 
 No network, no key, no node. The judge is driven with a fake that raises.
 """
+import ast
 import os
 import re
 import sys
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -48,6 +50,74 @@ def check(label, ok, detail=""):
     results.append(bool(ok))
     print(f"{'ok  ' if ok else 'FAIL'}  {label}"
           f"{'' if ok else '  ' + str(detail)[:160]}", flush=True)
+
+
+def _google_call_args(path):
+    """RUN GoogleReasoningJudge._call out of ONE shipped copy and return the
+    (url, headers) it actually hands to requests.post.
+
+    The copy is not imported -- three more passes over a 10k-line core would
+    be three more sets of import side effects, and E1 must stay cheap. The
+    method is lifted out with ast, compiled on its own, and driven with a
+    stub `self` and a stub `requests`. Nothing leaves the process and nothing
+    is written: the stub post() records its arguments and returns a canned
+    body. Annotations are stripped because they would need the module's
+    namespace, which is the thing we are declining to build.
+    """
+    fn = None
+    with open(path, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "GoogleReasoningJudge":
+            for b in node.body:
+                if isinstance(b, ast.FunctionDef) and b.name == "_call":
+                    fn = b
+    if fn is None:
+        raise LookupError("no GoogleReasoningJudge._call in this copy")
+    fn.returns = None
+    for a in fn.args.args:
+        a.annotation = None
+    mod = ast.Module(body=[fn], type_ignores=[])
+    ast.fix_missing_locations(mod)
+
+    seen = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"candidates": [{"content": {"parts": [{"text": "{}"}]}}]}
+
+    def _post(url, **kw):
+        seen["url"] = url
+        seen["headers"] = kw.get("headers") or {}
+        return _Resp()
+
+    class _Self:
+        api_key = KEY
+        model = None
+
+        def _build_prompt(self, data, principles):
+            return "prompt"
+
+        def _parse_verdict(self, text):
+            return text
+
+    stub = types.ModuleType("requests")
+    stub.post = _post
+    saved = sys.modules.get("requests")
+    sys.modules["requests"] = stub          # `_call` does `import requests`
+    try:
+        ns = {"JUDGE_TIMEOUT_S": 5}
+        exec(compile(mod, path, "exec"), ns)               # noqa: S102
+        ns["_call"](_Self(), {"memo": "anything"}, ["do no harm"])
+    finally:
+        if saved is None:
+            sys.modules.pop("requests", None)
+        else:
+            sys.modules["requests"] = saved
+    return seen.get("url", ""), seen.get("headers", {})
 
 
 def main():
@@ -108,12 +178,54 @@ def main():
     check("H2 NO copy puts the key in the URL -- the bug was in four files, "
           "so fixing one would have left three",
           not bad, bad)
+    bad = []   # H3 used to append to H2's list without resetting it, so a red
+               # H3 was really H2's finding wearing a second label -- it had
+               # never once failed on its own predicate
     for c in present:
         src = open(c, encoding="utf-8").read()
         if "generativelanguage" in src and "x-goog-api-key" not in src:
             bad.append(os.path.basename(c) + " (no header)")
     check("H3 ...and each one passes it as x-goog-api-key instead",
           not bad, bad)
+
+    # ---- H2b/H3b: the same two properties, RUN instead of grepped ---------
+    #
+    # WHY THESE EXIST. H2 and H3 read the source as a STRING. A mutation
+    # audit on 2026-09-09 put the 2026-08-29 defect back at the live call
+    # site -- `?key={self.api_key}` returned to the URL, the x-goog-api-key
+    # header entry deleted -- and E1 stayed 15/15, exit 0. Each grep escaped
+    # for its own reason:
+    #   H2's regex is `...googleapis\.com[^\n]*`, which stops at the newline.
+    #     Splitting the f-string over two lines -- a whitespace-only reformat,
+    #     exactly what black does when a line runs long -- moves the `?key=`
+    #     onto line two where the regex never looks.
+    #   H3 asks `"x-goog-api-key" not in src`, and the COMMENT above the call
+    #     site contains that literal, so H3 passes on the explanation of the
+    #     header after the header itself is gone.
+    # A cleverer regex only moves the goalposts; the next reformat wins again.
+    # So these two RUN the shipped _call of every copy with `requests`
+    # stubbed and assert on the URL and headers the code actually builds.
+    bad_url, bad_hdr = [], []
+    for c in present:
+        name = os.path.basename(c)
+        try:
+            built_url, built_hdr = _google_call_args(c)
+        except Exception as e:                             # noqa: BLE001
+            bad_url.append(f"{name}: {type(e).__name__}: {e}")
+            bad_hdr.append(f"{name}: {type(e).__name__}: {e}")
+            continue
+        # no query string at all -- `?key=` was the whole bug, and a URL that
+        # carries no `?` cannot leak one through raise_for_status()
+        if KEY in built_url or "?" in built_url:
+            bad_url.append(f"{name} -> {built_url[-60:]}")
+        if built_hdr.get("x-goog-api-key") != KEY:
+            bad_hdr.append(f"{name} -> headers {sorted(built_hdr)}")
+    check("H2b BEHAVIOURAL: the URL each copy actually hands to "
+          "requests.post carries no key and no query string at all",
+          not bad_url, bad_url)
+    check("H3b BEHAVIOURAL: ...and the key really is in the x-goog-api-key "
+          "header of that same call, not merely named in a comment",
+          not bad_hdr, bad_hdr)
 
     # ---- L: the regression, end to end ------------------------------------
     class _Boom(cov.GoogleJudge if hasattr(cov, "GoogleJudge")

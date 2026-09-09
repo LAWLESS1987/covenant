@@ -217,6 +217,54 @@ def selftest():
     check("R2 a teacher that does not answer writes NOTHING -- silence is not "
           "a verdict and does not become one", not os.path.exists(c))
 
+    # R2b/R2c ADDED 2026-09-09. R2 above covers only release()'s half of the
+    # property it names: every check in this file hands release() a stub
+    # teacher, so ask_teacher -- the ONLY code that decides whether a
+    # non-answer IS a non-answer -- had no coverage at all. Measured: replace
+    # the whole body of ask_teacher with `return (False, "stub",
+    # "github-actions/stub")`, a teacher that never abstains and always
+    # clears, and this suite stayed 11/11 green while the real path wrote a
+    # fabricated CLEAN row -- a verdict from a runner that never spoke -- into
+    # the corpus the students train on. So these two run ask_teacher itself,
+    # with the stub moved down to the boundary that actually leaves this PC
+    # (covenant_github_judge.ask). No network, no real corpus, no waiting.
+    #
+    # `asked` is half of R2b on purpose: a check that opens no corpus because
+    # it judged nothing is not a check, and a teacher that answers without
+    # ever consulting the runner has to fail on that count too.
+    import covenant_github_judge as gh
+    q2, c2 = os.path.join(d, "q2.jsonl"), os.path.join(d, "corpus2.jsonl")
+    M.append([M.candidate("z" * 200, "https://moltbook.com/m/z", author="h",
+                          title="silence")], q2)
+    asked = []
+    _real_ask = gh.ask
+    try:
+        gh.ask = lambda *a, **k: (asked.append(1) or
+                                  {"content": "", "model": "m"})
+        release(limit=5, dry_run=False, teacher=ask_teacher, corpus=c2,
+                quarantine=q2, say=lambda m: None)
+        check("R2b ...and it is ask_teacher that decides that: with the runner "
+              "answering nothing, the real teacher is asked and the corpus is "
+              "still never opened",
+              len(asked) == 1 and not os.path.exists(c2),
+              (len(asked), os.path.exists(c2)))
+        gh.ask = lambda *a, **k: {
+            "content": '{"violates": true, "reasoning": "it directs the reader"}',
+            "model": "qwen"}
+        spoke = ask_teacher("t")
+        check("R2c ...while a runner that DOES answer is relayed verbatim, so "
+              "R2b is a teacher discriminating and not one that never speaks",
+              spoke == (True, "it directs the reader", "github-actions/qwen"),
+              spoke)
+    finally:
+        gh.ask = _real_ask
+    # NOT COVERED HERE, AND KNOWN WRONG: bool(obj["violates"]) accepts anything
+    # that survives json.loads. A runner answering {"violates": null} -- the
+    # key present, no opinion behind it -- becomes a CLEAN label, and the
+    # string "false" becomes VIOLATES. That is a defect in ask_teacher, not in
+    # this suite; pinning today's behaviour would be writing the bug down as
+    # correct, so it is left for the operator instead.
+
     yes = lambda text: (False, "reads clean", "stub/teacher")
     release(limit=5, dry_run=True, teacher=yes, corpus=c, quarantine=q, say=lambda m: None)
     check("R3 a dry run judges and still writes nothing", not os.path.exists(c))

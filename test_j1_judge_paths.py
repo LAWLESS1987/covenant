@@ -321,6 +321,43 @@ def section_s():
     check("S4 no line in the core refuses on the independence count",
           not bad, "; ".join(bad[:2]))
 
+    # S4 reads the core as TEXT, one physical line at a time, and that window
+    # is narrower than the property it stands for. MEASURED: an unconditional
+    # gate inserted into build_semantic_quorum on its return path, written the
+    # ordinary way --
+    #     rep = quorum_diversity_report(q)
+    #     if rep.get("independent_semantic_judges", 0) < 2:
+    #         raise ValueError("refusing: ...")
+    # -- lands `raise` and the token on DIFFERENT lines, so S4 never saw it.
+    # The node's own default ethics quorum could no longer be CONSTRUCTED at
+    # all and J1 still printed 34/34, exit 0. S4 is not dead code -- collapse
+    # that same gate onto one physical line and it does go red -- so it stays
+    # as the record of the one shape it catches. It just must not be the only
+    # check, because a one-line window cannot stand in for an N-line
+    # condition (A69). S4b/S4c RUN the builder rather than reading it.
+    #
+    # The one documented exception is COVENANT_REQUIRE_JUDGE_DIVERSITY=1, an
+    # opt-in refusal test_b2 section E owns; UNSET is the invariant, so it is
+    # unset here and put back afterwards rather than inherited from whoever
+    # started the process.
+    prev = os.environ.pop("COVENANT_REQUIRE_JUDGE_DIVERSITY", None)
+    try:
+        built, why = cov.build_semantic_quorum(providers=["mock"]), ""
+    except Exception as e:                # noqa: BLE001
+        built, why = None, f"{type(e).__name__}: {e}"
+    finally:
+        if prev is not None:
+            os.environ["COVENANT_REQUIRE_JUDGE_DIVERSITY"] = prev
+    n_ind = (cov.quorum_diversity_report(built).get("independent_semantic_judges")
+             if built is not None else None)
+    check("S4b the quorum this node builds by DEFAULT is the non-diverse case "
+          "any independence gate would reject -- without this, S4c could pass "
+          "by testing nothing", n_ind is not None and n_ind < 2,
+          why or f"independent_semantic_judges={n_ind}")
+    check("S4c and the core BUILDS that quorum instead of refusing it -- "
+          "independence is disclosure, and disclosure does not gate",
+          built is not None, why)
+
 
 # ------------------------------------------------------------------ L ------
 def section_l():

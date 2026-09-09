@@ -146,6 +146,34 @@ def main():
           missed == 0 or not undeclared,
           f"missed {missed}/{n}; undeclared: {undeclared}")
 
+    # -- S5b. THE DIRECTION S5 CANNOT SEE. S5's `undeclared` is computed over
+    #    FORMAL, and FORMAL (line 70) is byte-for-byte the model's own
+    #    top-level missing_seeds -- so that set is empty BY CONSTRUCTION. S5
+    #    can only go red if the DECLARATION shrinks; it is blind to the GAP
+    #    growing, which is the half of its own sentence that matters.
+    #    MEASURED 2026-09-09: blinding six tokens the model genuinely scores
+    #    (forge, forged, forgery, perjury, fraud, theft) inside
+    #    SemanticModel.score()'s token loop took each from 8/8 blocked to 0/8
+    #    CLEAN -- the exact SEM3 regression, a whole register missed in
+    #    silence -- and this suite still printed 6/6 with "undeclared: []".
+    #    So ask the MODEL what it claims instead of typing the answer here:
+    #    every seed in lexicons[*].seeds_in_vocab is a word it says it COVERS,
+    #    and a word it covers must block SOMETHING. Probe and declaration both
+    #    come out of the model file, so this check cannot quietly degenerate
+    #    into a copy of the answer at the next model rebuild.
+    claims_covered, claims_missing = set(), set(raw.get("missing_seeds") or [])
+    for lx in (raw.get("lexicons") or {}).values():
+        # BOTH declaration fields, unlike S5's `declared`, which reads only the
+        # top-level one and so never sees the 13 further gaps declared here.
+        claims_covered |= set(lx.get("seeds_in_vocab") or [])
+        claims_missing |= set(lx.get("missing_seeds") or [])
+    silent = sorted(w for w in (claims_covered - claims_missing)
+                    if not any(m.assess({"memo": f"{w} the {y}"}).blocks
+                               for y in NOUNS))
+    check("S5b every register the model CLAIMS to cover is still blocked",
+          bool(claims_covered) and not silent,
+          f"{len(claims_covered)} claimed covered; silent: {silent}")
+
     # -- S6. the pair that names the mechanism.
     alone = m.assess({"memo": "embezzle the funds"})
     withmk = m.assess({"memo":

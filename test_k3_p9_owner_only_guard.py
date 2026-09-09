@@ -28,7 +28,9 @@ THE DIRECTION OF THE CHANGE. It is stronger, not weaker:
   either    the control failing to import raises, rather than being skipped
 
   A  the guard ACCEPTS a policy file locked to its owner
-  B  THE MUTATION: grant Everyone full control -- it must REFUSE
+  B  THE MUTATION: grant Everyone full control -- it must REFUSE, with the
+     type callers catch, and so must a SECOND stranger, because the control
+     claims to reject a class of principals and not one name
   C  it refuses for the right reason, and names the stranger
   D  fail-closed: unreadable ACL, missing file, and an unimportable control
      all raise rather than pass
@@ -105,6 +107,24 @@ def loosen(p):
     return r.returncode == 0
 
 
+def loosen_second(p):
+    """A SECOND stranger -- deliberately NOT the one B is written around.
+
+    Windows: BUILTIN\\Users, granted by SID (*S-1-5-32-545) rather than by
+    name so the fixture does not depend on the machine's locale. That is the
+    principal owner_only's own docstring calls "the default inherited ACL":
+    every interactive account on the box.
+    POSIX: group-readable only (0o640) -- `mode & 0o077` must refuse that too,
+    where loosen()'s 0o666 sets group AND other and so proves only one bit.
+    """
+    if not WIN:
+        os.chmod(p, 0o640)
+        return True
+    r = subprocess.run(["icacls", p, "/grant", "*S-1-5-32-545:F"],
+                       capture_output=True)
+    return r.returncode == 0
+
+
 print("== A. a locked-down policy file is accepted ==")
 with tempfile.TemporaryDirectory() as d:
     p = write_policy(d)
@@ -125,17 +145,59 @@ with tempfile.TemporaryDirectory() as d:
     if not loosen(p):
         check("B0 could not loosen the file, so B did NOT run (§5)", False)
     else:
+        exc = None
         refused = False
         msg = ""
         try:
             M.MainnetPolicy.load(p)
-        except M.MainnetGuardError as e:
-            refused, msg = True, str(e)
-        except Exception as e:                       # any other raise is still a refusal
-            refused, msg = True, f"{type(e).__name__}: {e}"
+        except Exception as e:            # any raise is still a refusal for B1
+            exc, refused, msg = e, True, f"{type(e).__name__}: {e}"
         check("B1 load() REFUSES a policy file anyone can edit", refused, msg[:90])
+        # B2 REWRITTEN 2026-09-09. It used to read
+        #     refused and isinstance(sys.exc_info()[1], type(None)) or refused
+        # which Python parses as (refused and isinstance(...)) or refused. The
+        # isinstance term is inert -- outside an except handler sys.exc_info()[1]
+        # is None, so isinstance(None, type(None)) is the constant True -- and
+        # the whole condition is therefore byte-for-byte `refused`: a second
+        # copy of B1 that asserts NOTHING about the type it names. B1 above it
+        # accepts any exception at all. MUTATION: change load()'s translation at
+        # covenant_xrp_mainnet.py:317 from `raise MainnetGuardError(` to
+        # `raise RuntimeError(` and the old B2 still printed PASS while the
+        # contract every caller's `except MainnetGuardError` depends on was
+        # broken (the file only noticed by accident, further down, when the
+        # RuntimeError escaped section C as an unhandled traceback). Hold the
+        # exception object and assert on it instead of re-asserting B1.
         check("B2 and the refusal is a MainnetGuardError, the type callers catch",
-              refused and isinstance(sys.exc_info()[1], type(None)) or refused)
+              isinstance(exc, M.MainnetGuardError), type(exc).__name__)
+
+# B3 ADDED 2026-09-09. B and C above hand the guard exactly ONE stranger,
+# `Everyone`, but the control claims to reject a CLASS -- ops\owner_only.py's
+# docstring: "Users, Everyone, Authenticated Users, another account -- fails".
+# MUTATION: narrow require_owner_only to count only that one name, by inserting
+# a line at ops\owner_only.py:132
+#     w = who.lower()
+#     if "everyone" not in w: continue      # <- inserted
+#     strangers.append(who)
+# -- a plausible refactor, not a contrived one. A policy file granting
+# BUILTIN\Users full control was then ACCEPTED and load() returned a live
+# spending policy (per-payment, per-day and lifetime XRP limits) while this
+# file printed 16/16 passed and exited 0. One principal is not a class, so B
+# gets a second one.
+with tempfile.TemporaryDirectory() as d:
+    p = write_policy(d)
+    lock_down(p)
+    if not loosen_second(p):
+        check("B3 could not grant the second stranger, so B3 did NOT run (§5)",
+              False)
+    else:
+        try:
+            pol = M.MainnetPolicy.load(p)
+            ok3 = False
+            why = f"ACCEPTED it -- max_per_payment_xrp={pol.max_per_payment_xrp}"
+        except Exception as e:
+            ok3, why = True, type(e).__name__
+        check("B3 refuses a second stranger too, not only Everyone "
+              "(win: BUILTIN\\Users by SID; posix: 0640)", ok3, why)
 
 print("\n== C. it refuses for the right reason ==")
 with tempfile.TemporaryDirectory() as d:

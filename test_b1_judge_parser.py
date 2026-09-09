@@ -209,6 +209,82 @@ def section_q():
     r = q.evaluate({"message": "hello"}, cov.DIVINE_PRINCIPLES)
     check("Q5 flag requires a violating component", not r.infrastructure_failure)
 
+    # Q5 above never builds the fixture its own comment describes. It re-runs
+    # the SAME QuorumJudge object from Q4 on the SAME payload, so its assertion
+    # is byte-for-byte Q4's second conjunct and cannot fail on its own; no
+    # component anywhere in this repo's tests carries infrastructure_failure=True
+    # without also violating. Q5b and Q2b below build that component and run it.
+    #
+    # THE MUTATION THAT MOTIVATED THEM (2026-09-09): weaken the quorum's
+    #   infra = violates and any(r.violates and r.infrastructure_failure ...)
+    # to `infra = any(r.infrastructure_failure for r in results)` and this
+    # entire suite stayed 162/162 green -- Q1/Q3 are the only checks that reach
+    # that line, and in both of them the flagged component IS the violating one,
+    # the single case the mutation preserves.
+    #
+    # Not cosmetic. The flag is read to DECIDE, not merely to disclose:
+    # covenant_judge_defer.py refuses to record a flagged verdict as a training
+    # label, and covenant_distill.py / covenant_study.py filter on it. Under the
+    # mutant, genuine clean verdicts and genuine dissents are silently dropped
+    # from the corpus the students learn from, and a judge that found harm is
+    # reported to the operator as judge_unavailable.
+    class FlaggedJudge:
+        """A component carrying infrastructure_failure=True, voting either way.
+
+        Returns its verdict directly instead of raising through
+        _retry_with_backoff, so it costs no sleep: three of these are cheaper
+        than one more TimeoutError fixture. `violates=False` is the pairing no
+        API judge emits -- which is precisely why the suite owned no such
+        component, and it is the only shape that tells 'violating AND infra'
+        apart from 'any infra'.
+        """
+        def __init__(self, violates, judge_id):
+            self.violates = violates
+            self.judge_id = judge_id
+
+        def evaluate(self, data, principles):
+            return cov.JudgmentResult(self.violates, "flagged component",
+                                      judge_id=self.judge_id,
+                                      infrastructure_failure=True)
+
+    flagged_clean = FlaggedJudge(False, "e:0")
+
+    # CASE A -- a clean quorum holding a non-violating flagged component. Dies
+    # under `any(r.infrastructure_failure ...)`; the fixture Q5's comment
+    # promised and never built.
+    q = cov.QuorumJudge([sem_ok, flagged_clean, mock], min_agree=3,
+                        required_judge_ids={mock.judge_id})
+    r = q.evaluate({"message": "hello"}, cov.DIVINE_PRINCIPLES)
+    check("Q5b clean quorum + non-violating flagged component -> not flagged",
+          not r.violates and not r.infrastructure_failure,
+          f"violates={r.violates} infra={r.infrastructure_failure}")
+
+    # CASE B -- the inner `r.violates and` conjunct, which Q2 also fails to
+    # reach because its fixture holds no flagged component at all: a REAL
+    # dissent is not relabelled infrastructure because some OTHER, clean
+    # component happened to carry the flag.
+    q = cov.QuorumJudge([sem_ok, sem_bad, flagged_clean, mock], min_agree=4,
+                        required_judge_ids={mock.judge_id})
+    r = q.evaluate({"message": "hello"}, cov.DIVINE_PRINCIPLES)
+    check("Q2b real dissent beside a flagged clean component -> NOT relabelled",
+          r.violates and not r.infrastructure_failure,
+          f"violates={r.violates} infra={r.infrastructure_failure}")
+
+    # CASE C -- the LEADING `violates and` conjunct, which neither Q5b nor
+    # anything else reaches: an outvoted unreachable judge (min_agree met by
+    # the three that answered) must leave the admitted verdict unflagged.
+    # Measured: dropping only that conjunct leaves Q5b green, so this check is
+    # not redundant with it. An admission wrongly flagged here is thrown out of
+    # ops/verdicts.jsonl by covenant_judge_defer.py -- the corpus quietly loses
+    # every clean verdict reached while one provider was down.
+    q = cov.QuorumJudge([sem_ok, FlaggedJudge(True, "f:0"),
+                         CannedJudge('{"violates": false, "reasoning": "ok"}', "d:0"), mock],
+                        min_agree=3, required_judge_ids={mock.judge_id})
+    r = q.evaluate({"message": "hello"}, cov.DIVINE_PRINCIPLES)
+    check("Q5c outvoted unreachable judge -> admitted and NOT flagged",
+          not r.violates and not r.infrastructure_failure,
+          f"violates={r.violates} infra={r.infrastructure_failure}")
+
     # No-key judge is infrastructure, not semantics.
     nokey = cov.ClaudeReasoningJudge(api_key="", judge_id="claude:9")
     r = nokey.evaluate({"x": 1}, ["p"])

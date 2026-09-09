@@ -55,6 +55,12 @@ def ledger(name, roots):
     return s.level(name, [s.leaf("n%d" % i, r) for i, r in enumerate(roots)])
 
 
+def deepest(rep):
+    """How far climb() ACTUALLY descended, read off the report it returned."""
+    return max([rep.get("depth", 0)]
+               + [deepest(c) for c in rep.get("children", [])])
+
+
 def main():
     print("S1 -- one relation, any depth, and no laundering\n")
 
@@ -147,6 +153,36 @@ def main():
     check("D2 past the depth limit it REFUSES rather than hangs -- a verifier "
           "that hangs is a verifier that gets switched off",
           "refused" in str(rov).lower() or rov["verdict"] == UNPROVEN)
+    # D2 CANNOT GO RED, which is why the two checks below exist. Its fixture
+    # wraps the ledger in levels that each have exactly ONE child, and one
+    # child can never reach the quorum attest derives (max(2, n//2+1) == 2),
+    # so this summit is UNPROVEN for a reason that has nothing to do with
+    # depth -- a chain of THREE such levels is UNPROVEN too. Delete the
+    # refusal from scale.py (`if depth > MAX_DEPTH:` -> `if False:`) and D2's
+    # second disjunct alone carries it: measured 23/23 green with D2 printing
+    # "ok", while climb() recursed past the limit and a cyclic level went from
+    # returning to raising RecursionError. D2's first disjunct is also only a
+    # substring of a nested report, which a reword of the message would void.
+    # So assert the refusal by what it DOES.
+    check("D2b ...and the refusal STOPS the descent rather than only naming "
+          "it. A limit that is announced while the recursion carries on is "
+          "not a limit",
+          deepest(rov) <= s.MAX_DEPTH + 1, (deepest(rov), s.MAX_DEPTH + 1))
+    # The self-referential level is the case MAX_DEPTH's own comment names
+    # ("far more likely to be a cycle than a hierarchy") and the case D2's
+    # label names ("rather than hangs"), and nothing in this repository
+    # tested it. With the refusal removed this raises RecursionError instead
+    # of returning a verdict -- the verifier that gets switched off.
+    cyc = {"name": "cycle", "children": [], "quorum": None}
+    cyc["children"].append(cyc)
+    try:
+        _, rcyc = s.climb(cyc)
+        cyc_ok, cyc_why = True, rcyc["verdict"]
+    except Exception as e:                                    # noqa: BLE001
+        cyc_ok, cyc_why = False, "%s: %s" % (type(e).__name__, e)
+    check("D2c a level that contains ITSELF returns a verdict instead of "
+          "blowing the stack -- the cycle the depth limit exists for",
+          cyc_ok, cyc_why)
 
     # ---- S: silence is not disagreement ------------------------------------
     _, rs = s.climb(ledger("Lsil", [A, A, None]))

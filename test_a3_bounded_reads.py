@@ -77,6 +77,16 @@ def send_json(port, obj, read_reply=True):
     return reply
 
 
+def refusal_details(monitor, kind):
+    """Every recorded detail of one anomaly kind, oldest first.
+
+    report() aggregates to COUNTS, and a count cannot tell a refusal from a
+    parse error -- both arrive as one <kind>_message_error. WHICH refusal
+    happened is the thing under test here, so read the events themselves
+    (test_a24_anomaly_eviction reads _events the same way)."""
+    return [d for _ts, k, d in list(monitor._events) if k == kind]
+
+
 def main():
     import threading
     print("== A3.0 recv_bounded fires on the crossing chunk ==")
@@ -141,6 +151,19 @@ def main():
         "peer_message_error", {}).get("baseline", 0)
     check("the refusal was recorded on the anomaly monitor",
           errs_after > errs_before, f"{errs_before} -> {errs_after}")
+    # A3.1b -- WHY THIS EXISTS. The count above says a refusal was recorded; it
+    # cannot say WHAT was refused. Delete the cap at the peer call site
+    # (covenant_unified_v8.py:9115, `data = recv_bounded(conn).decode()`) and
+    # replace it with a read-to-EOF: the handler swallows the whole 3 MB, the
+    # json.loads then fails, and the SAME peer_message_error is recorded -- so
+    # errs_after > errs_before is true in both worlds. Measured: with that call
+    # site made unbounded the three checks above all stay green. Only the KIND
+    # of the recorded refusal distinguishes "cut off at the cap" from
+    # "absorbed, then choked on the junk".
+    pdetails = refusal_details(m.node.anomaly_monitor, "peer_message_error")
+    check("A3.1b the P2P refusal is the CAP (PeerMessageTooLarge), not a parse error",
+          any("PeerMessageTooLarge" in d for d in pdetails),
+          f"last={pdetails[-1:]}")
 
     print("\n== A3.2 bridge listener refuses an oversized stream ==")
     flood(BRIDGE, cov.MAX_PEER_MSG_BYTES * 3)
@@ -150,6 +173,22 @@ def main():
     check("bridge flood refused, node still up (chain intact)",
           len(m.node.chain) == height_before,
           f"bridge_message_error baseline={berrs_after}, height {len(m.node.chain)}")
+    # A3.2b -- WHY THIS EXISTS. The check above was the WHOLE of A3.2, and it
+    # cannot fail: a stream of "xxxx..." never appends a block, so
+    # len(chain) == height_before holds whether the bridge stops at the cap or
+    # swallows every byte. Measured: with the bridge's own read
+    # (covenant_unified_v8.py:9428) replaced by an unbounded read-to-EOF, all
+    # 3 MB were absorbed into one buffer and this suite still printed 7 passed,
+    # 0 failed. Promoting berrs_after into `> berrs_before` would not have
+    # caught it either -- it reads 1 in both worlds (PeerMessageTooLarge in one,
+    # JSONDecodeError in the other), which is why the refusal is asserted BY
+    # KIND. This is the "same defect in four files, fixing one door leaves
+    # three" shape the bridge handler's own comments warn about: A3.0 and A3.1
+    # cover recv_bounded and the peer door; nothing covered this one.
+    bdetails = refusal_details(m.node.anomaly_monitor, "bridge_message_error")
+    check("A3.2b the bridge refusal is the CAP (PeerMessageTooLarge), not a parse error",
+          any("PeerMessageTooLarge" in d for d in bdetails),
+          f"last={bdetails[-1:]}")
 
     print("\n== A3.3 a normal in-cap message on the same port still works ==")
     # A well-formed but unknown-type message: the handler reads it fully,

@@ -277,10 +277,49 @@ def section_e():
         check("E3 =1 does NOT refuse a genuinely diverse quorum", False,
               "cannot build a credentialled quorum through the builder")
     except ValueError as e:
-        # The builder credentials nothing, so this SHOULD refuse here; the
-        # positive case is asserted directly on the report instead (R1).
+        # The builder hands out no credential of its own, so this SHOULD refuse
+        # here; the positive case is asserted directly on the report instead (R1).
         check("E3 =1 refuses at build time when no credential is present",
               "not independently diverse" in str(e))
+
+    # E3b THE POSITIVE DIRECTION, ACTUALLY RUN. E3 above can only ever reach its
+    # except-branch: with no key in the environment the builder produces an
+    # uncredentialled quorum, the armed flag refuses every time, and E3's "does
+    # NOT refuse" line is dead code. That left the flag's own named property with
+    # no guard at all -- mutating build_semantic_quorum's arming block from
+    # `if not rep.get("diverse"):` to `if True:` (an armed node that refuses to
+    # build ANY quorum, however diverse) kept this suite at 73/73 green.
+    # The v8.34 comment that motivated E3 -- "the builder credentials nothing" --
+    # is only true of the builder: _APIReasoningJudge.__init__ reads its own
+    # env_var at construction, so setting the three provider vars walks the REAL
+    # builder to a genuinely credentialled, genuinely diverse quorum. The values
+    # are placeholders; nothing here is a key and nothing is sent anywhere (M13).
+    # Saved and restored, because section H asserts on the keyless /health
+    # warnings and would break if they leaked forward.
+    _KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY")
+    _saved = {k: os.environ.get(k) for k in _KEYS}
+    _label = ("E3b =1 does NOT refuse a genuinely diverse quorum -- the refusal "
+              "must fire on the report's answer, not on every build")
+    try:
+        for k in _KEYS:
+            os.environ[k] = "placeholder-not-a-real-key"
+        q = cov.build_semantic_quorum(["claude", "openai", "google"])
+        r = report(q)
+        # The armed flag and a genuinely diverse fixture are both asserted, so
+        # this cannot pass by the gate being disarmed or the quorum being weak.
+        check(_label,
+              os.environ.get("COVENANT_REQUIRE_JUDGE_DIVERSITY") == "1"
+              and r.get("diverse") is True,
+              f"armed={os.environ.get('COVENANT_REQUIRE_JUDGE_DIVERSITY')!r} "
+              f"degradations={r.get('degradations')}")
+    except ValueError as e:
+        check(_label, False, str(e)[:90])
+    finally:
+        for k, v in _saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
     # ONE-WAY: no value of the variable relaxes anything. Only the exact string
     # "1" adds the refusal; everything else leaves v8.34 behaviour intact, and

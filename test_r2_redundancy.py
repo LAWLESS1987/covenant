@@ -51,11 +51,55 @@ def check(label, ok, detail=""):
 
 
 def flagged(path):
-    """Reimplements the classifier's decision for one path, as the tool does."""
+    """Reimplements the classifier's decision for one path.
+
+    A COPY, and read it as one: S1-S3 below can only ever check this
+    restatement of the rule. S1b/S2b run the shipped code instead.
+    See shipped_flags().
+    """
     segs = re.split(r"[\\/]", path)
     base = segs[-1] if segs else ""
     return (any(s in r.FORBIDDEN_SEGMENTS for s in segs[:-1])
             or base in r.FORBIDDEN_NAMES)
+
+
+def shipped_flags(path):
+    """Ask the SHIPPED classifier about one path -- by running it.
+
+    WHY THIS EXISTS. flagged() above is a hand copy of the two branch
+    conditions inside principle_check, so S1-S3 assert against the copy and
+    never against the tool. Replacing both of those conditions with `False`
+    -- the audit blind to the private corpus, the node keys and the audit
+    chain, which is the exact failure this file exists to prevent -- left the
+    suite at 17/17 passed, exit 0. A test that re-implements the thing it
+    guards cannot notice that thing being deleted.
+
+    So: stub the tracked-file listing, run the real principle_check, and
+    report what it actually decided.
+
+    Returns True or False, or None if the stub was never consulted -- which
+    would mean the classifier stopped reading `git ls-files` and any answer
+    here is about nothing. None counts as failure at the call site; it must
+    never read as a pass.
+
+    Read-only, no subprocess, no writes: _run is restored in a finally, so the
+    real-tree call at F2/F3 still measures the real tree.
+    """
+    seen = []
+    real = r._run
+
+    def fake(cmd, timeout=10):
+        if list(cmd[:2]) == ["git", "ls-files"]:
+            seen.append(tuple(cmd))
+            return path
+        return ""
+
+    try:
+        r._run = fake
+        findings, _ = r.principle_check()
+    finally:
+        r._run = real
+    return bool(findings) if seen else None
 
 
 def main():
@@ -93,6 +137,25 @@ def main():
           "ai_memory" in r.FORBIDDEN_SEGMENTS
           and "ai_memory_system" not in r.FORBIDDEN_SEGMENTS,
           r.FORBIDDEN_SEGMENTS)
+
+    # S1b/S2b ask S1/S2 of the CODE rather than of the copy. S4 inspects the
+    # DATA -- the tuple -- and the regression was in the MATCHING, which had
+    # no coverage at all: with both branch conditions in principle_check
+    # replaced by False, so that nothing tracked is ever reported, this suite
+    # still passed 17/17. F3 could not see it either, because "found nothing"
+    # is exactly what a dead classifier also returns. These two run it.
+    miss = [p for p in must_flag if shipped_flags(p) is not True]
+    hit = [p for p in must_allow if shipped_flags(p) is not False]
+    check("S1b ...and it is the SHIPPED classifier that catches them. S1 "
+          "asked a restatement living in this file; this one feeds "
+          "principle_check a tracked listing and reads the verdict it "
+          "returns, so deleting the check in redundancy.py turns this red",
+          not miss, miss)
+    check("S2b ...and it is the SHIPPED classifier that lets "
+          "ai_memory_system/ through -- the regression of S2, decided by the "
+          "code that ships rather than by a copy that would go on saying the "
+          "right thing long after the tool stopped",
+          not hit, hit)
 
     # ---- L: one question, every scale --------------------------------------
     check("L1 there are levels, and each is (tag, name, callable)",

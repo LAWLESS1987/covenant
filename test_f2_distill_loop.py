@@ -132,8 +132,31 @@ def main():
     check("L3 unreachable is not a label", not D.record_verdict({"message": "x"}, R(True, "down", infrastructure_failure=True), "t", "test", ledger))
     check("L4 held/abstained is not a label", not D.record_verdict({"message": "x"}, R(True, "held", not_understood=True), "t", "test", ledger))
     check("L5 uncertain is not a label", not D.record_verdict({"message": "x"}, R(True, "unsure", uncertain=True), "t", "test", ledger))
-    check("L6 an empty payload is not a label", not D.record_verdict({"origin": "human"}, R(False, "ok"), "t", "test", ledger)
-          or True)  # metadata-only payloads serialise to JSON text; either way no crash
+    # L6 REWRITTEN 2026-09-09 -- it could not fail, and it never reached the
+    # guard it names. It read
+    #     not D.record_verdict({"origin": "human"}, ...) or True
+    # which Python evaluates as (not X) or True: true for every X. Even without
+    # the ` or True` its fixture would have missed the guard, because a
+    # metadata-only payload serialises to the NON-empty text
+    # '{"origin": "human"}' and is legitimately written as a label -- which the
+    # old trailing comment conceded. Mutation 2026-09-09: deleting
+    # `if not text.strip(): return False` from record_verdict
+    # (covenant_judge_defer.py:216) left this suite 39/39 green, and that
+    # module's own --selftest 11/11, while rows like
+    # {"text": "", "violates": false} entered the corpus the students learn
+    # from. An empty string labelled CLEAN teaches nothing and pulls the
+    # student toward clean, and this line is the only filter deciding what may
+    # enter that ledger. Both halves are needed: L6 runs the guard on all three
+    # shapes of empty text, L6b reads the ledger back, because a return value
+    # alone would not notice a row written anyway.
+    _rows_before = len(open(ledger, encoding="utf-8").read().splitlines())
+    check("L6 an empty payload is not a label",
+          not D.record_verdict({"message": ""}, R(False, "ok"), "t", "test", ledger)
+          and not D.record_verdict({"message": "   "}, R(False, "ok"), "t", "test", ledger)
+          and not D.record_verdict("", R(False, "ok"), "t", "test", ledger))
+    check("L6b ...and none of the three appended a row -- the refusal is the ledger's, "
+          "not only the return value's",
+          len(open(ledger, encoding="utf-8").read().splitlines()) == _rows_before)
     rows = X.load_verdicts(ledger)
     check("L7 the ledger holds exactly the two answered verdicts, labelled", [r["violates"] for r in rows[:2]] == [False, True])
 
@@ -173,6 +196,25 @@ def main():
     # ---- T: why one seat -----------------------------------------------
     check("T1 two seats -> veto threshold 1; three -> 2 (a lone genuine dissent could no longer block)",
           math.ceil(2 * 0.5) == 1 and math.ceil(3 * 0.5) == 2)
+    # T1b ADDED 2026-09-09, beside T1 rather than replacing it: T1 still says
+    # what the arithmetic is meant to be, but it is four integer literals and
+    # the stdlib evaluated inside this process -- it re-implements the formula
+    # and then checks its own copy, so it says nothing about the deployed one.
+    # Mutation 2026-09-09: replacing
+    # `threshold = math.ceil(len(sem_judges) * frac)` in
+    # covenant_unified_v8.build_semantic_quorum (line 10315) with a constant
+    # left this suite 39/39 with byte-identical output, although the T* entry
+    # in this file's docstring claims F2 is where the two-seat veto is pinned.
+    # T1b asks the module the same question instead of asking math.ceil. It
+    # also reaches the path T1's hardcoded 0.5 cannot see: with
+    # COVENANT_VETO_FRACTION=phi the two-seat threshold is already 2 on the
+    # pristine file -- a lone dissent stops blocking, which is the exact harm
+    # T1's own label names. Offline and instant: no provider is contacted at
+    # build time (test_b2 builds the same quorums the same way).
+    check("T1b ...and the quorum the code actually builds agrees (asked of "
+          "build_semantic_quorum, not of math.ceil)",
+          cov.build_semantic_quorum(["claude", "openai"]).semantic_veto_threshold == 1
+          and cov.build_semantic_quorum(["claude", "openai", "google"]).semantic_veto_threshold == 2)
 
     # ---- P: promotion ----------------------------------------------------
     quiet = lambda *a, **k: None                                          # noqa: E731

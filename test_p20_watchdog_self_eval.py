@@ -24,6 +24,10 @@ WHAT THIS SUITE PINS.
   E10 REPORT-ONLY, pinned by AST: self_evaluation contains no call to
       start_node, Popen, urlopen or log -- it senses nothing and acts on
       nothing; it only returns text (the same boundary P12 draws)
+  E10b the same boundary pinned by RUNNING it: self_evaluation is called with
+      open/urlopen/Popen/log/start_node/os.replace/os.remove replaced by
+      recorders, so a probe, a spawn or a write one frame DOWN is caught --
+      E10's AST walk can only see the spelling inside its own ~65 lines
   E11 the one_pass hook exists, is gated on SELF_EVAL_EVERY, and logs its
       verdict unconditionally rather than through Adaptation
 
@@ -31,10 +35,13 @@ M13 shape: no node, no socket, no key, no ollama. The module is imported,
 never run; the writer is tested against a temp directory.
 """
 import ast
+import builtins
 import inspect
 import os
+import subprocess
 import sys
 import tempfile
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -206,6 +213,59 @@ def main():
     check("E10 self_evaluation is REPORT-ONLY by AST: no probe, no restart, "
           "no I/O, not even a log call",
           not (called & forbidden), str(sorted(called & forbidden)))
+
+    # E10b ---------------------------------------------------------------
+    # 2026-09-09: E10 above reads self_evaluation's SOURCE and forbids six
+    # spellings inside its own ~65 lines. It cannot see one frame down.
+    # The mutation that proved it: give _seat_defers() -- which
+    # self_evaluation calls from its own judge branch -- a log line and a
+    # /health probe. The suite printed that probe's log line on every round
+    # and then asserted, four lines later, that self_evaluation had made no
+    # log call. E10 stayed green. The control is worse: inlining
+    # _seat_defers()/_quorum_policy() into self_evaluation -- same path, same
+    # file, byte-identical behaviour -- turns E10 RED on the word 'open'. So
+    # E10 flags a refactor that changes nothing and misses a probe, a spawn
+    # and a write that change everything: it measures spelling in one stack
+    # frame, not the report-only boundary it names. E10b RUNS the function
+    # with every forbidden call replaced by a recorder, at any depth.
+    # SCOPE, stated honestly: shipped self_evaluation DOES read
+    # ops/quorum_policy.json -- E6b passes only because it does -- so a READ
+    # is allowed here and E10b pins the acting half: no probe, no spawn, no
+    # restart, no WRITE, no rename, no log.
+    fired = []
+    _saved = (builtins.open, urllib.request.urlopen, subprocess.Popen,
+              wd.log, wd.start_node, os.replace, os.remove)
+    _real_open = builtins.open
+
+    def _rec(name):
+        def _f(*a, **k):
+            fired.append(name)
+        return _f
+
+    def _rec_open(file, mode="r", *a, **k):
+        if any(c in str(mode) for c in "wax+"):
+            fired.append(f"open({os.path.basename(str(file))!r},{mode!r})")
+        return _real_open(file, mode, *a, **k)
+
+    try:
+        (builtins.open, urllib.request.urlopen, subprocess.Popen, wd.log,
+         wd.start_node, os.replace, os.remove) = (
+            _rec_open, _rec("urlopen"), _rec("Popen"), _rec("log"),
+            _rec("start_node"), _rec("os.replace"), _rec("os.remove"))
+        try:
+            ev(judge={})                       # the seat/policy branch
+            ev()                               # the baseline-present branch
+            ev(states={"A": None, "B": None, "C": None}, topo={},
+               self_drift=["WATCHDOG SOURCE DRIFT: aaaa/bbbb"],
+               alerts=["FORK: founder balance disagrees"])
+        except Exception as e:                 # a stub blowing up IS the call
+            fired.append(f"{type(e).__name__}: {e}")
+    finally:
+        (builtins.open, urllib.request.urlopen, subprocess.Popen, wd.log,
+         wd.start_node, os.replace, os.remove) = _saved
+    check("E10b self_evaluation is REPORT-ONLY when RUN, at any depth: no "
+          "probe, no spawn, no restart, no write, no rename, no log",
+          not fired, str(sorted(set(fired))))
 
     # E11 ----------------------------------------------------------------
     src = inspect.getsource(wd.one_pass)

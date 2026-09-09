@@ -42,10 +42,15 @@ accepted. The claim is narrower and it is enough: a check of this shape cannot
 tell you the code RUNS correctly, so it must never be the only guard on
 behaviour.
 
-HOW MUCH OF THE PROBLEM THIS CATCHES: 10 OF 28, AND THAT IS THE HONEST NUMBER.
-Measured against the 28 files whose guards were confirmed fake by mutation, this
-scan flags 10. It misses 18, because they fail SEMANTICALLY rather than
-syntactically, and no AST pattern can see the difference:
+HOW MUCH OF THE PROBLEM THIS CATCHES: 7 OF 28, AND THAT IS THE HONEST NUMBER.
+It was 10 until the false positive below was fixed; three of those ten were
+flagged only because the scan mistook a program's OUTPUT for its SOURCE, which
+is not catching anything. Measured against the 28 files whose guards were
+confirmed fake by mutation, this scan flags 7. (The measurement is taken after
+those files were repaired, so it is rough in both directions -- a repaired file
+may no longer carry the grep that would have flagged it.) It misses the rest,
+because they fail SEMANTICALLY rather than syntactically, and no AST pattern can
+see the difference:
 
     the test re-implements its subject and checks the copy   (test_r2's flagged())
     the fixture is hand-copied from the answer               (sem5's FORMAL tuple)
@@ -85,12 +90,37 @@ EXTRA = ("covenant_moltbook.py", "covenant_moltbook_release.py",
          "trader_freshness.py", "covenant_selfaudit.py")
 
 
+def _reads_python(call):
+    """True if this .read() is reading PROGRAM TEXT rather than program OUTPUT.
+
+    FALSE POSITIVE FOUND ON THIS FILE'S FIRST LIVE RUN, 2026-09-09. The first
+    version counted every `x = <anything>.read()` and then flagged
+    `"NODES DOWN" in wrote`, where `wrote` was guard.log -- the log the program
+    under test had just WRITTEN. That is a behavioural assertion of the best
+    kind: run the thing, read what it actually emitted, check the content. The
+    ratchet would have marked it as debt and pushed the author back toward a
+    grep, which is the exact opposite of what this file is for. A guard that
+    punishes the right answer is worse than no guard.
+
+    So the test is narrow: the path being opened must name a .py file, or
+    __file__. Reading a log, a ledger, a JSON artefact or a captured stdout is
+    evidence and is left alone.
+    """
+    for sub in ast.walk(call):
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+            if sub.value.endswith(".py"):
+                return True
+        if isinstance(sub, ast.Name) and sub.id == "__file__":
+            return True
+    return False
+
+
 def _source_names(tree):
     """Names bound to the TEXT of a source file.
 
     Two shapes, both live in this repo:
         src = inspect.getsource(mod)
-        src = io.open(path, encoding="utf-8").read()
+        src = io.open(os.path.join(HERE, "thing.py"), encoding="utf-8").read()
     """
     out = set()
     for node in ast.walk(tree):
@@ -100,14 +130,14 @@ def _source_names(tree):
         got = False
         if isinstance(v, ast.Call):
             fn = v.func
-            # inspect.getsource(...) / getsource(...)
+            # inspect.getsource(...) / getsource(...) -- always program text
             if isinstance(fn, ast.Attribute) and fn.attr == "getsource":
                 got = True
             elif isinstance(fn, ast.Name) and fn.id == "getsource":
                 got = True
-            # <anything>.read()
+            # <open(...)>.read() -- program text only if it opens a .py
             elif isinstance(fn, ast.Attribute) and fn.attr == "read":
-                got = True
+                got = _reads_python(v)
         if not got:
             continue
         for t in node.targets:

@@ -16,12 +16,14 @@ Run:  python3 test_p15_judge_identity.py     (imports covenant_watchdog from
                                               the same directory)
 """
 import ast
+import builtins
 import http.server
 import json
 import os
 import socket
 import sys
 import threading
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -251,6 +253,106 @@ check("W2c no generate/chat endpoint in the probe's code",
       consts and not any(b in c for c in consts
                          for b in ("/api/generate", "/api/chat", "/v1/chat")),
       str([c for c in consts if "/" in c]))
+
+# ------------------------------------------------ boundary: RUN, not read --
+# 2026-09-09 (mutation audit). W2a above CLAIMS a property of what
+# judge_identity_report DOES, but it MEASURES only the Call names one frame
+# deep in the reporter's own AST body. The reporter reaches _quorum_policy()
+# on the unreachable branch, and through _seat_defers() on the missing-tag
+# branch. The mutation that exposed this put subprocess.run(), an
+# open()-for-write and an os.remove() into _quorum_policy -- one frame down --
+# and this suite stayed 31/31 green while a single run of it spawned real
+# processes and deleted files eleven times. W2a is a grep: delete the
+# boundary and it stays green, because it looks in the wrong frame.
+#
+# Two things it also hides. The reporter DOES call open() today (it reads
+# ops/quorum_policy.json), so W2a's parenthesis "no ... file ... calls" is
+# already false as written; and no other check in this file constrains the
+# reporter's EFFECTS at all -- the other 30 read its returned text.
+#
+# W2a2 runs the reporter with the acting primitives replaced by recorders, so
+# an effect is caught at any depth and however it is spelled, while a
+# read-only open stays silent. That is the boundary this monitor actually
+# has: it may READ in order to describe the gate truthfully, and it may do
+# nothing else.
+print("== boundary: run it, do not read it ==")
+
+_ACTING = (("subprocess", "run"), ("subprocess", "Popen"),
+           ("subprocess", "call"), ("subprocess", "check_call"),
+           ("subprocess", "check_output"),
+           ("os", "system"), ("os", "remove"), ("os", "unlink"),
+           ("os", "replace"), ("os", "rename"), ("os", "rmdir"),
+           ("os", "mkdir"), ("os", "makedirs"), ("os", "kill"),
+           ("urllib.request", "urlopen"), ("urllib.request", "urlretrieve"))
+
+
+def _watch_effects(fn, *a, **kw):
+    """Call fn with every ACTING primitive swapped for a recorder that does
+    nothing at all, and return (result, effects). The swap happens on the
+    module objects covenant_watchdog itself resolves, so call depth and
+    spelling do not matter. open() is passed through -- the reporter
+    genuinely reads ops/quorum_policy.json -- but a write/append/create mode
+    is recorded, so an honest read is silent and a write is not."""
+    mods = {"subprocess": wd.subprocess, "os": wd.os,
+            "urllib.request": wd.urllib.request}
+    real_open, saved, effects = builtins.open, [], []
+
+    def _rec(label):
+        def _f(*aa, **kk):
+            effects.append("%s(%r)" % (label, aa[0] if aa else None))
+            return None
+        return _f
+
+    def _rec_open(file, mode="r", *aa, **kk):
+        if any(c in str(mode) for c in "wax+"):
+            effects.append("open(%r, %r)" % (file, mode))
+        return real_open(file, mode, *aa, **kk)
+
+    for _mn, _name in _ACTING:
+        _mod = mods[_mn]
+        if hasattr(_mod, _name):
+            saved.append((_mod, _name, getattr(_mod, _name)))
+            setattr(_mod, _name, _rec(_mn + "." + _name))
+    builtins.open = _rec_open
+    try:
+        return fn(*a, **kw), effects
+    finally:
+        builtins.open = real_open
+        for _m, _n, _orig in saved:
+            setattr(_m, _n, _orig)
+
+
+def _canary():
+    """Acts on purpose. An instrument that cannot see passes forever, which
+    is the exact defect W2a2 exists to stop, so the instrument gets checked
+    too. Nothing here reaches the disk or the OS: the recorders return
+    without doing anything, and the write-open names a path that cannot
+    exist."""
+    wd.subprocess.run(["cmd", "/c", "rem"])
+    wd.os.remove(os.path.join(HERE, "p15-no-such-file"))
+    try:
+        open(os.path.join(HERE, "no", "such", "dir", "p15.tmp"), "w").close()
+    except OSError:
+        pass
+
+
+_, _bite = _watch_effects(_canary)
+check("W2a3 the effect recorder bites -- spawn, delete and write-open are all "
+      "seen (a check whose instrument is blind is not a check)",
+      len(_bite) == 3, str(_bite))
+
+_absent = os.environ["COVENANT_QUORUM_POLICY_PATH"]
+_acted = []
+for _pp in (_absent, _pol):          # no policy at all, and a real one to READ
+    os.environ["COVENANT_QUORUM_POLICY_PATH"] = _pp
+    for _in in (OK, DOWN, GONE):     # reachable, unreachable, missing-tag
+        _res, _fx = _watch_effects(wd.judge_identity_report, _in, st4,
+                                   expected_model="qwen3:8b", root=R)
+        _acted += _fx
+os.environ["COVENANT_QUORUM_POLICY_PATH"] = _absent
+check("W2a2 judge_identity_report ACTS on nothing when it is actually RUN: "
+      "no spawn, no delete, no write, no fetch, at any call depth",
+      _acted == [], str(_acted))
 
 srv.shutdown()
 

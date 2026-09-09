@@ -44,6 +44,25 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG = os.path.join(HERE, "logs", "refine_check.log")
 LOCK = os.path.join(HERE, "logs", "refine_check.lock")
+# EIGHT BLACK WINDOWS EVERY FIFTEEN MINUTES, and the fix already existed.
+#
+# Asked 2026-09-09: "why do black screens keep popping up?" -- measured: this
+# task, 8 suites per run, every 15 minutes, about 32 consoles an hour.
+#
+# The task itself is silent: Task Scheduler runs it under pythonw.exe, which is
+# the GUI-subsystem interpreter and never allocates a console. But pythonw has
+# no console to lend, and PY below is python.exe, a CONSOLE binary -- so every
+# child got a brand new console window of its own. capture_output=True does not
+# prevent that: redirecting the handles is not the same as suppressing the
+# console, and Windows allocates one before the redirection matters.
+#
+# ops/hidden_task.py solved exactly this on 2026-09-03 ("stop letting it pop up
+# while I'm typing") for CovenantGuard and CovenantTrader. This file was written
+# afterwards and reintroduced the bug one level down -- the wrapper was applied
+# to the TASK and never to the eight processes the task spawns. A fix that is
+# not applied where the work moved to is not a fix that holds.
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0      # CREATE_NO_WINDOW
+
 PY = os.path.join(HERE, ".venv", "Scripts", "python.exe")
 if not os.path.exists(PY):
     PY = sys.executable
@@ -104,7 +123,8 @@ def main():
                 continue
             try:
                 r = subprocess.run([PY, path] + args, cwd=HERE, timeout=300,
-                                   capture_output=True, text=True)
+                                   capture_output=True, text=True,
+                                   creationflags=_NO_WINDOW)
                 rc = r.returncode
             except subprocess.TimeoutExpired:
                 rc = "timeout"

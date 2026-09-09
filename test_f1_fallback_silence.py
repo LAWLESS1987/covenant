@@ -225,6 +225,84 @@ def main():
               e, {"relax_valueless_for_local_nodes": True})
               and len(e.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",")) >= 1))({}))
 
+    # X6 CANNOT FAIL, and was measured green on an allow-list that did not
+    # exist (2026-09-09). apply_policy returns the DISCLOSURE STRING, which is
+    # truthy for any non-empty policy, and `"".split(",")` is `[""]` -- length
+    # 1 -- so the second half holds when the list is EMPTY too. On a checkout
+    # with no *.db.key file the line X6 claims to guard writes "" and the
+    # disclosure reads `trading_exception=off`, and X6 still printed ok.
+    # Nothing in it touches PROVENANCE: that the hashes are the sha256 of the
+    # public key of a key FILE ON THIS MACHINE, which is the whole of the
+    # operator's "the exception should be nodes local pc's" narrowing.
+    #
+    # THE MUTATION THAT PROVED IT: at covenant_judge_defer.py:120, write a
+    # constant instead of the derived list --
+    #     env["COVENANT_RELAX_VALUELESS_FOR"] = str(p.get(
+    #         "relax_hashes", <sha256 of the PEER public key X4 uses>))
+    # -- putting a peer's key in the allow-list, the one thing X6's own label
+    # says cannot happen. F1 still printed 26/26, exit 0, X6 "ok".
+    #
+    # So X6b and X6c do not READ the value at all. They put a real key file in
+    # a scratch folder (or leave the folder empty), point the module's key
+    # folder at it, run apply_policy, and drive the REAL ReasoningSentinel
+    # with the environment that produced. Provenance measured by consequence:
+    # the key that IS on this machine gets the relaxed reading, nothing else
+    # does, and where there is no key file the exception reaches nobody.
+    import shutil as _shutil
+    import tempfile as _tempfile
+    _D = __import__("covenant_judge_defer")
+    _here_was = _D.HERE
+    _env_was = os.environ.get("COVENANT_RELAX_VALUELESS_FOR")
+    _scratch = _tempfile.mkdtemp(prefix="f1_x6_keys_")
+
+    def _policy_env(folder):
+        """What apply_policy writes with the module's key folder at `folder`."""
+        _D.HERE = folder
+        try:
+            e = {}
+            _D.apply_policy(e, {"relax_valueless_for_local_nodes": True})
+            return e.get("COVENANT_RELAX_VALUELESS_FOR") or ""
+        finally:
+            _D.HERE = _here_was
+
+    try:
+        from cryptography.hazmat.primitives import serialization as _ser
+        from cryptography.hazmat.primitives.asymmetric import rsa as _rsa
+        import covenant_client as _cc
+        _kp = os.path.join(_scratch, "scratch_node.db.key")
+        with open(_kp, "wb") as _fh:
+            _fh.write(_rsa.generate_private_key(
+                public_exponent=65537, key_size=1024).private_bytes(
+                    _ser.Encoding.PEM, _ser.PrivateFormat.PKCS8,
+                    _ser.NoEncryption()))
+        LOCAL = _cc.pub_of_key(_kp)      # the identity of that key FILE
+
+        os.environ["COVENANT_RELAX_VALUELESS_FOR"] = _policy_env(_scratch)
+        _mine = _relaxed_for(_Tx(LOCAL, LOCAL, 0.0))
+        _theirs = _relaxed_for(_Tx(THEIRS, THEIRS, 0.0))
+        check("X6b apply_policy's allow-list is DERIVED FROM the *.db.key files "
+              "on this PC: with one key file in the folder, THAT key's valueless "
+              "self-send gets the relaxed reading, and a peer key that is not in "
+              "the folder still does not. A hash somebody merely typed into the "
+              "policy would fail both halves",
+              _mine is True and _theirs is not True, (_mine, _theirs))
+
+        _empty = _policy_env(_scratch + "_no_such_folder")
+        os.environ["COVENANT_RELAX_VALUELESS_FOR"] = _empty
+        _none = _relaxed_for(_Tx(THEIRS, THEIRS, 0.0))
+        check("X6c ...and with NO key file to derive from, the allow-list is "
+              "EMPTY and the exception reaches nobody -- not even a peer. This "
+              "is the state X6 was passing green in, and it is where a constant "
+              "written into the variable is loudest: it would relax a peer here",
+              _empty == "" and _none is None, (_empty[:16], _none))
+    finally:
+        _D.HERE = _here_was
+        _shutil.rmtree(_scratch, ignore_errors=True)
+        if _env_was is None:
+            os.environ.pop("COVENANT_RELAX_VALUELESS_FOR", None)
+        else:
+            os.environ["COVENANT_RELAX_VALUELESS_FOR"] = _env_was
+
     n, ok = len(results), sum(results)
     print(f"\nF1: {ok}/{n} passed")
     return 0 if ok == n else 1

@@ -119,6 +119,106 @@ def resolve(name):
     return None, None
 
 
+# ---- the money claim, asked from the CODE side and from the missing hedge ---
+# WHY THESE EXIST, added 2026-09-09. The D over-claim tripwire below (the
+# `universal` regex) is one literal phrasing, and nothing proved it could ever
+# match. A mutation that rewrote README.md's money paragraph to "All orders it
+# builds reach the venue's own dry-run endpoint and are priced and rejected
+# without booking" -- a false universal safety claim about order placement, in
+# the money paragraph of a public README -- left G2 at 64/64, exit 0, and the
+# very check whose label reads "does not promise a venue-side dry run of
+# 'every order'" printed ok. "All orders" is not "every order".
+#
+# Worse: the sentence this file's own docstring names as the reason it exists
+# -- "both default to the venue's own dry-run endpoint", 2026-09-02 -- contains
+# no "every order" at all, so the tripwire named after the bug could never have
+# seen the bug. Four of G2's 64 checks were green because a phrase happened to
+# be absent from the corpus, not because any document had been compared with
+# the code. The E section carries M1/M2 as controls and says out loud what it
+# means if they fail; the D section had none.
+#
+# So the two predicates below ask it the other way round. D2b reads venues.py
+# at run time and requires the DISCLOSURE to be present; D3b requires the
+# scoping HEDGE to be present. Both fail on an absence, which is the shape the
+# defect actually had, and M3/M4/M5 run them on prose with a known answer so
+# neither can go quietly vacuous the way the regex did.
+
+# The weaker guarantee, however a document phrases it. Every money document
+# today writes it within ~130 characters of the adapter's own name.
+LOCAL_DISCLOSURE = re.compile(
+    r"dry[- ]run (?:is |= )?local|local only|no (?:preview|such) endpoint"
+    r"|no venue[- ]side dry run|venue_validated: false")
+
+# A universal quantifier over ORDERS, the endpoint nouns a person would
+# actually write, and the scoping qualifier the shipped documents all carry.
+UNIVERSAL = re.compile(r"\b(?:every|all|each)\s+orders?\b")
+ENDPOINT = re.compile(
+    r"venues?'?s? own (?:dry[- ]run|preview|validation) endpoint"
+    r"|(?:venue|server|exchange)[- ]side (?:dry run|dry-run|preview|validation)"
+    r"|(?:dry[- ]run|preview|validation) endpoint"
+    r"|/orders/preview|validate=true")
+HEDGE = re.compile(
+    r"where (?:the|a) venue|where it does not|where one exists|where offered"
+    r"|(?:if|when) the venue|venues? that (?:offer|publish|have)"
+    r"|some orders|not all|not every|except")
+
+# Fixtures for M3/M4/M5. Written from the mutation and from the 2026-09-02
+# defect, NOT copied out of the documents being checked -- a control copied
+# from the artifact under test is empty by construction.
+OVERCLAIMS = [
+    "all orders it builds reach the venue's own dry-run endpoint and are "
+    "priced and rejected without booking.",
+    "every order it builds is sent to the venue's own dry-run endpoint and is "
+    "rejected without booking.",
+    "each order is validated against the venue's own preview endpoint before "
+    "anything is placed.",
+    "the trader is armed. all orders are priced and rejected by the venue's "
+    "own dry-run endpoint. it is bounded by a halt file and a $25 cap.",
+]
+SCOPED = [
+    "where a venue publishes one, every order is sent to its own dry-run "
+    "endpoint; where none exists the check is local.",
+    "for the two venues that offer it, every order reaches the preview "
+    "endpoint. where it does not, the dry run is local.",
+    "a venue-side dry run is true of some orders only; a document saying "
+    "every order reaches one is out of date.",
+]
+
+
+def discloses_local(doc, venue):
+    """True if `doc` says, near the adapter's OWN NAME, that its dry run does
+    not reach the venue. A window rather than a sentence, because the
+    documents write it as "Robinhood publishes no preview endpoint, so its dry
+    run is local only". Naming the adapter somewhere else in the file is not
+    disclosure: naming three and describing one guarantee is exactly what the
+    2026-09-02 documents did."""
+    for m in re.finditer(re.escape(venue), doc):
+        if LOCAL_DISCLOSURE.search(doc[max(0, m.start() - 60):m.start() + 260]):
+            return True
+    return False
+
+
+def overclaims(text):
+    """The sentences that promise a venue-side dry run for EVERY order with no
+    scoping qualifier in them or in either neighbour. Returns the offending
+    sentences, so a failure prints the prose rather than a boolean. This flags
+    the ABSENCE of the qualifier; the regex in the D section flags the
+    presence of one exact phrase, which is why it missed the mutant."""
+    sents = re.split(r"(?<=[.!?])\s+", text)
+    bad = []
+    for i, s in enumerate(sents):
+        u = UNIVERSAL.search(s)
+        if not u:
+            continue
+        e = ENDPOINT.search(s)
+        if not e or abs(e.start() - u.start()) > 200:
+            continue
+        if HEDGE.search(" ".join(sents[max(0, i - 1):i + 2])):
+            continue
+        bad.append(s[:200])
+    return bad
+
+
 def main():
     print("G2 -- a document that promises a command must be able to run it\n")
 
@@ -187,6 +287,8 @@ def main():
     check("D0 venues.py holds at least three adapters (M: not vacuous)",
           len(vs) >= 3, names)
     weakest = "local" if "local" in modes.values() else "venue"
+    local_names = [v.name.lower() for v in vs
+                   if getattr(v, "DRY_RUN", None) == "local"]
     check("D1 every adapter declares what its dry run reaches (DRY_RUN in "
           "{venue, local}) -- an adapter that declares nothing gets no "
           "adjective from any document",
@@ -203,6 +305,47 @@ def main():
               f"order' while the weakest adapter's dry run is {weakest}",
               not (m and weakest == "local"),
               (m.group(0)[:100] if m else ""))
+        # D2b -- the same claim from the code side. venues.py is read at run
+        # time; every adapter it holds whose DRY_RUN is "local" must be
+        # disclosed as local, BY NAME, in this document. It fails on an ABSENT
+        # disclosure, so no rewording of the promise evades it, and it is the
+        # arm that would have caught the 2026-09-02 sentence ("both default to
+        # the venue's own dry-run endpoint") that the phrase-tripwire above
+        # cannot see. If venues.py ever holds no local adapter this requires
+        # nothing -- and at that point the universal claim would be true.
+        undisclosed = [v for v in local_names if not discloses_local(doc, v)]
+        check(f"D2b:{rel:<22} discloses by name the weaker dry run of every "
+              f"adapter venues.py declares LOCAL {local_names}",
+              bool(doc) and not undisclosed, f"undisclosed {undisclosed}")
+        # D3b -- the missing hedge. Every money document today scopes the
+        # promise ("Where the venue offers a server-side dry run ...").
+        over = overclaims(doc)
+        check(f"D3b:{rel:<22} makes no UNSCOPED universal claim -- an "
+              f"every/all/each-order promise of a venue-side endpoint with no "
+              f"qualifier in that sentence or its neighbours",
+              bool(doc) and not (over and weakest == "local"), over[:2])
+
+    # ---- M: the two new D predicates are not vacuous -----------------------
+    # The D section had no control at all, which is how the tripwire above sat
+    # green on an absent phrase. These run the predicates on prose whose
+    # answer is known, so "D2b/D3b passed" can never again mean "D2b/D3b
+    # cannot fire".
+    missed = [s[:60] for s in OVERCLAIMS if not overclaims(s)]
+    check("M3 the unscoped-claim detector fires on real over-claims, "
+          "including the exact sentence the mutation put in README.md. If it "
+          "cannot, D3b* passed on nothing", not missed, missed)
+    flagged = [s[:60] for s in SCOPED if overclaims(s)]
+    check("M4 ...and does NOT fire on the scoped form the documents actually "
+          "use, so a future widening that refuses everything is caught here "
+          "rather than by deleting D3b*", not flagged, flagged)
+    check("M5 discloses_local() tells naming an adapter apart from disclosing "
+          "it -- the 2026-09-02 documents named the venues and described one "
+          "guarantee. If it cannot, D2b* passed on nothing",
+          not discloses_local(norm("venues.py holds Kraken, Coinbase and "
+                                   "Robinhood order adapters."), "robinhood")
+          and discloses_local(norm("Robinhood publishes no preview endpoint, "
+                                   "so its dry run is local only."),
+                              "robinhood"))
 
     n, ok = len(results), sum(results)
     print(f"\nG2: {ok}/{n} passed")

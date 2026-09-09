@@ -43,6 +43,7 @@ WHAT C4 PINS.
 Pure: no network, no node, no live database.
 """
 import os
+import sqlite3
 import sys
 import tempfile
 import time
@@ -129,6 +130,43 @@ def main():
         check("G7 the batch writer exists -- one connection, one executemany, "
               "one transaction, removing N-1 fsyncs",
               hasattr(C.Database, "add_succession_guardians"))
+        # G7b EXISTING IS NOT BEING CALLED. G7 above only asks whether the
+        # method is DEFINED, and hasattr is the only reference to the batch
+        # writer anywhere in the repo outside the module that defines it.
+        # Measured 2026-09-09: restoring the C1 defect in full -- register()
+        # writing all 16 guardians through the SINGULAR
+        # add_succession_guardian, one connection and one implicit transaction
+        # and one fsync each -- left this suite at 21/21, exit 0. G3 cannot
+        # catch it either, despite its label saying "in one transaction rather
+        # than N": with the cap in place the worst legal input costs 85 ms
+        # against G3's 1.0 s budget, about 12x of headroom, so no legal input
+        # can ever make that timer fire. The cap holds the ceiling down; the
+        # root-cause half of the C1 fix was the unguarded half.
+        #
+        # So count TRANSACTIONS, not milliseconds -- one connection for the
+        # config row and one for all the guardians. The stored count is
+        # asserted beside it, because a writer that wrote nothing at all would
+        # open fewer connections, not more, and would otherwise pass.
+        _real_connect, _opened = sqlite3.connect, []
+        sqlite3.connect = lambda *a, **k: (_opened.append(1),
+                                           _real_connect(*a, **k))[1]
+        try:
+            ok7, _ = S.register(g(7777), g(8888),
+                                [g(i) for i in
+                                 range(C.MAX_SUCCESSION_GUARDIANS)],
+                                2, 30, 15)
+        finally:
+            sqlite3.connect = _real_connect
+        stored = len(S.db.get_succession_guardians(g(7777)))
+        check("G7b ...and it is CALLED. A registration at the cap opens ONE "
+              "connection for the config row and ONE for all "
+              f"{C.MAX_SUCCESSION_GUARDIANS} guardians. The per-guardian loop "
+              "is 17 connections, 17 transactions, 17 fsyncs -- the shape "
+              "that cost 48.8 s at 5,000, and no wall-clock budget under the "
+              "cap can see it",
+              ok7 and stored == C.MAX_SUCCESSION_GUARDIANS
+              and len(_opened) <= 2,
+              (ok7, stored, len(_opened)))
 
     # ---- L: the rate limiter ----------------------------------------------
     old_cap = C.RATE_LIMIT_MAX_KEYS
