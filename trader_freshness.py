@@ -237,7 +237,11 @@ def selftest():
     # that C1-C3 cannot be satisfied by a verdict() that has simply become
     # uniformly non-zero for logs carrying markers.
     HDR = "==== Tue 09/09/2026  9:00:01.76 ====\n"
-    DONE = "==== CYCLE COMPLETE 09/09/2026 ====\n"
+    # The marker deliberately does NOT use the ==== delimiter: money_posture.py
+    # compiles the identical `^==== (.*?) ====$` and would have counted every
+    # completion as another run header, quietly inflating its run count. A new
+    # marker that collides with an existing format is a bug in two files.
+    DONE = "---- CYCLE COMPLETE 09/09/2026 ----\n"
     TODAY, LATE = (2026, 9, 9), (14, 48)
     check("C1 a header with a CRASH under it and no marker is STARTED BUT DID "
           "NOT FINISH (exit 1) once the log carries markers -- this returned 0",
