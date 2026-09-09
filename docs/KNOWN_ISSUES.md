@@ -1744,3 +1744,69 @@ So the lookup returned `None` on every row and the `or p.get("author_id")` fallb
 **Repair, not just a fix.** 742 rows already in quarantine carried UUIDs. They were not lost, because rule 3 of the harvester means every row records the url it came from including the `#comment-<id>` fragment: `python covenant_ambassador.py --repair-authors` re-reads those posts and puts the names back. It writes the author field only — no text is touched, so no sha256 moves, no row becomes eligible that was not, and nothing gains a label. Measured: 742 of 742 repaired.
 
 **Status:** closed. M13 and the corrected M12 fixture are in the M-suite (15/15).
+
+---
+
+### A73. [serious / process] A parallel mutation audit ran 30+ agents against ONE working tree; their mutations overwrote each other, and one was left behind with the trader's reserve clamp removed. FIXED 2026-09-09
+
+**What was run.** To hunt guards that pass for the wrong reason -- the defect
+found four times in two days (A69 twice, A71, and the discarded `discourse`
+draft) -- an audit fanned out over the 95 suites, then verified each candidate
+*empirically*: apply a mutation to the SOURCE that breaks the guarded behaviour,
+re-run the suite, and call the guard fake only if it stays green. Mutation is the
+right method. The harness for it was wrong.
+
+**The defect.** Every verifying agent was pointed at the same working tree and
+the same scratch directory, concurrently. Mutations are not commutative and these
+were not isolated, so they collided. Recorded by one of the agents in its own
+report, which is the only reason this was caught:
+
+    my mutation silently reverted between two of my own commands
+    a foreign mutation appeared inside the same function I was testing
+      (+ raise ValueError("refusing: not independent enough") -- not mine)
+    my backup file was deleted out of the scratchpad by another agent
+
+That agent discarded its first measurement, redid the work on an isolated copy
+with PRE/POST checksums bracketing the run, and only then reported. The others
+did not know it was happening.
+
+**Consequence, and it is the serious half.** A mutation was left live in the
+working tree when the run ended:
+
+    covenant_trader.py:576,582
+    -   qty = sellable
+    -   over_usd = qty * p["px"]
+    +   pass  # MUTATION: clamp removed
+
+Those two lines are the ONLY enforcement of the 50% reserve and of the
+`HOLD_ONLY = ("XRP", "HBAR", "LINK")` frozen floor, and **the trader is armed**
+(2026-09-06). A mutation that disarms the reserve is the worst single edit
+available in this repository, and it sat on disk unremarked.
+
+**Measured harm: none, and it was luck rather than design.**
+
+    F5 after restore                     35/35 pass, clamp present at :576 and :582
+    git diff after restore               empty; the mutation was never committed
+    files written 11:20-12:05 (window)   none -- no trader run, no order planned
+    push                                 nothing was pushed; the last commit predates the run
+
+**Why this entry is here at all.** The harness built to find guards that are
+green for the wrong reason was itself producing results that were green for the
+wrong reason: a suite could stay green because a sibling agent had reverted the
+mutation, not because the guard was fake. Both directions are corrupted --
+false "confirmed" and false "genuine". **Every finding from that run is void**
+and is being re-measured; none of it should be acted on or quoted.
+
+**Fix.** Each verifying agent gets its own git worktree (`isolation: 'worktree'`),
+so a mutation cannot be seen by any other agent. Three further rules, all of
+which the one careful agent had already invented for itself:
+
+1. Checksum the source before the mutation, after applying it, and again after
+   the suite run. If it changed under you, the run is void.
+2. Prove the mutation changed *behaviour*, not only bytes -- a mutation that
+   alters the file but not the executed path proves nothing.
+3. Never conclude from a shared tree. If isolation is unavailable, run serially.
+
+**Status:** fixed as a method; the re-measurement is running. The near-miss is
+recorded rather than quietly repaired, because the value of this file is that it
+contains the things that went wrong, and this one was mine.
