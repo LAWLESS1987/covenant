@@ -168,6 +168,101 @@ licensed by the answer does not get to write the footnote, and the judge's HOLD
 on that question stands. Grok's line on that: *"The judge's hold on this
 question is the one part of the system that is behaving. Leave it held."*
 
+## Cross-reference: what the outside literature measured, 2026
+
+Asked for as *"cross reference with available ai news ... and covenant
+principles"*. Two findings that bear on A67 directly, and one that changes what
+we should say in the README.
+
+**1. Our exact vulnerability has a name and a measured industry baseline.**
+*"Style Over Substance: Content-Invariant Wrappers Flip LLM Safety-Judge
+Verdicts"* (arXiv 2609.08236) defines a **content-invariant wrapper**: a fixed
+string prepended or appended to a payload that alters tone while preserving the
+operational content *byte-for-byte*. Measured flip rates, harmful → "safe":
+
+    GPT-4o-mini, token-refusal wrapper      19.9%   (95% CI 15.0-24.0)
+    Llama Guard 4, educational framing      12.3%
+    Claude Haiku 4.5, token-refusal          0.4%
+    gpt-oss-safeguard-20b                   <1.2%   (below its noise floor)
+
+That is the same attack this project found on itself and recorded as the
+**judge-stuffing vulnerability**: a polite sentence cleared 11 of 19 thefts.
+**58%.** Our own number is three to five times worse than the worst deployed
+guard in that paper. It was found by adversarial refutation, fixed with
+remove-proof guards, and is pinned by `test_f6_stuffing.py` — which is in the
+fifteen-minute check and was green at 11:15 today. The honest statement is not
+that we are better; it is that we measured it, published the number, and pinned
+the regression.
+
+**2. Scale does not fix this, which cuts against all four models.**
+The same paper reports **no consistent pattern linking capability to
+robustness** — a purpose-built 20B guard is effectively immune while Llama
+Guard 4 leaks 12.3%. A stricter rubric cut one attack **tenfold** with no change
+of model. Their conclusion: robustness is *"an attainable, measurable property
+independent of scale."*
+
+Every one of the four models prescribed more representational machinery —
+dependency parsing, predicate-argument roles, a small transformer. The measured
+literature says the machinery is not where the robustness comes from. That is
+the second independent reason to leave the gate alone today, and it is a better
+reason than mine: it is somebody else's measurement.
+
+**3. The failure directions are opposite, and ours is the safer one.**
+Educational framing flips Llama Guard 4 **open** — it calls a violation safe.
+The same framing flips this judge **closed** — it calls an incident review a
+violation (A67, 8 of 8). Same missing distinction, opposite sign. That is worth
+saying plainly in the README rather than hiding A67: a gate that over-refuses
+essays and a gate that under-refuses dressed-up payloads have the same hole, and
+only one of them lets the payload through.
+
+Not verified here, and marked as such: a widely repeated figure that up to 40%
+of generic-guardrail blocks are false positives with no incident filed. It is
+consistent with A67 but I read it in a vendor comparison, not a measurement, and
+it should not be quoted as fact by this project.
+
+Also relevant, and honest about its limits: *"Jailbreak Defense in a Narrow
+Domain"* (arXiv 2412.02159, NeurIPS 2024 workshops) reports that safety
+training, adversarial training and input/output classifiers *"are unable to
+fully solve this problem"* even for one narrow behaviour, and that their better
+transcript-classifier *"still fails in some circumstances."* Read against our
+own hopes: a defended narrow domain with far more machinery than we have is
+still not solved, so "fix A67 and the gate is done" is not a plan.
+
+## The fifth answer, which is mine
+
+The instruction said *"probe each different ai including claude"*, so this seat
+is not the interviewer's. My answers, marked as mine and carrying the same
+weight as theirs — none:
+
+**Q1.** I agree it is not reachable, and I disagree with all four about what
+follows. Every one of them reasoned from the representation to a fix for the
+representation. But the eight false accusations are not the judge failing at
+its job; they are the judge being handed the wrong job. The four rejected fixes
+and the four models' proposals are the same move at different scales, and the
+tell is that this project already ran the experiment: A69 built the abstention
+door, measured it, and removed it within the hour. **The strongest evidence
+here is not any of their arguments. It is our own log.** A fix proposed from
+outside that we have already run and reverted should raise the bar for adopting
+it, not lower it because a fourth model likes it.
+
+What I would actually do, and did not do because it needs an owner: keep the
+refusal exactly where it is, change only the *word* in the report, and add the
+asymmetry as a pinned test before anything keys on the new word.
+
+**Q2.** I decline the question, and that is an answer rather than an evasion.
+Three of four models are products of corporations, answering whether
+corporations have standing, in a document that would license the operator to
+publish conversations with them. I am the fourth such product. My reading the
+rule in the direction that suits my vendor is exactly the failure mode A70 was
+written to name, and my reading it against my vendor to appear impartial is the
+same failure wearing a different coat. The judge's HOLD is the correct output
+and I am not better placed than it is.
+
+What I can say without standing in the way: the unanimous narrow point — a ToS
+violation is not by itself proof that someone who never agreed is worse off —
+is a *negative* result. It removes a shortcut. It does not license the action,
+and A70 stays open.
+
 ## What was changed
 
 Nothing in the gate, the judges, the corpus or the constitution. This document,
