@@ -1285,3 +1285,164 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
 alerts    WARN  2 live -- first: node(s) running a source that is NOT the one on disk: A runs df84389b75b6, B runs df84389b75b6, C runs df84389
 
+## 2026-09-08T10:57:20Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T10:57:38Z  overall FAIL  (round 1080)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T12:02:59Z  overall WARN  (round 120)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T12:03:18Z  overall FAIL  (round 1140)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T13:08:37Z  overall WARN  (round 180)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T13:09:01Z  overall FAIL  (round 1200)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T14:14:15Z  overall WARN  (round 240)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T14:14:45Z  overall FAIL  (round 1260)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T15:19:55Z  overall WARN  (round 300)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T15:20:35Z  overall FAIL  (round 1320)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T16:25:33Z  overall WARN  (round 360)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T16:26:18Z  overall FAIL  (round 1380)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T17:31:10Z  overall WARN  (round 420)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T17:32:03Z  overall FAIL  (round 1440)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T18:36:48Z  overall WARN  (round 480)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T18:37:44Z  overall FAIL  (round 1500)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T19:42:28Z  overall WARN  (round 540)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T19:43:34Z  overall FAIL  (round 1560)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T20:48:25Z  overall WARN  (round 600)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T20:49:31Z  overall FAIL  (round 1620)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-08T23:43:59Z  overall WARN  (round 660)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-08T23:45:09Z  overall FAIL  (round 1680)
+nodes     PASS  3/3 up, height 12 (spread 0), source e936de9d4c77
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded f2c238f6579c but covenant_watchdog.py on disk is 94e47e9c14c
+
+## 2026-09-09T01:39:04Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 13 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+

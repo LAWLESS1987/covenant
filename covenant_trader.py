@@ -262,12 +262,35 @@ def seal_decision_result(cfg, record):
         # from the governor's current figure. A record-keeping self-send claims
         # neither benefit nor harm, so it carries the node's CURRENT alignment
         # rather than 0.0 -- with 0.0 every block of seals drifted and was
-        # refused (409, measured 2026-09-06; KNOWN_ISSUES A53). Read live; if
-        # /health is unreadable the seal still goes out at 0.0 and says so.
-        try:
-            benefit = float(cc.http("GET", ports[0], "/health", None, timeout=15)[1].get("alignment", 0.0))
-        except Exception:                                        # noqa: BLE001
-            benefit = 0.0
+        # refused (409, measured 2026-09-06; KNOWN_ISSUES A53). Read live.
+        #
+        # FAIL RATHER THAN SEAL SOMETHING UNMINABLE (2026-09-08). This used to
+        # fall back to 0.0 and "say so". Measured today on the operator's
+        # statement: the /health read timed out, the seal went out at 0.0, the
+        # node ADMITTED it -- and then /mine refused it 409 "Alignment drifts
+        # > 5%" on every pass for ever, because a lone transaction at 0.0
+        # against a governor at 0.5 always drifts. So the record was accepted
+        # and could never become durable: it sits pending until a restart drops
+        # it, which is A53 all over again by a different road.
+        #
+        # An admitted-but-unminable record is WORSE than a refused one. A
+        # refusal is visible and retryable; this looked like success. So a
+        # health read that fails now refuses the seal, and the retry is one
+        # longer read rather than a guess at the number.
+        benefit = None
+        for _timeout in (15, 45):
+            try:
+                benefit = float(cc.http("GET", ports[0], "/health", None,
+                                        timeout=_timeout)[1].get("alignment"))
+                break
+            except Exception:                                    # noqa: BLE001
+                continue
+        if benefit is None:
+            return _seal_refused(
+                "refusing to seal: /health did not answer, so the block's "
+                "alignment is unknown. Sealing at 0.0 would be admitted and "
+                "then refused by /mine for ever (409 alignment drift), which "
+                "looks like success and is not durable")
         tx = cov.Transaction(sender_pubkey=pem, receiver=pem, data=data,
                              amount=0.0, benefit_score=benefit, reg_nonce=reg)
         tx.sign(sk)

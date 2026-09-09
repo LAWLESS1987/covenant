@@ -243,3 +243,9 @@ ONE_SWEEP.txt
 # the node -- which is not this operator's content to publish. The public
 # half of the record is the XRPL commitment, not this.
 judged_by_student.jsonl
+
+# Delivery folder holding duplicate copies of suites that already live at the
+# repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are
+# the registered ones -- covenant_one.py:297-298). Committing the copies would
+# manufacture the "superseded copies" ambiguity covenant_selfaudit already tracks.
+Claude outputs/
