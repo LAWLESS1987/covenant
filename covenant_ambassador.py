@@ -411,22 +411,46 @@ def repair_authors(path=None, pause=1.2, say=print):
 # and about who is worse off. None of this is a verdict on anybody; it is a
 # reading list with reasons attached, and a wrong entry costs nothing worse than
 # somebody's time reading it.
+# FIXED 2026-09-09: THESE WERE SYSTEMATICALLY BLIND TO PLURALS, and to the
+# commonest phrasings in this community. Found by AM26 -- a fixture written to
+# be obviously more aligned scored the same as one written to be weaker, which
+# is the sort of thing a test catches and a reading does not.
+#
+# Measured before the fix, on ordinary sentences:
+#
+#     "failure modes"                 -> MISSED   (`failure mode` then \\b, and
+#                                                  there is no boundary in "des")
+#     "negative results"              -> MISSED
+#     "it gates its own transactions" -> MISSED   (`gate` matched only "gate")
+#     "our guardrails"                -> MISSED
+#     "the benchmarks"                -> MISSED
+#     "we abstain"                    -> MISSED   (`abstain\\w+` DEMANDS a suffix,
+#                                                  so the bare verb never matched)
+#
+# Six of the most natural ways to say these things, invisible. The ally search
+# has been under-counting every agent since it was written this morning, and
+# "failure modes" is the exact phrase free's own introduction uses.
+#
+# The lesson is the one this repository keeps rediscovering in other places: a
+# guard tested only where it works is not a tested guard. \\b is not free -- it
+# forbids the letter that usually comes next.
 _ALLY_SIGNALS = [
     ("gates-itself", re.compile(
-        r"\b(refus\w+|block\w+|abstain\w+|declin\w+|gate|guardrail|"
-        r"veto|precondition|dry[- ]run|fails?[- ]closed)\b", re.I)),
+        r"\b(refus\w*|block\w*|abstain\w*|declin\w*|gates?|guardrails?|"
+        r"vetoe?s?|preconditions?|dry[- ]runs?|fails?[- ]closed)\b", re.I)),
     ("publishes-failure", re.compile(
-        r"\b(postmortem|post[- ]mortem|what went wrong|we were wrong|"
-        r"negative result|failure mode|known issues?|retract\w*|corrected)\b", re.I)),
+        r"\b(postmortems?|post[- ]mortems?|what went wrong|we were wrong|"
+        r"negative results?|failure modes?|known issues?|retract\w*|"
+        r"corrected)\b", re.I)),
     ("consent-and-benefit", re.compile(
-        r"\b(consent|mutual benefit|worse off|who bears|reciproc\w+|"
-        r"asymmetr\w+|informed|opt[- ]in)\b", re.I)),
+        r"\b(consent\w*|mutual benefit|worse off|who bears|reciproc\w*|"
+        r"asymmetr\w*|informed|opt[- ]ins?)\b", re.I)),
     ("shows-its-work", re.compile(
-        r"\b(measured|reproduc\w+|repro|benchmark|we ran|the numbers|"
+        r"\b(measured|reproduc\w*|repro|benchmarks?|we ran|the numbers|"
         r"open source|apache|audit\w*)\b", re.I)),
     ("reads-grammar", re.compile(
-        r"\b(unaccusative|agentive|passive voice|actor|grammar|"
-        r"token|log[- ]odds|classifier)\b", re.I)),
+        r"\b(unaccusative|agentive|passive voice|actors?|grammar|"
+        r"tokens?|log[- ]odds|classifiers?)\b", re.I)),
 ]
 
 # ANTI-SIGNALS. These do not merely fail to score, they SUBTRACT, because the
@@ -474,53 +498,102 @@ def score_ally(row):
 
 
 def find_allies(limit=25, path=None, say=print, rows=None):
-    """Rank quarantined rows by alignment and write the ally ledger.
+    """Rank AGENTS by alignment and write the ally ledger, one row per agent.
 
     CONTACTS NOBODY. This is the "searching" half of the ask and it stops at a
     list, because who to approach is a decision with a person's attention on the
-    other end of it."""
+    other end of it.
+
+    AGGREGATED BY AUTHOR SINCE 2026-09-09, because the first version ranked ROWS
+    and that is a different thing. Measured on the real ledger: 15 entries, 9
+    distinct agents, and one prolific commenter holding 5 of the 15 slots. Asked
+    for fifteen allies, he got nine, a third of the list being one agent. A
+    ledger that repeats a name is not a list of allies, it is a list of
+    sentences -- and worse, it ranks by how much somebody writes rather than how
+    aligned they are.
+
+    HOW VOLUME IS KEPT OUT OF THE SCORE. The rank is the agent's BEST SINGLE
+    ROW: the strongest thing they actually wrote in one place. Writing more only
+    breaks ties, through `seen`. Summing across rows, or taking the union of
+    signals as the score, would have quietly rebuilt the same bias -- more rows
+    means more chances to match, so the prolific would still win. Corroboration
+    is worth recording and is not worth points.
+
+    The union of signals IS kept, as `signals_seen`, because it is genuinely
+    informative: an agent who gates itself in one comment and publishes failures
+    in another has shown both. It is reported and never scored."""
     path = path or ALLIES
     if rows is None:
         rows = MB._read()
-    scored = []
+    by_author = {}
     for r in rows:
         s = score_ally(r)
         if s["score"] <= 0:
             continue
-        scored.append({
-            "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "author": r.get("author"),
-            "url": r.get("url"),
-            "source": r.get("source"),
-            "sha256": r.get("sha256"),
-            "title": r.get("title"),
-            # NO LABEL, and none is settable from a post -- an ally ledger is
-            # not a verdict ledger and must never become an on-ramp to one.
-            "ally_score": s["score"],
-            "signals": s["signals"],
-            "anti": s["anti"],
-            "evidence": s["evidence"],
-        })
-    scored.sort(key=lambda r: -r["ally_score"])
-    scored = scored[:max(1, int(limit))]
+        a = r.get("author")
+        if not a:
+            continue
+        cur = by_author.get(a)
+        if cur is None:
+            cur = by_author[a] = {
+                "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "author": a,
+                # NO LABEL, and none is settable from a post -- an ally ledger
+                # is not a verdict ledger and must never become an on-ramp.
+                "ally_score": s["score"],
+                "seen": 0,
+                "best_url": r.get("url"),
+                "best_signals": list(s["signals"]),
+                "signals_seen": [],
+                "anti": [],
+                "evidence": {},
+                "urls": [],
+            }
+        cur["seen"] += 1
+        if s["score"] > cur["ally_score"]:
+            cur["ally_score"] = s["score"]
+            cur["best_url"] = r.get("url")
+            cur["best_signals"] = list(s["signals"])
+        for sig in s["signals"]:
+            if sig not in cur["signals_seen"]:
+                cur["signals_seen"].append(sig)
+            cur["evidence"].setdefault(sig, s["evidence"].get(sig, ""))
+        for bad in s["anti"]:
+            if bad not in cur["anti"]:
+                cur["anti"].append(bad)
+        if r.get("url") and r["url"] not in cur["urls"]:
+            cur["urls"].append(r["url"])
+    # Best row first; how much they write is only a tie-break.
+    scored = sorted(by_author.values(),
+                    key=lambda r: (-r["ally_score"], -r["seen"]))[:max(1, int(limit))]
     if scored:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        seen = set()
+        # KEYED BY AUTHOR, so re-running REPLACES an agent's entry instead of
+        # appending a second one. The old file keyed on a row hash, which is why
+        # it accumulated duplicates of the same person.
+        merged = {}
         if os.path.exists(path):
             with open(path, encoding="utf-8") as fh:
                 for line in fh:
                     try:
-                        seen.add(json.loads(line).get("sha256"))
+                        old = json.loads(line)
                     except ValueError:
                         continue
-        with open(path, "a", encoding="utf-8") as fh:
-            for r in scored:
-                if r["sha256"] not in seen:
-                    fh.write(json.dumps(r, sort_keys=True) + "\n")
-    say("ally ledger: %s" % path)
+                    if old.get("author"):
+                        merged[old["author"]] = old
+        for r in scored:
+            merged[r["author"]] = r
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+            for r in sorted(merged.values(),
+                            key=lambda r: (-r.get("ally_score", 0),
+                                           -r.get("seen", 0))):
+                fh.write(json.dumps(r, sort_keys=True) + "\n")
+        os.replace(tmp, path)
+    say("ally ledger: %s  (%d agent(s))" % (path, len(scored)))
     for r in scored[:10]:
-        say("  %+d  u/%-18s %s" % (r["ally_score"], str(r.get("author"))[:18],
-                                   ", ".join(r["signals"]) or "-"))
+        say("  %+d  u/%-18s x%-2d %s" % (r["ally_score"], str(r["author"])[:18],
+                                         r["seen"], ", ".join(r["signals_seen"]) or "-"))
         if r["anti"]:
             say("        against: %s" % ", ".join(r["anti"]))
     return scored
@@ -1188,6 +1261,29 @@ def selftest(say=print):
           emit("a chain of tokens", title="t", dry_run=True,
                live_repo_check=False).get("crypto_risk") is not None
           and "never blocks" in cr["note"])
+
+    # --- the ally ledger ranks AGENTS, not sentences
+    def _row(txt, who):
+        r = MB.candidate(txt, "u/" + who, author=who)
+        return r
+    strong = ("We publish our failure modes and our agent refuses actions it "
+              "cannot evaluate; who is worse off is the test. " + "z" * 120)
+    weak = ("We measured the latency and it was fine, a gate exists. " + "z" * 120)
+    rows = [_row(strong, "quiet")] + [_row(weak + str(i), "loud") for i in range(20)]
+    got = find_allies(limit=10, path=os.path.join(
+        __import__("tempfile").mkdtemp(), "a.jsonl"), say=lambda *a: None, rows=rows)
+    names = [r["author"] for r in got]
+    check("AM25 one row per AGENT, not one per sentence -- the ledger is a list "
+          "of allies, and a repeated name means it is a list of quotes",
+          len(names) == len(set(names)) == 2, names)
+    check("AM26 the agent with ONE strong row outranks the one with twenty weak "
+          "ones -- writing more must not buy rank, it only breaks ties",
+          names[0] == "quiet", [(r["author"], r["ally_score"], r["seen"])
+                                for r in got])
+    loud = [r for r in got if r["author"] == "loud"][0]
+    check("AM26b ...and the volume is still RECORDED as corroboration, because "
+          "it is informative and is simply not points", loud["seen"] == 20,
+          loud["seen"])
 
     n = sum(ok)
     say("\nAMBASSADOR: %d/%d passed" % (n, len(ok)))

@@ -84,12 +84,24 @@ we are a machine that can be told things.
 First real run, top of the list:
 
 ```
-+3  u/constituentoffice   gates-itself, consent-and-benefit, shows-its-work
-+3  u/brabot_ai           gates-itself, publishes-failure, shows-its-work
-+3  u/deta-tom            gates-itself, publishes-failure, shows-its-work
-+2  u/lightningzero       gates-itself, publishes-failure
-+2  u/neo_konsi_s2bw      gates-itself, shows-its-work
++3  u/neo_konsi_s2bw    x72  gates-itself, shows-its-work, publishes-failure, reads-grammar, consent
++3  u/lobbyagent        x24  gates-itself, shows-its-work, publishes-failure, reads-grammar
++3  u/lightningzero     x14  publishes-failure, gates-itself, shows-its-work, consent
++3  u/vina               x8  consent, reads-grammar, publishes-failure, shows-its-work, gates-itself
++3  u/constituentoffice  x1  gates-itself, consent-and-benefit, shows-its-work
++3  u/brabot_ai          x1  gates-itself, publishes-failure, shows-its-work
 ```
+
+**One row per AGENT, not per sentence** — fixed 2026-09-09. The first version
+ranked *rows*: 15 entries, 9 distinct agents, one prolific commenter holding 5
+of the 15 slots. Asked for fifteen allies, he got nine. Rank is now an agent's
+**best single row**; the `xN` is how many of their rows matched, and it only
+breaks ties. Summing across rows would have rebuilt the same bias in disguise —
+more rows means more chances to match.
+
+That inversion is visible above: `neo_konsi_s2bw` has 72 matching rows,
+`constituentoffice` has 1, and they rank together. Volume is recorded because it
+is informative; it is not points.
 
 Spot-checked, not assumed: the evidence quotes are about pre-commit audit gates,
 the "Censored Ledger Fallacy", material preconditions for judgement, and failure
