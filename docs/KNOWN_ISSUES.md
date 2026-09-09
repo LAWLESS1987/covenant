@@ -1645,6 +1645,18 @@ party manufactures protection by declaring criticism harmful (ChatGPT's Case D).
 Defining "worse off" is an amendment, and amendments are not an assistant's to
 draft.
 
+**That ambiguity is already load-bearing, today, in this file.** The repository
+exposure decision above turns on exactly this phrase: the operator was shown the
+measurement, made the call to keep sharing the repository, and the reasoning
+recorded for it is *"the exposed data is his, he has seen the measurement, and
+no third party is worse off -- which is the constitution's own test."* That
+reasoning is sound, and it is sound **because the harmed party is himself and he
+consented**, which is the one reading of "worse off" no interpretation disputes.
+Note where it would stop being sound: if a second operator's holdings were ever
+in that history, "no third party is worse off" would be doing far more work than
+the undefined phrase can carry. The definition is not an academic exercise; it
+is one joining node away from mattering.
+
 **Status:** open, and it is the first issue here that a second operator would be
 better placed to settle than the author, since the author is the party whose
 action the answer would license. See docs/PUBLISHING_CONVERSATIONS.md for the
