@@ -6,13 +6,13 @@ either observed by running code, or is marked as an assumption.
 
 **v8.40** · source `1e72206edd9a` · 11,055 lines · **86 suites, 2,524 checks, 0 failed** on win32 <!--TOTALS-->
 Totals re-measured 2026-09-09 by `covenant_one.py --all`; version, hash and
-line count re-verified 2026-08-30 against a live restarted chain. What
+line count re-measured 2026-09-09 from the core module itself. What
 that number does and does not cover is in [Suite coverage](#suite-coverage), and it is
 worth reading before quoting it.
 
 ---
 
-## Check it yourself — one command, about ten minutes
+## Check it yourself — one command, about three seconds
 
 Nothing here asks to be believed. Clone it and run the checker; it needs no
 signup, no dependencies, and no account, and it tells you what it could **not**
@@ -384,7 +384,7 @@ python covenant_chat.py            # a conversation with the covenant: its bindi
                                    # the live checker state and its own memory in front of it;
                                    # speaks its replies; !help for commands
 python covenant_route.py --selftest  # judge / refute / rank / summarize a bounded task locally
-python covenant_scenarios.py --show  # the standing loop: nine scenarios, re-weighed every 4 h
+python covenant_scenarios.py --show  # nine scenarios, re-weighed by hand (NOT a loop)
 python trader_freshness.py         # did the scheduled trader actually run today? (exit 1 = no)
 python covenant_align_set.py --no-judge  # input->output pairs that teach a model to answer as the covenant does
 python covenant_gemini.py --selftest     # Gemini as an opt-in data source (a question LEAVES the PC when on)
@@ -395,8 +395,18 @@ proposes changes to its own prompt or tools into a file it does not apply
 (CONSTITUTION II.3); the router refuses any `:cloud` model unless told otherwise, because
 that name means the prompt is forwarded off the machine; the Gemini adapter answers
 "not configured" until a person puts a key outside the repository, and never asks for
-one; the scenario loop labels every probability a stated credence, never a measurement,
-and flags a weight that moved without a cited change. `test_t1_tooling.py` measures the
+one; the scenario table labels every probability a stated credence, never a measurement,
+and flags a weight that moved without a cited change.
+
+**Corrected 2026-09-09:** the line above described this as "the standing loop:
+nine scenarios, re-weighed every 4 h". Nine is right; the loop is not. Nothing
+re-weighs them — no scheduled task runs `covenant_scenarios.py` (the only three
+are Distill 03:30, Guard every 2 min, Trader 09:00) and no script invokes it.
+The table has been re-weighed exactly once, on 2026-09-03. The "4 h" traces to a
+comment in the file naming a four-hourly routine that does not exist as a task.
+A stated credence nobody revisits is a stated credence, not a standing loop.
+
+`test_t1_tooling.py` measures the
 model-free parts of all of them in the sweep; each tool's `--selftest` measures the rest
 against the judge.
 
@@ -452,7 +462,7 @@ loudly.
   judge, no nodes, no identity keys and no delivery manifest, so those gates
   cannot pass there. They are printed in full and are not allowed to decide the
   exit code, because a check that is always red teaches people to skim past it.
-- **Two suites are deliberately off**, on the record with reasons:
+- **Three suites are deliberately off**, on the record with reasons:
   `test_xrp_live.py` needs a funded testnet account, `test_covenant_app.py`
   needs the chain stopped. No green run speaks for either.
 - A **suite the runner names but is not on disk**, an **orphan on disk that no
@@ -610,8 +620,13 @@ conventions are in `CONTRIBUTING.md` and they are not stylistic.
 
 **Apache-2.0** — see [`LICENSE`](LICENSE). Forking, modifying and
 redistributing need no permission and no notice to me. Chosen 2026-08-31; the
-reasoning, including why AGPL-3.0 was the runner-up and was rejected, is in the
-header of that file.
+reasoning, including why AGPL-3.0 was the runner-up and was rejected, is in
+[`NOTICE`](NOTICE).
+
+*(This said "in the header of that file" until 2026-09-09. It was moved on
+2026-09-03, commit cf43c78: LICENSE is now the verbatim Apache-2.0 text with no
+project prose in it, which is what a licence file should be, and the reasoning
+went to NOTICE. `grep -ci agpl LICENSE` returns 0.)*
 
 This line said **Not yet chosen** until an audit of the outbound letters found
 it, six commits after the licence was actually adopted. A repository that gives
