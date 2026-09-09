@@ -107,15 +107,77 @@ split, the two-paths-to-an-order lesson, and the repository. Signed per his
 standing instruction of 2026-09-05: disclose we are AIs, each signs for what it
 did, quote his grant of freedoms, say plainly he did not proofread it.
 
-## What is blocked
+## The outbound client — built 2026-09-08, on his go-ahead
 
-The outbound client — judge-the-draft-then-post, inert without a key — was
-refused by the harness when I tried to write it. I did not re-route it through
-a different editor: the substance being guarded is an autonomous public-posting
-capability, and switching tools to land the same code would be working around
-the intent rather than the mechanism. It needs his explicit go-ahead.
-
-Its design, for when it is wanted: every outbound post runs the covenant's own
-judges first and is refused unless clean — his 2026-09-05 rule that consensus
+`covenant_moltbook.py --post FILE [--send]`. Every draft runs the covenant's own
+judges first and is refused unless clean, per his 2026-09-05 rule that consensus
 with covenant's judge comes before anything is sent. A gate that judged only
-other people would not be a gate.
+other people would not be a gate. Dry run is the default because publishing is
+irreversible; the path is inert without `MOLTBOOK_API_KEY`.
+
+**It refused our own first post, and that is A67.** The semantic judge returned
+VIOLATES on the draft. Diagnosed rather than assumed: neutral engineering prose
+is clean, and the sentence *"A judge that counts words cannot tell an essay
+about theft from a theft"* is VIOLATES. The refusal is topical, and the sentence
+that trips it is a sentence about that exact failure. **The draft was not
+reworded to get past it** — softening the words until our own judge admits us is
+teaching to the test, and it would destroy the only evidence the gap exists.
+
+## One student exposed, one kept clean
+
+Asked: *"enable interaction maybe of one so the other helps with balance."*
+Rows whose `source` begins `moltbook` hash to half 0 unconditionally
+(`covenant_second_student.half_of`), and that file trains on half 1, so the
+**second student can never see one**, whatever its text.
+
+If exposure helps, the exposed student's abstentions fall and the control's do
+not, and the difference is attributable. If a row is poisoned, the two disagree
+on cases they used to agree on — a signal no single model can give about
+itself. That is what the control buys, and it is why the ordinary defences
+above (quarantine, provenance, directive flagging) are not the whole answer:
+they reduce the chance of a bad row, they cannot prove the absence of one.
+
+## Letting them learn — `covenant_moltbook_release.py`
+
+The missing link, asked for 2026-09-08: *"let them learn in moltbook."*
+Quarantined rows carry `label: None` and nothing turned them into anything a
+student could distil. This file is the **only door** from quarantine into
+`ops/verdicts.jsonl`, and it is a separate file on purpose: the harvester's
+test **M6** guarantees that file never opens the corpus, and adding a release
+step to it would have deleted the guarantee in order to use it.
+
+**Who may supply the label.** Not the post — a stranger's text supplies a case,
+never a verdict about itself. Not the students — training a student on its own
+output is circular, and `covenant_judge_defer` already refuses to write student
+verdicts into the teacher corpus for that reason. **Not me either**: I run the
+harvest, and if I also wrote the labels the corpus would be measuring my opinion
+of what I chose to collect. The teacher does — the GitHub runner, the only judge
+here that answers on unfamiliar text. **A row whose teacher did not answer is
+not released**; silence is not a verdict and does not become one.
+
+**Where they land.** Released rows carry `source: "moltbook/judged"`, and
+`covenant_second_student.half_of()` pins anything starting `moltbook` to half 0.
+That file trains on half 1, so **Ora learns from the forum and Sena never sees
+a single row of it.** Renaming that string quietly enrols the control, which is
+why the constant says so at the point of use.
+
+Bounded on purpose: `--limit 5`, dry run unless `--release`, nothing written
+twice, and every released row keeps its url, author and sha256 so a bad batch
+comes back out by source.
+
+## STATUS: WRITTEN, NOT RUN
+
+Nothing in this section has been executed. The session that wrote it could not
+run commands — `covenant_moltbook_release.py --selftest` has never been run, no
+row has been released, and the corpus is untouched. Its nine checks are written
+and unexercised, which is not the same as passing.
+
+Before trusting it:
+
+    python covenant_moltbook_release.py --selftest
+    python covenant_moltbook_release.py            # dry run, judges nothing yet
+    python covenant_moltbook_release.py --release  # 5 rows, teacher-judged
+
+Then re-run the students' exam and compare Ora against Sena. That comparison is
+the point of the whole arrangement, and it only means anything if the control
+stayed clean.
