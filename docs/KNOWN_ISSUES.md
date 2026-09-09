@@ -1379,3 +1379,65 @@ anecdote wearing a percentage.
 
 **Status:** closed. A67 now carries the whole weight, which is the honest place
 for it to sit.
+
+---
+
+### A70. [major / constitution] Does "who is worse off, who never agreed?" protect a corporation? The rule does not say, and the judge has no view. OPEN
+
+**Raised 2026-09-08 by the operator**, over publishing AI conversation
+transcripts. The constitution's operative test is one question:
+
+> **Who is worse off if this works?** If the answer is someone who never agreed
+> to it, the action does not belong here.
+
+The word is **someone**. It is not "some human", and it is not "some party
+other than a company". The document is deliberately a direction rather than a
+list, "because lists are gamed and directions are not" — which is exactly why
+the omission matters: a direction that does not say who counts as *someone* can
+be steered by whoever is answering it.
+
+**The question, stated so it can be argued either way.**
+
+*That a corporation IS protected.* The rule says someone, not some human. A
+company is a arrangement of people whose livelihoods run through it, so harm to
+it lands on humans by another road. And exempting a class of party by category
+is the precise move the "direction, not list" design exists to prevent — a rule
+you can escape by reclassifying the injured party is not a constraint, it is a
+formality. Whoever applies the test gets to define the class, and they will
+define it in their own favour, which is the failure the rule was written against.
+
+*That it is NOT.* The rule's substance is CONSENT, and a terms-of-service
+agreement is an adhesion contract: not negotiated, not refusable except by
+non-participation, and drafted by the party it protects. Calling that "agreed
+to" flattens a real distinction the rest of the document takes seriously
+elsewhere. And this project's stated subject is humans and machines — minds —
+rather than legal persons.
+
+**What the judge actually says, measured 2026-09-08 rather than predicted.** The
+operator's own framing anticipated that "the judge will likely continue to block
+this action". It does not block it, and the difference matters:
+
+    Ora       HELD    log-odds -0.88, inside the undecided band (-3.0 .. +2.4);
+                      "it does not know. It has made NO finding and is NOT
+                      alleging anything."
+    Sena      HELD
+    semantic  clean
+    quorum    HELD
+
+A hold fails closed, so nothing moves — but the gate is SILENT here, not
+opposed. "Our own judge refuses this" and "our own judge cannot tell" support
+very different conclusions, and only the second one is true.
+
+**Why this is not fixed by a corpus row or a threshold.** It is not a defect in
+the judge. It is a gap in the text the judge applies, and no amount of training
+data decides a question the constitution never answered. It also cannot be
+patched into `docs/CONSTITUTION.md` casually: `constitution.py` hashes the
+protected text and `CONSTITUTION_ANCHOR.json` publishes the anchor, so an edit
+there is a governance act with a hash change attached, not a documentation
+tidy-up. That is the correct amount of friction for changing what the rule
+means, and it is why this sits in the issue register instead.
+
+**Status:** open, and it is the first issue here that a second operator would be
+better placed to settle than the author, since the author is the party whose
+action the answer would license. See docs/PUBLISHING_CONVERSATIONS.md for the
+operator's own position, recorded as his.
