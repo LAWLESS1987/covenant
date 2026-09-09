@@ -681,7 +681,37 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Rewrite the kit and README lines to say the student judges first and Ollama is optional, and use COVENANT_JUDGE_PROVIDERS_OVERRIDE in covenant_phone.sh if an Ollama-only phone gate is really intended.
 
-**Status:** open
+**FIXED 2026-09-08/09**, in four places, each verified after the edit:
+
+- `README.md` quick start named `covenant_unified_v8.py`, which registers no
+  judge at all and falls back to `["claude"]` — a node that rejects everything.
+  Measured before and after: old command -> `quorum(claude:0, mock_selfreport:0)`;
+  new -> `quorum(local:0, semantic:1, mock_selfreport:0)`.
+- `README.md`'s "a node with no reachable judge rejects everything" corrected,
+  and a second stale sentence found on 09-09 describing the local judge as
+  "Ollama, the model the nodes' ethics gate calls".
+- `mobile/covenant_phone.sh` no longer pulls a multi-gigabyte model by default
+  (`COVENANT_PHONE_SKIP_OLLAMA=0` restores the old path), and its
+  `COVENANT_JUDGE_PROVIDERS=local` line is annotated as decorative rather than
+  left to be believed.
+- `mobile/TERMUX_SETUP.md` dropped `ollama` from the `pkg install` line, dropped
+  the "fifteen minutes, the model is the big download" timing that came with it,
+  and now prints the one-line proof that the exports are overridden.
+
+The proof, unchanged and still the point:
+
+    COVENANT_JUDGE_PROVIDERS=local python -c \
+      "import run_with_ollama_judge, os; print(os.environ['COVENANT_JUDGE_PROVIDERS'])"
+    -> deferring,semantic
+
+`OLLAMA_JUDGE.md` is kept and marked SUPERSEDED rather than deleted: it records
+how the tuned seat was built and measured, and removing the method because the
+component was retired would delete evidence instead of correcting a claim.
+
+**Status:** closed. The remaining Ollama references in tracked files are
+historical records (`LIVE_RUN_2026-08-22.md`, `FIT_CHECK.txt` and similar), and
+those are correct as written — a dated record of what was true then is not a
+stale claim about now.
 
 ### A39. [minor / judge] Boot output on a keyless node reads as errors to a newcomer: a REPLACED-provider WARNING and a banner naming qwen3:8b at 127.0.0.1:11434, neither of which exists on that machine
 

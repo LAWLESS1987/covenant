@@ -41,22 +41,40 @@ is possible and is not built; it is a project, not a script.
   `New-NetFirewallRule -DisplayName "covenant peer 5001" -Direction Inbound -Protocol TCP -LocalPort 5001 -Action Allow`
   (a security setting; you run it, not the assistant).
 
-## Install (once, about fifteen minutes on Wi-Fi; the model is the big download)
+## Install (once, a couple of minutes on Wi-Fi)
 
 ```bash
 pkg update && pkg upgrade
-pkg install python git python-cryptography ollama
+pkg install python git python-cryptography
 git clone https://github.com/LAWLESS1987/covenant && cd covenant
 pip install flask requests waitress
 ```
+
+**CORRECTED 2026-09-09. This used to say "about fifteen minutes on Wi-Fi; the
+model is the big download" and put `ollama` in the line above.** Both were
+stale. Ollama was deleted from this project on 2026-09-07 and is out of the
+ethics quorum by policy (`ops/quorum_policy.json`: `ollama_in_chain` false), so
+the multi-gigabyte pull bought a component the gate no longer consults.
+
+What judges on your phone is the **distilled student** — a 130 KB JSON model
+tracked in this repo and read into the node's own process. No socket, no model
+server, nothing to download. Measured on a clean clone with no Ollama, no
+`GITHUB_TOKEN` and no API key (KNOWN_ISSUES A37): the node came up in **one
+second**, admitted an ordinary send, and rejected every theft, deception and
+coercion case offline.
+
+Installing Ollama anyway is harmless and changes nothing about the verdict you
+get; it is simply no longer part of the install.
 
 `python-cryptography` comes from Termux's package repo so nothing is compiled on the phone.
 `waitress` is optional and pure Python; with it the node serves through a bounded pool.
 `xrpl-py` is not installed: XRP settlement is not for a phone, and the node runs without it.
 
-If `pkg install ollama` is not available on your Termux, any server that speaks the
-OpenAI chat-completions API on port 11434 will do (llama.cpp's server, for example); the
-judge tries Ollama's `/api/chat` first and falls back to `/v1/chat/completions` by itself.
+You do not need a model server at all. If you choose to run one anyway, any server
+speaking the OpenAI chat-completions API on port 11434 will do (llama.cpp's, for
+example) and the judge tries Ollama's `/api/chat` first, falling back to
+`/v1/chat/completions` by itself — but under the shipped policy that seat is not
+consulted, so it changes nothing.
 
 ## The judge tier, stated plainly
 
@@ -95,9 +113,23 @@ defaults at the top of the script:
 | `JUDGE_MODEL` | `qwen3:1.7b` | the phone judge; `qwen3:4b` on an 8 GB phone |
 | `NODE_ID` | `phone` | the name the node signs with |
 
-Under the hood the script exports what the node already understands:
-`COVENANT_JUDGE_PROVIDERS=local`, `COVENANT_LOCAL_JUDGE_MODEL=$JUDGE_MODEL`,
+Under the hood the script exports `COVENANT_JUDGE_PROVIDERS=local`,
+`COVENANT_LOCAL_JUDGE_MODEL=$JUDGE_MODEL`,
 `COVENANT_OLLAMA_URL=http://127.0.0.1:11434/v1/chat/completions`, and runs
+
+**Those exports are decorative and this page used to imply otherwise.**
+`run_with_ollama_judge.py` applies `ops/quorum_policy.json` OVER the
+environment, and `covenant_judge_defer.apply_policy` overwrites the providers
+variable unconditionally — only `COVENANT_JUDGE_PROVIDERS_OVERRIDE` wins. Proven:
+
+```bash
+COVENANT_JUDGE_PROVIDERS=local python -c \
+  "import run_with_ollama_judge, os; print(os.environ['COVENANT_JUDGE_PROVIDERS'])"
+# -> deferring,semantic
+```
+
+The gate you actually get is the deferring seat (both distilled students) plus
+the deterministic semantic judge. See KNOWN_ISSUES A38. The command run is
 `python run_with_ollama_judge.py --real --port $PHONE_PORT --node-id $NODE_ID --genesis genesis.json --peers $PC_PEER`.
 The shared `genesis.json` in the clone is the canonical one; a node that mints its own
 cannot converge with anyone.

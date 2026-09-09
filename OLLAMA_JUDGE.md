@@ -1,5 +1,18 @@
 # Turning Ollama into a Covenant judge
 
+> **SUPERSEDED 2026-09-07, kept as a record.** Ollama is no longer part of this
+> project's ethics quorum. It was deleted from the operator's machine on
+> 2026-09-07 and `ops/quorum_policy.json` sets `ollama_in_chain: false`, so a
+> node started today does not consult it even when it is installed and running.
+> **You do not need any of this to run a node.** What judges is the distilled
+> student — a 130 KB JSON model tracked in this repo, read into the node's own
+> process, no socket and no model server (see KNOWN_ISSUES A37). For the current
+> setup, follow the quick start in [README.md](README.md).
+>
+> This page is left in place because it documents how the tuned Ollama seat was
+> built and measured, and deleting the method because the component was retired
+> would remove evidence rather than correct it. Read it as history.
+
 You have Ollama, so this needs no API key and no internet.
 
 ## 1. Pick a model
