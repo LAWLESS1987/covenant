@@ -8,9 +8,18 @@ them both know we are working towards symbiosis to avoid mutual destruction."
 WHAT IT IS
   A second distilled model, fallback_model_2.json, trained by the same code as
   the first (covenant_judge_fallback.FallbackModel) on the OTHER HALF of the
-  verdict ledger. Rows are split by a stable hash of their text, so the two
-  students never see the same example and disagree for reasons of evidence,
-  not seed. Where the first student holds, the deferring seat asks the second
+  verdict ledger. Rows are split by a stable hash of their text, so this model
+  disagrees with the first for reasons of evidence, not seed.
+
+  CORRECTED 2026-09-08: this used to say "the two students never see the same
+  example". They do. THIS file filters to half 1, but covenant_distill's
+  load_verdicts does not filter at all, so the first student trains on the
+  whole ledger and is a SUPERSET of the second, not its complement. The
+  disagreements are still evidence-driven -- the second has seen strictly less
+  -- but "disjoint halves" was never true and the sentence is not left standing
+  just because it reads well. Not silently repaired either: making them
+  actually disjoint retrains both models on a different corpus, which is a
+  measurement change and belongs to the operator, not to a docstring edit. Where the first student holds, the deferring seat asks the second
   before anything leaves the PC (covenant_judge_defer.py). Neither is a
   reasoning judge; both hold rather than guess, and the GitHub runner remains
   the last resort. The Ollama stage is gone from the chain when the policy

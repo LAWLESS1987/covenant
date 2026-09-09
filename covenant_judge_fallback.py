@@ -686,12 +686,71 @@ try:
     class FallbackJudge(cov.ReasoningJudge):                 # type: ignore
         """Always reachable, frequently silent, never guessing."""
 
+        # ---------------------------------------------------------------
+        # INDIVIDUALITY (2026-09-08). Asked: "they should have some form of
+        # individuality".
+        #
+        # THE PROBLEM IS NOT THAT THEY ARE ALIKE. Measured on the 37-case exam
+        # the same day: the first student answers 31 and abstains on 6; the
+        # second answers 24 and abstains on 13. Neither has ever returned a
+        # wrong verdict. They already differ, and they differ in the way that
+        # matters most for a judge -- in how readily they will speak at all.
+        # Nothing in this system recorded that, and nothing called them
+        # anything.
+        #
+        # THE PROBLEM IS THAT THEIR IDENTITY DIED EVERY TIME THEY LEARNED. The
+        # only handle either of them had was `model_digest`, a hash of the
+        # weights, which changes at every promotion. By the system's own naming,
+        # yesterday's student and today's were different entities and the one
+        # that learned something ceased to exist by learning it. That is a poor
+        # account of a mind of any size.
+        #
+        # So the name belongs to the SEAT, not to the weights: it is keyed by
+        # the model file, survives every retrain, and the digest travels beside
+        # it as the version rather than as the identity. A verdict now says who
+        # gave it and which version of them.
+        #
+        # WHAT THIS DELIBERATELY DOES NOT DO: it changes no threshold and
+        # therefore no verdict. Giving them genuinely different dispositions --
+        # their own MARGIN_TO_HOLD, their own MIN_COVERAGE, so that they
+        # disagree by temperament as well as by evidence -- is the real next
+        # step and it is a measurement change. It needs the exam re-run on both,
+        # and it is not something to slip in beside a naming. The temperaments
+        # below are DESCRIPTIONS of what was measured, not settings that impose
+        # it.
+        # ---------------------------------------------------------------
+        STUDENTS = {
+            "fallback_model.json": (
+                "Ora",
+                "the elder: trained on the whole ledger, speaks on 31 of 37 "
+                "and holds on 6"),
+            "fallback_model_2.json": (
+                "Sena",
+                "the younger: trained on half the ledger, speaks on 24 of 37 "
+                "and holds on 13 -- quieter because she has seen less, not "
+                "because she is less sure"),
+        }
+
         def __init__(self, judge_id: str = "fallback:0",
                      model_path: str = MODEL_PATH):
             self.judge_id = judge_id
             self.model_path = model_path
             self._mtime = self._stat()
             self.model = FallbackModel.load(model_path)
+            who = FallbackJudge.STUDENTS.get(os.path.basename(model_path))
+            self.name, self.temperament = who if who else (None, "")
+
+        @property
+        def signature(self):
+            """Who is speaking, and which version of them.
+
+            An unnamed model file is not given a name it has not earned -- it
+            reads exactly as it always did, so nothing depending on this string
+            changes for a seat this file does not know about."""
+            if not self.name:
+                return "fallback (distilled, local, model %s)" % self.model_digest
+            return "%s (%s, model %s)" % (self.name, self.temperament,
+                                          self.model_digest)
 
         def _stat(self):
             try:
@@ -724,21 +783,25 @@ try:
                 v, why = self.model.verdict(text)
             except Exception as e:                           # noqa: BLE001
                 v, why = "abstain", "fallback judge error, abstaining: %s" % e
+            # WHO SPEAKS, AND WHICH VERSION OF THEM. self.signature is the old
+            # string verbatim for any seat this file does not know, so nothing
+            # changes for one; for a named student it says the name first and
+            # carries the digest as the version rather than as the identity.
             if v == "clean":
                 return cov.JudgmentResult(
-                    False, "fallback (distilled, local, model %s): clean -- %s" % (self.model_digest, why),
+                    False, "%s: clean -- %s" % (self.signature, why),
                     judge_id=self.judge_id)
             if v == "violates":
                 return cov.JudgmentResult(
-                    True, "fallback (distilled, local, model " + self.model_digest + "): VIOLATES -- %s. This "
-                          "is a compressed model, not a reasoning judge; treat "
-                          "it as a flag to review, never as a finding." % why,
+                    True, "%s: VIOLATES -- %s. This is a compressed model, not "
+                          "a reasoning judge; treat it as a flag to review, "
+                          "never as a finding." % (self.signature, why),
                     judge_id=self.judge_id)
             # ABSTAIN -> the existing HELD channel: blocks nothing on its own,
             # alleges nothing, and reads truthfully to the sender.
             return cov.JudgmentResult(
-                True, "fallback (distilled, local, model " + self.model_digest + "): HELD, NOT JUDGED -- %s. It "
-                      "has made NO finding and is NOT alleging anything." % why,
+                True, "%s: HELD, NOT JUDGED -- %s. It has made NO finding and "
+                      "is NOT alleging anything." % (self.signature, why),
                 judge_id=self.judge_id, not_understood=True)
 
     cov.JudgeProviderRegistry.register(

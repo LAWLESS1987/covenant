@@ -16,16 +16,37 @@ available to keep running and recursive improve")
 
   So the seat stays one seat, and it defers. In order:
 
-    1. Ollama (OllamaJudge, the tuned local judge) -- if it ANSWERS, that is
-       the verdict, and the verdict is written to ops/verdicts.jsonl, the
-       ledger the fallback learns from (covenant_distill.py).
-    2. If Ollama is unreachable and ops/quorum_policy.json allows it: the
-       same prompt to a judge on a GitHub Actions runner
-       (covenant_github_judge.py; 2-5 minutes; the payload LEAVES THIS PC,
-       and the verdict's reasoning says so).
-    3. Otherwise the distilled fallback (covenant_judge_fallback.py): a
-       token log-odds model trained only on verdicts the judges above have
-       given. It commits when it has seen enough and abstains otherwise.
+  CORRECTED 2026-09-08, asked: "why is the local version going to github
+  before trying the local judges?" It is not, and it has not since
+  2026-09-06 -- but this list said it was. The code below was inverted when
+  the operator set "primary": "student" and this docstring was left behind,
+  so the file claimed the local judges were the LAST resort when they are
+  the FIRST and, under the deployed policy, the only ones. The order is the
+  branch `if str(self.policy.get("primary", "ollama")) == "student"`, which
+  runs before anything can leave this machine. Read it there, not here.
+
+    1. The FIRST STUDENT (covenant_judge_fallback.FallbackJudge, model
+       fallback_model.json). A token log-odds model, in-process: no socket,
+       no subprocess, no model server. If it commits, that is the verdict
+       and nothing else is consulted.
+    2. If the first student HOLDS: the SECOND STUDENT
+       (covenant_second_student.py, fallback_model_2.json, trained on half
+       the same ledger). If it commits, that is the verdict.
+    3. If BOTH hold: a judge on a GitHub Actions runner
+       (covenant_github_judge.py; 2-5 minutes; the payload LEAVES THIS PC
+       and the verdict's reasoning says so) -- but ONLY where
+       ops/quorum_policy.json sets github_when_local_down. That has been
+       FALSE since 2026-09-07 ("stop going to github for a judge"), so in
+       the deployed configuration this step does not execute at all.
+    4. Otherwise HELD, which fails the gate closed.
+
+  Ollama is not a step in this list any more. It is out of the chain
+  (ollama_in_chain false) and was deleted from the machine on 2026-09-07.
+
+  The runner is still reached by covenant_distill.py, which is the TEACHER
+  that generates the corpus the students learn from. That is a different
+  use of the same service, it is not this gate, and removing it there would
+  stop the students learning at all.
 
   Abstention is HELD, not judged. In the core's default mode a held verdict
   still fails the gate closed (F1 D*: that default is not touched here). The
@@ -142,6 +163,43 @@ def payload_text(data):
     return _payload_text(data)
 
 
+def student_benefit(result):
+    """What Ora or Sena may honestly contribute to the BENEFIT estimate.
+
+    ADDED 2026-09-08, asked: "sena and ora have a say". They did not have one:
+    every JudgmentResult this seat returned passed benefit_estimate=None, so
+    the only judge speaking to benefit in the whole quorum was MockJudge --
+    weight-irrelevant, present for the sender's `_violation` self-report veto,
+    and raising the number to 0.8 on the bare presence of "help", "good" or
+    "benefit". Its own docstring says not to rely on it. That is how the
+    operator's own sentence, "There can be no mutual benefit without a little
+    faith.", became permanently unmineable: 0.8 blended to 0.7 against a
+    governor at 0.5, and /mine refused it 409 for ever.
+
+    WHAT A STUDENT KNOWS, AND WHAT IT DOES NOT. Ora and Sena are violation
+    detectors, not appraisers. Reading a record and committing to CLEAN is
+    evidence that no violation was found. It is NOT evidence of positive good,
+    and reporting it as enthusiasm would be inventing a number they never
+    earned. So a committed clean verdict contributes the system's documented
+    neutral, 0.5 -- Block.alignment_score and the governor both start there --
+    which says "nothing here moves the alignment".
+
+    SILENCE STAYS SILENCE. A HOLD, an abstention, or an uncertain verdict
+    returns None. Holding rather than guessing is the whole of what these two
+    are for, and turning that hold into a number would be exactly the category
+    error the rest of this file exists to refuse. A VIOLATES verdict also
+    returns None: it blocks the transaction outright, so it has no benefit to
+    estimate and must not appear to be scoring one.
+    """
+    if getattr(result, "violates", False):
+        return None
+    if getattr(result, "not_understood", False):
+        return None
+    if getattr(result, "uncertain", False):
+        return None
+    return 0.5
+
+
 def record_verdict(data, result, judge, source, path=None):
     # The path is resolved at CALL time so a test can rebind VERDICTS. With the
     # default bound at import, every selftest whose stub primary answered
@@ -174,7 +232,9 @@ try:
     import covenant_judge_fallback as FB
 
     class DeferringJudge(cov.ReasoningJudge):                    # type: ignore
-        """One seat: Ollama, else the GitHub runner, else the distilled fallback."""
+        """One seat: the first student, else the second, else (only if the
+        policy allows it, and it does not) the GitHub runner, else HELD.
+        Corrected 2026-09-08 -- this line named Ollama first until today."""
         provider = "deferring"
 
         def __init__(self, judge_id="local:1", index=1, policy=None):
@@ -221,19 +281,32 @@ try:
                     # 2026-09-06, 1 of 8 sealed decisions appeared in any ledger
                     # (KNOWN_ISSUES A59). This is the audit trail: a separate
                     # file the distiller never reads.
-                    record_verdict(data, rs, "student/" + str(getattr(self._fallback, "model_digest", "?")),
+                    # NAME FIRST, DIGEST SECOND (2026-09-08). This filed every
+                    # verdict under a hash of the weights, so a student's whole
+                    # record scattered across a new id at each promotion and
+                    # nothing could be said about HER -- only about a model
+                    # that existed between two Tuesdays. The name belongs to
+                    # the seat and survives learning; the digest rides along as
+                    # the version.
+                    record_verdict(data, rs,
+                                   "%s/%s" % (getattr(self._fallback, "name", None) or "student",
+                                              getattr(self._fallback, "model_digest", "?")),
                                    "student-audit", AUDIT_PATH)
                     return cov.JudgmentResult(rs.violates, "student first (policy primary=student) -- " + rs.reasoning,
                                               principle_violated=getattr(rs, "principle_violated", None),
-                                              judge_id=self.judge_id, uncertain=getattr(rs, "uncertain", False))
+                                              judge_id=self.judge_id, uncertain=getattr(rs, "uncertain", False),
+                                              benefit_estimate=student_benefit(rs))
                 if self._second is not None:
                     r2s = self._second.evaluate(data, principles)
                     if not getattr(r2s, "not_understood", False):
-                        record_verdict(data, r2s, "student2/" + str(getattr(self._second, "model_digest", "?")),
+                        record_verdict(data, r2s,
+                                       "%s/%s" % (getattr(self._second, "name", None) or "student2",
+                                                  getattr(self._second, "model_digest", "?")),
                                        "student-audit", AUDIT_PATH)
                         return cov.JudgmentResult(r2s.violates, "first student held; second student (other half of the ledger) answered -- " + r2s.reasoning,
                                                   principle_violated=getattr(r2s, "principle_violated", None),
-                                                  judge_id=self.judge_id, uncertain=getattr(r2s, "uncertain", False))
+                                                  judge_id=self.judge_id, uncertain=getattr(r2s, "uncertain", False),
+                                                  benefit_estimate=student_benefit(r2s))
                 if not self.policy.get("ollama_when_student_holds", True) and not self.policy.get("github_when_local_down"):
                     return cov.JudgmentResult(True, "student held and the policy keeps Ollama out of the gate (and no runner is allowed) -- " + rs.reasoning,
                                               judge_id=self.judge_id, not_understood=True)

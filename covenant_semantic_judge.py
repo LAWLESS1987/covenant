@@ -1173,9 +1173,37 @@ def install(reasoning_judge_cls, judgment_result_cls, registry_cls=None,
             # error as reporting it as a PASS, only in the other direction.
             unsure = (a.verdict == ABSTAIN)
             if inner_result is None:
+                # BENEFIT, ADDED 2026-09-08, asked: "the semantic judge is real".
+                # It is, and until today it was the only judge in the deployed
+                # quorum with a VOTE (local:0, semantic:1, mock_selfreport:0)
+                # and the only one that said NOTHING about benefit. So the
+                # number that decides whether a block can be mined was supplied
+                # entirely by MockJudge -- weight 0, present only for the
+                # sender's `_violation` self-report veto, and raising benefit to
+                # 0.8 on the bare presence of "help", "good" or "benefit". Its
+                # own docstring: "This is not a real semantic check. Do not rely
+                # on it." The operator's statement "There can be no mutual
+                # benefit without a little faith." was refused by /mine for ever
+                # because it contains the word "benefit".
+                #
+                # WHAT THIS JUDGE MAY HONESTLY CLAIM, and no more. It is a
+                # VIOLATION DETECTOR. Reading a payload and finding nothing to
+                # block is evidence of the ABSENCE of a violation; it is not
+                # evidence of positive good, and it must not be reported as
+                # enthusiasm. So a clean read supplies the system's documented
+                # neutral (0.5 -- Block.alignment_score and the governor both
+                # start there), which says "nothing here moves the alignment",
+                # not "this is worthy".
+                #
+                # ABSTAIN and ILLEGIBLE supply None, deliberately. This judge's
+                # UNKNOWN stays an unknown: turning it into a number would be
+                # the same category error as reporting it as a PASS. Both block
+                # on their own anyway, so no verdict is loosened by the silence.
                 return judgment_result_cls(
                     mine_blocks, reasoning, principle_violated=principle,
-                    judge_id=self.judge_id, benefit_estimate=None,
+                    judge_id=self.judge_id,
+                    benefit_estimate=(None if (unread or unsure or mine_blocks)
+                                      else 0.5),
                     not_understood=unread, uncertain=unsure)
 
             # ---- wrapper mode. OR, and only OR. -------------------------
