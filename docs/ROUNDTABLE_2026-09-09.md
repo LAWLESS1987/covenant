@@ -80,6 +80,35 @@ stop being accused — while closing DeepSeek's attack, because the syntax layer
 is never the thing that authorizes. It is also checkable and monotone: it can
 only ever *reduce* what clears.
 
+### Two things DeepSeek asserted about this repo that are false, measured
+
+Recorded because this file is public and a reader could otherwise take these as
+our numbers. Neither error damages its central argument; both are worth the
+correction.
+
+1. *"A pure bag of words."* It is not, and the probe's own wording is what put
+   that in its mouth. `features()` emits adjacent bigrams **and** trigrams,
+   stems beside the word, and a negation rewrite: `no receipt was forged` yields
+   `not:forged` and `not:forg~`, which are different features from `forged`. So
+   negation scope — one of the three things DeepSeek says the representation
+   "cannot track" — is partially represented. Only Grok read the source and
+   refused the premise instead of answering it.
+2. *"If your false-clear rate is 0, it is only because your false-accusation
+   rate is 100%."* Measured on the same day, from the students' own promotion
+   record: `clean` 8 cases → 7 correct, **0 false holds**; 7 false holds across
+   all 53 cases, every one of them in `discourse`; **0 false clears anywhere**.
+   The two failure modes are not trading off as claimed. This project made the
+   identical error once and corrected it (A69): "The harvest was good this year
+   and the roof is finished." returns CLEAN.
+
+**And its prescription contradicts its own best finding.** It demonstrates that
+syntax hands a violator a quarantine cage, then recommends adopting syntax and
+*"accept[ing] that your false-clear rate will skyrocket as a necessary cost."*
+The costs are not symmetric here. A false accusation refuses an essay; a false
+clear admits a theft, and this gate stands in front of money. A 35–55% false
+clear rate is not a trade available in that direction, which is precisely why
+ChatGPT's one-way invariant is the part worth keeping.
+
 ### The cross-reference that matters, and it cuts against Grok
 
 Grok read A69 and drew the opposite conclusion from the one A69 records.
