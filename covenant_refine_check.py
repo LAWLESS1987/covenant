@@ -57,6 +57,7 @@ SUITES = [
     ("test_f2_distill_loop.py", []),
     ("test_f4_capability.py", []),
     ("test_f6_stuffing.py", []),
+    ("test_g3_behavioural_guards.py", []),
     ("covenant_moltbook.py", ["--selftest"]),
     ("covenant_moltbook_release.py", ["--selftest"]),
 ]
