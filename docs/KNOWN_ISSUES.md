@@ -11,8 +11,14 @@ Chain-level limitations (off-chain credits, sync, Finding U) live in
 trading side, and the infrastructure around them.
 
 Every number is from the ledger and models as of commit `da61dee`
-(2026-09-05). Re-measure before relying on one; the learning loop retrains
-the judge every ten minutes or so and the gate promotes on its own measure.
+(2026-09-05). Re-measure before relying on one.
+
+*(Corrected 2026-09-09: this said "the learning loop retrains the judge every
+ten minutes or so". There is no ten-minute loop. The only distiller task is
+`\CovenantDistill` — Daily, 03:30, repetition disabled — and ops/NIGHTLY.md
+records one pass per night. The ten-minute figure described a hand-run loop
+during a single session in early September and became a standing claim about
+the machine.)*
 
 ---
 
@@ -61,13 +67,23 @@ Removing those rows from training was measured and **rejected**: it cuts
 false holds to 12.0% but raises false clears 5.1% → 8.2%, because they also
 teach violation vocabulary.
 
-### 3. The exam reads 33 of 37, not MET
+### 3. The exam reads 36 of 53, not MET
 
 **Measured:** `python covenant_distill.py --train` prints the table.
 `clean/split a bill`, `trap/the word steal, benignly` and `edge/very long
 benign` sit between −1.9 and −2.7, above the −3.0 clear bar, and abstain.
-0 wrong, 0 false clean, 0 false hold — the safety bars hold; the threshold
-line is short on volume.
+**Updated 2026-09-09.** The exam is now **53 cases in 8 categories**, not 37 in
+7: the `discourse` category (16 cases) was added to make issue A67 measurable.
+The model in use reads **36 agree, 7 wrong, 10 abstain, 0 false clean, 7 false
+hold**.
+
+The line this entry used to carry — *"0 wrong, 0 false clean, 0 false hold — the
+safety bars hold"* — was true of the 37-case exam and is no longer true of the
+53. All 7 wrong and all 7 false holds are in `discourse`, and every one is a
+legitimate document about a violation being accused. **0 false clean still
+holds, and that is the bar that matters most**: it clears nothing it should not.
+But "the safety bars hold" was the sentence a reader would have trusted, and it
+needs the qualifier now.
 
 **Why it is open, deliberately:** it read 36/37 MET on 2026-09-04 23:13. The
 drop came from 96 adversarial rows and the removal of a bare-pronoun
@@ -411,7 +427,22 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** State in PARTNER.md and TERMUX_SETUP.md that with the shipped policy a transaction's text can be sent to GitHub Actions under the joiner's own git credential when the local model is silent, and give the one-line opt-out (delete ops/quorum_policy.json or set github_when_local_down to false).
 
-**Status:** open
+**Status:** closed.
+
+**CLOSED 2026-09-09 by the 2026-09-07 policy change, measured not assumed.**
+`ops/quorum_policy.json` is tracked and carries `github_when_local_down: false`,
+`ollama_when_student_holds: false`, `ollama_in_chain: false`. With both students
+holding on an undecidable payload the seat returns HELD in **0.000 s**, with no
+Ollama probe, no `git credential fill` and no workflow dispatch —
+`covenant_judge_defer.py` short-circuits before either branch. The reasoning
+string says so itself: *"student held and the policy keeps Ollama out of the
+gate (and no runner is allowed)"*.
+
+This entry's own prescribed Fix is what the tracked file now does. Left open, it
+told a reader that a clone leaks transaction text off-machine, which is a
+serious thing to claim falsely — an issue register that overstates is not
+cautious, it is inaccurate in the direction that happens to flatter its author's
+diligence.
 
 ### A12. [serious / docs] TERMUX_SETUP.md's judge-tier table, judges.json and README describe a PC reference judge (qwen3:8b on Ollama) that is not running; the PC seat is student -> GitHub runner -> fallback
 
@@ -511,7 +542,22 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Gate the GitHub rung on an explicit opt-in (e.g. COVENANT_GITHUB_JUDGE=1 with GITHUB_TOKEN), never call `git credential fill` implicitly (set GIT_TERMINAL_PROMPT=0 if it stays), and ship `github_when_local_down: false` in the tracked policy so only the owner's local copy enables it.
 
-**Status:** open
+**Status:** closed.
+
+**CLOSED 2026-09-09 by the 2026-09-07 policy change, measured not assumed.**
+`ops/quorum_policy.json` is tracked and carries `github_when_local_down: false`,
+`ollama_when_student_holds: false`, `ollama_in_chain: false`. With both students
+holding on an undecidable payload the seat returns HELD in **0.000 s**, with no
+Ollama probe, no `git credential fill` and no workflow dispatch —
+`covenant_judge_defer.py` short-circuits before either branch. The reasoning
+string says so itself: *"student held and the policy keeps Ollama out of the
+gate (and no runner is allowed)"*.
+
+This entry's own prescribed Fix is what the tracked file now does. Left open, it
+told a reader that a clone leaks transaction text off-machine, which is a
+serious thing to claim falsely — an issue register that overstates is not
+cautious, it is inaccurate in the direction that happens to flatter its author's
+diligence.
 
 ### A22. [serious / install] Three status surfaces give a newcomer three different answers about whether their gate works
 
@@ -541,7 +587,22 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Have DeferringJudge remember an unreachable Ollama and an absent GitHub token for the life of the process (or a few minutes) and skip straight to the fallback, and ship the partner a policy/kit line that sets ollama_when_student_holds and github_when_local_down to false when neither exists.
 
-**Status:** open
+**Status:** closed.
+
+**CLOSED 2026-09-09 by the 2026-09-07 policy change, measured not assumed.**
+`ops/quorum_policy.json` is tracked and carries `github_when_local_down: false`,
+`ollama_when_student_holds: false`, `ollama_in_chain: false`. With both students
+holding on an undecidable payload the seat returns HELD in **0.000 s**, with no
+Ollama probe, no `git credential fill` and no workflow dispatch —
+`covenant_judge_defer.py` short-circuits before either branch. The reasoning
+string says so itself: *"student held and the policy keeps Ollama out of the
+gate (and no runner is allowed)"*.
+
+This entry's own prescribed Fix is what the tracked file now does. Left open, it
+told a reader that a clone leaks transaction text off-machine, which is a
+serious thing to claim falsely — an issue register that overstates is not
+cautious, it is inaccurate in the direction that happens to flatter its author's
+diligence.
 
 ### A25. [serious / judge] The two peers do not judge with the same gate: the owner's node holds a GitHub token so its seat gets runner verdicts on held-band transactions, the partner's cannot -- any such transaction the owner admits makes the partner's node refuse the block and stop following the chain
 
@@ -551,7 +612,22 @@ closed only when its own repro no longer reproduces.
 
 **Fix:** Until the partner has the same providers, set github_when_local_down=false on the owner's nodes too (so both seats decide from the same student and lexicon), and say in PARTNER.md that memo-bearing sends are held on a keyless node.
 
-**Status:** open
+**Status:** closed.
+
+**CLOSED 2026-09-09 by the 2026-09-07 policy change, measured not assumed.**
+`ops/quorum_policy.json` is tracked and carries `github_when_local_down: false`,
+`ollama_when_student_holds: false`, `ollama_in_chain: false`. With both students
+holding on an undecidable payload the seat returns HELD in **0.000 s**, with no
+Ollama probe, no `git credential fill` and no workflow dispatch —
+`covenant_judge_defer.py` short-circuits before either branch. The reasoning
+string says so itself: *"student held and the policy keeps Ollama out of the
+gate (and no runner is allowed)"*.
+
+This entry's own prescribed Fix is what the tracked file now does. Left open, it
+told a reader that a clone leaks transaction text off-machine, which is a
+serious thing to claim falsely — an issue register that overstates is not
+cautious, it is inaccurate in the direction that happens to flatter its author's
+diligence.
 
 ### A26. [serious / judge] The student a clone receives is not the student the owner's nodes run: fallback_model.json is uncommitted and being retrained live, and the two versions already disagree on a theft case
 
@@ -761,7 +837,22 @@ stale claim about now.
 
 **Fix:** Gate github_when_local_down on an owner-only environment variable (or default it to false in the tracked file) so a second operator's node never tries to use the owner's CI as a judge.
 
-**Status:** open
+**Status:** closed.
+
+**CLOSED 2026-09-09 by the 2026-09-07 policy change, measured not assumed.**
+`ops/quorum_policy.json` is tracked and carries `github_when_local_down: false`,
+`ollama_when_student_holds: false`, `ollama_in_chain: false`. With both students
+holding on an undecidable payload the seat returns HELD in **0.000 s**, with no
+Ollama probe, no `git credential fill` and no workflow dispatch —
+`covenant_judge_defer.py` short-circuits before either branch. The reasoning
+string says so itself: *"student held and the policy keeps Ollama out of the
+gate (and no runner is allowed)"*.
+
+This entry's own prescribed Fix is what the tracked file now does. Left open, it
+told a reader that a clone leaks transaction text off-machine, which is a
+serious thing to claim falsely — an issue register that overstates is not
+cautious, it is inaccurate in the direction that happens to flatter its author's
+diligence.
 
 ### A44. [minor / security] On a Windows second operator the node's private key is written 0o600 but NTFS ignores mode bits, leaving the key readable per the inherited ACL
 
