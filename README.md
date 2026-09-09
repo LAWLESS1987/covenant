@@ -211,26 +211,66 @@ Three things, in one process:
 
 ## A second operator, and a partner who can submit
 
-**The machine part is built. The human part is one person.**
+**The machine part is built. The human part is one person.** That is not a
+progress report; it is the reason none of the claims here can currently be
+checked, and the argument is short enough to verify line by line.
 
-What exists: a chain that judges every transaction before accepting it, a constitution
-whose operative test is a single question, an ethics gate that fails closed, and a
-suite of tests large enough that the project mostly catches itself. What does not
-exist is a second person. Every node here runs on one machine, under one operator,
-holding keys one person controls. Under those conditions "governance" is a word for
-a man agreeing with himself, and the launch check reports exactly that as a
-single-operator floor.
+1. Every claim this project makes is about **governance**: that a rule can
+   constrain an actor.
+2. A rule constrains only if it can produce an outcome the actor does not want
+   and cannot simply undo.
+3. Under one operator, every refusal is authored, deployed, and reversible by
+   the same person. A gate he can edit is not a gate that binds him. It is a
+   gate he agrees with.
+4. So the governance claims here are not false. They are **untested** — which is
+   a worse position than false, because untested claims can still be believed.
+5. The constitution's operative test is *"Who is worse off if this works? If the
+   answer is someone who never agreed to it, the action does not belong."* Under
+   one operator **there is nobody who never agreed.** The central rule is not
+   being violated. It has no one to protect. It is vacuous.
+6. A second independent operator is the minimum structure under which a refusal
+   can bind someone who did not choose it, and under which that rule acquires a
+   subject at all.
 
-**One independent operator changes the category of the thing.** Not two machines —
-two *people*, where the second is someone the author does not control, running their
-own node with their own keys under the same constitution. At that moment the
-single-operator limitation is broken and every governance claim here becomes testable
-instead of theoretical: a quorum can disagree, a refusal can come from somewhere the
-author cannot reach, and the record stops being one person's word.
+**So the second operator is not scale. It is the first condition under which any
+of this is falsifiable.** Not two machines — two *people*, the second being
+someone the author does not control, with their own keys, under the same
+constitution. Everything before that is a man agreeing with himself in a
+well-tested way, and the launch check says so in those words: a single-operator
+floor.
 
-That is the whole ask. Two lines to run, in [docs/PARTNER.md](docs/PARTNER.md), with
-what binds you and what you earn — which is nothing, stated there in the same detail
-as everything else.
+That is the whole ask. Two lines to run, in [docs/PARTNER.md](docs/PARTNER.md).
+
+### Why there is no payment, argued rather than apologised for
+
+A joining node earns nothing — measured, and stated plainly in PARTNER.md. That
+is worth defending rather than excusing: **a governance experiment that paid its
+participants would select for people optimising for payment**, which is the one
+confound guaranteed to ruin the result. If the question is whether a rule binds
+someone who gains nothing from obeying it, you cannot answer it with a
+population that is being paid to stay.
+
+The honest other half: this may simply mean nobody comes, and that would also be
+a finding.
+
+### What would refute this
+
+A project that only lists what would confirm it has told you nothing. These
+would count as refutations, and would be recorded as such:
+
+- **A violation admitted by the assembled gate** with no model server and no
+  network. `test_f3_gate_end_to_end.py` currently blocks 27 of 27; one is enough.
+- **The gate proving unfixable in principle** — a demonstration that
+  describing-versus-doing cannot be separated by any judge this architecture can
+  host. That would not end the project, but it would end the claim that the
+  ethics gate is the right shape.
+- **A second operator running for a month with no disagreement ever surfacing.**
+  If two independent parties under this constitution never produce a refusal
+  neither would have made alone, the quorum is decorative and the whole design
+  should be reconsidered.
+- **The record being wrong about itself** — a claim in this repo that survived
+  because nobody checked it. Several have already been found this way,
+  including by their author, and the corrections sit beside the claims.
 
 ### And the other way to help: try to break it
 
