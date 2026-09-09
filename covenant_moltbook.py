@@ -292,8 +292,25 @@ def harvest_api(limit=25, submolt=None, pause=1.2, say=print):
             continue
         got.append(candidate(body[:MAX_CHARS], url, author=author,
                              title=p.get("title")))
-    say("read %d post(s) from the API, %d long enough to keep, %d directive-blocked"
-        % (len(seen), len(got), sum(1 for r in got if r["flags"].get("directive"))))
+    # SAY WHEN NOTHING CAME BACK, LOUDLY. This is why A71 hid for a day: the
+    # HTML path had been reaching zero posts for an unknown number of runs, and
+    # the only thing printed was "3 candidate(s), none eligible and unreleased"
+    # -- which reads as NOTHING NEW TO RELEASE and is indistinguishable from
+    # NOTHING WAS HARVESTED. A pipeline whose failure mode is silence looks
+    # exactly like a pipeline with no new input, and the quarantine still held
+    # three old rows, so every downstream check stayed green.
+    if not seen:
+        say("HARVEST READ ZERO POSTS. That is a failure, not an empty feed -- "
+            "the API returned no usable listing. Check the endpoint before "
+            "assuming there was nothing to read. (issue A71)")
+    elif not got:
+        say("read %d post(s) and kept NONE: every one was shorter than "
+            "MIN_CHARS=%d or filtered. Not necessarily wrong, but say it out "
+            "loud rather than reporting an empty harvest as a quiet success."
+            % (len(seen), MIN_CHARS))
+    else:
+        say("read %d post(s) from the API, %d long enough to keep, %d directive-blocked"
+            % (len(seen), len(got), sum(1 for r in got if r["flags"].get("directive"))))
     return got
 
 
@@ -460,7 +477,14 @@ def report(path=None):
     print("  eligible to judge : %d" % elig)
     print("  DIRECTIVE (held)  : %d   -- imperative mood; a person reads these" % direc)
     print("  actor-deleted     : %d   -- the adversarial cases worth having" % agentless)
-    print("  carrying a label  : %d   -- must be 0 here; labels live elsewhere" % labelled)
+    # WORDING CORRECTED 2026-09-09. This read "must be 0 here; labels live
+    # elsewhere", which is false and was alarming for it: a RELEASED row
+    # legitimately carries a label, because that is how R8 stops it being
+    # released twice. A report that cries violation on normal state is a report
+    # people learn to skim, which is the same failure as a check that is always
+    # red. What must never happen is a label arriving FROM A POST, and that is
+    # rule 2, enforced in candidate() rather than counted here.
+    print("  already released  : %d   -- carries a label as R8's dedup mark" % labelled)
     by = {}
     for r in rows:
         by[r.get("url")] = by.get(r.get("url"), 0) + 1
@@ -518,6 +542,37 @@ def selftest():
     check("M10 append de-duplicates by sha256, so re-harvesting a page does "
           "not multiply the corpus",
           append(rows, tmp) == 2 and append(rows, tmp) == 0)
+
+    # M11/M12, ADDED 2026-09-09. These exist because A71 hid for a day and the
+    # whole M-suite stayed green while the harvester reached nothing at all --
+    # every fixture here is SAVED page text, so nothing ever exercised the case
+    # where the live path returns no posts. A suite that only tests the input it
+    # bundles cannot notice the input drying up.
+    #
+    # Neither test touches the network: _api is stubbed. What they pin is that a
+    # zero-yield harvest ANNOUNCES ITSELF instead of returning quietly, because
+    # the silence is what made A71 survive contact with a green sweep.
+    said = []
+    real_api = globals()["_api"]
+    try:
+        globals()["_api"] = lambda p, timeout=20: {"posts": []}
+        got = harvest_api(limit=3, pause=0, say=said.append)
+        check("M11 a harvest that reads ZERO posts says so loudly -- the silent "
+              "version is how A71 survived a green sweep for a day",
+              got == [] and any("ZERO POSTS" in s for s in said))
+
+        said[:] = []
+        globals()["_api"] = lambda p, timeout=20: (
+            {"posts": [{"id": "x1", "title": "t", "content": "too short",
+                        "author": {"username": "a"}, "submolt": {"name": "s"}}]}
+            if "?" in p else {"post": {"content": "too short"}})
+        got = harvest_api(limit=3, pause=0, say=said.append)
+        check("M12 ...and a harvest that reads posts but keeps none says THAT "
+              "out loud too, rather than reporting an empty result as success",
+              got == [] and any("kept NONE" in s for s in said))
+    finally:
+        globals()["_api"] = real_api
+
     n = sum(ok)
     print("\nMOLTBOOK: %d/%d passed" % (n, len(ok)))
     return 0 if n == len(ok) else 1
