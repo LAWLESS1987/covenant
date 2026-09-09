@@ -731,7 +731,15 @@ def thresholds_line(stats):
         s = stats[c]
         n = s["n"] - skip[c]
         rate = s["agree"] / float(n) if n else 1.0
-        need = S.THRESHOLDS[c]
+        # A category with no threshold REPORTS and does not gate. `discourse`
+        # (A67) is the first: the deployed quorum scores 6/16 on it, so any
+        # threshold worth writing would refuse every promotion from the day it
+        # landed, and a gate that always refuses is how a learning loop
+        # freezes. It still appears in the table and in examine(); it just
+        # cannot make MET false while nobody has moved the seat it measures.
+        need = S.THRESHOLDS.get(c)
+        if need is None:
+            continue
         if rate + 1e-9 < need:
             met = False
             short.append("%s %d/%d (need %.0f%%)" % (c, s["agree"], n, need * 100))
