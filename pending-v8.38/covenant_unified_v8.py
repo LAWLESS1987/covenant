@@ -1953,7 +1953,48 @@ class QuorumJudge(ReasoningJudge):
         summary = " | ".join(
             f"{r.judge_id}: {_label(r)} -- {r.reasoning}" for r in results)
         principle = next((r.principle_violated for r in results if r.principle_violated), None)
-        estimates = [r.benefit_estimate for r in results if r.benefit_estimate is not None]
+        # BENEFIT COMES FROM JUDGES THAT VOTE (2026-09-08). This line used to
+        # collect an estimate from every result regardless of voting weight,
+        # and judge_id carries that weight as its `provider:weight` suffix
+        # (see the parse at the provider tally above). build_semantic_quorum
+        # ALWAYS appends `mock_selfreport:0` -- weight zero, present for one
+        # purpose only, the sender's own `_violation` self-report veto. It was
+        # nonetheless the SOLE source of median_benefit in the deployed
+        # configuration, because neither the deferring students nor the
+        # semantic judge supplied one. MockJudge's own docstring says "This is
+        # not a real semantic check. Do not rely on it," and it raises benefit
+        # to 0.8 on the bare presence of "help", "good" or "benefit".
+        #
+        # MEASURED, not reasoned: the operator's statement "There can be no
+        # mutual benefit without a little faith." scored 0.8 for containing the
+        # word "benefit", blended to 0.7 against a governor at 0.5, and /mine
+        # refused it 409 on every pass for ever. The identical sentence with
+        # that one word changed mined at drift 0.000. A sentence must not be
+        # unrecordable because of a word it happens to contain.
+        #
+        # EXCLUDED BY NAME, NOT BY NUMBER. The `:N` in a judge_id is the
+        # ENUMERATION INDEX from build_semantic_quorum's `for i, name in
+        # enumerate(providers)`, NOT a voting weight. Under the deployed
+        # providers "deferring,semantic" that makes the deferring seat
+        # `local:0` and the semantic judge `semantic:1`, so a filter keyed on
+        # the suffix being "0" would have silenced the deferring seat -- which
+        # is Ora and Sena -- while claiming to remove only the mock. Caught by
+        # the operator, 2026-09-08: "sena and ora have a say". They do, and a
+        # numeric coincidence must not take it away.
+        #
+        # Only `mock_selfreport` is excluded, and only from the benefit
+        # estimate. It keeps its ABSOLUTE veto: a self-declared `_violation`
+        # still hard-blocks regardless of how any other judge votes. Nothing
+        # about any verdict changes here. Where no remaining judge offers an
+        # estimate, median_benefit stays None and the transaction keeps its
+        # claimed score, which the drift bound checks against the governor
+        # exactly as it always did.
+        def _has_vote(r):
+            jid = getattr(r, "judge_id", "") or ""
+            provider = jid.split(":")[0] if ":" in jid else jid
+            return provider != "mock_selfreport"
+        estimates = [r.benefit_estimate for r in results
+                     if r.benefit_estimate is not None and _has_vote(r)]
         median_benefit = sorted(estimates)[len(estimates) // 2] if estimates else None
         # B3 (v8.22): the quorum is an infrastructure failure when it violates
         # AND at least one VIOLATING component failed on infrastructure. A real
