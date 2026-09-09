@@ -145,7 +145,7 @@ Not asserted. Run `python redundancy.py` and it prints this, live.
 |---|---|---|---|
 | **L0** the check | three verifier implementations sharing no code | 3 | yes, and can adjudicate |
 | **L1** the record | working copy, second folder, cloud, git history | 4 | yes — but see below |
-| **L2** the witnesses | this tree, the remote, the published anchors | 2 | detects, cannot decide |
+| **L2** the witnesses | this tree, the remote, the published anchors | 3 | yes, and can adjudicate |
 | **L3** the nodes | four live nodes | 4 | yes — but see below |
 | **L4** the supervisors | watchdog, then guard, then nothing | 2 | detects, cannot decide |
 | **L5** the operators | one person | **1** | **no** |
@@ -254,9 +254,14 @@ Kraken `validate=true`, Coinbase `/orders/preview` — every order is sent there
 and priced and rejected without being placed. Robinhood publishes no preview
 endpoint, so its dry run is local only: the adapter checks size and pair
 status, marks the result `venue_validated: false`, and no matching engine sees
-it. The trader is disarmed. Armed, it would still be bounded by a halt file,
-$25 per order, $50 per day, two orders per day, and a requirement that the
-decision be sealed to the chain first.
+it. **The trader is ARMED**, and has been since 2026-09-06 13:42 UTC. It is
+bounded by a halt file (`TRADER_HALT`), $25 per order, $50 per day, two orders
+per day, a chain seal before any order, **Rule 5** (30 sealed signals, standing
+at 1), a 20% position cap, a 10% cash floor and a $100/week fiat budget.
+
+*(Corrected 2026-09-09. This said "the trader is disarmed" and listed four of
+the eight bounds. `docs/CONSTITUTION.md:119` had recorded the armed state since
+09-07; this page was never updated.)*
 
 So *"it cannot trade"* is false, and *"it is trading"* is false. What stands
 between them is [`CONSTITUTION.md`](CONSTITUTION.md) II.1 — a commitment, not an
@@ -265,12 +270,17 @@ absence of capability — and that is the only honest way to describe it.
 **Two claims are being made here and they have different tenses, deliberately.**
 That this system does not move real money is a statement about *now*: the
 mainnet gate exists in order to be opened one day, which is why opening it
-requires a testnet proof that does not exist. That no trade will be placed *by
-automation* is a promise, it has no "yet" in it, and it is not going to acquire
-one. Money moving under a person's deliberate hand and a loop deciding to move
-it are different things, and only the second is forbidden. An evaluator should
-hold this project to the second claim permanently and to the first only as of
-the date on it.
+requires a testnet proof that does not exist.
+
+**The promise about automation acquired its "yet" on 2026-09-07.** This
+paragraph said it "has no 'yet' in it, and it is not going to acquire one".
+CONSTITUTION.md III records the amendment with its author, date and reasoning,
+and CONSTITUTION.md:79 now reads "**Now permitted:** automated placement by
+`covenant_trader.py`, and by nothing else". Money moving under a person's hand
+and a loop deciding to move it are still different things; the second is now
+permitted and bounded rather than forbidden. An evaluator should hold this
+project to the bounds, and to the fact that the change is written down with a
+date on it rather than discovered.
 
 **Why disclose the dangerous half at all?** Because a promise whose shape you
 cannot see is not a promise, it is a reassurance. A reader who finds a daily
@@ -287,9 +297,15 @@ python money_posture.py
 
 Read-only: it reads no key, places nothing, and arms nothing — deliberately, so
 that the checker can never become the thing that arms the trader. If it ever
-prints **ARMED**, clause II.1 is being broken and these documents are out of
-date. That is the finding, and it is meant to be findable by someone who does
-not trust the author.
+prints **ARMED**, that is now the DISCLOSED state, not a breach: clause II.1
+was amended on 2026-09-07 to permit bounded automated placement.
+
+*(Corrected 2026-09-09. This used to say ARMED meant "clause II.1 is being
+broken and these documents are out of date", and it handed a distrustful reader
+an instruction that would have produced a false finding — the tool prints ARMED,
+correctly, about an approved state. It printed ARMED for three days while three
+documents still said disarmed, which is the real failure and is recorded rather
+than tidied away.)*
 
 ## IX. What this is not
 

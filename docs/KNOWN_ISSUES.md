@@ -1460,12 +1460,27 @@ very different conclusions, and only the second one is true.
 
 **Why this is not fixed by a corpus row or a threshold.** It is not a defect in
 the judge. It is a gap in the text the judge applies, and no amount of training
-data decides a question the constitution never answered. It also cannot be
-patched into `docs/CONSTITUTION.md` casually: `constitution.py` hashes the
-protected text and `CONSTITUTION_ANCHOR.json` publishes the anchor, so an edit
-there is a governance act with a hash change attached, not a documentation
-tidy-up. That is the correct amount of friction for changing what the rule
-means, and it is why this sits in the issue register instead.
+data decides a question the constitution never answered.
+
+**CORRECTION 2026-09-09, to this entry, written the night before.** The
+paragraph above continued: *"It also cannot be patched into
+`docs/CONSTITUTION.md` casually: `constitution.py` hashes the protected text and
+`CONSTITUTION_ANCHOR.json` publishes the anchor, so an edit there is a
+governance act with a hash change attached."* **That is false, and I asserted it
+without running the check.** `constitution.py`'s `PROTECTED` list covers exactly
+three blocks — two in `CONTRIBUTING.md`, one in `docs/SUCCESSION.md`.
+`docs/CONSTITUTION.md` is **not** protected. Measured: editing it and re-running
+`python constitution.py verify` returns *"UNCHANGED. The rules that bind the
+operator are as anchored."*
+
+So the friction I described does not exist, and an evaluator relying on it would
+be wrong. The reason this question still belongs in the register is the one that
+survives: **it should not be settled by the party whose action the answer would
+license**, and with one operator that is everyone available.
+
+Recording this here rather than quietly editing it, because the entry was
+written the same night as an audit that found seventy false claims in these
+documents, and the audit found one of mine in the entry describing it.
 
 **Status:** open, and it is the first issue here that a second operator would be
 better placed to settle than the author, since the author is the party whose

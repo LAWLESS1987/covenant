@@ -116,8 +116,10 @@ governs whoever runs it. These are the constraints on the operator:
    That is a weaker guarantee in the same shape, and it is stated here because
    the first version of this paragraph — and of the checker below — described
    two venues and one uniform guarantee, the day after the third was added.
-   **The trader is ARMED** (`armed: true`, set 2026-09-06 13:42 UTC), on an
-   hourly scheduled task, bounded by the halt file, the $25 per-order cap, the
+   **The trader is ARMED** (`armed: true`, set 2026-09-06 13:42 UTC), on a
+   DAILY scheduled task at 09:00 with repetition disabled — this clause said
+   "hourly" until 2026-09-09 while contradicting itself fifteen lines above,
+   where it correctly says daily — bounded by the halt file, the $25 per-order cap, the
    $50 daily cap, two orders per day, the sealed-decision requirement and
    Rule 5. It has still booked nothing — but that is now because the gates
    block it, not because it is switched off, and those are different
@@ -162,8 +164,17 @@ governs whoever runs it. These are the constraints on the operator:
 6. **What is not checked is not claimed.** Every assertion is marked observed,
    implemented, inferred, or hypothesised.
 
-The authoritative text of 1–3 and 6 lives in `CONTRIBUTING.md`; 4–5 in this
-document and `SUCCESSION.md`. `constitution.py` hashes them.
+The authoritative text of 1–3 and 6 lives in `CONTRIBUTING.md`, and the
+continuity rule in `SUCCESSION.md`. **`constitution.py` hashes those three
+blocks and no others** — two in `CONTRIBUTING.md`, one in `SUCCESSION.md`.
+
+**Corrected 2026-09-09.** This said "4–5 in this document and `SUCCESSION.md`;
+`constitution.py` hashes them", which overstated the protection twice: rules 4
+(the private corpus is never published) and 5 (refutations are retained) are in
+no hashed block, and **this file is not protected at all**. Read
+`constitution.py`'s `PROTECTED` list, which is the authority. That matters for
+an evaluator: an edit to *this document* changes no anchor and trips no
+verifier, so its claims rest on the record and the reader, not on a hash.
 
 ## III. Amendment
 

@@ -41,8 +41,14 @@ every memory's claim digest, deliberately excluding node-local fields such as
 timestamps and use counts so that honest replicas agree.
 
 ```
-python main.py verify          # walks the audit chain, names any break
+AI_MEMORY_ROOT=<your store> python ai_memory_system/main.py verify
+#   walks the audit chain, names any break
 ```
+
+*(Corrected 2026-09-09. This said `python main.py verify`. There is no `main.py`
+at the repository root, so the one command on the page that says "you need
+nothing but a clone" failed for anyone who ran it exactly as printed.
+`docs/SUCCESSION_ANCHORS.md:13` already carried the working form.)*
 
 The consequence that matters for succession:
 

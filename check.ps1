@@ -156,7 +156,12 @@ if ($py -and (Test-Path 'conformance.py')) {
     if ($rc -eq 0 -and $h.Count -ge 1 -and (IsRoot $h[0])) {
         "  [3] conformance root                  $vn vectors, behaviour not prose"
         "      $($h[0])"
-        "      NOT CROSS-CHECKED: no second implementation exists yet."
+        "      REPRODUCED BY TWO BUILDS THAT SHARE NO CODE WITH THIS TREE"
+        "      on 2026-09-03: conformance_indep/conformance_ps.ps1 and"
+        "      conformance_py.py, each written from the spec file alone"
+        "      by an AI agent forbidden to read this tree, audited for"
+        "      that, and rerun by test_n2_independent_root.py on every sweep."
+        "      Nobody OUTSIDE this project has reproduced this root yet."
         "      This is the number an independent build must reproduce, in"
         "      any language, sharing none of this code. Reproducing it is"
         "      the single most useful thing a reader of this repository"
