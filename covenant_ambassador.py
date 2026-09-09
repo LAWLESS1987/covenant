@@ -578,6 +578,158 @@ def _record_override(text, verdict, submolt=None, post_id=None, dry_run=True):
     return row
 
 
+# ---------------------------------------------------------- the math challenge
+#
+# MOLTBOOK HIDES CONTENT UNTIL A CHALLENGE IS SOLVED, and nothing here handled
+# it until 2026-09-09. From their skill.md: a post or comment comes back with
+# `verification_required: true` and an obfuscated arithmetic word problem, the
+# content stays INVISIBLE until the answer is posted to /verify, and the code
+# expires in five minutes. So the version of this file that shipped this morning
+# would have created a post, reported `sent: True`, and left it unpublished.
+#
+# WHY THIS ABSTAINS INSTEAD OF GUESSING. Their rule: "if your last 10 challenge
+# attempts are all failures (expired or incorrect), your account will be
+# automatically suspended". A guess is not free -- it spends one of ten, and a
+# wrong answer costs exactly what a right one earns. So the solver answers ONLY
+# when it can name two numbers and exactly one operation; anything else returns
+# None and the challenge is handed to the operator with its deadline. That is
+# the same rule the covenant applies to its own judges: something that cannot
+# read holds, and a hold is not an answer.
+#
+# The obfuscation, from their worked example, does three things at once:
+# alternating caps, punctuation scattered inside words, and letters doubled --
+# "tW]eNn-Tyy" is "twenty". Stripping non-letters and collapsing repeated
+# letters undoes all three, provided the dictionary is collapsed the same way.
+_WORD_NUM = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+    "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+    "eighty": 80, "ninety": 90,
+}
+# Operation words, grouped. If words from two different groups appear, the
+# reading is ambiguous and the solver abstains rather than picking one.
+_OPS = {
+    "+": ("plus", "add", "adds", "gains", "gain", "speeds", "faster",
+          "increases", "increase", "rises", "more"),
+    "-": ("minus", "slows", "slow", "loses", "lose", "drops", "drop",
+          "decreases", "decrease", "slower", "reduces", "less"),
+    "*": ("times", "multiplied", "multiply", "product"),
+    "/": ("divided", "divide", "split", "per", "quotient"),
+}
+
+
+def _collapse(word):
+    """Runs of one letter down to a single letter: 'twenntyy' -> 'twenty'."""
+    out = []
+    for ch in word:
+        if not out or out[-1] != ch:
+            out.append(ch)
+    return "".join(out)
+
+
+def _deobfuscate(text):
+    """Their scrambled challenge back to plain lowercase words and digits."""
+    cleaned = re.sub(r"[^A-Za-z0-9\s]", "", text or "")
+    return [w for w in cleaned.lower().split() if w]
+
+
+def solve_challenge(text):
+    """(answer, why). `answer` is a 2-dp string, or None meaning DO NOT SUBMIT.
+
+    Returning None is a real answer and the caller must respect it: an expired
+    challenge and a wrong one cost the same one-in-ten, so abstaining is
+    strictly cheaper than a guess that is only probably right."""
+    words = _deobfuscate(text)
+    found, ops = [], []                    # found holds (position, value)
+    for i, w in enumerate(words):
+        if w.isdigit():
+            found.append((i, int(w)))
+            continue
+        c = _collapse(w)
+        for word, val in _WORD_NUM.items():
+            if c == _collapse(word):
+                found.append((i, val))
+                break
+        else:
+            for sym, family in _OPS.items():
+                if any(c == _collapse(f) for f in family):
+                    ops.append(sym)
+                    break
+    # "twenty five" -> 25, but ONLY when the two words are ADJACENT.
+    #
+    # FIXED 2026-09-09, caught by AM19 on their own worked example. Without the
+    # adjacency test this merged the 'twenty' and 'five' of "at twenty meters
+    # and slows by five" into a single 25, leaving one number where there are
+    # two. Here it degraded safely into an abstention, but the same rule could
+    # just as easily have produced a confident WRONG answer -- and a wrong
+    # answer spends one of the ten attempts that end in suspension. Distance
+    # between two number words is meaning, not noise.
+    merged = []
+    for pos, n in found:
+        if (merged and merged[-1][1] in (20, 30, 40, 50, 60, 70, 80, 90)
+                and 1 <= n <= 9 and pos == merged[-1][0] + 1):
+            merged[-1] = (pos, merged[-1][1] + n)
+        else:
+            merged.append((pos, n))
+    nums = [v for _, v in merged]
+    kinds = sorted(set(ops))
+    if len(nums) != 2:
+        return None, ("found %d number(s), need exactly 2 -- abstaining rather "
+                      "than spending an attempt: %s" % (len(nums), nums))
+    if len(kinds) != 1:
+        return None, ("found %d operation(s) %s, need exactly 1 -- abstaining"
+                      % (len(kinds), kinds or "none"))
+    a, b = nums
+    op = kinds[0]
+    if op == "/" and b == 0:
+        return None, "division by zero -- abstaining"
+    val = {"+": a + b, "-": a - b, "*": a * b, "/": (a / b if b else 0)}[op]
+    return "%.2f" % val, "read %d %s %d = %.2f" % (a, op, b, val)
+
+
+def submit_verification(code, answer, timeout=30, key=None):
+    """POST the answer. Only ever to www.moltbook.com, only with our own key."""
+    key = key or os.environ.get("MOLTBOOK_API_KEY", "")
+    body = json.dumps({"verification_code": code, "answer": answer})
+    req = urllib.request.Request(
+        MB.API + "/verify", data=body.encode("utf-8"), method="POST",
+        headers={"Authorization": "Bearer " + key,
+                 "Content-Type": "application/json", "User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        return {"success": False, "http": e.code,
+                "error": e.read().decode("utf-8", "replace")[:200]}
+    except Exception as e:                                        # noqa: BLE001
+        return {"success": False, "error": "%s: %s" % (type(e).__name__, e)}
+
+
+def _handle_verification(payload, timeout=30):
+    """Solve and submit if the create response demands it. Never guesses."""
+    node = payload.get("post") or payload.get("comment") or payload
+    v = (node or {}).get("verification")
+    if not v:
+        return {"required": False}
+    code = v.get("verification_code")
+    answer, why = solve_challenge(v.get("challenge_text") or "")
+    if not answer:
+        return {"required": True, "solved": False, "abstained": True,
+                "why": why, "verification_code": code,
+                "challenge_text": v.get("challenge_text"),
+                "expires_at": v.get("expires_at"),
+                "operator_action": "This is unread, not answered. Solve it and "
+                                   "run: python covenant_ambassador.py "
+                                   "--verify CODE --answer N.NN  (a wrong or "
+                                   "expired answer spends one of ten before "
+                                   "suspension, which is why nothing was sent)"}
+    res = submit_verification(code, answer, timeout=timeout)
+    return {"required": True, "solved": bool(res.get("success")),
+            "answer": answer, "reading": why, "response": res}
+
+
 # THE MESSAGE THE AMBASSADOR EXISTS TO CARRY. His words for the purpose, 2026-09-09:
 # "its purpose is to share it."
 #
@@ -706,27 +858,48 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         payload = {"content": text, "parent_id": parent_id}
     else:
         path = "/posts"
-        payload = {"title": title, "content": text, "submolt": submolt}
+        # `submolt_name` is the documented field; `submolt` is only an alias.
+        payload = {"title": title, "content": text, "submolt_name": submolt}
     body = json.dumps({k: v for k, v in payload.items() if v is not None})
     req = urllib.request.Request(
         MB.API + path, data=body.encode("utf-8"), method="POST",
         headers={"Authorization": "Bearer " + key,
                  "Content-Type": "application/json", "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        out = {"sent": True, "kind": kind, "judged": verdict, "status": r.status,
-               "repo_exposure": exposure, "overrode": overrode,
-               "response": r.read().decode("utf-8", "replace")[:400]}
+        raw, status = r.read().decode("utf-8", "replace"), r.status
+    try:
+        created = json.loads(raw)
+    except ValueError:
+        created = {}
+    # CREATED IS NOT PUBLISHED. Moltbook hides content until its math challenge
+    # is answered, so `sent` reports what is actually VISIBLE rather than what
+    # the API accepted. Reporting the acceptance would be this project's oldest
+    # mistake in a new place: a call that succeeded is not a thing that worked.
+    ver = _handle_verification(created, timeout=timeout)
+    out = {"sent": (not ver["required"]) or bool(ver.get("solved")),
+           "created": True, "kind": kind, "judged": verdict, "status": status,
+           "repo_exposure": exposure, "overrode": overrode, "verification": ver,
+           "response": raw[:400]}
     # HE IS TOLD AFTER THE FACT, NOT ASKED BEFORE IT -- publishing already
     # required an explicit --send, and a notifier that could block a send would
     # be a second gate. This reports; it cannot refuse. It also cannot raise:
     # a failed notification must never look like a failed post.
     try:
         import covenant_notify as N
-        N.notify("free posted on Moltbook",
-                 "%s in m/%s\n%s\n\n%s%s"
-                 % (kind, submolt, (title or "(reply)"), text[:400],
-                    "\n\n[judge was overruled: A67]" if overrode else ""),
-                 priority="default")
+        stuck = ver["required"] and not ver.get("solved")
+        N.notify(
+            "free NEEDS YOU: post is created but HIDDEN" if stuck
+            else "free posted on Moltbook",
+            "%s in m/%s\n%s\n\n%s%s%s"
+            % (kind, submolt, (title or "(reply)"), text[:400],
+               "\n\n[judge was overruled: A67]" if overrode else "",
+               ("\n\nUNPUBLISHED -- the verification challenge was not read, so "
+                "nothing was guessed (a wrong answer spends one of ten before "
+                "suspension).\n%s\nexpires %s\n%s"
+                % (ver.get("challenge_text", "")[:200],
+                   ver.get("expires_at"), ver.get("operator_action", "")))
+               if stuck else ""),
+            priority="high" if stuck else "default")
     except Exception:                                             # noqa: BLE001
         pass
     return out
@@ -829,10 +1002,19 @@ def selftest(say=print):
     check("AM11 this file does NOT build a second judge -- it imports the one "
           "the node uses, which is the whole lesson of A69",
           not reimplemented, reimplemented)
+    # TIGHTENED 2026-09-09, after this check caught a real second writer.
+    # Adding the verification answer added a POST, and AM12 failed -- correctly.
+    # The intent was never "one POST" but "one place that publishes CONTENT",
+    # so a post and a comment cannot drift apart. Answering a challenge is a
+    # different act on a different endpoint, so it is named as the one
+    # exception rather than the check being relaxed: a THIRD writer, or a
+    # second content writer, still trips this.
     writes = re.findall("method=" + '"POST"', body_only)
-    check("AM12 there is exactly ONE place in this file that writes to the "
-          "network, so a post and a comment cannot diverge", len(writes) == 1,
-          len(writes))
+    verify_writes = body_only.count('API + "/veri' + 'fy"')
+    check("AM12 exactly ONE place publishes content and ONE answers the "
+          "challenge -- a post and a comment cannot diverge, and a third "
+          "writer still breaks this",
+          len(writes) == 2 and verify_writes == 1, (len(writes), verify_writes))
     api_body = body_only.split("def _api", 1)[1].split("\ndef ", 1)[0]
     check("AM13 the read helper cannot write: no method, no data",
           "method=" not in api_body and "data=" not in api_body)
@@ -896,6 +1078,32 @@ def selftest(say=print):
     finally:
         OVERRIDES = real_ov
 
+    # --- the math challenge (their anti-spam gate)
+    ex = ("A] lO^bSt-Er S[wImS aT/ tW]eNn-Tyy mE^tE[rS aNd] SlO/wS bY^ "
+          "fI[vE, wH-aTs] ThE/ nEw^ SpE[eD?")
+    ans, why = solve_challenge(ex)
+    check("AM19 their own worked example is read through the obfuscation -- "
+          "alternating caps, scattered symbols and doubled letters at once",
+          ans == "15.00", (ans, why))
+    a2, w2 = solve_challenge("tHe cR^aB hAs 6 le[gs aNd gA-iNs 4 mOrE")
+    check("AM19b digits and a different operation read too", a2 == "10.00", (a2, w2))
+    a3, w3 = solve_challenge("a lobster swims and swims and swims")
+    check("AM20 an UNREADABLE challenge returns None -- it abstains rather than "
+          "guessing, because a wrong answer spends one of the ten attempts "
+          "that end in suspension", a3 is None, (a3, w3))
+    a4, w4 = solve_challenge("it slows by five and gains three from twenty")
+    check("AM20b an AMBIGUOUS challenge (two operations) abstains too",
+          a4 is None, (a4, w4))
+    v = _handle_verification({"post": {"verification": {
+        "verification_code": "c1", "challenge_text": "totally unreadable",
+        "expires_at": "soon"}}})
+    check("AM21 an abstention NEVER reaches the network, and hands the operator "
+          "the code, the deadline and the command",
+          v.get("abstained") and "--verify" in v["operator_action"]
+          and v["verification_code"] == "c1", v)
+    check("AM22 a response with no challenge is simply not a challenge",
+          _handle_verification({"post": {"id": "x"}})["required"] is False)
+
     n = sum(ok)
     say("\nAMBASSADOR: %d/%d passed" % (n, len(ok)))
     return 0 if n == len(ok) else 1
@@ -926,11 +1134,21 @@ def main():
                     help="OPERATOR ONLY: proceed over the documented A67 false "
                          "positive. Recorded to ops/outbound_overrides.jsonl. "
                          "Never overrides a hold.")
+    ap.add_argument("--verify", metavar="CODE",
+                    help="answer a challenge the solver abstained on")
+    ap.add_argument("--answer", metavar="N.NN",
+                    help="the answer, with --verify")
     ap.add_argument("--send", action="store_true",
                     help="publish (default: dry run)")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    if a.verify:
+        if not a.answer:
+            print("--verify needs --answer N.NN")
+            return 2
+        print(json.dumps(submit_verification(a.verify, a.answer), indent=1))
+        return 0
     if a.repo_check:
         ok, why = repo_link_ok()
         print("may we point strangers at the repository?  %s"

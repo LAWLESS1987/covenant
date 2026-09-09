@@ -1038,6 +1038,24 @@ def main():
                 print(f"\n  cycle failed: {type(e).__name__}: {e}")
             time.sleep(max(60, int(cfg["loop_seconds"])))
     run_once(cfg, plan_only=a.plan_only)
+    # THE COMPLETION MARKER, added 2026-09-09. trader_freshness.py answered
+    # "is there a run header dated today?", and its docstring claimed that
+    # header was written by "the run itself". It is not: TRADER_TASK.bat:30
+    # echoes it BEFORE python starts, unconditionally. Measured -- a log
+    # holding only that header, or the header followed by a ModuleNotFoundError
+    # traceback, both returned exit 0 RAN. The monitor on the money path was
+    # answering "did the batch file begin", which is the scheduler's opinion
+    # of what it attempted, the exact thing it was written to stop trusting.
+    #
+    # Only this line can say a cycle finished, so the cycle prints it itself
+    # rather than the wrapper: a marker written by the launcher is bypassed by
+    # launching another way, which is how the duplicate watchdog survived a
+    # "one only" guard for a day.
+    #
+    # It prints for a refusal too (exit 3 below). A cycle that ran and refused
+    # DID complete; refusing is the gate working. What must never print it is a
+    # crash, and a crash cannot: run_once raises straight past this line.
+    print("---- CYCLE COMPLETE %s ----" % datetime.date.today().strftime("%m/%d/%Y"))
     if not LAST_SEAL_OK:
         # A required seal that failed used to leave Last Result 0 in the
         # scheduler and be visible only in trader_log.txt (2026-09-06 panel).

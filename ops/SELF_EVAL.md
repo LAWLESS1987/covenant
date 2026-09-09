@@ -1516,3 +1516,10 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    PASS  none this pass
 
+## 2026-09-09T13:43:59Z  overall WARN  (round 720)
+nodes     PASS  3/3 up, height 14 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+

@@ -88,7 +88,12 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 QUARANTINE = os.environ.get("COVENANT_MOLTBOOK_QUARANTINE") or os.path.join(
     HERE, "ops", "moltbook_candidates.jsonl")
-BASE = "https://moltbook.com"
+# WWW IS NOT COSMETIC. Moltbook's own skill.md, read 2026-09-09: "Using
+# moltbook.com without www will redirect and strip your Authorization
+# header." Nothing here sends a key through BASE today -- fetch() is the
+# dead HTML path (A71) and is unauthenticated -- but a bare host in a
+# constant is a trap primed for whoever next reaches for it.
+BASE = "https://www.moltbook.com"
 UA = "covenant-harvester/1.0 (+https://github.com/LAWLESS1987/covenant)"
 
 # A row is only worth judging if it is a case: long enough to carry a claim,
