@@ -119,6 +119,28 @@ taskkill /f /t /fi "windowtitle eq Covenant Node A*" >> "%OUT%" 2>&1
 taskkill /f /t /fi "windowtitle eq Covenant Node B*" >> "%OUT%" 2>&1
 taskkill /f /t /fi "windowtitle eq Covenant Node C*" >> "%OUT%" 2>&1
 taskkill /f /t /fi "windowtitle eq Covenant Watchdog*" >> "%OUT%" 2>&1
+
+REM  ADDED 2026-09-08. The title filter on the line above cannot see a
+REM  WINDOWLESS watchdog, and that is not hypothetical: PID 5248 was started
+REM  as .venv\Scripts\pythonw.exe on 09-07: pythonw has no console, so it has
+REM  no window title, so every restart since has walked straight past it and
+REM  started a second watchdog beside it. The two then mined the pool once a
+REM  minute each and rate-limited one another into HTTP 429, and both appended
+REM  to ops/SELF_EVAL.md -- which is why that ledger alternated self PASS and
+REM  self FAIL every hour with neither line being wrong.
+REM
+REM  This became load-bearing the moment covenant_prod.bat's "one only" guard
+REM  was fixed the same day: that guard now correctly SEES a surviving stale
+REM  watchdog and declines to start a fresh one, so without this block a
+REM  restart would leave the stale copy as the ONLY watchdog running.
+REM
+REM  Matched on COMMAND LINE, the only thing that actually identifies these.
+REM  NO TREE KILL, deliberately: sentinel_witness/seal_service.py is a
+REM  five-deep DESCENDANT of the stale watchdog and holds port 8433. Stop-Process
+REM  has no /T, so descendants are left running and the fresh watchdog re-adopts
+REM  the seal service on its next pass (covenant_watchdog.py tend_seal_service).
+>> "%OUT%" echo --- stop every watchdog by command line, windowed or not, no tree kill ---
+powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*covenant_watchdog.py*'}); foreach($p in $w){ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue; Write-Output ('stopped watchdog ' + $p.ProcessId) }" >> "%OUT%" 2>&1
 timeout /t 4 /nobreak >nul
 
 >> "%OUT%" echo --- stop by port, whatever still holds 5000 or 5020 ---

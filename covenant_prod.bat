@@ -133,7 +133,23 @@ if %errorlevel% neq 0 (
 timeout /t 20 /nobreak >nul
 
 REM -- watchdog: one only -----------------------------------------------------
-tasklist /v /fi "imagename eq python.exe" 2>nul | findstr /i "watchdog" >nul 2>nul
+REM  FIXED 2026-09-08. This check used to be
+REM      tasklist /v /fi "imagename eq python.exe" | findstr /i "watchdog"
+REM  and it never once matched. `tasklist /v` searches the WINDOW TITLE column,
+REM  and measured today every python.exe on this machine reports its title as
+REM  "N/A" -- including the watchdog that was running at the time. So findstr
+REM  found nothing, errorlevel was always 1, and the "one only" guard started
+REM  ANOTHER watchdog on every single run. That is how two came to be running
+REM  (PID 5248 from 09-07 10:46 on stale source, PID 26012 from 09-08 05:52):
+REM  each mined the pool once a minute, so each rate-limited the other into
+REM  HTTP 429, and each appended its own contradictory verdict to
+REM  ops/SELF_EVAL.md -- which is why that ledger alternated self PASS and
+REM  self FAIL every hour and neither was wrong.
+REM
+REM  Match on the COMMAND LINE, which is the only thing that actually
+REM  identifies this process. `.Where({...})` avoids a pipe, which would need
+REM  escaping inside a batch line. Exit 0 = a watchdog is already running.
+powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*covenant_watchdog.py*'}); exit [int]($w.Count -eq 0)"
 if %errorlevel% neq 0 (
   call :stamp "starting watchdog"
   start "Covenant Watchdog" /min cmd /c "%CE%&& python covenant_watchdog.py --interval 60 >> logs\watchdog-stdout.log 2>&1"
