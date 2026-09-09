@@ -133,7 +133,31 @@ def main():
             lines.append("%s=%s" % (suite.replace(".py", ""), rc))
 
         verdict = "GREEN" if not red else "RED"
-        entry = "%s  %-5s  %s" % (stamp, verdict, "  ".join(lines))
+        # WAS THE TREE MID-EDIT? At 19:03 on 2026-09-09 this task logged
+        #   RED: covenant_moltbook_release.py rc=1
+        # and nothing was wrong with the committed code. The file was being
+        # edited at that moment -- reverted to its old coercion for one minute
+        # to prove a new check could catch it. The task reads the WORKING TREE,
+        # which is right (uncommitted breakage is still breakage a person should
+        # see), but it leaves a red line in a permanent log that a reader will
+        # later investigate and find nothing behind.
+        #
+        # So the entry says which it was. This does NOT change the verdict or
+        # the exit code -- suppressing a red because the tree is dirty is how a
+        # check learns to excuse the thing it exists to notice. It only records
+        # that a person was editing, so tomorrow's reader can tell a regression
+        # from someone's hands being on the keys.
+        dirty = ""
+        try:
+            r = subprocess.run(["git", "status", "--porcelain"], cwd=HERE,
+                               timeout=20, capture_output=True, text=True,
+                               creationflags=_NO_WINDOW)
+            if r.returncode == 0 and r.stdout.strip():
+                n = len([x for x in r.stdout.splitlines() if x.strip()])
+                dirty = "  (tree dirty: %d file%s uncommitted)" % (n, "" if n == 1 else "s")
+        except Exception:
+            dirty = ""          # git absent or slow is not this check's business
+        entry = "%s  %-5s  %s%s" % (stamp, verdict, "  ".join(lines), dirty)
         if red:
             entry += "\n    RED: " + "; ".join(red)
         with open(LOG, "a", encoding="utf-8") as fh:
