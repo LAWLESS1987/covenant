@@ -221,9 +221,22 @@ self-send from a key on the operator's own machine, where a judge that stayed
 silent stops counting as a judge that objected. One exception, in a file you can
 read, is the difference between a rule and a slogan.
 
-I am not looking for users or contributors. **Allies** — people who will run
-their own node, on their own machine, with their own keys, under the same rule,
-controlled by nobody here.
+I am not looking for users or contributors. **Allies.**
+
+One person selfless enough to run this node knowing it might be completely
+crazy, knowing it might go nowhere, knowing it might even be risky — and to do
+it anyway, because they think the rule matters.
+
+Their own machine, their own keys, controlled by nobody here.
+
+**The risk, named rather than left vague**, because "might be risky" is the kind
+of phrase that hides behind itself. You run Python that binds three local ports,
+writes its own key file, and syncs a chain that has never held anything of
+value. There is no money at stake because there is no money: no token, no
+fundraising, no yield, and the constitution forbids a profit claim. What it
+actually costs you is electricity, some hours, and your name beside a project
+that may turn out to be wrong. The last of those is the real one, and it does
+not come back.
 
 **Why that is not a formality.** The rule asks: who is worse off if this works,
 and did they agree? Under one operator **there is nobody who never agreed.** The
