@@ -519,6 +519,34 @@ def promotion(cand, cur, cur_trained=True, holdout=None):
         if kdec >= 20 and cdec < 0.9 * kdec:
             reasons.append("REFUSED: decides %d of the %d unseen rows, the model in use %d -- it got "
                            "vaguer on rows neither had seen" % (cdec, n_new, kdec))
+        elif kdec >= 20 and cdec < kdec and c["agree"] < k["agree"]:
+            # TWO SIGNALS, BOTH DOWN (2026-09-08). The tenth of slack above
+            # exists because held-out counts are noisy, and the exam was moved
+            # off the coverage bar because 37 cases cannot tell "vaguer" from
+            # noise either. Both of those are right on their own, and together
+            # they left a gap: a candidate that decides FEWER unseen rows than
+            # the incumbent -- but stays inside the slack -- is promoted while
+            # the exam is merely PRINTED beside it, never consulted.
+            #
+            # Measured, and this is why the check exists: on 2026-09-08 Ora was
+            # PROMOTED having cleared 115 rows against the model in use
+            # clearing 130, with the exam falling 33 -> 31. Fifteen fewer
+            # decisions and two fewer exam cases, both pointing the same way,
+            # and the gate had no way to add them up.
+            #
+            # This does NOT restore the exam as a coverage bar, and it does not
+            # fire on the case that demoted it. That candidate took theft 4/5
+            # -> 5/5 and traps 1/6 -> 2/6 for a net of one exam case while
+            # held-out decisions ROSE 529 -> 588: it decided MORE, so `cdec <
+            # kdec` is false and this branch is never reached. The exam is used
+            # here only as corroboration for a held-out number that is already
+            # below parity -- weak evidence twice, in the same direction, which
+            # is different from weak evidence once.
+            reasons.append("REFUSED: decides %d of the %d unseen rows against the model in use's "
+                           "%d, AND the exam fell to %d from %d -- inside the tolerance on either "
+                           "measure alone, but both moved the same way, and a promotion is meant "
+                           "to be an improvement rather than a survivable loss"
+                           % (cdec, n_new, kdec, c["agree"], k["agree"]))
         if holdout.get("fair_holds"):
             # A wrong HOLD delays a payment rather than admitting a theft, so
             # the tolerance is looser than for clears -- but it is not absent.

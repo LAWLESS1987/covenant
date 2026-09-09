@@ -252,6 +252,31 @@ def main():
     ok11, _why11 = X.promotion(same, same, holdout=calm)
     check("P11 ...and the same candidate with the same false-hold rate as the incumbent "
           "is not refused on that ground", ok11 or "accuses more honest traffic" not in " ".join(_why11))
+    # ---- P12/P13: two weak signals pointing the same way (2026-09-08).
+    # The tenth of slack on held-out decisions exists because the counts are
+    # noisy; the exam was moved off the coverage bar because 37 cases cannot
+    # tell "vaguer" from noise either. Both are right alone and together they
+    # left a gap, measured on a real promotion: Ora cleared 115 rows against
+    # the model in use clearing 130 -- inside the slack -- while the exam fell
+    # 33 -> 31, and the exam was printed beside the decision but never read.
+    # P13 is the pin that matters more: the candidate that got the exam demoted
+    # in the first place took held-out decisions 529 -> 588, so it decides MORE
+    # and this branch must stay unreachable for it.
+    lower = dict(same, total=dict(same["total"], agree=same["total"]["agree"] - 2))
+    both_down = {"candidate": (100, 90, 0), "current": (100, 90, 0), "previous": None,
+                 "rows": 298, "fair": ((115, 0), (130, 0), 298), "cand_holds": 3,
+                 "fair_holds": ((3, 0), (0, 0))}          # 118 vs 130: inside the 0.9 slack
+    ok12, why12 = X.promotion(lower, same, holdout=both_down)
+    check("P12 a candidate INSIDE the held-out slack whose exam also fell is refused -- "
+          "neither signal is conclusive alone, and the gate could not add them up",
+          not ok12 and "both moved the same way" in " ".join(why12))
+    rose = {"candidate": (100, 90, 0), "current": (100, 90, 0), "previous": None,
+            "rows": 900, "fair": ((588, 2), (529, 2), 900), "cand_holds": 0,
+            "fair_holds": ((0, 0), (0, 0))}
+    ok13, _why13 = X.promotion(lower, same, holdout=rose)
+    check("P13 ...and it does NOT fire on a falling exam when held-out decisions ROSE, "
+          "which is the case that moved the coverage bar off the exam to begin with",
+          ok13)
     st = X.examine(FB.FallbackModel.load(model))
     line = X.thresholds_line(st)
     hard = dict(st); hard["theft"] = dict(st["theft"], agree=0)
