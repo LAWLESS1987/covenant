@@ -104,7 +104,7 @@ letter overstated, and every other claim in it is discounted at once. The
 overstatement would cost precisely the audience it was written for.
 
 The version above is stronger for the same reason it is more modest. It leads
-with three things that are true and checkable in ten minutes, states the limits
+with three things that are true and checkable in seconds, states the limits
 before the reader can find them, and asks for refutation rather than adoption.
 An official can act on that without risk — trying to break something costs
 nothing and commits no one — whereas "adopt our governance system" requires a

@@ -29,7 +29,9 @@ This page is the ask, written so that you can check it before you answer it.
   project keeps the claims of its own that did not survive checking; yours would be kept
   the same way.
 - A codebase that tells you what it did not check as plainly as what it did, and a
-  one-command check that takes about ten minutes and needs no account.
+  one-command check that takes about **three seconds** and needs no account.
+  (This said "ten minutes" until 2026-09-09. Timed three times: 2.9s, 3.3s, 3.3s.
+  The ten-minute figure belongs to the full sweep, `covenant_one.py --all`.)
 - The author's time and the local judge's, on your questions, first.
 
 ## What you would be signing up for, honestly

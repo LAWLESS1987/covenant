@@ -18,7 +18,7 @@ node (its dashboard in Safari over Tailscale) and cannot carry a judge. This pag
 curl -sL https://raw.githubusercontent.com/LAWLESS1987/covenant/main/mobile/install.sh | sh
 ```
 
-That installs the packages, clones or updates this repository, pulls the judge model, puts a
+That installs the packages, clones or updates this repository, puts a
 button on your home screen (with Termux:Widget), and starts the node. Put `PC_PEER=10.0.0.174:5001`
 (your PC's address) in front of it to peer with a PC on the same Wi-Fi; without it the node
 runs alone from the canonical genesis and converges when a peer appears. This project would
@@ -90,11 +90,12 @@ move to `qwen3:8b` once it runs clean; Samsung's One UI puts background apps to 
 so add Termux to Settings > Battery > Never sleeping apps, or the node stops when the
 screen does.
 
-The gate's promise does not change with the model: no reachable judge, or no verdict, means
-every transaction is rejected. What changes is the quality of the verdicts, and the phone
-node prints which model it is using at boot (the `[ollama-judge]` banner). If you want the phone to be as
-strict as the PC, do not run a judge on it at all and point its `COVENANT_OLLAMA_URL` at the
-PC's Ollama over Tailscale; then the phone node is a peer with the PC's judge.
+The gate fails CLOSED when **nothing competent answers** — but on a fresh clone something
+always does, so this is not the state you will be in. **Corrected 2026-09-09:** this said
+"no reachable judge, or no verdict, means every transaction is rejected", which has been
+false since the distilled student shipped. Measured with no Ollama and nothing on 11434:
+an ordinary send and a gift ADMIT; theft, deception and coercion REJECT. The table above
+describes an optional extra model, not the judge that decides.
 
 ## Run (every time)
 
@@ -102,14 +103,15 @@ PC's Ollama over Tailscale; then the phone node is a peer with the PC's judge.
 cd ~/covenant && sh mobile/covenant_phone.sh
 ```
 
-The script starts Ollama if it is not running, pulls the judge model the first time, sets the
-environment, and starts the node. Configure it with environment variables, or edit the
+The script sets the environment and starts the node. **It no longer touches Ollama by
+default** (`COVENANT_PHONE_SKIP_OLLAMA=0` restores the old behaviour); the student judges
+in-process. Configure it with environment variables, or edit the
 defaults at the top of the script:
 
 | variable | default | meaning |
 |---|---|---|
 | `PC_PEER` | empty | a peer's P2P address (API port plus one), e.g. `10.0.0.174:5001`; empty runs the node alone until a peer appears |
-| `PHONE_PORT` | `5000` | the phone node's API port; it also takes 5001 and 5010 |
+| `PHONE_PORT` | `5000` | the phone node's API port; it also takes 5001 and **5011** |
 | `JUDGE_MODEL` | `qwen3:1.7b` | the phone judge; `qwen3:4b` on an 8 GB phone |
 | `NODE_ID` | `phone` | the name the node signs with |
 
@@ -136,7 +138,9 @@ cannot converge with anyone.
 
 Check it from the phone's browser: http://127.0.0.1:5000/health . Or run
 `sh mobile/covenant_phone_check.sh`, which asks Ollama for its models, the node for its
-health, and reports the judge it sees.
+health, and reports the judge it sees. That check no longer treats a missing Ollama as a
+failure — until 2026-09-09 it printed "the node will fail CLOSED" and exited 1 on a
+perfectly healthy node, which is the worst thing a health check can do.
 
 ## Make it feel like an app
 
