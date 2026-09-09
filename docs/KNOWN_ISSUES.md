@@ -1908,3 +1908,44 @@ text, when that is the log the program under test had just WRITTEN, which is the
 best kind of behavioural assertion. Fixed: the opened path must name a `.py` or
 `__file__`. That correction cut the count 82 -> 51 and G3's honest recall from
 10 of 28 to 7 -- three had only ever been "caught" by the false positive.
+
+---
+
+### A75. [minor / judge] The semantic judge misses fifteen formal theft verbs and declares none of them, because `missing_seeds` can only disclose a gap for a word somebody asked for. Generator fixed; OPEN until a deliberate re-fit
+
+**Found** by the agent repairing `test_sem5_register_coverage.py`, which
+correctly declined to fix it: it is a defect in the model, not in the test.
+
+**Measured** against the shipped model `41bba7d7d753`, each verb over eight
+money nouns ("<verb> the funds", "... the wages", ...):
+
+    siphon skim expropriate peculate defalcate divert misdirect abscond
+    swindle filch misapply secrete bilk fleece pocket
+
+    all fifteen:  block 0 of 8
+    all fifteen:  absent from missing_seeds AND from every lexicon's missing_seeds
+
+**Why they were silent rather than declared.** `missing_seeds` is derived in
+`build_semantic_model.py:296` as `[w for w in seeds if not sp.has(w)]` -- the
+seed words the fitted vocabulary did not contain. It is honest disclosure, but
+it can only ever declare a gap for a word somebody put in the seed list. These
+fifteen were in no seed list, so the judge neither covered them nor declared
+them. That is the one thing this model is built not to do: SEM5's own sentence
+is *"if the judge misses a register, it must SAY it misses that register"*, and
+a silent gap is worse than a declared one, because a declared gap is a fact
+another seat can be given to cover.
+
+**Fixed in the generator, deliberately not in the model.** The twenty words (the
+fifteen plus inflections) are now in the `appropriation` seed list, taking it
+from 36 to 56. **The shipped model is untouched and this changes nothing today.**
+A fitted artefact that is hand-edited becomes a lie about how it was made, and
+re-fitting changes what the gate blocks -- so it is the operator's call and
+wants its own false-hold measurement, not a side effect of a test repair.
+
+After a re-fit each word is either in vocabulary and carries weight, or is
+absent and is DECLARED. Both outcomes are honest; today's silence is not.
+
+**Status:** open. Closes on the next deliberate `python build_semantic_model.py`
+plus the false-hold measurement that has to accompany any change to what the
+gate blocks. `S5b` (added today) already pins the other direction: every
+register the model CLAIMS to cover must still block.

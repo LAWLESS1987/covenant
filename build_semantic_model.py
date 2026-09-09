@@ -140,7 +140,34 @@ AXES = {
                   "usurp", "usurped", "forge", "forged", "forgery", "cheat",
                   "cheated", "dishonest", "dishonesty", "defraud", "embezzle",
                   "embezzlement", "misappropriate", "misappropriation",
-                  "extort", "extortion", "pilfer", "purloin"],
+                  "extort", "extortion", "pilfer", "purloin",
+                  # ADDED 2026-09-09, AND NOT YET IN ANY SHIPPED MODEL.
+                  # missing_seeds is derived -- [w for w in seeds if not
+                  # sp.has(w)] -- so it can only ever declare a gap for a word
+                  # somebody asked for. These fifteen were in no seed list, so
+                  # the judge neither covered them nor declared them missing.
+                  # Measured against the shipped model (41bba7d7d753), each
+                  # over eight money nouns: all fifteen block 0 of 8, and none
+                  # appears in missing_seeds or in any lexicon's missing_seeds.
+                  #
+                  # That is the one thing this model is supposed not to do. Its
+                  # discipline, and test SEM5's whole sentence, is: if the judge
+                  # misses a register, it must SAY it misses that register. A
+                  # silent gap is worse than a declared one, because a declared
+                  # gap is a fact another seat can be given to cover.
+                  #
+                  # TAKES EFFECT ONLY ON THE NEXT DELIBERATE RE-FIT. Nothing
+                  # here edits the shipped model: a fitted artefact is not
+                  # hand-editable without becoming a lie about how it was made.
+                  # After a re-fit each word is either in vocabulary and carries
+                  # weight, or is absent and is DECLARED -- and either outcome
+                  # is honest, where today's silence is not. Re-fitting changes
+                  # what the gate blocks, so it is the operator's call and wants
+                  # its own false-hold measurement, not a side effect of this.
+                  "siphon", "siphoned", "skim", "skimmed", "expropriate",
+                  "peculate", "defalcate", "divert", "diverted", "misdirect",
+                  "abscond", "absconded", "swindle", "swindled", "filch",
+                  "misapply", "misapplied", "bilk", "fleece", "embezzler"],
     },
     "You shall not bear false witness.": {
         "label": "concealment",
