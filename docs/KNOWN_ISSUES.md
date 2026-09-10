@@ -2531,3 +2531,77 @@ stops a sale. If the per-symbol evaluation cannot run, it blocks.
 **Verified by mutation.** F7 70/70 clean; with both halves reverted, **68/70**,
 and B9c reports `('PLACED', [])` -- the buy went live with no per-symbol
 question asked. B9d pins that a sale is still never asked.
+
+### A85. [critical / privacy] `covenant_seal.py manifest` walked gitignored paths, so regenerating MANIFEST.sha256 would have written the portfolio, the balance exports and four node identity keys — by name — into a TRACKED file in a PUBLIC repo. FIXED 2026-09-10
+
+**Where.** `covenant_seal.py` `walk()` / `EXCLUDE_DIRS`.
+
+**The defect.** The walk excluded `.venv`, `__pycache__`, `.git`, `logs`,
+`node_modules` and the scratch restore directories — a hand-kept list — and not
+`private/`, which is gitignored at `.gitignore:210` precisely because a
+per-asset quantity is the portfolio and CONSTITUTION II.4 keeps that
+unpublished.
+
+**Measured** by running the documented command:
+
+    25859 in manifest, 25859 changed or missing
+      24638 entries under .claude/worktrees   leftover agent worktrees
+        466 entries under private/            the whole private directory
+
+and among the loose gitignored files it carried:
+
+    holdings.txt, holdings.txt.bak-*          the portfolio
+    coinbase_balance.json / .txt              balances
+    coinbase_history.csv, balance.png
+    covenant_A.db.key, nodeA_prod.db.key,
+    nodeB_prod.db.key, nodeC_prod.db.key      NODE IDENTITY KEYS
+    trader_config.json                        armed state and budgets
+
+`MANIFEST.sha256` records **name, size and hash**, it is **tracked**, and this
+repository is **public**. The committed copy has zero `private/` entries — it
+was built 2026-09-09, before `private/` had grown — so **nothing has been
+published**. The next regeneration would have published all of it.
+
+The file already knew: its own manifest command prints *"MANIFEST.sha256 lists
+your FILENAMES -- use `public` for a version safe to hand to someone you are not
+sharing names with."* The default path did not honour it.
+
+**Fix.** The walk now asks git what it ignores (`git ls-files --others --ignored
+--exclude-standard -z`, one call) and skips those paths, with `private/` and
+`.claude/` also named statically. `.gitignore` is the repository's own statement
+of what is not part of it — private, generated, or not shipped — so this is the
+definition rather than a heuristic, and it cannot drift the way a hand-kept
+second list drifts. `--others` lists only UNTRACKED ignored files, so a tracked
+file is never dropped.
+
+Result: 624 files instead of 25,859; `holdings.txt`, the four `.key` files and
+`trader_config.json` out; `covenant_unified_v8.py` and `docs/CONSTITUTION.md`
+in.
+
+**When git cannot answer, it says so loudly** rather than quietly producing the
+wider set. That mattered immediately: during this fix `subprocess` was not
+imported in `covenant_seal.py`, the helper returned `None`, and the walk silently
+went back to 755 files — the exact failure the fix is about, inside the fix.
+
+**Verified by mutation.** A85 suite 6/6. With the git filter removed and
+`private` un-excluded: **4/6**, M1 naming all 466 private paths and M3 naming 597
+ignored files. M3 pins the general rule — *nothing the walk yields is
+git-ignored* — rather than the two directory names, which is what makes the next
+private directory safe without another edit.
+
+### A85b. [major / tooling] Two tools write MANIFEST.sha256, in different formats
+
+`verify_bundle.py --write` maintains the committed artifact (header comment,
+`hash  path`, walks what git tracks). `covenant_seal.py manifest` writes the same
+filename as `hash  size  path` with CRLF endings. Whichever runs last wins, and
+the other's readers then see **every** line as changed — measured: after
+`covenant_seal.py manifest`, `verify_bundle` reported "624 in manifest, 624
+changed or missing", where the manifest it maintains itself reports 0.
+
+Both views are legitimate; silently replacing one with the other is not.
+`covenant_seal.py manifest` now says so and names the command that restores it.
+Recorded rather than unified, because changing which file a sealing tool writes
+is a structural change, not a repair.
+
+**C4 now passes:** 576 files in the manifest, 0 changed or missing, and the
+self-audit is 6 PASS / 0 FAIL / 0 UNKNOWN for the first time today.

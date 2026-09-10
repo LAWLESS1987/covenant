@@ -64,6 +64,7 @@ import io
 import json
 import os
 import struct
+import subprocess
 import sys
 import tarfile
 import time
@@ -78,7 +79,32 @@ EXCLUDE_DIRS = {".venv", "__pycache__", ".git", "logs", "node_modules",
                 # the next archive. Observed on the real folder: 129 files
                 # became 261 and covenant_sealed.bin doubled to 1.4 MB.
                 # A manifest must not swallow its own output.
-                "_unsealtest", "_unseal", "scratch", "_to_delete"}
+                "_unsealtest", "_unseal", "scratch", "_to_delete",
+                # A85 (2026-09-10). THE MANIFEST LISTS FILENAMES, AND THIS
+                # REPOSITORY IS PUBLIC.
+                #
+                # `private/` is gitignored (.gitignore:210) precisely because a
+                # per-asset quantity is the portfolio and CONSTITUTION II.4
+                # keeps that unpublished. It was not excluded here, so running
+                # the documented `covenant_seal.py manifest` today walked it and
+                # wrote 466 private paths into MANIFEST.sha256 -- a TRACKED file
+                # in a PUBLIC repo. Measured: names like
+                # portfolio_whole_2026-09-02.csv, coinbase_balances_*.csv and
+                # the NSF draft filenames. The committed manifest has zero
+                # private/ entries, so nothing has been published; it was built
+                # on 2026-09-09 before private/ had grown, and the next
+                # regeneration would have done it.
+                #
+                # It is also simply wrong as a manifest: private/ is not part of
+                # the delivery, so a verifier on another machine could never
+                # match it.
+                "private",
+                # And `.claude/` holds agent scratch, including leftover git
+                # worktrees. Measured on the same run: 24,638 of 25,859 manifest
+                # entries were worktree copies -- the manifest grew 45x and
+                # verify_bundle reported "25859 in manifest, 25859 changed or
+                # missing", a record that certifies nothing about anything.
+                ".claude"}
 EXCLUDE_EXT = {".pyc", ".pyo", ".tmp",
                # 88MB of vendor installer is not your work and does not
                # need sealing. Re-downloadable; excluded from both the
@@ -104,6 +130,9 @@ EXCLUDE_NAMES = {"covenant_sealed.bin", "covenant_sealed.json",
 # Proofs are outputs too, and there can be any number of them.
 EXCLUDE_PREFIX = ("PROOF_",)
 
+# Distinguishes 'caller passed nothing' from 'caller passed None on purpose'.
+_SENTINEL = object()
+
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 1 << 17, 8, 1     # ~128 MB, ~1s. Deliberate.
 MAGIC = b"CVNTSEAL1"
 INFO = b"covenant-seal-v1"
@@ -116,7 +145,62 @@ MODE_BOTH = "keyfile+passphrase"
 
 
 # ------------------------------------------------------------------ walk --
-def walk():
+def git_ignored_set():
+    """Every UNTRACKED file git ignores, or None if git cannot answer here.
+
+    A85 (2026-09-10). THE STATIC LIST WAS NOT THE REPOSITORY'S OWN ANSWER, and
+    the gap was not academic. Measured on this tree, the walk carried 131
+    git-ignored files, among them:
+
+        holdings.txt, holdings.txt.bak-*     the portfolio
+        coinbase_balance.json/.txt           balances
+        coinbase_history.csv, balance.png
+        covenant_A.db.key, nodeA_prod.db.key, nodeB_prod.db.key,
+        nodeC_prod.db.key                    NODE IDENTITY KEYS
+        trader_config.json                   armed state and budgets
+        private/  (466 files)                CONSTITUTION II.4
+
+    MANIFEST.sha256 records NAME, SIZE and HASH, it is TRACKED, and this
+    repository is PUBLIC. This file's own manifest command already prints
+    "MANIFEST.sha256 lists your FILENAMES -- use `public` for a version safe to
+    hand to someone you are not sharing names with", so the sensitivity was
+    known; the default path simply did not honour it.
+
+    .gitignore is the repository's own statement of what is not part of it --
+    private, generated or not shipped, and all three are reasons a public
+    integrity record should not name the file. Asking git is therefore not a
+    heuristic; it is the definition, and it cannot drift the way a hand-kept
+    second list drifts.
+
+    ONE CALL, not one per path. `--others --ignored --exclude-standard` lists
+    ignored UNTRACKED files only, so a TRACKED file is never dropped from the
+    manifest even if it matches a pattern -- which is right: a tracked file IS
+    part of the delivery.
+
+    Returns None when git cannot answer. The caller must then say so out loud
+    rather than quietly producing a wider manifest, because "could not check"
+    is not "nothing to exclude" -- the lesson of A73, A76 through A82.
+    """
+    try:
+        p = subprocess.run(["git", "ls-files", "--others", "--ignored",
+                            "--exclude-standard", "-z"],
+                           cwd=HERE, capture_output=True, timeout=120)
+    except Exception:                                        # noqa: BLE001
+        return None
+    if p.returncode != 0:
+        return None
+    return {x.decode("utf-8", "replace").replace("\\", "/")
+            for x in p.stdout.split(b"\0") if x.strip()}
+
+
+def walk(ignored=_SENTINEL):
+    """Yield (relative path, full path) for every file the delivery contains.
+
+    `ignored` is computed once per walk by default; pass a set (or None) to
+    control it, which is what the A85 suite does to test both modes.
+    """
+    if ignored is _SENTINEL:
+        ignored = git_ignored_set()
     for root, dirs, files in os.walk(HERE):
         dirs[:] = sorted(d for d in dirs if d not in EXCLUDE_DIRS)
         for f in sorted(files):
@@ -126,6 +210,8 @@ def walk():
                 continue
             full = os.path.join(root, f)
             rel = os.path.relpath(full, HERE).replace("\\", "/")
+            if ignored and rel in ignored:
+                continue
             yield rel, full
 
 
@@ -326,6 +412,33 @@ def cmd_manifest(_):
                 f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n")
     print(f"  {len(rows)} files")
     print(f"  root {root}")
+    # SAY WHICH MODE PRODUCED THIS SET (A85). A manifest built without git's
+    # answer is WIDER -- it can name gitignored files, which here include the
+    # portfolio, the balance exports and four node identity keys. Silently
+    # producing the wider set is the exact failure this whole fix is about, and
+    # it happened once during the fix itself: subprocess was not imported, the
+    # helper returned None, and the walk quietly went back to 755 files.
+    # TWO WRITERS, ONE FILENAME (A85b, 2026-09-10). verify_bundle.py --write
+    # also writes MANIFEST.sha256, and in a DIFFERENT format: it emits a header
+    # comment and `hash  path`, this emits `hash  size  path`. Whichever runs
+    # last wins, and the loser's readers see every line as changed -- measured:
+    # after this command, verify_bundle reported "624 in manifest, 624 changed
+    # or missing", where the file it maintains itself reports 0.
+    #
+    # verify_bundle is the maintainer of the committed artifact: it walks what
+    # GIT TRACKS. This command is the sealing tool's own view. Both are
+    # legitimate; silently overwriting one with the other is not.
+    print("  ! NOTE: verify_bundle.py --write also maintains MANIFEST.sha256,")
+    print("    in a different format (header, no size column). You have just")
+    print("    replaced it. If the committed manifest is what you wanted, run")
+    print("    `python verify_bundle.py --write` to put it back.")
+    if git_ignored_set() is None:
+        print("  ! git could not be asked what it ignores, so this manifest is")
+        print("    the WIDER set from the static exclusion list alone. Check it")
+        print("    for private paths BEFORE committing -- 'could not check' is")
+        print("    not 'nothing to exclude'.")
+    else:
+        print("  scope: git-tracked delivery only (gitignored paths excluded)")
     print("  wrote MANIFEST.sha256 and SEAL_ROOT.txt")
     print("  MANIFEST.sha256 lists your FILENAMES -- use `public` for a")
     print("  version safe to hand to someone you are not sharing names with.")
