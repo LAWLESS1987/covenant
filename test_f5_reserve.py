@@ -185,11 +185,27 @@ def main():
           T.RESERVE_PATH)
     # P4b is the half that actually protects him and that nothing asserted: the
     # directory being named private/ is worthless if git will commit it.
-    _ign = subprocess.run(["git", "check-ignore", "-q", T.RESERVE_PATH],
-                          cwd=HERE, capture_output=True)
-    check("P4b ...and git genuinely ignores that path -- the name private/ is a "
-          "convention, the ignore rule is the mechanism",
-          _ign.returncode == 0, "check-ignore rc=%d" % _ign.returncode)
+    # THREE STATES, NOT TWO (A85c, and this is the same mistake one commit
+    # earlier). covenant_one runs every suite in a STAGED COPY with no .git, so
+    # `git check-ignore` cannot answer there and a two-state check reported a
+    # failure -- F5 46/47, sweep red, CI red -- while F5 was 47/47 here.
+    #
+    # An ignore rule is a property OF A REPOSITORY. Outside one there is no rule
+    # to violate, so the check has no subject; P4 above still pins that the path
+    # is under private/. A repository that EXISTS and cannot answer is still a
+    # failure, and that distinction is kept.
+    _in_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                              cwd=HERE, capture_output=True, text=True)
+    if not (_in_repo.returncode == 0 and _in_repo.stdout.strip() == "true"):
+        check("P4b ...and git genuinely ignores that path -- N/A here, no git "
+              "repository (staged copy); P4 above still holds", True,
+              "not a git work tree")
+    else:
+        _ign = subprocess.run(["git", "check-ignore", "-q", T.RESERVE_PATH],
+                              cwd=HERE, capture_output=True)
+        check("P4b ...and git genuinely ignores that path -- the name private/ is "
+              "a convention, the ignore rule is the mechanism",
+              _ign.returncode == 0, "check-ignore rc=%d" % _ign.returncode)
 
     # ---- P2b/H7b: THE SAME CLAIMS, RUN RATHER THAN READ --------------------
     # P1-P4 and H7 above are greps. Measured 2026-09-09 by mutation, in an

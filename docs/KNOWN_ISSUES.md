@@ -2691,3 +2691,27 @@ handlers, for the second time this week (A77b was the first).
 Devices Platform Service -- legitimate, auto-start, and not a covenant process.
 It is named here because it is wildcard-bound and inbound-permitted on the
 public profile, and because its purpose is device pairing and discovery.
+
+### A84b. [major / tests] The same staged-copy mistake, one commit earlier: F5's P4b also asked git a question the sweep cannot answer. FIXED 2026-09-10
+
+A84 added P4b — *git genuinely ignores `RESERVE_PATH`* — as a two-state check.
+`covenant_one` runs every suite in a staged copy with no `.git`, so
+`check-ignore` returned non-zero there and P4b failed: **F5 46/47, sweep red, CI
+red**, while F5 was 47/47 in the working tree.
+
+This is A85c's defect one commit **earlier**, and it is why the CI run at
+`3955844` failed — the same root cause I diagnosed on `59460fa` and then failed
+to look for in the check I had written an hour before.
+
+Fixed the same way: an ignore rule is a property **of a repository**, so outside
+one the check has no subject and reports N/A; P4 still pins that the path is
+under `private/`; a repository that exists and cannot answer is still a failure.
+
+**Verified where the runner runs it.** In a staged copy: F5 47/47, F7 70/70,
+A82 18/18, A85 6/6, all rc=0.
+
+**Three instances in one day** — A84 P4b, A85 M3, and A82's A2 (which reported
+N/A on a working machine because a swallow hid a missing import). The pattern is
+not "git is unreliable"; it is that a check asking an environment-dependent
+question needs three answers, and **a new suite is not finished until it has
+been run where the sweep will run it.**
