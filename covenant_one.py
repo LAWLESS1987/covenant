@@ -313,6 +313,7 @@ SUITES = [
     # exit 2. That is the correct answer and it is not a pass. A suite nobody
     # runs is indistinguishable from a suite that does not exist.
     ("test_a77_listener_bind.py",         120, "SECURITY"),
+    ("test_a82_exposure_unknown.py",      120, "SECURITY"),
     ("test_g3_behavioural_guards.py",     120, "SECURITY"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),

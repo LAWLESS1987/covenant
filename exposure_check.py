@@ -63,17 +63,45 @@ PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 10)})
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
 
-def _run(cmd: List[str]) -> str:
+def _run(cmd: List[str]) -> Optional[str]:
+    """The command's output, or None if it DID NOT RUN. A82 (2026-09-10).
+
+    This returned "" for both, and every caller read "" as "measured, found
+    nothing". Measured on this machine: with netstat reachable the tool printed
+    four WILDCARD sockets and "REACHABLE ... on: private, public", exit 1; sixty
+    seconds later, same binary and same source, with netstat merely not
+    resolvable, it printed "Nothing listening on any covenant port. Nothing to
+    expose." and exited 0. A 25s TimeoutExpired lands in the same "".
+
+    That is the worst possible failure for THIS tool specifically: it exists to
+    answer whether the operator's machine is reachable from the internet, and
+    the answer it gave when it could not look was the reassuring one. The file
+    says the rule itself twice -- "do not treat 'could not check' as 'not
+    exposed'" at the platform branch, and "Treat as UNKNOWN, not as safe" when
+    the program cannot be identified. _run defeated both.
+    """
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
-        return (out.stdout or "") + (out.stderr or "")
     except Exception:                                        # noqa: BLE001
-        return ""
+        return None
+    text = (out.stdout or "") + (out.stderr or "")
+    # A non-zero exit with nothing to say is a command that did not do its job.
+    # Genuinely empty output from a SUCCESSFUL command stays "", which is a
+    # measurement, and callers may read it as one.
+    if out.returncode != 0 and not text.strip():
+        return None
+    return text
 
 
-def listeners() -> List[Dict[str, object]]:
-    """(address, port, pid) for every LISTENING socket on a covenant port."""
+def listeners() -> Optional[List[Dict[str, object]]]:
+    """(address, port, pid) for every LISTENING socket on a covenant port.
+
+    None means netstat DID NOT RUN -- unknown, not empty. [] means it ran and
+    matched nothing, which is a real measurement (A82).
+    """
     text = _run(["netstat", "-ano"])
+    if text is None:
+        return None
     if not text:
         return []
     found = []
@@ -101,10 +129,19 @@ def program_for(pid: str) -> Optional[str]:
     return out or None
 
 
-def allowing_rules(program: str) -> List[Tuple[str, str]]:
-    """(rule name, profiles) for enabled inbound Allow rules naming `program`."""
+def allowing_rules(program: str) -> Optional[List[Tuple[str, str]]]:
+    """(rule name, profiles) for enabled inbound Allow rules naming `program`.
+
+    None means netsh DID NOT RUN. [] means it ran and no enabled inbound Allow
+    rule names this program -- which main() renders as "likely NOT reachable",
+    a sentence that must never be printed on the strength of a failed command
+    (A82). Measured: with netsh reachable this returned four real Private and
+    Public ALLOW rules; with it unreachable, [].
+    """
     text = _run(["netsh", "advfirewall", "firewall", "show", "rule",
                  "name=all", "dir=in", "verbose"])
+    if text is None:
+        return None
     if not text:
         return []
     hits, block, target = [], [], os.path.basename(program).lower()
@@ -136,6 +173,15 @@ def main() -> int:
     print("  " + "-" * 60)
 
     live = listeners()
+    if live is None:
+        # Exit 2 is this file's existing code for "this check could not run",
+        # used by the platform branch above. (The `not programs` branch below
+        # predates A82 and returns 1 for its own UNKNOWN; both are non-zero, so
+        # nothing that asks "did this pass" is misled either way.)
+        print("  COULD NOT RUN netstat, so what is listening is UNKNOWN.")
+        print("  This is NOT a clean result. Do not read it as 'nothing to")
+        print("  expose' -- that is the sentence this branch exists to prevent.")
+        return 2
     if not live:
         print("  Nothing listening on any covenant port. Nothing to expose.")
         return 0
@@ -177,9 +223,16 @@ def main() -> int:
     print()
     print("  Firewall:")
     permitted = []
+    unknown_firewall = False
     for prog in sorted(programs):
         rules = allowing_rules(prog)
         print("    %s" % prog)
+        if rules is None:
+            print("      COULD NOT READ the firewall rules for this program")
+            print("      (netsh did not run). Whether anything off this machine")
+            print("      can reach it is UNKNOWN, and unknown is not safe.")
+            unknown_firewall = True
+            continue
         if not rules:
             print("      no enabled inbound Allow rule names this program.")
             print("      Windows blocks inbound by default, so this is likely")
@@ -229,6 +282,19 @@ def main() -> int:
         print("  covenant_unified_v8.py. Needs a chain restart, and costs")
         print("  nothing while every node runs on this one machine.")
         return 1
+
+    if unknown_firewall:
+        # THE SENTENCE BELOW MUST NOT BE PRINTED ON A FAILED COMMAND (A82).
+        # "Probably not reachable" is a claim about the firewall, and if netsh
+        # did not run for even one serving program then nobody looked at it.
+        # Measured before the fix: netsh unreachable produced exactly this
+        # reassuring paragraph on a machine certified REACHABLE on the public
+        # profile one minute earlier.
+        print("  UNKNOWN, not safe: the sockets are wildcard-bound and the")
+        print("  firewall rules for at least one serving program could not be")
+        print("  read. Nothing here says whether they are reachable. Check")
+        print("  from another device, or re-run when netsh is available.")
+        return 2
 
     print("  Probably not reachable: sockets are wildcard-bound, but no")
     print("  enabled inbound Allow rule names the serving program. Windows")

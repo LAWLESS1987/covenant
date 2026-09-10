@@ -2444,3 +2444,47 @@ informative count line and adds `G3: n/n passed (no file rose above its
 baseline)`, counted as one invariant per file plus the total. Verified by
 feeding each suite's real stdout to `covenant_one.TALLY`: both now yield a
 tally, `rc=0`.
+
+### A82. [major / security tooling] exposure_check printed "Nothing to expose" and exited 0 when it could not look. FIXED 2026-09-10
+
+**Where.** `exposure_check.py` `_run`, `listeners`, `allowing_rules`, `main`.
+
+**The defect.** `_run` collapsed `FileNotFoundError`, a non-zero exit and a real
+25-second `TimeoutExpired` all into `""`, and both readers treated `""` as
+"measured, found nothing".
+
+**Measured on this machine, sixty seconds apart, same binary and same source:**
+
+    netstat reachable   -> 4 WILDCARD sockets, "REACHABLE ... on: private, public", EXIT=1
+    netstat unreachable -> "Nothing listening on any covenant port.
+                            Nothing to expose."                          EXIT=0
+
+The second run is on a machine the tool itself had just certified reachable on
+the **public** profile. The firewall half behaved the same way: with netsh
+reachable `allowing_rules` returned four real Private/Public ALLOW rules; with
+netsh unreachable it returned `[]`, which `main()` renders as *"Probably not
+reachable"*.
+
+**Why this tool specifically.** It exists to answer whether the operator's
+machine is reachable from the internet, and the answer it gave when it could not
+look was the reassuring one. The file states the correct rule twice in its own
+prose -- *"do not treat 'could not check' as 'not exposed'"* and *"Treat as
+UNKNOWN, not as safe"* -- and `_run` defeated both. Same shape as A73/A76-A81:
+two different facts arriving as one value.
+
+**Fix.** `_run` returns `Optional[str]`: `None` when the command did not run, or
+exited non-zero with nothing to say; a genuinely empty result from a successful
+command stays `""` and is still a measurement. `listeners()` and
+`allowing_rules()` propagate `None` rather than flattening it. `main()` branches
+on it and reports UNKNOWN with exit 2 -- the code the platform branch already
+uses for "this check could not run" -- and the *"Probably not reachable"*
+paragraph is now unreachable when any serving program's rules could not be read.
+
+**Nothing referenced exposure_check before this.** `test_a82_exposure_unknown.py`
+is new: 13/13, registered in `covenant_one.py`, and its tally parses. Reverting
+the seam gives 12/13; reverting the three caller-side `None` checks gives
+**6/13**, with `rc=0` on an unmeasurable machine -- the original defect exactly.
+
+**Live finding, unrelated to the bug:** the real run still reports **REACHABLE
+on private and public** for ports 5000/5020/5040/5060. That is the tool working,
+and it is the operator's decision to act on.
