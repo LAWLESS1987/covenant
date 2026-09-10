@@ -2715,3 +2715,36 @@ N/A on a working machine because a swallow hid a missing import). The pattern is
 not "git is unreliable"; it is that a check asking an environment-dependent
 question needs three answers, and **a new suite is not finished until it has
 been run where the sweep will run it.**
+
+### A87. [major / tests] P20's only guard on the self-evaluation ledger read `one_pass`'s SOURCE, so a one-character default could silence the ledger for ever with every watchdog suite green. FIXED 2026-09-10
+
+**Where.** `test_p20_watchdog_self_eval.py` E11a/E11b.
+
+**The defect.** Both checks assert over `inspect.getsource(wd.one_pass)`. They
+see the **call** and never the **behaviour**. Measured by mutation:
+
+* set `SELF_EVAL_EVERY`'s default (`covenant_watchdog.py:718`) from `"60"` to
+  `"0"` — the ledger is silenced permanently, `one_pass` is byte-identical, and
+  P20 plus every other watchdog suite stays green;
+* or wrap the call site in `if False and ...` — the text is still there and the
+  write never happens.
+
+`covenant_watchdog._self_eval_write` is the tree's **only** writer of
+`ops/SELF_EVAL.md`, and that ledger is how the operator knows the monitor is
+still watching. A guard on it that cannot tell a live call from a dead one is
+guarding the sentence, not the thing.
+
+**Fix.** E11c/E11d/E11e run `one_pass` with `SELF_EVAL_PATH` redirected to a
+temp directory and `health`, `start_node` and `log` stubbed the way
+`test_watchdog_outage.py` already stubs them — no node probed, none started,
+nothing real written. E11c asserts the ledger is actually written; E11d that it
+contains a real verdict block rather than an empty heading; **E11e that
+`SELF_EVAL_EVERY=0` genuinely silences it**, so E11c is measuring the gate and
+not a write that would happen regardless.
+
+**28/28**, in the working tree and in a staged copy — the fourth step from
+A84b/A85c, done before committing this time rather than after.
+
+**Verified it touched nothing real:** the only change to `ops/SELF_EVAL.md`
+during the run was the watchdog's own hourly block (round 1260, real node data),
+not the stub's.

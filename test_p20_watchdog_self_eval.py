@@ -37,6 +37,7 @@ never run; the writer is tested against a temp directory.
 import ast
 import builtins
 import inspect
+import io
 import os
 import subprocess
 import sys
@@ -273,6 +274,63 @@ def main():
           "self_evaluation(" in src and "SELF_EVAL_EVERY" in src, "")
     check("E11b the verdict line is logged directly, not through Adaptation",
           "_adapt_info.observe" not in src.split("self_evaluation(")[1], "")
+
+    # E11c/E11d: RUN IT. A87 (2026-09-10).
+    #
+    # E11a and E11b read inspect.getsource(one_pass), so they see the CALL and
+    # never the BEHAVIOUR. Measured by mutation: set SELF_EVAL_EVERY's default
+    # at covenant_watchdog.py:718 from "60" to "0" and the ledger is silenced
+    # permanently -- one_pass stays byte-identical, and P20 and every other
+    # watchdog suite stay green. The same is true of `if False and ...` at the
+    # call site: the text is still there, the write never happens.
+    #
+    # covenant_watchdog._self_eval_write is the tree's ONLY writer of
+    # ops/SELF_EVAL.md, and the self-eval is the record the operator reads to
+    # know the monitor is still watching. A guard on it that cannot tell a live
+    # call from a dead one is guarding the sentence, not the thing.
+    #
+    # Everything below is stubbed the way test_watchdog_outage.py already
+    # stubs it: no node is probed, none started, nothing real is written.
+    import tempfile as _tf
+    _saved_se = (wd.SELF_EVAL_PATH, wd.SELF_EVAL_EVERY, wd.health,
+                 wd.start_node, wd.log, dict(wd._self_eval))
+    try:
+        _dir = _tf.mkdtemp()
+        wd.SELF_EVAL_PATH = os.path.join(_dir, "SELF_EVAL.md")
+        wd.health = lambda port, timeout=8: (
+            {"warnings": [], "chain_height": 9, "peers": 1,
+             "version": "v8.40", "judge": "quorum(x)"}, "")
+        wd.start_node = lambda n: None
+        wd.log = lambda level, msg: None
+
+        wd.SELF_EVAL_EVERY = 1
+        wd._self_eval["round"] = 0
+        wd.one_pass()
+        _wrote = (os.path.exists(wd.SELF_EVAL_PATH)
+                  and os.path.getsize(wd.SELF_EVAL_PATH) > 0)
+        _body = (io.open(wd.SELF_EVAL_PATH, encoding="utf-8").read()
+                 if _wrote else "")
+        check("E11c one_pass ACTUALLY WRITES the self-evaluation ledger -- run, "
+              "not read: the source can say self_evaluation() while the write "
+              "never happens", _wrote, "%d bytes" % (len(_body)))
+        check("E11d ...and what it writes is a real verdict block, not an empty "
+              "heading", "overall" in _body and "nodes" in _body,
+              _body.strip()[:70])
+
+        # The gate must work in the OTHER direction too, or E11c would pass on
+        # a watchdog that wrote the ledger every single round.
+        os.remove(wd.SELF_EVAL_PATH)
+        wd.SELF_EVAL_EVERY = 0
+        wd._self_eval["round"] = 0
+        wd.one_pass()
+        check("E11e ...and SELF_EVAL_EVERY=0 genuinely silences it, so E11c is "
+              "measuring the gate and not just a write that always happens",
+              not os.path.exists(wd.SELF_EVAL_PATH))
+    finally:
+        (wd.SELF_EVAL_PATH, wd.SELF_EVAL_EVERY, wd.health,
+         wd.start_node, wd.log) = _saved_se[:5]
+        wd._self_eval.clear()
+        wd._self_eval.update(_saved_se[5])
 
     p = sum(results)
     print(f"\nP20: {p}/{len(results)} passed")

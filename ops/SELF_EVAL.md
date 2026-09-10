@@ -1628,3 +1628,45 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
 
+## 2026-09-10T11:53:52Z  overall WARN  (round 960)
+nodes     PASS  3/3 up, height 15 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T12:59:16Z  overall WARN  (round 1020)
+nodes     PASS  3/3 up, height 15 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T14:04:40Z  overall WARN  (round 1080)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T15:10:07Z  overall WARN  (round 1140)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T16:15:31Z  overall WARN  (round 1200)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T17:21:03Z  overall WARN  (round 1260)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
