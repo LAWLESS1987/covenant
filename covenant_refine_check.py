@@ -158,28 +158,62 @@ def main():
         # can be a disarmed guard on the money path.
         #
         # The needle is assembled at runtime so this file does not match itself.
+        #
+        # THE FIRST VERSION OF THIS CHECK HAD THE SAME SHAPE AS THE BUG IT
+        # GUARDS. Written and committed an hour earlier, it scanned
+        # os.listdir(HERE) -- the top level only. Measured straight afterwards:
+        # 268 tracked .py files, 48 of them in subdirectories, including all
+        # four in ops/ and both in quant/. A mutation left in any of those would
+        # have passed a check whose whole purpose is to notice it, and the log
+        # line would have read no_stray_mutation=0 while one sat there. That is
+        # A73 again one level down, and the same shape as the A76 skip that
+        # counted nine unread videos as done: a negative result that cannot tell
+        # "clean" from "never looked".
+        #
+        # Enumerating through git is what makes the scope honest rather than
+        # guessed. It is exactly the tracked set at any depth -- .venv, the
+        # throwaway mutation worktrees under .claude/, and private/ are excluded
+        # because git already knows they are not source. The listdir fallback is
+        # narrower and SAYS SO in the log, because a check that silently
+        # degrades to a smaller scope is the bug above wearing a different hat.
         needle = "MUT" + "ANT"
-        stray = []
+        me = os.path.abspath(__file__)
+        files, how = [], ""
         try:
-            for name in os.listdir(HERE):
-                if name.endswith(".mutbak") or ".mutbak" in name:
-                    stray.append(name)
-                    continue
-                if not name.endswith(".py"):
-                    continue
-                p = os.path.join(HERE, name)
-                try:
-                    with open(p, encoding="utf-8", errors="replace") as fh:
-                        body = fh.read()
-                except OSError:
-                    continue
-                if needle in body and name != os.path.basename(__file__):
-                    stray.append(name)
-        except OSError:
-            stray = []
+            r = subprocess.run(["git", "ls-files", "*.py"], cwd=HERE, timeout=30,
+                               capture_output=True, text=True,
+                               creationflags=_NO_WINDOW)
+            if r.returncode != 0 or not r.stdout.strip():
+                raise OSError("git listed nothing")
+            files = [x.strip() for x in r.stdout.splitlines() if x.strip()]
+        except Exception:                                        # noqa: BLE001
+            how = "-listdir"       # git absent or broken; scope shrinks, say so
+            files = [n for n in os.listdir(HERE) if n.endswith(".py")]
+        stray = []
+        for rel in files:
+            full = os.path.join(HERE, rel)
+            if os.path.abspath(full) == me:
+                continue
+            try:
+                with open(full, encoding="utf-8", errors="replace") as fh:
+                    if needle in fh.read():
+                        stray.append(rel)
+            except OSError:
+                continue
+        # A .mutbak backup is untracked by definition, so git cannot list it.
+        # Look in every directory that holds tracked python, which is where a
+        # mutation tool writes the backup it means to restore from.
+        for d in sorted({os.path.dirname(f) for f in files}):
+            try:
+                for n in os.listdir(os.path.join(HERE, d) if d else HERE):
+                    if ".mutbak" in n:
+                        stray.append(os.path.join(d, n) if d else n)
+            except OSError:
+                continue
         if stray:
             red.append("MUTATION LEFT IN TREE: " + ", ".join(sorted(stray)[:6]))
         lines.append("no_stray_mutation=%d" % (1 if stray else 0))
+        lines.append("scanned=%d%s" % (len(files), how))
 
         verdict = "GREEN" if not red else "RED"
         # WAS THE TREE MID-EDIT? At 19:03 on 2026-09-09 this task logged
