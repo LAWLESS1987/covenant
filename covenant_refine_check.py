@@ -140,6 +140,47 @@ def main():
                 red.append("%s rc=%s" % (suite, rc))
             lines.append("%s=%s" % (suite.replace(".py", ""), rc))
 
+        # A LIVE MUTATION WAS LEFT IN THE TREE ONCE, AND IT DISARMED THE MONEY.
+        #
+        # A73, 2026-09-09. A mutation audit ran 30+ agents against one shared
+        # working tree. When it ended, covenant_trader.py was still sitting there
+        # with its two `qty = sellable` clamps replaced by `pass` -- the ONLY
+        # enforcement of the 50% reserve and of the frozen HOLD_ONLY floor, gone,
+        # while the trader was armed. Nothing was committed and no trader ran in
+        # that window, so no harm followed. That was luck. It was found by
+        # someone thinking to look, which is exactly the thing that must not be
+        # the control.
+        #
+        # Mutation testing is the right method and will be run again. So the
+        # check is not "never mutate" -- it is "never leave one behind". Any
+        # source file still carrying a mutation marker, and any .mutbak left in
+        # the tree, is an unfinished run, and an unfinished run on this codebase
+        # can be a disarmed guard on the money path.
+        #
+        # The needle is assembled at runtime so this file does not match itself.
+        needle = "MUT" + "ANT"
+        stray = []
+        try:
+            for name in os.listdir(HERE):
+                if name.endswith(".mutbak") or ".mutbak" in name:
+                    stray.append(name)
+                    continue
+                if not name.endswith(".py"):
+                    continue
+                p = os.path.join(HERE, name)
+                try:
+                    with open(p, encoding="utf-8", errors="replace") as fh:
+                        body = fh.read()
+                except OSError:
+                    continue
+                if needle in body and name != os.path.basename(__file__):
+                    stray.append(name)
+        except OSError:
+            stray = []
+        if stray:
+            red.append("MUTATION LEFT IN TREE: " + ", ".join(sorted(stray)[:6]))
+        lines.append("no_stray_mutation=%d" % (1 if stray else 0))
+
         verdict = "GREEN" if not red else "RED"
         # WAS THE TREE MID-EDIT? At 19:03 on 2026-09-09 this task logged
         #   RED: covenant_moltbook_release.py rc=1
