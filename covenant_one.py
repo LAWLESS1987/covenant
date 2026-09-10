@@ -557,9 +557,24 @@ def stage(say):
     os.makedirs(os.path.join(work, "logs"), exist_ok=True)
     for name in os.listdir(HERE):
         p = os.path.join(HERE, name)
+        # .md IS STAGED TOO, since 2026-09-10, and its absence was a real
+        # failure. The record sentinel guards four documents. Three live under
+        # docs/, which is copied wholesale below. The fourth, MY_STRATEGY.md,
+        # sits at the root -- and the root was filtered by extension with no
+        # .md in the list, so it never arrived. In the staged copy the sentinel
+        # then measured nothing for it, R6 reported it "unguarded", and
+        # test_sentinels failed on every sweep and every CI run.
+        #
+        # Nothing was wrong with the sentinel. THE COPY WAS NOT THE REPOSITORY,
+        # which is worse: a suite that passes or fails against a tree missing a
+        # file it is supposed to read is not measuring this project. All 26
+        # top-level .md files total 197 KB, so the honest fix is to stage them
+        # rather than to add MY_STRATEGY.md to the extension list and wait for
+        # the next document to be forgotten.
         if os.path.isfile(p) and (name.endswith(".py") or name.endswith(".bat")
                                   or name.endswith(".html")
                                   or name.endswith(".json")
+                                  or name.endswith(".md")
                                   or name.endswith(".sh")
                                   or name == "MANIFEST.sha256"):
             try:

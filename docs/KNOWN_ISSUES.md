@@ -2292,3 +2292,47 @@ a negative result that could not distinguish *clean* from *never looked at*.
 
 **The standing lesson.** Green from a subset is not green. Read the run history
 of the independent witness, not the last local line.
+
+### A80. [major / tooling] The sweep's staged copy was not the repository: it filtered the root by extension with no `.md`, so a guarded document never arrived and `test_sentinels` failed on every sweep and every CI run. FIXED 2026-09-10
+
+**Where.** `covenant_one.py` `stage()`, and the diagnosis it produced in
+`covenant_sentinels.py` R6.
+
+**How it surfaced.** CI had been red for hours. Two suites were failing; this is
+the second (the first is A77b, which was mine). `test_sentinels` reported:
+
+    FAIL R6 every anchored document is still a subject of the shipped sentinel
+         and still alerts on marker loss -- unguarded: MY_STRATEGY.md
+
+`MY_STRATEGY.md` **is** in `GUARDED_DOCUMENTS` (`covenant_sentinels.py:101`), is
+tracked, is anchored in `ops/RECORD_ANCHORS.json`, and measures correctly in the
+working tree -- where R6 passes. It failed only in the staged copy.
+
+**The cause.** `stage()` copies top-level files by extension: `.py`, `.bat`,
+`.html`, `.json`, `.sh`, `MANIFEST.sha256`. **No `.md`.** Three of the four
+guarded documents live under `docs/`, which is copied as a whole directory. The
+fourth is at the root, so it never arrived. `measure()` returned `None`, the
+document was dropped, and R6 named it as a lost subject.
+
+Nothing was wrong with the sentinel. **The copy was not the repository**, which
+is worse: a suite that passes or fails against a tree missing a file it is
+supposed to read is not measuring this project at all.
+
+**The second defect, in the diagnosis.** R6 collapsed *absent* and *unguarded*
+into one word. A reader chasing "unguarded: MY_STRATEGY.md" would go looking at
+the sentinel's subject list -- which is correct -- and never at the staging
+function. A mechanism that is right while the diagnosis it hands you is wrong
+costs more than silence, and it is the same shape as A73/A76/A77/A78/A79: two
+different facts arriving as one value.
+
+**Fix.**
+1. `stage()` also copies `.md`. All 26 top-level markdown files total 197 KB.
+   Staging them all is the honest fix; adding `MY_STRATEGY.md` to the extension
+   list would only wait for the next document to be forgotten.
+2. R6 now reports `ANCHORED BUT NOT IN THIS TREE (cannot be read, so cannot be
+   guarded here)` separately from `present but unguarded`, and fails on either.
+
+**Verified both directions.** With `.md` staged: 26 markdown files present,
+`MY_STRATEGY.md` there, `test_sentinels` in the staged copy **rc=0**. With the
+one line reverted: absent, **rc=1**, and the failure now names the staging
+problem instead of the sentinel.

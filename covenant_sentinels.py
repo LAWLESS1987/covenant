@@ -494,19 +494,34 @@ def _self_test() -> int:
     # more marker than it has now. Drop a subject from GUARDED_DOCUMENTS and its
     # alert vanishes from this report. (covenant_selfaudit.py C5 checks only the
     # other direction -- a guarded document that has no anchor.)
-    _louder = {"documents": {}}
+    # ABSENT AND UNGUARDED ARE DIFFERENT FACTS, and this check used to report
+    # both as "unguarded" (2026-09-10). A document that measure() cannot read
+    # was silently dropped from _louder and then named as a subject the
+    # sentinel had lost -- so a STAGING bug in covenant_one.py, which copied
+    # the root by extension and had no .md in the list, read for weeks as
+    # "MY_STRATEGY.md is no longer guarded". The mechanism was right and the
+    # diagnosis it handed a reader was wrong, which costs more than silence.
+    _louder, _absent = {"documents": {}}, []
     for _rel in anchored:
         _m = RecordSentinel([_rel]).measure(_rel)
         if _m:
             _louder["documents"][_rel] = dict(_m, markers=_m["markers"] + 1)
+        else:
+            _absent.append(_rel)
     _alerts = RecordSentinel().check(_louder).alerts
-    _unguarded = [r for r in anchored
-                  if not any(r in x and "correction markers went" in x for x in _alerts)]
-    check(bool(anchored) and not _unguarded,
-          "R6 every anchored document is still a subject of the shipped sentinel "
-          "and still alerts on marker loss"
-          + ("" if anchored and not _unguarded
-             else " -- unguarded: " + (", ".join(_unguarded) or "no anchors at all")))
+    _unguarded = [r for r in anchored if r not in _absent
+                  and not any(r in x and "correction markers went" in x for x in _alerts)]
+    _why = ""
+    if _absent:
+        _why += (" -- ANCHORED BUT NOT IN THIS TREE (cannot be read, so cannot be "
+                 "guarded here): " + ", ".join(_absent))
+    if _unguarded:
+        _why += " -- present but unguarded: " + ", ".join(_unguarded)
+    if not anchored:
+        _why = " -- no anchors at all"
+    check(bool(anchored) and not _unguarded and not _absent,
+          "R6 every anchored document is present, is still a subject of the shipped "
+          "sentinel, and still alerts on marker loss" + _why)
 
     # R7 IS RETIRED, AND IT RETIRED ITSELF CORRECTLY. It was added earlier on
     # 2026-09-09 to DISCLOSE a source defect rather than repair it: MARKER
