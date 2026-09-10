@@ -93,6 +93,15 @@ SUITES = [
     # one network-touching check runs with live_repo_check=False.
     ("covenant_ambassador.py", ["--selftest"]),
     ("covenant_notify.py", ["--selftest"]),
+    # ADDED 2026-09-10, because it caught something this loop could not.
+    #
+    # A77 landed with `except OSError: pass` in the core -- written into the
+    # very fix whose subject is failing in silence. test_security_audit asserts
+    # no `except: pass` survives there, went red on GitHub, and this loop
+    # stayed GREEN through three commits because it does not run that suite.
+    # 14s measured, and it is the one suite here that reads the core's shape
+    # rather than one feature's behaviour.
+    ("test_security_audit.py", []),
 ]
 STALE_LOCK_S = 900          # a lock older than one interval is a dead run
 
@@ -220,6 +229,19 @@ def main():
             red.append("MUTATION LEFT IN TREE: " + ", ".join(sorted(stray)[:6]))
         lines.append("no_stray_mutation=%d" % (1 if stray else 0))
         lines.append("scanned=%d%s" % (len(files), how))
+        # HOW BIG IS THE SAMPLE? Eleven suites out of ninety-three test files
+        # is twelve per cent, and for three commits on 2026-09-10 a GREEN here
+        # was read -- by me -- as "the tree is green" while the full sweep was
+        # red on a suite this list does not contain. The number is printed so
+        # nobody has to remember that this is a SAMPLE, including whoever wrote
+        # it. The full sweep is covenant_one.py --ci, and it is what CI runs.
+        try:
+            allsuites = len([n for n in os.listdir(HERE)
+                             if n.startswith("test_") and n.endswith(".py")
+                             and ".PRE-" not in n])
+        except OSError:
+            allsuites = 0
+        lines.append("suites=%d/%d" % (len(SUITES), allsuites or len(SUITES)))
 
         verdict = "GREEN" if not red else "RED"
         # WAS THE TREE MID-EDIT? At 19:03 on 2026-09-09 this task logged

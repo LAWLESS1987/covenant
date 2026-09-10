@@ -8761,8 +8761,22 @@ class CovenantUnifiedMaster:
                 attempt += 1
                 try:
                     s.close()                       # do not leak the descriptor
-                except OSError:
-                    pass
+                except OSError as close_err:
+                    # NOT SWALLOWED, for _accept_loop's reason forty lines up:
+                    # a close() that fails is a descriptor that LEAKED, and on
+                    # a loop that retries every few seconds a leak is the thing
+                    # that turns a transient bind failure into a permanent one.
+                    #
+                    # This was `except OSError: pass` for about an hour after
+                    # A77 landed, and test_security_audit -- which asserts no
+                    # `except: pass` survives in the core -- went red on CI
+                    # while covenant_refine_check.py stayed green, because that
+                    # eleven-suite loop does not run the security audit. I
+                    # wrote the silent handler into the very fix whose subject
+                    # is failing in silence.
+                    self.node.anomaly_monitor.record(
+                        f"{label}_bind_close_error",
+                        f"{type(close_err).__name__}: {close_err}")
                 self.node.anomaly_monitor.record(
                     f"{label}_bind_error",
                     f"{type(e).__name__}: {e} (port {port}, attempt {attempt})")

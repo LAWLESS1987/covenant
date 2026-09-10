@@ -2251,3 +2251,44 @@ behaviour; only the record changed. The three false descriptions are corrected.
 **Verified.** Ambassador 47/47. AM18d pins that an override taken on the
 standing grant says so and does **not** claim a flag; AM18e pins that an
 explicitly requested one is recorded as the different act it is.
+
+### A77b. [major / process] A77's fix introduced the exact defect it was about: a silent `except: pass`. CI caught it; the fifteen-minute loop did not, and I read the loop's GREEN as the tree's. FIXED 2026-09-10
+
+**What happened.** A77 hardened the listener so a bind failure could not fail in
+silence. Its retry path closed the failed socket like this:
+
+    try:
+        s.close()
+    except OSError:
+        pass
+
+`test_security_audit.py` asserts that no `except: pass` survives in the core. It
+went **red on GitHub Actions**, at commit `6a3197c`, within a minute of the push.
+Measured: pre-A77 the core had **zero** such handlers; after A77 it had exactly
+one, at line 8764. It is mine.
+
+**Why I did not see it.** `covenant_refine_check.py` runs **11 suites**. There
+are **93 test files** on disk. `test_security_audit.py` was not among the 11. So
+the loop said GREEN, I reported GREEN, and the independent witness had been
+saying otherwise since the push. CI had in fact been red for hours across
+several commits before that, and I had not looked at it once.
+
+That is the same shape as A73, A76, A77, A78 and A79, with me as the mechanism:
+a negative result that could not distinguish *clean* from *never looked at*.
+
+**Fix, three parts.**
+1. The handler now records `<label>_bind_close_error` to the anomaly monitor,
+   which is what `_accept_loop` forty lines above already does for the same
+   reason: a `close()` that fails is a descriptor that **leaked**, and on a loop
+   retrying every few seconds a leak turns a transient bind failure into a
+   permanent one. Core is back to zero bare handlers; security audit 129/129.
+2. `test_security_audit.py` is now in the fifteen-minute loop (14s). It is the
+   one suite there that reads the core's *shape* rather than one feature's
+   behaviour.
+3. The loop's log line now carries **`suites=12/93`**. It is a SAMPLE, it was
+   always a sample, and printing the denominator means nobody has to remember
+   that -- including whoever wrote it. The full sweep is `covenant_one.py --ci`,
+   which is what CI runs.
+
+**The standing lesson.** Green from a subset is not green. Read the run history
+of the independent witness, not the last local line.
