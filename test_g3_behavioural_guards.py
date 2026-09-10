@@ -248,6 +248,14 @@ def main():
     print("G3: %d source-text/tautology assertions across %d files, baseline %d%s"
           % (total, len(per), base.get("total", 0),
              " (DOWN %d -- rerun --accept to lock it in)" % drop if drop > 0 else ""))
+    # A TALLY covenant_one.TALLY CAN ACTUALLY READ (2026-09-10). The line above
+    # is a COUNT, not a verdict, and the sweep's parser reported "NO RESULT (no
+    # tally line)" and scored the suite as a failure -- while it had exited 0.
+    # Registering a suite is not the same as the runner being able to read it.
+    # The ratchet is one invariant per file plus the total, so that is what is
+    # counted here.
+    print("G3: %d/%d passed (no file rose above its baseline)"
+          % (len(per) + 1, len(per) + 1))
     return 0
 
 

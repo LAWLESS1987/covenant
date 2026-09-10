@@ -373,7 +373,11 @@ def main():
           _am2.node.anomaly_monitor.events)
 
     n = sum(1 for _, ok in results if ok)
-    print("\n%d of %d" % (n, len(results)))
+    # "A77: n/m passed" rather than "n of m": covenant_one.TALLY reads the
+    # former and reported the latter as "NO RESULT (no tally line)", scoring a
+    # suite that had exited 0 as a failure. A suite the runner cannot read is
+    # not measured, whatever its exit code says.
+    print("\nA77: %d/%d passed" % (n, len(results)))
     return 0 if n == len(results) else 1
 
 

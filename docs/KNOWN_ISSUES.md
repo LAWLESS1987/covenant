@@ -2416,3 +2416,31 @@ reason.
 **Verified by mutation.** 20/20 clean. With the three guards reverted, P8/P8b
 fail with the original crashes -- `'int' object has no attribute 'encode'` and
 `'NoneType' object has no attribute 'get'` -- and record `[]`. Restored, 20/20.
+
+### A80c. [major / process] Registering the two suites was not enough: the runner could not read their tally, so both were scored as failures while exiting 0. FIXED 2026-09-10
+
+**What happened.** A80b registered `test_a77_listener_bind.py` and
+`test_g3_behavioural_guards.py` in `covenant_one.py`, and the next full sweep
+reported:
+
+    test_a77_listener_bind.py       NO RESULT   3.4s  (no tally line)
+    test_g3_behavioural_guards.py   NO RESULT   0.7s  (no tally line)
+    RESULT: FAIL.
+
+Both suites had **passed** -- the transcript shows `11 of 11` and exit 0. But
+`covenant_one.TALLY` matches forms like `N/M passed`, `N/M checks`,
+`ALL PASS`, `RESULTS:`, `X9: N/M passed`; mine printed `20 of 20`, and G3
+printed a *count* (`51 source-text/tautology assertions...`) rather than a
+verdict. Neither parsed, so both were scored as failures.
+
+**The lesson, third variant in one day.** A73/A76 were "clean vs never looked
+at". A80b was "on disk vs actually run". This is "run vs *readable*": a suite the
+runner cannot interpret is not measured, whatever its exit code says. Adding a
+test now takes three steps, not one -- write it, register it, and confirm the
+runner can read its result.
+
+**Fix.** `test_a77_listener_bind.py` prints `A77: n/m passed`. G3 keeps its
+informative count line and adds `G3: n/n passed (no file rose above its
+baseline)`, counted as one invariant per file plus the total. Verified by
+feeding each suite's real stdout to `covenant_one.TALLY`: both now yield a
+tally, `rc=0`.
