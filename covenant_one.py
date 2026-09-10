@@ -306,6 +306,14 @@ SUITES = [
     ("test_purge_tool.py",                60,  "SECURITY"),
     ("test_gate_proxy.py",                90,  "SECURITY"),
     ("test_sentinel_gate.py",             60,  "SECURITY"),
+    # BOTH OF THESE WERE ORPHANS UNTIL 2026-09-10 -- on disk, in no runner and
+    # on no off-record -- because I wrote them and did not register them. The
+    # full sweep never ran either one, and covenant_one said so in the only way
+    # it can: RESULT INCOMPLETE, "nothing failed; something was not measured",
+    # exit 2. That is the correct answer and it is not a pass. A suite nobody
+    # runs is indistinguishable from a suite that does not exist.
+    ("test_a77_listener_bind.py",         120, "SECURITY"),
+    ("test_g3_behavioural_guards.py",     120, "SECURITY"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40
@@ -348,6 +356,7 @@ DELIBERATELY_OFF = {
         "chain STOPPED. 27/27 x2 on Linux 2026-08-29 (run_all_tests.sh runs "
         "it in the sandbox sweep, where there is no chain to collide with).",
     "probe_block_hash.py":  "one-off investigation probe, not a pass/fail suite",
+    "probe_unaccusative.py": "one-off investigation probe, not a pass/fail suite",
     "probe_mainnet_review.py": "one-off investigation probe, not a pass/fail suite",
     "probe_power.py":       "one-off investigation probe, not a pass/fail suite",
     "probe_scaling.py":     "one-off investigation probe, not a pass/fail suite",

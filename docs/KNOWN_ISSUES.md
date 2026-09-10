@@ -2336,3 +2336,35 @@ different facts arriving as one value.
 `MY_STRATEGY.md` there, `test_sentinels` in the staged copy **rc=0**. With the
 one line reverted: absent, **rc=1**, and the failure now names the staging
 problem instead of the sentinel.
+
+### A80b. [major / process] Two suites I wrote were orphans: on disk, in no runner, on no off-record. The full sweep never ran either, and said so. FIXED 2026-09-10
+
+**What happened.** With A77b and A80 fixed, the sweep reported **zero
+failures, 85 suites ok** -- and still refused to call it a pass:
+
+    RESULT: INCOMPLETE. Nothing failed; something was not measured.
+    orphaned on disk    3  -> probe_unaccusative.py,
+                             test_a77_listener_bind.py,
+                             test_g3_behavioural_guards.py
+
+`test_g3_behavioural_guards.py` and `test_a77_listener_bind.py` are mine, written
+this morning and this afternoon. I added them to `covenant_refine_check.py` --
+the eleven-suite loop -- and never to `covenant_one.py`, which is the registry
+the full sweep and CI use. So the suites ran every fifteen minutes on this
+machine and **never once on the independent witness**.
+
+A suite nobody runs is indistinguishable from a suite that does not exist. That
+is the same shape as A73, A76, A77, A78, A79 and A80, and it is the fourth time
+today the mechanism has been me rather than the code.
+
+**covenant_one was right and said so precisely.** INCOMPLETE is exit code 2 --
+not a pass, not a failure, "something was not measured" -- which is exactly the
+distinction this whole day has been about. It is the one runner here that
+already refuses to conflate the two, and it named all three files.
+
+**Fix.** Both suites registered under SECURITY with timeouts;
+`probe_unaccusative.py` added to the off-record beside the other probes, since a
+probe is a measurement and cannot fail. Orphans now 0, absent 0.
+
+**The standing lesson, restated.** A new test is not finished when it passes. It
+is finished when the thing that runs everything knows about it.
