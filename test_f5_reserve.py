@@ -36,12 +36,16 @@ Run:  python test_f5_reserve.py     (offline; no exchange, no keys, no network)
 import io
 import os
 import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import guards as G                                                       # noqa: E402
+# Imported at module level since A84, because P4 now asks covenant_trader for
+# the VALUE of RESERVE_PATH rather than grepping its source for a literal.
+import covenant_trader as T                                              # noqa: E402
 
 OK = []
 
@@ -160,8 +164,32 @@ def main():
           "sell trimmed" in src and "sellable" in src)
     check("P3 a sell that starts at the floor is DROPPED, not sent at zero size",
           "sell DROPPED" in src)
+    # P4 ASKS THE CONSTANT, NOT THE BYTES. A84 (2026-09-10).
+    #
+    # It used to be `'"private", "RESERVE.json"' in src` -- a substring test over
+    # the whole of covenant_trader.py, which pins the PRESENCE of that literal
+    # somewhere in the file and not the VALUE of RESERVE_PATH. Measured by
+    # mutation: redirect the path to ops/ and leave the original expression
+    # behind as a trailing `# was ...` comment, and F5 reported 39/39, exit 0 --
+    # while the per-asset baseline quantities, the hold-only list and
+    # starting_total_usd were written to ops/RESERVE.json, which `git
+    # check-ignore` does not cover and `git add -n` accepts. That is the
+    # operator's portfolio staged for a public commit, with the guard green.
+    #
+    # An env-var or fallback wrapper around the original expression does the
+    # same. Reading the imported module's constant cannot be fooled by any of
+    # them, because it is the value the program will actually use.
     check("P4 the baseline is written under private/, because a per-asset quantity is "
-          "the portfolio (CONSTITUTION II.4)", '"private", "RESERVE.json"' in src)
+          "the portfolio (CONSTITUTION II.4)",
+          os.path.basename(os.path.dirname(T.RESERVE_PATH)) == "private",
+          T.RESERVE_PATH)
+    # P4b is the half that actually protects him and that nothing asserted: the
+    # directory being named private/ is worthless if git will commit it.
+    _ign = subprocess.run(["git", "check-ignore", "-q", T.RESERVE_PATH],
+                          cwd=HERE, capture_output=True)
+    check("P4b ...and git genuinely ignores that path -- the name private/ is a "
+          "convention, the ignore rule is the mechanism",
+          _ign.returncode == 0, "check-ignore rc=%d" % _ign.returncode)
 
     # ---- P2b/H7b: THE SAME CLAIMS, RUN RATHER THAN READ --------------------
     # P1-P4 and H7 above are greps. Measured 2026-09-09 by mutation, in an
@@ -184,7 +212,6 @@ def main():
     # The lesson was already in this file, eleven lines below, at P5: "a test
     # that reads the prose instead of running the code". It was applied to one
     # check and not to its neighbours. So: run the code.
-    import covenant_trader as T
 
     def _planned_sell(sym):
         """Units of `sym` the planner actually attaches to a plan.
@@ -220,7 +247,6 @@ def main():
     # code. Run the code: hand it a SMALLER holding and see whether the stored
     # number follows it down. That is the ratchet, and it is the whole point.
     import tempfile
-    import covenant_trader as T
     tmp = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
 
     def pf(units, sym="XLM"):
