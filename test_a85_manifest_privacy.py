@@ -103,10 +103,33 @@ def main():
           "leftover worktrees are not the delivery",
           not under_claude, "%d found" % len(under_claude))
 
-    ignored = git_ignored(walked)
-    if ignored is None:
+    # THREE STATES, NOT TWO -- and getting this wrong made the suite red in CI
+    # while it was green here (2026-09-10).
+    #
+    #   git answered, nothing ignored  -> PASS
+    #   git answered, something ignored -> FAIL
+    #   there is no git repository here -> the check has NO SUBJECT
+    #
+    # covenant_one runs every suite in a STAGED COPY under the temp directory,
+    # which has no .git. `git check-ignore` cannot answer there, and the first
+    # version of this check called that unknown and failed -- correct instinct
+    # (A82: "could not check" is not "clean"), wrong application. Outside a
+    # repository there is no .gitignore to violate, so there is nothing to be
+    # unknown ABOUT. M1 and M2 still run there and still hold.
+    #
+    # A git repo that EXISTS and cannot answer is still a failure. That is the
+    # distinction, and it is the same one this whole file is about.
+    in_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                             cwd=HERE, capture_output=True, text=True)
+    in_repo_ok = in_repo.returncode == 0 and in_repo.stdout.strip() == "true"
+    ignored = git_ignored(walked) if in_repo_ok else set()
+    if not in_repo_ok:
+        check("M3 THE RULE: nothing the walk yields is git-ignored -- N/A here, "
+              "no git repository (staged copy); M1 and M2 above still hold",
+              True, "not a git work tree")
+    elif ignored is None:
         check("M3 THE RULE: nothing the walk yields is git-ignored", False,
-              "git check-ignore did not run -- unknown, not clean")
+              "git IS a repo here but check-ignore failed -- unknown, not clean")
     else:
         check("M3 THE RULE: nothing the walk yields is git-ignored, whatever it "
               "is named -- ignored means private, generated, or not shipped",

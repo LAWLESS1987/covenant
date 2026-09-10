@@ -2605,3 +2605,39 @@ is a structural change, not a repair.
 
 **C4 now passes:** 576 files in the manifest, 0 changed or missing, and the
 self-audit is 6 PASS / 0 FAIL / 0 UNKNOWN for the first time today.
+
+### A85c. [major / tests] A85's own check failed in CI and passed here: it treated "no git repository" as "unknown", and the sweep runs every suite in a staged copy that has none. FIXED 2026-09-10
+
+**What happened.** `covenant_one` stages the tree into a temp directory and runs
+every suite there — deliberately, so a suite that binds a port or deletes a db
+cannot reach the production nodes. **The staged copy has no `.git`.**
+
+A85's M3 asserts *nothing the walk yields is git-ignored*. With no repository,
+`git check-ignore` cannot answer, and M3 called that unknown and failed:
+
+    [FAIL] M3 ... -- git check-ignore did not run -- unknown, not clean
+    A85: 5/6   rc=1   ->  sweep red  ->  CI red
+
+The instinct was right and is A82's rule — *"could not check" is not "clean"*.
+The application was wrong. **Outside a repository there is no `.gitignore` to
+violate, so there is nothing to be unknown about.** The check has no subject
+there; M1 and M2 still run and still hold.
+
+**Three states, not two**, which is this whole week's lesson pointed at itself:
+
+    git answered, nothing ignored   -> PASS
+    git answered, something ignored -> FAIL
+    not a git work tree at all      -> N/A, and say so
+
+A repository that **exists** and cannot answer is still a failure — that
+distinction is kept, tested by `git rev-parse --is-inside-work-tree`.
+
+**Verified in both contexts.** In the repo: M3 measures and reports `0 ignored`.
+In a staged copy: M3 reports `N/A here, no git repository`, and the suite is
+6/6 with rc=0 in both.
+
+**The wider point.** A suite that passes in the working tree and fails in the
+staged copy is not a flaky test — it is a test that was never run the way the
+runner runs it. Writing it, registering it and confirming the tally parses
+(A80b, A80c) is still not enough: it has to be exercised **where the sweep will
+exercise it**. That is the fourth step.
