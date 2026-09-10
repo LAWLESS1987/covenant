@@ -2227,3 +2227,27 @@ policy file: `sent=False`, `ran=False`, `overrode=None`, and **no row written**
 selftest.
 
 **Found by:** the outbound-gate lens of the 2026-09-10 sweep.
+
+### A79b. [major / audit record] Every override row claimed a per-message flag had been passed, and three places described the override as off by default when it has been on since 2026-09-05. FIXED 2026-09-10
+
+**Where.** `covenant_ambassador.py` `_record_override` and `emit`.
+
+**The defect.** `_record_override` hard-coded `"by": "operator
+(--override-a67)"` on every row. `FREE_REIN` has been `True` since 2026-09-05,
+so `emit` turns the override on with no flag in the ordinary case -- and every
+row asserted a specific human act that had not happened. Three descriptions said
+the same untrue thing, including `emit`'s own parameter docstring: *"an
+ACCUSATION only, never a hold, and never by default."*
+
+**What is not the defect.** The default-on is the operator's documented
+decision, quoted at `covenant_ambassador.py:122-156`. An audit ledger that
+misnames who decided is a different thing from a decision one disagrees with.
+
+**Fix.** `emit` now records which branch decided -- `COVENANT_A67_STRICT`, an
+explicit `COVENANT_A67_OVERRIDE=1`, the standing `FREE_REIN` grant, or a caller
+passing the argument -- and hands it to the ledger. Same truth table, same
+behaviour; only the record changed. The three false descriptions are corrected.
+
+**Verified.** Ambassador 47/47. AM18d pins that an override taken on the
+standing grant says so and does **not** claim a flag; AM18e pins that an
+explicitly requested one is recorded as the different act it is.

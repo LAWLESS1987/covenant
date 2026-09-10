@@ -635,7 +635,8 @@ OVERRIDES = os.environ.get("COVENANT_OVERRIDE_LEDGER") or os.path.join(
     HERE, "ops", "outbound_overrides.jsonl")
 
 
-def _record_override(text, verdict, submolt=None, post_id=None, dry_run=True):
+def _record_override(text, verdict, submolt=None, post_id=None, dry_run=True,
+                     by="operator (unrecorded route -- see A79b)"):
     """Write down that a judge was overruled, before anything is sent.
 
     THE POINT IS THE RECORD, NOT THE PERMISSION. The covenant's own draft says
@@ -645,15 +646,24 @@ def _record_override(text, verdict, submolt=None, post_id=None, dry_run=True):
     complaining". The difference between those two acts is entirely whether it
     is written down, so this writes it down first and returns the row.
 
-    An assistant never sets this. It is off unless the operator passes
-    --override-a67 or sets COVENANT_A67_OVERRIDE=1, and the row records the
-    exact verdict overruled and a sha256 of the exact text, so a later reader
-    can see what the judge said and judge the judgement."""
+    An assistant never sets this. The row records the exact verdict overruled
+    and a sha256 of the exact text, so a later reader can see what the judge
+    said and judge the judgement.
+
+    `by` IS PART OF THE RECORD, SO IT HAS TO BE TRUE. A79b (2026-09-10). This
+    was hard-coded to "operator (--override-a67)" on every row, and three
+    places in this file described the override as off unless that flag was
+    passed -- including emit's own parameter docstring, "never by default".
+    FREE_REIN has been True since 2026-09-05, so the common case is no flag at
+    all, and every row asserted a specific human act that had not happened.
+    That is the one thing an audit ledger may not do. The default-on is his
+    decision and is not in question; what was wrong is a record that misnamed
+    who decided."""
     row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            "issue": "A67", "overridden_verdict": verdict,
            "sha256": MB._sha(text), "chars": len(text),
            "submolt": submolt, "post_id": post_id, "dry_run": bool(dry_run),
-           "by": "operator (--override-a67)"}
+           "by": by}
     try:
         os.makedirs(os.path.dirname(OVERRIDES), exist_ok=True)
         with open(OVERRIDES, "a", encoding="utf-8", newline="\n") as fh:
@@ -1053,14 +1063,28 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     TWO THINGS MOVED 2026-09-09, both on his instruction and both recorded:
     step 2 warns instead of blocking (see repo_link_policy), and step 3 can be
     overruled for the documented A67 false positive IF the operator passes
-    override_a67 -- an ACCUSATION only, never a hold, and never by default. A
+    override_a67 -- an ACCUSATION only, and never a hold. NOT "never by
+    default": FREE_REIN has been True since 2026-09-05, so the default is ON
+    and the ledger row now names which route decided (A79b). A
     hold still refuses: nothing could read the text, and there is nothing there
     to knowingly disagree with."""
+    # WHICH ROUTE TURNED IT ON IS PART OF THE RECORD (A79b). Same truth table
+    # as before -- STRICT wins, then an explicit env var, then the standing
+    # grant -- but the branch that decided is now carried to the ledger instead
+    # of every row claiming a flag was passed.
     if override_a67 is None:
-        override_a67 = (FREE_REIN
-                        or bool(os.environ.get("COVENANT_A67_OVERRIDE")))
         if os.environ.get("COVENANT_A67_STRICT"):
-            override_a67 = False          # the judge back in charge, one variable
+            override_a67, _a67_by = False, "off (COVENANT_A67_STRICT=1)"
+        elif os.environ.get("COVENANT_A67_OVERRIDE"):
+            override_a67, _a67_by = True, "operator (COVENANT_A67_OVERRIDE=1)"
+        elif FREE_REIN:
+            override_a67, _a67_by = True, (
+                "standing grant: covenant_ambassador.FREE_REIN=True "
+                "(operator's decision of 2026-09-05) -- no per-message flag was passed")
+        else:
+            override_a67, _a67_by = False, "off (FREE_REIN False, no override set)"
+    else:
+        _a67_by = "caller passed override_a67=%r" % (override_a67,)
     text = compose(text)
     # EVERY PRECONDITION IS MEASURED BEFORE ANY OF THEM CAN RETURN, so a dry run
     # shows the WHOLE picture instead of only the first thing in the way.
@@ -1120,7 +1144,8 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         # THE OPERATOR OVERRULING A DOCUMENTED FALSE POSITIVE. Recorded, never
         # silent, and never taken by an assistant on its own -- see _record_override.
         overrode = _record_override(text, verdict, submolt=submolt,
-                                    post_id=post_id, dry_run=dry_run)
+                                    post_id=post_id, dry_run=dry_run,
+                                    by=_a67_by)
     key = os.environ.get("MOLTBOOK_API_KEY", "")
     if not key:
         return {"sent": False, "judged": verdict, "repo_exposure": exposure, "crypto_risk": crypto,
@@ -1395,6 +1420,26 @@ def selftest(say=print):
             check("AM18c ...and it says so, rather than reporting a judgement that "
                   "was never made",
                   "COULD NOT RUN" in (r5.get("why") or ""), r5.get("why"))
+
+            # AM18d: THE LEDGER MAY NOT MISNAME WHO DECIDED. A79b.
+            # Every row used to read by="operator (--override-a67)" whether or
+            # not a flag was passed, while FREE_REIN has made the default ON
+            # since 2026-09-05 -- so the common case asserted a human act that
+            # had not happened. The default-on is his decision and is not in
+            # question; a record that misattributes it is a different thing.
+            MB.judge_outbound = lambda _t: (False, ["quorum=violates"], False)
+            r6 = emit("x", title="t", dry_run=True, live_repo_check=False)
+            _by = (r6.get("overrode") or {}).get("by", "")
+            check("AM18d an override taken on the standing grant says so, instead of "
+                  "claiming a per-message flag nobody passed",
+                  r6.get("overrode") is not None and "FREE_REIN" in _by
+                  and "--override-a67" not in _by, _by)
+            r7 = emit("x", title="t", dry_run=True, live_repo_check=False,
+                      override_a67=True)
+            check("AM18e ...and an explicitly requested override is recorded as the "
+                  "different act it is",
+                  "caller passed" in (r7.get("overrode") or {}).get("by", ""),
+                  (r7.get("overrode") or {}).get("by"))
         finally:
             MB.judge_outbound = real_judge
     finally:
