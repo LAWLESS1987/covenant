@@ -30,15 +30,46 @@ on:
   # so the tree is re-verified even when the laptop that lands it is asleep.
   # A scheduled run measures the SAME source (main) on ubuntu; it is evidence
   # about that platform, not about the Windows box (M29) -- G12 stays local.
+  #
+  # REPEATEDLY, asked 2026-09-10: "set gethub to self check repeatedly". Every
+  # two hours now, not once a day. The local fifteen-minute check only exists
+  # while that machine is awake and is the same hands that wrote the code; this
+  # is the independent witness, and a witness that speaks once a day can be
+  # twenty-three hours behind the tree.
+  #
+  # :30 rather than :00 deliberately -- GitHub queues scheduled jobs and the
+  # top of the hour is the worst minute to ask for one.
+  #
+  # TWO THINGS THAT CAN STOP THIS SILENTLY, and neither raises anything:
+  #   * GitHub DISABLES scheduled workflows after 60 days with no repository
+  #     activity. This repo is committed to most days, so it is not a live
+  #     risk today -- but it is a stop with no alarm, which is the exact shape
+  #     of A73/A76/A77/A78. If the operator ever steps away, the schedule goes
+  #     quiet and quiet reads like green.
+  #   * A scheduled run can be delayed or DROPPED under load. A missing run is
+  #     not a passing run. Absence of a red tick is not evidence of green --
+  #     read the run history, not the last badge.
   schedule:
-    - cron: "30 9 * * *"
+    - cron: "30 */2 * * *"      # the repeated self-check
+    - cron: "30 9 * * *"        # the original daily anchor, kept as it was
 
 permissions:
   contents: read
 
 concurrency:
-  group: covenant-${{ github.ref }}
-  cancel-in-progress: true
+  # A SCHEDULED SELF-CHECK MUST NOT BE CANCELLED BY SOMEONE PUSHING.
+  #
+  # This was one group with cancel-in-progress for everything, which is right
+  # for push and pull_request -- a superseded commit's run is wasted minutes.
+  # It is wrong for the schedule: at a two-hourly cadence a push would land
+  # mid-run and cancel the witness, and a CANCELLED run is neither green nor
+  # red. It reports nothing and looks like nothing happened, which is how a
+  # check stops checking without ever going red.
+  #
+  # So the schedule gets its own lane and is never cancelled; push and PR keep
+  # the old behaviour exactly.
+  group: covenant-${{ github.event_name == 'schedule' && 'schedule' || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   sweep:
