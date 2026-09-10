@@ -2368,3 +2368,51 @@ probe is a measurement and cannot fail. Orphans now 0, absent 0.
 
 **The standing lesson, restated.** A new test is not finished when it passes. It
 is finished when the thing that runs everything knows about it.
+
+### A81. [critical / node] The integrity monitor was killed by the tamper it exists to detect, and the HTTP API thread could die taking every operator lever with it. FIXED 2026-09-10
+
+**Where.** `covenant_unified_v8.py` `_integrity_monitor_loop` and the API
+thread started in `CovenantUnifiedMaster.run()`.
+
+**A77 fixed one of six thread targets.** These are the two others whose death is
+both invisible and consequential.
+
+**1. The integrity monitor, killed by its own subject.** The loop had *no*
+exception handling at all. A genesis whose `message` is not a string raises
+`AttributeError` on `.encode`; one whose `data` is null raises on `.get` a line
+earlier. Measured by construction -- a real `RegistrationPoW`, a real RSA
+signature, a real `Block.mine()` at difficulty 4, adopted by a second
+independently-keyed node through the real `load_canonical_genesis`:
+
+    CASE STRTAMPER  message="I rewrote the covenant."   thread alive: True   crisis_mode: True
+    CASE INTTAMPER  message=12345                       thread alive: False  crisis_mode: False
+                    anomaly report: total_events_retained 0
+
+The guard **works** on a string tamper. One input type switches it off silently,
+and `/health` still reports `degraded: false`. Coercing to `str()` is *not* the
+fix -- with that applied, a genesis with `data: null` crashes one line earlier
+and kills the thread just the same. The defect is the missing handler.
+
+Reachability, stated plainly: nothing an attacker sends over the wire reaches
+`chain[0]`. A hostile genesis arrives only if the operator points `--genesis` at
+a file and adopts it, which is a larger compromise than this bug. It is fixed
+because a monitor that can be switched off without a sound is worth less than
+its log suggests, not because the attack is likely.
+
+**2. The HTTP API thread was bare.** Both waitress and werkzeug bind inside
+`run()`, so an occupied port raised there, killed the thread, and left the node
+mining, gossiping and accepting peer blocks with **no `/health`, no `/sync`, no
+succession endpoints and no watchdog view**. A node invisible to the watchdog is
+reported as unreachable -- indistinguishable from one that is down. The single
+failure that removes the ability to *say* anything was the one nothing said.
+
+**Fix.** The check is extracted to `_integrity_check_once()` and the loop calls
+it inside a handler that records `integrity_check_error` and **keeps checking**;
+a message that cannot be hashed now records `integrity_genesis_unreadable`,
+because *cannot tell* is not *no tamper*. The API runs through `_serve_api`,
+which records `api_serve_error` and retries with capped backoff, for A77's
+reason.
+
+**Verified by mutation.** 20/20 clean. With the three guards reverted, P8/P8b
+fail with the original crashes -- `'int' object has no attribute 'encode'` and
+`'NoneType' object has no attribute 'get'` -- and record `[]`. Restored, 20/20.

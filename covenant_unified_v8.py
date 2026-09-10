@@ -8559,8 +8559,45 @@ class CovenantUnifiedMaster:
                   f"{len(self.node.chain)}")
         return total
 
+    def _serve_api(self):
+        """The HTTP API, with its death RECORDED. A81 (2026-09-10).
+
+        A77 hardened the two P2P listeners so a bind failure could not be
+        silent. This was the third listener and it was still bare:
+        `threading.Thread(target=self.api.run)`. Whatever the WSGI backend
+        raises -- waitress and werkzeug both bind inside run(), so an occupied
+        port raises there -- killed the thread, and the node carried on mining,
+        gossiping and accepting peer blocks with NO HTTP API at all. Every
+        operator lever is on that API: /health, /sync, the succession
+        endpoints, and the watchdog's entire view of this node. A node that is
+        invisible to the watchdog is reported by it as unreachable, which is
+        indistinguishable from a node that is down -- so the one failure that
+        removes the ability to SAY anything was the one failure nothing said.
+
+        Retry with capped backoff, for A77's reason: the usual cause is a
+        leaked process still holding the port, and it clears when that exits.
+        """
+        delay, attempt = 1.0, 0
+        while self.node.running:
+            try:
+                self.api.run()
+                return                  # returned cleanly: the server is done
+            except Exception as e:                              # noqa: BLE001
+                attempt += 1
+                self.node.anomaly_monitor.record(
+                    "api_serve_error",
+                    f"{type(e).__name__}: {e} (port {self.api.port}, attempt {attempt})")
+                if attempt == 1:
+                    print(f"HTTP API DIED on {self.api.host}:{self.api.port} -- "
+                          f"{type(e).__name__}: {e}. /health, /sync and the "
+                          f"watchdog's whole view of this node are gone until it "
+                          f"comes back; the node itself is still running",
+                          file=sys.stderr, flush=True)
+                time.sleep(delay)
+                delay = min(30.0, delay * 2)
+
     def run(self):
-        threading.Thread(target=self.api.run, daemon=True).start()
+        threading.Thread(target=self._serve_api, daemon=True).start()
         threading.Thread(target=self._listen_for_peers, daemon=True).start()
         threading.Thread(target=self._listen_for_bridge, daemon=True).start()
         threading.Thread(target=self._integrity_monitor_loop, daemon=True).start()
@@ -9600,29 +9637,74 @@ class CovenantUnifiedMaster:
         """
         while self.node.running:
             time.sleep(interval)
-            with self.node.chain_lock:
-                if not self.node.chain:
-                    continue
-                alignment = self.node.governor.get_current()
-                genesis_tx = self.node.chain[0].transactions[0] if self.node.chain[0].transactions else None
-                tamper_detected = False
-                if genesis_tx is not None:
-                    msg = genesis_tx.data.get("message", "")
+            # ONE BAD ITERATION MUST NOT END THE MONITOR. A81 (2026-09-10).
+            #
+            # This loop had no exception handling at all, and the thing that
+            # kills it is the very thing it exists to detect: a genesis whose
+            # `message` is not a string raises AttributeError on `.encode`, and
+            # a genesis whose `data` is null raises on `.get` one line earlier.
+            # The thread then dies, crisis_mode stays False, /health stays
+            # `degraded: false`, and the anomaly monitor holds zero events --
+            # because, as SpikingAnomalyMonitor says of itself, "it cannot
+            # detect anything nobody calls record() for".
+            #
+            # Measured by construction: a real signed and mined genesis with
+            # message=12345, adopted through the real load_canonical_genesis,
+            # left the thread dead and crisis_mode False, while the same tamper
+            # carrying a STRING was caught correctly. The guard has real value
+            # and one input type switched it off silently.
+            try:
+                self._integrity_check_once()
+            except Exception as e:                              # noqa: BLE001
+                self.node.anomaly_monitor.record(
+                    "integrity_check_error", f"{type(e).__name__}: {e}")
+                print(f"integrity monitor: this round's check FAILED and was "
+                      f"skipped ({type(e).__name__}: {e}) -- the genesis tamper "
+                      f"check did not run; the monitor is still alive",
+                      file=sys.stderr, flush=True)
+
+    def _integrity_check_once(self):
+        """One pass of the integrity check.
+
+        Extracted from the loop so that a failure here is survivable and
+        recorded, and so the check can be exercised without starting a thread.
+        """
+        with self.node.chain_lock:
+            if not self.node.chain:
+                return
+            alignment = self.node.governor.get_current()
+            genesis_tx = self.node.chain[0].transactions[0] if self.node.chain[0].transactions else None
+            tamper_detected = False
+            if genesis_tx is not None:
+                # CANNOT TELL IS NOT CLEAN. A message that is not a string
+                # cannot be compared to GOLDEN_AGE_HASH at all, and the old
+                # code's only possible answers were "matches" or a dead
+                # thread. Saying so out loud is the whole repair: the check
+                # did not run, and that is a different fact from "no tamper".
+                _d = getattr(genesis_tx, "data", None)
+                msg = _d.get("message", "") if isinstance(_d, dict) else None
+                if isinstance(msg, str):
                     tamper_detected = hashlib.sha3_256(msg.encode()).hexdigest() != GOLDEN_AGE_HASH
+                else:
+                    self.node.anomaly_monitor.record(
+                        "integrity_genesis_unreadable",
+                        "genesis message is %s, not a string -- the "
+                        "GOLDEN_AGE_HASH comparison could NOT be made this "
+                        "round" % type(msg).__name__)
 
-            if alignment < INTEGRITY_ALIGNMENT_FLOOR:
-                self._integrity_breach_count += 1
-            else:
-                self._integrity_breach_count = 0
+        if alignment < INTEGRITY_ALIGNMENT_FLOOR:
+            self._integrity_breach_count += 1
+        else:
+            self._integrity_breach_count = 0
 
-            if tamper_detected and not self.node.crisis_mode:
-                self.node.crisis_mode = True
-                self.node.crisis_reason = "genesis message hash does not match GOLDEN_AGE_HASH (possible tamper)"
-                print(f"crisis_mode: {self.node.crisis_reason}")
-            elif self._integrity_breach_count >= INTEGRITY_CONSECUTIVE_BREACHES_REQUIRED and not self.node.crisis_mode:
-                self.node.crisis_mode = True
-                self.node.crisis_reason = f"alignment {alignment:.3f} below floor {INTEGRITY_ALIGNMENT_FLOOR} for {self._integrity_breach_count} consecutive checks"
-                print(f"crisis_mode: {self.node.crisis_reason}")
+        if tamper_detected and not self.node.crisis_mode:
+            self.node.crisis_mode = True
+            self.node.crisis_reason = "genesis message hash does not match GOLDEN_AGE_HASH (possible tamper)"
+            print(f"crisis_mode: {self.node.crisis_reason}")
+        elif self._integrity_breach_count >= INTEGRITY_CONSECUTIVE_BREACHES_REQUIRED and not self.node.crisis_mode:
+            self.node.crisis_mode = True
+            self.node.crisis_reason = f"alignment {alignment:.3f} below floor {INTEGRITY_ALIGNMENT_FLOOR} for {self._integrity_breach_count} consecutive checks"
+            print(f"crisis_mode: {self.node.crisis_reason}")
 
     def _succession_monitor_loop(self, interval: float = 3600):
         """

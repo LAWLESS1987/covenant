@@ -33,7 +33,25 @@ asserts on a string in it -- that is the fake-guard shape the 2026-09-09
 mutation audit found in 35 of 36 suites, and this file was written after it.
 Delete the try/except in _bind_and_serve and P2 through P5 go red.
 
-CHECKS (~6 s, real sockets, no node):
+A81 EXTENDS IT TO THE OTHER TWO THREADS THAT DIE IN SILENCE. A77 hardened ONE
+of the six thread targets CovenantUnifiedMaster.run() starts. Two more mattered:
+
+  * `_integrity_monitor_loop` had no exception handling at all, and what kills
+    it is the very thing it exists to detect. A genesis whose `message` is not
+    a string raises on `.encode`; one whose `data` is null raises on `.get` a
+    line earlier. Measured by construction with a real signed and mined genesis
+    adopted through the real load_canonical_genesis: message=12345 left the
+    thread DEAD, crisis_mode False, and the anomaly monitor holding zero
+    events, while the same tamper carrying a STRING was caught correctly. The
+    guard has real value and one input type switched it off silently.
+  * the HTTP API thread was bare. Whatever the WSGI backend raises -- both
+    waitress and werkzeug bind inside run() -- killed it, and the node carried
+    on mining and gossiping with no /health, no /sync, no succession endpoints
+    and no watchdog view. A node invisible to the watchdog is reported as
+    unreachable, which is indistinguishable from one that is down: the single
+    failure that removes the ability to SAY anything was the one nothing said.
+
+CHECKS (~10 s, real sockets, no node):
   P1  the port is genuinely un-bindable while occupied (the premise itself,
       because a test whose setup silently fails would pass by construction)
   P2  a failed bind is RECORDED as <label>_bind_error, naming the port and
@@ -46,6 +64,15 @@ CHECKS (~6 s, real sockets, no node):
       entered, and ZERO anomalies recorded
   P7  the refactor kept the port arithmetic: peers on node.port, bridge on
       node.port + 10
+  P8  a genesis message that is not a string does not raise out of the
+      integrity check, and "could not be compared" is RECORDED rather than
+      read as "no tamper" -- cannot-tell is not clean
+  P8c an honest genesis records nothing: a guard that alerts on everything
+      is the same as one that alerts on nothing
+  P8d a check that throws does not END the monitor; it runs again, and every
+      failure is recorded
+  P9  an HTTP API that cannot start is recorded and retried, not lost, and
+      the clean path still records nothing
 """
 import os
 import socket
@@ -66,6 +93,9 @@ results = []
 def check(label, ok, detail=""):
     results.append((label, bool(ok)))
     tag = "PASS" if ok else "FAIL"
+    # str(), because a check that CRASHES on its own failure message reports
+    # nothing at all -- which is this file's whole subject, one level up.
+    detail = "" if detail == "" or detail is None else str(detail)[:110]
     print("  [%s] %s%s" % (tag, label, ("  -- " + detail) if detail else ""))
 
 
@@ -229,6 +259,118 @@ def main():
     check("P7 peers listen on node.port", seen.get("peer") == 6001, str(seen))
     check("P7b bridge listens on node.port + 10", seen.get("bridge") == 6011,
           str(seen))
+
+    # ---- A81: the other two threads that could die in silence ----------
+    #
+    # A77 fixed ONE thread target. CovenantUnifiedMaster.run() starts six.
+    # These are the two whose death is invisible and consequential: the
+    # integrity monitor (killed by the very tamper it exists to detect) and
+    # the HTTP API (whose loss removes every operator lever and the watchdog's
+    # entire view of the node).
+    class FakeChainNode:
+        def __init__(self):
+            self.chain_lock = threading.Lock()
+            self.running = True
+            self.crisis_mode, self.crisis_reason = False, ""
+            self.anomaly_monitor = Recorder()
+            self.governor = type("G", (), {"get_current": lambda _s: 1.0})()
+            self.chain = []
+
+    class Tx:
+        def __init__(self, data):
+            self.data = data
+
+    class Blk:
+        def __init__(self, txs):
+            self.transactions = txs
+
+    def integrity_master(msg):
+        m = type("M", (), {})()
+        m.node = FakeChainNode()
+        m.node.chain = [Blk([Tx({"message": msg} if msg is not _NODATA else None)])]
+        m._integrity_breach_count = 0
+        return m
+
+    _NODATA = object()
+
+    # P8: a genesis message that is not a string used to raise AttributeError
+    # out of the loop and kill the thread, leaving crisis_mode False and the
+    # anomaly monitor empty -- the check silently stopped checking.
+    for _label, _msg in (("an int", 12345), ("null data", _NODATA)):
+        _m = integrity_master(_msg)
+        try:
+            cov.CovenantUnifiedMaster._integrity_check_once(_m)
+            _raised = None
+        except Exception as _e:                                   # noqa: BLE001
+            _raised = "%s: %s" % (type(_e).__name__, _e)
+        check("P8 a genesis whose message is %s does not raise out of the "
+              "integrity check" % _label, _raised is None, _raised)
+        check("P8b ...and 'could not be compared' is RECORDED, not read as "
+              "'no tamper' (%s)" % _label,
+              _m.node.anomaly_monitor.count("integrity_genesis_unreadable") == 1,
+              _m.node.anomaly_monitor.events)
+
+    # P8c: an honest genesis must still be silent -- a guard that alerts on
+    # everything is the same as one that alerts on nothing.
+    _ok = integrity_master(cov.CORE_COVENANT if hasattr(cov, "CORE_COVENANT") else "x")
+    cov.CovenantUnifiedMaster._integrity_check_once(_ok)
+    check("P8c a readable genesis records nothing (no false alarm)",
+          _ok.node.anomaly_monitor.events == [], _ok.node.anomaly_monitor.events)
+
+    # P8d: and the LOOP survives a check that throws for any other reason.
+    _m = integrity_master("x")
+    _calls = {"n": 0}
+
+    def _boom_check(_self):
+        _calls["n"] += 1
+        if _calls["n"] >= 3:
+            _self.node.running = False
+        raise RuntimeError("planted")
+
+    # The stub goes on the INSTANCE, not the class: _m is a stand-in, not a
+    # CovenantUnifiedMaster, so `self._integrity_check_once()` resolves on the
+    # object. Patching the class here left the real method unreachable, the
+    # loop caught AttributeError every 10ms, and `running` was never cleared --
+    # a test that hung instead of failing, which is its own small lesson.
+    _m._integrity_check_once = lambda: _boom_check(_m)
+    cov.CovenantUnifiedMaster._integrity_monitor_loop(_m, interval=0.01)
+    check("P8d a check that throws does not end the monitor: it ran again and "
+          "each failure is recorded",
+          _calls["n"] >= 3
+          and _m.node.anomaly_monitor.count("integrity_check_error") >= 3,
+          "%d calls, %d recorded"
+          % (_calls["n"], _m.node.anomaly_monitor.count("integrity_check_error")))
+
+    # P9: the HTTP API was the third listener and A77 did not reach it.
+    class FakeAPI:
+        def __init__(self, fail_times):
+            self.host, self.port = "127.0.0.1", 5999
+            self.left = fail_times
+            self.served = 0
+
+        def run(self):
+            if self.left > 0:
+                self.left -= 1
+                raise OSError("planted: address in use")
+            self.served += 1
+
+    _am = type("M", (), {})()
+    _am.node = FakeChainNode()
+    _am.api = FakeAPI(fail_times=2)
+    cov.CovenantUnifiedMaster._serve_api(_am)
+    check("P9 an HTTP API that cannot start is RECORDED rather than dying "
+          "silently", _am.node.anomaly_monitor.count("api_serve_error") == 2,
+          _am.node.anomaly_monitor.events)
+    check("P9b ...and it retries until it serves, instead of leaving the node "
+          "alive with no /health and no watchdog view",
+          _am.api.served == 1, _am.api.served)
+    _am2 = type("M", (), {})()
+    _am2.node = FakeChainNode()
+    _am2.api = FakeAPI(fail_times=0)
+    cov.CovenantUnifiedMaster._serve_api(_am2)
+    check("P9c the clean path records nothing and serves once",
+          _am2.api.served == 1 and _am2.node.anomaly_monitor.events == [],
+          _am2.node.anomaly_monitor.events)
 
     n = sum(1 for _, ok in results if ok)
     print("\n%d of %d" % (n, len(results)))
