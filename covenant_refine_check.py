@@ -77,6 +77,12 @@ SUITES = [
     ("test_f4_capability.py", []),
     ("test_f6_stuffing.py", []),
     ("test_g3_behavioural_guards.py", []),
+    # ADDED 2026-09-10 with A77. 3.5s measured. It binds only ephemeral
+    # ports on 127.0.0.1 and never a production one, so it obeys the rule
+    # above. It is here because covenant_unified_v8.py is the most-edited
+    # file in the tree and this is the only behavioural pin on whether its
+    # listeners come up at all.
+    ("test_a77_listener_bind.py", []),
     ("covenant_moltbook.py", ["--selftest"]),
     ("covenant_moltbook_release.py", ["--selftest"]),
     # ADDED 2026-09-09. The ambassador is the largest surface written this week

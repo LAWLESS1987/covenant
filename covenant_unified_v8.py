@@ -8709,18 +8709,81 @@ class CovenantUnifiedMaster:
                         f"{label}_close_error", f"{type(close_err).__name__}: {close_err}")
 
     def _listen_for_peers(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        _bind_exclusive(s)                          # A19 (v8.30)
-        s.bind((self.node.host, self.node.port))
-        s.listen()
-        self._accept_loop(s, self._handle_peer, "peer")
+        self._bind_and_serve(self.node.port, self._handle_peer, "peer")
 
     def _listen_for_bridge(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        _bind_exclusive(s)                          # A19 (v8.30)
-        s.bind((self.node.host, self.node.port + 10))
-        s.listen()
-        self._accept_loop(s, self._handle_bridge, "bridge")
+        self._bind_and_serve(self.node.port + 10, self._handle_bridge, "bridge")
+
+    def _bind_and_serve(self, port, handler, label):
+        """Get the listening socket UP, and never fail at it in silence.
+
+        A77 (2026-09-10). _accept_loop above was hardened at the 1000-node scale
+        test precisely because a dead listener thread leaves a node that "stayed
+        up, kept serving HTTP, kept reporting a healthy chain -- and was
+        permanently deaf to every peer from that moment on, with nothing recorded
+        anywhere". That fix was applied to accept(). The bind() and listen() one
+        line ABOVE it stayed bare, so the identical failure remained reachable by
+        the two calls that decide whether the listener exists at all.
+
+        It is not hypothetical. w2_w2off.err, 2026-09-09 02:12, sitting untracked
+        in the repo root:
+
+            Exception in thread Thread-2 (_listen_for_peers):
+              File "covenant_unified_v8.py", line 8714, in _listen_for_peers
+                s.bind((self.node.host, self.node.port))
+            OSError: [WinError 10048] Only one usage of each socket address ...
+
+        A traceback on stderr, into a file nobody reads, and the node carried on
+        looking healthy. SpikingAnomalyMonitor states its own limit plainly --
+        "it cannot detect anything nobody calls record() for" -- and nothing
+        called record() here.
+
+        A19 makes this the COMMON case on the platform that actually runs this
+        node, by design: SO_EXCLUSIVEADDRUSE exists to refuse a port another
+        process holds, instead of silently sharing it the way Windows'
+        SO_REUSEADDR would. Doing the correct thing loudly at the socket layer
+        and then dropping the result on the floor is the worst of both.
+
+        RETRY RATHER THAN DIE, for the same reason _accept_loop backs off rather
+        than exiting: the usual cause is a leaked node still holding the port,
+        which clears when it goes. Capped at 30s so a permanent conflict costs
+        nothing, and every attempt is recorded, so /health can show a node that
+        is deaf instead of a node that looks fine.
+        """
+        delay, attempt = 1.0, 0
+        while self.node.running:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            _bind_exclusive(s)                      # A19 (v8.30)
+            try:
+                s.bind((self.node.host, port))
+                s.listen()
+            except OSError as e:
+                attempt += 1
+                try:
+                    s.close()                       # do not leak the descriptor
+                except OSError:
+                    pass
+                self.node.anomaly_monitor.record(
+                    f"{label}_bind_error",
+                    f"{type(e).__name__}: {e} (port {port}, attempt {attempt})")
+                if attempt == 1:
+                    # Once, not every retry: the anomaly record is the durable
+                    # signal, and a console line per second is how a real
+                    # warning gets scrolled away and then filtered out.
+                    print(f"{label} listener CANNOT BIND {self.node.host}:{port} "
+                          f"-- {e}; this node is DEAF on that port until it clears",
+                          file=sys.stderr, flush=True)
+                time.sleep(delay)
+                delay = min(30.0, delay * 2)
+                continue
+            if attempt:
+                self.node.anomaly_monitor.record(
+                    f"{label}_bind_recovered",
+                    f"bound port {port} after {attempt} failed attempt(s)")
+                print(f"{label} listener bound {self.node.host}:{port} after "
+                      f"{attempt} failed attempt(s)", file=sys.stderr, flush=True)
+            self._accept_loop(s, handler, label)
+            return
 
     def _accept_block_common(self, block: Block) -> bool:
         """

@@ -2003,3 +2003,70 @@ bare post id.
 **Status:** closed. The corpus is 114 of 114 video files read for its window.
 One video remains outside it -- 2026-09-08, the only upload in the 17-day
 silence after 22 August -- because it postdates the catalogue.
+
+### A77. [major / networking] The listener's `bind()` could fail in total silence: the node stays up, keeps serving HTTP, keeps reporting a healthy chain, and is permanently deaf. FIXED 2026-09-10
+
+**Where.** `covenant_unified_v8.py`, `_listen_for_peers` / `_listen_for_bridge`.
+
+**The defect, and why it is embarrassing rather than merely a bug.** The
+`_accept_loop` immediately below those two methods was hardened at the
+1000-node scale test, and its docstring states the finding in full:
+
+> accept() was previously bare. At N=1000 the host hit `OSError: [Errno 24] Too
+> many open files`, the exception propagated out of the while-loop, and the
+> listener thread DIED. The node stayed up, kept serving HTTP, kept reporting a
+> healthy chain -- and was permanently deaf to every peer from that moment on,
+> with nothing recorded anywhere. 85 nodes that were provably reachable never
+> received the block.
+
+That fix was applied to `accept()`. The `bind()` and `listen()` **one line
+above it** -- the two calls that decide whether the listener exists at all --
+stayed bare. The identical failure remained reachable through the earlier door.
+
+**Measured, not hypothetical.** `w2_w2off.err`, 2026-09-09 02:12, sitting
+untracked in the repo root the whole time:
+
+    Exception in thread Thread-2 (_listen_for_peers):
+      File "covenant_unified_v8.py", line 8714, in _listen_for_peers
+        s.bind((self.node.host, self.node.port))
+    OSError: [WinError 10048] Only one usage of each socket address ...
+
+A traceback on stderr, into a file nobody reads, and the node carried on. The
+anomaly monitor could not have helped, and says so about itself:
+*"it cannot detect anything nobody calls `record()` for"* -- and nothing called
+it here.
+
+**A19 makes this the COMMON case on the platform that runs this node, by
+design.** `SO_EXCLUSIVEADDRUSE` exists precisely to REFUSE a port another
+process holds, instead of silently sharing it the way Windows' `SO_REUSEADDR`
+would. Doing the correct thing loudly at the socket layer and then dropping the
+result on the floor is the worst of both.
+
+**Fix.** Both listeners now go through one `_bind_and_serve(port, handler,
+label)`. A failed bind is recorded as `<label>_bind_error` naming the port and
+the attempt, printed once to stderr, and **retried** with backoff capped at 30s
+while the node runs -- for the same reason `_accept_loop` backs off rather than
+exiting: the usual cause is a leaked node still holding the port, which clears
+when it goes. A later success records `<label>_bind_recovered` with the count.
+The success path is byte-for-byte the same sequence it always was.
+
+Retry rather than exit is deliberate. A node that cannot bind is not
+experiencing a permanent fault, and killing it would be a larger behaviour
+change than this repair is entitled to make. What was actually missing was not
+severity -- it was **visibility**.
+
+**Verified by mutation, not by reading.** `test_a77_listener_bind.py` occupies a
+real port and runs the real method; no check in it reads the source of
+`covenant_unified_v8.py` or asserts on a string in it, which is the fake-guard
+shape A74 found in 35 of 36 suites. Clean: **11 of 11**. With the `except`
+clause reverted to re-raise (the pre-fix behaviour): **5 of 11** -- the six
+checks that test the fix go red, and P1, P6 and P7 correctly stay green because
+they do not test it.
+
+**Found by:** noticing a stray untracked `.err` file while auditing something
+else, and reading it instead of deleting it.
+
+**Related:** the same shape as A73 (a mutation nobody looked for), A76 (nine
+videos skipped and reported as done), and the top-level-only blind spot in the
+stray-mutation guard committed the same morning -- a negative result that cannot
+distinguish *clean* from *never looked at*.
