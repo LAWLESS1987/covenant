@@ -2151,3 +2151,79 @@ and `B8b ... 9000.0` (the budget re-anchored). Restored, green.
 **Found by:** an eight-lens mutation sweep, 2026-09-10. Two independent lenses
 (money-path and swallowed-errors) reached the same handler from different
 directions.
+
+### A79. [critical / outbound gate] The A67 override covered the case where NO JUDGE RAN: an unreachable quorum arrived labelled like an accusation and was overridden, and a row was written claiming an operator had overruled a verdict. FIXED 2026-09-10
+
+**Where.** `covenant_moltbook.py` `judge_outbound`, `covenant_ambassador.py`
+`emit`.
+
+**What is NOT the defect.** That the A67 override is on by default is the
+operator's deliberate, documented decision -- `covenant_ambassador.py:122-156`
+quotes his three statements and `COVENANT_A67_STRICT=1` is the off switch. That
+half is intent.
+
+**The defect.** The override is licensed to overrule an *accusation* and
+explicitly not a *hold*. The invariant is stated in this repo's own words:
+
+> a HOLD still refuses -- **nobody could read the text**, so there is no
+> disagreement to knowingly overrule.
+
+That rule is about the fact, not the label. A quorum that cannot be **reached**
+is the purest instance of nobody reading the text -- and it arrived at the gate
+as `(clean=False, held=False)`, which is the exact shape the override exists to
+pass. So it was passed.
+
+`judge_outbound` read `not_understood` off the result and threw
+`infrastructure_failure` away, though the core computes both and states the
+distinction at `covenant_unified_v8.py:1854` in capitals: *"A JUDGE THAT DID NOT
+ANSWER IS NOT A JUDGE THAT DISAGREED."* Worse, the `except` branch's own comment
+already claimed the intent -- *"`held` stays False: a gate that could not run is
+not a judge holding, and must not be overridable as though it were"* -- while
+`held=False` is precisely what **made** it overridable downstream. The comment
+and the code said opposite things.
+
+**Reachable with no code edit and no monkeypatch.** An absent or corrupt
+`ops/quorum_policy.json` is a documented supported state ("Delete this file to
+return to the core default"). `load_policy()` returns `{}` for absent or corrupt
+alike, `apply_policy()` never sets `COVENANT_JUDGE_PROVIDERS`,
+`build_semantic_quorum()` falls back to the keyless judge, and that returns
+`violates=True, infrastructure_failure=True`.
+
+**Measured, with the policy file truncated and the fix reverted:**
+
+    sent    : False
+    why     : no MOLTBOOK_API_KEY -- the account is the operator's to create
+    overrode: YES -- a row claiming an operator overruled a verdict
+
+The judge gate was **passed**. The only thing left between a wholly unjudged
+draft and a public post was the missing key and `--send`.
+
+**Blast radius, stated honestly.** Nothing could reach Moltbook today: the
+account does not exist, `MOLTBOOK_API_KEY` is unset, and publishing needs an
+explicit `--send`. The hole arms itself at the exact moment
+`register_free.py:133` tells the operator to run
+`python covenant_ambassador.py --introduce --send`.
+
+**And it wrote false provenance.** Every row it produced was stamped
+`"by": "operator (--override-a67)"` with no operator flag passed and no judge
+run. The ambassador's suite was **43/43 green** while doing it.
+
+**Fix.** `judge_outbound` now returns a fourth element, `ran`, false when the
+quorum raised or reported `infrastructure_failure`. `emit`'s test becomes
+`if not clean and not (override_a67 and not held and ran)`. Callers unpack
+tolerantly (`res[:3]`, then `res[3]` if present) so an existing three-element
+fake still means "a judge ran". Both refusal messages now say *the judge could
+not run* instead of reporting a judgement nobody made -- `post()` refused this
+case already, but was describing it falsely.
+
+No new capability and no new gate: this propagates a distinction the core
+already computes, so that the invariant the ambassador already states is true of
+the code.
+
+**Verified.** Ambassador 45/45 (was 43/43; AM18b and AM18c are new and sit in
+the hole between AM17's hold and AM18's accusation). End to end with a truncated
+policy file: `sent=False`, `ran=False`, `overrode=None`, and **no row written**
+-- 2 override rows before, 2 after, where the pre-fix run wrote 4 during a green
+selftest.
+
+**Found by:** the outbound-gate lens of the 2026-09-10 sweep.

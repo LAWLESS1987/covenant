@@ -412,7 +412,7 @@ def judge_outbound(text):
     run. post() may let the OPERATOR proceed over a hold, deliberately and on
     the record; nothing may proceed over an accusation, and no code path
     admits anything on its own."""
-    reasons, clean, held = [], True, False
+    reasons, clean, held, ran = [], True, False, True
     data = {"text": text, "kind": "outbound_post", "origin": "covenant_moltbook"}
     try:
         import covenant_judge_defer as D
@@ -420,8 +420,26 @@ def judge_outbound(text):
         D.apply_policy(os.environ, D.load_policy())
         r = cov.build_semantic_quorum().evaluate(data, cov.DIVINE_PRINCIPLES)
         held = bool(getattr(r, "not_understood", False))
+        # A JUDGE THAT DID NOT ANSWER IS NOT A JUDGE THAT DISAGREED. A79
+        # (2026-09-10). covenant_unified_v8.py:1854 states that in those words
+        # and computes it into `infrastructure_failure`; this function read
+        # `not_understood` beside it and dropped the other half on the floor.
+        #
+        # The two do not arrive the same way. A quorum that cannot be REACHED
+        # comes back violates=True with infrastructure_failure=True and
+        # not_understood False -- so it was reported here as an accusation, and
+        # an accusation is precisely the shape the A67 override is allowed to
+        # overrule. That inverted this file's own stated rule, which is not
+        # about the label but about the fact underneath it: a gate nobody could
+        # get an answer from is a gate where NOBODY READ THE TEXT, so there is
+        # no disagreement to knowingly overrule.
+        ran = not bool(getattr(r, "infrastructure_failure", False))
         if held:
             reasons.append("quorum=HELD (no view; not an objection -- and not a licence)")
+        elif not ran:
+            reasons.append("quorum=DID NOT RUN (infrastructure failure -- no judge "
+                           "reached the text; this is not an accusation and not a "
+                           "licence, and no flag overrides it)")
         else:
             reasons.append("quorum=%s" % ("violates" if r.violates else "clean"))
         # `blocks` semantics, exactly as the node applies them: anything other
@@ -435,10 +453,13 @@ def judge_outbound(text):
         # True when the student stack raised; a gate that cannot run is not a
         # gate that approves. `held` stays False: a gate that could not run is
         # not a judge holding, and must not be overridable as though it were.
-        clean, held = False, False
+        clean, held, ran = False, False, False
         reasons.append("quorum unavailable (%s: %s) -- refusing"
                        % (type(e).__name__, str(e)[:120]))
-    return clean, reasons, held
+    # FOUR, NOT THREE, and `ran` is the one that carries the intent the comment
+    # above always claimed. Callers unpack tolerantly (res[:3] then res[3] if
+    # present) so a three-element fake in a selftest still means "a judge ran".
+    return clean, reasons, held, ran
 
 
 def post(text, title=None, submolt="general", dry_run=True, timeout=30):
@@ -480,11 +501,21 @@ def post(text, title=None, submolt="general", dry_run=True, timeout=30):
                         "repo_check": why}
     except ImportError:
         pass          # the checker is a record, not a gate; see repo_link_policy
-    clean, reasons, held = judge_outbound(text)
+    _res = judge_outbound(text)
+    clean, reasons, held = _res[:3]
+    ran = _res[3] if len(_res) > 3 else True
     verdict = "; ".join(reasons)
     if not clean and not held:
         # An ACCUSATION. Not overridable, by anyone, through any argument.
-        return {"sent": False, "why": "refused by covenant's judge: " + verdict}
+        #
+        # ...unless no judge ran, in which case calling it an accusation is a
+        # false statement about what happened (A79). This path refuses either
+        # way, so only the sentence changes -- but the sentence is what an
+        # operator reads before deciding whether to argue with it.
+        return {"sent": False,
+                "why": ("the covenant's judge COULD NOT RUN, so nothing read this "
+                        "text -- refusing: " if not ran
+                        else "refused by covenant's judge: ") + verdict}
     if not clean and held:
         # A HOLD, and it refuses too. AN OVERRIDE WAS BUILT HERE AND REMOVED
         # THE SAME DAY, because measuring it showed it was gated on nothing.

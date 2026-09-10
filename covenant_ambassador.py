@@ -1088,13 +1088,32 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
                            "still serving the operator's portfolio",
                     "crypto_risk": crypto, "rate": rate_note,
                     "repo_check": why}
-    clean, reasons, held = MB.judge_outbound(text)
+    # A79 (2026-09-10). THE OVERRIDE COVERED THE CASE WHERE NO JUDGE RAN.
+    #
+    # The invariant stated at the top of this file -- "a HOLD still refuses --
+    # nobody could read the text, so there is no disagreement to knowingly
+    # overrule" -- is about the FACT, not the label. A quorum that cannot be
+    # reached is the purest instance of nobody reading the text, and it used to
+    # arrive here as (clean=False, held=False): the exact shape the A67
+    # override is licensed to overrule. So with an absent or corrupt
+    # ops/quorum_policy.json -- a state this project documents as supported --
+    # the gate passed a wholly unjudged draft, and wrote a row claiming an
+    # operator had overridden a verdict, with no flag passed and no judge run.
+    #
+    # `ran` now carries the distinction the core already computed and named.
+    # Unpacked tolerantly so a three-element fake still means "a judge ran".
+    _res = MB.judge_outbound(text)
+    clean, reasons, held = _res[:3]
+    ran = _res[3] if len(_res) > 3 else True
     verdict = "; ".join(reasons)
-    if not clean and not (override_a67 and not held):
-        return {"sent": False, "held": bool(held), "repo_exposure": exposure, "crypto_risk": crypto,
+    if not clean and not (override_a67 and not held and ran):
+        return {"sent": False, "held": bool(held), "ran": bool(ran),
+                "repo_exposure": exposure, "crypto_risk": crypto,
                 "rate": rate_note,
                 "why": ("held by covenant's judge (no view -- not an objection, "
                         "and not a licence): " if held
+                        else "the covenant's judge COULD NOT RUN, so nothing read "
+                             "this text -- no flag overrides that: " if not ran
                         else "refused by covenant's judge: ") + verdict}
     overrode = None
     if not clean:
@@ -1349,6 +1368,33 @@ def selftest(say=print):
                   r4.get("overrode") and r4["overrode"]["issue"] == "A67"
                   and "violates" in r4["overrode"]["overridden_verdict"]
                   and os.path.exists(OVERRIDES), r4.get("overrode"))
+
+            # AM18b: THE HOLE BETWEEN AM17 AND AM18. A79 (2026-09-10).
+            #
+            # AM17 pins that a HOLD is not overridable and AM18 pins that an
+            # ACCUSATION is. A quorum that could not be REACHED is neither: it
+            # arrived as (False, [...], False) -- AM18's exact shape -- and was
+            # overridden, with a row written claiming an operator had overruled
+            # a verdict when no flag was passed and no judge read a word.
+            # Reachable with no code edit: an absent or corrupt
+            # ops/quorum_policy.json, a state this project documents as
+            # supported, leaves the keyless default judge returning
+            # violates=True with infrastructure_failure=True.
+            #
+            # This suite was 43/43 green throughout that, because no fixture
+            # ever produced a fourth element.
+            MB.judge_outbound = lambda _t: (
+                False, ["quorum=DID NOT RUN (infrastructure failure)"], False, False)
+            r5 = emit("x", title="t", dry_run=True, live_repo_check=False,
+                      override_a67=True)
+            check("AM18b the override does NOT pass a quorum that never RAN, even "
+                  "though it arrives labelled like an accusation -- nobody read "
+                  "the text, so there is no disagreement to overrule",
+                  r5["sent"] is False and r5.get("overrode") is None
+                  and r5.get("ran") is False, r5.get("why"))
+            check("AM18c ...and it says so, rather than reporting a judgement that "
+                  "was never made",
+                  "COULD NOT RUN" in (r5.get("why") or ""), r5.get("why"))
         finally:
             MB.judge_outbound = real_judge
     finally:
