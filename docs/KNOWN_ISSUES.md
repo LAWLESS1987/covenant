@@ -2488,3 +2488,46 @@ the seam gives 12/13; reverting the three caller-side `None` checks gives
 **Live finding, unrelated to the bug:** the real run still reports **REACHABLE
 on private and public** for ports 5000/5020/5040/5060. That is the tool working,
 and it is the operator's decision to act on.
+
+### A83. [major / money] The cooldown could never fire on the trader: the guard stack was asked without a symbol, and nothing wrote `last_sold`. FIXED 2026-09-10
+
+**Where.** `covenant_trader.py` `execute` / `run_once`.
+
+**Two independent causes, both measured.**
+
+*Asked without a symbol.* `run_once` calls `evaluate(state)` with no symbol.
+The identical state gives:
+
+    evaluate(state)         [ok   ] cooldown       not asset-specific
+                            [ok   ] concentration  not asset-specific
+    evaluate(state,'XLM')   [BLOCK] cooldown       XLM sold 0.0d ago, cooldown 7d
+                            [BLOCK] concentration  XLM already 50.0%, cap 20%
+
+*No writer.* `guards.CooldownPeriod` reads `st["last_sold"]`. `daily.py` writes
+it from `--sold SYM` -- a human typing what they did. `covenant_trader`, the one
+program that actually **places** both sells and buys, never wrote it. A real
+`execute()` against a fake venue returned `status: PLACED` with the sale in
+`orders_today`, and `st["last_sold"]` was still `{}`.
+
+**Scope, stated precisely.** The guard is *not* dead in the tree: removing
+`CooldownPeriod` from `guards.DEFAULTS` turns `test_d3_daily_guards` red at
+E13/E13b/E13c, so it is live and pinned on `daily.py`'s advisory path. It was
+inert only on the trader -- and no trader test noticed its removal.
+
+**Live impact today: none, and worth saying so.** `covenant_trader` has one buy
+emitter, gated by `allow_fiat_buys`, which ships **off** with a zero budget. With
+buys off no round-trip can occur, so this was a truthfulness defect in the audit
+block rather than a churn risk. It becomes a real guard the moment the operator
+turns buys on -- which is exactly when nobody would be re-reading this code.
+
+**Fix.** A PLACED sell now writes `st["last_sold"][sym]` beside the existing
+buy-side bookkeeping -- the same record `daily.py` keeps, moved to the program
+that places the order. And `execute` takes an optional `may_buy` callable,
+consulted for **buys only**, which re-asks the stack *with the symbol* via
+`guards.GuardStack().may_buy`. Sell-side guards are not asked, because a rule
+about what may be sold has no view on what may be bought, and a guard never
+stops a sale. If the per-symbol evaluation cannot run, it blocks.
+
+**Verified by mutation.** F7 70/70 clean; with both halves reverted, **68/70**,
+and B9c reports `('PLACED', [])` -- the buy went live with no per-symbol
+question asked. B9d pins that a sale is still never asked.

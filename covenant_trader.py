@@ -753,11 +753,37 @@ def venue_for(order, live_venues):
     return None
 
 
-def execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only=False):
+def execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only=False,
+            may_buy=None):
+    """`may_buy` -- optional callable sym -> [blocking guard names]. A83.
+
+    THE GUARD STACK WAS ASKED WITHOUT A SYMBOL, so the asset-specific guards
+    could never answer. run_once calls evaluate(state) with no symbol for the
+    audit print, and CooldownPeriod and ConcentrationCap both reply "not asset
+    specific" and pass. Measured: the identical state that yields
+      [ok   ] cooldown       not asset-specific
+      [ok   ] concentration  not asset-specific
+    yields, when asked about the symbol,
+      [BLOCK] cooldown       XLM sold 0.0d ago, cooldown 7d
+      [BLOCK] concentration  XLM already 50.0%, cap 20%
+
+    Optional keyword so every existing caller keeps working unchanged. It is
+    consulted for BUYS only, which is what guards.GuardStack.may_buy already
+    enforces -- a rule about what may be sold has no view on what may be
+    bought, and a guard never stops a sale.
+    """
     live_venues = [v for v in V.all_venues() if v.has_credentials()]
     results = []
     for o in orders:
-        bad = preconditions(cfg, st, {}, o, sealed_ok, guard_blocks)
+        extra = []
+        if o.get("side") == "buy" and may_buy is not None:
+            try:
+                extra = list(may_buy(o["sym"]) or [])
+            except Exception as e:                            # noqa: BLE001
+                # A guard that cannot be evaluated is not a guard that passed.
+                extra = ["per-symbol guards unavailable (%s)" % type(e).__name__]
+        bad = preconditions(cfg, st, {}, o, sealed_ok,
+                            list(guard_blocks) + extra if extra else guard_blocks)
         v = venue_for(o, live_venues)
         if v is None:
             results.append({**o, "status": "NO VENUE",
@@ -812,6 +838,19 @@ def execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only=False):
                     # the trailing-week record guards.WeeklyBudget reads
                     st.setdefault("fiat_buys", []).append({"at": time.time(), "usd": fiat_part,
                                                            "sym": o["sym"]})
+                # THE SELL-SIDE COUNTERPART, AND IT HAD NO WRITER. A83
+                # (2026-09-10). guards.CooldownPeriod reads st["last_sold"] to
+                # stop a symbol being sold and bought straight back. daily.py
+                # writes it from `--sold SYM`, a human typing what they did.
+                # covenant_trader -- the one program that actually PLACES both
+                # sells and buys -- never wrote it at all, so the cooldown had
+                # nothing to read here and could never fire.
+                #
+                # Measured before the fix: a real execute() against a fake
+                # venue returned status PLACED with the sale in orders_today,
+                # and st["last_sold"] was still {}.
+                if o.get("side") == "sell":
+                    st.setdefault("last_sold", {})[o["sym"]] = time.time()
                 save_state(st)
         except V.VenueError as e:
             msg = str(e)
@@ -888,6 +927,7 @@ def run_once(cfg, plan_only=False):
             st["equity_start_of_day"] = pf["total"]
 
     guard_blocks = []
+    state = None            # A83: bound here so the buy path can re-ask it
     print("\n  GUARDS")
     if GUARDS_ERR:
         print(f"    guards.py unavailable ({GUARDS_ERR}) -- FAILING CLOSED")
@@ -1017,7 +1057,21 @@ def run_once(cfg, plan_only=False):
     global LAST_SEAL_OK
     LAST_SEAL_OK = sealed_ok or not (orders or cfg.get("seal_required"))
 
-    results = execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only)
+    # A83: the per-symbol question, asked only on the buy path. `state` above
+    # is the same object the audit print used; may_buy re-evaluates it WITH the
+    # symbol, which is the only way CooldownPeriod and ConcentrationCap can
+    # answer at all.
+    def _may_buy(sym):
+        # A guard that cannot be evaluated is not a guard that passed: with no
+        # state (guards absent, or a zero-value book) the answer is a block,
+        # not silence.
+        if _guards is None or state is None:
+            return ["guards unavailable"]
+        ok, blocks, _v = _guards.GuardStack().may_buy(state, sym)
+        return [] if ok else [b.guard for b in blocks]
+
+    results = execute(cfg, st, orders, sealed_ok, guard_blocks, plan_only,
+                      may_buy=_may_buy)
     if results:
         print("\n  ORDERS")
         for r in results:

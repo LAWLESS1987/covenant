@@ -371,6 +371,98 @@ def main():
           not os.path.exists(os.path.join(d, "fresh.json") + ".tmp")
           if G.set_starting_total(1234.0, os.path.join(d, "fresh.json")) else False)
 
+    # B9b/B9c: THE COOLDOWN HAD NO WRITER, AND THE STACK WAS ASKED WITHOUT A
+    # SYMBOL. A83 (2026-09-10).
+    #
+    # guards.CooldownPeriod reads st["last_sold"] to stop a symbol being sold
+    # and bought straight back. daily.py writes it from `--sold SYM`, a human
+    # typing what they did. covenant_trader -- the one program that actually
+    # PLACES both sells and buys -- never wrote it, so the guard had nothing to
+    # read there. And run_once asked the stack with no symbol, where
+    # CooldownPeriod and ConcentrationCap both answer "not asset-specific" and
+    # pass; asked WITH the symbol the same state gives
+    #   [BLOCK] cooldown       XLM sold 0.0d ago, cooldown 7d
+    #   [BLOCK] concentration  XLM already 50.0%, cap 20%
+    #
+    # Deleting CooldownPeriod from guards.DEFAULTS turned test_d3 red, so the
+    # guard was live on daily.py's advisory path the whole time -- and no
+    # covenant_trader test noticed it was inert on the trader.
+    class _FakeVenue:
+        name = "kraken"
+
+        def __init__(self):
+            self.calls = []
+
+        def has_credentials(self):
+            return True
+
+        def place(self, sym, side, qty, live=False):
+            self.calls.append((sym, side, qty, live))
+            return {"descr": "fake", "txid": "TXFAKE"}
+
+    _fv = _FakeVenue()
+    _real_all = T.V.all_venues
+    _st = {"day": time.strftime("%Y-%m-%d"), "orders_today": [], "last_sold": {},
+           "closed_trades": [], "bought_total_usd": 0.0, "equity_peak": 100.0,
+           "equity_start_of_day": 100.0}
+    _cfg = dict(T.DEFAULT_CONFIG, armed=True, seal_required=False,
+                min_sealed_signals=0, rule5_require_significance=False)
+    _order = {"sym": "XLM", "side": "sell", "qty": 10.0, "usd": 20.0,
+              "rule": "test", "at": {"kraken": 10.0}}
+    _saved_state_path = T.STATE
+    try:
+        T.V.all_venues = lambda: [_fv]
+        T.STATE = os.path.join(d, "trader_state_a83.json")
+        _res = T.execute(_cfg, _st, [_order], True, [])
+    finally:
+        T.V.all_venues = _real_all
+        T.STATE = _saved_state_path
+    check("B9b a PLACED sell writes last_sold, so the cooldown has something to "
+          "read on the program that actually sells (status %s)"
+          % (_res[0]["status"] if _res else "none"),
+          _st.get("last_sold", {}).get("XLM") is not None, _st.get("last_sold"))
+
+    # B9c: the buy path now asks about the SYMBOL. may_buy is the seam, so a
+    # planted blocker must reach preconditions for a buy...
+    _seen = []
+
+    def _blocker(sym):
+        _seen.append(sym)
+        return ["cooldown"]
+
+    _st2 = dict(_st, orders_today=[], last_sold={})
+    _buy = {"sym": "XLM", "side": "buy", "qty": 1.0, "usd": 20.0,
+            "rule": "test", "at": {"kraken": 10.0}}
+    try:
+        T.V.all_venues = lambda: [_FakeVenue()]
+        T.STATE = os.path.join(d, "trader_state_a83b.json")
+        _rb = T.execute(_cfg, _st2, [_buy], True, [], may_buy=_blocker)
+    finally:
+        T.V.all_venues = _real_all
+        T.STATE = _saved_state_path
+    # preconditions() prefixes the guard name ("guards: cooldown"), so match the
+    # substring rather than the bare name -- an exact-equality check here failed
+    # while the behaviour was correct, which is a test bug and worth the comment.
+    check("B9c a per-symbol block reaches the buy and stops it going live",
+          _seen == ["XLM"] and _rb
+          and any("cooldown" in b for b in (_rb[0].get("blocked_by") or []))
+          and _rb[0]["status"] != "PLACED",
+          (_seen, _rb[0].get("status"), _rb[0].get("blocked_by")) if _rb else None)
+
+    # ...and must NOT be consulted for a sale: a guard never stops a sale.
+    _seen2 = []
+    _st3 = dict(_st, orders_today=[], last_sold={})
+    try:
+        T.V.all_venues = lambda: [_FakeVenue()]
+        T.STATE = os.path.join(d, "trader_state_a83c.json")
+        T.execute(_cfg, _st3, [dict(_order)], True, [],
+                  may_buy=lambda s: (_seen2.append(s), ["cooldown"])[1])
+    finally:
+        T.V.all_venues = _real_all
+        T.STATE = _saved_state_path
+    check("B9d ...and it is NOT asked about a SALE -- a guard never stops a sale",
+          _seen2 == [], _seen2)
+
     check("B9 roll_day backfills the lifetime buy total to zero ONLY on evidence: "
           "a state with no closed trades, no orders and no equity peak has never "
           "seen a trade, so zero is a measurement",
