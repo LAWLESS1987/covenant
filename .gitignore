@@ -249,3 +249,4 @@ judged_by_student.jsonl
 # the registered ones -- covenant_one.py:297-298). Committing the copies would
 # manufacture the "superseded copies" ambiguity covenant_selfaudit already tracks.
 Claude outputs/
+ops/rule5_backfill_ledger.jsonl
