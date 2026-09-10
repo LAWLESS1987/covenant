@@ -51,6 +51,7 @@ CHECKS (fast, no network, nothing written):
 """
 import io
 import os
+import subprocess
 import sys
 from contextlib import redirect_stdout
 
@@ -168,6 +169,67 @@ def main():
                   rc == 2 and "do not" in out.lower(), "rc=%s" % rc)
     finally:
         X._run = saved
+
+    # ---- A86: the checker was looking at the wrong ports ------------------
+    #
+    # It computed {base, base+10} from a comment saying "the node binds `port`
+    # and `port + 10`". The relationship is right; the BASE is not. `base` is
+    # the API port, and covenant_unified_v8.py:8294 sets p2p_port = port + 1,
+    # so the two real binds land on base+1 (peers) and base+11 (bridge).
+    # base+10 is nothing at all.
+    #
+    # Measured 2026-09-10: ten covenant sockets wildcard-bound, four reported.
+    # The six it missed were the PEER and BRIDGE ports -- the ones that take
+    # chain traffic -- not the read-only HTTP API.
+    for base in (5000, 5020, 5060):
+        want = {base, base + 1, base + 11}
+        check("A1 the scope covers the API, PEER and BRIDGE ports for base %d "
+              "(%s), not base+10 which nothing binds"
+              % (base, sorted(want)),
+              want.issubset(set(X.PORTS)),
+              sorted(want - set(X.PORTS)))
+    check("A1b ...and base+10, which the old arithmetic used, is not mistaken "
+          "for a real port by this check itself", 5010 not in (5000, 5001, 5011))
+
+    # A2 -- the scope measured against THIS machine, when there is a node to
+    # measure against. Three states, not two (A85c): with no covenant process
+    # listening there is nothing to be wrong about, and saying "N/A" is the
+    # honest answer rather than a pass or a failure.
+    import re as _re
+    # The error is CARRIED, not swallowed. The first version of this block did
+    # `except Exception: _net = ""` and then reported "N/A, netstat did not
+    # run" -- on a machine where netstat returns 19 KB. A silent swallow inside
+    # the suite whose whole subject is silent swallows; it hid its own cause.
+    _net, _neterr = "", ""
+    try:
+        _net = subprocess.run(["netstat", "-ano"], capture_output=True,
+                              text=True, timeout=25).stdout or ""
+    except Exception as _e:                                       # noqa: BLE001
+        _neterr = "%s: %s" % (type(_e).__name__, str(_e)[:80])
+    _open = set()
+    for _ln in _net.splitlines():
+        if "LISTENING" not in _ln:
+            continue
+        _p = _ln.split()
+        if len(_p) < 5:
+            continue
+        _m = _re.match(r"^(.*):(\d+)$", _p[1])
+        if _m and _m.group(1) in ("0.0.0.0", "[::]", "*", "::"):
+            _port = int(_m.group(2))
+            if 5000 <= _port < 5200:
+                _open.add(_port)
+    if not _net:
+        check("A2 the scope covers every covenant socket actually open here -- "
+              "N/A, netstat did not run", True, _neterr or "netstat gave no output")
+    elif not _open:
+        check("A2 the scope covers every covenant socket actually open here -- "
+              "N/A, no covenant port is listening on this machine", True,
+              "nothing in 5000-5199")
+    else:
+        _missed = sorted(_open - set(X.PORTS))
+        check("A2 every wildcard covenant socket open on THIS machine is inside "
+              "the checker's scope -- the measurement that caught A86",
+              not _missed, "open=%s missed=%s" % (sorted(_open), _missed))
 
     n = sum(1 for _, ok in results if ok)
     print("\nA82: %d/%d passed" % (n, len(results)))

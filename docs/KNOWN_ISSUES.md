@@ -2641,3 +2641,53 @@ staged copy is not a flaky test — it is a test that was never run the way the
 runner runs it. Writing it, registering it and confirming the tally parses
 (A80b, A80c) is still not enough: it has to be exercised **where the sweep will
 exercise it**. That is the fourth step.
+
+### A86. [critical / security tooling] exposure_check looked at the wrong ports and under-reported the open surface by 60%. FIXED 2026-09-10
+
+**Where.** `exposure_check.py`, the `PORTS` computation.
+
+**The defect.** It read *"The node binds `port` and `port + 10`"* and computed
+`{b, b+10}`. The **relationship** is right and the **base** is wrong. `b` is the
+API port, and `covenant_unified_v8.py:8294` sets
+
+    if p2p_port is None: p2p_port = port + 1
+
+so the two real socket binds -- `_listen_for_peers` on `p2p_port` and
+`_listen_for_bridge` on `p2p_port + 10` -- land on **b+1** and **b+11**.
+`b+10` is nothing at all.
+
+**Measured on this machine**, wildcard-bound and listening:
+
+    actually open : 5000 5001 5011  5020 5021 5031  5040  5060 5061 5071
+    it reported   : 5000            5020            5040  5060
+
+Six covenant ports invisible to the tool that exists to find them -- and the six
+it missed are the **peer-to-peer and bridge** ports, which accept chain traffic,
+rather than the read-only HTTP API it did report. **A security check that
+under-reports is worse than none, because it is believed.**
+
+Found while answering an operator report of an attempted email breach, by
+comparing the checker's output against `netstat` directly instead of trusting it.
+
+**Fix.** `PORTS = {b, b+1, b+11}` per base. The check now reports all ten sockets
+and, correctly, `REACHABLE ... on: private, public`, exit 1. Its generated
+`netsh` close command now covers every port rather than four of ten.
+
+**Pinned behaviourally** in `test_a82_exposure_unknown.py`: A1 asserts the API,
+peer and bridge ports are all in scope for each base; **A2 compares the
+checker's scope against every wildcard covenant socket actually open on this
+machine** -- the measurement that caught it -- and reports N/A rather than
+passing when there is nothing listening or netstat cannot run (A85c's three
+states). 18/18, in the working tree and in a staged copy.
+
+**A2 hid its own cause first.** It was written with `except Exception: _net = ""`
+and reported *"N/A, netstat did not run"* on a machine where netstat returns
+19 KB. Carrying the error instead of swallowing it printed
+`NameError: name 'subprocess' is not defined` -- a missing import, invisible
+behind the swallow. A silent handler inside the suite whose subject is silent
+handlers, for the second time this week (A77b was the first).
+
+**Separately, and not a defect:** port 5040 is `CDPSvc`, the Windows Connected
+Devices Platform Service -- legitimate, auto-start, and not a covenant process.
+It is named here because it is wildcard-bound and inbound-permitted on the
+public profile, and because its purpose is device pairing and discovery.

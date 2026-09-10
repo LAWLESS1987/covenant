@@ -55,10 +55,30 @@ import subprocess
 import sys
 from typing import Dict, List, Optional, Set, Tuple
 
-# The node binds `port` and `port + 10` (see the two socket binds in
-# covenant_unified_v8.py), so both belong in scope.
+# WHICH PORTS A NODE ACTUALLY BINDS. A86 (2026-09-10), and the old arithmetic
+# under-reported the exposed surface by 60%.
+#
+# It read: "The node binds `port` and `port + 10`", and computed {b, b+10}.
+# The relationship is right and the BASE is wrong. `b` here is the API port,
+# and covenant_unified_v8.py:8294 sets
+#
+#     if p2p_port is None: p2p_port = port + 1
+#
+# so the two socket binds -- _listen_for_peers on `p2p_port` and
+# _listen_for_bridge on `p2p_port + 10` -- land on b+1 and b+11, not b and
+# b+10. b+10 is nothing at all.
+#
+# MEASURED on this machine 2026-09-10, wildcard-bound and listening:
+#
+#     actually open : 5000 5001 5011  5020 5021 5031  5040  5060 5061 5071
+#     this reported : 5000            5020            5040  5060
+#
+# Six covenant ports invisible to the tool that exists to find them -- and the
+# six it missed are the PEER-TO-PEER and BRIDGE ports, the ones that accept
+# chain traffic, rather than the read-only HTTP API. A security check that
+# under-reports is worse than none, because it is believed.
 BASE_PORTS = [5000, 5020, 5040, 5060, 5100, 5120, 5140]
-PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 10)})
+PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 1, b + 11)})
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
