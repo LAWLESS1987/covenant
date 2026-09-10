@@ -1949,3 +1949,57 @@ absent and is DECLARED. Both outcomes are honest; today's silence is not.
 plus the false-hold measurement that has to accompany any change to what the
 gate blocks. `S5b` (added today) already pins the other direction: every
 register the model CLAIMS to cover must still block.
+
+---
+
+### A76. [major / tooling] A skip that reported success: nine videos of the study corpus were never read, because one X post can carry four videos and the output was keyed on the post. FIXED 2026-09-09
+
+**Where.** `convo_ocr/x_video_text.py` -- an adjacent tool, not this repo, but
+the corpus it produces is what this project reads when it wants to know what the
+operator has actually published. A gap there is a gap here.
+
+**The defect.** Output was keyed on the status_id alone:
+
+    base = os.path.join(textdir, "%s_%s" % (date, sid))
+    if os.path.exists(base + ".json"): skipped += 1; continue
+
+An X post can carry up to four videos, all sharing one status_id. So the first
+file of such a post was written and **every other video in it matched the
+existence check and was logged as "skipped (already had text)"**.
+
+**Measured on the shipped catalogue:**
+
+    catalogue rows (video files)      114
+    unique status_ids (posts)         105
+    multi-video posts                   6   (one carrying four)
+    videos never read                   9
+    the run's own report            "114 videos ... 0 failed"
+
+**Why it is the worst shape a skip can have.** In the log and in the exit code it
+is indistinguishable from work that finished. A counter that cannot tell
+"already done" from "never attempted" reports green either way -- which is A74's
+finding restated as an operational defect rather than a test defect, and the
+third instance of that shape found on one day (A73, A74, this).
+
+**Recovered:** 1,478 messages from 197 frames across the nine files. None of
+them changes the dated finding in `SONAR_2026-09-09.md` -- the earliest payload
+term in the whole corpus is still 2026-07-07, one day after the announcement it
+refers to.
+
+**Fix.** The output key is now the status_id plus the video's position within
+its post (`<sid>-v2`, `-v3`, ...). Single-video posts keep their existing
+filenames exactly, so nothing already written is orphaned or silently re-run.
+The log line and the stored json now name the video, not just the post, because
+a record that cannot distinguish the first video from the fourth has the same
+defect one layer down. The post URL still uses the bare status_id, correctly --
+all four videos genuinely share one post.
+
+**Verified both directions.** Full catalogue: 114 videos, 114 skipped, 0 done,
+0 failed -- all accounted for, where the same run previously accounted for 105.
+Then the mutation: delete one multi-video record and re-run; exactly that one is
+re-read (`1 done, 113 skipped`) and the log names `...277-v4` rather than the
+bare post id.
+
+**Status:** closed. The corpus is 114 of 114 video files read for its window.
+One video remains outside it -- 2026-09-08, the only upload in the 17-day
+silence after 22 August -- because it postdates the catalogue.
