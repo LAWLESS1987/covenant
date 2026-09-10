@@ -334,6 +334,43 @@ def main():
     check("B8 ...and it refuses a nonsense total rather than recording it",
           G.set_starting_total(0.0, os.path.join(d, "empty.json")) is None)
 
+    # B8b/B8c: THE HOLE IN "NEVER OVERWRITES". A78 (2026-09-10).
+    #
+    # starting_total() returns None for an absent file, an absent key AND a
+    # file that will not parse, and set_starting_total treated all three as
+    # "not recorded yet". So on a torn file it wrote -- and its write rebuilt
+    # `data` from {}, deleting the reserve floors and re-anchoring this
+    # lifetime budget to today's book. Measured before the fix: one torn-file
+    # cycle turned $100 of remaining buy budget into $2,100, and the new anchor
+    # was then protected by the very invariant that had just failed.
+    #
+    # B7 above is the guard for this promise and it stayed green throughout,
+    # because it only ever hands the function a file that parses. B8 uses a
+    # NONEXISTENT file. Neither shape is the one that bites.
+    torn = os.path.join(d, "torn.json")
+    G.set_starting_total(5000.0, torn)
+    io.open(torn, "w", encoding="utf-8").write(
+        io.open(torn, encoding="utf-8").read()[:30])          # truncate it
+    _before = io.open(torn, encoding="utf-8").read()
+    check("B8b an UNREADABLE starting-book file is 'unknown', not 'never recorded': "
+          "set_starting_total refuses instead of re-anchoring the lifetime budget "
+          "to today's book",
+          G.set_starting_total(9000.0, torn) is None, G.set_starting_total(9000.0, torn))
+    check("B8c ...and it leaves the unreadable file untouched rather than rebuilding it",
+          io.open(torn, encoding="utf-8").read() == _before)
+    # BuyBudget falls back to reading the reserve file when the state carries
+    # no starting total, so the guard has to be bound to the TORN file for this
+    # to mean anything -- `bb` above is bound to the intact one, and pointing
+    # this check at `bb` made it pass on 6700.0 from a different file.
+    _bb_torn = G.BuyBudget(0.50, reserve_path=torn)
+    check("B8d ...and a torn reserve file reaches BuyBudget as 'cannot be told', so it "
+          "BLOCKS rather than assuming a budget (B5's contract via a torn file)",
+          not _bb_torn.check(bstate(None, 0.0)).allowed
+          and _bb_torn.remaining(bstate(None, 0.0)) is None)
+    check("B8e the write is atomic: no .tmp is left beside a freshly written file",
+          not os.path.exists(os.path.join(d, "fresh.json") + ".tmp")
+          if G.set_starting_total(1234.0, os.path.join(d, "fresh.json")) else False)
+
     check("B9 roll_day backfills the lifetime buy total to zero ONLY on evidence: "
           "a state with no closed trades, no orders and no equity peak has never "
           "seen a trade, so zero is a measurement",

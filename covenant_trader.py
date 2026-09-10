@@ -422,6 +422,26 @@ def gather(cfg):
 RESERVE_PATH = os.path.join(HERE, "private", "RESERVE.json")
 
 
+class ReserveUnreadable(Exception):
+    """The floor file exists and will not parse. A78 (2026-09-10).
+
+    UNKNOWN IS NOT ABSENT, and treating it as absent lowered the floors. The
+    read below used to answer a parse failure with `data, base = {}, {}`,
+    which is the same answer it gives for a file that was never written. From
+    an empty baseline every held symbol is 'not in base', so every floor is
+    re-set to TODAY'S QUANTITY -- including the HOLD_ONLY symbols whose floor
+    is supposed to be frozen for ever -- and the write below, whose own
+    comment says MERGE NEVER REBUILD, rebuilds from {} and takes
+    starting_total_usd with it. Measured: a frozen XRP floor of 500 followed a
+    holding down to 300, and the buy budget re-anchored to that day's book,
+    both in one cycle, with a note list byte-identical to a legitimate
+    first-ever run.
+
+    guards.py:472 already states the doctrine this file was missing: "A file
+    that exists but will not parse IS unknown, and that blocks."
+    """
+
+
 def reserve_baseline(pf, path=RESERVE_PATH):
     """Half of every coin is not for sale, and half OF WHAT is the whole
     question (asked 2026-09-04: "50% of every current coin should be off
@@ -455,11 +475,24 @@ def reserve_baseline(pf, path=RESERVE_PATH):
             q = p["val"] / p["px"]
         if q is not None:
             held[p["sym"]] = q
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
+    # MISSING AND UNREADABLE ARE DIFFERENT FACTS. Only a genuinely absent file
+    # means "no floors have been set yet"; a file that exists and will not
+    # parse means the floors are UNKNOWN, and the one thing that must not
+    # happen is to carry on from an empty baseline. See ReserveUnreadable.
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as e:
+            raise ReserveUnreadable("%s: %s" % (type(e).__name__, e)) from e
+        # A list parses as valid JSON and then raises AttributeError on .get,
+        # which the tuple above never caught. guards.set_starting_total already
+        # guards this shape; this reader did not.
+        if not isinstance(data, dict):
+            raise ReserveUnreadable("RESERVE.json holds a %s, not an object"
+                                    % type(data).__name__)
         base = dict(data.get("baseline", {}))
-    except (OSError, ValueError):
+    else:
         data, base = {}, {}
     # FROZEN FLOORS (2026-09-07). "hold the current amount able to add and use
     # for trading" -- for a hold-only symbol the baseline is the amount held
@@ -504,13 +537,23 @@ def reserve_baseline(pf, path=RESERVE_PATH):
                 "hold_only": sorted(frozen),
                 "set_by": "covenant_trader.reserve_baseline",
                 "baseline": base})
-            with open(path, "w", encoding="utf-8") as fh:
-                # MERGE, never rebuild. guards.set_starting_total writes
-                # starting_total_usd and pct_buyable into this same file, and
-                # rebuilding the dict from scratch deleted them -- after which
-                # the next cycle re-anchored the buy budget to that day's book,
-                # which is the ratchet set_starting_total exists to prevent.
+            # MERGE, never rebuild. guards.set_starting_total writes
+            # starting_total_usd and pct_buyable into this same file, and
+            # rebuilding the dict from scratch deleted them -- after which
+            # the next cycle re-anchored the buy budget to that day's book,
+            # which is the ratchet set_starting_total exists to prevent.
+            #
+            # ATOMIC (A78). This program is one of the two writers of this
+            # file, so a kill or a full disk between open("w") and the last
+            # byte is a torn file THIS PROGRAM CREATED -- and a torn file is
+            # exactly the state the read above now has to refuse. Do not
+            # manufacture the emergency you fail closed on.
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=1, sort_keys=True)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, path)
         except OSError:
             pass
     return base, held, raised
@@ -540,7 +583,16 @@ def plan(cfg, pf, week_spent=0.0):
     # guard stack is consulted for buys only ("a guard never stops a sale"),
     # so a reserve enforced there would never run. It is enforced HERE, on the
     # quantity itself, before an order exists.
-    base, held_now, raised = reserve_baseline(pf)
+    try:
+        base, held_now, raised = reserve_baseline(pf)
+    except ReserveUnreadable as e:
+        # FAIL CLOSED, and it costs nothing to do so. Every order this
+        # function can produce is a SELL, so refusing to plan is precisely the
+        # conservative answer when the floors are unknown -- the position is
+        # simply held for one cycle until an operator looks at the file.
+        return [], ["RESERVE FILE UNREADABLE (%s) -- planning NO sales this "
+                    "cycle. The floors are unknown, and unknown is not zero. "
+                    "Repair or restore private/RESERVE.json." % e]
     pct_reserved = 0.50
     for r in raised:
         notes.append("reserve: " + r)

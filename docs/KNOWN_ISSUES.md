@@ -2070,3 +2070,84 @@ else, and reading it instead of deleting it.
 videos skipped and reported as done), and the top-level-only blind spot in the
 stray-mutation guard committed the same morning -- a negative result that cannot
 distinguish *clean* from *never looked at*.
+
+### A78. [critical / money] "Unknown" was read as "absent": an unparseable private/RESERVE.json lowered every frozen floor to today's holdings AND re-anchored the lifetime buy budget, in one cycle. FIXED 2026-09-10
+
+**Where.** `covenant_trader.py` `reserve_baseline` (the read and the write) and
+`guards.py` `set_starting_total`. The trader is ARMED.
+
+**The defect.** Both readers of the floor file collapsed three different facts
+into one answer. `reserve_baseline` answered a parse failure with
+
+    except (OSError, ValueError):
+        data, base = {}, {}
+
+which is byte-identical to the answer for a file that was never written. From an
+empty baseline every held symbol is "not in base", so **every floor is re-set to
+today's quantity** -- including the HOLD_ONLY symbols (XRP, HBAR, LINK) whose
+floor is supposed to be frozen for ever. The write immediately below, whose own
+comment reads *"MERGE, never rebuild"*, then rebuilt from `{}` and took
+`starting_total_usd` with it. On the same cycle `guards.set_starting_total` saw
+`starting_total()` return `None` -- which it returns for an absent file, an
+absent key **and** a file that will not parse -- treated that as "never
+recorded", and wrote today's book as the lifetime anchor.
+
+So both ratchets this file exists to defeat fired at once, from one torn file.
+
+**Measured.** Frozen XRP floor 500, holding sold down to 300:
+
+    intact  -> {'XLM': 100.0, 'XRP': 500.0}
+    torn    -> {'XLM':  60.0, 'XRP': 300.0}
+
+and the buy budget, with the book grown to $9,000 and $2,400 already spent:
+
+    intact  -> $100.00 of the $2,500.00 buy budget left
+    torn    -> $2,100.00 of the $4,500.00 buy budget left
+
+The new anchor is then protected by the very "never overwrites" invariant that
+had just failed. After the cycle the file still asserts, in its own `_what`
+string, that *"Lowering a number here is an operator's decision and this program
+never does it."*
+
+**Indistinguishable from a legitimate first run.** Genuine first-ever run and
+torn-file run over the same portfolio produced byte-identical note lists, no
+non-zero exit, and no alert. That is the A73/A76/A77 shape again: a result that
+cannot tell *clean* from *never looked at*.
+
+**Two neighbouring holes in the same handler.** A file holding valid JSON of the
+wrong shape (`[]`) raised `AttributeError` on `.get`, which
+`except (OSError, ValueError)` never caught -- `guards.set_starting_total`
+already defended against that shape and this reader did not. And both writers
+used a plain `open(path, "w")`, so **this program was one of the two things that
+could create the torn file it then mishandled.**
+
+**Nothing observed the branch in either direction.** With the parse-failure
+branch inverted, the whole money suite stayed green: F5 39/39, F7 63/63, D3
+77/77, B6 15/15, G3 unchanged. F5's P5 explicitly claims to pin *"a baseline
+never follows a holding DOWN"* and passed anyway, because every fixture it uses
+starts from a file that parses. F7's B7 pins *"never overwrites"* on a file that
+parses; B8 uses a nonexistent one. Neither shape is the one that bites.
+
+**Fix.** `guards.py:472` already stated the doctrine that was missing -- *"A
+file that exists but will not parse IS unknown, and that blocks."*
+
+1. `reserve_baseline` splits missing from unreadable and raises
+   `ReserveUnreadable` on a file that exists and will not parse or is not an
+   object. `plan()` catches it and returns **no orders** with a loud note: every
+   order that function can emit is a SELL, so refusing to plan is exactly the
+   conservative answer when the floors are unknown.
+2. `set_starting_total` returns `None` when the file exists and will not parse,
+   which reaches `BuyBudget` as "cannot be told" and blocks -- its existing
+   fail-closed path, previously unreachable through this door.
+3. Both writers are now atomic (`.tmp` + `fsync` + `os.replace`), so the program
+   cannot manufacture the emergency it fails closed on.
+4. Neither reader touches a file it could not read.
+
+**Verified by mutation.** F5 46/46 and F7 67/67 clean. With both fixes reverted:
+F5 **43/46**, F7 **64/67**, and the failures print the harm itself --
+`P10b ... {'XRP': 300.0}` (the frozen floor followed the holding down from 500)
+and `B8b ... 9000.0` (the budget re-anchored). Restored, green.
+
+**Found by:** an eight-lens mutation sweep, 2026-09-10. Two independent lenses
+(money-path and swallowed-errors) reached the same handler from different
+directions.

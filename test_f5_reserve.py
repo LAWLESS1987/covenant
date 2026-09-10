@@ -293,6 +293,84 @@ def main():
           "(found %r)" % d2.get("starting_total_usd"),
           d2.get("starting_total_usd") == 6899.82, d2)
 
+    # P10: A TORN FLOOR FILE IS UNKNOWN, NOT ABSENT. A78 (2026-09-10).
+    #
+    # Found by mutation audit: line 462 used to answer a parse failure with
+    # `data, base = {}, {}` -- byte-identical to the answer for a file that was
+    # never written. From an empty baseline every held symbol is "not in base",
+    # so every floor is re-set to TODAY'S quantity, hold-only symbols included,
+    # and the MERGE-never-rebuild write then rebuilds from {} and takes
+    # starting_total_usd with it. Measured before the fix: a frozen XRP floor
+    # of 500 followed the holding down to 300, and the buy budget re-anchored
+    # to that day's book, in ONE cycle, with a note list byte-identical to a
+    # legitimate first-ever run.
+    #
+    # P5 above claims to pin exactly this ratchet ("a baseline never follows a
+    # holding DOWN") and stayed green with the branch inverted, because every
+    # fixture it uses starts from a file that parses. The ratchet was pinned on
+    # the happy path only.
+    tmp4 = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
+    T.reserve_baseline(pf(500.0, "XRP"), path=tmp4)          # frozen floor at 500
+    _intact = io.open(tmp4, encoding="utf-8").read()
+    io.open(tmp4, "w", encoding="utf-8").write(_intact[:40])  # torn: truncated
+    _torn = io.open(tmp4, encoding="utf-8").read()
+    try:
+        _b, _h, _r = T.reserve_baseline(pf(300.0, "XRP"), path=tmp4)
+        _raised, _got = False, _b
+    except T.ReserveUnreadable as _e:
+        _raised, _got = True, str(_e)
+    check("P10 a RESERVE.json that exists and will not parse RAISES rather than "
+          "rebuilding from an empty baseline -- unknown is not absent", _raised, _got)
+    check("P10b ...so the frozen hold-only floor of 500 does NOT follow the holding "
+          "down to 300 through the torn-file path (the measured harm)",
+          _raised and (not isinstance(_got, dict) or _got.get("XRP") != 300.0), _got)
+    check("P10c ...and the unreadable file is left EXACTLY as found: a program that "
+          "cannot read a floor file must not overwrite it either",
+          io.open(tmp4, encoding="utf-8").read() == _torn)
+
+    # A list is valid JSON and then raises AttributeError on .get, which the
+    # original `except (OSError, ValueError)` never caught -- so this shape
+    # crashed the cycle instead of failing closed. guards.set_starting_total
+    # already defended against it; this reader did not.
+    tmp5 = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
+    io.open(tmp5, "w", encoding="utf-8").write("[]")
+    try:
+        T.reserve_baseline(pf(100.0), path=tmp5)
+        _shape = "no exception"
+    except T.ReserveUnreadable as _e:
+        _shape = "ReserveUnreadable"
+    except Exception as _e:                                   # noqa: BLE001
+        _shape = "%s: %s" % (type(_e).__name__, _e)
+    check("P10d valid JSON of the wrong SHAPE (a list) is refused the same way, not "
+          "an uncaught AttributeError", _shape == "ReserveUnreadable", _shape)
+
+    # P10e: the planner's side of it. Every order plan() can produce is a SELL,
+    # so refusing to plan is the conservative answer when the floors are
+    # unknown -- the position is simply held for a cycle. reserve_baseline is
+    # stubbed here because plan() binds RESERVE_PATH as a default argument at
+    # import; what is under test is plan's HANDLING, not the read.
+    _real = T.reserve_baseline
+    try:
+        def _boom(_pf, path=None):
+            raise T.ReserveUnreadable("planted")
+        T.reserve_baseline = _boom
+        _orders, _notes = T.plan({"max_position_pct": 0.25}, pf(500.0, "XRP"))
+    finally:
+        T.reserve_baseline = _real
+    check("P10e plan() returns NO orders when the floors are unreadable -- every order "
+          "it can emit is a sale, so refusing is the conservative direction",
+          _orders == [], _orders)
+    check("P10f ...and says so loudly enough for an operator to act on",
+          any("UNREADABLE" in n and "RESERVE" in n for n in _notes), _notes)
+
+    # P10g: the write that could create the torn file is atomic, so this
+    # program cannot manufacture the emergency it now fails closed on.
+    tmp6 = os.path.join(tempfile.mkdtemp(), "RESERVE.json")
+    T.reserve_baseline(pf(100.0), path=tmp6)
+    check("P10g the floor write leaves no .tmp behind and the result parses",
+          not os.path.exists(tmp6 + ".tmp")
+          and isinstance(_json.loads(io.open(tmp6, encoding="utf-8").read()), dict))
+
     # ---- W: what it cannot do at all -------------------------------------
     BANK = re.compile(r"\b(withdraw\w*|payment_method\w*|ach_transfer|wire_transfer|"
                       r"bank_account|cash_out)\b", re.I)

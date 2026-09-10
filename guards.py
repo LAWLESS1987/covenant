@@ -730,9 +730,29 @@ def set_starting_total(total: float, path: Optional[str] = None) -> Optional[flo
     have = starting_total(path)
     if have is not None:
         return have
+    # "NEVER RECORDED" AND "CANNOT BE READ" BOTH ARRIVE HERE AS None. A78
+    # (2026-09-10). starting_total() returns None for an absent file, for an
+    # absent key, AND for a file that will not parse -- and only the first two
+    # mean "not set yet". On the third, the write below rebuilds `data` from
+    # {} and persists it, which deletes the reserve floors and re-anchors this
+    # lifetime budget to today's book. Measured: one torn-file cycle turned
+    # $100 of remaining buy budget into $2,100, and the new anchor was then
+    # protected by the very "never overwrites" invariant that had just failed.
+    #
+    # Line 472 of this file already states the rule: a file that exists and
+    # will not parse IS unknown, and that blocks. Returning None makes
+    # BuyBudget.check refuse with its existing "no starting book value
+    # recorded" verdict, which is the fail-closed direction.
+    p = path or RESERVE_PATH
+    if os.path.exists(p):
+        try:
+            with open(p, encoding="utf-8") as fh:
+                if not isinstance(json.load(fh), dict):
+                    raise ValueError("RESERVE.json is not an object")
+        except (OSError, ValueError):
+            return None
     if not (isinstance(total, (int, float)) and total > 0):
         return None
-    p = path or RESERVE_PATH
     try:
         os.makedirs(os.path.dirname(p), exist_ok=True)
         try:
@@ -748,8 +768,16 @@ def set_starting_total(total: float, path: Optional[str] = None) -> Optional[flo
             "starting_total_usd is the book at the moment the floor was set; "
             "buying is capped at pct_buyable of it, cumulatively, for ever.")
         data.setdefault("pct_buyable", 0.50)
-        with open(p, "w", encoding="utf-8") as fh:
+        # ATOMIC (A78). This is one of the two writers of RESERVE.json, and a
+        # kill between open("w") and the last byte leaves a torn file that
+        # both readers must now refuse. Do not manufacture the emergency you
+        # fail closed on.
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=1, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, p)
     except OSError:
         return None
     return float(total)
