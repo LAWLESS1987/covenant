@@ -426,7 +426,16 @@ GET api.github.com/repos/LAWLESS1987/covenant              -> "private": false
 
 That is a legitimate call and it is recorded here so nobody has to reconstruct it: **the exposed data is his, he has seen the measurement, and no third party is worse off** -- which is the constitution's own test. What would NOT be legitimate is the exposure going unmeasured, and it no longer can.
 
-**The action that actually closes this is still his:** the GitHub Support purge (text at `covenant-backup-2026-09-05/GITHUB_SUPPORT_REQUEST.md`). The 09-05 force-push unpublished nothing, because GitHub serves by SHA. Until that is filed, this issue stays open and the link is shared knowingly.
+**FILED 2026-09-11 — GitHub Support ticket #4747776, "Clear Cached Views", status open.** Submitted through the support portal's clear-cached-views route. That route is worth naming, because the obvious one is a trap: the current portal's only other purge branch under Repositories is *repository deletion*, which asks for the repository URL and a Delete/Don't-Delete confirmation, and it is not what this needs. The ticket carries the four things GitHub's own procedure asks for:
+
+- owner and repository;
+- **0** affected pull requests — this repository has never had one (REST API, `state=all`, empty list), so there are no PR references to dereference;
+- the first changed commit of the rewritten history, which is the **root commit**: the sensitive files were present from the initial commit, so every commit was rewritten;
+- no orphaned LFS objects — this repository does not use LFS.
+
+It also answers the test GitHub applies before assisting, that the risk cannot be mitigated by rotating the affected credential: **no credential was ever committed.** What is exposed is financial position data, which cannot be rotated or revoked. Removal is the only remedy that exists.
+
+**Filing is not the fix, and this issue does not close on a ticket number.** It closes when `python covenant_ambassador.py --repo-check` stops finding HTTP 200. Measured again immediately after filing: **still 200 on both URLs, 505 and 1345 bytes.** The 09-05 force-push unpublished nothing, because GitHub serves by SHA; only the purge does. Until the live check goes quiet, this stays open and the link is shared knowingly.
 
 ### A10. [serious / docs] DEPLOYMENT.md (README 'Start here' -> 'how it is deployed and configured') documents a judge setup the code no longer defaults to and names 7 commands that do not exist; G2 does not scan it
 
