@@ -768,6 +768,28 @@ def report(block):
 
 
 # ---------------------------------------------------------------- train
+def vocabulary_moved(cur, cand, limit=12):
+    """What the candidate stopped being able to say, and why.
+
+    WRITTEN 2026-09-11, after nineteen features left the model on a night whose
+    report said only "4202 weighted tokens" where the night before said 4221.
+    The number was in the ledger and the loss was not: nobody could see that
+    `his account` and `that belongs to` had gone without diffing two JSON files
+    by hand. covenant_judge_fallback.MIN_EVIDENCE_* fixed that cause; this makes
+    the next one visible whatever the cause turns out to be.
+
+    Returns a line for the block, or "" when nothing left -- silence here means
+    nothing was lost, never that nothing was looked at."""
+    gone = sorted(set(cur.weights) - set(cand.weights),
+                  key=lambda t: -abs(cur.weights[t]))
+    if not gone:
+        return ""
+    added = len(set(cand.weights) - set(cur.weights))
+    shown = ", ".join("%s (%+.2f)" % (t, cur.weights[t]) for t in gone[:limit])
+    return ("features dropped: %d (%d added). The model can no longer weigh: %s%s"
+            % (len(gone), added, shown, "" if len(gone) <= limit else ", ..."))
+
+
 def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDATE, say=print):
     verdicts = load_verdicts(verdicts_path)
     examples = [(v["text"], bool(v["violates"])) for v in verdicts]
@@ -866,9 +888,11 @@ def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDAT
             pass
     else:
         cand.save(candidate_path)
-    block = ("## %s  %s\n%s\n\nteacher verdicts: %d (%s)\ncandidate: %d examples, %d weighted tokens; model in use before: %s, after: %s\n%s\n\n%s"
+    moved = vocabulary_moved(cur, cand)
+    block = ("## %s  %s\n%s\n\nteacher verdicts: %d (%s)\ncandidate: %d examples, %d weighted tokens; model in use before: %s, after: %s\n%s%s\n\n%s"
              % (when, "PROMOTED" if ok else "REFUSED", "\n".join(reasons), len(verdicts), "; ".join(sources_of(verdicts)) or "none",
                 cand.n_examples, len(cand.weights), digest_of(model_path) if not ok else "(replaced)", digest_of(model_path),
+                (moved + "\n") if moved else "",
                 thresholds_line(cand_stats), table(cand_stats)))
     report(block)
     say(block)

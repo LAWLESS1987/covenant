@@ -39,7 +39,7 @@ that is the fake-guard shape A74 found in 35 of 36 suites. E1 and E2 also
 recompute what the OLD rule would have done on the same two corpora, so the
 suite fails if the cut is ever moved back onto the weight.
 
-CHECKS (fast, no network, nothing written):
+CHECKS (fast, no network; only E7 writes, into a temp dir it deletes):
   E1  hold side: one clean row that never mentions the feature decided its fate
       under the old rule; under the shipped rule it decides nothing
   E2  clear side: the same, for a feature that argues for clearing
@@ -49,6 +49,8 @@ CHECKS (fast, no network, nothing written):
   E5  a feature's fate changes when its OWN counts change (the cut still cuts)
   E6  neither bar sits on a low-count atom, which is what made one drift
       remove nineteen features at once rather than one
+  E7  the loop NAMES what it drops: this fix removed one cause, not every
+      future cause, and the night this happened reported only a token count
 LICENCE: public domain.
 """
 from __future__ import annotations
@@ -195,6 +197,48 @@ def main():
        clearance(old_in_evidence, 8) < 0.01,
        "old bar %.4f was %.4f from log(6/5) -- the atom the nineteen sat on"
        % (old_in_evidence, clearance(old_in_evidence, 8)))
+
+    # -- E7  a future loss is reported, whatever causes it -----------------
+    # The cut above removed the cause found on 2026-09-11. It cannot remove the next
+    # cause, and the ledger that night said only "4202 weighted tokens" where
+    # the night before said 4221 -- the loss was real and invisible. These run
+    # the real covenant_distill.train() end to end against a temp ledger.
+    import json
+    import shutil
+    import tempfile
+    import covenant_distill as D
+
+    tmp = tempfile.mkdtemp(prefix="a88_")
+    try:
+        # The model in use knows the feature; the new ledger makes it neutral.
+        before = corpus(MARK_HOLD, 9, 2, 48, 52)
+        after = corpus(MARK_HOLD, 6, 6, 48, 52)
+        model_path = os.path.join(tmp, "model.json")
+        trained(before).save(model_path)
+        ledger = os.path.join(tmp, "verdicts.jsonl")
+        with open(ledger, "w", encoding="utf-8", newline="\n") as fh:
+            for text, viol in after:
+                fh.write(json.dumps({"text": text, "violates": viol, "source": "a88"}) + "\n")
+        said = []
+        keep = (D.REPORT, D.HOLDOUT_RECORD)
+        D.REPORT, D.HOLDOUT_RECORD = os.path.join(tmp, "DISTILL.md"), os.path.join(tmp, "HOLDOUT.json")
+        try:
+            D.train(ledger, model_path=model_path,
+                    candidate_path=os.path.join(tmp, "cand.json"), say=said.append)
+        finally:
+            D.REPORT, D.HOLDOUT_RECORD = keep
+        block = "\n".join(said)
+        ck("E7a a dropped feature is named in the block the loop writes",
+           "features dropped:" in block and MARK_HOLD in block,
+           "block did not name it:\n%s" % block[:400])
+        ck("E7b and it reaches ops/DISTILL.md, not just the console",
+           "features dropped:" in open(os.path.join(tmp, "DISTILL.md"), encoding="utf-8").read())
+        # Silence must mean nothing was lost, never that nothing was checked.
+        same = trained(before)
+        ck("E7c when nothing is dropped the line is absent rather than empty",
+           D.vocabulary_moved(same, same) == "")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
     bad = [n for n, ok, _d in _checks if not ok]
     print("\nA88: %d/%d passed" % (len(_checks) - len(bad), len(_checks)))
