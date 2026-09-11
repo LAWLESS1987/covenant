@@ -29,7 +29,14 @@ say "covenant on this phone: install/update, then start (Ctrl-C to stop the node
 # 1. packages from Termux's own repo (python-cryptography avoids compiling on the phone)
 if command -v pkg >/dev/null 2>&1; then
     pkg update -y >/dev/null 2>&1 || true
-    pkg install -y python git python-cryptography ollama || {
+    # CORRECTED 2026-09-10: this line still read "... python-cryptography ollama".
+    # d81f808 took Ollama out of covenant_phone.sh and TERMUX_SETUP.md on 2026-09-09
+    # and missed the one file a new operator actually pastes. Ollama is out of the
+    # ethics quorum by policy (ops/quorum_policy.json: ollama_in_chain false), so the
+    # pull bought a component the gate does not consult -- and if the package is not
+    # available for this device the `|| exit 2` aborted the whole install over it.
+    # What judges here is the distilled student, read into the node's own process.
+    pkg install -y python git python-cryptography || {
         say "pkg install failed -- is this Termux from F-Droid? (the Play Store build is broken)"; exit 2; }
 else
     say "no 'pkg' here: this script is for Termux on Android"; exit 2
