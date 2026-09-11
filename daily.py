@@ -9,7 +9,8 @@ anything) to do. Optionally pushes the summary to your phone.
 It never trades and holds no keys. It tells you; you decide.
 
   python daily.py
-  python daily.py --push YOUR_NTFY_TOPIC
+  python daily.py --push auto            # topic from ~/.covenant/ntfy_topic
+  python daily.py --push YOUR_NTFY_TOPIC  # or give one explicitly
 """
 from __future__ import annotations
 import os, sys, json, time, argparse, statistics, urllib.request, urllib.parse
@@ -362,6 +363,38 @@ def fetch(sym, source=None, notes=None, divs=None):
     return px, closes, None
 
 
+# The ntfy topic is a CREDENTIAL, not a setting (2026-09-11). ntfy.sh has no
+# authentication: whoever knows the topic name receives the message. The topic
+# used to be written into DAILY.bat, which is tracked on a PUBLIC repository and
+# has been since the initial commit -- so the message this file builds
+# ("Portfolio $X, cash Y%") was addressed to a channel anyone who read that one
+# line could subscribe to. The argument at the top of this file, that an equity
+# history "is not something to post off the box either", was 690 lines above the
+# push that did it.
+#
+# So the topic now lives OUTSIDE the repository, where no commit can reach it,
+# and the tracked caller says only "auto".
+TOPIC_FILE = os.path.join(os.path.expanduser("~"), ".covenant", "ntfy_topic")
+
+
+def resolve_topic(value):
+    """A literal topic is used as given. "auto" reads COVENANT_NTFY_TOPIC, else
+    TOPIC_FILE. Absent means NO PUSH -- silence, never a guess."""
+    if value != "auto":
+        return value
+    t = (os.environ.get("COVENANT_NTFY_TOPIC") or "").strip()
+    if t:
+        return t
+    try:
+        t = open(TOPIC_FILE, encoding="utf-8").read().strip()
+    except OSError:
+        t = ""
+    if not t:
+        print("  (no push: --push auto, but %s is absent or empty and" % TOPIC_FILE)
+        print("   COVENANT_NTFY_TOPIC is unset. Write a topic there to enable it.)")
+    return t
+
+
 def push(topic, msg):
     if not topic:
         return
@@ -466,7 +499,8 @@ def guard_state(st, total, cash, positions, now=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--push", default="", help="ntfy topic for a phone summary")
+    ap.add_argument("--push", default="", metavar="TOPIC",
+                    help="ntfy topic for a phone summary; 'auto' reads ~/.covenant/ntfy_topic (never commit a topic: it is the credential)")
     ap.add_argument("--sold", default="", metavar="SYM",
                     help="record that you sold SYM today (feeds the cooldown guard)")
     ap.add_argument("--pnl", type=float, default=None,
@@ -703,6 +737,7 @@ def main():
         state["equity"].append([time.time(), total])
         save_state(state)
 
+    args.push = resolve_topic(args.push)
     if args.push:
         n = len(actions)
         blocked_note = f" Guards block adds: {','.join(blocked_syms)}." if blocked_syms else ""

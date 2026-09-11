@@ -325,6 +325,10 @@ SUITES = [
     # staged copy cannot answer and reports SKIP rather than PASS -- the
     # A84b/A85c lesson, three answers not two.
     ("test_a91_corpus_membrane.py",       120, "SECURITY"),
+    # A92, same change as the topic it moved out of DAILY.bat. Its E6 scans the
+    # ARTIFACT -- every .bat/.sh/.ps1/.py/.md in the tree -- because the defect
+    # was never in daily.py: it was in a batch file that called it.
+    ("test_a92_topic_is_a_credential.py", 120, "SECURITY"),
     # Registered in the same change that created it, 2026-09-11. The suite
     # above it went unregistered for days and the sweep called that INCOMPLETE;
     # there is no reason to repeat it.
