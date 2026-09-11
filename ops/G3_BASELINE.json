@@ -5,7 +5,7 @@
   "test_c3_guard.py": 3,
   "test_d1_preflight_deps.py": 1,
   "test_f2_distill_loop.py": 1,
-  "test_f5_reserve.py": 7,
+  "test_f5_reserve.py": 6,
   "test_f7_caps.py": 8,
   "test_g12_inflight.py": 4,
   "test_gate_proxy.py": 1,
@@ -18,5 +18,5 @@
   "test_sem4_degraded_model.py": 2,
   "test_sentinel_gate.py": 1
  },
- "total": 51
+ "total": 50
 }

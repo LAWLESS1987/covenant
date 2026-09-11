@@ -496,6 +496,38 @@ def _ollama_dead(err):
                                        "ConnectionReset", "10054", "timed out"))
 
 
+OFFSITE_CUT = chr(10) + chr(10) + "MEMORY:" + chr(10)
+
+
+def _offsite_system(text):
+    """What may leave this PC when a turn goes to the GitHub runner.
+
+    system_prompt() carries two PRIVATE blocks after the cut: MEMORY
+    (ops/chat/MEMORY.md -- what Lawrence has said, tagged [Lawrence]) and the
+    LIVE STATE that live_state() builds by running money_posture.py,
+    trader_freshness.py and launch_check.py. A judge on a runner needs neither
+    to answer a question, and dispatch() puts what it is given into a
+    workflow_dispatch input on a PUBLIC repo (verified 2026-09-11: anonymous
+    GET 200, private=false, 310 dispatch runs listable with no token).
+
+    What is KEPT is already published in that same repo: the instructions, the
+    binding text from CONTRIBUTING.md and the principle from
+    docs/CONSTITUTION.md. Nothing is withheld that the runner could not read
+    off the repo it is running in.
+
+    THE LIMIT, said out loud: this redacts the SYSTEM prompt, the block that
+    would otherwise carry the whole money posture on EVERY turn. It does not
+    redact the conversation. If a turn discusses a balance, that turn still
+    leaves with it -- as it must, since it is the question being asked.
+    """
+    head = text.split(OFFSITE_CUT, 1)[0]
+    if head == text:
+        return text
+    return head + (chr(10) + chr(10) + "(MEMORY and the LIVE STATE are "
+                   "withheld from this request: the turn leaves this PC. Say "
+                   "so plainly if the question needed them.)")
+
+
 def chat_github(messages, model_hint):
     """Ollama is not answering: send this turn's messages to a judge on a GitHub
     Actions runner. The conversation window leaves this PC. Returns the answer
@@ -507,6 +539,11 @@ def chat_github(messages, model_hint):
     window = [m for m in messages if m.get("role") in ("system", "user", "assistant")][-9:]
     if window and window[0].get("role") != "system" and messages and messages[0].get("role") == "system":
         window = [messages[0]] + window
+    # 2026-09-11: redact before the window leaves. Every turn used to carry
+    # the full system prompt, and live_state() fills its tail with
+    # money_posture.py output, the launch gates and the last self-eval block.
+    window = [dict(m, content=_offsite_system(m.get("content") or ""))
+              if m.get("role") == "system" else m for m in window]
     ans = gh.ask("", "", gm, timeout=900, messages=window)
     return "(via GitHub runner, %s, %.0fs) %s" % (gm, ans.get("seconds", 0), ans.get("content", "").strip())
 
@@ -632,13 +669,38 @@ class Log:
         self.buf = []
 
 
+def _banner_lines(model):
+    """The opening banner, as DATA so a suite can run it instead of reading it.
+
+    Extracted 2026-09-11. The previous form printed straight from main(), so the
+    only way to guard it was to grep this file for a sentence -- which is the
+    exact shape of guard A87 caught reading source instead of behaviour. This
+    returns the lines; main() prints them; test_a90 RUNS it with the probe
+    stubbed both ways and reads what comes back.
+    """
+    out = []
+    if _local_alive():
+        out.append("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
+    elif _GITHUB["on"]:
+        out.append("  covenant chat -- NO LOCAL MODEL: %s is not answering, and the GitHub" % OLLAMA)
+        out.append("  fallback is ON, so EVERY turn leaves this PC to a runner in a PUBLIC repo.")
+        out.append("  MEMORY and the live state are withheld from it; the conversation is not.")
+        out.append("  !github off stops it (the chat then has no model at all).")
+    else:
+        out.append("  covenant chat -- NO LOCAL MODEL: %s is not answering and the GitHub" % OLLAMA)
+        out.append("  fallback is off, so no turn can be answered until a local model is back.")
+    out.append("  browsing is %s (only a query or URL leaves, to the site you ask about). !help for commands."
+               % ("on" if _BROWSE["on"] else "off"))
+    return out
+
+
 def main():
     args = [a for a in sys.argv[1:]]
     if "--help" in args or "-h" in args:
         print(__doc__); return 0
     if "--say-test" in args:
         print("  voices:", ", ".join(voices()))
-        speak("Hey! I am the covenant. Nothing leaves this machine, and I only say what I can measure. What are we digging into?")
+        speak("Hey! I am the covenant. My voice is made on this machine, and I only say what I can measure. What are we digging into?")
         time.sleep(4); print("ok    spoke one sentence (if you heard nothing, check the sound device)"); return 0
     if "--selftest" in args:
         t = web_fetch("https://example.com/")
@@ -677,17 +739,8 @@ def main():
     # which live_state() fills with money_posture.py's output -- in a repo that
     # is public. The banner said the opposite of what the program did. It now
     # probes and reports where the turn will actually go.
-    if _local_alive():
-        print("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
-    elif _GITHUB["on"]:
-        print("  covenant chat -- NO LOCAL MODEL: %s is not answering, and the GitHub" % OLLAMA)
-        print("  fallback is ON, so EVERY turn leaves this PC to a runner in a PUBLIC repo,")
-        print("  carrying the live-state system prompt (money posture, gates). !github off stops it.")
-    else:
-        print("  covenant chat -- NO LOCAL MODEL: %s is not answering and the GitHub" % OLLAMA)
-        print("  fallback is off, so no turn can be answered until a local model is back.")
-    print("  browsing is %s (only a query or URL leaves, to the site you ask about). !help for commands."
-          % ("on" if _BROWSE["on"] else "off"))
+    for _line in _banner_lines(model):
+        print(_line)
     print("  reading the live state (money posture, freshness, gates)...", flush=True)
     speak("Reading the live state. One moment.")
     state = live_state()

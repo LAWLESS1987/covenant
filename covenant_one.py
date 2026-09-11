@@ -316,6 +316,11 @@ SUITES = [
     ("test_a82_exposure_unknown.py",      120, "SECURITY"),
     ("test_a85_manifest_privacy.py",      120, "SECURITY"),
     ("test_g3_behavioural_guards.py",     120, "SECURITY"),
+    # A90, registered in the change that created it (the lesson the A88
+    # comment below records). Runs covenant_chat end to end with the
+    # dispatcher replaced by a recorder, so it reads what WOULD have gone on
+    # the wire rather than grepping the source for the word "redact".
+    ("test_a90_offsite_redaction.py",     120, "SECURITY"),
     # Registered in the same change that created it, 2026-09-11. The suite
     # above it went unregistered for days and the sweep called that INCOMPLETE;
     # there is no reason to repeat it.
