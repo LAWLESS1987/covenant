@@ -2761,3 +2761,51 @@ A84b/A85c, done before committing this time rather than after.
 **Verified it touched nothing real:** the only change to `ops/SELF_EVAL.md`
 during the run was the watchdog's own hourly block (round 1260, real node data),
 not the stub's.
+
+---
+
+### A89. [minor / monitoring] The mesh multi-source warning latches on a peer that has left, so it can never clear. OPEN 2026-09-11
+
+**Where.** `covenant_unified_v8.py` `PeerState.observe` (~:650) and
+`PeerState.summary` (~:694); the warning it feeds is the A20 block at ~:8191.
+
+**The defect.** `PeerState._rows` is evicted on **capacity only** — the
+`MAX_PEERS_TRACKED` branch in `observe` picks the oldest row when a *new* peer
+arrives and the table is full. Nothing evicts on **age**. A peer that connected
+once, reported its source digest and went away keeps its row, and its `src`,
+for the life of the process. `summary()` folds every row with a `src` into
+`by_source`, and the A20 warning fires whenever `by_source` holds a digest that
+is not ours. So a peer that is gone keeps raising a warning about a
+disagreement that no longer exists, and no amount of waiting clears it.
+
+**Measured, not inferred.** Node A on :5000, 2026-09-11:
+
+* `/health` `mesh` = `{"by_source": {"1e72206edd9a": ["127.0.0.1:5021",
+  "peer_127.0.0.1_5021"], "57d877e3f7a6": ["10.0.0.174:?"]}, "tracked": 3}`
+* `/peers` = `{"peer_127.0.0.1_5021": ["127.0.0.1", 5021]}` — **one** peer.
+
+The 10.0.0.174 row is counted in `tracked` and in `by_source` while being
+absent from `peers`. 10.0.0.174 is this PC's own Wi-Fi address, so the
+"foreign" source is a process that ran the current disk source on this machine,
+talked to node A once, and exited; `docs/KNOWN_ISSUES.md:394` records exactly
+such an experiment ("a clone node peered to 10.0.0.174:5001 from this host did
+pull blocks"). It is not the stray `test_a77_listener_bind.py` process: that
+test binds `127.0.0.1` only (lines 126, 182, 192, 236, 347) and never contacts
+a live node.
+
+**What it costs.** `ops/SELF_EVAL.md` has carried `alerts WARN 2 live` on every
+round since 2026-09-11T00:59:15Z (round 1680) — 19 rounds and counting — and
+one of the two can never go away on its own. A warning that cannot clear
+trains the operator to read `2 live` as the resting state, which is the same
+failure mode as the stale deploy pins in `verify_deploy.py` (fixed 2026-09-11).
+
+**Not fixed here.** The obvious repair — age out a row whose last `seen` is
+older than some multiple of the heartbeat, or drop `src` for a peer no longer
+in `peers` — changes what the A20 warning *means*, and the standing rule
+(2026-09-09) is refinements only until there is a second operator. It is
+written down rather than done.
+
+**The honest reading today:** of the two live alerts, `source-not-on-disk` is
+true and actionable (the three nodes have run `1e72206edd9a` since
+2026-09-09T14:24 and were never restarted onto the committed code), and
+`mesh multi-source` is a latched record of a peer that left.
