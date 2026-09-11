@@ -17,7 +17,7 @@ plan for reversing that decision safely, if and when it is wanted.
 | `holdings.txt` | 505 bytes, 13 lines, ~10 position rows with quantities and average buy prices |
 | `TRADING_POLICY.json` | keys `policy`, `locked_positions`, `sleeve`, `graduation_requirements`, `overrides` |
 | paths to purge | 4 — root and `launch/covenant-v8.37/` for both files |
-| commits that MODIFIED them | `716a60a` (added), `2dfe018` (removed) |
+| commits that MODIFIED them | `<SHA-REDACTED>` (added), `2dfe018` (removed) |
 | commits whose TREE CONTAINS them | **16** — every commit between those two |
 
 A correction worth keeping, because it was nearly a mistake in this very

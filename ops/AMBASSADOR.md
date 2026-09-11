@@ -149,9 +149,9 @@ warning he has read is a decision; a warning nobody records is how A9 sat marked
 Measured on the open internet, 2026-09-09:
 
 ```
-raw.../LAWLESS1987/covenant/716a60a/holdings.txt        -> HTTP 200,  505 bytes
+raw.../LAWLESS1987/covenant/<SHA-REDACTED>/holdings.txt        -> HTTP 200,  505 bytes
    13 lines: 11 tickers with QUANTITY and AVG_BUY_PRICE, plus CASH
-raw.../LAWLESS1987/covenant/716a60a/TRADING_POLICY.json -> HTTP 200, 1345 bytes
+raw.../LAWLESS1987/covenant/<SHA-REDACTED>/TRADING_POLICY.json -> HTTP 200, 1345 bytes
 api.github.com/repos/LAWLESS1987/covenant                -> "private": false
 ```
 
