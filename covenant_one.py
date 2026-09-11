@@ -316,6 +316,10 @@ SUITES = [
     ("test_a82_exposure_unknown.py",      120, "SECURITY"),
     ("test_a85_manifest_privacy.py",      120, "SECURITY"),
     ("test_g3_behavioural_guards.py",     120, "SECURITY"),
+    # Registered in the same change that created it, 2026-09-11. The suite
+    # above it went unregistered for days and the sweep called that INCOMPLETE;
+    # there is no reason to repeat it.
+    ("test_a88_evidence_cut.py",         120,  "JUDGE"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
     # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40

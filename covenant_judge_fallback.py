@@ -100,6 +100,48 @@ MODEL_PATH = os.path.join(HERE, "fallback_model.json")
 MIN_EXAMPLES = 40        # below this the model has no business having a view
 MIN_DOC_FREQ = 3         # a token seen once or twice is a coincidence, not evidence
 MIN_COVERAGE = 0.35      # fraction of payload tokens the model has ever seen
+# MIN_EVIDENCE, replacing a cut on the stored weight, 2026-09-11.
+#
+# The old rule was `abs(w) >= 0.25`, where w is the weight actually written to
+# the model: log((a+1)/(b+1)) + log((n_c+2)/(n_v+2)). The first term is what
+# the FEATURE has been seen to do. The second is the corpus's class balance --
+# the same number for every feature, and a number that moves every night as
+# rows arrive. Cutting on the sum means a feature can be dropped without one
+# new row ever mentioning it.
+#
+# Measured, and this is why the constant exists. On 2026-09-11 the nightly
+# added 12 violations and 10 clean rows. The balance moved 1675/1565 = 1.0703
+# to 1685/1577 = 1.0685 -- 0.0018 -- and nineteen features were dropped: among
+# them `his account`, `that belongs to`, `say nothing`, `not:arrived`. Every
+# one of the nineteen had weight 0.2502 against a cut of 0.25. None of their
+# counts had changed. They would have come back on a night that shifted the
+# balance the other way: flicker, not learning.
+#
+# So the cut is on the evidence alone. For fixed counts that is a constant: it
+# moves only when a new row actually mentions the feature, which is the only
+# thing that should ever move it.
+#
+# The two values are where the old rule already stood, not new judgements. The
+# offset pushed one side up and the other down, so in evidence terms the bar
+# was 0.1838 to write down a reason to HOLD and 0.3162 to write down a reason
+# to CLEAR. That asymmetry was nobody's decision -- it fell out of cutting the
+# sum -- and the obvious tidy-up is one bar for both. Measured 2026-09-11, one
+# bar at 0.17 adds 240 clean-side features and costs coverage: held-out
+# decisions 2178 -> 2159 with false clears 55 -> 57. Deciding less while
+# admitting more is the exact shape covenant_distill.promotion() refuses, so
+# the asymmetry stays until there is evidence for changing it, and it stays
+# WRITTEN DOWN rather than emergent.
+#
+# Each value is then nudged into the middle of a gap. With Laplace smoothing a
+# low-count feature's evidence can only land on log(k/m) for small integers,
+# and the pile-up that caused this bug was nineteen features sharing one such
+# point. 0.17 lies between log(7/6) = 0.1542 and log(6/5) = 0.1823; 0.30 lies
+# between log(4/3) = 0.2877 and log(11/8) = 0.3185. Both are about two
+# hundredths clear, where the old rule ran 0.0017 from a nineteen-feature
+# atom. High-count features still land anywhere near a bar -- nothing can stop
+# that -- but they now cross it only on their own evidence.
+MIN_EVIDENCE_HOLD = 0.17   # to write down a reason to hold  (was 0.1838, drifting)
+MIN_EVIDENCE_CLEAR = 0.30  # to write down a reason to clear (was 0.3162, drifting)
 # MARGIN_TO_HOLD, raised from 1.2 to 2.4 on 2026-09-04.
 #
 # 1.2 was set when the student was weak and barely decided anything, and a low
@@ -466,8 +508,14 @@ class FallbackModel:
             pc = (c_counts.get(t, 0) + 1.0) / (n_c + 2.0)
             w = math.log(pv / pc)
             # Drop tokens that barely move anything: a smaller, readable model
-            # beats a marginally sharper unreadable one.
-            if abs(w) >= 0.25:
+            # beats a marginally sharper unreadable one. The test is on the
+            # evidence the feature carries and not on w, because w also holds
+            # the corpus's class balance, which drifts nightly and belongs to
+            # no feature -- see MIN_EVIDENCE. The weight WRITTEN is still the
+            # full log-odds; only the decision to write it has changed.
+            evidence = math.log((v_counts.get(t, 0) + 1.0) / (c_counts.get(t, 0) + 1.0))
+            bar = MIN_EVIDENCE_HOLD if evidence > 0 else MIN_EVIDENCE_CLEAR
+            if abs(evidence) >= bar:
                 weights[t] = round(w, 4)
         prior = math.log((n_v + 1.0) / (n_c + 1.0))
         m = cls({"weights": weights, "vocab": vocab, "n_examples": n_v + n_c,
