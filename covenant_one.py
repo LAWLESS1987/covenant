@@ -321,6 +321,10 @@ SUITES = [
     # dispatcher replaced by a recorder, so it reads what WOULD have gone on
     # the wire rather than grepping the source for the word "redact".
     ("test_a90_offsite_redaction.py",     120, "SECURITY"),
+    # A91, same change as the split it pins. Its E2 asks git a question the
+    # staged copy cannot answer and reports SKIP rather than PASS -- the
+    # A84b/A85c lesson, three answers not two.
+    ("test_a91_corpus_membrane.py",       120, "SECURITY"),
     # Registered in the same change that created it, 2026-09-11. The suite
     # above it went unregistered for days and the sweep called that INCOMPLETE;
     # there is no reason to repeat it.

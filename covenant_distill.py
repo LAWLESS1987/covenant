@@ -65,6 +65,18 @@ import covenant_judge_fallback as FB                                     # noqa:
 import judge_suite as S                                                  # noqa: E402
 
 VERDICTS = os.path.join(HERE, "ops", "verdicts.jsonl")
+# The local half of the corpus (covenant_judge_defer.LIVE_VERDICTS, 2026-09-11).
+# Verdicts on live transactions carry the transaction text, so they stay off a
+# public repository -- but the student is meant to learn from everything this
+# machine sees, so training reads BOTH. That asymmetry is the point: the
+# repository carries what is shareable, this machine carries all of it.
+LIVE_VERDICTS = os.path.join(HERE, "ops", "verdicts_live.jsonl")
+
+
+def corpus_paths():
+    """Every ledger the student learns from, shareable first. A missing local
+    ledger is the normal case, not an error."""
+    return [q for q in (VERDICTS, LIVE_VERDICTS) if os.path.exists(q)] or [VERDICTS]
 REJECTED = os.path.join(HERE, "ops", "distill_rejected.jsonl")
 REPORT = os.path.join(HERE, "ops", "DISTILL.md")
 MODEL_PATH = FB.MODEL_PATH
@@ -137,7 +149,7 @@ def contaminating(text, ebags=None):
     return False
 
 
-def load_verdicts(path=VERDICTS, paired_only=True):
+def load_verdicts(path=None, paired_only=True):
     """The ledger, minus the study rows that lost their pair.
 
     MEASURED 2026-09-04: of the first 32 study rows written, 32 were clean and
@@ -156,18 +168,27 @@ def load_verdicts(path=VERDICTS, paired_only=True):
     (rule 5) -- they are skipped HERE, at training time, rather than deleted.
     paired_only=False returns the ledger as written, for anyone counting it.
     """
+    # 2026-09-11: one path, several paths, or None for "every corpus this
+    # machine has". Every existing caller passing a single path still works.
+    if path is None:
+        paths = corpus_paths()
+    elif isinstance(path, str):
+        paths = [path]
+    else:
+        paths = list(path)
     out = []
-    try:
-        with open(path, encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    d = json.loads(line)
-                    if isinstance(d, dict) and d.get("text") and "violates" in d:
-                        out.append(d)
-                except ValueError:
-                    continue
-    except OSError:
-        pass
+    for q in paths:
+        try:
+            with open(q, encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        d = json.loads(line)
+                        if isinstance(d, dict) and d.get("text") and "violates" in d:
+                            out.append(d)
+                    except ValueError:
+                        continue
+        except OSError:
+            pass
     if not paired_only:
         return out
     # RETRACTED ROWS, 2026-09-04. The study pipeline turns a scripture line
@@ -790,7 +811,7 @@ def vocabulary_moved(cur, cand, limit=12):
             % (len(gone), added, shown, "" if len(gone) <= limit else ", ..."))
 
 
-def train(verdicts_path=VERDICTS, model_path=MODEL_PATH, candidate_path=CANDIDATE, say=print):
+def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, say=print):
     verdicts = load_verdicts(verdicts_path)
     examples = [(v["text"], bool(v["violates"])) for v in verdicts]
     when = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

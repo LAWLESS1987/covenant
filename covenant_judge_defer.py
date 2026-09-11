@@ -83,6 +83,30 @@ VERDICTS = os.path.join(HERE, "ops", "verdicts.jsonl")
 # own verdict can never become a teacher label.
 AUDIT_PATH = os.path.join(HERE, "ops", "judged_by_student.jsonl")
 
+# THE MEMBRANE (2026-09-11). ops/verdicts.jsonl is TRACKED, and this repository
+# is public. Measured on that day: 3,569 rows carrying no address, no ticker
+# with an amount, no path and no balance -- clean by accident rather than by
+# construction, because the only source that would carry a real payload is
+# "live" (:327) and no live transaction had reached it yet. The first one would
+# have published the transaction text, in the same shape as the chat leak found
+# the same day: a path that is harmless only until the feature works.
+#
+# So the split is by SOURCE, allowlist not denylist -- a source nobody thought
+# of lands in the local ledger, not the published one. The students lose
+# nothing: covenant_distill reads BOTH files, so this machine learns from
+# everything it sees while the repository carries only what is shareable.
+# The same reasoning as judged_by_student.jsonl (.gitignore:241-245): whatever
+# a submitter sent to the node is not this operator's content to publish.
+LIVE_VERDICTS = os.path.join(HERE, "ops", "verdicts_live.jsonl")
+SHAREABLE_SOURCES = frozenset({"seed", "generated+judged", "study", "github",
+                               "moltbook/judged", "test"})
+
+
+def verdict_path_for(source):
+    """Which ledger a verdict of this source belongs in. Fails CLOSED: only a
+    source known to be shareable reaches the tracked file."""
+    return VERDICTS if str(source) in SHAREABLE_SOURCES else LIVE_VERDICTS
+
 
 def load_policy(path=POLICY):
     try:
@@ -205,7 +229,7 @@ def record_verdict(data, result, judge, source, path=None):
     # default bound at import, every selftest whose stub primary answered
     # wrote its fixture ("a gift of 5") into the REAL training ledger as a live
     # Ollama verdict -- 184 rows by 2026-09-06 (KNOWN_ISSUES A54).
-    path = path or VERDICTS
+    path = path or verdict_path_for(source)
     """Append an ANSWERED verdict to the ledger the fallback learns from.
     Silence, abstention and uncertainty are not verdicts and are not written.
     Returns True when a line was written."""
@@ -359,7 +383,7 @@ except Exception as _e:                                          # noqa: BLE001
 
 
 def _selftest():
-    global VERDICTS, AUDIT_PATH
+    global VERDICTS, LIVE_VERDICTS, AUDIT_PATH
     import tempfile as _tmp       # the function imports tempfile again below, which would shadow the module name
     _d = _tmp.mkdtemp()
     # KEEP THE REAL PATH AND ITS SIZE, taken BEFORE the rebinding on the next
@@ -368,7 +392,10 @@ def _selftest():
     # a check, and a comment cannot notice when it stops being true (A54).
     _real_verdicts = VERDICTS
     _real_size = os.path.getsize(_real_verdicts) if os.path.exists(_real_verdicts) else -1
+    _real_live = LIVE_VERDICTS
+    _real_live_size = os.path.getsize(_real_live) if os.path.exists(_real_live) else -1
     VERDICTS = os.path.join(_d, "selftest_verdicts.jsonl")      # never the real ledger
+    LIVE_VERDICTS = os.path.join(_d, "selftest_live.jsonl")     # nor the real local one
     AUDIT_PATH = os.path.join(_d, "selftest_audit.jsonl")       # nor the real audit trail
     import tempfile
     ok = []
@@ -422,13 +449,25 @@ def _selftest():
         # (the temp ledger is never created) and D1c goes red (the real one
         # grows by exactly one row).
         _rows = []
-        if os.path.exists(VERDICTS):
-            with open(VERDICTS, encoding="utf-8") as fh:
+        if os.path.exists(LIVE_VERDICTS):
+            with open(LIVE_VERDICTS, encoding="utf-8") as fh:
                 _rows = [json.loads(x) for x in fh if x.strip()]
         check("D1b that verdict was written to the ledger this test rebound, not to a default frozen at import",
               len(_rows) == 1 and _rows[0]["text"] == "gift" and _rows[0]["source"] == "live")
+        # THE MEMBRANE, checked in both directions (2026-09-11). D1b alone would
+        # pass if "live" landed in BOTH ledgers.
+        check("D1b2 a live verdict did NOT also land in the SHAREABLE ledger",
+              not os.path.exists(VERDICTS) or os.path.getsize(VERDICTS) == 0)
+        check("D1b3 and a shareable source still reaches the shareable ledger",
+              record_verdict({"message": "seeded case"}, R(False), "t", "seed")
+              and os.path.exists(VERDICTS) and os.path.getsize(VERDICTS) > 0)
+        check("D1b4 an UNKNOWN source fails closed to the local ledger, not the public one",
+              record_verdict({"message": "from somewhere new"}, R(False), "t", "a-source-nobody-thought-of")
+              and sum(1 for _x in open(LIVE_VERDICTS, encoding="utf-8") if _x.strip()) == 2)
         check("D1c and the real ops/verdicts.jsonl did not grow by a byte while this ran",
               (os.path.getsize(_real_verdicts) if os.path.exists(_real_verdicts) else -1) == _real_size)
+        check("D1c2 nor did the real ops/verdicts_live.jsonl",
+              (os.path.getsize(_real_live) if os.path.exists(_real_live) else -1) == _real_live_size)
         j._primary = Stub(cov.JudgmentResult(True, "unreachable", judge_id="local:1", infrastructure_failure=True))
         # The premise is an UNTRAINED fallback. The repository's own model is
         # trained now, so point this seat at a model file that does not exist.
