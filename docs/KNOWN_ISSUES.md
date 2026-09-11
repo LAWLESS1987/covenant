@@ -2809,3 +2809,23 @@ written down rather than done.
 true and actionable (the three nodes have run `1e72206edd9a` since
 2026-09-09T14:24 and were never restarted onto the committed code), and
 `mesh multi-source` is a latched record of a peer that left.
+
+**CONFIRMED BY RESTART, 2026-09-11T23:38Z.** The diagnosis above was reasoning
+about `PeerState._rows`; this is the measurement. A power-adjacent event killed
+the watchdog and its three child nodes at 23:33:13Z, and
+`covenant_watchdog_guard.py` revived them at 23:38:07Z (gap 288s, attempt #6).
+Across that restart, node A's `/health`:
+
+* height **17 before and 17 after** -- `load_chain()` resumed the chain from
+  `nodeA_prod.db`, genesis `00009b31` unchanged;
+* source `1e72206edd9a` -> **`57d877e3f7a6`**, so `source-not-on-disk` is
+  resolved as well: the nodes finally run the committed code;
+* `mesh.by_source` went from two digests to one, `tracked` 3 -> 2, and the
+  warning count went **4 -> 3** with the multi-source line gone and nothing new.
+
+So the latched row died with the process, exactly as predicted, and **a process
+restart is the only thing that clears it**. That is the argument for the fix
+rather than against it: a warning whose sole remedy is restarting a healthy
+node is a warning that trains the operator to restart healthy nodes. Still not
+fixed here -- ageing a row out changes what the A20 warning means, and the
+standing rule is refinements only until there is a second operator.
