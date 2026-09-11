@@ -269,3 +269,33 @@ ops/quorum_policy.json
 # manufacture the "superseded copies" ambiguity covenant_selfaudit already tracks.
 Claude outputs/
 ops/rule5_backfill_ledger.jsonl
+
+# --- diagnostic captures: outputs, not deliverables (2026-09-11) -----------
+# Sixteen one-machine captures were tracked on a public main that is meant to
+# be read as guidance. They are not a judgement call: verify_bundle.py:73-79
+# ALREADY lists every one of them as a generated output to exclude from
+# hashing, for the reason stated there -- a launcher that writes a report into
+# this folder would otherwise guarantee the next run reports "changed". So the
+# repository was publishing files its own verifier classifies as noise.
+# Checked before removal: none is named in MANIFEST.sha256, and the only one
+# named by code is judge_bench_out.txt, by judge_bench.py -- which WRITES it.
+# The generators (pc_check.bat, AG_LEAN_MEASURE.bat, AD_DIAG_PORTS.bat ...)
+# all stay; a second operator runs them and gets their own machine's answers.
+# pc_report.txt mattered most: exact CPU SKU, RAM, disk size and free space,
+# GPU driver build and the power-scheme GUID of this one PC.
+CLEANUP.txt
+FIT_CHECK.txt
+FREE_RAM.txt
+INTEGRATE_RESULTS.txt
+INTEGRATE_RESULTS2.txt
+LEAN_MEASURE.txt
+PORT_DIAG.txt
+PORT_PICK.txt
+RETEST_RESULTS.txt
+STRAY_FIX.txt
+TOPMEM.txt
+diag_out.txt
+go_out.txt
+judge_bench_out.txt
+preflight_out.txt
+pc_report.txt
