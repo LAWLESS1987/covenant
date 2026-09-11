@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 10924
+EXPECTED_LINES = 11214
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -59,10 +59,20 @@ MANIFEST = {
     # the SAME digest the candidate sweep printed for its staged core
     # (525f235134f5 "as STAGED") -- what was swept is what shipped, provable
     # from the two files carrying one hash.
+    # 2026-09-11: re-pinned. Seven commits between 2026-09-03 and 09-10
+    # moved these four files without moving these pins -- the newest is
+    # 26cd4b7 (A81), which is why the core drifted 8f219285f268 ->
+    # 57d877e3f7a6 and 10924 -> 11214 lines. This is stale pins, not a bad
+    # delivery: all four are clean against HEAD, so it is the exact M53
+    # failure the notes below describe. The suites that judge these bytes
+    # were RUN against them BEFORE this pin moved -- K1 20/20, K2 25/25,
+    # P19 23/23, A3s 51/51, P15 33/33 -- which is the order the b969
+    # lesson below teaches: a pin proves WHICH bytes arrived, never that
+    # the bytes are right.
     "covenant_unified_v8.py":
-        "8f219285f26807de9811c48dd34e8e826c337c7112932be85ce7fb16e2a65518",
+        "57d877e3f7a65593bf28fa635341fcbcc77404a17dc36e154f40aeeb79ff552f",
     "test_a3s_send_bounds.py":
-        "bd0ab67ae2f62a12b6a0253926511ca7cffa6155e3a74bb6633d3875006d1d7c",
+        "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
     # wired in (~05:45Z), then test_p19_overlay_guard (~08:00Z), then
     # test_p15_judge_identity (~10:30Z -- shipped 08-28, wired into no runner
@@ -87,7 +97,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "6511158dc70338f81b81bf7d7897077b295c9d5c4e5147410b349baa870e7534",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
+        "f238ff9b25fe91cc3299e41ab047ff6f827a6728b7b8f37302b60556c3517f04",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -116,7 +126,7 @@ MANIFEST = {
     # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
     # runners name is part of the delivery (M53).
     "test_p15_judge_identity.py":
-        "3cf62e36f9020a5354515d8d9318c1ee5fcb5c8588793feb512a263886ad2ae1",   # 2026-09-03: R4d/R5c pin the deferring-policy wording (F2); moved with the file (M53)
+        "a0f2702f2fe56cfa39dc5c769e2e9fd8f378cc638ced12af418c49582a687370",   # 2026-09-03: R4d/R5c pin the deferring-policy wording (F2); moved with the file (M53)
 }
 # file -> module it imports that must sit in the same directory
 COMPANIONS = {
