@@ -597,6 +597,16 @@ def propose(msgs, model):
     return "%d proposal(s) written to %s -- not applied; that is a human's hand" % (len(props), PROPOSALS)
 
 
+def _local_alive(timeout=4):
+    """Is there a local model to answer at all? The banner below must not
+    promise 'stays on this PC' out of a constant -- it has to ask."""
+    try:
+        with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=timeout) as r:
+            return bool(json.loads(r.read().decode()).get("models"))
+    except Exception:                                            # noqa: BLE001
+        return False
+
+
 def models():
     try:
         with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=8) as r:
@@ -659,7 +669,23 @@ def main():
             _VOICE["name"], _VOICE["rate"], _VOICE["pitch"]))
     model = MODEL
     log = Log()
-    print("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
+    # 2026-09-11: this used to assert "Conversation, memory and state stay on
+    # this PC" from a constant. True when a local Ollama answered every turn;
+    # false since Ollama was deleted from this machine on 2026-09-07. With no
+    # local model, chat_tools raises on EVERY turn, _ollama_dead matches, and
+    # the turn goes to a GitHub Actions runner -- carrying the system prompt,
+    # which live_state() fills with money_posture.py's output -- in a repo that
+    # is public. The banner said the opposite of what the program did. It now
+    # probes and reports where the turn will actually go.
+    if _local_alive():
+        print("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
+    elif _GITHUB["on"]:
+        print("  covenant chat -- NO LOCAL MODEL: %s is not answering, and the GitHub" % OLLAMA)
+        print("  fallback is ON, so EVERY turn leaves this PC to a runner in a PUBLIC repo,")
+        print("  carrying the live-state system prompt (money posture, gates). !github off stops it.")
+    else:
+        print("  covenant chat -- NO LOCAL MODEL: %s is not answering and the GitHub" % OLLAMA)
+        print("  fallback is off, so no turn can be answered until a local model is back.")
     print("  browsing is %s (only a query or URL leaves, to the site you ask about). !help for commands."
           % ("on" if _BROWSE["on"] else "off"))
     print("  reading the live state (money posture, freshness, gates)...", flush=True)
