@@ -1670,3 +1670,216 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
 
+## 2026-09-10T18:26:28Z  overall WARN  (round 1320)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T19:31:57Z  overall WARN  (round 1380)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T20:37:23Z  overall WARN  (round 1440)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T21:42:51Z  overall WARN  (round 1500)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T22:48:18Z  overall WARN  (round 1560)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-10T23:53:42Z  overall WARN  (round 1620)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 1e72206edd9a, B runs 1e72206edd9a, C runs 1e72206
+
+## 2026-09-11T00:59:15Z  overall WARN  (round 1680)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T02:04:50Z  overall WARN  (round 1740)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T03:10:38Z  overall WARN  (round 1800)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T04:17:56Z  overall WARN  (round 1860)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T05:23:51Z  overall WARN  (round 1920)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T06:29:35Z  overall WARN  (round 1980)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T07:35:10Z  overall WARN  (round 2040)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T08:40:39Z  overall WARN  (round 2100)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T09:46:04Z  overall WARN  (round 2160)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+
+## 2026-09-11T04:12Z  overall FAIL  (scheduled self-eval)
+nodes     PASS  3/3 up (5000/5020/5060), height 16, genesis 00009b31, v8.40, all running source 1e72206edd9a; degraded=true on all three (no provider key, no code sandbox on win32)
+watchdog  PASS  last line 2s old (2026-09-11T04:00:14Z, balance agreement A/B/C); 82 ALERTs since 09-10T00Z, 37 today. New kind since the last block: peer_message_error SPIKE on node A (09-10T23:14, 6 vs expected 0.8). Others recurring: rate_limit_rejection spikes, source-not-on-disk, mesh multi-source.
+gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false. All three /health report judge quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report. Ollama absent by the operator's decision -- disclosed, not failed.
+trader    PASS  trader_log.txt 15.0h old, last line "---- CYCLE COMPLETE 09/10/2026 ----". trader_freshness.py exit 0: "NOT YET DUE: trigger 09:00 plus 5 min grace has not passed" (ran at 00:00 local). Rule 5 still blocks: 3 settled signals of 30 needed, 0/3 wins, mean -5.92% after costs, p=1.000. NOTE: trader_config.json reads armed=true (armed 2026-09-06 by FUTURE.bat), not armed=false as this task's file states; nothing can trade while Rule 5 is short.
+student   PASS  loop working. --exam decides 36/53 (0 false clean, 7 false hold, all in `discourse`). Thresholds NOT MET -- short on clean 7/8, trap 5/6, theft 4/5, edge 1/3. ops/DISTILL.md 2026-09-11T07:51:37Z: PROMOTED (no false clean, cleared 139/353 unseen rows with 0 wrong). Seat stays with the deferring chain.
+repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- 4 hash mismatches (covenant_unified_v8.py, run_all_tests.sh, test_a3s_send_bounds.py, test_p15_judge_identity.py). Cause is stale pins, not tamper: the pins in verify_deploy.py were last edited 2026-09-04 and 7 commits have touched covenant_unified_v8.py since. Disk hashes 57d877e3f7a6 and is clean against HEAD.
+mesh      NOTE  the "foreign" peer source 57d877e3f7a6 at 10.0.0.174 is the CURRENT disk source. The three local nodes are the stale ones: they still run 1e72206edd9a and were never restarted onto the committed code.
+git       WARN  branch a9-support-ticket-filed, 2 ahead / 0 behind origin/main. 10 modified (all loop-written ledgers/models), 3 untracked: ops/outbound_overrides.jsonl, ops/strategy_reports/NIGHTLY_2026-09-{10,11}.txt, w2_w2off.err. No holdings/portfolio file among them.
+disk      PASS  C: 314G free of 476G (35% used); logs/ 23M; no %TEMP%\covenant_sweep to prune.
+## 2026-09-11T10:51:36Z  overall WARN  (round 2220)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T11:57:03Z  overall WARN  (round 2280)
+nodes     PASS  3/3 up, height 16 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T13:02:28Z  overall WARN  (round 2340)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T14:07:57Z  overall WARN  (round 2400)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T15:13:29Z  overall WARN  (round 2460)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T16:18:58Z  overall WARN  (round 2520)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T17:24:27Z  overall WARN  (round 2580)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T18:29:57Z  overall WARN  (round 2640)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T19:35:29Z  overall WARN  (round 2700)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T20:40:59Z  overall WARN  (round 2760)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+
+
+## 2026-09-11T21:38Z  overall FAIL  (scheduled self-eval)
+nodes     PASS  3/3 up (5000/5020/5060), height 17 all three (spread 0), genesis 00009b31, v8.40, all running source 1e72206edd9a, is_quorum=true. degraded=true on all three (no provider key, no win32 code sandbox) -- unchanged.
+watchdog  PASS  last line 54s old (21:35:38Z, balance agreement A/B/C: 988/12/0). 64 ALERTs since the 04:12Z block; only two kinds, both recurring (source-not-on-disk, mesh multi-source). No new kind -- 09-10's peer_message_error SPIKE has not recurred.
+gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false; relax_valueless_for_local_nodes=true. All three /health: quorum(local:0,semantic:1,mock_selfreport:0), 2 semantic + 1 self-report, degradations []. Ollama absent by the operator's decision -- disclosed, not failed.
+trader    PASS  trader_log.txt 8h37m old; the 09:00 cycle COMPLETED (trader-printed, not launcher). trader_freshness.py exit 0: "RAN: a cycle dated 2026-09-11 COMPLETED". No orders: cash_floor BLOCK, R4/R6 held, XRP sell dropped at the frozen floor; sealed ok (tx 2e7dc64f2188). Rule 5 unchanged: 3/30 settled, 0/3 wins, mean -5.92% after costs, p=1.000. NOTE (3rd block running): trader_config.json reads armed=true (2026-09-06 by FUTURE.bat), not armed=false as this task file states -- the task file is stale, not the config. No funds or keys touched.
+student   PASS  loop working. --exam: 36/53 agree, 0 false clean, 7 false hold (all in `discourse`), 10 abstain. Thresholds NOT MET -- short on clean 7/8, trap 5/6, theft 4/5, edge 1/3. ops/DISTILL.md {2026-09-11T13:46:47Z}: PROMOTED (no false clean, holds no clean case, 2178 held-out rows with 55 false clears, no prior record to beat). Seat stays with the deferring chain.
+repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- same 4 hash mismatches as 04:12Z (covenant_unified_v8.py 57d877e3f7a6 vs pinned 8f219285f268, run_all_tests.sh, test_a3s_send_bounds.py, test_p15_judge_identity.py). Cause is stale pins in verify_deploy.py, not tamper: those files were last committed 09-10 (A81) and 09-09 and the working tree is clean against HEAD. Companions all present.
+mesh      NOTE  three source generations in play: local nodes run 1e72206edd9a, disk is 57d877e3f7a6, the tested pins expect 8f219285f268. The "foreign" peer at 10.0.0.174 runs the disk source -- the local three are the stale ones, never restarted onto the committed code.
+git       WARN  branch fix/judge-evidence-cut, 4 ahead / 0 behind origin/main. 2 modified (ops/NIGHTLY.md, ops/SELF_EVAL.md -- loop-written), 3 untracked: ops/outbound_overrides.jsonl, ops/strategy_reports/NIGHTLY_2026-09-{10,11}.txt, w2_w2off.err. No portfolio file untracked (holdings.txt.bak-* covered by .gitignore:227 *.bak-2*).
+disk      PASS  C: 318G free of 476G (34% used); logs/ 23M; no %TEMP%\covenant_sweep to prune.
+method    NOTE  the first shell read of this run returned an internally CONSISTENT view 11h stale (clock 10:30Z, watchdog tail 10:29Z, height 16). Caught only by cross-checking a second process (21:36Z, height 17, trader_freshness 17:35 local). A freshness check that compares a log tail to a clock from the same read can agree with itself and still be 11 hours wrong.
+## 2026-09-11T21:46:35Z  overall WARN  (round 2820)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+
+## 2026-09-11T22:53:39Z  overall WARN  (round 2880)
+nodes     PASS  3/3 up, height 17 (spread 0), source 1e72206edd9a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 1e72206edd9a, peers report ['57d877e3f7a6'] -- peers on a
+

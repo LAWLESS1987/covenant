@@ -1,0 +1,43 @@
+{
+  "_what": "Copy this to ops/quorum_policy.json to record YOUR standing decision about the ethics quorum, then edit it. The real file is gitignored: a policy is the operator's, not the delivery's, and publishing one operator's answer teaches the next operator less than publishing the question. DELETE the real file at any time to return to the core default (providers local,semantic; silence fails closed) -- covenant_judge_defer.apply_policy returns '' on an absent or empty policy and touches nothing, so absence is a supported state and not a broken install.",
+
+  "_who_reads_it": "covenant_judge_defer.apply_policy() is the single implementation. run_with_ollama_judge.py applies it at node start (over the watchdog's env, under COVENANT_JUDGE_PROVIDERS_OVERRIDE) and covenant_watchdog.start_node asks the SAME function when it revives a node. Do not add a second reader: a node the watchdog revives must be wired like a node you start, or a restart silently changes the gate on the path nobody watches.",
+
+  "_the_decision_this_file_records": [
+    "A quorum decides by MAJORITY VETO, and a judge that RAISES -- unreachable,",
+    "timed out, model unloaded -- counts as a dissent. So the seat count is not",
+    "a preference, it is arithmetic:",
+    "",
+    "  n=1  one failure rejects every transaction",
+    "  n=2  STRICTLY WORSE than one: two things that can each halt the chain",
+    "  n=3  one may fail and the chain keeps running",
+    "  n=5  two may fail",
+    "",
+    "At 2-of-3 a WEAK judge is safe: it cannot block a legitimate transfer alone",
+    "and cannot approve theft alone. That is what makes a small fast model an",
+    "affordable third vote."
+  ],
+
+  "providers": "deferring,semantic",
+  "_providers": "Comma-separated seat list, passed through as COVENANT_JUDGE_PROVIDERS. The core default when this file is absent is 'local,semantic'.",
+
+  "primary": "student",
+  "_primary": "Which member of a deferring seat answers first. 'student' puts the distilled local model ahead of any remote judge.",
+
+  "silence_is_not_dissent": false,
+  "_silence_is_not_dissent": "FALSE means a judge that does not answer still counts as a dissent, so the gate fails CLOSED when nothing competent is available. Set it true ONLY when you can show a competent judge is always reachable -- for the distilled student that is the point at which covenant_distill.py --exam says MET, and test_f2_distill_loop.py pins the measurement. Turning it true without that evidence hands the decision to whichever judge happens to answer.",
+
+  "github_when_local_down": false,
+  "_github_when_local_down": "TRUE sends a live transaction's payload to a judge on a GitHub Actions runner when the local seat cannot answer -- 2 to 5 minutes, and the payload LEAVES THE MACHINE. If your repository is public, assume the dispatch is visible. Availability bought this way is bought with disclosure; decide that deliberately.",
+
+  "second_student": "fallback_model_2.json",
+  "_second_student": "A second distilled model trained on the other half of the ledger, consulted when the first holds. Two students trained on the same rows are one student twice.",
+
+  "relax_valueless_for_local_nodes": false,
+  "_relax_valueless_for_local_nodes": "A narrow exception: for a ZERO-amount self-send signed by a key that exists only on this machine, a seat that did not ANSWER stops counting as a seat that DISAGREED. It exists so an audit record can be sealed when every judge holds. A real dissent still blocks, the semantic veto is unchanged, and if nothing answered nothing is admitted. The identity list is built from the *.db.key files in the folder, so it is unreachable from the network however a payload is shaped.",
+
+  "github_model": "qwen2.5:7b",
+  "github_timeout_s": 240,
+
+  "decided_by": "REPLACE THIS with who decided, when, and in what words. The field exists so a reader of the running system can tell a decision from a default, and so the decision can be argued with later. It is checked for shape, never for content -- see test_f2_distill_loop.py Q3."
+}

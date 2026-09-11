@@ -254,6 +254,15 @@ judged_by_student.jsonl
 # publish. Same reasoning as the entry above. Pinned by test_a91.
 ops/verdicts_live.jsonl
 
+# The operator's standing decision about the ethics quorum (2026-09-11). This
+# repository is public and is meant to be read as GUIDANCE, and a policy file
+# is one operator's ANSWER -- it also carried his own words in decided_by.
+# ops/quorum_policy.example.json is shipped in its place: same keys, the same
+# reasoning about what each one costs, and no answer filled in. The code
+# already treats absence as valid (covenant_judge_defer.apply_policy:101,
+# "if not p: return ''"), which is exactly what a fresh clone gets.
+ops/quorum_policy.json
+
 # Delivery folder holding duplicate copies of suites that already live at the
 # repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are
 # the registered ones -- covenant_one.py:297-298). Committing the copies would

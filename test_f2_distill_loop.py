@@ -74,8 +74,24 @@ def main():
     D.apply_policy(env, {"providers": "deferring,semantic", "silence_is_not_dissent": True, "github_when_local_down": True})
     check("Q2 policy sets providers and the relaxed flag, touches nothing else",
           env == {"OTHER": "1", "COVENANT_JUDGE_PROVIDERS": "deferring,semantic", "COVENANT_SILENCE_IS_NOT_DISSENT": "1"})
-    check("Q3 the shipped policy file parses and names its decider",
-          bool(D.load_policy().get("decided_by")) and D.load_policy().get("providers") == "deferring,semantic")
+    # Q3 (rewritten 2026-09-11). It used to assert that a policy file IS
+    # shipped and that its providers are exactly "deferring,semantic" -- one
+    # operator's standing decision, hard-coded into a suite in a public
+    # repository, so the repository could not be purified without going red.
+    # A policy file is the OPERATOR'S, not the delivery's: absence is a valid
+    # state that covenant_judge_defer.apply_policy already handles
+    # (":101 if not p: return ''"), and it is what a second operator gets on a
+    # fresh clone. Three answers, not two.
+    _pol = D.load_policy()
+    if _pol:
+        _prov = _pol.get("providers")
+        check("Q3 a policy file IS present, so it must parse and any providers it names must be a non-empty string",
+              isinstance(_pol, dict) and (_prov is None
+                                          or (isinstance(_prov, str) and _prov.strip() != "")))
+    else:
+        _e = {"OTHER": "1"}
+        check("Q3 no policy file is shipped -- a VALID state: the core default stands and the environment is untouched",
+              D.apply_policy(_e) == "" and _e == {"OTHER": "1"})
 
     # Q4-Q6 (2026-09-07). THE REVIVAL PATH MUST GET THE SAME GATE.
     # covenant_watchdog.start_node builds a node's environment when it revives
