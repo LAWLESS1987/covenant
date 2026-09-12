@@ -28,7 +28,8 @@ then `sh install.sh`.
 
 Why Termux at all: Android will not run a Python node from a link. It needs a terminal app,
 and Termux is that app. **Since 2026-09-12 there is also a packaged app** -- `mobile/app/`,
-built by GitHub Actions and published as the `android-latest` release; see
+built by GitHub Actions and published as an `android-<commit>` release (newest at
+`releases/latest/download/covenant-node.apk`); see
 `mobile/app/README.md`. The app and this kit run the same node with the same flags.
 
 ## Requirements

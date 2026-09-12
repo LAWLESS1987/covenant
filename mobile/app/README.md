@@ -24,9 +24,12 @@ ability to interact with my other apps".
 - **Over a cable (recommended):** `mobile/USB.md`. `python mobile/usb_link.py install covenant-node.apk`,
   then `link` so the phone node peers with the PC at `127.0.0.1:15001`.
 - **From GitHub:** every push to `main` that touches the app or the node's
-  files rebuilds it and republishes
-  `https://github.com/LAWLESS1987/covenant/releases/download/android-latest/covenant-node.apk`
-  (with `SHA256SUMS` beside it). Samsung: Settings > Security and privacy >
+  files rebuilds it, proves it on the emulator and publishes an immutable
+  release `android-<commit>`; the newest is always at
+  `https://github.com/LAWLESS1987/covenant/releases/latest/download/covenant-node.apk`
+  (with `SHA256SUMS` beside it). Releases on this repository are immutable
+  by setting, so a build is never replaced under its name -- a new one is
+  added. Samsung: Settings > Security and privacy >
   Auto Blocker off for the install (re-arm after); allow "Install unknown apps"
   for the browser or My Files; expect Play Protect's "hasn't seen this app
   before" prompt.

@@ -177,7 +177,7 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    name: publish android-latest
+    name: publish this build as a release
     needs: [build, verify]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
@@ -194,15 +194,25 @@ jobs:
           cp covenant-node.apk "covenant-node-$SHA7.apk"
           sha256sum covenant-node.apk "covenant-node-$SHA7.apk" > SHA256SUMS
           cat SHA256SUMS
-      - name: Publish the moving android-latest release
+      # Releases here are IMMUTABLE (a repository setting): a published tag
+      # name can never be reused, so the first run's moving "android-latest"
+      # -- deleted and re-created on every build -- was refused the second
+      # time ("tag_name was used by an immutable release") and the APK went
+      # missing from the release page (2026-09-12). One release per verified
+      # build, tagged by commit, marked latest, never deleted; the stable URL
+      # is GitHub's own: releases/latest/download/covenant-node.apk.
+      - name: Publish this build as an immutable release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SHA7=${GITHUB_SHA::7}
-          gh release delete android-latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
-          gh release create android-latest --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-            --title "Covenant Node (latest main)" \
-            --notes "Built by android.yml from $GITHUB_SHA on $(date -u +%FT%TZ). Emulator-verified /health. Signed with the public debug-class key in mobile/app/signing (installs over previous builds). Install notes: mobile/app/README.md. Stable URL: releases/download/android-latest/covenant-node.apk" \
+          if gh release view "android-$SHA7" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "android-$SHA7 is already published (immutable); nothing to do"
+            exit 0
+          fi
+          gh release create "android-$SHA7" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
+            --title "Covenant Node $SHA7" \
+            --notes "Built by android.yml from $GITHUB_SHA on $(date -u +%FT%TZ). Emulator-verified /health. Signed with the public debug-class key in mobile/app/signing (installs over previous builds). Install notes: mobile/app/README.md. Stable URL: releases/latest/download/covenant-node.apk" \
             covenant-node.apk "covenant-node-$SHA7.apk" SHA256SUMS
       - name: Publish a permanent tag when asked
         if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
