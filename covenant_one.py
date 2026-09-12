@@ -840,6 +840,18 @@ IN_PLACE = [
     # node. In place because it reads mobile/ (not staged) and the node's --help.
     ("test_m3_mobile.py", 180,
      "it reads mobile/, which the scratch copy lacks"),
+    # A93 (2026-09-12): a CLONE must seat the distilled student, not a model
+    # server it lacks. Here for M3's reason and one more. It runs the real
+    # mobile/covenant_phone.sh, which stage() does not copy -- registered in
+    # SUITES first, the sweep reported it ABSENT, which is the runner doing its
+    # job. And it builds its own clone-equivalent tree by copying THIS folder
+    # and deleting the gitignored ops/quorum_policy.json: from a scratch copy it
+    # would be copying a copy, and the thing it measures is what a clone of the
+    # FOLDER gets. It writes nothing here; the tree it makes is a temp dir it
+    # removes.
+    ("test_a93_clone_seats_the_student.py", 300,
+     "it runs mobile/covenant_phone.sh and clones the FOLDER, neither of which "
+     "the scratch copy can serve"),
     ("test_g2_promised_commands.py", 180,
      "resolves the commands the documents promise against the FOLDER, and the "
      "scratch copy does not carry root .md files or SAFEGUARD.bat"),

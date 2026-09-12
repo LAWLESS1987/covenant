@@ -2901,3 +2901,36 @@ seats that were configured, not seats that answered. A seat pointed at a dead
 socket is indistinguishable from a working one in `/health` until a
 transaction is judged. Not fixed: probing a judge at startup costs a round trip
 on every boot and changes what the field means.
+
+### A95. [minor / reporting] `covenant_one.py --only <an IN_PLACE suite>` reports it ABSENT while the same run executes it. OPEN 2026-09-12
+
+**Where.** `covenant_one.py:975-992`. `--only` builds its plan from `SUITES`
+alone; a name not in that list becomes an `AD HOC` entry, and an `AD HOC` entry
+that does not resolve to a file on disk is printed as `ABSENT (not on disk)`.
+
+**The defect.** `IN_PLACE` suites are not in `SUITES`, so `--only` never
+recognises one. Two things then go wrong at once, and they pull in opposite
+directions:
+
+* `--only test_a93_clone_seats_the_student` (no extension) prints
+  `ABSENT (not on disk)` — untrue; the file is on disk, and the same run
+  executed it, reporting `test_a93_clone_seats_the_student.py=ok` on the
+  `folder integrity` line four lines earlier.
+* `--only test_a93_clone_seats_the_student.py` would resolve, and then be run
+  **from the scratch copy** as AD HOC — where it must fail, for exactly the
+  reason it is in `IN_PLACE`: the scratch copy carries no `mobile/`.
+
+So one spelling lies about the file's existence and the other would produce a
+false failure.
+
+**What it does not affect.** A full run. `IN_PLACE` suites are executed by the
+folder-integrity phase and reported there, so an ordinary `python
+covenant_one.py` measures them. This is a `--only` ergonomics defect, not a
+coverage hole.
+
+**Not fixed here.** The honest repair is for `--only` to recognise `IN_PLACE`
+names and route them to the in-place runner, which means a fourth result status
+threaded through the tally. Changing what the tally can report is not a repair
+of a broken thing; the standing rule is refinements only until there is a
+second operator. Recorded so the next reader does not mistake the `ABSENT` line
+for a missing file, which is what it says and not what is true.
