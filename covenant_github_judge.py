@@ -4,15 +4,19 @@ machine. This PC runs no model server (removed 2026-09-07); the nodes' gate is
 the distilled student, and covenant_route.py / covenant_chat.py send their
 turns here.
 
-WHY (asked 2026-09-03: "route through GitHub if Ollama is failing")
+WHY (asked 2026-09-03: "route through GitHub if the local server is failing")
   At the time the nodes' judge, covenant_route.py and covenant_chat.py all
   talked to a local model server on 127.0.0.1:11434. When it was down they had
   nowhere to go. GitHub Models inference was the obvious second place and it
   was probed first: 2026-09-04 it answered HTTP 410
   "github_models_retirement_brownout". So the second place is a GitHub
-  Actions runner (.github/workflows/judge.yml) that installs Ollama, pulls a
-  small model, answers ONE prompt and hands it back as an artifact. The repo
-  is public, so the minutes cost nothing.
+  Actions runner (.github/workflows/judge.yml) that starts a model server of
+  its own, answers ONE prompt and hands it back as an artifact. Since
+  2026-09-12 that server is llama.cpp's llama-server on a pinned build with a
+  byte-checked GGUF (it installed Ollama until then), and since 2026-09-07 it
+  is not a second place but the only one: the teacher of the distilled
+  students and the judge behind the router and the chat. The repo is public,
+  so the minutes cost nothing.
 
 WHAT LEAVES THIS PC
   The prompt (or the chat messages) and the model name, to GitHub, over the
@@ -29,10 +33,14 @@ HOW IT AUTHENTICATES
   printed or written.
 
 LATENCY
-  A hosted runner boots, installs Ollama and pulls the model before it can
-  think: measured 2026-09-04 with qwen3:4b, 107 s cold and 94 s with the model
-  cached (45 s of that is the runner installing Ollama); the answer itself ~19 s.
-  This is a fallback for bounded questions, not a chat you sit in front of.
+  A hosted runner boots, restores the runtime and the model from cache and
+  loads the model before it can think. Measured 2026-09-04 on the Ollama-era
+  file with qwen3:4b: 107 s cold, 94 s with the model cached, 45 s of that
+  installing the runtime; the answer itself ~19 s. The llama-server file
+  (2026-09-12) restores a 17 MB runtime instead of installing 1.4 GB; a 4.3 GB
+  model cache entry restored in 26-42 s in the runs that measured it. The
+  first call after the swap writes its own numbers into ops/judge_route.log.
+  This is a place for bounded questions, not a chat you sit in front of.
 
 USE
   python covenant_github_judge.py --prompt "..." [--model <DEFAULT_MODEL>] [--json]

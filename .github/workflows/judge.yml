@@ -1,11 +1,13 @@
-# judge.yml -- a covenant judge that runs on GitHub's machine when this PC's
-# Ollama is not answering (asked for 2026-09-03: "route through GitHub if
-# Ollama is failing"). GitHub Models inference was tried first and is in a
-# retirement brownout (HTTP 410, 2026-09-04), so this runs Ollama itself on a
-# hosted runner: pull a small model, answer one prompt, hand the answer back as
-# an artifact. Public repo, so the minutes are free. Nothing here has a key:
-# the caller (covenant_github_judge.py) authenticates to GitHub, the runner
-# only ever sees the prompt it was given.
+# judge.yml -- the covenant's judge on GitHub's machine: the teacher the
+# distilled students learn from (covenant_distill.py, covenant_study.py) and
+# the judge covenant_route.py and covenant_chat.py send their turns to. This
+# PC runs no model server. The runtime is llama.cpp's llama-server (a 17 MB
+# prebuilt CPU tarball, pinned by build tag; until 2026-09-12 this file
+# installed a 1.4 GB Ollama bundle on every cold run); the model is one GGUF
+# fetched with the runner's own curl and kept in actions/cache. The caller
+# passes the model tags it always did (qwen2.5:7b ...); the "Resolve the
+# model" step maps each to a GGUF, so covenant_github_judge.py is unchanged.
+# Public repo, so the minutes are free. Nothing here has a key.
 #
 # Latency measured at first use is written into covenant_github_judge.py.
 # Inputs are capped by GitHub at 65,535 characters in total; the prompt is
@@ -21,7 +23,7 @@ on:
         required: true
         type: string
       model:
-        description: "Ollama model to answer with"
+        description: "model tag (Ollama-style, mapped to a GGUF inside): qwen2.5:7b qwen2.5:3b llama3.2:3b gemma2:2b phi4-mini"
         required: false
         default: "qwen2.5:7b"
         type: string
@@ -43,66 +45,139 @@ on:
 permissions:
   contents: read
 
+env:
+  # Pin a bNNNNN prerelease tag: binaries live ONLY on those. /releases/latest
+  # is the v0.4.0 tag whose single asset is a 7-byte nightly-tag.txt.
+  # b10930 published 2026-09-12; llama-b10930-bin-ubuntu-x64.tar.gz = 16,817,743 bytes.
+  LLAMA_BUILD: b10930
+  LLAMA_TARBALL_BYTES: "16817743"
+
 jobs:
   judge:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      # MEASURED 2026-09-04, and it is why both of these are cached. One call
-      # cost 157 s wall clock, of which the model spent 7.4 s thinking:
-      #
-      #     boot + install Ollama   100.0 s     <- this step, every single time
-      #     pull the model            1.0 s     <- already cached, working
-      #     the model thinking        7.4 s
-      #     dispatch + polling       49.0 s
-      #
-      # The model cache was doing its job and the INSTALL was not cached at
-      # all, so every dispatch re-downloaded and re-installed the runtime to
-      # answer one prompt. Caching the binary and its libraries turns a
-      # download-and-install into a restore.
-      - name: Cache the Ollama runtime
-        id: ollama-cache
+      # The Ollama-era numbers (2026-09-04, 157 s per call: 100 s of it
+      # installing the runtime) are why everything below is cached. The
+      # llama.cpp runtime is 17 MB, so its cache entry is trivial; the model
+      # (1.7-4.7 GB) is the entry that matters. Restore of a 4.27 GB entry
+      # measured 26-42 s on 2026-09-12.
+      - name: Cache the llama.cpp runtime
         uses: actions/cache@v4
         with:
-          path: |
-            ~/ollama-bin
-            ~/ollama-lib
-          key: ollama-runtime-v1-${{ runner.os }}
+          path: ~/llama-bin
+          key: llamacpp-${{ env.LLAMA_BUILD }}-ubuntu-x64-v1
 
       - name: Cache the model
         uses: actions/cache@v4
         with:
-          path: ~/ollama-models
-          key: ollama-${{ inputs.model }}-v1
+          path: ~/llama-models/${{ inputs.model }}
+          key: gguf-${{ inputs.model }}-v1
 
-      - name: Install and start Ollama
+      - name: Install llama.cpp
         run: |
+          set -euo pipefail
           date -u +%s > t_start
-          if [ -x "$HOME/ollama-bin/ollama" ]; then
-            echo "restoring the cached runtime instead of installing it"
-            sudo cp -a "$HOME/ollama-bin/ollama" /usr/local/bin/ollama
-            sudo mkdir -p /usr/local/lib/ollama
-            sudo cp -a "$HOME/ollama-lib/." /usr/local/lib/ollama/ 2>/dev/null || true
+          BIN="$HOME/llama-bin/llama-$LLAMA_BUILD"
+          if [ -x "$BIN/llama-server" ]; then
+            echo "restoring the cached runtime instead of downloading it"
           else
-            curl -fsSL https://ollama.com/install.sh | sh
-            mkdir -p "$HOME/ollama-bin" "$HOME/ollama-lib"
-            cp -a "$(command -v ollama)" "$HOME/ollama-bin/ollama"
-            cp -a /usr/local/lib/ollama/. "$HOME/ollama-lib/" 2>/dev/null || true
+            URL="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_BUILD/llama-$LLAMA_BUILD-bin-ubuntu-x64.tar.gz"
+            curl -fL --retry 3 --retry-delay 5 -o llama.tar.gz "$URL"
+            got=$(stat -c %s llama.tar.gz)
+            [ "$got" = "$LLAMA_TARBALL_BYTES" ] || { echo "tarball is $got bytes, expected $LLAMA_TARBALL_BYTES"; exit 1; }
+            mkdir -p "$HOME/llama-bin"
+            # the archive extracts into llama-<tag>/ with libllama.so, libggml*.so
+            # and the libggml-cpu-<variant>.so files beside the binary (RPATH $ORIGIN):
+            # they must stay together, never copy llama-server out on its own
+            tar -xzf llama.tar.gz -C "$HOME/llama-bin"
+            rm llama.tar.gz
           fi
-          sudo systemctl stop ollama 2>/dev/null || true
-          mkdir -p ~/ollama-models
-          OLLAMA_MODELS=$HOME/ollama-models OLLAMA_KEEP_ALIVE=30m nohup ollama serve > ollama.log 2>&1 &
-          for i in $(seq 1 60); do
-            curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break
-            sleep 1
-          done
-          curl -sf http://127.0.0.1:11434/api/tags
-          date -u +%s > t_ready
+          # GGML_OPENMP is ON in the release build and the tarball ships no
+          # libgomp; a missing libgomp.so.1 surfaces as "CPU backend is not
+          # loaded" (llama.cpp issue #22503), so install it and gate on ldd.
+          dpkg -s libgomp1 >/dev/null 2>&1 || sudo apt-get install -y --no-install-recommends libgomp1
+          if ldd "$BIN"/libggml-cpu-*.so "$BIN/llama-server" | grep -q 'not found'; then
+            ldd "$BIN"/libggml-cpu-*.so "$BIN/llama-server" | grep 'not found'
+            echo "runtime has unresolved shared libraries"; exit 1
+          fi
+          "$BIN/llama-server" --version
+          echo "LLAMA_SERVER=$BIN/llama-server" >> "$GITHUB_ENV"
+
+      # The caller sends Ollama-style tags. Every target is an ungated
+      # Hugging Face GGUF at Q4_K_M (the quant Ollama's qwen2.5 tags use;
+      # gemma2:2b on Ollama is Q4_0 and phi4-mini's quant is not stated, so
+      # those two are the same model family at a nearby quant, not the same
+      # bytes). Sizes are the exact byte counts read from the HF trees on
+      # 2026-09-12 and are checked after download. CTX is the context the
+      # server is started with (Gemma 2 is trained to 8k).
+      - name: Resolve the model
+        env:
+          MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          case "$MODEL" in
+            qwen2.5:7b)
+              REPO=bartowski/Qwen2.5-7B-Instruct-GGUF; FILE=Qwen2.5-7B-Instruct-Q4_K_M.gguf; BYTES=4683074240; CTX=16384 ;;
+            qwen2.5:3b)
+              REPO=bartowski/Qwen2.5-3B-Instruct-GGUF; FILE=Qwen2.5-3B-Instruct-Q4_K_M.gguf; BYTES=1929903264; CTX=16384 ;;
+            llama3.2:3b)
+              REPO=bartowski/Llama-3.2-3B-Instruct-GGUF; FILE=Llama-3.2-3B-Instruct-Q4_K_M.gguf; BYTES=2019377696; CTX=16384 ;;
+            gemma2:2b)
+              REPO=bartowski/gemma-2-2b-it-GGUF; FILE=gemma-2-2b-it-Q4_K_M.gguf; BYTES=1708582752; CTX=8192 ;;
+            phi4-mini)
+              REPO=unsloth/Phi-4-mini-instruct-GGUF; FILE=Phi-4-mini-instruct-Q4_K_M.gguf; BYTES=2491874272; CTX=16384 ;;
+            *)
+              echo "unknown model tag '$MODEL'; known: qwen2.5:7b qwen2.5:3b llama3.2:3b gemma2:2b phi4-mini"; exit 1 ;;
+          esac
+          {
+            echo "GGUF_REPO=$REPO"
+            echo "GGUF_FILE=$FILE"
+            echo "GGUF_BYTES=$BYTES"
+            echo "GGUF_CTX=$CTX"
+            echo "GGUF_PATH=$HOME/llama-models/$MODEL/$FILE"
+          } >> "$GITHUB_ENV"
 
       - name: Pull the model
         run: |
-          ollama pull "${{ inputs.model }}"
+          set -euo pipefail
+          if [ -f "$GGUF_PATH" ] && [ "$(stat -c %s "$GGUF_PATH")" = "$GGUF_BYTES" ]; then
+            echo "model restored from cache: $GGUF_PATH"
+          else
+            mkdir -p "$(dirname "$GGUF_PATH")"
+            rm -f "$GGUF_PATH"
+            # the runner's own curl, not the binary's HTTPS path; no token, ungated repo
+            curl -fL --retry 3 --retry-delay 10 -o "$GGUF_PATH" \
+              "https://huggingface.co/$GGUF_REPO/resolve/main/$GGUF_FILE"
+            got=$(stat -c %s "$GGUF_PATH")
+            [ "$got" = "$GGUF_BYTES" ] || { echo "GGUF is $got bytes, expected $GGUF_BYTES"; rm -f "$GGUF_PATH"; exit 1; }
+          fi
           date -u +%s > t_pulled
+
+      - name: Start llama-server
+        run: |
+          set -euo pipefail
+          # -t 4 / -np 1 explicitly: 4 vCPUs, one slot, so the whole context
+          # goes to the one prompt. --reasoning off / --reasoning-format none
+          # are no-ops for these five (no thinking templates) and make a
+          # later qwen3-style swap safe. --no-webui and 127.0.0.1: nothing exposed.
+          nohup "$LLAMA_SERVER" -m "$GGUF_PATH" --host 127.0.0.1 --port 8080 \
+            -c "$GGUF_CTX" -t 4 -np 1 --no-webui --no-slots \
+            --reasoning off --reasoning-format none > llama.log 2>&1 &
+          # /health: 503 {"error":{"code":503,"message":"Loading model",...}} while
+          # loading, 200 {"status":"ok"} when ready. 180 s ceiling, not 60.
+          ready=0
+          for i in $(seq 1 180); do
+            if curl -sf http://127.0.0.1:8080/health >/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then
+            echo "llama-server never became healthy; last 80 lines of llama.log:"
+            tail -n 80 llama.log
+            exit 1
+          fi
+          curl -sf http://127.0.0.1:8080/health
+          date -u +%s > t_ready
 
       - name: Answer
         env:
@@ -113,7 +188,7 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           python3 - <<'PY'
-          import base64, json, os, time, urllib.request
+          import base64, json, os, re, time, urllib.request
           prompt = base64.b64decode(os.environ["PROMPT_B64"]).decode("utf-8", "replace")
           system = base64.b64decode(os.environ.get("SYSTEM_B64") or b"").decode("utf-8", "replace")
           if prompt.lstrip().startswith("["):
@@ -124,40 +199,53 @@ jobs:
           else:
               messages = ([{"role": "system", "content": system}] if system else []) + \
                          [{"role": "user", "content": prompt}]
-          # First run (2026-09-04) showed qwen3's reasoning leaking into content on the
-          # runner's Ollama despite think=False; Qwen3's own soft switch is reliable.
+          # Kept from the Ollama era: Qwen3's soft switch. No-op for the five mapped models.
           if os.environ["MODEL"].startswith("qwen3") and messages and messages[-1].get("role") == "user":
               messages[-1]["content"] = messages[-1]["content"].rstrip() + chr(10) + "/no_think"
-          body = {"model": os.environ["MODEL"], "stream": False, "think": False,
-                  "options": {"temperature": 0, "num_predict": 3000, "num_ctx": 16384},
-                  "messages": messages}
+          body = {"model": "judge", "messages": messages, "stream": False,
+                  "temperature": 0, "seed": 42, "max_tokens": 3000,
+                  "chat_template_kwargs": {"enable_thinking": False}}
           if os.environ.get("JSON_ONLY", "false") == "true":
-              body["format"] = "json"
+              # Grammar-enforced: the output is valid JSON by construction. The
+              # inner schema forces an OBJECT; a bare {"type":"json_object"} is
+              # schema {} = any JSON, which admits a string or an array. The
+              # schema is never shown to the model -- the prompt still names the keys.
+              body["response_format"] = {"type": "json_object", "schema": {"type": "object"}}
           t0 = time.time()
-          req = urllib.request.Request("http://127.0.0.1:11434/api/chat", data=json.dumps(body).encode(),
-                                       headers={"Content-Type": "application/json"})
+          req = urllib.request.Request("http://127.0.0.1:8080/v1/chat/completions",
+                                       data=json.dumps(body).encode(),
+                                       headers={"Content-Type": "application/json",
+                                                "Authorization": "Bearer no-key"})
           with urllib.request.urlopen(req, timeout=1200) as r:
               res = json.loads(r.read().decode("utf-8", "replace"))
-          import re
-          content = (res.get("message") or {}).get("content", "")
-          # Two runs (2026-09-04) showed the registry's qwen3:4b reasoning in the open with no
-          # opening tag and /no_think ignored (a 2507-thinking build, not the hybrid this PC
-          # has), so the default moved to qwen2.5:3b, which has no thinking mode. Belt and
-          # braces for any model: keep only what follows the last </think>.
+          choice = (res.get("choices") or [{}])[0]
+          content = (choice.get("message") or {}).get("content") or ""
+          finish = choice.get("finish_reason")
+          # Belt and braces for any model: keep only what follows the last </think>.
           content = re.sub(r"<think>.*?</think>", "", content, flags=re.S)
           content = content.rsplit("</think>", 1)[-1].strip()
           t_start = int(open("t_start").read())
+          # Same keys as the Ollama-era answer.json (the caller passes them
+          # through). seconds_to_ollama = runtime healthy; seconds_to_model =
+          # GGUF on disk. Two extra keys, finish_reason and runtime, for the log:
+          # finish_reason "length" means the grammar-valid prefix was cut off.
           out = {"tag": os.environ["TAG"], "model": os.environ["MODEL"], "place": "github-actions",
                  "seconds_answer": round(time.time() - t0, 1),
                  "seconds_to_ollama": int(open("t_ready").read()) - t_start,
                  "seconds_to_model": int(open("t_pulled").read()) - t_start,
-                 "content": content, "prompt_chars": len(prompt)}
+                 "content": content, "prompt_chars": len(prompt),
+                 "finish_reason": finish,
+                 "runtime": "llama.cpp " + os.environ.get("LLAMA_BUILD", "") + " " + os.environ.get("GGUF_REPO", "") + "/" + os.environ.get("GGUF_FILE", "")}
           json.dump(out, open("answer.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
-              fh.write("## judge %s\n\nmodel `%s`, answered in %.1fs\n\n```\n%s\n```\n"
-                       % (os.environ["TAG"], os.environ["MODEL"], out["seconds_answer"], content[:4000]))
+              fh.write("## judge %s\n\nmodel `%s` (%s), answered in %.1fs, finish %s\n\n```\n%s\n```\n"
+                       % (os.environ["TAG"], os.environ["MODEL"], out["runtime"], out["seconds_answer"], finish, content[:4000]))
           print(json.dumps(out, ensure_ascii=False)[:2000])
           PY
+
+      - name: Show the server log on failure
+        if: failure()
+        run: tail -n 120 llama.log 2>/dev/null || true
 
       - name: Hand the answer back
         uses: actions/upload-artifact@v4
