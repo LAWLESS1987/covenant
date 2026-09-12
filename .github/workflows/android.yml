@@ -22,7 +22,7 @@ name: android
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]   # ops/post-commit.autosync pushes sentinel-witness with every commit; that build installed nowhere
     paths:
       - "mobile/app/**"
       - ".github/workflows/android.yml"
@@ -142,14 +142,14 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-api35-x86_64-v1
-
+      # No AVD cache: the first run reached the script 108 s into this step
+      # without one, and saving a multi-GB snapshot after every run costs
+      # more than it saves. The script writes logcat.txt and app_files.txt
+      # itself, on every exit: the action kills the emulator at the end of
+      # THIS step, and a later step's `adb logcat` waits for a device forever
+      # (the first run spent its remaining 40 minutes doing exactly that).
       - name: Boot the APK and read its /health
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -163,8 +163,8 @@ jobs:
       - name: Keep the evidence
         if: always()
         run: |
-          adb logcat -d > logcat.txt || true
           { echo '### phone /health on the emulator'; echo '```'; cat health.json 2>/dev/null | head -c 2000; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
+          { echo '### the app files (last_exit.txt, node.log tail)'; echo '```'; cat app_files.txt 2>/dev/null | tail -c 3000; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -174,6 +174,7 @@ jobs:
             health2.json
             health3.json
             logcat.txt
+            app_files.txt
           retention-days: 7
           if-no-files-found: ignore
 

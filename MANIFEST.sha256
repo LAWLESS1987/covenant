@@ -1,7 +1,7 @@
 # covenant bundle manifest -- sha256 of every shipped file.
 # Keys, databases and logs are deliberately NOT in here.
 84485e905a7f97610172e0d4529d82d700cebefcddd411a85b831bf60f912175  .gitattributes
-64db27d48f42c32ee31544cdfdffed2c926fa5567ac7a13c5fb3013ab0afd6c3  .github/workflows/android.yml
+5cc476594aed94a4d45f3214ecf598a2074bab78a9bf2b401869e706677bd9c3  .github/workflows/android.yml
 f39837ed9e9aa6a74dcad1c87a42fdd95d5c7bc0c3483437127867faf8cf4f29  .github/workflows/covenant.yml
 dc38c898d2aa6a67d72b2a9cd52c43545d23b9ad2cb80788b4a7da7fefb0a4d9  .github/workflows/judge.yml
 741e512cb1f533e012f751e521aa5a91883cca7dfbe61afcad2ae02e43843be9  .gitignore
@@ -346,7 +346,7 @@ b299b63b4e1ab0cef2c8d7db71ff08fb7eeb481183798c54b0e2c8b7b9980eb5  mobile/app/app
 3abfb2fcb06505ce3e1cbd1683e908d382dc2f3e9aaf649a04b560d77bf5c8e2  mobile/app/app/src/main/res/xml/network_security_config.xml
 1b4b58565ef63e47d37864bd7a045cdf6ca38f43c585a2d2b92e8fafb89192e5  mobile/app/build.gradle
 d3ef344a5add4da99a347ab2c4595006d159cca88fa09a5eabfcd79374874de1  mobile/app/build.sh
-a6fa8577919d6981d6c054af121ad6a61be77745b245264070d7c9d1ab803adc  mobile/app/ci_check.sh
+f70e355b5ead73e84d457ac8ad2438f2326f84f986cd2402566875fcb1b95bb5  mobile/app/ci_check.sh
 bb57a82f66781bde5ac17744451e3935629e1be12396486a32dd0c88fc9a70be  mobile/app/gradle.properties
 46f9eb521daf5157d9433518a58bcb66ec814a31537763b0232f416afc142dd7  mobile/app/python_sources.txt
 d1d2cdc545a9fb3a00ab3e3a0c45c52f1e7809e962cc14c5b318cfeea3f20434  mobile/app/settings.gradle
