@@ -94,6 +94,10 @@ def main(files_dir, apk_path):
     # refuse code-proposal sandboxing rather than fork inside ART. NO providers,
     # NO override, NO local-judge variables here.
     os.environ["COVENANT_FORCE_NO_SANDBOX"] = "1"
+    # The API (/health, the dashboard, every route) answers only this phone:
+    # the app polls 127.0.0.1, a USB tunnel lands on 127.0.0.1, and nothing on
+    # the Wi-Fi can read it. The peer port stays open so the PC node can talk.
+    os.environ.setdefault("COVENANT_API_HOST", "127.0.0.1")
     sys.path.insert(0, core)
     argv = [LAUNCHER, "--real", "--port", str(port), "--node-id", node_id, "--genesis", "genesis.json"]
     if peer:

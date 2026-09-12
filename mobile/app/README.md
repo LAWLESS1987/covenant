@@ -109,3 +109,26 @@ network. This APK is signed with a public debug-class key; an accessibility
 grant on an app anyone can install over yours would hand your phone to
 whoever did. Remote driving waits for a signing key only you hold
 (`docs/KNOWN_ISSUES.md` A104).
+
+## What leaves the phone, and what does not (2026-09-12)
+
+- **No analytics, no crash reporter, no third-party SDK, no account.** The
+  app has no `dependencies` block; it is the platform, Chaquopy's Python and
+  this repository's own files.
+- **The node's HTTP API binds to 127.0.0.1 on the phone** (`COVENANT_API_HOST`):
+  `/health`, the dashboard and every route answer only the app itself and a
+  USB tunnel. Nothing on the Wi-Fi can read or poke them.
+- **The peer port (API port + 1) is open** so the PC node can talk to the
+  phone. Peer traffic is the covenant's protocol over plain TCP on your own
+  network: every transaction is signed and every block hashed, so nothing can
+  be forged in transit, but a device on the same network could read payload
+  text. Encrypting the peer link is a protocol change for the group, not a
+  phone setting.
+- **The actuator reads a screen only when a job for that app is pending and
+  the app is green-lit**; it never reads other apps' screens, never sends
+  anything anywhere, and logs every action locally. Its grant is yours to give
+  and to withdraw in Android settings.
+- **What this app cannot promise:** anything above it. Android, Samsung,
+  Google services and the carrier see what they see regardless of any app;
+  the APK's public debug key means only builds you trust should be installed
+  (`mobile/app/signing/README.md`).

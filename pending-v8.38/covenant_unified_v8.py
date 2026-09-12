@@ -8431,7 +8431,12 @@ class CovenantUnifiedMaster:
                 self.node.governor.update(b)
 
         self._integrity_breach_count = 0
-        self.api = CovenantAPI(self.node, self.db, host, port)
+        # COVENANT_API_HOST (2026-09-12): the HTTP API may bind narrower than the
+        # peer listener. Unset, both bind `host` as before. The phone app sets it
+        # to 127.0.0.1 so /health, the dashboard and every API route answer only
+        # the app itself (and a USB tunnel, which lands on the phone's loopback);
+        # nothing on the Wi-Fi can read or poke the node's API. Peers still reach 5001.
+        self.api = CovenantAPI(self.node, self.db, os.environ.get("COVENANT_API_HOST", "").strip() or host, port)
         # item AO -- /sync needs to invoke bootstrap_chain, which lives on the
         # master (it owns _accept_block_common). Set after construction rather
         # than passed in, to avoid a circular reference in the constructor.
