@@ -299,3 +299,6 @@ go_out.txt
 judge_bench_out.txt
 preflight_out.txt
 pc_report.txt
+
+# 2026-09-12: Google platform-tools (adb) fetched by mobile/usb_link.py; a binary, not the delivery
+tools/platform-tools/

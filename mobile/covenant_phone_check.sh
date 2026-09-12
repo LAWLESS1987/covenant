@@ -8,10 +8,10 @@
 # failure line and a non-zero exit, and concludes the node is broken when the
 # gate is judging perfectly well.
 #
-# Ollama was deleted from this project on 2026-09-07 and ops/quorum_policy.json
-# sets ollama_in_chain false, so a node started today does not consult it. What
-# judges is the distilled student, in-process, no socket. Ollama is now reported
-# as an optional extra and never decides the exit code.
+# Ollama was deleted from this project on 2026-09-07. What judges is the
+# distilled student, in-process, no socket. Until 2026-09-12 this script still
+# probed port 11434 and reported Ollama as "optional"; under the operator's
+# direction that nothing on a phone reaches a model server, it no longer looks.
 #
 # Nothing here changes anything.
 
@@ -24,14 +24,6 @@ if [ -f "$(dirname "$0")/../fallback_model.json" ]; then
     say "judge: distilled student present (fallback_model.json) -- judges in-process"
 else
     say "judge: fallback_model.json MISSING -- the gate has no local judge"; ok=1
-fi
-
-# --- optional, and not part of the verdict -----------------------------------
-if curl -s -m 3 http://127.0.0.1:11434/api/tags >/tmp/covenant_tags.json 2>/dev/null; then
-    say "ollama: up (optional; out of the quorum by policy, so it changes nothing)"
-    say "  models: $(tr -d '\n' </tmp/covenant_tags.json | sed 's/[{}"]//g' | tr ',' '\n' | grep '^name:' | sed 's/name://' | tr '\n' ' ')"
-else
-    say "ollama: absent -- expected, and not a problem. The student judges without it."
 fi
 
 # --- the node ----------------------------------------------------------------

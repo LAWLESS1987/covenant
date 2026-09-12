@@ -12,7 +12,6 @@
 #   PC_PEER      a peer's P2P address (API port + 1), e.g. 10.0.0.174:5001. Empty = no
 #                peer: the node runs alone from the canonical genesis and converges when
 #                a peer appears. Nothing here invents a peer for you.
-#   JUDGE_MODEL  qwen3:1.7b (default, 6 GB phones) | qwen3:4b (8 GB) | qwen3:8b (12 GB)
 #   NODE_ID      the name the node signs with (default phone)
 #   NO_START=1   install only; do not start the node
 #

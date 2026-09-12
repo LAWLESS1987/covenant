@@ -844,6 +844,11 @@ IN_PLACE = [
     # node. In place because it reads mobile/ (not staged) and the node's --help.
     ("test_m3_mobile.py", 180,
      "it reads mobile/, which the scratch copy lacks"),
+    # M4 (2026-09-12): the USB-C cable tool (mobile/usb_link.py) decides from
+    # what adb says. Driven by a stub adb so no phone, no download and no
+    # network are needed; in place for M3's reason -- mobile/ is not staged.
+    ("test_m4_usb_link.py", 120,
+     "it runs mobile/usb_link.py, which the scratch copy lacks"),
     # A93 (2026-09-12): a CLONE must seat the distilled student, not a model
     # server it lacks. Here for M3's reason and one more. It runs the real
     # mobile/covenant_phone.sh, which stage() does not copy -- registered in

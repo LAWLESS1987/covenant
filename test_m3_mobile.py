@@ -7,8 +7,8 @@ scripts call run_with_ollama_judge.py with flags it has and export variables the
 reads. This suite makes the promise checkable on every sweep: the scripts parse, every
 flag the start script passes exists in the node's --help, every COVENANT_* variable the
 scripts export is read somewhere in the judge or core, the setup page names the same
-variables and defaults as the script, and the example judges file is valid JSON of the
-shape the named-judge loader documents. What it cannot do: run the node on a phone. It
+variables and defaults as the script, and -- since 2026-09-12, "no Ollama anywhere" --
+no live line of any script names a model server. What it cannot do: run the node on a phone. It
 says so. Runs IN PLACE (it reads mobile/ and the node's --help). Exit 0 = pass, 1 = fail.
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ def read(rel):
 
 def main():
     scripts = ["mobile/install.sh", "mobile/covenant_phone.sh", "mobile/covenant_phone_check.sh", "mobile/widget/covenant-phone-start.sh"]
-    for s in scripts + ["mobile/TERMUX_SETUP.md", "mobile/judges.example.json"]:
+    for s in scripts + ["mobile/TERMUX_SETUP.md", "mobile/USB.md"]:
         check("M3.0 %s is in the tree" % s, os.path.exists(os.path.join(HERE, s)))
 
     sh = shutil.which("sh")
@@ -79,17 +79,27 @@ def main():
         check("M3.4 setup page documents %s with default %s" % (var, default),
               ("`%s`" % var) in doc and ("`%s`" % default) in doc)
 
-    # the example judges file has the documented shape
-    try:
-        j = json.load(io.open(os.path.join(MOB, "judges.example.json"), encoding="utf-8"))
-        ok = isinstance(j, dict) and all(isinstance(v, dict) and "url" in v and "model" in v for v in j.values()) and "phone" in j
-    except Exception as e:                                       # noqa: BLE001
-        ok, j = False, str(e)
-    check("M3.5 judges.example.json is {name: {url, model}} and names the phone", ok, str(j)[:200])
 
-    # the tier table is honest: the reference judge and the phone tiers are named
-    for m in ("qwen3:8b", "qwen3:4b", "qwen3:1.7b"):
-        check("M3.6 setup page names the %s tier" % m, m in doc)
+    # NO OLLAMA ANYWHERE (2026-09-12). Until today this checked that the page named
+    # three qwen3 tiers. Now it checks the opposite, and on the scripts' LIVE lines
+    # rather than their prose: a comment may say "Ollama was deleted"; a line that
+    # runs may not start it, pull it, probe it or export a knob for it.
+    live_bad = []
+    for sname in scripts:
+        for n, line in enumerate(read(sname).split("\n"), 1):
+            code = line.split("#", 1)[0]
+            # The launcher is still NAMED run_with_ollama_judge.py on 2026-09-12; its
+            # rename is batch 3 of the Ollama-removal plan and lands with a shim.
+            # Until then the filename is exempt here -- and ONLY the filename, so a
+            # line that starts, pulls or probes a model server still fails this.
+            code = code.replace("run_with_ollama_judge.py", "")
+            if re.search(r"(?i)ollama|qwen|11434|JUDGE_MODEL", code):
+                live_bad.append("%s:%d" % (sname, n))
+    check("M3.6 no live line of any phone script names a model server (ollama/qwen/11434/JUDGE_MODEL)",
+          not live_bad, ", ".join(live_bad))
+    check("M3.6b the setup page's variable table has no JUDGE_MODEL row", "| `JUDGE_MODEL`" not in doc)
+    check("M3.6c the setup page states the judge is the same as the PC's and names the exam record",
+          "The judge, stated plainly" in doc and "ops/DISTILL.md" in doc)
     check("M3.7 setup page says the gate fails CLOSED", "fails CLOSED" in doc or "fail CLOSED" in doc)
     check("M3.8 setup page says what iOS cannot do", "iPhone" in doc and "cannot" in doc)
 
