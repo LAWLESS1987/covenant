@@ -849,6 +849,12 @@ IN_PLACE = [
     # network are needed; in place for M3's reason -- mobile/ is not staged.
     ("test_m4_usb_link.py", 120,
      "it runs mobile/usb_link.py, which the scratch copy lacks"),
+    # M5 (2026-09-12): the Android app ships the SAME core by staging it OUTSIDE
+    # the checkout at build time; this pins the allowlist, the manifest and the
+    # workflow. In place because it reads mobile/app and .github/workflows,
+    # which stage() does not copy. File checks only, no SDK.
+    ("test_m5_app.py", 120,
+     "it reads mobile/app and .github/workflows, which the scratch copy lacks"),
     # A93 (2026-09-12): a CLONE must seat the distilled student, not a model
     # server it lacks. Here for M3's reason and one more. It runs the real
     # mobile/covenant_phone.sh, which stage() does not copy -- registered in

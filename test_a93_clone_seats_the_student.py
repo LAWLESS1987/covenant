@@ -48,7 +48,12 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 POLICY_REL = os.path.join("ops", "quorum_policy.json")
 SKIP_DIRS = {".git", ".venv", "venv", ".claude", "logs", "__pycache__",
-             "node_modules", ".pytest_cache", "strategy_reports"}
+             "node_modules", ".pytest_cache", "strategy_reports",
+             # 2026-09-12: a local build of mobile/app leaves hundreds of MB under
+             # build/ and .gradle/; copying that into the clone-equivalent tree
+             # would time this suite out. The APK build stages outside the tree
+             # anyway, but a stray local build must not be able to break a sweep.
+             "build", ".gradle", ".kotlin"}
 
 PROBE = r'''
 import os, sys

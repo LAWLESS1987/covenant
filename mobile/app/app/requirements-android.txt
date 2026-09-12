@@ -1,0 +1,8 @@
+# What Chaquopy's pip resolves at build time for android_24_arm64_v8a and x86_64.
+# Deliberately NOT the repo's requirements.txt: xrpl-py is absent (the node
+# tolerates that; XRP settlement is not for a phone). Mirrors the Termux kit's
+# `pip install flask requests waitress` plus cryptography, which Termux took from pkg.
+flask>=3.0,<4
+waitress>=3.0,<4
+requests>=2.31,<3
+cryptography>=41.0,<43   # 42.0.8 is the newest cp312 Android wheel; Chaquopy cannot compile Rust, so the <43 pin makes a break visible in a diff

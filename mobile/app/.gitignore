@@ -1,0 +1,19 @@
+# Nested ignore file for the Android project: a local build can never track
+# outputs, and no keystore but the one public debug-class key is ever tracked.
+build/
+*/build/
+.gradle/
+.kotlin/
+.idea/
+*.iml
+local.properties
+captures/
+.cxx/
+*.apk
+*.aab
+keystore.properties
+google-services.json
+*.jks
+*.keystore
+*.p12
+!signing/debug.p12

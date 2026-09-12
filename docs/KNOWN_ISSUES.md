@@ -3052,3 +3052,58 @@ fake-guard shape this register already names.
 vocabulary, and four of the words it held on are covenant's own. Widening the
 corpus to include the chain's historical payloads is the repair that would make
 the waiver rarely needed, and it belongs to the distillation loop.
+
+
+### A99. [new capability -- the operator's decision, 2026-09-12] The phone app: mobile/app, built and published by android.yml. LANDED; unverified on a real phone.
+
+**What it is.** The same node the PC runs, in an Android app: the tracked
+launcher, started with exactly the flags `mobile/covenant_phone.sh` passes, on
+CPython 3.12 (Chaquopy 17) inside a foreground service of type `specialUse` --
+the one type Android 15 never times out and BOOT_COMPLETED may start. The
+node's files are staged from the checkout into `$RUNNER_TEMP` at build time and
+carried as APK assets; **nothing under `mobile/app` is a copy of the core**
+(P18 V3 is unaffected, and `test_m5_app.py` M5.4 closes P18's depth-3 blind
+spot for that directory). Share in / share out: any app's Share sheet can hand
+it a text, which the node's own quorum and sentinel judge in-process; no HTTP
+endpoint was added to the node. The operator chose this scope ("share in /
+share out") over notification-reading and screen-control, both refused.
+
+**Why this and not the alternatives** (research of 2026-09-12, three routes
+evaluated with sources): python-for-android ships CPython 3.14 with no pin to
+3.12, compiles `cryptography` through Rust on the build host (broke twice in
+May 2026), and can only emit a `dataSync` service, which Android 15 kills after
+six hours a day; BeeWare Briefcase has no service support at all, in the
+maintainer's own words. Chaquopy has prebuilt cp312 wheels for the only two
+binary deps, and its own CI builds on the stock runner image in minutes.
+
+**Posture changes, stated.** `android.yml` is the first workflow here holding
+`contents: write`, on its release job only, with no secret beyond
+`GITHUB_TOKEN`. `mobile/app/signing/debug.p12` is the first tracked keystore:
+debug-class, public by design, so consecutive builds install over each other
+and the phone keeps the node's identity; anyone can sign an APK that installs
+over yours, so install only what the workflow built from a commit you trust.
+The release is a public prerelease on a public repository.
+
+**What it deliberately does not do.** No model server and no `JUDGE_MODEL`
+(the operator: "no ollama"); no `xrpl-py`; no key backup (an uninstall deletes
+the identity); no in-app restart loop; code proposals refused
+(`COVENANT_FORCE_NO_SANDBOX=1`). It ships no `ops/quorum_policy.json`, so a
+phone runs the launcher's no-policy default, `deferring,semantic` (A93).
+
+**What is verified, and where.** On the repository side, `test_m5_app.py`
+(allowlist == the launcher's AST import closure minus one documented exclusion;
+the manifest's service type, process, permissions and share filter; the
+workflow's permissions and secrets; the scripts). On CI, `android.yml`: the
+build wrote nothing into the checkout, the APK's core is byte-identical to the
+checkout's, and on an x86_64 API-35 emulator the service came up, `/health`
+reported the canonical genesis and a `quorum(...)` judge, kept answering with
+the screen off and idle forced, stopped on Stop, and started again. **Nothing
+has run on a real phone.** The emulator exercises x86_64 wheels; the S25+ needs
+arm64. Only a finger proves the Start button, the Share sheet from another app,
+and Samsung's sleep policy. A cable install (`mobile/USB.md`) is the way to
+find out.
+
+**Known costs.** The partial wake lock is held for the service's whole life --
+the operator asked for a node that keeps running; the battery pays.
+`cryptography` is frozen at 42.0.8 by wheel availability. Android 17 will
+require `ACCESS_LOCAL_NETWORK` for LAN peers when the app targets 37.

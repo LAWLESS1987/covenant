@@ -26,9 +26,10 @@ runs alone from the canonical genesis and converges when a peer appears. This pr
 rather you read before you run: `curl -sLO .../mobile/install.sh`, then `less install.sh`,
 then `sh install.sh`.
 
-Why there is no true one-tap install: Android will not run a Python node and a model server
-from a link. It needs a terminal app, and Termux is that app. A packaged APK that bundles both
-is possible and is not built; it is a project, not a script.
+Why Termux at all: Android will not run a Python node from a link. It needs a terminal app,
+and Termux is that app. **Since 2026-09-12 there is also a packaged app** -- `mobile/app/`,
+built by GitHub Actions and published as the `android-latest` release; see
+`mobile/app/README.md`. The app and this kit run the same node with the same flags.
 
 ## Requirements
 

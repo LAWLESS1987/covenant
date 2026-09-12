@@ -4,8 +4,8 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `1e72206edd9a` · 11,055 lines · **86 suites, 2,524 checks, 0 failed** on win32 <!--TOTALS-->
-Totals re-measured 2026-09-09 by `covenant_one.py --all`; version, hash and
+**v8.40** · source `73e4a0ce0b7a` · 11,283 lines · **95 suites, 2,745 checks, 1 failed** on win32 <!--TOTALS-->
+Totals re-measured 2026-09-12 by `covenant_one.py --all`; version, hash and
 line count re-measured 2026-09-09 from the core module itself. What
 that number does and does not cover is in [Suite coverage](#suite-coverage), and it is
 worth reading before quoting it.
@@ -476,7 +476,7 @@ claims a profit edge or promises a return; it claims what a reader can verify.
 
 ## Suite coverage
 
-**86 suites · 2,524 checks · 0 failed**, win32, 2026-09-09 <!--TOTALS-->
+**95 suites · 2,745 checks · 1 failed**, win32, 2026-09-12 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.

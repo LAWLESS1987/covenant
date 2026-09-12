@@ -1,0 +1,36 @@
+plugins { id 'com.android.application'; id 'com.chaquo.python' }
+
+// The core is an ASSET staged outside the tree by build.sh (stage.sh), never a
+// source set, never a copy in the checkout. Running gradle directly is refused.
+def stage = System.getenv('COVENANT_PY_STAGE') ?: {
+  throw new GradleException('COVENANT_PY_STAGE is unset: run mobile/app/build.sh, not gradle directly. It stages the node files OUTSIDE the checkout (test_p18 forbids a second copy of the core in the tree).')
+}()
+
+android {
+  namespace 'org.covenant.node'
+  compileSdk 35
+  defaultConfig {
+    applicationId 'org.covenant.node'
+    minSdk 34            // Android 14+: startForeground(id, notif, type) + specialUse; no compat branches
+    targetSdk 35         // Android 15 rules; a specialUse service has no timeout there
+    versionCode ((System.getenv('COVENANT_APP_VERSION_CODE') ?: '1') as int)
+    versionName (System.getenv('COVENANT_APP_VERSION_NAME') ?: '0.1-local')
+    ndk { abiFilters 'arm64-v8a', 'x86_64' }   // arm64 for the phone, x86_64 for the CI emulator
+  }
+  sourceSets { main { assets.srcDirs += stage } }   // $stage/core/* -> APK assets/core/*
+  signingConfigs {
+    // ONE fixed, public, debug-class key so every build installs over the last
+    // and the node's identity survives updates. See signing/README.md.
+    fixed { storeFile file('../signing/debug.p12'); storeType 'PKCS12'; storePassword 'android'; keyAlias 'covenant'; keyPassword 'android' }
+  }
+  buildTypes { debug { signingConfig signingConfigs.fixed } }
+  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+chaquopy {
+  defaultConfig {
+    version '3.12'                        // the minor the sweep tests; buildPython must be 3.12.x
+    pip { install '-r', 'requirements-android.txt' }
+  }
+}
+// No dependencies {} block: only entry.py lives under src/main/python; the core is an asset.

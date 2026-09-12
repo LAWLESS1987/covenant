@@ -1,0 +1,9 @@
+plugins {
+  id 'com.android.application' version '8.9.1' apply false   // needs Gradle >= 8.11.1 (CI pins 8.13); inside Chaquopy 17's window; JDK 17
+  id 'com.chaquo.python' version '17.0.0' apply false
+}
+allprojects {
+  // build.sh sets COVENANT_APP_BUILD so every Gradle output lands outside the checkout
+  def out = System.getenv('COVENANT_APP_BUILD')
+  if (out) { layout.buildDirectory = file("$out/${project.name}") }
+}

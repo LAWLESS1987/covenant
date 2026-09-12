@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- install-time normal permissions, plus POST_NOTIFICATIONS (runtime on 13+) -->
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+
+  <!-- allowBackup=false: the node's RSA identity in files/ must never ride Google auto-backup. -->
+  <application
+      android:label="Covenant Node"
+      android:allowBackup="false"
+      android:networkSecurityConfig="@xml/network_security_config"
+      android:theme="@android:style/Theme.DeviceDefault.DayNight">
+
+    <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+      <!-- SHARE IN: any app's Share sheet can hand covenant a text to judge -->
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="text/plain"/>
+      </intent-filter>
+    </activity>
+
+    <!-- The node. Its own process so Stop can end the interpreter cleanly; specialUse so
+         Android 15 never times it out and BOOT_COMPLETED may start it. -->
+    <service android:name=".NodeService"
+        android:exported="false"
+        android:process=":node"
+        android:stopWithTask="false"
+        android:foregroundServiceType="specialUse">
+      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+          android:value="Runs the operator's own Covenant peer-to-peer node: an HTTP API and a peer listener that other nodes connect to at any hour."/>
+    </service>
+
+    <receiver android:name=".BootReceiver" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

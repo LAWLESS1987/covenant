@@ -47,3 +47,5 @@ pc_report.txt     -text
 *.bin  binary
 *.db   binary
 *.zip  binary
+# 2026-09-12: the app's fixed debug-class signing key (mobile/app/signing)
+*.p12 binary
