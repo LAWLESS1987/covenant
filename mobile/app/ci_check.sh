@@ -43,10 +43,16 @@ assert str(h['judge']).startswith('quorum(') and 'semantic' in str(h['judge']), 
 PYEOF
 echo "repo core sha256: $(sha256sum covenant_unified_v8.py)"
 adb shell dumpsys activity services $PKG | grep -q 'isForeground=true'
+# From here every command is traced and stderr is kept: the second run's
+# restart died with exit 255 and no output at all (2026-09-12).
+set -x
+exec 2>&1
 adb shell input keyevent KEYCODE_SLEEP; adb shell dumpsys deviceidle force-idle || true; sleep 30
 curl -sf -m 5 "http://127.0.0.1:$PORT/health" -o health2.json       # still answering, screen off, idle forced
+adb shell dumpsys deviceidle unforce || true; adb shell input keyevent KEYCODE_WAKEUP || true   # the Stop/Start proof is about the service, not doze
 adb shell am stopservice -n $PKG/.NodeService; sleep 5
 if curl -s -m 3 "http://127.0.0.1:$PORT/health" >/dev/null; then echo 'still answering after Stop'; exit 1; fi
+adb wait-for-device; adb devices
 adb shell am start-foreground-service -n $PKG/.NodeService; wait_health health3.json   # a second start, fresh :node process
 if adb logcat -d AndroidRuntime:E '*:S' | grep -q 'FATAL EXCEPTION'; then echo 'FATAL in logcat'; exit 1; fi
 echo 'emulator check passed'
