@@ -46,56 +46,17 @@ if "!HEALTHY!"=="1" (
 :CHECKED
 
 REM ---------------------------------------------------------------------------
-REM  P17 GUARD, added 2026-08-26. READ THIS BEFORE REMOVING IT.
+REM  P17 GUARD, added 2026-08-26, RETIRED 2026-09-12.
 REM
-REM  This script's stop ALWAYS succeeds. covenant_prod.bat's start CAN refuse:
-REM  its first act is to curl Ollama on 11434 and abort if nothing answers,
-REM  which is correct, because a judge that cannot be reached fails CLOSED and
-REM  a node in that state rejects every transaction while looking healthy.
-REM
-REM  Composed, that is not a restart. It is a stop. A machine that was serving
-REM  a chain a minute ago serves nothing, and the only notice is a line in a
-REM  console that scrolls past. The judge is a 5.2 GB local model on a box
-REM  P12 measured at ~3.5 GB free, so "Ollama is not answering right now" is
-REM  an ordinary state, not an exotic one.
-REM
-REM  So: ask FIRST, and refuse to stop what cannot be started. This can only
-REM  ever decline to act -- it never starts, kills or changes anything.
+REM  This script's stop always succeeds; until 2026-09-07 covenant_prod.bat's
+REM  start could refuse, because its first act was to probe a local model
+REM  server on 11434 and abort when nothing answered. Composed, that was not a
+REM  restart but a stop, so this guard asked FIRST and refused to stop what
+REM  could not be started. The server was removed from this PC on 2026-09-07
+REM  and the probe in covenant_prod.bat went with it on 2026-09-12; the judge is
+REM  the distilled student, in-process, and a start is never blocked by a
+REM  missing server. Nothing is checked here any more; the record stays.
 REM ---------------------------------------------------------------------------
-echo Checking the ethics judge is reachable BEFORE stopping anything ...
-REM 2026-09-03: with ops\quorum_policy.json the local seat defers when Ollama
-REM is silent, and covenant_prod.bat starts anyway -- so P17's premise (a stop
-REM that would not be followed by a start) no longer holds, and the restart
-REM may proceed. Without the policy file the guard below stands unchanged.
-if exist "ops\quorum_policy.json" goto POLICY_DEFERS
-curl -s -m 8 http://127.0.0.1:11434/api/tags >nul 2>nul
-if %errorlevel% neq 0 goto NO_JUDGE
-echo   Ollama answers on 11434. Safe to restart.
-goto JUDGE_OK
-
-:POLICY_DEFERS
-echo   ops\quorum_policy.json is present: the local seat defers when Ollama is
-echo   silent, so covenant_prod.bat will start without it. Safe to restart.
-goto JUDGE_OK
-
-:NO_JUDGE
-echo.
-echo   REFUSING TO RESTART. Ollama is not answering on 11434.
-echo.
-echo   covenant_prod.bat would abort before starting the nodes, so stopping
-echo   them now would take the chain down and leave it down. Nothing has
-echo   been stopped. The nodes are still running whatever they were running.
-echo.
-echo   Start Ollama, confirm with:  curl http://127.0.0.1:11434/api/tags
-echo   then run this again.
-echo.
-> "NODE_RESTART.txt" echo ==== node restart REFUSED %DATE% %TIME% ====
->> "NODE_RESTART.txt" echo P17: Ollama not answering on 11434; stop would not be followed by a start.
->> "NODE_RESTART.txt" echo Nothing was stopped. No database was touched.
-pause
-exit /b 3
-
-:JUDGE_OK
 
 > "%OUT%" echo ==== node restart  %DATE% %TIME% ====
 >> "%OUT%" echo.

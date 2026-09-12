@@ -106,8 +106,13 @@ class OpenAICompatJudge(cov._APIReasoningJudge):
     provider = "local"
     env_var = "COVENANT_LOCAL_JUDGE_KEY"     # may be unset for a local server
     judge_id = "local:1"
-    default_url = "http://localhost:11434/v1/chat/completions"
-    default_model = "qwen3.6:latest"   # what is actually installed on this machine
+    # NO ASSUMED SERVER (2026-09-12). These were a URL on port 11434 and a model
+    # tag "actually installed on this machine" -- until 2026-09-07, when that
+    # server was removed. An empty default fails closed at evaluate time with a
+    # reason a person can act on; construction stays cheap (nothing is read
+    # until _endpoint() is called), so a probe that only builds the class works.
+    default_url = ""
+    default_model = ""
 
     def __init__(self, *a, **kw):
         # A local server needs no key. The base class constructs fine without
@@ -125,11 +130,17 @@ class OpenAICompatJudge(cov._APIReasoningJudge):
         return super()._parse_verdict(_extract_verdict_json(text))
 
     def _endpoint(self) -> str:
-        return os.environ.get("COVENANT_LOCAL_JUDGE_URL", self.default_url)
+        url = os.environ.get("COVENANT_LOCAL_JUDGE_URL") or self.default_url
+        if not url:
+            raise ValueError('provider "local" needs COVENANT_LOCAL_JUDGE_URL; no server is assumed')
+        return url
 
     def _model(self) -> str:
-        return (self.model or os.environ.get("COVENANT_LOCAL_JUDGE_MODEL")
-                or self.default_model)
+        model = (self.model or os.environ.get("COVENANT_LOCAL_JUDGE_MODEL")
+                 or self.default_model)
+        if not model:
+            raise ValueError('provider "local" needs COVENANT_LOCAL_JUDGE_MODEL; no model is assumed')
+        return model
 
     def _call(self, data, principles):
         import requests

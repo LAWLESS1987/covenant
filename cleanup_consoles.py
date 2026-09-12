@@ -16,7 +16,7 @@ import os, subprocess, sys
 
 LAUNCHERS = ("AA_INTEGRATE_AND_RUN", "AB_RESTART_NODES", "AC_COPY_SWEEP_LOGS",
              "AD_DIAG_PORTS", "AE_KILL_STRAY_START_B", "AF_RETEST",
-             "AG_LEAN_MEASURE", "AH_FITCHECK", "AI_TOPMEM")
+             "AI_TOPMEM")   # AG_/AH_ were deleted with the model server, 2026-09-12
 NEVER = ("run_with_ollama_judge", "covenant_watchdog", "AJ_CLEANUP",
          "cleanup_consoles")
 

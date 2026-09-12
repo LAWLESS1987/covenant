@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 run_with_local_judge.py -- run a Covenant node whose ethics gate is a LOCAL
-model served by Ollama (or any OpenAI-compatible endpoint), instead of an API
-key or the insecure mock.
+model behind any OpenAI-compatible endpoint you run yourself, instead of an API
+key or the insecure mock. No server is assumed: COVENANT_LOCAL_JUDGE_URL and
+COVENANT_LOCAL_JUDGE_MODEL must be set, or the seat fails closed with a clear
+reason. (Until 2026-09-12 this file defaulted to a server on port 11434 that
+was removed from this PC on 2026-09-07.)
 
 WHY THIS FILE EXISTS
   covenant_judge_local.py registers the "local", "deepseek" and "mistral"
@@ -28,13 +31,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import covenant_unified_v8 as cov
 import covenant_judge_local  # noqa: F401 -- the import IS the registration
 
-# Defaults that match OLLAMA_JUDGE.md. Anything already set in the environment
-# wins, so start_live_local.bat / your own exports still control this.
-os.environ.setdefault("COVENANT_LOCAL_JUDGE_URL",
-                      "http://localhost:11434/v1/chat/completions")
-os.environ.setdefault("COVENANT_LOCAL_JUDGE_MODEL", "qwen3.6:latest")
+# No URL or model default: the operator names the server they run.
 # A timeout is recorded as a VIOLATION, so slow hardware silently rejects your
-# own transactions. Keep this generous -- see OLLAMA_JUDGE.md section 3.
+# own transactions. Keep this generous.
 os.environ.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "300")
 os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
 
@@ -43,8 +42,8 @@ os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
 # never silently fall back to keyword matching
 os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
 
-print(f"[local-judge] {os.environ['COVENANT_LOCAL_JUDGE_MODEL']} via "
-      f"{os.environ['COVENANT_LOCAL_JUDGE_URL']} "
+print(f"[local-judge] {os.environ.get('COVENANT_LOCAL_JUDGE_MODEL') or '(model unset)'} via "
+      f"{os.environ.get('COVENANT_LOCAL_JUDGE_URL') or '(url unset -- the seat will fail closed)'} "
       f"(timeout {os.environ['COVENANT_LOCAL_JUDGE_TIMEOUT']}s, fail-closed, "
       f"insecure mock OFF)")
 

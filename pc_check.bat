@@ -32,18 +32,6 @@ echo == POWER PLAN == >> %R%
 powercfg /getactivescheme >> %R% 2>&1
 echo. >> %R%
 
-echo == OLLAMA == >> %R%
-ollama --version >> %R% 2>&1
-echo -- models -- >> %R%
-ollama list >> %R% 2>&1
-echo -- loaded right now -- >> %R%
-ollama ps >> %R% 2>&1
-echo -- OLLAMA_* environment -- >> %R%
-set OLLAMA >> %R% 2>&1
-echo -- what 11434 is bound to (0.0.0.0 = exposed to your LAN) -- >> %R%
-netstat -ano ^| findstr :11434 >> %R% 2>&1
-echo. >> %R%
-
 echo == PYTHON == >> %R%
 python --version >> %R% 2>&1
 if exist ".venv\Scripts\python.exe" (.venv\Scripts\python.exe --version >> %R% 2>&1) else (echo no .venv >> %R%)

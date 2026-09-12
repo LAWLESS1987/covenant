@@ -350,7 +350,7 @@ def g6():
                  "loads by paging. P12 measured exactly this on the production "
                  "box (3,535 MB free against a ~5,200 MB model)."
                  % (name, model_mb, free_mb),
-                 "Close what you can (AK_FREE_RAM.bat), or use a smaller model.")
+                 "Close what you can, or use a smaller model.")
     return R("G6", g6._title, PASS,
              "model %s %.0f MB, %.0f MB available." % (name, model_mb, free_mb))
 

@@ -886,9 +886,6 @@ def start_node(node):
     production resumes a chain, it does not rebuild one."""
     env = dict(os.environ)
     env["COVENANT_DB_PATH"] = node["db"]
-    env.setdefault("COVENANT_LOCAL_JUDGE_URL",
-                   "http://127.0.0.1:11434/v1/chat/completions")
-    env.setdefault("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:8b")
     env.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "600")
     env.setdefault("COVENANT_JUDGE_TIMEOUT", "600")
     # v8.40: match run_with_ollama_judge.py's pair -- a node the watchdog

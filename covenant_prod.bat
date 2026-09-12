@@ -2,13 +2,9 @@
 REM ============================================================================
 REM  covenant_prod.bat -- production start/stop/status. NOT a test rig.
 REM
-REM  The difference from covenant_go.bat, which is a test rig:
-REM
-REM    covenant_go.bat   DELETES nodeA_prod.db / nodeB_prod.db on every run.
-REM                      Correct for a repeatable test. Catastrophic in
-REM                      production -- it discards the chain.
-REM    covenant_prod.bat NEVER deletes a database. It creates one only if
-REM                      none exists, and otherwise resumes.
+REM  covenant_prod.bat NEVER deletes a database. It creates one only if none
+REM  exists, and otherwise resumes. (A test rig that did delete them,
+REM  covenant_go.bat, was removed on 2026-09-12 with the model server it drove.)
 REM
 REM  It also does not prompt, does not wipe, does not ask you to read a number
 REM  and click Y, and starts a watchdog that restarts a dead node and checks
@@ -28,8 +24,8 @@ if /i "%~1"=="stop"   goto :stop
 if /i "%~1"=="status" goto :status
 
 REM -- judge wiring (production values) ---------------------------------------
-set COVENANT_LOCAL_JUDGE_URL=http://127.0.0.1:11434/v1/chat/completions
-if "%COVENANT_LOCAL_JUDGE_MODEL%"=="" set COVENANT_LOCAL_JUDGE_MODEL=qwen3:8b
+REM 2026-09-12: no local model server URL or model tag is set here any more;
+REM the server they named was removed from this PC on 2026-09-07.
 set COVENANT_LOCAL_JUDGE_TIMEOUT=600
 set COVENANT_JUDGE_TIMEOUT=600
 REM v8.40 (2026-08-29): the semantic judge rides in the quorum, not on
@@ -40,55 +36,21 @@ REM finding in itself, caught this time BEFORE the restart.
 set COVENANT_JUDGE_PROVIDERS=deferring,semantic
 REM 2026-09-12: was local,semantic; the launcher's no-policy default changed (A93).
 REM 2026-09-03: ops\quorum_policy.json overrides the line above at node start
-REM (run_with_ollama_judge.py applies it; the watchdog reads it too). Today it
-REM says "deferring,semantic": the local seat is Ollama, else a judge on a
-REM GitHub runner, else the distilled fallback covenant_distill.py trains from
-REM the judges' own verdicts. Delete that file to get exactly the line above.
+REM (the launcher applies it; the watchdog reads it too). It says
+REM "deferring,semantic": seat 0 is "deferring" -- the two distilled students,
+REM in-process -- and "semantic" is the deterministic lexical judge. Delete that
+REM file to get exactly the line above, which since 2026-09-12 means the same.
 set "COVENANT_INSECURE_MOCK_JUDGE="
-set COVENANT_OLLAMA_NUM_PREDICT=96
-set COVENANT_OLLAMA_NUM_CTX=2048
-REM 60m -> 30m, 2026-08-22. Measured on this box: the model is 5.2 GB and
-REM free RAM was 2.8 GB WITH it loaded, so Windows was already compressing to
-REM cope. The chain sat at height 3 through 431 watchdog ticks -- a 60-minute
-REM hold was keeping 5.2 GB resident for an hour after a transaction that may
-REM not come for a day. 30m is not a new number: it is what OLLAMA_TUNING.md
-REM measured and what covenant_go.bat already used. This line was the only
-REM place that disagreed. The timer resets on every verdict, so a burst still
-REM runs warm; the cost is one cold load -- measured today at 39.9s against
-REM 12.1s warm -- on the first transaction after a quiet half hour.
-set COVENANT_OLLAMA_KEEP_ALIVE=30m
 
-call :stamp "start requested, model %COVENANT_LOCAL_JUDGE_MODEL%"
+call :stamp "start requested"
 if exist ".venv\Scripts\activate.bat" call ".venv\Scripts\activate.bat"
 
-REM -- preflight: Ollama ------------------------------------------------------
-REM 2026-09-03: with ops\quorum_policy.json present the local seat DEFERS when
-REM Ollama is silent (GitHub runner, then the distilled fallback) and the gate
-REM no longer fails closed on that alone -- so a silent Ollama is disclosed,
-REM not fatal, and the fit check is skipped. Without the policy file the v8.40
-REM abort below stands unchanged.
-set COVENANT_QUORUM_POLICY=
-if exist "ops\quorum_policy.json" set COVENANT_QUORUM_POLICY=1
-curl -s -m 8 http://127.0.0.1:11434/api/tags >nul 2>nul
-if %errorlevel% equ 0 goto OLLAMA_OK
-if defined COVENANT_QUORUM_POLICY goto OLLAMA_SILENT_DEFERS
-call :stamp "ABORT: Ollama not answering on 11434. A judge that cannot be reached fails CLOSED - every transaction rejected."
-echo Ollama is not running. Start it, then re-run.
-exit /b 1
-
-:OLLAMA_SILENT_DEFERS
-call :stamp "WARN: Ollama not answering on 11434; ops\quorum_policy.json is present, so the local seat defers - starting anyway"
-goto FIT_SKIP
-
-:OLLAMA_OK
-if defined COVENANT_QUORUM_POLICY goto FIT_SKIP
-REM -- preflight: does the model fit? -----------------------------------------
-python -c "import sys,os;sys.path.insert(0,'.');from judge_bench import fit_check,OUT;ok=fit_check();print('\n'.join(OUT));sys.exit(0 if ok else 1)"
-if %errorlevel% neq 0 (
-  call :stamp "ABORT: model does not fit or is not installed - see above"
-  exit /b 1
-)
-:FIT_SKIP
+REM -- preflight: none for a model server (2026-09-12) ------------------------
+REM Until today this file probed port 11434 and ABORTED when nothing answered,
+REM which on any tree without the gitignored ops\quorum_policy.json -- every
+REM clone -- meant it could not start at all (a LIVE defect). The server was
+REM removed on 2026-09-07; the judge is the distilled student, in-process. A
+REM start is never blocked by a missing server; the gate itself fails closed.
 
 REM -- first run only: create the databases. NEVER delete an existing one. ----
 if not exist "genesis.json"      ( call :stamp "ABORT: genesis.json missing" & exit /b 1 )
@@ -101,7 +63,7 @@ if exist "nodeB_prod.db" ( call :stamp "resuming existing nodeB_prod.db" ) else 
 if exist "nodeC_prod.db" ( call :stamp "resuming existing nodeC_prod.db" ) else ( call :stamp "first run - nodeC_prod.db will be created by adopting genesis.json" )
 
 REM -- start each node only if its port is not already listening --------------
-set CE=set COVENANT_LOCAL_JUDGE_URL=%COVENANT_LOCAL_JUDGE_URL%^&^& set COVENANT_LOCAL_JUDGE_MODEL=%COVENANT_LOCAL_JUDGE_MODEL%^&^& set COVENANT_LOCAL_JUDGE_TIMEOUT=600^&^& set COVENANT_JUDGE_TIMEOUT=600^&^& set COVENANT_OLLAMA_NUM_PREDICT=96^&^& set COVENANT_OLLAMA_NUM_CTX=2048^&^& set COVENANT_OLLAMA_KEEP_ALIVE=30m
+set CE=set COVENANT_LOCAL_JUDGE_TIMEOUT=600^&^& set COVENANT_JUDGE_TIMEOUT=600
 
 curl -s -m 5 http://127.0.0.1:5000/health >nul 2>nul
 if %errorlevel% neq 0 (

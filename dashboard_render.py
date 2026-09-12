@@ -98,7 +98,8 @@ def judge_model():
         try:
             with open(p, encoding="utf8", errors="replace") as f:
                 for line in reversed(f.read().splitlines()):
-                    m = re.search(r"\[ollama-judge\]\s+(\S+)\s+via", line)
+                    # 2026-09-12: the banner is "[node] providers=... | student <name>@<digest> | ..."
+                    m = re.search(r"\[node\].*?student\s+(\S+)", line)
                     if m:
                         return m.group(1)
         except OSError:
@@ -192,7 +193,7 @@ def demo():
         "generated_utc": "2026-08-23T02:40:00Z",
         "generated_local": "Sat 23 Aug 02:40:00", "generated_epoch": int(time.time()),
         "host": "sales", "free_mb": 8180, "total_mb": 15680,
-        "judge_model": "qwen3:8b",
+        "judge_model": "Ora@stubdigest",
         "nodes": [
             {"id": "A", "port": 5000, "up": True, "height": 3, "peers": 1, "pending": 0,
              "judge": "quorum(local:0,mock_selfreport:0)", "insecure": False,
