@@ -50,8 +50,13 @@ exec 2>&1
 adb shell input keyevent KEYCODE_SLEEP; adb shell dumpsys deviceidle force-idle || true; sleep 30
 curl -sf -m 5 "http://127.0.0.1:$PORT/health" -o health2.json       # still answering, screen off, idle forced
 adb shell dumpsys deviceidle unforce || true; adb shell input keyevent KEYCODE_WAKEUP || true   # the Stop/Start proof is about the service, not doze
-adb shell am stopservice -n $PKG/.NodeService; sleep 5
+# The stop command's exit code is RECORDED, not obeyed: onDestroy kills the
+# :node process and `am` reports 255 after printing "Service stopped" (run
+# 34706380921). The proof of a Stop is what follows: no /health, no process.
+adb shell am stopservice -n $PKG/.NodeService || echo "am stopservice exit $? (recorded, see above)"
+sleep 5
 if curl -s -m 3 "http://127.0.0.1:$PORT/health" >/dev/null; then echo 'still answering after Stop'; exit 1; fi
+if adb shell pidof "$PKG:node" | grep -q '[0-9]'; then echo 'the :node process survived Stop'; exit 1; fi
 adb wait-for-device; adb devices
 adb shell am start-foreground-service -n $PKG/.NodeService; wait_health health3.json   # a second start, fresh :node process
 if adb logcat -d AndroidRuntime:E '*:S' | grep -q 'FATAL EXCEPTION'; then echo 'FATAL in logcat'; exit 1; fi
