@@ -88,7 +88,6 @@ def build_default_sentinel():
     # covenant_judge_defer). Without them build_semantic_quorum raises
     # "unknown judge provider" -- measured 2026-09-05.
     import covenant_judge_local    # noqa: F401
-    import covenant_judge_ollama   # noqa: F401
     import covenant_judge_fallback  # noqa: F401
     import covenant_judge_defer    # noqa: F401
     judge = core.build_semantic_quorum()

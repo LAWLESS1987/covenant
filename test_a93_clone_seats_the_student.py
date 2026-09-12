@@ -7,7 +7,8 @@ inherit the question, not the answer). Correct on its own terms -- and it
 silently changed what a clone's gate is, because the launcher (then named
 run_with_ollama_judge.py, run_node.py since 2026-09-12) fell
 back to a HARD-CODED "local,semantic" whenever there was no policy file,
-discarding COVENANT_JUDGE_PROVIDERS entirely. Provider "local" is OllamaJudge.
+discarding COVENANT_JUDGE_PROVIDERS entirely. Provider "local" was OllamaJudge
+(a server no clone ran; the module was deleted on 2026-09-12).
 
 So every fresh clone -- the phone kit, and the second operator this project has
 been building toward -- came up with a judge pointed at a model server that is
@@ -33,7 +34,7 @@ it. That environment is then fed to a real interpreter in the clone tree, which
 asks the registry which class provider[0] resolves to.
 
 The controls are the point: an explicit OVERRIDE=local,semantic must still
-produce OllamaJudge (so the probe is known to discriminate), and a plain
+produce the HTTP provider (so the probe is known to discriminate), and a plain
 COVENANT_JUDGE_PROVIDERS=local must be IGNORED on a policy-less tree (the
 fallback, not the shell, decides a clone's gate). A guard that cannot fail on
 the bug it guards is not a guard (A66 and the 35/36 fake guards of 2026-09-09).
@@ -160,17 +161,18 @@ class CloneSeatsTheStudent(unittest.TestCase):
         got = self._resolve({k: v for k, v in captured.items()
                              if k.startswith("COVENANT_")})
         self.assertNotEqual(
-            got["impl"], "OllamaJudge",
-            "a clone seated OllamaJudge: it will talk to 127.0.0.1:11434, which a "
-            "phone does not run. Resolved providers=%r" % got["providers"])
+            got["impl"], "OpenAICompatJudge",
+            "a clone seated an HTTP provider it does not run (there is no server "
+            "on a phone). Resolved providers=%r" % got["providers"])
         self.assertEqual(got["impl"], "DeferringJudge", got)
 
     def test_03_control_an_explicit_override_still_wins(self):
         """The probe must be able to produce the BROKEN seat on demand, or a
         green test_02 proves nothing. OVERRIDE is the one variable that beats
-        the fallback, so OVERRIDE=local,semantic must yield OllamaJudge."""
+        the fallback, so OVERRIDE=local,semantic must yield the HTTP provider
+        (OpenAICompatJudge since the Ollama module was deleted, 2026-09-12)."""
         got = self._resolve({"COVENANT_JUDGE_PROVIDERS_OVERRIDE": "local,semantic"})
-        self.assertEqual(got["impl"], "OllamaJudge",
+        self.assertEqual(got["impl"], "OpenAICompatJudge",
                          "the probe can no longer reach the broken seat; re-derive this "
                          "guard rather than trusting it (got %r)" % got)
 

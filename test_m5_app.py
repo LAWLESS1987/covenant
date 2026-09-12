@@ -103,7 +103,7 @@ def main():
           listed_py == expected, "listed-not-needed=%s needed-not-listed=%s" % (sorted(listed_py - expected), sorted(expected - listed_py)))
 
     # M5.3 the data files the shipped modules open beside themselves are listed
-    for d in ("genesis.json", "semantic_judge_model.json", "fallback_model.json", "fallback_model_2.json", "judges.json"):
+    for d in ("genesis.json", "semantic_judge_model.json", "fallback_model.json", "fallback_model_2.json"):
         check("M5.3 data file listed: %s" % d, d in names)
 
     # M5.4 nothing under mobile/app at ANY depth is a copy of the core or a secret
@@ -119,7 +119,8 @@ def main():
 
     # M5.5 exactly one Python source file is packaged from src/main/python
     pydir = os.path.join(APP, "app", "src", "main", "python")
-    pyfiles = sorted(os.listdir(pydir)) if os.path.isdir(pydir) else []
+    pyfiles = sorted(n for n in os.listdir(pydir) if os.path.isfile(os.path.join(pydir, n))) if os.path.isdir(pydir) else []
+    # files only: a local py_compile of entry.py leaves an ignored __pycache__ beside it (went red 2026-09-12)
     check("M5.5 src/main/python contains exactly entry.py", pyfiles == ["entry.py"], pyfiles)
 
     # M5.6 entry.py sets no provider variables and only known flags

@@ -76,7 +76,8 @@ Observed live at 14:12: the sequence stop → start reported
 `stopped. Databases untouched` and then `node A already up`, `node B already up`.
 
 `:stop` runs `taskkill /f /fi "windowtitle eq Covenant Node A*"`. The nodes are
-launched as `start "Covenant Node A" /min cmd /c "... python run_with_ollama_judge.py ..."`,
+launched as `start "Covenant Node A" /min cmd /c "... python run_node.py ..."` (the
+launcher was `run_with_ollama_judge.py` until 2026-09-12),
 so the window title belongs to the **cmd wrapper**; `/f` without `/t` kills the
 wrapper and leaves `python.exe` holding 5000/5020. The next start's `curl /health`
 succeeds, so it does nothing and says so cheerfully.
@@ -144,8 +145,8 @@ records the deployed hash and python version, then runs `run_local_sweep.py`, wh
 stages everything into `%TEMP%\covenant_sweep`, runs each suite there under a
 whole-tree kill on timeout, and appends each result to `SWEEP_RESULTS.txt` **as it
 happens** so the bridge can watch it. One launcher, one job: the node restart is
-`AB_RESTART_NODES.bat`, and it refuses to stop anything if Ollama is not answering
-— the judge fails closed, so a node that cannot reach it rejects every
+`AB_RESTART_NODES.bat` (until 2026-09-12 it refused to stop anything if the model
+server was not answering — the judge fails closed, so a node that could not reach it rejected every
 transaction, and a node that is up beats one that will not come back.
 
 Two harness bugs worth not repeating, both mine, both Windows-specific:
@@ -275,7 +276,7 @@ everything above it is the record of 2026-08-22. Updated 2026-08-23 ~03:10.)*
   the 5.2 GB the model needs, so it was loading by paging. `AJ_CLEANUP.bat`
   (closes leaked launcher consoles, spares the node ones) and `AK_FREE_RAM.bat`
   (unloads the model: 2.86 → 8.18 GB free) are the two levers.
-  `COVENANT_OLLAMA_KEEP_ALIVE` is now **30m**, not 60m — the cost is one cold
+  `COVENANT_OLLAMA_KEEP_ALIVE` was **30m**, not 60m (a server knob; the server went on 2026-09-07) — the cost was one cold
   load after a quiet half hour, and the chain sat at height 3 through 431
   watchdog ticks.
 - **`AL_DASHBOARD.bat`** renders a 3D view of the mesh into a local HTML file

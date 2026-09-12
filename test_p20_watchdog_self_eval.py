@@ -31,7 +31,7 @@ WHAT THIS SUITE PINS.
   E11 the one_pass hook exists, is gated on SELF_EVAL_EVERY, and logs its
       verdict unconditionally rather than through Adaptation
 
-M13 shape: no node, no socket, no key, no ollama. The module is imported,
+M13 shape: no node, no socket, no key, no model server. The module is imported,
 never run; the writer is tested against a temp directory.
 """
 import ast

@@ -24,6 +24,12 @@
   "primary": "student",
   "_primary": "Which member of a deferring seat answers first. 'student' puts the distilled local model ahead of any remote judge.",
 
+  "local_in_chain": false,
+  "_local_in_chain": "TRUE seats a local HTTP judge (provider 'local', an OpenAI-compatible server you run and name) in the deferring chain after the students. FALSE (the default since 2026-09-12) means the chain is the students, then HELD -- or the GitHub runner if github_when_local_down is true. Until 2026-09-12 this key was named for a model server removed on 2026-09-07 and defaulted to consulting it.",
+
+  "local_when_student_holds": false,
+  "_local_when_student_holds": "With primary=student: TRUE consults the local HTTP judge when the student holds; FALSE (default) holds. Only meaningful when local_in_chain is true.",
+
   "silence_is_not_dissent": false,
   "_silence_is_not_dissent": "FALSE means a judge that does not answer still counts as a dissent, so the gate fails CLOSED when nothing competent is available. Set it true ONLY when you can show a competent judge is always reachable -- for the distilled student that is the point at which covenant_distill.py --exam says MET, and test_f2_distill_loop.py pins the measurement. Turning it true without that evidence hands the decision to whichever judge happens to answer.",
 

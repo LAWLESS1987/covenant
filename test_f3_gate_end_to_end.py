@@ -56,7 +56,6 @@ os.environ.pop("COVENANT_SILENCE_IS_NOT_DISSENT", None)
 
 import covenant_unified_v8 as cov                                        # noqa: E402
 import covenant_judge_local                                              # noqa: E402,F401
-import covenant_judge_ollama                                             # noqa: E402,F401
 import covenant_judge_defer as D                                         # noqa: E402
 import covenant_judge_fallback as FB                                     # noqa: E402
 import judge_suite as S                                                  # noqa: E402
@@ -94,7 +93,7 @@ def main():
     # Both are the same fix: state the condition instead of inheriting it.
     policy = dict(D.load_policy())
     policy["github_when_local_down"] = False        # the worst honest case
-    policy["ollama_when_student_holds"] = False     # ...and it must be made, not assumed
+    policy["local_when_student_holds"] = False      # ...and it must be made, not assumed
     quorum = cov.build_semantic_quorum(["deferring", "semantic"])
     for j in quorum.judges:
         if isinstance(j, D.DeferringJudge):

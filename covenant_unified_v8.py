@@ -553,40 +553,30 @@ def read_available_memory_bytes():
 
 
 def read_judge_footprint_bytes():
-    """(bytes, source, reason). What the local judge model needs to load.
+    """(bytes, source, reason). What the judge needs to load.
 
-    Measured from Ollama where possible (M30: an asserted number drifts
-    invisibly), falling back to an operator-declared figure, then to nothing.
-    One short GET to /api/tags -- a listing, which does not touch a model's
-    keep_alive timer. Never raises.
+    2026-09-12: the judge is the distilled student, a JSON file read into this
+    process, so the footprint is that file's size, labelled "student". Until
+    today this asked a model server on 11434 for its largest model (source
+    "ollama"); that server was removed on 2026-09-07. An operator-declared
+    figure (COVENANT_JUDGE_FOOTPRINT_MB) still wins when set, labelled
+    "declared" (M30: an asserted number is a different kind of claim from a
+    measured one, and the label says which). Never raises.
     """
-    url = os.environ.get("COVENANT_LOCAL_JUDGE_URL", "")
-    model = os.environ.get("COVENANT_LOCAL_JUDGE_MODEL", "")
     declared = os.environ.get("COVENANT_JUDGE_FOOTPRINT_MB", "")
-    if url and model:
-        try:
-            import urllib.request
-            base = url.split("/v1/")[0].rstrip("/")
-            if "://" in base:
-                req = urllib.request.Request(base + "/api/tags")
-                with urllib.request.urlopen(
-                        req, timeout=SUBSTRATE_PROBE_TIMEOUT_S) as r:
-                    tags = json.loads(r.read().decode())
-                for m in tags.get("models", []):
-                    if m.get("name") == model or m.get("model") == model:
-                        size = m.get("size")
-                        if isinstance(size, (int, float)) and size > 0:
-                            return int(size), "ollama", ""
-                return None, "", f"model {model!r} not listed by ollama"
-        except Exception as e:
-            if not declared:
-                return None, "", f"{type(e).__name__}: {e}"
     if declared:
         try:
-            return int(float(declared) * 1024 * 1024), "declared", ""
+            return int(float(declared) * 1048576), "declared", ""
         except ValueError:
             return None, "", f"COVENANT_JUDGE_FOOTPRINT_MB={declared!r} is not a number"
-    return None, "", "no local judge configured and nothing declared"
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        p = os.path.join(here, "fallback_model.json")
+        if os.path.isfile(p):
+            return os.path.getsize(p), "student", ""
+        return None, "", "no student model file (fallback_model.json) beside the core"
+    except Exception as e:                                       # noqa: BLE001
+        return None, "", f"{type(e).__name__}: {e}"
 
 
 class PeerStateTable:
@@ -1861,9 +1851,9 @@ class QuorumJudge(ReasoningJudge):
         # then counted in the tallies below as though a working judge had found
         # fault.
         #
-        # MEASURED 2026-08-30, not hypothetical. Deployed wiring is
-        # COVENANT_JUDGE_PROVIDERS="local,semantic", so the veto threshold is
-        # ceil(2 * 0.5) = 1. Stop Ollama and a benign payload comes back
+        # MEASURED 2026-08-30, not hypothetical. Deployed wiring WAS
+        # COVENANT_JUDGE_PROVIDERS="local,semantic", so the veto threshold was
+        # ceil(2 * 0.5) = 1. Stop the model server and a benign payload came back
         # violates=True, infrastructure_failure=True. Every transaction is
         # refused, and _accept_block_common refuses PEER blocks too -- which
         # the code there already names "a fork in the making". One process on
@@ -8180,13 +8170,14 @@ class CovenantAPI:
                     serialization.PublicFormat.SubjectPublicKeyInfo).decode()
             warnings = []
             if keyless and ("local:" in judge_id or "semantic:" in judge_id):
-                # Keyless is not judgeless: the deferring seat (distilled students,
-                # then the GitHub runner) and the semantic judge are in the quorum.
+                # Keyless is not judgeless: the deferring seat (the distilled
+                # students; a runner only if the policy seats one, since 2026-09-12)
+                # and the semantic judge are in the quorum.
                 # The old text -- "will reject every transaction" -- was false
                 # under this configuration and read as an outage (2026-09-06).
                 warnings.append("no provider key: the ethics seat is the deferring chain "
-                                "(students -> runner) plus the semantic judge; a hold fails "
-                                "CLOSED, a clean verdict admits")
+                                "(the distilled students, then HELD unless the policy seats a runner) "
+                                "plus the semantic judge; a hold fails CLOSED, a clean verdict admits")
             elif keyless:
                 warnings.append("ethics gate has no provider key and is failing CLOSED -- "
                                 "this node will reject every transaction")
@@ -10335,9 +10326,9 @@ class JudgeProviderRegistry:
     def register(cls, name: str, factory, replace: bool = False) -> None:
         """Bind a provider name to a factory.
 
-        WHY THIS WARNS AND DOES NOT REFUSE. Two shipped modules both register
-        `local`: covenant_judge_local (OpenAICompatJudge) and
-        covenant_judge_ollama (OllamaJudge). Import order alone decided which
+        WHY THIS WARNS AND DOES NOT REFUSE. Two shipped modules both registered
+        `local` until 2026-09-12: covenant_judge_local (OpenAICompatJudge) and
+        the since-deleted covenant_judge_ollama. Import order alone decided which
         one every `local:N` judge in the quorum turned out to be, and it did so
         in silence -- measured live on v8.37: importing local then ollama moved
         'local' from OpenAICompatJudge to OllamaJudge with no output at all. An
@@ -10639,8 +10630,8 @@ def _judge_facts(j, semantic_ids: Set[str], required_ids: Set[str]) -> Dict[str,
     # THE MODEL THIS JUDGE WILL ACTUALLY SEND -- not the constructor override.
     #
     # v8.38. `getattr(j, "model")` is the EXPLICIT override, and it is None in
-    # every configuration this repo ships. OllamaJudge keeps its per-instance
-    # model in `_model_override`, set by the judges.json factory whose own
+    # every configuration this repo ships. The since-deleted OllamaJudge kept
+    # its per-instance model in `_model_override`, set by a judges.json factory whose own
     # comment says those overrides exist so "several judges can coexist in one
     # process pointing at different endpoints and different models"; and
     # OpenAICompatJudge resolves model -> env -> default_model inside `_model()`.

@@ -34,7 +34,6 @@ on:
       - "covenant_trading_bridge.py"
       - "covenant_neural_bridge.py"
       - "covenant_judge_local.py"
-      - "covenant_judge_ollama.py"
       - "covenant_judge_fallback.py"
       - "covenant_judge_defer.py"
       - "covenant_client.py"
@@ -43,7 +42,6 @@ on:
       - "semantic_judge_model.json"
       - "fallback_model.json"
       - "fallback_model_2.json"
-      - "judges.json"
   workflow_dispatch:
     inputs:
       release_tag:

@@ -177,7 +177,7 @@ def main():
     check("L7 the ledger holds exactly the two answered verdicts, labelled", [r["violates"] for r in rows[:2]] == [False, True])
 
     # ---- S: the deferring seat ------------------------------------------
-    j = D.DeferringJudge(judge_id="local:1", policy={})
+    j = D.DeferringJudge(judge_id="local:1", policy={"primary": "local", "local_in_chain": True})
     j._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
     j._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
     r = j.evaluate({"message": "a gift of 5"}, [])
@@ -197,17 +197,17 @@ def main():
     check("S4 a failing GitHub runner is named in the reasoning and the seat still falls to the fallback",
           "GitHub runner" in r.reasoning and r.not_understood is True)
 
-    j3 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student"})
+    j3 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "local_in_chain": True, "local_when_student_holds": True})
     j3._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)     # untrained -> holds
     j3._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
     r = j3.evaluate({"message": "a gift"}, [])
     check("S5 primary=student: an untrained student holds, so the primary is consulted and answers", r.violates is False and r.reasoning == "clean by primary")
-    j4 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "ollama_when_student_holds": False})
+    j4 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "local_when_student_holds": False})
     j4._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
     j4._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
     r = j4.evaluate({"message": "a gift"}, [])
     check("S6 primary=student with the local seat kept out: a held student stays HELD, the primary is never asked",
-          r.not_understood is True and "keeps Ollama out" in r.reasoning)
+          r.not_understood is True and "keeps the local seat out" in r.reasoning)
 
     # ---- T: why one seat -----------------------------------------------
     check("T1 two seats -> veto threshold 1; three -> 2 (a lone genuine dissent could no longer block)",
@@ -340,7 +340,7 @@ def main():
     hard = dict(st); hard["theft"] = dict(st["theft"], agree=0)
     check("P8 the thresholds line says MET or names the categories that fall short, and a theft miss is never MET",
           ("MET" in line or "short on" in line) and "NOT MET" in X.thresholds_line(hard) and "theft" in X.thresholds_line(hard))
-    j5 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "ollama_when_student_holds": False})
+    j5 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "local_when_student_holds": False})
     j5._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)      # trained by the agreeing teacher
     j5._primary = Stub(R(True, "MUST NOT BE ASKED", judge_id="local:1", infrastructure_failure=True))
     # The probe is a coercion memo from the teacher's OWN corpus, not from the

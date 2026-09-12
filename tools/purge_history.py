@@ -17,7 +17,7 @@ paths and would have reported "clean" while the portfolio stayed public:
     table as holdings.txt -- and it is in EVERY commit. A path filter cannot
     fix a file that must stay; its contents have to be rewritten.
   * PLAN.md, docs/TRADING_READINESS.md, docs/IMPROVEMENT_LOG.md,
-    covenant_scenarios.py and strategy_validate.py quote the locked book value
+    covenant_scenarios.py (deleted 2026-09-12) and strategy_validate.py quote the locked book value
     or the sleeve amount in prose.
   * docs/results/daily_state.SAMPLE.json holds one equity row of uncertain
     provenance.

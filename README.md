@@ -400,12 +400,12 @@ Until today this paragraph said "Everything below runs on this machine… Nothin
 leaves the PC unless a line says so." That was false for the first two entries in
 the block, and the escape clause is what carried it: the lines did not say so.
 
-`covenant_chat.py` and `covenant_route.py` both talk to Ollama at
-`127.0.0.1:11434` first. Ollama was deleted from this machine on 2026-09-07, so
-every connection is refused, and each tool takes its GitHub Actions fallback —
-`covenant_chat.py:529`, `covenant_route.py:189-197`. The turn therefore **leaves
-this PC**, base64'd into a `workflow_dispatch` input on a repository that is
-public. That is not a fallback any more; with no local model it is the only path.
+`covenant_chat.py` and `covenant_route.py` send every turn and every bounded
+task to a judge on a GitHub Actions runner. Until 2026-09-12 each still tried a
+local model server first — one deleted from this machine on 2026-09-07 — and
+fell through to the runner after a refused connection; that dead first hop is
+gone. The turn **leaves this PC**, base64'd into a `workflow_dispatch` input on
+a repository that is public. It is not a fallback; it is the only path.
 
 The distilled student — a 130 KB JSON model read into the process with no socket
 and no model server — is real, and it is what the nodes' **ethics gate** calls. It
@@ -419,18 +419,15 @@ introduces, which is how the claim survived a correction.)*
 python covenant_chat.py            # a conversation with the covenant: its binding text,
                                    # the live checker state and its own memory in front of it;
                                    # speaks its replies; !help for commands.
-                                   # THE TURN LEAVES THE PC while no local model is
-                                   # installed (see above); !github off stops it, and the
-                                   # opening banner says which world you are in. MEMORY and
-                                   # the live state are withheld from what is sent; the
-                                   # conversation is not.
+                                   # EVERY TURN LEAVES THE PC to the runner (see above);
+                                   # !github off leaves the chat with no model, and the
+                                   # opening banner says so. MEMORY and the live state are
+                                   # withheld from what is sent; the conversation is not.
 python covenant_route.py --selftest  # judge / refute / rank / summarize a bounded task.
-                                   # THE PROMPT LEAVES THE PC the same way: COVENANT_ROUTE_GITHUB
-                                   # defaults to "auto" and every local model is dead, so
-                                   # local_dead is permanently true. COVENANT_ROUTE_GITHUB=off
-                                   # disables it. --file/--prompt-file/--evidence-file mean an
-                                   # arbitrary local file can be the payload.
-python covenant_scenarios.py --show  # nine scenarios, re-weighed by hand (NOT a loop)
+                                   # THE PROMPT LEAVES THE PC the same way, on every call
+                                   # (2-5 minutes); COVENANT_ROUTE_GITHUB=off makes it refuse
+                                   # to send at all. --file/--prompt-file/--evidence-file mean
+                                   # an arbitrary local file can be the payload.
 python trader_freshness.py         # did the scheduled trader actually run today? (exit 1 = no)
 python covenant_align_set.py --no-judge  # input->output pairs that teach a model to answer as the covenant does
 python covenant_gemini.py --selftest     # Gemini as an opt-in data source (a question LEAVES the PC when on)
@@ -438,22 +435,19 @@ python covenant_gemini.py --selftest     # Gemini as an opt-in data source (a qu
 
 What each refuses, by construction: the chat never places an order, holds no key, and
 proposes changes to its own prompt or tools into a file it does not apply
-(CONSTITUTION II.3); the router refuses any `:cloud` model unless told otherwise, because
-that name means the prompt is forwarded off the machine — **but that is not the
-router's only way off the machine, and reading it as one is the mistake this
-section made until 2026-09-11**: the GitHub fallback above bypasses the `:cloud`
-check entirely, and it is on by default; the Gemini adapter answers
-"not configured" until a person puts a key outside the repository, and never asks for
-one; the scenario table labels every probability a stated credence, never a measurement,
-and flags a weight that moved without a cited change.
+(CONSTITUTION II.3); the router has exactly one judge and it is off this machine — its
+docstring, its log line (`"place": "github-actions"`) and this section say so, and
+`COVENANT_ROUTE_GITHUB=off` makes it refuse to send at all (until 2026-09-12 it refused
+`:cloud` model *names* while sending every prompt to the runner anyway — the mistake this
+section named on 2026-09-11); the Gemini adapter answers "not configured" until a person
+puts a key outside the repository, and never asks for one.
 
-**Corrected 2026-09-09:** the line above described this as "the standing loop:
-nine scenarios, re-weighed every 4 h". Nine is right; the loop is not. Nothing
-re-weighs them — no scheduled task runs `covenant_scenarios.py` (the only three
-are Distill 03:30, Guard every 2 min, Trader 09:00) and no script invokes it.
-The table has been re-weighed exactly once, on 2026-09-03. The "4 h" traces to a
-comment in the file naming a four-hourly routine that does not exist as a task.
-A stated credence nobody revisits is a stated credence, not a standing loop.
+**2026-09-12:** `covenant_scenarios.py` and `covenant_thesis.py` were deleted
+(docs/KNOWN_ISSUES.md A100). Both were written around the local model server
+removed on 2026-09-07. The scenario table had been re-weighed exactly once, on
+2026-09-03, by hand — this section had already corrected (2026-09-09) an earlier
+claim that it was "the standing loop … re-weighed every 4 h"; no task ever ran
+it. Their text is in git history.
 
 `test_t1_tooling.py` measures the
 model-free parts of all of them in the sweep; each tool's `--selftest` measures the rest

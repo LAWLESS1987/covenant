@@ -303,14 +303,6 @@ run test_p12_substrate_sensing.py 180
 #                       redundant ALERT lines out of 3,456. Pure functions, no
 #                       node, no socket, no key: 33/33.
 run test_p14_watchdog_self_drift.py 120
-#   test_p15_judge_identity (P15, 2026-08-28) the watchdog probes ollama ITSELF:
-#                       /api/tags digest is the identity, ALERT on digest change /
-#                       missing expected tag / unreachable (fail-closed consequence
-#                       named). Canned responses, GET-only pinned by AST -- no
-#                       ollama, no socket needed. Shipped 08-28 with watchdog
-#                       8b878ee771f3 but wired into NO runner until 2026-08-29:
-#                       29/29 x2 here while absent from both sweep lists.
-run test_p15_judge_identity.py 120
 #   test_c2_watchdog_live (C2, 2026-08-29) every watchdog check above is a
 #                       PURE function handed its subject as an argument; the
 #                       loop that FEEDS them -- health(), the 3-strike counter,

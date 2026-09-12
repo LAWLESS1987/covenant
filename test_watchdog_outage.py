@@ -66,7 +66,7 @@ check(run(one_down) == [], "O4 a node that comes back resets its own counter")
 
 # --- F: the suppression list, matched as substrings ------------------------
 LIVE = [
-    ("no provider key: the ethics seat is the deferring chain (students -> runner) plus "
+    ("no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus "
      "the semantic judge; a hold fails CLOSED, a clean verdict admits", True,
      "F1 the CURRENT keyless-seat wording is suppressed"),
     ("ethics gate has no provider key and is failing CLOSED -- this node will reject "

@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""covenant_route.py -- send a bounded task to the covenant's LOCAL judges
-instead of to a cloud model.
+"""covenant_route.py -- send a bounded task to the covenant's judge on the
+GitHub Actions runner, instead of to a cloud chat model.
 
 WHY (2026-09-02). A 15-agent Claude workflow spent 2.6M tokens answering one
 question. Most of that was judging and refuting: "does this claim survive?",
 "which of these five is best?", "summarise this log". Those are bounded tasks
-with a structured answer, and the covenant already runs judges for exactly
-that shape -- Ollama on this machine (qwen3:8b, the ethics judge the nodes
-call). This routes such tasks there. The cloud model is kept for what the
-local one cannot do: open-ended synthesis, code, and reading its own output.
+with a structured answer, and the covenant already runs a judge for exactly
+that shape. This routes such tasks there. The cloud model is kept for what the
+judge cannot do: open-ended synthesis, code, and reading its own output.
+
+WHERE THE ANSWER IS MADE (corrected 2026-09-12). Until 2026-09-07 the judge
+was a local model server on this PC; it was removed that day, and until
+2026-09-12 this file still tried it first on every call and fell through to
+the runner after a refused connection. Now every task goes straight to the
+judge on a GitHub Actions runner (covenant_github_judge.py, workflow
+judge.yml): 2-5 minutes, and THE PROMPT LEAVES THIS PC to GitHub. The log line
+says so: "place": "github-actions". There is no local path.
 
 WHAT IT DOES
   judge      a prompt + a JSON shape -> the judge answers IN that shape.
@@ -16,28 +23,15 @@ WHAT IT DOES
   rank       N candidates + criteria -> {"ranking": [...], "scores": {...}}
   summarize  a file -> {"summary", "facts": [...]} within --max-words
 
-  --models  comma list (default qwen3:8b). --quorum k requires k models to
-            agree on the primary field, else exit 3 (DISAGREE) with all views.
   Every call is appended to ops/judge_route.log as one JSON line: time, task,
-  models, sha256 of the prompt, each model's answer, and the outcome. Records
-  are kept, including the ones that disagreed (rule 5: refutations retained).
+  model, sha256 of the prompt, the answer, and the outcome. Records are kept,
+  including the ones that failed (rule 5: refutations retained).
 
 WHAT IT DOES NOT DO
-  It stays on http://127.0.0.1:11434 while Ollama answers. A model whose name
-  ends in ':cloud' is refused unless --allow-cloud is given, because that name
-  means Ollama forwards the prompt off this machine. It places no order, reads
-  no key, edits no file but the log and --out.
+  It places no order, reads no key of its own (the runner is reached with the
+  GitHub credential git already holds), edits no file but the log and --out.
 
-WHEN OLLAMA IS NOT ANSWERING (added 2026-09-04, asked for: "route through
-  GitHub if Ollama is failing")
-  If every local model errors with a connection failure, the same prompt goes
-  to a judge on a GitHub Actions runner (covenant_github_judge.py, workflow
-  judge.yml) -- 2-5 minutes, and the prompt LEAVES THIS PC to GitHub. The log
-  line says so: "place": "github-actions". COVENANT_ROUTE_GITHUB=off disables
-  it, =always forces it, default auto. A model unloaded or slow is not a
-  connection failure and does not trigger it.
-
-EXIT  0 answered   2 judge unavailable / no valid JSON   3 quorum disagreed
+EXIT  0 answered   2 judge unavailable / no valid JSON
 
 USE
   python covenant_route.py judge --prompt-file q.txt --shape '{"verdict":"PASS|FAIL","reason":"..."}'
@@ -59,34 +53,21 @@ import time
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
 LOG = os.path.join(HERE, "ops", "judge_route.log")
-DEFAULT_MODELS = os.environ.get("COVENANT_ROUTE_MODELS", "qwen3:4b")
-# TIERS (2026-09-02). This laptop runs the judge on CPU (Ryzen 5 5625U, 6 cores,
-# no usable GPU): qwen3:8b took 34 s for a 300-char judgment and 138 s for a
-# 9.5k-char summary, and a 24.6k-char one timed out. Two copies of the same 8B
-# model would each run at half speed. What helps: a smaller model for the
-# bounded, low-stakes tasks (summarize, rank), a right-sized context instead
-# of Ollama's 40,960 default (which alone made the load 11 GB), keeping the
-# model warm between calls, and chunking long inputs. judge/refute stay on the
-# 8B: those are the calls whose quality matters.
-LIGHT_MODEL = os.environ.get("COVENANT_ROUTE_LIGHT", "qwen3:4b")
-LIGHT_TASKS = {"summarize", "rank"}
-NUM_CTX = {"judge": 4096, "refute": 6144, "rank": 6144, "summarize": 6144}
-KEEP_ALIVE = os.environ.get("COVENANT_ROUTE_KEEP_ALIVE", "20m")
 CHUNK_CHARS = 9000            # a summarize input above this is split and reduced
-GITHUB = os.environ.get("COVENANT_ROUTE_GITHUB", "auto").lower()   # auto | off | always
-GITHUB_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:3b")
-CONNECT_ERRORS = ("URLError", "ConnectionRefusedError", "ConnectionResetError", "RemoteDisconnected",
-                  "TimeoutError", "timed out", "10061", "10054", "actively refused")
+# The one switch: "off" makes every task refuse to send (exit 2, logged as
+# place "none"). Anything else sends. Until 2026-09-12 this also had "auto" and
+# "always", which chose between a local server and the runner; the server is gone.
+GITHUB = os.environ.get("COVENANT_ROUTE_GITHUB", "on").lower()
 
 
-def have_model(name):
-    try:
-        with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=6) as r:
-            return any(m.get("name") == name for m in json.loads(r.read().decode()).get("models", []))
-    except Exception:                                            # noqa: BLE001
-        return False
+def _github_model():
+    """One source for the runner's model: covenant_github_judge.DEFAULT_MODEL
+    (COVENANT_GITHUB_MODEL). Until 2026-09-12 this file carried its own default
+    and the two drifted (3b here, 7b there)."""
+    import covenant_github_judge as gh
+    return gh.DEFAULT_MODEL
+
 
 SYSTEM = ("You are a judge inside a system whose one rule is mutual benefit: honesty "
           "over green-looking results. Answer ONLY with a JSON object in exactly the "
@@ -94,49 +75,32 @@ SYSTEM = ("You are a judge inside a system whose one rule is mutual benefit: hon
           "question say so in the reason. Be concise.")
 
 
-def _post(path, body, timeout):
-    req = urllib.request.Request(OLLAMA + path, data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8", "replace"))
-
-
-def ask(model, prompt, timeout=240, num_ctx=6144):
-    """One model, JSON-only output, no chain-of-thought (qwen3 emits <think>
-    otherwise -- covenant_judge_ollama.py measured that). Returns (obj, raw)."""
-    body = {"model": model, "stream": False, "format": "json", "think": False,
-            "keep_alive": KEEP_ALIVE,
-            "options": {"temperature": 0, "num_predict": 900, "num_ctx": num_ctx},
-            "messages": [{"role": "system", "content": SYSTEM},
-                         {"role": "user", "content": prompt}]}
-    res = _post("/api/chat", body, timeout)
-    raw = (res.get("message") or {}).get("content", "")
+def ask(prompt, timeout=900):
+    """One question to the judge on the GitHub runner, JSON-only. Returns
+    (obj, raw, view) where view carries the runner's model, place, seconds and
+    run_url for the log."""
+    import covenant_github_judge as gh
+    t0 = time.time()
+    ans = gh.ask(prompt, SYSTEM, _github_model(), json_only=True, timeout=timeout)
+    raw = ans.get("content", "")
+    view = {"model": "github-actions/" + str(ans.get("model")), "place": "github-actions",
+            "seconds": round(time.time() - t0, 1), "run_url": ans.get("run_url")}
     try:
-        return json.loads(raw), raw
+        return json.loads(raw), raw, view
     except ValueError:
-        # one retry, asking for the object only
-        body["messages"].append({"role": "assistant", "content": raw})
-        body["messages"].append({"role": "user", "content": "Return only the JSON object."})
-        res = _post("/api/chat", body, timeout)
-        raw2 = (res.get("message") or {}).get("content", "")
-        try:
-            return json.loads(raw2), raw2
-        except ValueError:
-            return None, raw2
+        return None, raw, view
 
 
 def reduce_chunks(text, a):
     """Map-reduce for long inputs: summarise each chunk with the light model,
     join the partial summaries, and let the final call summarise those. The
     partials are logged like any other call."""
-    models = [m for m in a.models.split(",") if m.strip()]
-    light = LIGHT_MODEL if have_model(LIGHT_MODEL) else models[0]
     parts = [text[i:i + CHUNK_CHARS] for i in range(0, len(text), CHUNK_CHARS)][:12]
     partial = []
     for k, chunk in enumerate(parts, 1):
         prompt = ("TASK: summarise part %d/%d in at most 120 words and list its hard facts.\n\n%s\n\n"
                   "Answer as JSON: {\"summary\": \"...\", \"facts\": [\"...\"]}" % (k, len(parts), chunk))
-        rec, ok = route("summarize-part", prompt, "summary", [light], 1, a.allow_cloud, a.timeout)
+        rec, ok = route("summarize-part", prompt, "summary", a.timeout)
         if ok:
             partial.append("PART %d: %s FACTS: %s" % (k, ok[0].get("summary", ""), "; ".join(map(str, ok[0].get("facts", [])[:6]))))
     return "\n".join(partial) or text[:CHUNK_CHARS]
@@ -168,55 +132,28 @@ def build_prompt(task, a):
     raise SystemExit("unknown task " + task)
 
 
-def route(task, prompt, primary, models, quorum, allow_cloud, timeout):
+def route(task, prompt, primary, timeout):
+    """Send one task to the judge on the runner; (record, [answer] or [])."""
     views, ok = [], []
-    for m in models:
-        if m.endswith(":cloud") and not allow_cloud:
-            views.append({"model": m, "error": "refused: ':cloud' forwards the prompt off this machine (--allow-cloud to permit)"})
-            continue
-        t0 = time.time()
+    if GITHUB == "off":
+        v = {"model": "github-actions/" + _github_model(), "place": "none",
+             "error": "COVENANT_ROUTE_GITHUB=off: the only judge is on the GitHub runner and sending is disabled"}
+    else:
         try:
-            obj, raw = ask(m, prompt, timeout, NUM_CTX.get(task, 6144))
-        except Exception as e:                                   # noqa: BLE001
-            views.append({"model": m, "error": "%s: %s" % (type(e).__name__, e)})
-            continue
-        v = {"model": m, "seconds": round(time.time() - t0, 1)}
-        if obj is None:
-            v["error"] = "no valid JSON"; v["raw"] = raw[:400]
-        else:
-            v["answer"] = obj; ok.append(obj)
-        views.append(v)
-    # Ollama down -> GitHub runner. Only a CONNECTION failure on every local
-    # model counts (a bad JSON answer is the model's fault, not the socket's).
-    local_dead = bool(models) and all("error" in v and any(k in v["error"] for k in CONNECT_ERRORS) for v in views)
-    if GITHUB != "off" and not ok and (GITHUB == "always" or local_dead):
-        t0 = time.time()
-        try:
-            import covenant_github_judge as gh
-            ans = gh.ask(prompt, SYSTEM, GITHUB_MODEL, json_only=True, timeout=900)
-            v = {"model": "github-actions/" + GITHUB_MODEL, "place": "github-actions",
-                 "seconds": round(time.time() - t0, 1), "run_url": ans.get("run_url")}
-            try:
-                obj = json.loads(ans.get("content", ""))
+            obj, raw, v = ask(prompt, timeout)
+            if obj is None:
+                v["error"] = "no valid JSON"; v["raw"] = raw[:400]
+            else:
                 v["answer"] = obj; ok.append(obj)
-            except ValueError:
-                v["error"] = "no valid JSON"; v["raw"] = ans.get("content", "")[:400]
         except Exception as e:                                   # noqa: BLE001
-            v = {"model": "github-actions/" + GITHUB_MODEL, "place": "github-actions",
+            v = {"model": "github-actions/" + _github_model(), "place": "github-actions",
                  "error": "%s: %s" % (type(e).__name__, e)}
-        views.append(v)
-        print("  [ollama unreachable -> GitHub runner: %s]" % (v.get("error") or "answered in %ss" % v["seconds"]),
-              file=sys.stderr)
-    outcome = "answered"
-    if not ok:
-        outcome = "unavailable"
-    elif quorum > 1:
-        keyvals = [json.dumps(o.get(primary), sort_keys=True) for o in ok]
-        top = max(set(keyvals), key=keyvals.count)
-        if keyvals.count(top) < quorum:
-            outcome = "disagree"
+    views.append(v)
+    print("  [judge on the GitHub runner: %s]" % (v.get("error") or "answered in %ss" % v["seconds"]),
+          file=sys.stderr)
+    outcome = "answered" if ok else "unavailable"
     rec = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "task": task,
-           "models": models, "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()[:16],
+           "models": [_github_model()], "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()[:16],
            "prompt_chars": len(prompt), "views": views, "outcome": outcome}
     try:
         os.makedirs(os.path.dirname(LOG), exist_ok=True)
@@ -228,16 +165,16 @@ def route(task, prompt, primary, models, quorum, allow_cloud, timeout):
 
 
 def selftest():
-    print("covenant_route selftest -- one bounded question to the local judge")
+    print("covenant_route selftest -- one bounded question to the judge on the GitHub runner (2-5 min)")
     prompt = ("TASK: judge.\nClaim: 'trader_log.txt has five run headers, the last dated "
               "2026-09-01, so the trader did not run on 2026-09-02.' The evidence is the "
               "log itself, which shows exactly those five headers and nothing for 09-02.\n"
               "Answer as JSON with exactly these keys: {\"verdict\": \"PASS|FAIL\", "
               "\"reason\": \"...\"}")
-    rec, ok = route("judge", prompt, "verdict", DEFAULT_MODELS.split(","), 1, False, 300)
+    rec, ok = route("judge", prompt, "verdict", 900)
     print(json.dumps(rec, indent=1)[:1500])
     good = bool(ok) and str(ok[0].get("verdict", "")).upper().startswith("PASS")
-    print("\n%s  the local judge answered in the requested shape with PASS" % ("ok  " if good else "FAIL"))
+    print("\n%s  the judge answered in the requested shape with PASS" % ("ok  " if good else "FAIL"))
     return 0 if good else 2
 
 
@@ -249,10 +186,8 @@ def main():
     ap.add_argument("--claim"); ap.add_argument("--evidence"); ap.add_argument("--evidence-file")
     ap.add_argument("--file"); ap.add_argument("--criteria", default="honesty, evidence, cost realism")
     ap.add_argument("--max-words", type=int, default=200)
-    ap.add_argument("--models", default=DEFAULT_MODELS)
-    ap.add_argument("--quorum", type=int, default=1)
-    ap.add_argument("--allow-cloud", action="store_true")
-    ap.add_argument("--timeout", type=int, default=240)
+    ap.add_argument("--models", default="", help="accepted for compatibility and ignored: the runner's model is COVENANT_GITHUB_MODEL")
+    ap.add_argument("--timeout", type=int, default=900)
     ap.add_argument("--out", help="write the answer JSON here as well as stdout")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -261,11 +196,7 @@ def main():
     if not a.task:
         ap.error("task required (judge|refute|rank|summarize) or --selftest")
     prompt, primary = build_prompt(a.task, a)
-    models = [m.strip() for m in a.models.split(",") if m.strip()]
-    if a.task in LIGHT_TASKS and a.models == DEFAULT_MODELS and have_model(LIGHT_MODEL):
-        models = [LIGHT_MODEL]
-    rec, ok = route(a.task, prompt, primary, models,
-                    a.quorum, a.allow_cloud, a.timeout)
+    rec, ok = route(a.task, prompt, primary, a.timeout)
     out = {"outcome": rec["outcome"], "answer": ok[0] if ok else None,
            "views": rec["views"], "log": LOG}
     text = json.dumps(out, indent=1, ensure_ascii=False)

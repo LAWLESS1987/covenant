@@ -94,7 +94,7 @@ class RecordingQuorum:
     writes down the order build_default_sentinel actually executes them in.
     Installed on sys.meta_path so the import statements inside that function
     are really taken -- nothing here reads the file's text."""
-    NAMES = ("covenant_unified_v8", "covenant_judge_local", "covenant_judge_ollama",
+    NAMES = ("covenant_unified_v8", "covenant_judge_local",
              "covenant_judge_fallback", "covenant_judge_defer")
 
     def __init__(self, log):
@@ -260,8 +260,8 @@ def main():
 
     src = io.open(GP.__file__, encoding="utf-8").read()
     body = src[src.find("def build_default_sentinel"):]
-    ok("G22", "the real gate imports the launcher's four companions before building the quorum",
-       all(("import covenant_judge_%s" % m) in body for m in ("local", "ollama", "fallback", "defer"))
+    ok("G22", "the real gate imports the launcher's three companions before building the quorum",
+       all(("import covenant_judge_%s" % m) in body for m in ("local", "fallback", "defer"))
        and body.find("import covenant_judge_defer") < body.find("build_semantic_quorum()"))
 
     # G22 reads the file's bytes, so it survives the mutation that matters:
@@ -291,8 +291,8 @@ def main():
             os.environ["COVENANT_JUDGE_PROVIDERS"] = saved_env
     at = log.index("<quorum built>") if "<quorum built>" in log else -1
     companions = [n for n in log if n.startswith("covenant_judge_")]
-    ok("G22b", "and it really takes those imports at run time, all four, before the quorum",
-       not err and at >= 0 and len(companions) == 4 and all(log.index(c) < at for c in companions)
+    ok("G22b", "and it really takes those imports at run time, all three, before the quorum",
+       not err and at >= 0 and len(companions) == 3 and all(log.index(c) < at for c in companions)
        and isinstance(built, tuple) and built[0] == "sentinel", err or log)
 
     print("GATE-PROXY: %d/%d passed" % (N - len(FAILS), N))

@@ -13,7 +13,6 @@ covenant_semantic_judge.py
 covenant_trading_bridge.py
 covenant_neural_bridge.py
 covenant_judge_local.py
-covenant_judge_ollama.py
 covenant_judge_fallback.py
 covenant_judge_defer.py
 covenant_client.py
@@ -23,7 +22,6 @@ genesis.json
 semantic_judge_model.json
 fallback_model.json
 fallback_model_2.json
-judges.json
 # NOT shipped, and the only exclusion: covenant_github_judge.py is imported only
 # under a policy flag a phone never sets, needs a token, and drags covenant_quiet.
 # Never: covenant_xrp_signer.py, covenant_one.py, anything under ops/ or private/.

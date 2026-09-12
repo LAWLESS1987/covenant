@@ -73,8 +73,6 @@ HOME = os.path.expanduser("~")
 # Every place a conversation may already live on this machine, with no login.
 LOCAL_SOURCES = [
     ("Claude Code", os.path.join(HOME, ".claude", "projects"), ".jsonl"),
-    ("Ollama desktop", os.path.join(HOME, "AppData", "Local", "Ollama",
-                                    "db.sqlite"), ".sqlite"),
     ("memory store", os.path.join(HOME, "ai_memory"), ".md"),
 ]
 

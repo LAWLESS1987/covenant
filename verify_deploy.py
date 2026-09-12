@@ -148,7 +148,6 @@ COMPANIONS = {
 }
 NODES = [("A", 5000), ("B", 5020), ("C", 5060)]
 RESTART_BAT = "AB_RESTART_NODES.bat"
-OLLAMA_URL = "http://127.0.0.1:11434"
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 lines_out = []
@@ -276,35 +275,11 @@ def main():
         unknowns.append("running version not checked (--no-restart)")
         return finish(failures, unknowns)
 
-    # --------------------------------------------- 2b. THE JUDGE IS UP
-    # AB_RESTART_NODES.bat kills the nodes and THEN calls covenant_prod.bat,
-    # which aborts before starting anything if Ollama does not answer on
-    # 11434 ("a judge that cannot be reached fails CLOSED"). Those two facts
-    # compose into a restart that can take the chain down and leave it down:
-    # stop succeeds, start refuses, and the operator is looking at a console
-    # that scrolled past. So ask first, and refuse to touch a running node
-    # over a judge that is not there.
-    say("")
-    say("--- 2b. JUDGE: is Ollama answering before we stop anything? ---")
-    try:
-        req = urllib.request.Request(f"{OLLAMA_URL}/api/tags",
-                                     headers={"User-Agent": "verify-deploy/1.0"})
-        with urllib.request.urlopen(req, timeout=8) as r:
-            tags = json.loads(r.read().decode())
-        models = [m.get("name") for m in tags.get("models", []) if m.get("name")]
-        say(f"  ok       ollama answering, {len(models)} model(s): "
-            f"{', '.join(models[:6]) or '(none listed)'}")
-        if not models:
-            say("  WARNING  ollama is up but reports no models -- "
-                "covenant_prod.bat's fit_check will abort the start")
-            failures.append("ollama reports no models")
-    except Exception as e:
-        say(f"  DOWN     {OLLAMA_URL} did not answer ({type(e).__name__})")
-        say("           NOT restarting. The launcher would stop the nodes and")
-        say("           then covenant_prod.bat would abort before starting")
-        say("           them, leaving this machine running nothing at all.")
-        say("           Start Ollama, then run this again.")
-        failures.append("ollama unreachable -- restart refused")
+    # 2b (retired 2026-09-12). Until today this step asked a local model server
+    # on 11434 whether it was up and REFUSED every restart on this PC when it
+    # was not -- and it never was, after 2026-09-07. The judge is the distilled
+    # student, in-process; there is no server to ask, and a start is never
+    # blocked by a missing one.
 
     if failures:
         say("")

@@ -10,7 +10,8 @@ be true, all of which this reports:
 
   1. NAME COLLISION. JudgeProviderRegistry.register() is
      `cls._providers[name] = factory` with no guard, and BOTH
-     covenant_judge_local.py and covenant_judge_ollama.py register "local".
+     covenant_judge_local.py and (until its deletion on 2026-09-12)
+     covenant_judge_ollama.py both registered "local".
      Measured 2026-08-29: after importing local then ollama,
      COVENANT_JUDGE_PROVIDERS=local silently changes from
      OpenAICompatJudge to OllamaJudge. The ethics gate's reasoning engine is
@@ -54,7 +55,7 @@ def _tracking(cls, name, factory):
 
 cov.JudgeProviderRegistry.register = classmethod(_tracking)
 
-OPTIONAL = ["covenant_judge_local", "covenant_judge_ollama"]
+OPTIONAL = ["covenant_judge_local"]   # covenant_judge_ollama was deleted 2026-09-12
 for m in OPTIONAL:
     try:
         importlib.import_module(m)
@@ -114,15 +115,15 @@ for impl, names in sorted(impls.items()):
 print(f"\n   names: {len(ok)}   distinct classes: {len(impls)}")
 print("""
    CAREFUL, and this tool got it wrong before saying so: several names over one
-   CLASS is not necessarily one judge. covenant_judge_ollama registers named
-   configs (pc_qwen, pc_mid, pc_small) that may point at DIFFERENT MODELS, and a
+   CLASS is not necessarily one judge. The deleted covenant_judge_ollama registered
+   named configs (pc_qwen, pc_mid, pc_small) that could point at DIFFERENT MODELS, and a
    different model is a different C -- which is exactly the diversity
    CONSTRAINT_COVERAGE.md argues for. But `model` is None at construction here
    (resolved later from config/env), so weight-level diversity CANNOT be
    determined statically. This tool does not claim it either way.
 
    What can be said: quorum_diversity_report keys on the IMPLEMENTATION, not on
-   the model. So three ollama judges running three different models count as ONE
+   the model. So three judges on one server running three different models count as ONE
    independent judge. That errs safe -- under-counting independence is the right
    direction for a gate -- but it gives no credit for genuinely diverse local
    models, which is a quiet disincentive to the plurality the coverage argument

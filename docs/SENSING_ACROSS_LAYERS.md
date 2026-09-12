@@ -197,11 +197,12 @@ synchronized restart at degree ≥ 5.
 
 **3. The node senses the machine.** `SubstrateSensor` samples available memory
 (`GlobalMemoryStatusEx` on Windows, `MemAvailable` on Linux) and the judge
-model's load footprint (measured from Ollama's `/api/tags`, falling back to an
-operator-declared figure, and *labelled with which*, per M30). A background
+model's load footprint (since 2026-09-12 the size of the student file the seat
+reads, labelled `student`; an operator-declared figure wins when set, labelled
+`declared`, per M30; until then it was measured from a model server's `/api/tags`). A background
 sampler caches it; `/health` reads the cache and never blocks. Every failure
-degrades to a reason string — the platform is unsupported, Ollama is
-unreachable, the declaration is junk — and none of them raises.
+degrades to a reason string — the platform is unsupported, the student file is
+missing, the declaration is junk — and none of them raises.
 
 ### The boundary, asserted mechanically
 

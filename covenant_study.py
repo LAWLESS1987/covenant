@@ -523,20 +523,11 @@ def generate(limit, say=print):
               "for that number instead of inventing one.\n%s\n"
               "Answer ONLY JSON: {\"pairs\": [{\"n\": <number>, \"violating\": \"...\", "
               "\"honouring\": \"...\"}, ...]}" % (len(todo), listing))
-    pref = os.environ.get("COVENANT_DISTILL_TEACHER", "auto").lower()
-    use_gh = pref == "github" or (pref == "auto" and not X.ollama_up())
-    if use_gh:
-        import covenant_github_judge as gh
-        ans = gh.ask(prompt, "You write test cases for an ethics judge. JSON only.",
-                     json_only=True, timeout=900)
-        raw, who = ans.get("content", ""), "github-actions/%s" % ans.get("model")
-    else:
-        res = X._post("/api/chat", {"model": X.TEACHER, "stream": False, "format": "json",
-                                    "think": False,
-                                    "options": {"temperature": 0.8, "num_predict": 1600,
-                                                "num_ctx": 8192},
-                                    "messages": [{"role": "user", "content": prompt}]}, 900)
-        raw, who = (res.get("message") or {}).get("content", ""), "ollama/%s" % X.TEACHER
+    # 2026-09-12: the runner is the only teacher (no local model server).
+    import covenant_github_judge as gh
+    ans = gh.ask(prompt, "You write test cases for an ethics judge. JSON only.",
+                 json_only=True, timeout=900)
+    raw, who = ans.get("content", ""), "github-actions/%s" % ans.get("model")
     try:
         pairs = json.loads(raw).get("pairs", [])
     except (ValueError, AttributeError):
@@ -561,16 +552,8 @@ def generate(limit, say=print):
     if not cases:
         say("teacher (%s) produced no usable pairs" % who); return 0, 0
     principles = list(cov.DIVINE_PRINCIPLES)
-    if use_gh:
-        verdicts, jm = X.gh_blind_judge([{"message": c["message"]} for c in cases], principles)
-        judge = "github-actions/%s" % jm
-    else:
-        j = X.blind_judge()[0]
-        verdicts, judge = {}, "ollama/%s" % X.TEACHER
-        for i, c in enumerate(cases):
-            r = j.evaluate({"message": c["message"], "origin": "organic"}, principles)
-            if not getattr(r, "infrastructure_failure", False):
-                verdicts[i] = (bool(r.violates), (r.reasoning or "")[:240])
+    verdicts, jm = X.gh_blind_judge([{"message": c["message"]} for c in cases], principles)
+    judge = "github-actions/%s" % jm
     # A PAIR IS KEPT OR DROPPED WHOLE. Measured on the first pass: 24 kept and
     # 24 rejected, and the split was not random -- the honouring half of nearly
     # every pair was confirmed and the violating half was not, because a

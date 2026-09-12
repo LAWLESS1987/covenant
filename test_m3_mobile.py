@@ -65,7 +65,7 @@ def main():
     # execs on the last line. The check was not wrong about its two files; its
     # population was missing the launcher. Counting what a check reads before
     # believing what it says is the standing lesson here.
-    READS = ["run_node.py", "covenant_judge_ollama.py", "covenant_unified_v8.py"]
+    READS = ["run_node.py", "covenant_judge_local.py", "covenant_unified_v8.py"]
     code = "".join(read(f) for f in READS)
     for var in sorted(set(re.findall(r"export (COVENANT_[A-Z_]+)", start))):
         check("M3.3 %s is read by one of the %d files the phone runs"

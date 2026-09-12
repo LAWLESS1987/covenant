@@ -126,8 +126,8 @@ def sensor_checks():
               "COVENANT_JUDGE_FOOTPRINT_MB"):
         os.environ.pop(k, None)
     f, src, why = cov.read_judge_footprint_bytes()
-    check("S3 no judge configured -> no number, a reason, no raise",
-          f is None and src == "" and bool(why), f"{f!r} {src!r} {why!r}")
+    check("S3 with nothing declared the footprint is the student file, labelled student (2026-09-12)",
+          (f and f > 0 and src == "student") or (f is None and src == "" and bool(why)), f"{f!r} {src!r} {why!r}")
 
     os.environ["COVENANT_JUDGE_FOOTPRINT_MB"] = "5200"
     f, src, why = cov.read_judge_footprint_bytes()
@@ -140,14 +140,14 @@ def sensor_checks():
           f is None and "not a number" in why, f"{f!r} {why!r}")
     os.environ.pop("COVENANT_JUDGE_FOOTPRINT_MB", None)
 
-    # an unreachable model server must not hang or raise
+    # 2026-09-12: no model server is asked, so nothing can hang; a stale URL is ignored
     os.environ["COVENANT_LOCAL_JUDGE_URL"] = "http://127.0.0.1:1/v1/chat/completions"
     os.environ["COVENANT_LOCAL_JUDGE_MODEL"] = "nope:1b"
     t0 = time.monotonic()
     f, src, why = cov.read_judge_footprint_bytes()
     dt = time.monotonic() - t0
-    check("S6 an unreachable model server degrades fast, with a reason",
-          f is None and bool(why) and dt < 10, f"{dt:.2f}s {why!r}")
+    check("S6 a stale local-judge URL is ignored: the reader answers from the student file, fast",
+          src in ("student", "") and dt < 2, f"{dt:.2f}s {src!r} {why!r}")
     for k in ("COVENANT_LOCAL_JUDGE_URL", "COVENANT_LOCAL_JUDGE_MODEL"):
         os.environ.pop(k, None)
 
@@ -189,7 +189,7 @@ def sensor_checks():
     os.environ.pop("COVENANT_JUDGE_FOOTPRINT_MB", None)
 
     s._snap = {"available_memory_mb": 3100, "judge_footprint_mb": 5200,
-               "judge_footprint_source": "ollama", "unavailable": ""}
+               "judge_footprint_source": "student", "unavailable": ""}
     s._sampled_at = time.monotonic()
     w = s.warnings()
     check("S9 the 2026-08-23 condition produces a warning naming both numbers",

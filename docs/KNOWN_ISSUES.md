@@ -3107,3 +3107,25 @@ find out.
 the operator asked for a node that keeps running; the battery pays.
 `cryptography` is frozen at 42.0.8 by wheel availability. Android 17 will
 require `ACCESS_LOCAL_NETWORK` for LAN peers when the app targets 37.
+
+### A100. [housekeeping / honesty] Two tools written around the deleted model server were still shipped. CLOSED 2026-09-12
+
+**What.** `covenant_scenarios.py` (a scenario table "re-weighed" by a local
+model; re-weighed once, by hand, on 2026-09-03, never by a task) and
+`covenant_thesis.py` (the local model reading the moral-texts extractions)
+both called a model server at `127.0.0.1:11434` that was removed on
+2026-09-07. Since then each `--selftest` and each real run failed at the
+socket; `test_t1_tooling.py` imported them and round-tripped the scenario
+table, so the sweep stayed green over two tools that could not do their job.
+`README.md` still promised `python covenant_scenarios.py --show`.
+
+**Decision.** The operator's, 2026-09-12: delete both rather than port them
+to the runner ("Delete both"). Nothing scheduled ran either; nothing imports
+them; `private/BREAKTHROUGHS.md` keeps its append marker as a record.
+
+**Done.** Both files removed (`git rm`; history kept), the README block and
+its two paragraphs rewritten, `test_t1_tooling.py` lists and its S1/S2 checks
+removed, `covenant_quiet.py` and `tools/purge_history.py` no longer name them
+as live. The same commit deletes `covenant_chat.py`'s dead local hop -- the
+first call on every turn since 2026-09-07 had been a refused connection -- so
+the chat, like the router, has one model path and names it.

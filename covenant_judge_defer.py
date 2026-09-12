@@ -43,8 +43,9 @@ available to keep running and recursive improve")
        the deployed configuration this step does not execute at all.
     4. Otherwise HELD, which fails the gate closed.
 
-  Ollama is not a step in this list any more. It is out of the chain
-  (ollama_in_chain false) and was deleted from the machine on 2026-09-07.
+  No model server is a step in this list any more: the one there was went
+  from the machine on 2026-09-07, and since 2026-09-12 a local HTTP judge is
+  seated only if the policy says so (local_in_chain, default false).
 
   The runner is still reached by covenant_distill.py, which is the TEACHER
   that generates the corpus the students learn from. That is a different
@@ -260,8 +261,12 @@ try:
 
     class DeferringJudge(cov.ReasoningJudge):                    # type: ignore
         """One seat: the first student, else the second, else (only if the
-        policy allows it, and it does not) the GitHub runner, else HELD.
-        Corrected 2026-09-08 -- this line named Ollama first until today."""
+        policy allows it, and by default it does not) a local provider, else
+        (only if the policy allows it) the GitHub runner, else HELD.
+        2026-09-12: the policy keys are local_in_chain / local_when_student_holds
+        (both default False) and primary defaults to 'student'; until today
+        they were named for a model server removed on 2026-09-07 and defaulted
+        to consulting it."""
         provider = "deferring"
 
         def __init__(self, judge_id="local:1", index=1, policy=None):
@@ -286,17 +291,20 @@ try:
             return self._primary
 
         def _teacher(self):
-            return "ollama/" + os.environ.get("COVENANT_LOCAL_JUDGE_MODEL", "qwen3:8b")
+            # 2026-09-12: name what actually answered. Until today every primary
+            # verdict was recorded as "ollama/<model tag>", true or not.
+            return "primary/%s" % getattr(self._primary, "judge_id", "unknown")
 
         def evaluate(self, data, principles):
-            # policy "primary": "ollama" (default) or "student". With "student" the
-            # distilled model judges FIRST -- microseconds, no RAM -- and Ollama is
-            # only consulted when the student holds (and only if the policy still
-            # allows it: "ollama_when_student_holds"). Asked 2026-09-03: "ollama
-            # keeps freezing ... derive our own ... more compact but more efficient".
-            # The switch is the operator's, and covenant_distill.py's exam line
-            # says whether the student has earned it.
-            if str(self.policy.get("primary", "ollama")) == "student":
+            # policy "primary": "student" (default since 2026-09-12) or "local".
+            # With "student" the distilled model judges FIRST -- microseconds,
+            # no RAM -- and a local provider is consulted when the student holds
+            # only if the policy says so ("local_when_student_holds", default
+            # False). Asked 2026-09-03: "ollama keeps freezing ... derive our own
+            # ... more compact but more efficient". The switch is the operator's,
+            # and covenant_distill.py's exam line says whether the student has
+            # earned it.
+            if str(self.policy.get("primary", "student")) == "student":
                 rs = self._fallback.evaluate(data, principles)
                 if not getattr(rs, "not_understood", False):
                     # AUDIT, NOT TRAINING. A student verdict is deliberately not
@@ -334,21 +342,22 @@ try:
                                                   principle_violated=getattr(r2s, "principle_violated", None),
                                                   judge_id=self.judge_id, uncertain=getattr(r2s, "uncertain", False),
                                                   benefit_estimate=student_benefit(r2s))
-                if not self.policy.get("ollama_when_student_holds", True) and not self.policy.get("github_when_local_down"):
-                    return cov.JudgmentResult(True, "student held and the policy keeps Ollama out of the gate (and no runner is allowed) -- " + rs.reasoning,
+                if not self.policy.get("local_when_student_holds", False) and not self.policy.get("github_when_local_down"):
+                    return cov.JudgmentResult(True, "student held and the policy keeps the local seat out of the gate (and no runner is allowed) -- " + rs.reasoning,
                                               judge_id=self.judge_id, not_understood=True)
-            # OLLAMA IN THE CHAIN. Asked 2026-09-06 to take it out of the
-            # equation: with "ollama_in_chain": false the seat goes from the
-            # students straight to the runner. The 404 on a model that is not
-            # installed cost ~2 s per verdict and proved nothing.
-            if self.policy.get("ollama_in_chain", True):
+            # A LOCAL PROVIDER IN THE CHAIN. Asked 2026-09-06 to take the model
+            # server out of the equation; since 2026-09-12 "local_in_chain"
+            # defaults to False, so the seat goes from the students straight to
+            # the runner (if allowed) or HELD. A connect to a server that is not
+            # there cost ~2-7 s per verdict and proved nothing.
+            if self.policy.get("local_in_chain", False):
                 try:
                     r = self._get_primary().evaluate(data, principles)
                 except Exception as e:                           # noqa: BLE001
                     r = cov.JudgmentResult(True, "local judge raised %s: %s" % (type(e).__name__, e),
                                            judge_id=self.judge_id, infrastructure_failure=True)
             else:
-                r = cov.JudgmentResult(True, "students held; Ollama is out of the chain by policy",
+                r = cov.JudgmentResult(True, "students held; no local model server in the chain",
                                        judge_id=self.judge_id, infrastructure_failure=True)
             if not getattr(r, "infrastructure_failure", False):
                 record_verdict(data, r, self._teacher(), "live")

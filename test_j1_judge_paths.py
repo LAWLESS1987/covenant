@@ -17,8 +17,8 @@ wrong, which is the reason this file exists as checks and not as prose:
        A syntax was counted and a semantics was reported. What IS true, and is
        worse, is J1d.
   J1d  `model` was read from `getattr(j, "model")` -- the CONSTRUCTOR override,
-       which is None in every configuration this repo ships. OllamaJudge keeps
-       its real model in `_model_override`. So three judges on three models
+       which is None in every configuration this repo ships. The since-deleted
+       OllamaJudge kept its real model in `_model_override`. So three judges on three models
        reported `<provider default>` three times and counted as ONE.
 
 Runs fully in-process, M13 shape: no key is read or stored, no socket is
@@ -104,7 +104,7 @@ def section_x():
     REG.register("j1_x", lambda i: cov.MockJudge())
     check("X1 OLD+NEW: a second register() of the same name still wins",
           REG._providers["j1_x"] is not first,
-          "gating this would break the shipped local/ollama import order")
+          "gating this would break the shipped provider import order")
 
     # X2 names the FIX. It must FAIL on v8.37.
     check("X2 FIX: and the overwrite is now on the record", HAS_LEDGER,
@@ -359,27 +359,6 @@ def section_s():
           built is not None, why)
 
 
-# ------------------------------------------------------------------ L ------
-def section_l():
-    print("== L. LIVE: the collision between the two shipped judge modules ==")
-    try:
-        import covenant_judge_local            # noqa: F401
-        import covenant_judge_ollama           # noqa: F401
-    except Exception as e:                     # noqa: BLE001
-        skip("L1-L2 live local/ollama collision", f"not importable here: {e}")
-        return
-    check("L1 both modules do claim the name 'local'",
-          "local" in REG.available_providers())
-    if not HAS_LEDGER:
-        skip("L2 the collision is on the record", "v8.37 has no ledger")
-        return
-    hits = [r for r in REG.shadowed_providers() if r["name"] == "local"]
-    check("L2 and the collision is on the record with both sides named",
-          bool(hits) and "covenant_judge_local" in hits[0]["was"]
-          and "covenant_judge_ollama" in hits[0]["now"],
-          str(hits[:1]))
-
-
 def main():
     print(f"source: {cov.COVENANT_VERSION}  {cov.CORE_SOURCE_SHA256[:12]}  "
           f"{cov.CORE_SOURCE_LINES} lines   ledger={HAS_LEDGER} "
@@ -389,7 +368,6 @@ def main():
     section_m()
     section_d()
     section_s()
-    section_l()
     print(f"\nJ1: {PASS}/{PASS + FAIL} passed, {SKIP} skipped")
     sys.exit(0 if FAIL == 0 else 1)
 

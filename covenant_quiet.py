@@ -21,7 +21,6 @@ glitch")
                             makes several calls
     covenant_watchdog       every round, forever
     covenant_chat           powershell, for speech and for the microphone
-    covenant_scenarios      a subprocess per scenario, from the daily task
 
   So the flag lives here, once, and the modules call this instead of
   subprocess directly. A helper is not the interesting part; not having to

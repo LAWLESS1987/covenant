@@ -7,9 +7,10 @@ THE HAZARD, measured 2026-09-11. covenant_chat.py builds its system prompt from
 system_prompt(state), where state is live_state(): the output of
 money_posture.py, trader_freshness.py, launch_check.py and the last SELF_EVAL
 block. It also embeds memory_text() -- ops/chat/MEMORY.md, the lines tagged
-[Lawrence]. Ollama was deleted from this machine on 2026-09-07, so chat_tools
-raises on EVERY turn, _ollama_dead matches the connection error, and the turn
-goes to chat_github, which base64s the window into a workflow_dispatch input on
+[Lawrence]. The local model server was deleted from this machine on
+2026-09-07; from then until 2026-09-12 every turn fell through a dead local
+call to chat_github, and since 2026-09-12 (the dead hop deleted) chat_github
+is the only path. It base64s the window into a workflow_dispatch input on
 LAWLESS1987/covenant -- a PUBLIC repo (anonymous GET 200, private=false, 310
 dispatch runs listable with no token). The opening banner meanwhile printed
 "Conversation, memory and state stay on this PC" from a constant.
@@ -25,7 +26,9 @@ sentence and pass while main() printed something else entirely. So:
   * E5 then neuters _offsite_system to the identity function and asserts the
     secret DOES arrive. An instrument that cannot see the leak cannot prove its
     absence, so E4 without E5 proves nothing.
-  * E6/E7 RUN _banner_lines with the local-model probe stubbed both ways.
+  * E6/E7 RUN _banner_lines with the runner switch both ways. (Until
+    2026-09-12 a local-model probe was stubbed too; it went with the hop, so
+    no world claims locality any more and E7/E8 pin that instead.)
 
 Run: python test_a90_offsite_redaction.py
 """
@@ -132,21 +135,14 @@ check(MARKER in str(bled.get("messages")),
 
 print()
 print("== the banner: run it under both worlds ==")
-_probe = cc._local_alive
 _github_was = cc._GITHUB["on"]
 try:
-    cc._local_alive = lambda timeout=4: False
     cc._GITHUB["on"] = True
-    dead_on = cc._banner_lines("local-model")
+    dead_on = cc._banner_lines()
 
     cc._GITHUB["on"] = False
-    dead_off = cc._banner_lines("local-model")
-
-    cc._local_alive = lambda timeout=4: True
-    cc._GITHUB["on"] = True
-    alive = cc._banner_lines("local-model")
+    dead_off = cc._banner_lines()
 finally:
-    cc._local_alive = _probe
     cc._GITHUB["on"] = _github_was
 
 CLAIM = "stay on this PC"
@@ -158,13 +154,10 @@ check(CLAIM not in " ".join(dead_off),
       "E6c with the fallback off it still makes no locality claim, and says it cannot answer")
 check("no turn can be answered" in " ".join(dead_off).lower(),
       "E6d ...and says plainly that it cannot answer, rather than failing quietly")
-check(CLAIM in " ".join(alive),
-      "E7 THE INSTRUMENT BITES: with a local model alive the honest claim IS made",
-      "so E6a is measuring the probe and not a deleted sentence")
-
-worlds = [CLAIM in " ".join(w) for w in (dead_on, dead_off, alive)]
-check(sum(worlds) == 1,
-      "E8 the locality claim is conditional: true in exactly 1 of 3 worlds, not a constant")
+check(all(CLAIM not in " ".join(w) for w in (dead_on, dead_off)),
+      "E7 no world claims locality: the sentence went with the local hop (2026-09-12); it is not gated on a probe")
+check("leaves this PC" in " ".join(dead_on) and "nothing is sent" in " ".join(dead_off).lower(),
+      "E8 each world says what happens to the turn: it leaves, or nothing is sent")
 
 print()
 n_ok = sum(1 for r in results if r)

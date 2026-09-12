@@ -33,7 +33,7 @@ LOG="$HOME/covenant-install.log"
 # CORRECTED 2026-09-10: this line used to read "... python-cryptography ollama".
 # d81f808 took Ollama out of covenant_phone.sh and TERMUX_SETUP.md on 2026-09-09 and
 # missed the one file a new operator actually pastes. Ollama is out of the ethics
-# quorum by policy (ops/quorum_policy.json: ollama_in_chain false), so the pull bought
+# quorum (ops/quorum_policy.json: local_in_chain false, the default since 2026-09-12), so the pull bought
 # a component the gate does not consult -- and `|| exit 2` aborted the whole install
 # over it. What judges here is the distilled student, read into the node's own process.
 #

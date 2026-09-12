@@ -36,7 +36,7 @@ print("tracked total: {:.1f} GB across {} processes".format(
 print()
 print("covenant's own share:")
 own = 0
-for n in ("python.exe", "python3.12.exe", "ollama.exe", "ollama app.exe", "cmd.exe"):
+for n in ("python.exe", "python3.12.exe", "cmd.exe"):
     if n in mem:
         print("  {:<28}{:>10.0f} MB  x{}".format(n, mem[n] / 1024.0, cnt[n]))
         own += mem[n]

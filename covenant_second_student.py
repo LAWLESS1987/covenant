@@ -22,8 +22,9 @@ WHAT IT IS
   measurement change and belongs to the operator, not to a docstring edit. Where the first student holds, the deferring seat asks the second
   before anything leaves the PC (covenant_judge_defer.py). Neither is a
   reasoning judge; both hold rather than guess, and the GitHub runner remains
-  the last resort. The Ollama stage is gone from the chain when the policy
-  says so (ops/quorum_policy.json: "ollama_in_chain": false).
+  the last resort. No local model server is in the chain unless the policy
+  says so (ops/quorum_policy.json: "local_in_chain", default false since
+  2026-09-12).
 
 WHY A SECOND STUDENT AND NOT A PEER IN THE QUORUM
   The quorum counts an abstention as a dissent (silence_is_not_dissent=false,

@@ -12,7 +12,7 @@ REM
 REM  1. IMPORT  hands a vendor export to import_conversations.py (lossless,
 REM             no model call, names every file it could not parse).
 REM  2. SEARCH  sweeps every system already readable WITHOUT a login --
-REM             Claude Code sessions, the Ollama desktop database, the memory
+REM             Claude Code sessions and the memory
 REM             store -- and prints each passage with its file and timestamp.
 REM
 REM  Boilerplate is filtered. Searching "hospice" once returned five sessions

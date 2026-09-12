@@ -13,7 +13,7 @@ THE PROBLEM IT EXISTS FOR, measured 2026-08-30
       sem_dissent = sum(1 for r in results
                         if r.judge_id in semantic_judge_ids and r.violates)
 
-  So an unreachable judge is counted as a judge that DISAGREED. Ollama stops,
+  So an unreachable judge is counted as a judge that DISAGREED. The model server stops,
   and every transaction is refused -- and worse, `_accept_block_common` refuses
   peer blocks too, which the code itself names "a fork in the making". One
   process on one machine halts the whole node's participation in a network that

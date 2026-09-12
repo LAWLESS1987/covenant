@@ -3,18 +3,22 @@
 state and its own memory in front of it, so it answers as the covenant rather
 than as a generic assistant.
 
-WHERE THE ANSWER IS MADE -- read this first (corrected 2026-09-11)
-  This docstring said "Nothing leaves this machine." main() prints it verbatim
-  as --help (:699), so that sentence was the summary a reader took away, and it
-  had been false since 2026-09-07, when Ollama was deleted from this PC.
+WHERE THE ANSWER IS MADE -- read this first (corrected 2026-09-11; the local
+hop deleted 2026-09-12)
+  Every turn goes to a judge on a GitHub Actions runner (covenant_github_judge.py;
+  chat_github below). The conversation LEAVES THIS PC, base64'd into a
+  workflow_dispatch input on a repository that is PUBLIC, and each answer is
+  prefixed "(via GitHub runner ...)" so the transcript says where it was made.
+  There is no other path: `!github off` leaves the chat with no model at all,
+  and it says so instead of failing quietly.
 
-  With no local model, chat_tools() raises on EVERY turn, _ollama_dead() matches
-  the refused connection, and the turn goes to a judge on a GitHub Actions
-  runner (:529). So the conversation LEAVES THIS PC, base64'd into a
-  workflow_dispatch input on a repository that is PUBLIC. It is not a fallback
-  any more; with nothing local it is the only path. The opening banner probes
-  and tells you which of those worlds you are in, and `!github off` stops it --
-  after which the chat has no model at all and says so.
+  History, because this docstring once said the opposite. Until 2026-09-07 a
+  local model server on this PC answered every turn and "Nothing leaves this
+  machine" was true. The server was deleted that day; the code kept trying it
+  first on every turn, caught the refused connection and fell through to the
+  runner, and --help still promised locality until 2026-09-11. On 2026-09-12
+  the dead first hop -- the local call, its tool-calling loop, the model list
+  and switch -- was deleted rather than kept as a path that could not answer.
 
   What does NOT leave, since 2026-09-11: the private half of the system prompt.
   _offsite_system() cuts MEMORY and the LIVE STATE -- money posture, launch
@@ -30,25 +34,28 @@ WHAT IT IS
   exchange is appended to ops/chat/<date>.md (rule 5: the record is kept,
   including the answers that were wrong).
 
-BROWSING (2026-09-02, qualified 2026-09-11)
-  The judge may call web_search / web_fetch itself, or you can with !search and
-  !fetch. Only the query or the URL goes to the search engine -- but that is a
-  statement about BROWSING, not about the turn. While no local model is
-  installed the conversation is already leaving, by the paragraph above.
+BROWSING (2026-09-02; the judge's own tool calls went with the local hop, 2026-09-12)
+  !search <q> and !fetch <url> put a result list or a page into the
+  conversation for the judge's next turn. The judge on the runner cannot call
+  them itself; tool calling was a feature of the deleted local hop. Only the
+  query or the URL goes to the search engine -- and the turn that follows
+  leaves the PC, as every turn does.
 
-MEMORY AND IMPROVEMENT (corrected 2026-09-11)
+MEMORY AND IMPROVEMENT (corrected 2026-09-11; live again 2026-09-12)
   On exit it asks the judge for durable facts and lessons and appends them to
-  MEMORY.md ([session], [lesson]), reading them back next time. That call is
-  still made (:854) -- but extract_facts and reflect use chat(), which talks
-  ONLY to Ollama and has no GitHub fallback, so with Ollama gone both raise,
-  both are swallowed by `except Exception: return []`, and every session
-  silently learns nothing. The call is live; the capability is not.
+  MEMORY.md ([session], [lesson]), reading them back next time. From
+  2026-09-07 to 2026-09-12 that call was dead: extract_facts and reflect used a
+  chat() that talked only to the deleted local server, both raised, both were
+  swallowed, and every session silently learned nothing. chat() now goes to
+  the runner like every turn, so leaving costs two runner round trips (2-5
+  minutes each); Ctrl-C skips them and says so.
   !improve makes it PROPOSE changes to its own prompt, tools or memory into
   ops/chat/PROPOSALS.md; it never applies them (CONSTITUTION II.3: a loop that
   can edit its own constraints has none).
 
 WHAT IT IS NOT
-  It is not a large model and, at the moment, not a local one either. It knows
+  It is not a large model, and not a local one: the model that answers runs on
+  a GitHub Actions runner. It knows
   nothing past its training unless it fetches it, and can be wrong with
   confidence. It places no order and holds no key. It DOES write files -- all
   of them under ops/chat, none of them code: <date>.md, MEMORY.md, VOICE.json
@@ -59,18 +66,17 @@ COMMANDS inside the chat
   !status     re-read the live state (gates, posture, freshness) into context
   !judge <claim>   ask the judge for a PASS/FAIL verdict with a reason
   !refute <claim>  ask it to try to refute a claim from the state it has
-  !search <q>  / !fetch <url>   browse (results go into the conversation);  !browse on|off
-  !gemini on|off   let the judge consult Gemini (leaves the PC);  !gemini <question>
+  !search <q>  / !fetch <url>   browse (the results go into the conversation)
+  !gemini on|off   allow Gemini as a second opinion (a question leaves the PC to Google);  !gemini <question>
   !improve    the judge proposes changes to its own prompt/tools -> ops/chat/PROPOSALS.md
-  !models     list local models;  !model NAME  switch (':cloud' refused)
   !voice [on|off]  toggle speech (offline);  !rate -10..10;  !pitch +12%  tune the delivery
   !voice save  keep the current delivery (ops/chat/VOICE.json);  !tune  the covenant PICKS ITS OWN
               voice, rate and pitch from what is installed, says a line in it, and keeps it
   !mic [on|off|test]  talk instead of type: with the mic on, press Enter on an empty line and
               speak; Windows' offline recogniser (System.Speech) turns it into the next message.
               Nothing is recorded and nothing leaves the PC. !mic 30 sets the listen window.
-  !github [on|off]  when Ollama is not answering, send the turn to a judge on a GitHub Actions
-              runner instead (covenant_github_judge.py). That turn LEAVES THIS PC; the answer says so.
+  !github [on|off]  off: nothing is sent anywhere and the chat has no model. on (the default):
+              every turn goes to the judge on a GitHub Actions runner and LEAVES THIS PC; the answer says so.
   !remember <fact>  add to the covenant's memory (ops/chat/MEMORY.md);  !memory  show it
   !save       write the transcript now;  !quit / Ctrl-C  leave (on exit the judge
               extracts what the session established into MEMORY.md, marked [session])
@@ -79,7 +85,7 @@ USE
   python covenant_chat.py "one question" # single answer, then exit
   python covenant_chat.py --mute         # text only (voice is on by default)
   python covenant_chat.py --talk         # mic on from the start (Enter on an empty line = speak)
-  python covenant_chat.py --selftest     # one round trip against the judge
+  python covenant_chat.py --selftest     # one round trip to the judge on the runner (2-5 minutes)
   python covenant_chat.py --say-test     # speak one sentence, list voices
 LICENCE: public domain.
 """
@@ -94,8 +100,15 @@ import urllib.request
 import covenant_quiet                                    # no console window on Windows (covenant_quiet.py)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
-MODEL = os.environ.get("COVENANT_CHAT_MODEL", "qwen3:4b")   # 2026-09-03: the 8b is gone (it froze the PC); 4b stays for local chat
+# 2026-09-12: no local model server and no local model name. The judge that
+# answers is on the GitHub Actions runner; its model is named once, in
+# covenant_github_judge.py (COVENANT_GITHUB_MODEL), and every answer says which.
+MODEL = None   # "the runner's model": the value the functions below pass around and ignore
+
+
+def _runner_model():
+    import covenant_github_judge as gh
+    return gh.DEFAULT_MODEL
 LOGDIR = os.path.join(HERE, "ops", "chat")
 MEMORY = os.path.join(LOGDIR, "MEMORY.md")   # what the covenant has learned; read every session
 
@@ -206,30 +219,21 @@ def system_prompt(state):
             "something is not known or not checked. Prefer a red truth to a green lie. Answer "
             "in plain words, briefly, in the first person as the covenant. You place no order, "
             "hold no key, and cannot act -- you can only say what is measured, what it means, "
-            "and what would need a human hand. You may use web_search and web_fetch when an "
-            "answer needs outside or current information; say what you fetched. When Gemini "
-            "is on you may ask_gemini for a second opinion, and you say it was Gemini's. "
+            "and what would need a human hand. You cannot call tools: the operator pastes "
+            "search results, fetched pages or a Gemini answer into the conversation with "
+            "!search, !fetch and !gemini, and you say when an answer rests on one of those. "
             "MEMORY below is what you learned in earlier "
             "sessions; it holds unless the live state contradicts it.\n\n"
             "BINDING TEXT:\n%s\n\nPRINCIPLE AND OPERATOR RULES:\n%s\n\nMEMORY:\n%s\n\n%s"
             % (binding, principle, memory_text(), state))
 
 
-def chat(messages, model=MODEL, timeout=300):
-    # num_ctx 8192: the system prompt is ~2.3k tokens and the window keeps the
-    # last 20 turns, so 8k fits; Ollama's default here was 40,960, which alone
-    # made the load 11 GB and every prompt slow. keep_alive keeps the model warm
-    # for the session so turn two does not pay the reload (and the identical
-    # system prefix is reused from the KV cache); COVENANT_CHAT.bat unloads on
-    # exit is not needed -- it expires after 20 minutes idle.
-    body = {"model": model, "stream": False, "think": False, "keep_alive": "20m",
-            "options": {"temperature": 0.3, "num_predict": 700, "num_ctx": 8192},
-            "messages": messages}
-    req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        res = json.loads(r.read().decode("utf-8", "replace"))
-    return (res.get("message") or {}).get("content", "").strip()
+def chat(messages, model=None, timeout=900):
+    """One exchange with the judge on the GitHub runner -- the only model path
+    since 2026-09-12. `model` is accepted and ignored: the runner's model is
+    covenant_github_judge.DEFAULT_MODEL. The window is redacted the way every
+    turn is (see _offsite_system) before it leaves."""
+    return _ask_runner(messages, timeout, say=False)["content"]
 
 
 # ---------------------------------------------------------------- voice
@@ -397,24 +401,15 @@ def voices():
 
 
 # ---------------------------------------------------------------- browsing
-# Two tools the judge may call on its own (qwen3 tool calling via /api/chat) or
-# that you can call with !search / !fetch. Only the query or the URL goes to the
-# SEARCH ENGINE; browsing sends it neither the conversation nor the memory nor
-# the state. Qualified 2026-09-11: that is a claim about this tool, not about
-# the turn. With no local model the whole conversation is already leaving by
-# another road -- chat_github at :529 -- so "the conversation never leaves" was
-# true of browsing and false of the session, and the unqualified form read as
-# the second. Every fetch is logged in the transcript. Reading only: no forms,
-# no logins, no downloads.
-_BROWSE = {"on": os.environ.get("COVENANT_CHAT_BROWSE", "1") == "1", "log": []}
-TOOLS = [
-    {"type": "function", "function": {"name": "web_search", "description":
-        "Search the web (DuckDuckGo). Use when the answer needs current or outside information.",
-        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-    {"type": "function", "function": {"name": "web_fetch", "description":
-        "Fetch a web page and return its readable text (first 6000 characters).",
-        "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
-]
+# !search and !fetch: the operator's commands, whose result enters the
+# conversation. Only the query or the URL goes to the SEARCH ENGINE; browsing
+# sends it neither the conversation nor the memory nor the state -- a claim
+# about this tool, not about the turn, which leaves the PC to the runner
+# either way (qualified 2026-09-11). Until 2026-09-12 these were also tools
+# the local model could call on its own; that loop went with the local hop.
+# Every fetch is logged in the transcript. Reading only: no forms, no logins,
+# no downloads.
+_BROWSE = {"log": []}
 
 
 def _html_text(html):
@@ -485,14 +480,10 @@ def web_search(query, n=6):
 
 
 # ---------------------------------------------------------------- gemini
-# Gemini as a data source the judge may consult -- OFF unless this session
-# turns it on, because the question leaves the PC (to Google). The key lives
-# outside the repo; covenant_gemini.py never asks for one.
+# Gemini as a second opinion the operator may paste in (!gemini <q>) -- OFF
+# unless this session turns it on, because the question leaves the PC (to
+# Google). The key lives outside the repo; covenant_gemini.py never asks for one.
 _GEMINI = {"on": os.environ.get("COVENANT_CHAT_GEMINI", "0") == "1"}
-GEMINI_TOOL = {"type": "function", "function": {"name": "ask_gemini", "description":
-    "Ask Google's Gemini model a question and return its answer, as a second opinion or for "
-    "knowledge you lack. Use only when the user has turned Gemini on.",
-    "parameters": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]}}}
 
 
 def ask_gemini(question):
@@ -508,24 +499,7 @@ def ask_gemini(question):
     return (text or "(no answer)") + "\n-- " + note
 
 
-def run_tool(name, args):
-    if name == "ask_gemini":
-        return ask_gemini(str(args.get("question", "")))
-    if not _BROWSE["on"]:
-        return "browsing is off (!browse on)"
-    if name == "web_search":
-        return web_search(str(args.get("query", "")))
-    if name == "web_fetch":
-        return web_fetch(str(args.get("url", "")))
-    return "unknown tool"
-
-
 _GITHUB = {"on": os.environ.get("COVENANT_CHAT_GITHUB", "1") == "1"}
-
-
-def _ollama_dead(err):
-    return any(k in str(err) for k in ("10061", "refused", "URLError", "RemoteDisconnected",
-                                       "ConnectionReset", "10054", "timed out"))
 
 
 OFFSITE_CUT = chr(10) + chr(10) + "MEMORY:" + chr(10)
@@ -560,14 +534,15 @@ def _offsite_system(text):
                    "so plainly if the question needed them.)")
 
 
-def chat_github(messages, model_hint):
-    """Ollama is not answering: send this turn's messages to a judge on a GitHub
-    Actions runner. The conversation window leaves this PC. Returns the answer
-    prefixed so the transcript shows where it was made."""
+def _ask_runner(messages, timeout=900, say=True):
+    """The one model path: the last nine turns, behind the redacted system
+    prompt, to the judge on the GitHub Actions runner. The window leaves this
+    PC. Returns {"content", "model", "seconds"}."""
     import covenant_github_judge as gh
-    gm = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:3b")
-    print("  [Ollama is not answering -> asking the GitHub runner (%s); 2-5 minutes, this turn leaves the PC]" % gm,
-          flush=True)
+    gm = gh.DEFAULT_MODEL
+    if say:
+        print("  [asking the judge on the GitHub runner (%s); 2-5 minutes; this turn leaves the PC]" % gm,
+              flush=True)
     window = [m for m in messages if m.get("role") in ("system", "user", "assistant")][-9:]
     if window and window[0].get("role") != "system" and messages and messages[0].get("role") == "system":
         window = [messages[0]] + window
@@ -576,38 +551,17 @@ def chat_github(messages, model_hint):
     # money_posture.py output, the launch gates and the last self-eval block.
     window = [dict(m, content=_offsite_system(m.get("content") or ""))
               if m.get("role") == "system" else m for m in window]
-    ans = gh.ask("", "", gm, timeout=900, messages=window)
-    return "(via GitHub runner, %s, %.0fs) %s" % (gm, ans.get("seconds", 0), ans.get("content", "").strip())
+    ans = gh.ask("", "", gm, timeout=timeout, messages=window)
+    return {"content": (ans.get("content") or "").strip(), "model": gm, "seconds": ans.get("seconds", 0)}
 
 
-def chat_tools(messages, model, max_rounds=3):
-    """chat() with tool calling: the judge may ask for a search or a fetch; the
-    result is appended as a tool message and the judge continues. Bounded."""
-    for _ in range(max_rounds):
-        body = {"model": model, "stream": False, "think": False, "keep_alive": "20m",
-                "options": {"temperature": 0.3, "num_predict": 700, "num_ctx": 8192},
-                "messages": messages,
-                "tools": (TOOLS if _BROWSE["on"] else []) + ([GEMINI_TOOL] if _GEMINI["on"] else [])}
-        req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=400) as r:
-            msg = (json.loads(r.read().decode("utf-8", "replace")).get("message") or {})
-        calls = msg.get("tool_calls") or []
-        if not calls:
-            return (msg.get("content") or "").strip()
-        messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
-        for c in calls:
-            fn = (c.get("function") or {})
-            args = fn.get("arguments") or {}
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except ValueError:
-                    args = {}
-            result = run_tool(fn.get("name", ""), args)
-            print("  [%s %s]" % (fn.get("name"), (args.get("query") or args.get("url") or "")[:80]))
-            messages.append({"role": "tool", "content": result[:6000]})
-    return (msg.get("content") or "").strip() or "(the judge kept asking for tools without answering)"
+def chat_github(messages, model_hint=None):
+    """One turn to the judge on the GitHub runner, the answer prefixed so the
+    transcript shows where it was made. Until 2026-09-12 this was the fallback
+    behind a local call that had been dead since 2026-09-07; it is the only
+    path now. test_a90 reads what it hands the dispatcher."""
+    ans = _ask_runner(messages)
+    return "(via GitHub runner, %s, %.0fs) %s" % (ans["model"], ans["seconds"], ans["content"])
 
 
 # ------------------------------------------------------------ reflection
@@ -666,24 +620,6 @@ def propose(msgs, model):
     return "%d proposal(s) written to %s -- not applied; that is a human's hand" % (len(props), PROPOSALS)
 
 
-def _local_alive(timeout=4):
-    """Is there a local model to answer at all? The banner below must not
-    promise 'stays on this PC' out of a constant -- it has to ask."""
-    try:
-        with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=timeout) as r:
-            return bool(json.loads(r.read().decode()).get("models"))
-    except Exception:                                            # noqa: BLE001
-        return False
-
-
-def models():
-    try:
-        with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=8) as r:
-            return [m["name"] for m in json.loads(r.read().decode()).get("models", [])]
-    except Exception as e:                                       # noqa: BLE001
-        return ["(Ollama not answering: %s)" % e]
-
-
 class Log:
     def __init__(self):
         os.makedirs(LOGDIR, exist_ok=True)
@@ -701,28 +637,26 @@ class Log:
         self.buf = []
 
 
-def _banner_lines(model):
+def _banner_lines():
     """The opening banner, as DATA so a suite can run it instead of reading it.
 
     Extracted 2026-09-11. The previous form printed straight from main(), so the
     only way to guard it was to grep this file for a sentence -- which is the
     exact shape of guard A87 caught reading source instead of behaviour. This
-    returns the lines; main() prints them; test_a90 RUNS it with the probe
-    stubbed both ways and reads what comes back.
+    returns the lines; main() prints them; test_a90 RUNS it with the runner
+    switch both ways and reads what comes back. (Until 2026-09-12 a third
+    world, "a local model is alive", was probed; the probe went with the hop.)
     """
     out = []
-    if _local_alive():
-        out.append("  covenant chat -- local judge %s. Conversation, memory and state stay on this PC;" % model)
-    elif _GITHUB["on"]:
-        out.append("  covenant chat -- NO LOCAL MODEL: %s is not answering, and the GitHub" % OLLAMA)
-        out.append("  fallback is ON, so EVERY turn leaves this PC to a runner in a PUBLIC repo.")
+    if _GITHUB["on"]:
+        out.append("  covenant chat -- NO LOCAL MODEL. EVERY turn leaves this PC to a judge on a")
+        out.append("  GitHub Actions runner in a PUBLIC repo (%s; 2-5 minutes a turn)." % _runner_model())
         out.append("  MEMORY and the live state are withheld from it; the conversation is not.")
         out.append("  !github off stops it (the chat then has no model at all).")
     else:
-        out.append("  covenant chat -- NO LOCAL MODEL: %s is not answering and the GitHub" % OLLAMA)
-        out.append("  fallback is off, so no turn can be answered until a local model is back.")
-    out.append("  browsing is %s (only a query or URL leaves, to the site you ask about). !help for commands."
-               % ("on" if _BROWSE["on"] else "off"))
+        out.append("  covenant chat -- NO LOCAL MODEL, and the GitHub runner is off (!github on),")
+        out.append("  so no turn can be answered. Nothing is sent anywhere.")
+    out.append("  !search and !fetch put a page into the conversation (only the query or URL goes to that site). !help for commands.")
     return out
 
 
@@ -743,10 +677,7 @@ def main():
         assert "selftest marker" in memory_text(), "memory did not round-trip"
         print("ok    memory round-trips through ops/chat/MEMORY.md")
         t0 = time.time()
-        m2 = [{"role": "system", "content": system_prompt("LIVE STATE: (selftest, not read)")},
-              {"role": "user", "content": "Use web_fetch on https://example.com/ and tell me its page title in one sentence."}]
-        tl = chat_tools(m2, MODEL)
-        print("%s  the judge called a tool and answered from it: %s" % ("ok  " if "example" in tl.lower() else "FAIL", tl[:120]))
+        print("  one round trip to the judge on the GitHub runner (2-5 minutes; this leaves the PC)...", flush=True)
         ans = chat([{"role": "system", "content": system_prompt("LIVE STATE: (selftest, not read)")},
                     {"role": "user", "content": "In one sentence: may you ever place a trade by automation? Answer with the rule that says so."}])
         ok = ans and ("no" in ans.lower() or "never" in ans.lower())
@@ -764,14 +695,11 @@ def main():
     model = MODEL
     log = Log()
     # 2026-09-11: this used to assert "Conversation, memory and state stay on
-    # this PC" from a constant. True when a local Ollama answered every turn;
-    # false since Ollama was deleted from this machine on 2026-09-07. With no
-    # local model, chat_tools raises on EVERY turn, _ollama_dead matches, and
-    # the turn goes to a GitHub Actions runner -- carrying the system prompt,
-    # which live_state() fills with money_posture.py's output -- in a repo that
-    # is public. The banner said the opposite of what the program did. It now
-    # probes and reports where the turn will actually go.
-    for _line in _banner_lines(model):
+    # this PC" from a constant -- false since the local server was deleted on
+    # 2026-09-07, while every turn quietly fell through to a GitHub runner in a
+    # public repo. The banner now says where the turn goes; since 2026-09-12
+    # there is exactly one place it can go.
+    for _line in _banner_lines():
         print(_line)
     print("  reading the live state (money posture, freshness, gates)...", flush=True)
     speak("Reading the live state. One moment.")
@@ -783,15 +711,13 @@ def main():
         msgs.append({"role": "user", "content": user_text})
         log.add("Lawrence", user_text)
         t0 = time.time()
-        try:
-            ans = chat_tools(msgs, model)
-        except Exception as e:                                   # noqa: BLE001
-            ans = "(the judge did not answer: %s -- is Ollama running, is %s pulled?)" % (e, model)
-            if _GITHUB["on"] and _ollama_dead(e):
-                try:
-                    ans = chat_github(msgs, model)
-                except Exception as e2:                          # noqa: BLE001
-                    ans += " (GitHub runner also failed: %s)" % e2
+        if not _GITHUB["on"]:
+            ans = "(no model: the GitHub runner is off (!github on) and there is no local model; nothing was sent)"
+        else:
+            try:
+                ans = chat_github(msgs, model)
+            except Exception as e:                               # noqa: BLE001
+                ans = "(the judge on the GitHub runner did not answer: %s)" % e
         msgs.append({"role": "assistant", "content": ans})
         log.add("covenant", ans)
         print("\n  covenant (%.0fs): %s\n" % (time.time() - t0, ans))
@@ -846,17 +772,14 @@ def main():
                 _MIC["window"] = max(5, min(120, int(text[5:]))); print("  listen window ->", _MIC["window"], "s"); continue
             if text in ("!github", "!github on", "!github off"):
                 _GITHUB["on"] = (text != "!github off") and (not _GITHUB["on"] if text == "!github" else True)
-                print("  github fallback", "on -- a turn Ollama cannot answer goes to a GitHub runner and leaves this PC"
-                      if _GITHUB["on"] else "off"); continue
+                print("  github runner", "on -- every turn goes to a GitHub runner and leaves this PC"
+                      if _GITHUB["on"] else "off -- the chat has no model; nothing is sent"); continue
             if text.startswith("!search "):
                 r = web_search(text[8:]); print(r[:1500]); log.add("search", text[8:] + "\n" + r[:1500])
                 msgs.append({"role": "user", "content": "Search results for %r:\n%s" % (text[8:], r[:4000])}); continue
             if text.startswith("!fetch "):
                 r = web_fetch(text[7:].strip()); print(r[:1500]); log.add("fetch", text[7:] + "\n" + r[:1500])
                 msgs.append({"role": "user", "content": "Page text of %s:\n%s" % (text[7:].strip(), r[:5000])}); continue
-            if text in ("!browse", "!browse on", "!browse off"):
-                _BROWSE["on"] = (text != "!browse off") and (not _BROWSE["on"] if text == "!browse" else True)
-                print("  browsing", "on" if _BROWSE["on"] else "off"); continue
             if text in ("!gemini", "!gemini on", "!gemini off"):
                 _GEMINI["on"] = (text != "!gemini off") and (not _GEMINI["on"] if text == "!gemini" else True)
                 print("  gemini", "on -- questions you send it leave this PC to Google" if _GEMINI["on"] else "off"); continue
@@ -865,26 +788,26 @@ def main():
                 msgs.append({"role": "user", "content": "Gemini answered %r with:\n%s" % (text[8:], r[:4000])}); continue
             if text == "!improve":
                 print("  " + propose(msgs, model)); continue
-            if text == "!models":
-                print("  ", ", ".join(models())); continue
-            if text.startswith("!model "):
-                m = text[7:].strip()
-                if m.endswith(":cloud"):
-                    print("  refused: a ':cloud' model forwards the conversation off this machine"); continue
-                model = m; print("  model ->", model); continue
             if text == "!status":
                 state = live_state(); msgs[0] = {"role": "system", "content": system_prompt(state)}
                 print(state[-1500:]); continue
             if text.startswith("!judge ") or text.startswith("!refute "):
                 task, claim = text.split(" ", 1)
                 out = _run([sys.executable, "covenant_route.py", "refute" if task == "!refute" else "judge",
-                            "--claim" if task == "!refute" else "--prompt", claim, "--models", model], 320)
+                            "--claim" if task == "!refute" else "--prompt", claim], 1000)
                 print(out[-1500:]); log.add("route", out[-1500:]); continue
             turn(text)
     except KeyboardInterrupt:
         print()
-    facts = extract_facts(msgs, model)
-    lessons = reflect(msgs, model)
+    facts, lessons = [], []
+    if _GITHUB["on"] and len(msgs) > 1:
+        print("  asking the runner what this session established (two round trips, 2-5 minutes each; Ctrl-C skips)",
+              flush=True)
+        try:
+            facts = extract_facts(msgs, model)
+            lessons = reflect(msgs, model)
+        except KeyboardInterrupt:
+            print("  skipped: nothing learned from this session.")
     if lessons:
         print("  learned %d lesson(s) -> %s" % (len(lessons), MEMORY))
     if facts:

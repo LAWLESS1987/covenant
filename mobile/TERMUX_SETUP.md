@@ -55,7 +55,7 @@ pip install flask requests waitress
 **CORRECTED 2026-09-09. This used to say "about fifteen minutes on Wi-Fi; the
 model is the big download" and put `ollama` in the line above.** Both were
 stale. Ollama was deleted from this project on 2026-09-07 and is out of the
-ethics quorum by policy (`ops/quorum_policy.json`: `ollama_in_chain` false), so
+ethics quorum (`ops/quorum_policy.json`: `local_in_chain` false, the default since 2026-09-12), so
 the multi-gigabyte pull bought a component the gate no longer consults.
 
 What judges on your phone is the **distilled student** — a 130 KB JSON model

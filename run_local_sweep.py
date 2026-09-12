@@ -58,14 +58,13 @@ SUITES = [
     # and silently DROPPED it -- so the win32 candidate sweeps that blessed
     # pending-v8.38 could not have run a24/p18 (M58/PRELAND). These four are
     # the delivery's own suites: a24/a24b + p18 arrived with v8.39, p19
-    # guards this runner itself, p15 is the shipped watchdog's newest control
-    # (canned responses -- no ollama needed).
+    # guards this runner itself. (p15, the watchdog's model-server identity
+    # probe, was deleted with the server on 2026-09-12.)
     ("test_a24_anomaly_eviction.py", 300),
     ("test_p18_version_collision.py", 120),
     ("test_p19_overlay_guard.py", 180), ("test_c3_guard.py", 120),
     ("test_m2_merkle_seal.py", 120), ("test_t1_triangulate.py", 120),
     ("test_e1_secret_egress.py", 120),
-    ("test_p15_judge_identity.py", 120),
     ("test_y1_stake_divergence.py", 120), ("test_w1_wsgi.py", 150),
     ("test_p11_version_identity.py", 180),
     ("test_p12_substrate_sensing.py", 180),

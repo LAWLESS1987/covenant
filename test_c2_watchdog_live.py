@@ -122,7 +122,7 @@ def gap_check(logfile, interval_s, now=None):
     return ("ALIVE" if gap <= 5 * interval_s else "DEAD"), gap
 
 
-# ------------------------------------------------------------- ollama stub
+# ------------------------------------------------------- model-server stub
 class _Judge(BaseHTTPRequestHandler):
     digest = "aaaaaaaaaaaa1111111111112222222222223333"
 
@@ -240,7 +240,7 @@ def main():
         except OSError:
             pass
 
-    # ollama stand-in
+    # model-server stand-in
     judge_srv = ThreadingHTTPServer(("127.0.0.1", 0), _Judge)
     threading.Thread(target=judge_srv.serve_forever, daemon=True).start()
     judge_url = f"http://127.0.0.1:{judge_srv.server_port}/v1/chat/completions"
@@ -339,9 +339,6 @@ def main():
     check("L3 adaptation dedups permanent conditions on the real log (P12)",
           n_rounds >= 5 and ins and worst <= 1 + n_rounds // 30,
           f"{len(set(ins))} distinct text(s), worst repeat {worst}, {n_rounds} rounds")
-    check("L4 judge identity is named in the log (P15)",
-          re.search(r"judge: qwen3:8b@[0-9a-f]{12} -- 1 model\(s\) served", text)
-          is not None, "")
     lines = parse_lines(text)[1:]     # first loop line may trail the strict passes
     gaps = [(b[0] - a[0]).total_seconds() for a, b in zip(lines, lines[1:])]
     check("L5 the promised heartbeat is real: max inter-line gap within contract",

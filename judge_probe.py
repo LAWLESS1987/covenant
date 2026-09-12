@@ -10,12 +10,10 @@ judge call to each endpoint and reports what did.
 It sends a synthetic, benign test transaction. None of your data leaves here.
 
   python judge_probe.py                # everything it can reach
-  python judge_probe.py --ollama-only  # just your local models
 """
 from __future__ import annotations
 import os, sys, json, time, argparse, urllib.request, urllib.error
 
-OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 # name -> (url, env var for the key or None, default model)
 PROVIDERS = [
@@ -109,17 +107,8 @@ def try_one(name, url, key_env, model, timeout=90):
     return ("ok", f"violates={v.get('violates')} benefit={v.get('benefit_estimate')}", dt)
 
 
-def ollama_models():
-    try:
-        with urllib.request.urlopen(f"{OLLAMA}/api/tags", timeout=10) as r:
-            return [m["name"] for m in json.loads(r.read().decode()).get("models", [])]
-    except Exception:
-        return []
-
-
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ollama-only", action="store_true")
     ap.add_argument("--timeout", type=float, default=90)
     a = ap.parse_args()
 
@@ -129,33 +118,18 @@ def main():
 
     working = []
 
-    models = ollama_models()
-    print(f"\n  OLLAMA ({OLLAMA})")
-    if not models:
-        print("    not reachable -- is `ollama serve` running?")
-    else:
-        print(f"    {len(models)} model(s) installed\n")
-        for m in models:
-            st, msg, dt = try_one(f"ollama:{m}", f"{OLLAMA}/v1/chat/completions",
-                                  None, m, a.timeout)
-            mark = {"ok":"WORKS", "fail":"fail", "unparsable":"no verdict", "skip":"skip"}[st]
-            print(f"    {m:<28}{mark:<12}{(f'{dt:.1f}s' if dt else ''):<8}{msg[:44]}")
-            if st == "ok":
-                working.append(("local", m, dt))
-
-    if not a.ollama_only:
-        print("\n  HOSTED")
-        for name, url, env, model in PROVIDERS:
-            st, msg, dt = try_one(name, url, env, model, a.timeout)
-            mark = {"ok":"WORKS", "fail":"fail", "unparsable":"no verdict", "skip":"skip"}[st]
-            print(f"    {name:<14}{mark:<12}{(f'{dt:.1f}s' if dt else ''):<8}{msg[:52]}")
-            if st == "ok":
-                working.append((name, model, dt))
+    print("\n  HOSTED")
+    for name, url, env, model in PROVIDERS:
+        st, msg, dt = try_one(name, url, env, model, a.timeout)
+        mark = {"ok":"WORKS", "fail":"fail", "unparsable":"no verdict", "skip":"skip"}[st]
+        print(f"    {name:<14}{mark:<12}{(f'{dt:.1f}s' if dt else ''):<8}{msg[:52]}")
+        if st == "ok":
+            working.append((name, model, dt))
 
     print("\n" + "=" * 78)
     if not working:
         print("  Nothing answered with a usable verdict.")
-        print("  Start with Ollama -- it needs no key: `ollama serve`")
+        print("  Set a hosted provider key, or leave the gate on the distilled student (no key needed).")
         return
     working.sort(key=lambda x: x[2] or 999)
     print(f"  {len(working)} usable judge(s), fastest first:")
@@ -163,18 +137,13 @@ def main():
         print(f"    {n:<14}{m:<34}{dt:.1f}s")
     fastest = working[0]
     print("\n  To use the fastest one:")
-    if fastest[0] == "local":
-        print(f"    export COVENANT_LOCAL_JUDGE_URL={OLLAMA}/v1/chat/completions")
-        print(f"    export COVENANT_LOCAL_JUDGE_MODEL={fastest[1]}")
-        print( "    export COVENANT_JUDGE_PROVIDERS=local,mock")
-    else:
-        print(f"    export COVENANT_LOCAL_JUDGE_URL=<the {fastest[0]} url above>")
-        print(f"    export COVENANT_LOCAL_JUDGE_MODEL={fastest[1]}")
-        print( "    export COVENANT_LOCAL_JUDGE_KEY=<your key>")
-        print( "    export COVENANT_JUDGE_PROVIDERS=local,mock")
+    print(f"    export COVENANT_LOCAL_JUDGE_URL=<the {fastest[0]} url above>")
+    print(f"    export COVENANT_LOCAL_JUDGE_MODEL={fastest[1]}")
+    print("    export COVENANT_LOCAL_JUDGE_KEY=<your key>")
+    print("    export COVENANT_JUDGE_PROVIDERS=local,mock")
     # COUNT PROVIDERS, NOT ENDPOINTS. QuorumJudge derives a provider from the
     # part of judge_id before the colon, so local:1 and local:2 collapse to one
-    # -- two Ollama models satisfy nothing, and the quorum raises "lacks
+    # -- two models behind one server satisfy nothing, and the quorum raises "lacks
     # diversity" on startup. They would not be independent anyway: same box,
     # same RAM, same power cable. One unplugged lead takes out both.
     distinct = {n for n, _, _ in working}

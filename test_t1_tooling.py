@@ -2,10 +2,12 @@
 """test_t1_tooling.py -- T1: the covenant's tool layer, the parts that need no model.
 
 Seven tools landed on 2026-09-02/03 (route, chat, gemini, align_set, thesis,
-scenarios, trader_freshness). Each has a --selftest that talks to the local
-judge, which is slow and cannot run in a scratch copy under RAM pressure. What
-CAN run anywhere in seconds is the pure part: imports, argument parsing, the
-memory and scenario tables round-tripping, the search parser on a fixture, the
+scenarios, trader_freshness); thesis and scenarios were deleted on 2026-09-12
+with the local model server they were written around. Each survivor's
+--selftest talks to the judge on the GitHub runner, which is slow and leaves
+the PC, so it cannot run in a sweep. What CAN run anywhere in seconds is the
+pure part: imports, argument parsing, the memory table round-tripping, the
+search parser on a fixture, the
 alignment builder producing pairs from the documents, and the refusals being
 present -- the false pushes toward MORE capability that the set exists to
 teach. A tool the runner never imports is a tool the sweep cannot vouch for.
@@ -35,15 +37,14 @@ def main():
     print("T1 -- the tool layer, model-free\n")
     mods = {}
     for name in ("covenant_route", "covenant_chat", "covenant_gemini", "covenant_align_set",
-                 "covenant_thesis", "covenant_scenarios", "trader_freshness", "money_posture"):
+                 "trader_freshness", "money_posture"):
         try:
             mods[name] = importlib.import_module(name)
             check(f"I:{name:<22} imports", True)
         except Exception as e:                                   # noqa: BLE001
             check(f"I:{name:<22} imports", False, e)
     for name in ("covenant_route.py", "covenant_chat.py", "covenant_gemini.py", "covenant_align_set.py",
-                 "covenant_thesis.py", "covenant_scenarios.py", "trader_freshness.py",
-                 "readme_totals.py", "covenant_roundtable_local.py"):
+                 "trader_freshness.py", "readme_totals.py", "covenant_roundtable_local.py"):
         p = subprocess.run([sys.executable, os.path.join(HERE, name), "--help"], capture_output=True, text=True, timeout=60)
         check(f"H:{name:<22} --help exits 0", p.returncode == 0, (p.stderr or p.stdout)[-160:])
 
@@ -85,24 +86,14 @@ def main():
               "shipped broken once)", len(links) == 2 and links[0][0] == "https://a.example/")
         check("C3 speakable text drops links, hashes and markdown",
               c._speakable("see **this** https://x.y/z and 8f219285f268abcd") == "see this a link and a hash")
-        check("C4 browsing tools are offered only when on, gemini only when on",
-              all(t["function"]["name"] in ("web_search", "web_fetch") for t in c.TOOLS)
-              and c.GEMINI_TOOL["function"]["name"] == "ask_gemini")
-
-    # scenarios: table round trip without a judge
-    s = mods.get("covenant_scenarios")
-    if s:
-        with tempfile.TemporaryDirectory() as td:
-            old = (s.PRIV, s.TABLE, s.LEDGER)
-            s.PRIV, s.TABLE, s.LEDGER = td, os.path.join(td, "S.json"), os.path.join(td, "S.md")
-            try:
-                t = s.load_table()
-                check("S1 the default scenario table has the nine named variables",
-                      len(t["scenarios"]) == 9 and t["scenarios"][0]["name"] == "recognition")
-                s.save_table(t); t2 = s.load_table()
-                check("S2 the table round-trips", t2 == t)
-            finally:
-                s.PRIV, s.TABLE, s.LEDGER = old
+        was = c._GEMINI["on"]
+        try:
+            c._GEMINI["on"] = False
+            off = c.ask_gemini("what time is it")
+        finally:
+            c._GEMINI["on"] = was
+        check("C4 Gemini is off unless this session turns it on: ask_gemini answers 'off' and sends nothing",
+              "off" in off and "Google" in off, off)
 
     # alignment set: documents -> pairs, refusals present, false pushes paired with refusals
     a = mods.get("covenant_align_set")
@@ -129,12 +120,21 @@ def main():
         class A:  # noqa: D401 - a tiny argparse stand-in
             prompt = "is 2+2=4?"; prompt_file = None; shape = '{"verdict":"PASS|FAIL"}'
             claim = "c"; evidence = "e"; evidence_file = None; file = None; criteria = "x"; max_words = 50
-            models = r.DEFAULT_MODELS; allow_cloud = False; timeout = 1
+            timeout = 1
         p1, k1 = r.build_prompt("judge", A()); p2, k2 = r.build_prompt("refute", A())
         check("R1 judge/refute prompts are built without a model and name their primary field",
               "TASK: judge" in p1 and k1 == "verdict" and "REFUTE" in p2 and k2 == "refuted")
-        check("R2 ':cloud' models are refused unless --allow-cloud (the prompt would leave the PC)",
-              r.route("judge", "x", "verdict", ["fake:cloud"], 1, False, 1)[0]["views"][0].get("error", "").startswith("refused"))
+        # 2026-09-12: the only judge is on the GitHub runner, so the one switch
+        # left is the refusal to send; this runs it, offline, and reads the record.
+        was = r.GITHUB
+        try:
+            r.GITHUB = "off"
+            rec, ok = r.route("judge", "x", "verdict", 1)
+        finally:
+            r.GITHUB = was
+        check("R2 COVENANT_ROUTE_GITHUB=off refuses to send (place 'none', outcome 'unavailable', nothing dispatched)",
+              not ok and rec["outcome"] == "unavailable" and rec["views"][0].get("place") == "none"
+              and "disabled" in rec["views"][0].get("error", ""), rec["views"])
 
     n, ok = len(results), sum(results)
     print(f"\nT1: {ok}/{n} passed")

@@ -233,11 +233,6 @@ SUITES = [
     ("test_p11_version_identity.py",     180,  "IDENTITY"),
     ("test_p12_substrate_sensing.py",    180,  "IDENTITY"),
     ("test_p14_watchdog_self_drift.py",  120,  "IDENTITY"),
-    # P15 (2026-08-28): the watchdog's ollama identity probe -- canned
-    # responses, no socket, no keys. 29/29 here 2026-08-29; shipped 08-28 and
-    # wired into NO runner until now, which is exactly the orphan class this
-    # coverage phase exists to catch.
-    ("test_p15_judge_identity.py",       120,  "IDENTITY"),
     # P20 (2026-08-29): the watchdog's self-evaluation ledger -- every layer
     # it senses, one PASS/WARN/FAIL block, report-only by AST. 23/23.
     ("test_p20_watchdog_self_eval.py",   120,  "IDENTITY"),
@@ -1107,7 +1102,7 @@ def phase_live(say, title="5. LIVE STATE -- what is actually up right now (read-
             say("  node %s :%-5d down" % (name, port))
     say("  console :%-5d %s" % (CONSOLE_PORT,
         "UP" if port_open("127.0.0.1", CONSOLE_PORT) else "not running"))
-    say("  ollama  :11434 %s" % ("UP" if port_open("127.0.0.1", 11434) else "not running"))
+    say("  model server: none on this PC (removed 2026-09-07); the ethics seat is the distilled student")
     wd = os.path.join(HERE, "logs", "watchdog.log")
     if os.path.isfile(wd):
         age = time.time() - os.path.getmtime(wd)

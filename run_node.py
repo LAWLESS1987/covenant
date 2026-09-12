@@ -27,9 +27,8 @@ import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import covenant_unified_v8 as cov
 import covenant_judge_local    # noqa: F401 -- registers local/deepseek/mistral
-import covenant_judge_ollama   # noqa: F401 -- re-registers "local" as the tuned judge
 import covenant_judge_fallback # noqa: F401 -- registers "fallback", the distilled floor (covenant_distill.py trains it)
-import covenant_judge_defer    # noqa: F401 -- registers "deferring": Ollama, else the GitHub runner, else the fallback
+import covenant_judge_defer    # noqa: F401 -- registers "deferring": the students, then HELD (a runner only by policy)
 
 # A timeout is recorded as a VIOLATION, so slow hardware silently rejects your
 # own transactions. num_predict=160 caps how long one verdict can run, but keep
@@ -37,7 +36,8 @@ import covenant_judge_defer    # noqa: F401 -- registers "deferring": Ollama, el
 os.environ.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "300")
 os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
 
-# v8.40: local (ollama) + semantic (the deterministic lexical judge) -- two
+# v8.40 wired local (a model server) + semantic (the deterministic lexical
+# judge); since 2026-09-12 it is deferring (the students) + semantic -- two
 # INDEPENDENT opinions, which is what B2 requires the quorum to have.
 # 2026-09-03: ops/quorum_policy.json is the operator's standing decision about the
 # quorum (providers, and whether a silent seat is a dissent). It is applied here,
@@ -53,7 +53,7 @@ os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
 # second operator -- came up with its first semantic seat pointed at a model
 # server it did not run, while this PC never noticed because its gitignored
 # ops/quorum_policy.json said deferring,semantic all along. "deferring" is the
-# seat that never goes empty (students -> runner -> fallback); with no policy
+# seat that never goes empty (the students, then HELD; a runner only by policy); with no policy
 # it is the only default that judges on a fresh clone. The environment is still
 # discarded when there is no policy, deliberately: a clone's gate must not
 # depend on what a shell happened to export. Measured before/after in
