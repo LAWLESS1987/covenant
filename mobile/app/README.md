@@ -84,3 +84,28 @@ again. Only a phone proves: the arm64 binaries load on the S25+; the Start
 button's tap path; Samsung's sleep policy; the Share sheet from another app.
 `test_m5_app.py` pins the allowlist, the manifest and the workflow from the
 repository side.
+
+## Using your other apps (phase 1, 2026-09-12)
+
+The operator asked for "access and use of all my apps if I green-light it".
+Phase 1 is the consent layer and a local actuator, nothing remote:
+
+- **Apps Covenant may use** lists every launchable app with a switch, all
+  OFF. A switch on is the green light; the actuator refuses any app that is
+  not on the list, every time.
+- **The actuator** is an Android Accessibility service. Only you can enable
+  it, in Android's Accessibility settings; the app can only send you there.
+  It requests no gestures.
+- **Use an app...** picks a green-lit app, takes a text and whether to press
+  its Send/Post/Submit button. The text goes through the node's own gate
+  first (a REFUSED text never leaves; a hold that alleges nothing is logged
+  and passes), then the app is opened and the text put into its field.
+- **Every action and every refusal** is one line in the app's
+  `files/actions.log` (read it with `adb shell run-as org.covenant.node cat
+  files/actions.log` over a cable, or from the phone's log tail).
+
+What is deliberately NOT here: any way to drive this from the PC or the
+network. This APK is signed with a public debug-class key; an accessibility
+grant on an app anyone can install over yours would hand your phone to
+whoever did. Remote driving waits for a signing key only you hold
+(`docs/KNOWN_ISSUES.md` A104).

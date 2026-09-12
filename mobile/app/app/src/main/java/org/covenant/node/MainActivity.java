@@ -11,7 +11,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -85,6 +87,8 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_share).setOnClickListener(v ->
                 shareText(pill.getText() + "  " + detail.getText() + "\nhttp://127.0.0.1:" + currentPort() + "/health"));
         findViewById(R.id.btn_judge).setOnClickListener(v -> askForText());
+        findViewById(R.id.btn_apps).setOnClickListener(v -> startActivity(new Intent(this, AppsActivity.class)));
+        findViewById(R.id.btn_use).setOnClickListener(v -> useAnApp());
         findViewById(R.id.btn_battery).setOnClickListener(v -> {
             PowerManager pm = getSystemService(PowerManager.class);
             if (pm.isIgnoringBatteryOptimizations(getPackageName())) {
@@ -156,6 +160,80 @@ public class MainActivity extends Activity {
                         .setNegativeButton("Close", null).show();
             });
         }, "covenant-judge").start();
+    }
+
+    // ------------------------------------------------------------- phase 1: use an app (local, green-lit, judged, logged)
+
+    /** Pick a green-lit app, a text, and whether to press Send; the text is judged first. */
+    private void useAnApp() {
+        Settings s = Settings.load(this);
+        final List<String> pkgs = new ArrayList<>(s.allowedApps);
+        if (pkgs.isEmpty()) {
+            Toast.makeText(this, "no app is green-lit yet: open 'Apps Covenant may use' first", Toast.LENGTH_LONG).show();
+            startActivity(new Intent(this, AppsActivity.class));
+            return;
+        }
+        if (!CovenantActuator.isConnected()) {
+            Toast.makeText(this, "the actuator is off: enable 'Covenant actuator' in Android's Accessibility settings", Toast.LENGTH_LONG).show();
+            startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            return;
+        }
+        final String[] labels = new String[pkgs.size()];
+        for (int i = 0; i < pkgs.size(); i++) {
+            try { labels[i] = getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(pkgs.get(i), 0)) + "  (" + pkgs.get(i) + ")"; }
+            catch (Exception e) { labels[i] = pkgs.get(i); }
+        }
+        new AlertDialog.Builder(this).setTitle("Use which app?").setItems(labels, (d, which) -> {
+            final String pkg = pkgs.get(which);
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            int pad = (int) (16 * getResources().getDisplayMetrics().density);
+            col.setPadding(pad, pad / 2, pad, 0);
+            EditText box = new EditText(this);
+            box.setHint("text to put into " + labels[which]);
+            box.setMinLines(3);
+            col.addView(box);
+            CheckBox send = new CheckBox(this);
+            send.setText("then press its Send / Post / Submit button");
+            col.addView(send);
+            new AlertDialog.Builder(this).setTitle("Use " + labels[which]).setView(col)
+                    .setPositiveButton("Go", (d2, w) -> actIn(pkg, box.getText().toString(), send.isChecked()))
+                    .setNegativeButton("Cancel", null).show();
+        }).show();
+    }
+
+    /** The covenant's own gate first (in this process): a REFUSED text never leaves; a hold that alleges nothing is logged and passes (A98). */
+    private void actIn(String pkg, String text, boolean send) {
+        if (text.trim().isEmpty()) return;
+        AlertDialog wait = new AlertDialog.Builder(this).setTitle("Judging first...").setMessage("the text goes through the node's gate before it touches another app").setCancelable(false).create();
+        wait.show();
+        new Thread(() -> {
+            String verdict = "REFUSED", why = "";
+            try {
+                if (!Python.isStarted()) Python.start(new AndroidPlatform(this));
+                PyObject r = Python.getInstance().getModule("entry").callAttr("judge_text",
+                        getFilesDir().getAbsolutePath(), getApplicationInfo().sourceDir, text);
+                JSONObject j = new JSONObject(r.toString());
+                verdict = j.optBoolean("admitted") ? "ADMITTED" : (j.optBoolean("alleges_nothing") ? "HELD" : "REFUSED");
+                why = j.optString("message");
+            } catch (Throwable t) {
+                why = "could not judge: " + t;
+            }
+            final String v = verdict, w = why;
+            handler.post(() -> {
+                wait.dismiss();
+                CovenantActuator.log(this, pkg, "job: " + text.length() + " chars" + (send ? " + send" : "") + "; gate said " + v + (w.isEmpty() ? "" : " -- " + w));
+                if (v.equals("REFUSED")) {
+                    new AlertDialog.Builder(this).setTitle("Refused by the gate").setMessage(w).setPositiveButton("Close", null).show();
+                    return;
+                }
+                CovenantActuator.submit(new CovenantActuator.Job(pkg, text, send));
+                Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+                if (launch == null) { Toast.makeText(this, "cannot open " + pkg, Toast.LENGTH_LONG).show(); return; }
+                Toast.makeText(this, "opening " + pkg + "; the text goes in when its screen appears (60 s window)", Toast.LENGTH_LONG).show();
+                startActivity(launch);
+            });
+        }, "covenant-act").start();
     }
 
     private void shareText(String text) {

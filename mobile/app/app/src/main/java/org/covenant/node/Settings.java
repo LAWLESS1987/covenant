@@ -21,6 +21,8 @@ final class Settings {
     int port = 5000;
     String nodeId = "phone";
     boolean autostart = false;
+    /** Phase 1 of "use my other apps": the packages the operator green-lit. Off is the default for every app. */
+    java.util.Set<String> allowedApps = new java.util.TreeSet<>();
 
     static File file(Context c) { return new File(c.getFilesDir(), "settings.json"); }
 
@@ -33,6 +35,8 @@ final class Settings {
             s.port = j.optInt("port", s.port);
             s.nodeId = j.optString("node_id", s.nodeId);
             s.autostart = j.optBoolean("autostart", s.autostart);
+            org.json.JSONArray a = j.optJSONArray("allowed_apps");
+            for (int i = 0; a != null && i < a.length(); i++) s.allowedApps.add(a.getString(i));
         } catch (Exception ignored) {
             // absent on first run, or damaged: defaults
         }
@@ -45,6 +49,7 @@ final class Settings {
         j.put("port", s.port);
         j.put("node_id", s.nodeId);
         j.put("autostart", s.autostart);
+        j.put("allowed_apps", new org.json.JSONArray(s.allowedApps));
         File tmp = new File(c.getFilesDir(), "settings.json.tmp");
         try (OutputStreamWriter w = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
             w.write(j.toString(1));

@@ -72,6 +72,12 @@
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="Your other apps"/>
+            <Button android:id="@+id/btn_apps" style="@style/Secondary" android:text="Apps Covenant may use…"/>
+            <Button android:id="@+id/btn_use" style="@style/Secondary" android:text="Use an app…"/>
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="Node log"/>
             <TextView android:id="@+id/log" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:typeface="monospace" android:textSize="11sp" android:textColor="@color/ink"

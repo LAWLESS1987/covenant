@@ -3192,3 +3192,29 @@ sweep caught `test_t1_tooling.py` still probing the router's deleted
 student file, by digest (`_student_state()`), PASS with a digest and FAIL
 (fail-closed) only when the file is missing. T1's R2 pins the router's one
 remaining switch instead: `COVENANT_ROUTE_GITHUB=off` refuses to send.
+
+### A104. [new capability -- the operator's decision, 2026-09-12] "Use my other apps": consent list and a local actuator; nothing remote until the app has a private signing key. PHASE 1 LANDED
+
+**Asked.** "allow access and use of all my apps if i green light it", after
+the phone app's first real install.
+
+**Built (phase 1).** `AppsActivity`: every launchable app with a switch, all
+off; the list is stored in the app's settings.json and is the green light.
+`CovenantActuator`: an Accessibility service the operator enables himself in
+Android settings (no code can), which acts only in green-lit packages, only
+on a job placed from this phone (`Use an app...` in the app), and writes
+every action and refusal to `files/actions.log`. It requests no gestures.
+Before any text goes into another app it passes the node's own gate in
+process: REFUSED never leaves; a hold that alleges nothing is logged and
+passes (A98's rule). The manifest gains `<queries>` for the launcher intent
+(not a permission) and the service; no new `uses-permission`.
+
+**Withheld, and why.** Any remote channel -- the PC, the tunnel, a peer --
+into the actuator. The APK is signed with a public debug-class key by
+design (so GitHub can build it); an accessibility grant on an app anyone
+can install over yours would hand the phone to whoever did. Remote driving
+is gated on a release key only the operator holds, which also forces a
+one-time uninstall (new key = new identity; documented in
+mobile/app/signing/README.md). The Send-button finder knows English words
+only. Not verified on the emulator (the CI check starts no accessibility
+service); verified by the operator's use on the phone, or not at all.

@@ -10,6 +10,15 @@
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
+  <!-- Phase 1 of "use my other apps": to LIST launchable apps on Android 11+ the manifest
+       must declare the intent it asks about; this is not a permission. -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.MAIN"/>
+      <category android:name="android.intent.category.LAUNCHER"/>
+    </intent>
+  </queries>
+
   <!-- allowBackup=false: the node's RSA identity in files/ must never ride Google auto-backup. -->
   <application
       android:label="Covenant Node"
@@ -40,6 +49,22 @@
         android:foregroundServiceType="specialUse">
       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
           android:value="Runs the operator's own Covenant peer-to-peer node: an HTTP API and a peer listener that other nodes connect to at any hour."/>
+    </service>
+
+    <!-- Phase 1 of "use my other apps" (2026-09-12): the green-light list, and the actuator.
+         An accessibility service can only be enabled by the person, in Android settings;
+         it acts only in green-lit apps, only on a job placed from this phone, and logs every
+         action. No gestures are requested. Remote driving waits for the operator's own
+         signing key (this APK's key is public). -->
+    <activity android:name=".AppsActivity" android:exported="false" android:label="Apps Covenant may use"/>
+    <service android:name=".CovenantActuator"
+        android:exported="true"
+        android:label="Covenant actuator"
+        android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+      <intent-filter>
+        <action android:name="android.accessibilityservice.AccessibilityService"/>
+      </intent-filter>
+      <meta-data android:name="android.accessibilityservice" android:resource="@xml/actuator_config"/>
     </service>
 
     <receiver android:name=".BootReceiver" android:exported="true">
