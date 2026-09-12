@@ -33,7 +33,7 @@ is deliberately not configurable) against three real v8.39 nodes and measures:
 
 The ollama stand-in and the run_with_ollama_judge.py launcher stub are created
 INSIDE the scratch dir by this suite and never shipped: the stub launcher
-boots the core with the mock judge (this sandbox has no ollama) and exists so
+boots the core with the mock judge (this sandbox has no model server) and exists so
 start_node's real code path -- the Popen with the exact argv and env the PC
 uses -- is what gets exercised.
 
@@ -149,7 +149,7 @@ LAUNCHER_STUB = '''\
 """run_with_ollama_judge.py -- TEST STAND-IN, created by test_c2_watchdog_live.py.
 
 Exists only inside the scratch dir so covenant_watchdog.start_node() can run
-its real restart path in a sandbox with no ollama: same argv contract as the
+its real restart path in a sandbox with no model server: same argv contract as the
 production launcher, but boots the core on the MOCK judge.  Never ship this."""
 import os, sys, subprocess
 env = dict(os.environ)

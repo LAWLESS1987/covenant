@@ -272,11 +272,11 @@ def selftest():
               (len(asked), os.path.exists(c2)))
         gh.ask = lambda *a, **k: {
             "content": '{"violates": true, "reasoning": "it directs the reader"}',
-            "model": "qwen"}
+            "model": "stub-model"}
         spoke = ask_teacher("t")
         check("R2c ...while a runner that DOES answer is relayed verbatim, so "
               "R2b is a teacher discriminating and not one that never speaks",
-              spoke == (True, "it directs the reader", "github-actions/qwen"),
+              spoke == (True, "it directs the reader", "github-actions/stub-model"),
               spoke)
     finally:
         gh.ask = _real_ask

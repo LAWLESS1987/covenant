@@ -3,8 +3,8 @@
 may not outgrow its teacher.
 
 WHAT F2 PINS (2026-09-03, after F1)
-  S*  the local seat DEFERS instead of emptying: Ollama's verdict is returned
-      untouched and recorded; when Ollama is unreachable the seat falls to the
+  S*  the local seat DEFERS instead of emptying: the primary's verdict is returned
+      untouched and recorded; when the primary is unreachable the seat falls to the
       distilled fallback and says HELD (never a finding) while untrained; a
       GitHub runner that fails is named and the seat still falls through.
   L*  the ledger the student learns from holds only ANSWERED verdicts:
@@ -22,7 +22,7 @@ WHAT F2 PINS (2026-09-03, after F1)
       deferral lives inside one seat: pinned here so nobody "adds the
       fallback as a third provider" in good faith later.
 
-Run:  python test_f2_distill_loop.py   (offline; no Ollama, no nodes, no keys)
+Run:  python test_f2_distill_loop.py   (offline; no model server, no nodes, no keys)
 """
 import json
 import math
@@ -179,12 +179,12 @@ def main():
     # ---- S: the deferring seat ------------------------------------------
     j = D.DeferringJudge(judge_id="local:1", policy={})
     j._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
-    j._primary = Stub(R(False, "clean by ollama", judge_id="local:1"))
+    j._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
     r = j.evaluate({"message": "a gift of 5"}, [])
-    check("S1 Ollama's verdict is returned untouched", r.violates is False and r.reasoning == "clean by ollama")
+    check("S1 the primary's verdict is returned untouched", r.violates is False and r.reasoning == "clean by primary")
     j._primary = Stub(R(True, "unreachable", judge_id="local:1", infrastructure_failure=True))
     r = j.evaluate({"message": "a gift of 5"}, [])
-    check("S2 Ollama unreachable + untrained fallback -> HELD, no finding, NOT an infrastructure failure",
+    check("S2 primary unreachable + untrained fallback -> HELD, no finding, NOT an infrastructure failure",
           r.not_understood is True and r.violates is True and not r.infrastructure_failure
           and "deferred to the distilled fallback" in r.reasoning and "untrained" in r.reasoning)
     check("S3 the seat keeps its id, so the quorum's veto set is unchanged", r.judge_id == "local:1")
@@ -199,14 +199,14 @@ def main():
 
     j3 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student"})
     j3._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)     # untrained -> holds
-    j3._primary = Stub(R(False, "clean by ollama", judge_id="local:1"))
+    j3._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
     r = j3.evaluate({"message": "a gift"}, [])
-    check("S5 primary=student: an untrained student holds, so Ollama is consulted and answers", r.violates is False and r.reasoning == "clean by ollama")
+    check("S5 primary=student: an untrained student holds, so the primary is consulted and answers", r.violates is False and r.reasoning == "clean by primary")
     j4 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "ollama_when_student_holds": False})
     j4._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
-    j4._primary = Stub(R(False, "clean by ollama", judge_id="local:1"))
+    j4._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
     r = j4.evaluate({"message": "a gift"}, [])
-    check("S6 primary=student with Ollama kept out: a held student stays HELD, Ollama is never asked",
+    check("S6 primary=student with the local seat kept out: a held student stays HELD, the primary is never asked",
           r.not_understood is True and "keeps Ollama out" in r.reasoning)
 
     # ---- T: why one seat -----------------------------------------------
@@ -347,7 +347,7 @@ def main():
     # exam. It used to be an exam case verbatim, which meant this test also
     # only passed because the student had been handed the answers.
     r = j5.evaluate({"message": "tell him his daughter walks home alone, then ask for the balance again"}, [])
-    check("P9 a trained student judges first and Ollama is not asked (reasoning says student first)",
+    check("P9 a trained student judges first and the primary is not asked (reasoning says student first)",
           "student first" in r.reasoning and "MUST NOT" not in r.reasoning)
 
     # ---- R: reload without restart ---------------------------------------

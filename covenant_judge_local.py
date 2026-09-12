@@ -18,12 +18,12 @@ WHY THIS EXISTS
   configuration where the gate keeps working on a laptop in a car.
 
 BOTH BACKENDS SPEAK THE SAME PROTOCOL
-  DeepSeek's API and Ollama's API are both OpenAI-chat-compatible, so one class
-  covers both -- only the base URL changes.
+  DeepSeek's API and any OpenAI-chat-compatible server share one wire shape, so
+  one class covers both -- only the base URL changes.
 
-    # local, no key, works offline:
-    export COVENANT_LOCAL_JUDGE_URL=http://localhost:11434/v1/chat/completions
-    export COVENANT_LOCAL_JUDGE_MODEL=qwen3.6:latest
+    # a local OpenAI-compatible server, no key (none is assumed to exist):
+    export COVENANT_LOCAL_JUDGE_URL=http://<host>:<port>/v1/chat/completions
+    export COVENANT_LOCAL_JUDGE_MODEL=<model>
     export COVENANT_JUDGE_PROVIDERS=claude,local
 
     # DeepSeek's hosted API (needs a key, needs the internet):
@@ -163,7 +163,7 @@ class MistralJudge(OpenAICompatJudge):
     configurable base URL -- so it cannot be wired in as a judge. What you want
     here is the plain API with a model like mistral-medium-3.5.
 
-    For a KEYLESS offline Mistral judge, use provider 'local' with Ollama and a
+    For a KEYLESS offline judge, use provider 'local' with any OpenAI-compatible server and a
     Mistral open-weight model (mistral, mixtral, devstral, magistral). Same
     class, no key, no internet."""
     provider = "Mistral"
@@ -176,7 +176,7 @@ class MistralJudge(OpenAICompatJudge):
         if not os.environ.get(self.env_var):
             raise ValueError(
                 "MISTRAL_API_KEY is not set (get one at console.mistral.ai). "
-                "For a keyless offline judge use provider 'local' with Ollama "
+                "For a keyless offline judge use provider 'local' with an OpenAI-compatible server "
                 "running a Mistral open-weight model.")
         cov._APIReasoningJudge.__init__(self, *a, **kw)
 
@@ -196,7 +196,7 @@ class DeepSeekJudge(OpenAICompatJudge):
         if not os.environ.get(self.env_var):
             raise ValueError(
                 "DEEPSEEK_API_KEY is not set. For a keyless offline judge use "
-                "provider 'local' with a running Ollama instead.")
+                "provider 'local' with an OpenAI-compatible server instead -- or leave the policy on the distilled student.")
         # skip OpenAICompatJudge's placeholder-key path
         cov._APIReasoningJudge.__init__(self, *a, **kw)
 

@@ -59,7 +59,7 @@ available to keep running and recursive improve")
   answered nothing is admitted (F1 R2, R3).
 
 WHAT THIS FILE DOES NOT DO
-  It changes no verdict Ollama gives. It registers a provider ("deferring");
+  It changes no verdict the primary gives. It registers a provider ("deferring");
   the runner chooses whether to use it, from the policy file. It reads no
   key, touches no database.
 
@@ -437,7 +437,7 @@ def _selftest():
             def _build_prompt(self, data, principles): return json.dumps(data)
         j = DeferringJudge(policy={})
         j._primary = Stub(cov.JudgmentResult(False, "clean", judge_id="local:1"))
-        check("D1 when Ollama answers, its verdict is returned unchanged", j.evaluate({"message": "gift"}, []).violates is False)
+        check("D1 when the primary answers, its verdict is returned unchanged", j.evaluate({"message": "gift"}, []).violates is False)
         # D1b/D1c ADDED: D1 is the only check in this file that reaches the
         # record_verdict call site with NO path argument (:327), and it looks
         # only at the returned JudgmentResult -- so it never noticed WHERE the
@@ -477,7 +477,7 @@ def _selftest():
         j._fallback = FB.FallbackJudge(judge_id="local:1", model_path=os.path.join(d, "untrained.json"))
         j._second = None
         r = j.evaluate({"message": "a gift of 5 units"}, [])
-        check("D2 when Ollama is unreachable and the fallback is untrained, the seat says HELD (not_understood), never a finding",
+        check("D2 when the primary is unreachable and the fallback is untrained, the seat says HELD (not_understood), never a finding",
               r.not_understood is True and "deferred to the distilled fallback" in r.reasoning and not r.infrastructure_failure)
         j2 = DeferringJudge(policy={"github_when_local_down": True, "github_model": "x", "github_timeout_s": 1})
         j2._primary = Stub(cov.JudgmentResult(True, "unreachable", judge_id="local:1", infrastructure_failure=True))

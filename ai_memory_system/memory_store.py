@@ -139,7 +139,7 @@ def claim_digest(rec: Dict[str, Any]) -> str:
     clocks and counters. `tier` is a per-node recall policy. `review` and
     `review_by` are the local gate's verdict, which legitimately differs when
     one node's judge was reachable and another's was not -- folding that into
-    the consensus token would report an Ollama hiccup on one node as a
+    the consensus token would report a judge hiccup on one node as a
     history split across the cluster, and an alarm that fires on ordinary
     operation is one nobody keeps.
 
@@ -238,7 +238,7 @@ class MemoryStore:
         # The ethics gate is INJECTED, and None means "build the default".
         # Injection is what lets the suite drive a blocking gate and an
         # unreachable one without a model call; a store that could only be
-        # tested with Ollama running is a store whose gate is never tested.
+        # tested with a live judge running is a store whose gate is never tested.
         if gate is None:
             try:
                 from ethics_gate import EthicsGate

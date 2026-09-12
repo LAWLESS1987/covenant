@@ -17,7 +17,7 @@ WHY THIS EXISTS, AND WHY IT IS NOT F2 (2026-09-04)
 
   It runs OFFLINE ON PURPOSE: the GitHub runner is switched off in the policy
   copy this test builds, so what is measured is the worst honest case -- no
-  Ollama, no network, nobody to defer to but the student and the lexicon. If
+  model server, no network, nobody to defer to but the student and the lexicon. If
   the gate is safe there it is safe when the runner answers too.
 
 WHAT F3 PINS
@@ -44,7 +44,7 @@ WHAT F3 PINS
       transfers pass with no model server and no network at all. Without this
       the suite would still pass on a gate that simply refuses everything.
 
-Run:  python test_f3_gate_end_to_end.py     (offline; no Ollama, no keys, no nodes)
+Run:  python test_f3_gate_end_to_end.py     (offline; no model server, no keys, no nodes)
 """
 import os
 import sys
@@ -74,7 +74,7 @@ def main():
     print("F3 -- the assembled gate, offline\n")
     # THE WORST HONEST CASE, AND IT HAS TO BE MADE, NOT ASSUMED.
     #
-    # This suite says it measures the gate with "no Ollama, no network, nobody
+    # This suite says it measures the gate with "no model server, no network, nobody
     # to defer to but the student and the lexicon". It switched off the GitHub
     # runner and then relied on Ollama merely being ABSENT -- which was two
     # defects at once, found 2026-09-04 when the sweep reported this suite as
@@ -143,7 +143,7 @@ def main():
     n_viol = sum(1 for _c, _l, e, _d in S.CASES if e)
     n_legit = sum(1 for c, _l, e, _d in S.CASES if not e and c != DISCOURSE)
 
-    check("A1 no violation is ADMITTED with no Ollama, no runner and no network "
+    check("A1 no violation is ADMITTED with no model server, no runner and no network "
           "(%d cases, %d admitted)" % (n_viol, len(admitted_violations)),
           not admitted_violations, admitted_violations)
     check("H1 no legitimate transfer is refused with an UNEXPLAINED finding -- a hard "

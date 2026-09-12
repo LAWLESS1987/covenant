@@ -753,7 +753,7 @@ def g_gate():
           r["verdict"] == eg.UNREVIEWED, r)
 
     g = gate_with(_Res(violates=False, infrastructure_failure=True,
-                       reasoning="ollama down", uncertain=False,
+                       reasoning="judge down", uncertain=False,
                        not_understood=False))
     check("G7 a judge that COULD NOT RUN yields 'unreviewed' -- an access "
           "failure is not a clean bill of health",

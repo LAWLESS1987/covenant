@@ -91,7 +91,7 @@ by the governor's drift band or drags the band, and neither is visible.
 4. **The signing key never leaves the process.**
 
 It also describes itself, because P15 counted the long-lived processes on this
-machine and found the fourth one — ollama — reporting nothing. This is the
+machine and found the fourth one — the model server, since removed (2026-09-07) — reporting nothing. This is the
 fifth. It prints its own source hash and line count at boot (P11) and writes a
 line to `logs/app.log` at least every 60 seconds even when nothing changes,
 **and states that bound in its own banner**, so a longer gap is readable as

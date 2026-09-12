@@ -62,7 +62,7 @@ H = {"chain_height": 7, "source_sha256": "89ef8efe914e8bdd",
 TOPO = {"A": {"height": 7, "uptime": 100, "addrs": ["h:1", "h:2"]},
         "B": {"height": 7, "uptime": 100, "addrs": ["h:1"]},
         "C": {"height": 7, "uptime": 100, "addrs": ["h:2"]}}
-JUDGE = {"digest": "sha256:abcdef123456", "served": {"qwen3:8b": "x"},
+JUDGE = {"digest": "sha256:abcdef123456", "served": {"model-a": "x"},
          "loaded": []}
 
 

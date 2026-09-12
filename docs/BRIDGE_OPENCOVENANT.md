@@ -66,11 +66,13 @@ silently becomes a bypass.
 **Where the judged text goes.** The proxy uses the node's seat as configured
 in `ops/quorum_policy.json`. Under the policy in force on 2026-09-05
 (`deferring,semantic`), a request the distilled student cannot clear is
-passed to a local Ollama judge if one is running and otherwise to the
-project's judge on the GitHub Actions runner, which means **the text of that
-request leaves the machine**. The gate's own answer says so in its reasoning
+judged by the two distilled students and the deterministic semantic judge,
+in-process (ops/quorum_policy.json: no local model server in the chain, and no
+runner in the gate since 2026-09-07). A policy that sets github_when_local_down
+sends it to the project's judge on the GitHub Actions runner instead, which
+means **the text of that request leaves the machine**. The gate's own answer says so in its reasoning
 ("This payload left the PC"). An operator who cannot accept that egress
-must run Ollama locally or set a policy that stops at the student, and must
+must leave the policy stopping at the student, and must
 know that stopping at the student means more refusals, not more allowances.
 
 Not tested: the proxy against a live `covenantd`. That daemon does not run on

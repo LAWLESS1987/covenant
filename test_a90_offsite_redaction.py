@@ -137,14 +137,14 @@ _github_was = cc._GITHUB["on"]
 try:
     cc._local_alive = lambda timeout=4: False
     cc._GITHUB["on"] = True
-    dead_on = cc._banner_lines("qwen3:8b")
+    dead_on = cc._banner_lines("local-model")
 
     cc._GITHUB["on"] = False
-    dead_off = cc._banner_lines("qwen3:8b")
+    dead_off = cc._banner_lines("local-model")
 
     cc._local_alive = lambda timeout=4: True
     cc._GITHUB["on"] = True
-    alive = cc._banner_lines("qwen3:8b")
+    alive = cc._banner_lines("local-model")
 finally:
     cc._local_alive = _probe
     cc._GITHUB["on"] = _github_was

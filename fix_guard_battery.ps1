@@ -48,11 +48,11 @@
 #     the problem. An S4U task runs in session 0; covenant_watchdog_guard.py
 #     revive and covenant_watchdog.py start_node both spawn DETACHED_PROCESS
 #     and inherit that session, and start_node hardwires
-#     COVENANT_LOCAL_JUDGE_URL to 127.0.0.1:11434 -- while Ollama runs in the
-#     INTERACTIVE session from the Startup folder. So in exactly the scenario
-#     S4U exists to cover, a revived chain would start nodes whose judge is
-#     unreachable, and the judge sits inside consensus. Make Ollama a service
-#     first, or teach the guard to refuse to revive while the judge is down.
+#     COVENANT_LOCAL_JUDGE_URL to 127.0.0.1:11434 -- while, until 2026-09-07, the
+#     judge was an out-of-process model server in the INTERACTIVE session. So in
+#     exactly the scenario S4U exists to cover, a revived chain would have started
+#     nodes whose judge was unreachable. With the judge in-process since then, the
+#     S4U question is open again on its own merits.
 #   * It does NOT add a second supervisor. redundancy.py already rejects that
 #     in the project's own words: the fix is not a third supervisor, which
 #     regresses forever, but an OS-level service. A second scheduled task would
@@ -157,7 +157,7 @@ Write-Output "  This raises COVERAGE. It does not add a level: the guard is"
 Write-Output "  still the top of the chain with nothing above it, which"
 Write-Output "  redundancy.py reports as L4 N=2. The durable fix is an"
 Write-Output "  OS-level service that does not die with a console -- and that"
-Write-Output "  needs Ollama out of the interactive session first."
+Write-Output "  (the judge has been in-process since 2026-09-07)."
 Write-Output ""
 Write-Output "  PROVE IT, rather than trusting this message: unplug the"
 Write-Output "  machine, leave it a while, then check that logs/guard.log has"

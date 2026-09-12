@@ -678,7 +678,7 @@ _judge_prev = {}
 def _quorum_policy():
     """ops/quorum_policy.json (2026-09-03): the operator's standing decision.
     Read only to DESCRIBE the gate truthfully -- with a deferring seat, a silent
-    Ollama does not make the gate fail closed, and an alert that says it does
+    a silent local seat does not make the gate fail closed, and an alert that says it does
     is a false alert. Nothing here restarts, relaxes or reconfigures."""
     path = os.environ.get("COVENANT_QUORUM_POLICY_PATH") or os.path.join(HERE, "ops", "quorum_policy.json")
     try:

@@ -22,7 +22,7 @@ wrong, which is the reason this file exists as checks and not as prose:
        reported `<provider default>` three times and counted as ONE.
 
 Runs fully in-process, M13 shape: no key is read or stored, no socket is
-opened, no ollama is required, nothing is mined. Where a judge must appear
+opened, no model server is required, nothing is mined. Where a judge must appear
 credentialled its `api_key` is set to the literal string "canned".
 
 Sections
@@ -72,7 +72,7 @@ def skip(label, why):
 
 
 class _StubJudge(cov.MockJudge):
-    """Shaped like OllamaJudge where it matters: the real model lives in
+    """Shaped like the HTTP judges where it matters: the real model lives in
     `_model_override` and is resolved by `_model()`, NOT in `self.model`."""
     provider = "stub"
     default_model = "stub-default"
@@ -112,7 +112,7 @@ def section_x():
           else "v8.37 has no ledger -- the overwrite left no trace at all")
 
     # X3 is the defect J1d, stated as the record of the old behaviour.
-    j = _StubJudge(); j._model_override = "qwen3:8b"
+    j = _StubJudge(); j._model_override = "model-a"
     old_read = str(getattr(j, "model", None) or "<provider default>")
     check("X3 OLD: the constructor override is empty for a judge configured "
           "the shipped way", old_read == "<provider default>",
@@ -190,9 +190,9 @@ def section_m():
                                       "X4 already recorded that")
         return
 
-    j = _StubJudge(); j._model_override = "qwen3:4b"
+    j = _StubJudge(); j._model_override = "model-b"
     f = cov._judge_facts(j, set(), set())
-    check("M1 the resolver wins", f["model"] == "qwen3:4b", f["model_source"])
+    check("M1 the resolver wins", f["model"] == "model-b", f["model_source"])
     check("M1b and says where the answer came from",
           f["model_source"] == "resolver")
 
@@ -237,9 +237,9 @@ def section_m():
 # ------------------------------------------------------------------ D ------
 def section_d():
     print("== D. The arithmetic on a real three-model local quorum ==")
-    # judges.json on the machine this was written for: qwen3:8b / 4b / 1.7b,
-    # one implementation, one endpoint, one credential env.
-    q = _quorum(["qwen3:8b", "qwen3:4b", "qwen3:1.7b"])
+    # three named models on one implementation, one endpoint, one credential env
+    # (the machine this was written for had three local model tags).
+    q = _quorum(["model-a", "model-b", "model-c"])
     rep = cov.quorum_diversity_report(q)
     ws = cov.quorum_diversity_warnings(rep)
     n = rep["independent_semantic_judges"]
@@ -289,7 +289,7 @@ def section_d():
 # ------------------------------------------------------------------ S ------
 def section_s():
     print("== S. Safety: no secret, no raise, no gate ==")
-    q = _quorum(["qwen3:8b", "qwen3:4b"])
+    q = _quorum(["model-a", "model-b"])
     for j in q.judges:
         j.api_key = "sk-SECRET-DO-NOT-LEAK"
     blob = repr(cov.quorum_diversity_report(q))

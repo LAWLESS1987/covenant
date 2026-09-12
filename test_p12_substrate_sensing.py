@@ -140,13 +140,13 @@ def sensor_checks():
           f is None and "not a number" in why, f"{f!r} {why!r}")
     os.environ.pop("COVENANT_JUDGE_FOOTPRINT_MB", None)
 
-    # an unreachable ollama must not hang or raise
+    # an unreachable model server must not hang or raise
     os.environ["COVENANT_LOCAL_JUDGE_URL"] = "http://127.0.0.1:1/v1/chat/completions"
     os.environ["COVENANT_LOCAL_JUDGE_MODEL"] = "nope:1b"
     t0 = time.monotonic()
     f, src, why = cov.read_judge_footprint_bytes()
     dt = time.monotonic() - t0
-    check("S6 an unreachable ollama degrades fast, with a reason",
+    check("S6 an unreachable model server degrades fast, with a reason",
           f is None and bool(why) and dt < 10, f"{dt:.2f}s {why!r}")
     for k in ("COVENANT_LOCAL_JUDGE_URL", "COVENANT_LOCAL_JUDGE_MODEL"):
         os.environ.pop(k, None)

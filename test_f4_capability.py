@@ -33,7 +33,7 @@ benefit")
   when nobody else can, and each is used for what it is actually good at.
   The exam number is the honest cost of that trade and is printed beside it.
 
-Run:  python test_f4_capability.py     (offline; no Ollama, no keys, no nodes)
+Run:  python test_f4_capability.py     (offline; no model server, no keys, no nodes)
 """
 import io
 import json

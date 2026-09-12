@@ -93,7 +93,7 @@ replace it, because it syncs positions and does not compute orders.
 |---|---|
 | `covenant_unified_v8.py` | the node. 425KB, the core of everything |
 | `covenant_client.py` | operator client — balance, send, mine, status |
-| `covenant_judge_local.py` | DeepSeek / Mistral / Ollama judge providers |
+| `covenant_judge_local.py` | OpenAI-compatible local / DeepSeek / Mistral judge providers (the local model-server seat was retired 2026-09-07) |
 | `NODES.md` | **read before running multiple nodes.** Port arithmetic will bite you |
 | `run_with_claude_judge.py` | file-based judge gate, no API key |
 | `phone/node-install.sh` | run a node on Android via Termux |

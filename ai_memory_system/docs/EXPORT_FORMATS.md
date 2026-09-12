@@ -17,7 +17,7 @@ Modules allowed: `json, sqlite3, zipfile, tarfile, csv, re, io, pathlib, hashlib
 | 5 | **Cursor** | â not installed | high, KV-blob reverse-eng |
 | 6 | **Windsurf** | â not installed | do last, key name unknown |
 
-Tier 0 items 1â2 are the only things in this entire brief that can be tested today. **Write and validate the pipeline against those two, then bolt on the rest.**
+Tier 0 item 1 is the only thing in this entire brief that can be tested today (the desktop app of item 2 is not installed on this machine, directory absent 2026-09-12). **Write and validate the pipeline against those two, then bolt on the rest.**
 
 ### Tier 1 â real self-serve export, request now, parse later
 Ranked by (schema confidence Ã likely data volume):

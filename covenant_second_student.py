@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-covenant_second_student.py -- the second student, so Ollama can leave the chain.
+covenant_second_student.py -- the second student, so the chain needs no local model server.
 
 ASKED 2026-09-06: "form a second to replace ollama out of the equation and let
 them both know we are working towards symbiosis to avoid mutual destruction."

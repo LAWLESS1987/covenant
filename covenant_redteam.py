@@ -12,7 +12,7 @@ and token preservation")
   A discipline that costs nothing runs every night.
 
   This is the same shape on the GitHub Actions runner (covenant_github_judge,
-  qwen2.5:7b -- a weaker attacker, and that is fine: the student is a bag of
+  the runner's model (COVENANT_GITHUB_MODEL) -- a weaker attacker, and that is fine: the student is a bag of
   words, and the holes it has are the kind a 7B model finds). The runner
   writes memos meant to fool the student; the student, local and instant,
   says which ones did; the runner then labels the survivors BLIND, without

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """covenant_github_judge.py -- ask a covenant judge that runs on GitHub's
-machine, for the moments this PC's Ollama is not answering.
+machine. This PC runs no model server (removed 2026-09-07); the nodes' gate is
+the distilled student, and covenant_route.py / covenant_chat.py send their
+turns here.
 
 WHY (asked 2026-09-03: "route through GitHub if Ollama is failing")
-  The nodes' judge, covenant_route.py and covenant_chat.py all talk to Ollama
-  on 127.0.0.1:11434. When it is down (RAM, a crash, a reboot) they have
+  At the time the nodes' judge, covenant_route.py and covenant_chat.py all
+  talked to a local model server on 127.0.0.1:11434. When it was down they had
   nowhere to go. GitHub Models inference was the obvious second place and it
   was probed first: 2026-09-04 it answered HTTP 410
   "github_models_retirement_brownout". So the second place is a GitHub
@@ -33,7 +35,7 @@ LATENCY
   This is a fallback for bounded questions, not a chat you sit in front of.
 
 USE
-  python covenant_github_judge.py --prompt "..." [--model qwen2.5:3b] [--json]
+  python covenant_github_judge.py --prompt "..." [--model <DEFAULT_MODEL>] [--json]
   python covenant_github_judge.py --prompt-file q.txt --system-file s.txt
   python covenant_github_judge.py --selftest
   from covenant_github_judge import ask, available

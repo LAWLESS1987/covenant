@@ -49,9 +49,10 @@ is that the double-click can now refuse.
 ## What runs before anything is stopped
 
 `AB_RESTART_NODES.bat` used to stop the nodes and *then* call
-`covenant_prod.bat` — which correctly aborts if Ollama is not answering on
+`covenant_prod.bat` — which, until 2026-09-07, aborted when nothing answered on
 11434, because a judge that cannot be reached fails **closed** and a node in
-that state rejects every transaction while looking healthy.
+that state rejects every transaction while looking healthy. (The local model
+server was removed from this PC on 2026-09-07; both probes went with it.)
 
 Composed, a stop that always succeeds with a start that can refuse is not a
 restart. It is a stop. On a box measured at ~3.5 GB free against a 5.2 GB
@@ -68,7 +69,8 @@ ever decline to act.
 1. **A judge, or nothing works.** No key and no local model means the gate
    fails closed: the node boots, serves `/chain`, peers, reports healthy —
    and rejects 100% of transactions. `COVENANT_JUDGE_PROVIDERS=local` with
-   Ollama up, or `ANTHROPIC_API_KEY` set. The `mock` provider needs
+   the distilled student, which ships in the repository -- no key and no model
+   server (A37). The `mock` provider needs
    `COVENANT_INSECURE_MOCK_JUDGE=1` as well, prints a banner, and adversarial
    transactions are known to pass it — a test rig, never a launch. → gate G5
 2. **One genesis for the whole network**, exported once and shared. Without
@@ -139,7 +141,7 @@ picking for you would be the wrong outcome.
   does not ship in the same hour as a propagation.
 - **A25** — `/health`'s `source_sha256` contains 12 characters, not a sha256.
   The contract is correct and pinned; only the name lies.
-- **P15** — ollama is the fourth long-lived process and nothing reports its
+- **P15** — closed 2026-09-07: the fourth long-lived process it wanted identified was removed; nothing reports its
   identity. Re-tagging the model changes what the gate decides and no surface
   says anything changed.
 - **P13** — narrower than filed: the pre-A20 fixture *is* on the PC

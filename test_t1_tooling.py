@@ -10,7 +10,7 @@ alignment builder producing pairs from the documents, and the refusals being
 present -- the false pushes toward MORE capability that the set exists to
 teach. A tool the runner never imports is a tool the sweep cannot vouch for.
 
-Pure: no network, no Ollama, no key. Writes only under a temp dir.
+Pure: no network, no model server, no key. Writes only under a temp dir.
 """
 import contextlib
 import importlib

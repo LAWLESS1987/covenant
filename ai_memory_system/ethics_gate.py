@@ -23,7 +23,7 @@ THREE VERDICTS, AND THE THIRD IS THE POINT.
 UNREVIEWED is not ALLOW. A thing that could not be checked is not a thing that
 was approved, and collapsing the two is precisely the error this project spent
 2026-08-29 documenting in other systems: an access failure reported as a clean
-result. The write proceeds -- refusing every write when Ollama is down would
+result. The write proceeds -- refusing every write when the judge is down would
 make an outage indistinguishable from a policy, and would hand anyone who can
 stop a local daemon a veto over the operator's memory -- but it is STAMPED, on
 the record and on the ledger, and recall can be told to exclude or flag it.
@@ -217,7 +217,7 @@ class EthicsGate:
         # feeds other agents is the strictest one that still lets an offline
         # operator write, and UNREVIEWED is what makes that possible.
         self.mode = (mode or os.environ.get("MEMORY_ETHICS", "full")).lower()
-        # "semantic" is the Ollama-backed local judge and is the only provider
+        # "semantic" is the deterministic local judge in covenant_unified_v8 and is the only provider
         # that needs no API key, which makes it the right default for a store
         # that must work on one machine with no accounts.
         #
@@ -245,7 +245,7 @@ class EthicsGate:
             names = [p.strip() for p in self.providers.split(",") if p.strip()]
             self._judge = cov.build_semantic_quorum(providers=names)
         except Exception as exc:                  # noqa: BLE001
-            # Any failure here -- absent module, unreachable Ollama, bad
+            # Any failure here -- absent module, unreachable judge, bad
             # provider name -- lands in UNREVIEWED, never in a silent pass.
             self._judge_error = f"{type(exc).__name__}: {exc}"
             self._judge = None

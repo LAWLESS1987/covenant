@@ -12,7 +12,7 @@ others not available to keep running and recursive improve")
 
 THE THREE PARTIES
 
-  teacher   the covenant's own judges. Every verdict Ollama gives on a live
+  teacher   the covenant's own judges. Every verdict the primary gives on a live
             transaction is written to ops/verdicts.jsonl by covenant_judge_defer.py.
             Between transactions the teacher also WRITES cases: --generate asks
             the local judge for new transaction messages in each category, then
@@ -992,7 +992,7 @@ def ollama_up():
 
 # ---------------------------------------------------------------- the teacher on GitHub's machine
 # Asked 2026-09-03: "clear any clutter from the pc also including ollama after
-# and have it constantly improve". Without Ollama the teacher is the judge on a
+# and have it constantly improve". With no local model server the teacher is the judge on a
 # GitHub Actions runner (covenant_github_judge.py): one run writes a category's
 # cases, one run judges them all blind, as a batch -- a run costs ~70-110 s, so
 # a cycle is ~12 runs. The batch prompt is the node judge's own prompt head
@@ -1127,7 +1127,7 @@ def generate_github(n_per_cat, say=print, verdicts_path=VERDICTS, rejected_path=
 
 def generate(n_per_cat, model=TEACHER, say=print, verdicts_path=VERDICTS, rejected_path=REJECTED):
     """Teacher writes, then blind-judges. Kept only on agreement. Returns
-    (kept, rejected, teacher_down). Ollama if it answers; else the GitHub
+    (kept, rejected, teacher_down). A local server if one answers; else the GitHub
     runner (COVENANT_DISTILL_TEACHER=github forces it, =ollama forbids the runner)."""
     pref = os.environ.get("COVENANT_DISTILL_TEACHER", "auto").lower()
     if pref == "github" or (pref == "auto" and not ollama_up()):
