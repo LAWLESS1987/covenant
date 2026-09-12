@@ -5,8 +5,23 @@
 # loop -- is pushed at once, and the sentinel-witness branch is moved to the
 # same commit and pushed too, so the two never drift and nobody types a push.
 # A failed push (offline, remote ahead) is reported and never blocks the commit.
+#
+# A94 (2026-09-12). The branch guard below used to be a bare `|| exit 0`: on any
+# branch but main this hook did nothing AND SAID NOTHING. The working tree drifted
+# onto fix/judge-evidence-cut around 2026-09-10 and fourteen commits -- including
+# the offsite-redaction and leak-address fixes -- sat unpublished for two days
+# while every commit looked exactly as successful as a pushed one. A sync that
+# goes quiet when it stops syncing is the same defect this project keeps finding
+# everywhere else, and it was in the thing whose whole job is to be noticed.
+# It still must not block or switch branches: what to do about a side branch is
+# the operator's call. It just has to say so.
 b=$(git branch --show-current 2>/dev/null)
-[ "$b" = "main" ] || exit 0
+if [ "$b" != "main" ]; then
+  n=$(git rev-list --count origin/main.."$b" 2>/dev/null || echo "?")
+  echo "post-commit: on branch '$b', NOT main -- nothing pushed." >&2
+  echo "post-commit: $n commit(s) here are not on origin/main. Merge or switch when you mean to publish." >&2
+  exit 0
+fi
 git branch -f sentinel-witness main >/dev/null 2>&1
 if git push -q origin main sentinel-witness >/dev/null 2>&1; then
   echo "post-commit: pushed main and sentinel-witness ($(git rev-parse --short HEAD))"
