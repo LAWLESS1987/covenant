@@ -4,8 +4,8 @@
 WHAT BROKE. ops/quorum_policy.json was untracked from the repository on
 2026-09-11 (11f22a8: the policy is the operator's answer, and a clone should
 inherit the question, not the answer). Correct on its own terms -- and it
-silently changed what a clone's gate is, because run_with_ollama_judge.py:52-55
-falls back to a HARD-CODED "local,semantic" whenever there is no policy file,
+silently changed what a clone's gate is, because run_with_ollama_judge.py fell
+back to a HARD-CODED "local,semantic" whenever there was no policy file,
 discarding COVENANT_JUDGE_PROVIDERS entirely. Provider "local" is OllamaJudge.
 
 So every fresh clone -- the phone kit, and the second operator this project has
@@ -13,6 +13,15 @@ been building toward -- came up with a judge pointed at a model server that is
 not there, while /health reported operable_semantic_judges: 2 because nothing
 probes a seat at startup. This PC never saw it: the policy file still exists
 here, it is merely gitignored now.
+
+HOW IT WAS CLOSED, in two steps. On 2026-09-12 the phone script first exported
+COVENANT_JUDGE_PROVIDERS_OVERRIDE, the one variable the fallback could not
+discard. That worked and was wrong: OVERRIDE beats the operator's own policy
+file, so a phone operator's standing decision would have been silently ignored.
+Later the same day the operator changed the fallback itself to
+"deferring,semantic" and the override came out of the script. What this file
+now pins is the second state: a policy-less tree seats the student with NO help
+from the environment, and the phone script exports nothing about providers.
 
 HOW THIS TEST WORKS, and why it is not a grep. It builds a clone-equivalent
 tree by COPYING this one and deleting the gitignored policy file (no git: the
@@ -22,9 +31,11 @@ captures the environment the script actually hands the node instead of starting
 it. That environment is then fed to a real interpreter in the clone tree, which
 asks the registry which class provider[0] resolves to.
 
-The negative control is the point: the SAME machinery, given the pre-fix
-environment, must still produce OllamaJudge. A guard that cannot fail on the bug
-it guards is not a guard (A66 and the 35/36 fake guards of 2026-09-09).
+The controls are the point: an explicit OVERRIDE=local,semantic must still
+produce OllamaJudge (so the probe is known to discriminate), and a plain
+COVENANT_JUDGE_PROVIDERS=local must be IGNORED on a policy-less tree (the
+fallback, not the shell, decides a clone's gate). A guard that cannot fail on
+the bug it guards is not a guard (A66 and the 35/36 fake guards of 2026-09-09).
 """
 import json
 import os
@@ -124,12 +135,19 @@ class CloneSeatsTheStudent(unittest.TestCase):
         self.assertTrue(line, "probe produced no result:\n" + r.stdout + r.stderr)
         return json.loads(line[0][len("__RESULT__"):])
 
-    def test_01_script_sets_the_only_variable_that_wins(self):
+    def test_01_script_exports_nothing_about_providers(self):
+        """The phone script must not pin the seat list. OVERRIDE beats the
+        operator's own ops/quorum_policy.json, so a script that exported it
+        would silently ignore a phone operator's standing decision. Resolution
+        belongs to the launcher: policy if present, else its default."""
         captured = self._env_the_script_exports()
-        self.assertIn("COVENANT_JUDGE_PROVIDERS_OVERRIDE", captured,
-                      "covenant_phone.sh exported no OVERRIDE; with no policy file "
-                      "every other providers variable is discarded")
-        self.assertIn("deferring", captured["COVENANT_JUDGE_PROVIDERS_OVERRIDE"])
+        self.assertNotIn("COVENANT_JUDGE_PROVIDERS_OVERRIDE", captured,
+                         "covenant_phone.sh exports OVERRIDE again -- that silences a phone "
+                         "operator's own policy file")
+        self.assertNotIn("COVENANT_JUDGE_PROVIDERS", captured,
+                         "covenant_phone.sh exports a providers list; with no policy the "
+                         "launcher discards it, and with a policy the policy wins -- either "
+                         "way it is a value that lies to whoever reads the script")
 
     def test_02_clone_seats_the_student(self):
         captured = self._env_the_script_exports()
@@ -141,19 +159,23 @@ class CloneSeatsTheStudent(unittest.TestCase):
             "phone does not run. Resolved providers=%r" % got["providers"])
         self.assertEqual(got["impl"], "DeferringJudge", got)
 
-    def test_03_negative_control_the_old_wiring_still_breaks(self):
-        """The pre-fix environment MUST still produce the broken seat here.
+    def test_03_control_an_explicit_override_still_wins(self):
+        """The probe must be able to produce the BROKEN seat on demand, or a
+        green test_02 proves nothing. OVERRIDE is the one variable that beats
+        the fallback, so OVERRIDE=local,semantic must yield OllamaJudge."""
+        got = self._resolve({"COVENANT_JUDGE_PROVIDERS_OVERRIDE": "local,semantic"})
+        self.assertEqual(got["impl"], "OllamaJudge",
+                         "the probe can no longer reach the broken seat; re-derive this "
+                         "guard rather than trusting it (got %r)" % got)
 
-        If this ever starts passing as DeferringJudge, the fallback in
-        run_with_ollama_judge.py changed and test_02 has stopped proving that
-        the phone script is what fixed anything."""
+    def test_04_the_shell_does_not_decide_a_clone_gate(self):
+        """A plain COVENANT_JUDGE_PROVIDERS=local on a policy-less tree must be
+        IGNORED: the launcher's default decides, not whatever a shell exported.
+        This is the property the 2026-09-12 fallback change relies on."""
         got = self._resolve({"COVENANT_JUDGE_PROVIDERS": "local"})
-        self.assertEqual(
-            got["impl"], "OllamaJudge",
-            "the bug this test guards is no longer reproducible; re-derive the "
-            "guard rather than trusting it (got %r)" % got)
-        self.assertEqual(got["providers"], "local,semantic",
-                         "the hard-coded no-policy fallback changed shape: " + repr(got))
+        self.assertEqual(got["providers"], "deferring,semantic",
+                         "no-policy fallback changed shape: " + repr(got))
+        self.assertEqual(got["impl"], "DeferringJudge", got)
 
 
 if __name__ == "__main__":

@@ -42,14 +42,27 @@ os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
 # quorum (providers, and whether a silent seat is a dissent). It is applied here,
 # after whatever env the watchdog or covenant_prod.bat passed in, so every start
 # path -- operator, watchdog revival, guard -> watchdog -> node -- runs the same
-# gate. COVENANT_JUDGE_PROVIDERS_OVERRIDE still beats everything. No policy file
-# -> exactly the v8.40 wiring below.
+# gate. COVENANT_JUDGE_PROVIDERS_OVERRIDE still beats everything.
+#
+# NO POLICY FILE -> "deferring,semantic". Decided by the operator 2026-09-12
+# ("change the fallback to deferring,semantic"), closing A93. The line used to
+# say "local,semantic" under a comment reading "exactly the v8.40 wiring below",
+# which was true on 2026-08-29 and false from 2026-09-07, the day Ollama was
+# deleted: provider "local" is OllamaJudge, so every CLONE -- the phone kit, a
+# second operator -- came up with its first semantic seat pointed at a model
+# server it did not run, while this PC never noticed because its gitignored
+# ops/quorum_policy.json said deferring,semantic all along. "deferring" is the
+# seat that never goes empty (students -> runner -> fallback); with no policy
+# it is the only default that judges on a fresh clone. The environment is still
+# discarded when there is no policy, deliberately: a clone's gate must not
+# depend on what a shell happened to export. Measured before/after in
+# test_a93_clone_seats_the_student.py.
 _policy = covenant_judge_defer.apply_policy()
 if _policy:
     print("[ollama-judge] " + _policy, file=sys.stderr, flush=True)
 os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
     "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
-    os.environ["COVENANT_JUDGE_PROVIDERS"] if _policy else "local,semantic")
+    os.environ["COVENANT_JUDGE_PROVIDERS"] if _policy else "deferring,semantic")
 # never silently fall back to keyword matching
 os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
 

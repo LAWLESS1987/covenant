@@ -115,35 +115,29 @@ defaults at the top of the script:
 | `JUDGE_MODEL` | `qwen3:1.7b` | the phone judge; `qwen3:4b` on an 8 GB phone |
 | `NODE_ID` | `phone` | the name the node signs with |
 
-Under the hood the script exports `COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic`,
-`COVENANT_LOCAL_JUDGE_MODEL=$JUDGE_MODEL`,
-`COVENANT_OLLAMA_URL=http://127.0.0.1:11434/v1/chat/completions`, and runs
+Under the hood the script exports `COVENANT_LOCAL_JUDGE_MODEL=$JUDGE_MODEL` and
+`COVENANT_OLLAMA_URL=http://127.0.0.1:11434/v1/chat/completions` (both read only by
+the optional Ollama seat), and runs
 
-**CORRECTED 2026-09-12 (A93). This page said those exports were decorative
-because the policy file overrode them. That was measured on the PC, which has
-`ops/quorum_policy.json`. A phone does not.** The policy was untracked from the
-repository on 2026-09-11 -- it is the operator's answer, and a clone should
-inherit the question -- and `run_with_ollama_judge.py:52-55` falls back to a
-hard-coded `local,semantic` whenever there is no policy file, discarding
-`COVENANT_JUDGE_PROVIDERS` entirely. Provider `local` is `OllamaJudge`. So a
-freshly cloned phone came up pointed at a model server it does not run, while
-`/health` still called it an operable seat, because nothing probes a seat at
-startup.
+**A93, closed 2026-09-12.** The policy file `ops/quorum_policy.json` is the
+operator's answer and is gitignored, so a clone never has one -- and until
+2026-09-12 the launcher's fallback for "no policy" was hard-coded to
+`local,semantic`, an Ollama seat no phone runs. For one day this script papered
+over that with `COVENANT_JUDGE_PROVIDERS_OVERRIDE`, which would have silently
+ignored a phone operator's own policy file. The operator then changed the
+fallback itself: **with no policy, every node -- phone or PC -- now seats
+`deferring,semantic`**, and this script exports nothing about providers.
+Measured on a clone-equivalent tree, no policy, no override:
 
-The script now exports `COVENANT_JUDGE_PROVIDERS_OVERRIDE`, the one variable
-that fallback cannot discard. Measured on a clone-equivalent tree, same machine,
-same script, only the variable changed:
-
-| what the script exports | seat 0 resolves to |
+| tree | seat 0 resolves to |
 |---|---|
-| `COVENANT_JUDGE_PROVIDERS=local` | `OllamaJudge` -- broken on a phone |
-| `COVENANT_JUDGE_PROVIDERS=deferring,semantic` | `OllamaJudge` -- silently ignored |
-| `COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic` | `DeferringJudge` |
+| before 2026-09-12 (fallback `local,semantic`) | `OllamaJudge` -- broken on a phone |
+| after (fallback `deferring,semantic`) | `DeferringJudge` -- the distilled student, in-process |
 
-`test_a93_clone_seats_the_student.py` pins it by running this script with a fake
-`python` that captures the environment it exports, then asking the registry what
-that environment resolves to. Its negative control asserts the old wiring still
-produces `OllamaJudge`, so the guard cannot quietly stop guarding.
+`test_a93_clone_seats_the_student.py` pins it by running this script with a
+fake `python` that captures the environment, then asking the launcher what a
+policy-less tree resolves to. Its control asserts an explicit OVERRIDE still
+wins, so the probe is known to discriminate.
 
 The gate you actually get is the deferring seat (both distilled students) plus
 the deterministic semantic judge. See KNOWN_ISSUES A38 and A93. The command run is

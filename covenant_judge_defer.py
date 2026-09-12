@@ -4,8 +4,11 @@
 WHY (asked 2026-09-03: "create a semantic judge to defer to if others not
 available to keep running and recursive improve")
 
-  The ethics gate is COVENANT_JUDGE_PROVIDERS="local,semantic": Ollama on this
-  PC, and the deterministic semantic judge. Two seats, veto threshold 1. When
+  The ethics gate WAS COVENANT_JUDGE_PROVIDERS="local,semantic": Ollama on this
+  PC, and the deterministic semantic judge. (Since 2026-09-12 the no-policy
+  default is "deferring,semantic" -- this module's seat -- see A93; the
+  paragraph below describes the wiring this file was written against.)
+  Two seats, veto threshold 1. When
   Ollama is down the local seat fails closed, and F1 measured what follows:
   every transaction refused, peer blocks refused, "a fork in the making".
 

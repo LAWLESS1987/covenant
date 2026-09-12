@@ -2887,14 +2887,38 @@ environment resolves to. Mutation-tested: reverting the script's export makes
 environment still yields `OllamaJudge`, so the guard cannot quietly stop
 guarding the thing it was written for.
 
-**Deliberately NOT fixed: the fallback itself.** The honest repair is for
-`run_with_ollama_judge.py` to fall back to `deferring,semantic` rather than
-`local,semantic`, which would fix every clone and every other entry point at
-once rather than the phone alone. That changes the default gate for everyone,
-which is a change in what the rule MEANS and not a repair of a broken one — and
-the standing rule is refinements only until there is a second operator. It is
-the operator's call, and it is the first thing to decide before anyone else
-clones this.
+**The fallback itself — DECIDED AND FIXED, later on 2026-09-12.** The paragraph
+this replaces said the honest repair was for `run_with_ollama_judge.py` to fall
+back to `deferring,semantic` rather than `local,semantic`, that doing so changed
+the default gate for everyone, and that it was therefore the operator's call.
+The operator made it: *"change the fallback to deferring,semantic."*
+
+Changed in step, so no start path drifts from another (P17's hazard sideways):
+`run_with_ollama_judge.py` (the fallback and the comment that called the old
+one "exactly the v8.40 wiring"), `covenant_watchdog.start_node` and
+`covenant_prod.bat` (both set the same pair before the policy is applied),
+`ops/quorum_policy.example.json` (stated the old default twice), and
+`covenant_judge_defer.py`'s docstring. Not changed: `run_with_local_judge.py`,
+whose whole identity is "run behind the local judge" and whose default of
+`local` is its meaning, and the historical measurement records in
+`covenant_judge_fallback.py`, `test_f1_fallback_silence.py` and the F1 comment
+in `covenant_one.py`, which describe the wiring of 2026-08-30 as it was.
+
+**And the phone script's override came OUT.** For one day
+`mobile/covenant_phone.sh` exported `COVENANT_JUDGE_PROVIDERS_OVERRIDE`, which
+worked and was wrong: OVERRIDE beats the operator's own `ops/quorum_policy.json`,
+so a phone operator who wrote a standing policy would have had it silently
+ignored by the very script that starts their node. With the fallback fixed the
+script exports nothing about providers, and resolution on a phone is what it is
+everywhere: policy if present, else the launcher's default.
+
+`test_a93_clone_seats_the_student.py` now pins the second state: a policy-less
+tree seats `DeferringJudge` with no help from the environment (test_02), the
+script exports no providers variable at all (test_01), an explicit
+`OVERRIDE=local,semantic` still produces `OllamaJudge` so the probe is known to
+discriminate (test_03), and a plain `COVENANT_JUDGE_PROVIDERS=local` is ignored
+on a policy-less tree (test_04) — the shell does not decide a clone's gate.
+Mutation-tested: restoring the old literal fails test_02 and test_04.
 
 **A second, smaller thing this exposed.** `operable_semantic_judges` counts
 seats that were configured, not seats that answered. A seat pointed at a dead

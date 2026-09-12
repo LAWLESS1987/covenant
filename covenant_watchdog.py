@@ -894,7 +894,9 @@ def start_node(node):
     # v8.40: match run_with_ollama_judge.py's pair -- a node the watchdog
     # revives must judge with the same quorum a node the operator starts
     # does, or a restart silently changes the gate (P17's hazard sideways).
-    env["COVENANT_JUDGE_PROVIDERS"] = "local,semantic"
+    # 2026-09-12: "deferring,semantic", the launcher's new no-policy default
+    # (run_with_ollama_judge.py, A93). Kept identical so the two never drift.
+    env["COVENANT_JUDGE_PROVIDERS"] = "deferring,semantic"
     # 2026-09-03: the operator's standing quorum decision, ops/quorum_policy.json,
     # read here so a node this watchdog revives is wired like one the operator
     # starts (the runner applies the same file again; this only keeps the env

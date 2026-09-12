@@ -37,7 +37,8 @@ REM the bench. The smoke boot of this landing printed the core's own
 REM hint ('add it to COVENANT_JUDGE_PROVIDERS to use it') -- a judge
 REM shipped and wired to nothing is the defect class this repo keeps
 REM finding in itself, caught this time BEFORE the restart.
-set COVENANT_JUDGE_PROVIDERS=local,semantic
+set COVENANT_JUDGE_PROVIDERS=deferring,semantic
+REM 2026-09-12: was local,semantic; the launcher's no-policy default changed (A93).
 REM 2026-09-03: ops\quorum_policy.json overrides the line above at node start
 REM (run_with_ollama_judge.py applies it; the watchdog reads it too). Today it
 REM says "deferring,semantic": the local seat is Ollama, else a judge on a
