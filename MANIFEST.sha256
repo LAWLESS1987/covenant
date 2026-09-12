@@ -1,7 +1,7 @@
 # covenant bundle manifest -- sha256 of every shipped file.
 # Keys, databases and logs are deliberately NOT in here.
 84485e905a7f97610172e0d4529d82d700cebefcddd411a85b831bf60f912175  .gitattributes
-ffdae5c0a5406936a631627c211a0a0146fb052a86287a5940279448da6c284b  .github/workflows/android.yml
+64db27d48f42c32ee31544cdfdffed2c926fa5567ac7a13c5fb3013ab0afd6c3  .github/workflows/android.yml
 f39837ed9e9aa6a74dcad1c87a42fdd95d5c7bc0c3483437127867faf8cf4f29  .github/workflows/covenant.yml
 dc38c898d2aa6a67d72b2a9cd52c43545d23b9ad2cb80788b4a7da7fefb0a4d9  .github/workflows/judge.yml
 741e512cb1f533e012f751e521aa5a91883cca7dfbe61afcad2ae02e43843be9  .gitignore

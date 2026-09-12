@@ -59,8 +59,10 @@ concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  COVENANT_APP_STAGE: ${{ runner.temp }}/covenant-app
+# No workflow-level env: the first run of this file was rejected by GitHub at
+# parse time because it set COVENANT_APP_STAGE from ${{ runner.temp }} here,
+# and the runner context does not exist at workflow level. build.sh already
+# stages to $RUNNER_TEMP/covenant-app when the variable is unset.
 
 jobs:
   build:
@@ -108,7 +110,7 @@ jobs:
 
       - name: The APK carries the core, and the core is the checkout's
         run: |
-          APK="$COVENANT_APP_STAGE/covenant-node.apk"
+          APK="$RUNNER_TEMP/covenant-app/covenant-node.apk"
           unzip -l "$APK" | grep -E 'assets/core/(covenant_unified_v8.py|genesis.json|semantic_judge_model.json|fallback_model.json)|lib/(arm64-v8a|x86_64)/libpython3.12.so'
           unzip -o -q "$APK" 'assets/core/covenant_unified_v8.py' -d "$RUNNER_TEMP/x"
           cmp "$RUNNER_TEMP/x/assets/core/covenant_unified_v8.py" covenant_unified_v8.py && echo "core in APK == core in checkout"
