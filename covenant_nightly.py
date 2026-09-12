@@ -150,11 +150,24 @@ def main():
     if a.strategy:
         try:
             import subprocess
+            # A97 (2026-09-12): this was a bare subprocess.run, the last one in
+            # any unattended path. covenant_quiet exists because of exactly this
+            # shape and says so in its own docstring: "On Windows a console
+            # process launched from a parent that has NO console gets a BRAND
+            # NEW ONE, and redirecting its output does not stop that."
+            # CovenantDistill runs this file from pythonw via ops/hidden_task.py,
+            # so the parent has no console -- and strategy_validate.py then threw
+            # a real window in front of whoever was typing, once per nightly pass.
+            # That is the third time this defect has been fixed in a new place;
+            # the helper is the fix, remembering to use it is the problem, and a
+            # source audit of every unattended path (2026-09-12) found this one
+            # call left.
+            import covenant_quiet
             sdir = os.path.join(HERE, "ops", "strategy_reports")
             os.makedirs(sdir, exist_ok=True)
             sout = os.path.join(sdir, "NIGHTLY_%s.txt" % time.strftime("%Y-%m-%d", time.gmtime()))
-            r = subprocess.run([sys.executable, os.path.join(HERE, "strategy_validate.py"), "--out", sout],
-                               cwd=HERE, capture_output=True, text=True, timeout=1800)
+            r = covenant_quiet.run([sys.executable, os.path.join(HERE, "strategy_validate.py"), "--out", sout],
+                                   cwd=HERE, capture_output=True, text=True, timeout=1800)
             tail = [l for l in (r.stdout or "").splitlines() if l.strip()][-3:]
             for l in tail:
                 say("strategy: " + l.strip()[:160])

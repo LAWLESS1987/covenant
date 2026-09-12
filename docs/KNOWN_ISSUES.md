@@ -2934,3 +2934,97 @@ threaded through the tally. Changing what the tally can report is not a repair
 of a broken thing; the standing rule is refinements only until there is a
 second operator. Recorded so the next reader does not mistake the `ABSENT` line
 for a missing file, which is what it says and not what is true.
+
+### A96. [minor / observability] A node refusing a peer's block on ethics did it in silence. FIXED 2026-09-12
+
+**Where.** `covenant_unified_v8.py` `_accept_block_common`, the
+`block_rejected_ethics` branch.
+
+**The defect.** Refusing a peer's block is how a node declines to converge, and
+the only trace was one `/anomalies` COUNT whose detail was truncated to 120
+characters. `/health` meanwhile reported `peers: 1`, `dead_peers: 0` and a
+height that never moved. A joining node sat at height 2 against a peer at 17
+and nothing anywhere said why; reading the reason took an instrumented
+interpreter that monkeypatched the anomaly monitor.
+
+**Fixed.** The full reason is printed once per refused block
+(`SYNC REFUSED block N: ...`). Blocks are refused rarely, and when one is, that
+line is the only thing that explains why the chain stopped growing.
+
+### A97. [minor / desktop] The nightly validator threw a console window in front of the operator. FIXED 2026-09-12
+
+**Where.** `covenant_nightly.py:156`, a bare `subprocess.run` of
+`strategy_validate.py`.
+
+**The defect.** `covenant_quiet.py` exists for exactly this and states the rule
+in its own docstring: "On Windows a console process launched from a parent that
+has NO console gets a BRAND NEW ONE, and redirecting its output does not stop
+that." `CovenantDistill` runs `covenant_nightly.py` from `pythonw` via
+`ops/hidden_task.py`, so the parent has no console, and this child got a real
+window -- once per nightly pass, which is why it read as "at times" rather than
+as a steady flicker.
+
+**Measured.** A source audit of every unattended path (watchdog, guard, refine
+check, nightly, daily, chat, github judge, scenarios, distill, trader) on
+2026-09-12 found exactly one call left without a flag: this one. A 10-minute
+process/window watch over the same machine recorded no visible window from the
+per-minute balance checks -- those already route through `covenant_quiet` and
+their `conhost` children are the invisible console `CREATE_NO_WINDOW` still
+allocates, which is not a window and must not be read as one.
+
+**The pattern, third time.** The helper is the fix; remembering to use it is the
+problem. A check that fails when an unattended path calls `subprocess` directly
+would end this, and is not written.
+
+### A98. [major / second-operator blocking] A refusal that alleged nothing stopped a node from ever catching up. FIXED 2026-09-12
+
+**Where.** `ReasoningSentinel.validate_block`, reached from
+`_accept_block_common` on the fetch path.
+
+**The defect, measured.** A joining node re-judges every transaction in the
+history it fetches. The distilled student HELD on a seal-anchor transaction
+from 2026-08-22, in its own words:
+
+> log-odds -8.19 would clear this, but 6 content word(s) here were never seen in
+> training [asserts, commitment, files, hash] ... It has made NO finding and is
+> NOT alleging anything.
+
+`semantic:1` said clean. `mock_selfreport:0` said clean. The hold fails closed,
+so one non-finding vetoed two clears, the block was refused, and the joiner
+stalled at height 2 against a peer at 17 -- indefinitely.
+
+That is not a safety property. It is a growth ceiling: **no node can ever join a
+chain whose history predates its own student's vocabulary**, so the network
+cannot gain a second operator at all.
+
+**Why the existing knob was not the answer.** `silence_is_not_dissent` already
+does this -- and it is gated, by this project's own rule, behind an exam the
+student currently fails (`ops/DISTILL.md`: "NOT MET -- short on clean 7/8, trap
+5/6, theft 4/5, edge 1/3"; `DISTILL_2.md` worse). Setting it would also relax
+the ADMISSION gate, which is what that exam is about. Turning it on to fix
+convergence would have overridden the criterion it exists to enforce.
+
+**The fix, and its exact scope** (chosen by the operator, 2026-09-12, over three
+alternatives). `validate_block(block, sync=True)` waives a refusal that alleges
+nothing -- `not_understood` ("Held, not judged") or `uncertain` ("Blocked, not
+proven"), the two results whose own text says no finding was made -- and only
+that. Unchanged: a genuine dissent refuses the block on every path; admitting a
+new transaction still fails closed; live gossip is untouched, because
+`_apply_fetched_blocks` is the only caller passing `catching_up=True`. Every
+waiver is recorded (`sync_hold_waived`) and printed.
+
+**Verified end to end.** A clone peered to node A went 2 -> 4 -> 13 -> 17 and
+reported `joiner=17 A=17`, having printed one
+`SYNC WAIVED HOLD on block 2: ... NOTHING WAS ALLEGED about them`.
+
+**Pinned.** `test_a98_sync_hold_waiver.py`, judged by a stub so it measures the
+decision and not the student. Mutation-tested both ways: disabling the waiver
+fails two tests, and widening it to swallow a genuine dissent fails H3 by name.
+Its H6 reads the AST rather than counting the string `catching_up=True` -- the
+first draft counted 2 and one of them was prose in a docstring, which is the
+fake-guard shape this register already names.
+
+**What this does not fix.** The student still cannot read the chain's own
+vocabulary, and four of the words it held on are covenant's own. Widening the
+corpus to include the chain's historical payloads is the repair that would make
+the waiver rarely needed, and it belongs to the distillation loop.

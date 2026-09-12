@@ -2121,19 +2121,68 @@ class ReasoningSentinel:
         ok, msg, benefit, _ = self.evaluate_transaction(tx)
         return ok, msg, benefit
 
-    def validate_block(self, block: Block) -> Tuple[bool, str]:
+    def validate_block(self, block: Block, sync: bool = False) -> Tuple[bool, str]:
+        """A98 (2026-09-12) -- `sync` is the CATCH-UP reading, and nothing else.
+
+        THE DEFECT IT FIXES, measured. A node joining an established chain
+        re-judges every transaction in the history it fetches. A distilled
+        student HOLDS on text whose words it has not seen, a hold fails closed,
+        and the block is refused -- so a joiner sat at height 2 against a peer
+        at 17. The held transaction was a seal-anchor from 2026-08-22 and the
+        student's own words were: "log-odds -8.19 would clear this, but 6
+        content word(s) here were never seen in training [asserts, commitment,
+        files, hash] ... It has made NO finding and is NOT alleging anything."
+        The other two seats said clean. One non-finding vetoed two clears.
+
+        Left alone, that is not a safety property, it is a growth ceiling: NO
+        node can ever join a chain whose history predates its own student's
+        vocabulary, so the network cannot gain a second operator, ever.
+
+        WHAT `sync` CHANGES, precisely: a refusal that ALLEGES NOTHING --
+        `not_understood` ("Held, not judged") or `uncertain` ("Blocked, not
+        proven"), the two results whose own text says no finding was made --
+        stops vetoing a block this node is FETCHING TO CATCH UP. That is all.
+
+        WHAT IT DOES NOT CHANGE:
+          * a genuine dissent (violates, with neither flag) still refuses the
+            block, on every path, exactly as before;
+          * admitting a NEW transaction is untouched and still fails closed;
+          * live gossip of a new block is untouched -- only
+            _apply_fetched_blocks passes catching_up=True;
+          * every waiver is recorded and printed, never silent.
+
+        The operator chose this scope on 2026-09-12 over three alternatives.
+        The one it is narrower than -- setting silence_is_not_dissent true --
+        would have relaxed the ADMISSION gate too, and that setting is gated
+        behind an exam the student currently fails (ops/DISTILL.md: "NOT MET
+        -- short on clean 7/8, trap 5/6, theft 4/5, edge 1/3"). This waiver
+        touches no admission and so is not gated by that exam."""
         # v8.24 (B5 follow-on, observability only): remember whether the
         # refusal was a real dissent or an infrastructure failure (no key /
         # timeout / HTTP error / unparseable reply -- B3's flag) so the two
         # block paths can record judge_unavailable beside the refusal. The
         # decision is unchanged: an unavailable judge still refuses the block.
         self.last_block_infrastructure_failure = False
+        waived = []
         for tx in block.transactions:
             is_valid, message, _, result = self.evaluate_transaction(tx)
             if not is_valid:
                 self.last_block_infrastructure_failure = bool(
                     result is not None and getattr(result, "infrastructure_failure", False))
+                alleges_nothing = bool(result is not None and (
+                    getattr(result, "not_understood", False)
+                    or getattr(result, "uncertain", False)))
+                if sync and alleges_nothing:
+                    # No seat alleged anything; this node simply cannot read the
+                    # text. Refusing the peer's history over that is how the
+                    # network fails to grow. Recorded, never silent.
+                    waived.append(message)
+                    continue
                 return False, f"Block contains invalid transaction: {message}"
+        if waived:
+            return True, ("Block accepted while catching up; %d transaction(s) "
+                          "could not be judged and NOTHING WAS ALLEGED about them: %s"
+                          % (len(waived), " | ".join(w[:160] for w in waived)))
         return True, "Block is ethically valid"
 
 
@@ -8446,7 +8495,7 @@ class CovenantUnifiedMaster:
                 self.node.anomaly_monitor.record(
                     "bootstrap_decode_failed", f"{type(e).__name__}: {e}")
                 break
-            if not self._accept_block_common(b):
+            if not self._accept_block_common(b, catching_up=True):
                 break
             applied += 1
             last = b
@@ -8836,7 +8885,7 @@ class CovenantUnifiedMaster:
             self._accept_loop(s, handler, label)
             return
 
-    def _accept_block_common(self, block: Block) -> bool:
+    def _accept_block_common(self, block: Block, catching_up: bool = False) -> bool:
         """
         Shared verify+accept path used by both peer and bridge handlers.
 
@@ -8952,10 +9001,30 @@ class CovenantUnifiedMaster:
                 f"block {block.index} alignment_score {block.alignment_score!r} != "
                 f"mean(benefit_score) = {expected_alignment!r}")
             return False
-        ok_ethics, why_ethics = self.node.sentinel.validate_block(block)
+        ok_ethics, why_ethics = self.node.sentinel.validate_block(block, sync=catching_up)
+        if ok_ethics and catching_up and "NOTHING WAS ALLEGED" in str(why_ethics):
+            # A98: say what was waived, every time, where the operator reads.
+            self.node.anomaly_monitor.record(
+                "sync_hold_waived", f"block {block.index}: {str(why_ethics)[:200]}")
+            print(f"SYNC WAIVED HOLD on block {block.index}: {why_ethics}",
+                  file=sys.stderr, flush=True)
         if not ok_ethics:
             self.node.anomaly_monitor.record(
                 "block_rejected_ethics", f"block {block.index}: {str(why_ethics)[:120]}")
+            # A96 (2026-09-12). SAY IT. Refusing a peer's block on ethics is how
+            # a node declines to converge, and until now it happened in silence:
+            # one /anomalies COUNT, its detail truncated to 120 characters, and
+            # /health showing a cheerful `peers: 1` beside a height that never
+            # moves. A joining node sat at height 2 against a peer at 17 with
+            # nothing anywhere saying why -- the reason turned out to be four
+            # words the distilled student had never seen, and it took an
+            # instrumented interpreter to read it. That is this project's own
+            # named failure: a refusal nobody can see reads as a system that is
+            # merely slow. Printed in full, once per refused block; blocks are
+            # refused rarely, and when they are, this is the only line that
+            # explains why the chain stopped growing.
+            print(f"SYNC REFUSED block {block.index}: {why_ethics}",
+                  file=sys.stderr, flush=True)
             if getattr(self.node.sentinel, "last_block_infrastructure_failure", False):
                 # v8.24: a peer block refused because OUR judge was down is a
                 # fork in the making (B4); name it so the operator can tell it
