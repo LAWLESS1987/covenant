@@ -335,7 +335,7 @@ f09620528d2ac0464965822b45aca4bd53b7c220fd0878775746dc0f2b5324ce  mobile/app/.gi
 717656e7b14801f67c95729ac93c4469a1cb138f75f3a49f816f80d260fb8a0b  mobile/app/app/requirements-android.txt
 290bb5aaa8f982948edf68dabe6fa3d258ee526d6c89be45e6956eb4d3ff0b84  mobile/app/app/src/main/AndroidManifest.xml
 b0fcd1a4f5e699c2f56015a8af0964e518ff237b8f8f0b27c3a012c7e0bb9c70  mobile/app/app/src/main/java/org/covenant/node/BootReceiver.java
-31745cc2f81f1e7959a1eb78f312c1d7252a8ea4620e30f9fe64bb514a4025e2  mobile/app/app/src/main/java/org/covenant/node/MainActivity.java
+d65cf34123210c57f8e49ffea1c09af84b6684095aae36f52e57f7bb5aea9ae0  mobile/app/app/src/main/java/org/covenant/node/MainActivity.java
 f17d6dcc568fbf3fa13b185892023010c8b883cbf9d1ca77f83b9467ac595bae  mobile/app/app/src/main/java/org/covenant/node/NodeService.java
 16a86f84d7074e999c3e9acdc3cddd9a813fe556b3d3355851b8e2e3a740ecc5  mobile/app/app/src/main/java/org/covenant/node/Settings.java
 1f03d3f7e2fcef6a9d3ca4351fd7c7e98673c90edf8d2e85c3c74b2b7e80e4e0  mobile/app/app/src/main/python/entry.py

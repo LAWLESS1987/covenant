@@ -72,7 +72,9 @@ public class MainActivity extends Activity {
 
         pcPeer = new EditText(this);
         pcPeer.setHint("PC peer host:port, e.g. 10.0.0.174:5001 (PC API port + 1); over the USB cable 127.0.0.1:15001; blank = run alone");
-        pcPeer.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        // Plain text, not TYPE_TEXT_VARIATION_URI: Samsung Keyboard's URL layout
+        // would not take ":" or "." here and refused a paste (Galaxy S25+, 2026-09-12).
+        pcPeer.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         col.addView(pcPeer);
 
         port = new EditText(this);
