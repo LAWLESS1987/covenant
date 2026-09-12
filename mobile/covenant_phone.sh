@@ -77,21 +77,31 @@ fi
 
 # 3. the node, with the judge the phone has
 #
-# COVENANT_JUDGE_PROVIDERS IS NOT WHAT DECIDES THIS, and this line has been
-# decorative since the policy file shipped. run_with_ollama_judge.py:47-52
-# applies ops/quorum_policy.json OVER the environment, and
-# covenant_judge_defer.apply_policy overwrites this variable unconditionally --
-# only COVENANT_JUDGE_PROVIDERS_OVERRIDE wins. Proven:
+# A93 (2026-09-12). The note that used to live here said COVENANT_JUDGE_PROVIDERS
+# was decorative because ops/quorum_policy.json overrode it. That was measured on
+# THIS PC, where the policy file exists. It stopped being true for a phone on
+# 2026-09-11, when the policy file was untracked from the repository (it is the
+# operator's answer, and a clone should not inherit one). A clone now has no
+# policy -- and run_with_ollama_judge.py:52-55 reads:
 #
-#   COVENANT_JUDGE_PROVIDERS=local python -c \
-#     "import run_with_ollama_judge, os; print(os.environ['COVENANT_JUDGE_PROVIDERS'])"
-#   -> deferring,semantic
+#   os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
+#       "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
+#       os.environ["COVENANT_JUDGE_PROVIDERS"] if _policy else "local,semantic")
 #
-# It is left set so the shape of the run command stays familiar, and so that
-# anyone who greps for it finds this note instead of believing the value. The
-# gate you actually get is the deferring seat (both distilled students) plus
-# the deterministic semantic judge. See KNOWN_ISSUES A38.
-export COVENANT_JUDGE_PROVIDERS=local
+# With no policy the environment is DISCARDED and "local,semantic" is hard-coded.
+# Provider "local" is OllamaJudge. So a freshly cloned phone seated a judge that
+# talks to a model server the phone does not have, while /health still counted it
+# as an operable semantic seat because nothing probes it at startup.
+#
+# Measured on a clone-equivalent tree (git archive HEAD) on 2026-09-12:
+#   COVENANT_JUDGE_PROVIDERS=local               -> local:0 OllamaJudge    (broken)
+#   COVENANT_JUDGE_PROVIDERS=deferring,semantic  -> local:0 OllamaJudge    (ignored)
+#   COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic -> local:0 DeferringJudge
+#
+# Only the OVERRIDE wins, so that is what this script sets. It stays deferrable to
+# the caller, and on an operator's own machine the policy file still decides what
+# the other variables mean, because OVERRIDE is the one apply_policy cannot touch.
+export COVENANT_JUDGE_PROVIDERS_OVERRIDE="${COVENANT_JUDGE_PROVIDERS_OVERRIDE:-deferring,semantic}"
 export COVENANT_LOCAL_JUDGE_MODEL="$JUDGE_MODEL"
 export COVENANT_OLLAMA_URL="$OLLAMA_URL"
 say "health when up: http://127.0.0.1:$PHONE_PORT/health"

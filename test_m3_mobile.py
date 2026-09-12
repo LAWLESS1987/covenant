@@ -56,10 +56,20 @@ def main():
     for flag in re.findall(r"(--[a-z][a-z-]+)", start.split("exec python run_with_ollama_judge.py", 1)[-1]):
         check("M3.2 node --help knows %s" % flag, flag in helptext, helptext[-200:])
 
-    # every COVENANT_* variable the scripts export is read by the judge or the core
-    code = read("covenant_judge_ollama.py") + read("covenant_unified_v8.py")
+    # every COVENANT_* variable the scripts export is read by something the phone
+    # actually runs.
+    #
+    # A93 (2026-09-12): this read covenant_judge_ollama.py and covenant_unified_v8.py
+    # only, and reported COVENANT_JUDGE_PROVIDERS_OVERRIDE as unread -- while the one
+    # file that reads it is run_with_ollama_judge.py, the program the start script
+    # execs on the last line. The check was not wrong about its two files; its
+    # population was missing the launcher. Counting what a check reads before
+    # believing what it says is the standing lesson here.
+    READS = ["run_with_ollama_judge.py", "covenant_judge_ollama.py", "covenant_unified_v8.py"]
+    code = "".join(read(f) for f in READS)
     for var in sorted(set(re.findall(r"export (COVENANT_[A-Z_]+)", start))):
-        check("M3.3 %s is read by the judge or core" % var, var in code)
+        check("M3.3 %s is read by one of the %d files the phone runs"
+              % (var, len(READS)), var in code)
 
     # the setup page and the script agree on the knobs and their defaults
     doc = read("mobile/TERMUX_SETUP.md")

@@ -2829,3 +2829,75 @@ rather than against it: a warning whose sole remedy is restarting a healthy
 node is a warning that trains the operator to restart healthy nodes. Still not
 fixed here -- ageing a row out changes what the A20 warning means, and the
 standing rule is refinements only until there is a second operator.
+
+### A93. [major / second-operator blocking] Removing the policy file from the repository silently changed what a CLONE's ethics gate is. FIXED for the phone kit 2026-09-12; the wider default is left for the operator.
+
+**Where.** `run_with_ollama_judge.py:52-55`, reached whenever
+`ops/quorum_policy.json` is absent — which, since 11f22a8 (2026-09-11)
+untracked it, is every clone.
+
+**The defect.**
+
+```python
+os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
+    "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
+    os.environ["COVENANT_JUDGE_PROVIDERS"] if _policy else "local,semantic")
+```
+
+With no policy file the environment is **discarded** and `local,semantic` is
+hard-coded. Provider `local` is `OllamaJudge`. The comment above it — "No
+policy file -> exactly the v8.40 wiring below" — was true when written and
+false from 2026-09-07, the day Ollama was deleted from this project.
+
+Untracking the policy was right on its own terms: the policy is the operator's
+answer and a clone should inherit the question. What nobody measured is that
+the answer was also the only thing seating the distilled student.
+
+**Measured, not inferred.** A clone-equivalent tree (`git archive HEAD`), same
+machine, same `mobile/covenant_phone.sh`, only the exported variable changed:
+
+| exported | seat 0 resolves to |
+|---|---|
+| `COVENANT_JUDGE_PROVIDERS=local` | `OllamaJudge` |
+| `COVENANT_JUDGE_PROVIDERS=deferring,semantic` | `OllamaJudge` — ignored |
+| `COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic` | `DeferringJudge` |
+
+The same tree on 2026-09-10, before the policy was untracked, printed
+`quorum policy (ops/quorum_policy.json): providers=deferring,semantic` at
+startup and seated `DeferringJudge`. Two days later the startup line is gone
+and the seat is `OllamaJudge`.
+
+**What it costs.** A phone node — and a second operator's node — comes up with
+its first semantic seat pointed at `127.0.0.1:11434`, which neither of them
+runs. `/health` reports `operable_semantic_judges: 2` regardless, because
+nothing probes a seat at startup; the number is a count of configured seats,
+not of answering ones. This PC never saw any of it: `ops/quorum_policy.json`
+still exists here and is merely gitignored, so every node already running kept
+the student.
+
+**Fixed here.** `mobile/covenant_phone.sh` now exports
+`COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic`, the one variable the
+fallback cannot discard, and still defers to a caller who sets it.
+`test_a93_clone_seats_the_student.py` pins it by building a clone-equivalent
+tree **without git** (the suite runner stages to a directory with no `.git` —
+A84b/A87), running the real script with a fake `python` on PATH that captures
+the environment instead of starting a node, and asking the registry what that
+environment resolves to. Mutation-tested: reverting the script's export makes
+`test_01` and `test_02` fail. Its negative control asserts the pre-fix
+environment still yields `OllamaJudge`, so the guard cannot quietly stop
+guarding the thing it was written for.
+
+**Deliberately NOT fixed: the fallback itself.** The honest repair is for
+`run_with_ollama_judge.py` to fall back to `deferring,semantic` rather than
+`local,semantic`, which would fix every clone and every other entry point at
+once rather than the phone alone. That changes the default gate for everyone,
+which is a change in what the rule MEANS and not a repair of a broken one — and
+the standing rule is refinements only until there is a second operator. It is
+the operator's call, and it is the first thing to decide before anyone else
+clones this.
+
+**A second, smaller thing this exposed.** `operable_semantic_judges` counts
+seats that were configured, not seats that answered. A seat pointed at a dead
+socket is indistinguishable from a working one in `/health` until a
+transaction is judged. Not fixed: probing a judge at startup costs a round trip
+on every boot and changes what the field means.

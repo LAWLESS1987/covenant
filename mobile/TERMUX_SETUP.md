@@ -115,23 +115,38 @@ defaults at the top of the script:
 | `JUDGE_MODEL` | `qwen3:1.7b` | the phone judge; `qwen3:4b` on an 8 GB phone |
 | `NODE_ID` | `phone` | the name the node signs with |
 
-Under the hood the script exports `COVENANT_JUDGE_PROVIDERS=local`,
+Under the hood the script exports `COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic`,
 `COVENANT_LOCAL_JUDGE_MODEL=$JUDGE_MODEL`,
 `COVENANT_OLLAMA_URL=http://127.0.0.1:11434/v1/chat/completions`, and runs
 
-**Those exports are decorative and this page used to imply otherwise.**
-`run_with_ollama_judge.py` applies `ops/quorum_policy.json` OVER the
-environment, and `covenant_judge_defer.apply_policy` overwrites the providers
-variable unconditionally — only `COVENANT_JUDGE_PROVIDERS_OVERRIDE` wins. Proven:
+**CORRECTED 2026-09-12 (A93). This page said those exports were decorative
+because the policy file overrode them. That was measured on the PC, which has
+`ops/quorum_policy.json`. A phone does not.** The policy was untracked from the
+repository on 2026-09-11 -- it is the operator's answer, and a clone should
+inherit the question -- and `run_with_ollama_judge.py:52-55` falls back to a
+hard-coded `local,semantic` whenever there is no policy file, discarding
+`COVENANT_JUDGE_PROVIDERS` entirely. Provider `local` is `OllamaJudge`. So a
+freshly cloned phone came up pointed at a model server it does not run, while
+`/health` still called it an operable seat, because nothing probes a seat at
+startup.
 
-```bash
-COVENANT_JUDGE_PROVIDERS=local python -c \
-  "import run_with_ollama_judge, os; print(os.environ['COVENANT_JUDGE_PROVIDERS'])"
-# -> deferring,semantic
-```
+The script now exports `COVENANT_JUDGE_PROVIDERS_OVERRIDE`, the one variable
+that fallback cannot discard. Measured on a clone-equivalent tree, same machine,
+same script, only the variable changed:
+
+| what the script exports | seat 0 resolves to |
+|---|---|
+| `COVENANT_JUDGE_PROVIDERS=local` | `OllamaJudge` -- broken on a phone |
+| `COVENANT_JUDGE_PROVIDERS=deferring,semantic` | `OllamaJudge` -- silently ignored |
+| `COVENANT_JUDGE_PROVIDERS_OVERRIDE=deferring,semantic` | `DeferringJudge` |
+
+`test_a93_clone_seats_the_student.py` pins it by running this script with a fake
+`python` that captures the environment it exports, then asking the registry what
+that environment resolves to. Its negative control asserts the old wiring still
+produces `OllamaJudge`, so the guard cannot quietly stop guarding.
 
 The gate you actually get is the deferring seat (both distilled students) plus
-the deterministic semantic judge. See KNOWN_ISSUES A38. The command run is
+the deterministic semantic judge. See KNOWN_ISSUES A38 and A93. The command run is
 `python run_with_ollama_judge.py --real --port $PHONE_PORT --node-id $NODE_ID --genesis genesis.json --peers $PC_PEER`.
 The shared `genesis.json` in the clone is the canonical one; a node that mints its own
 cannot converge with anyone.
