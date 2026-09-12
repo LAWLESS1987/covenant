@@ -38,8 +38,11 @@ LATENCY
   file with qwen3:4b: 107 s cold, 94 s with the model cached, 45 s of that
   installing the runtime; the answer itself ~19 s. The llama-server file
   (2026-09-12) restores a 17 MB runtime instead of installing 1.4 GB; a 4.3 GB
-  model cache entry restored in 26-42 s in the runs that measured it. The
-  first call after the swap writes its own numbers into ops/judge_route.log.
+  model cache entry restored in 26-42 s in the runs that measured it.
+  MEASURED 2026-09-12, the first calls after the swap: qwen2.5:7b cold (the
+  4.7 GB GGUF fetched on the runner) 116 s in all -- 59 s to the model on
+  disk, 62 s to a healthy server, 1.3 s to answer; the three panel members
+  in parallel (ask_many) 54 s / 74 s / 84 s, every answer valid JSON.
   This is a place for bounded questions, not a chat you sit in front of.
 
 USE
