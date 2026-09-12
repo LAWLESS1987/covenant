@@ -1,5 +1,7 @@
 # A node on the phone, and judges in more places
 
+> **SUPERSEDED 2026-09-07.** This page pointed a phone at the PC's local model server, which was removed on 2026-09-07. The phone kit that replaced it is `mobile/install.sh` + `mobile/covenant_phone.sh` (`mobile/TERMUX_SETUP.md`), and since 2026-09-12 the packaged app in `mobile/app/`. Nothing in it is a current instruction.
+
 Two requests, one answer, and a tension worth naming before anything else.
 
 ---

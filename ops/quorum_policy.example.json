@@ -1,7 +1,7 @@
 {
   "_what": "Copy this to ops/quorum_policy.json to record YOUR standing decision about the ethics quorum, then edit it. The real file is gitignored: a policy is the operator's, not the delivery's, and publishing one operator's answer teaches the next operator less than publishing the question. DELETE the real file at any time to return to the core default (providers deferring,semantic since 2026-09-12; silence fails closed) -- covenant_judge_defer.apply_policy returns '' on an absent or empty policy and touches nothing, so absence is a supported state and not a broken install.",
 
-  "_who_reads_it": "covenant_judge_defer.apply_policy() is the single implementation. run_with_ollama_judge.py applies it at node start (over the watchdog's env, under COVENANT_JUDGE_PROVIDERS_OVERRIDE) and covenant_watchdog.start_node asks the SAME function when it revives a node. Do not add a second reader: a node the watchdog revives must be wired like a node you start, or a restart silently changes the gate on the path nobody watches.",
+  "_who_reads_it": "covenant_judge_defer.apply_policy() is the single implementation. run_node.py applies it at node start (over the watchdog's env, under COVENANT_JUDGE_PROVIDERS_OVERRIDE) and covenant_watchdog.start_node asks the SAME function when it revives a node. Do not add a second reader: a node the watchdog revives must be wired like a node you start, or a restart silently changes the gate on the path nobody watches.",
 
   "_the_decision_this_file_records": [
     "A quorum decides by MAJORITY VETO, and a judge that RAISES -- unreachable,",

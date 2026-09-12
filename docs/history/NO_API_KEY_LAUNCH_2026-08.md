@@ -1,5 +1,7 @@
 # Running the real ethics gate without an Anthropic key
 
+> **SUPERSEDED 2026-09-07.** Both keyless paths described here ran a local model server that was removed from this PC on 2026-09-07. The keyless gate today is the distilled student, tracked in the repository and read in-process (KNOWN_ISSUES A37). Nothing in it is a current instruction.
+
 You have two keyless paths, and neither is the insecure keyword mock. I verified
 both end-to-end in the sandbox before writing this. One of them was blocked by a
 bug; that is fixed and included.

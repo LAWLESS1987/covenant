@@ -61,7 +61,7 @@ class _Shim:
 
 def apply_quorum_policy():
     """The node's provider list comes from ops/quorum_policy.json (the
-    operator's standing decision), applied by run_with_ollama_judge before
+    operator's standing decision), applied by run_node before
     the core is imported. Without it build_semantic_quorum falls back to the
     keyless 'claude' provider and refuses EVERYTHING -- measured 2026-09-05
     when the first opinion run did exactly that. COVENANT_JUDGE_PROVIDERS
@@ -83,7 +83,7 @@ def build_default_sentinel():
     and the tests can run with a mock and never touch the real providers."""
     apply_quorum_policy()
     import covenant_unified_v8 as core
-    # The same companions, in the same order, as run_with_ollama_judge.py:
+    # The same companions, in the same order, as run_node.py:
     # each registers a provider the policy may name ("deferring" lives in
     # covenant_judge_defer). Without them build_semantic_quorum raises
     # "unknown judge provider" -- measured 2026-09-05.

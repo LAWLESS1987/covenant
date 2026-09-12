@@ -31,7 +31,7 @@ is deliberately not configurable) against three real v8.39 nodes and measures:
       that a per-line round number changes every line's text and would break
       Adaptation's dedup unless it is kept out of the observe() key.
 
-The ollama stand-in and the run_with_ollama_judge.py launcher stub are created
+The judge stand-in and the run_node.py launcher stub are created
 INSIDE the scratch dir by this suite and never shipped: the stub launcher
 boots the core with the mock judge (this sandbox has no model server) and exists so
 start_node's real code path -- the Popen with the exact argv and env the PC
@@ -146,7 +146,7 @@ class _Judge(BaseHTTPRequestHandler):
 
 LAUNCHER_STUB = '''\
 #!/usr/bin/env python3
-"""run_with_ollama_judge.py -- TEST STAND-IN, created by test_c2_watchdog_live.py.
+"""run_node.py -- TEST STAND-IN, created by test_c2_watchdog_live.py.
 
 Exists only inside the scratch dir so covenant_watchdog.start_node() can run
 its real restart path in a sandbox with no model server: same argv contract as the
@@ -176,7 +176,7 @@ def start_node(nid, port, peers):
     if os.name != "nt":
         kw["start_new_session"] = True
     p = subprocess.Popen(
-        [sys.executable, "run_with_ollama_judge.py", "--port", str(port),
+        [sys.executable, "run_node.py", "--port", str(port),
          "--node-id", nid, "--genesis", "genesis.json", "--peers", peers],
         cwd=WORK, env=env, stdout=out, stderr=subprocess.STDOUT, **kw)
     _children.append(p)
@@ -220,7 +220,7 @@ def main():
     for f in ("covenant_unified_v8.py", "covenant_path_pattern.py",
               "covenant_watchdog.py", "covenant_quiet.py"):
         shutil.copy2(os.path.join(HERE, f), WORK)
-    with open(os.path.join(WORK, "run_with_ollama_judge.py"), "w") as fh:
+    with open(os.path.join(WORK, "run_node.py"), "w") as fh:
         fh.write(LAUNCHER_STUB)
 
     env = dict(os.environ)

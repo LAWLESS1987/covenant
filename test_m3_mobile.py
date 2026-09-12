@@ -3,7 +3,7 @@
 
 mobile/ carries a Termux start script, a health script, a widget entry and a setup page
 that promise flags, environment variables and files. None of that is a mobile fork: the
-scripts call run_with_ollama_judge.py with flags it has and export variables the judge
+scripts call run_node.py with flags it has and export variables the judge
 reads. This suite makes the promise checkable on every sweep: the scripts parse, every
 flag the start script passes exists in the node's --help, every COVENANT_* variable the
 scripts export is read somewhere in the judge or core, the setup page names the same
@@ -50,10 +50,10 @@ def main():
 
     start = read("mobile/covenant_phone.sh")
     # flags the start script passes must exist in the node's --help
-    p = subprocess.run([sys.executable, os.path.join(HERE, "run_with_ollama_judge.py"), "--help"],
+    p = subprocess.run([sys.executable, os.path.join(HERE, "run_node.py"), "--help"],
                        capture_output=True, text=True, timeout=120)
     helptext = (p.stdout or "") + (p.stderr or "")
-    for flag in re.findall(r"(--[a-z][a-z-]+)", start.split("exec python run_with_ollama_judge.py", 1)[-1]):
+    for flag in re.findall(r"(--[a-z][a-z-]+)", start.split("exec python run_node.py", 1)[-1]):
         check("M3.2 node --help knows %s" % flag, flag in helptext, helptext[-200:])
 
     # every COVENANT_* variable the scripts export is read by something the phone
@@ -61,11 +61,11 @@ def main():
     #
     # A93 (2026-09-12): this read covenant_judge_ollama.py and covenant_unified_v8.py
     # only, and reported COVENANT_JUDGE_PROVIDERS_OVERRIDE as unread -- while the one
-    # file that reads it is run_with_ollama_judge.py, the program the start script
+    # file that reads it is the launcher (run_node.py), the program the start script
     # execs on the last line. The check was not wrong about its two files; its
     # population was missing the launcher. Counting what a check reads before
     # believing what it says is the standing lesson here.
-    READS = ["run_with_ollama_judge.py", "covenant_judge_ollama.py", "covenant_unified_v8.py"]
+    READS = ["run_node.py", "covenant_judge_ollama.py", "covenant_unified_v8.py"]
     code = "".join(read(f) for f in READS)
     for var in sorted(set(re.findall(r"export (COVENANT_[A-Z_]+)", start))):
         check("M3.3 %s is read by one of the %d files the phone runs"
@@ -88,11 +88,6 @@ def main():
     for sname in scripts:
         for n, line in enumerate(read(sname).split("\n"), 1):
             code = line.split("#", 1)[0]
-            # The launcher is still NAMED run_with_ollama_judge.py on 2026-09-12; its
-            # rename is batch 3 of the Ollama-removal plan and lands with a shim.
-            # Until then the filename is exempt here -- and ONLY the filename, so a
-            # line that starts, pulls or probes a model server still fails this.
-            code = code.replace("run_with_ollama_judge.py", "")
             if re.search(r"(?i)ollama|qwen|11434|JUDGE_MODEL", code):
                 live_bad.append("%s:%d" % (sname, n))
     check("M3.6 no live line of any phone script names a model server (ollama/qwen/11434/JUDGE_MODEL)",

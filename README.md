@@ -621,15 +621,14 @@ pip install -r requirements.txt
 # genesis.json is TRACKED and CANONICAL. Do not mint one -- a joiner never does.
 # (The founder minted once; export_genesis now refuses to overwrite an existing file.)
 python launch_check.py                       # twelve gates, changes nothing
-python run_with_ollama_judge.py --port 5000 --node-id A --genesis genesis.json
+python run_node.py --port 5000 --node-id A --genesis genesis.json
 ```
 
-**Yes, that filename is wrong, and no, you do not need Ollama.** Ollama was
-removed from this project on 2026-09-07 and is out of the ethics quorum by
-policy; the launcher keeps its old name because the watchdog, the restart
-scripts and the running processes all identify nodes by it, and renaming it
-would be a riskier change than an honest paragraph. What it actually does is
-register the four judge modules the gate needs.
+The launcher was named `run_with_ollama_judge.py` until 2026-09-12, for a local
+model server removed from this project on 2026-09-07; a one-line shim keeps the
+old name for one release. What it does is register the judge seats the gate
+needs -- the two distilled students and the semantic judge -- and apply the
+operator's policy. No model server is assumed or reached.
 
 Do not start the node with `python covenant_unified_v8.py` directly. That was
 the line printed here until 2026-09-08 and it produces a node that **rejects

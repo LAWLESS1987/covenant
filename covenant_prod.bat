@@ -68,13 +68,13 @@ set CE=set COVENANT_LOCAL_JUDGE_TIMEOUT=600^&^& set COVENANT_JUDGE_TIMEOUT=600
 curl -s -m 5 http://127.0.0.1:5000/health >nul 2>nul
 if %errorlevel% neq 0 (
   call :stamp "starting node A on 5000"
-  start "Covenant Node A" /min cmd /c "set COVENANT_DB_PATH=nodeA_prod.db&& %CE%&& python run_with_ollama_judge.py --port 5000 --node-id A --genesis genesis.json --peers 127.0.0.1:5021 >> logs\nodeA.log 2>&1"
+  start "Covenant Node A" /min cmd /c "set COVENANT_DB_PATH=nodeA_prod.db&& %CE%&& python run_node.py --port 5000 --node-id A --genesis genesis.json --peers 127.0.0.1:5021 >> logs\nodeA.log 2>&1"
 ) else ( call :stamp "node A already up" )
 
 curl -s -m 5 http://127.0.0.1:5020/health >nul 2>nul
 if %errorlevel% neq 0 (
   call :stamp "starting node B on 5020"
-  start "Covenant Node B" /min cmd /c "set COVENANT_DB_PATH=nodeB_prod.db&& %CE%&& python run_with_ollama_judge.py --port 5020 --node-id B --genesis genesis.json --peers 127.0.0.1:5001,127.0.0.1:5061 >> logs\nodeB.log 2>&1"
+  start "Covenant Node B" /min cmd /c "set COVENANT_DB_PATH=nodeB_prod.db&& %CE%&& python run_node.py --port 5020 --node-id B --genesis genesis.json --peers 127.0.0.1:5001,127.0.0.1:5061 >> logs\nodeB.log 2>&1"
 ) else ( call :stamp "node B already up" )
 
 REM -- node C. Port arithmetic (M2): --port N takes N, N+1 and N+11, so nodes
@@ -90,7 +90,7 @@ REM other. preflight_port_check catches both since v8.15.
 curl -s -m 5 http://127.0.0.1:5060/health >nul 2>nul
 if %errorlevel% neq 0 (
   call :stamp "starting node C on 5060"
-  start "Covenant Node C" /min cmd /c "set COVENANT_DB_PATH=nodeC_prod.db&& %CE%&& python run_with_ollama_judge.py --port 5060 --node-id C --genesis genesis.json --peers 127.0.0.1:5021 >> logs\nodeC.log 2>&1"
+  start "Covenant Node C" /min cmd /c "set COVENANT_DB_PATH=nodeC_prod.db&& %CE%&& python run_node.py --port 5060 --node-id C --genesis genesis.json --peers 127.0.0.1:5021 >> logs\nodeC.log 2>&1"
 ) else ( call :stamp "node C already up" )
 
 timeout /t 20 /nobreak >nul

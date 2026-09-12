@@ -1,9 +1,9 @@
 #!/bin/sh
 # covenant_phone.sh -- start a covenant node on an Android phone (Termux).
 #
-# The SAME node as the PC (run_with_ollama_judge.py -- the file keeps its old
-# name; what it runs today is the distilled student plus the deterministic
-# semantic judge, in-process, no model server). Peered to the PC if you say so.
+# The SAME node as the PC (run_node.py: the distilled students plus the
+# deterministic semantic judge, in-process, no model server). Peered to the PC
+# if you say so.
 # Configure by environment or edit the defaults below. See mobile/TERMUX_SETUP.md.
 #
 #   PC_PEER      a peer's P2P address: its API port plus one. Over Wi-Fi that is
@@ -54,9 +54,9 @@ command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock
 # 2. the node
 say "health when up: http://127.0.0.1:$PHONE_PORT/health"
 if [ -n "$PC_PEER" ]; then
-    exec python run_with_ollama_judge.py --real --port "$PHONE_PORT" --node-id "$NODE_ID" \
+    exec python run_node.py --real --port "$PHONE_PORT" --node-id "$NODE_ID" \
         --genesis genesis.json --peers "$PC_PEER"
 else
-    exec python run_with_ollama_judge.py --real --port "$PHONE_PORT" --node-id "$NODE_ID" \
+    exec python run_node.py --real --port "$PHONE_PORT" --node-id "$NODE_ID" \
         --genesis genesis.json
 fi

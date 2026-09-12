@@ -9,15 +9,16 @@ Matched on the COMMAND LINE, which names the .bat, not on the window title:
 taskkill's title filter rejects a leading wildcard, and the launcher name sits
 in the middle of "C:\\WINDOWS\\system32\\cmd.exe - AA_INTEGRATE_AND_RUN.bat".
 
-Never touches: the node wrappers (their command line runs
-run_with_ollama_judge.py), the watchdog, this process, or its own console.
+Never touches: the node wrappers (their command line runs run_node.py, or the
+old name run_with_ollama_judge.py until the chain is restarted once under the
+new one), the watchdog, this process, or its own console.
 """
 import os, subprocess, sys
 
 LAUNCHERS = ("AA_INTEGRATE_AND_RUN", "AB_RESTART_NODES", "AC_COPY_SWEEP_LOGS",
              "AD_DIAG_PORTS", "AE_KILL_STRAY_START_B", "AF_RETEST",
              "AI_TOPMEM")   # AG_/AH_ were deleted with the model server, 2026-09-12
-NEVER = ("run_with_ollama_judge", "covenant_watchdog", "AJ_CLEANUP",
+NEVER = ("run_node", "run_with_ollama_judge", "covenant_watchdog", "AJ_CLEANUP",
          "cleanup_consoles")
 
 ps = ("Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | "

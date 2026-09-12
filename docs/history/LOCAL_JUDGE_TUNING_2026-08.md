@@ -1,5 +1,7 @@
 # Making the local judge operational, and tuning it for semantics
 
+> **SUPERSEDED 2026-09-07.** This is the tuning record of the local model-server seat that was removed from this PC on 2026-09-07 and from the ethics chain by policy on 2026-09-06 (KNOWN_ISSUES A38/A93). Nothing in it is a current instruction.
+
 > **Superseded in part by `LIVE_RUN_2026-08-22.md`.** The chain is now up on
 > this machine with `qwen3:8b`, 6/6 on the bench, 16.7 s per verdict. Read
 > that file for what actually happened; read this one for why each setting is

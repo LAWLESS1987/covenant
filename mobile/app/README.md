@@ -6,7 +6,7 @@ ability to interact with my other apps".
 
 ## What you get
 
-- The tracked launcher (`run_with_ollama_judge.py` -- the name is historical;
+- The tracked launcher (`run_node.py` --
   it runs the distilled students plus the deterministic semantic judge, no
   model server), started with exactly the flags `mobile/covenant_phone.sh`
   passes, on CPython 3.12 inside a foreground service that Android 15 does

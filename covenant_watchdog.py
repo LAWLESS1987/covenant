@@ -888,11 +888,11 @@ def start_node(node):
     env["COVENANT_DB_PATH"] = node["db"]
     env.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "600")
     env.setdefault("COVENANT_JUDGE_TIMEOUT", "600")
-    # v8.40: match run_with_ollama_judge.py's pair -- a node the watchdog
+    # v8.40: match run_node.py's pair -- a node the watchdog
     # revives must judge with the same quorum a node the operator starts
     # does, or a restart silently changes the gate (P17's hazard sideways).
     # 2026-09-12: "deferring,semantic", the launcher's new no-policy default
-    # (run_with_ollama_judge.py, A93). Kept identical so the two never drift.
+    # (run_node.py, A93). Kept identical so the two never drift.
     env["COVENANT_JUDGE_PROVIDERS"] = "deferring,semantic"
     # 2026-09-03: the operator's standing quorum decision, ops/quorum_policy.json,
     # read here so a node this watchdog revives is wired like one the operator
@@ -928,7 +928,7 @@ def start_node(node):
     os.makedirs(LOGDIR, exist_ok=True)
     out = open(os.path.join(LOGDIR, f"node{node['id']}.log"), "a",
                encoding="utf-8", errors="replace")
-    cmd = [sys.executable, "run_with_ollama_judge.py",
+    cmd = [sys.executable, "run_node.py",
            "--port", str(node["port"]), "--node-id", node["id"],
            "--genesis", "genesis.json", "--peers", node["peers"]]
     flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)

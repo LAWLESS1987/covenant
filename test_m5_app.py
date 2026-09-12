@@ -23,7 +23,7 @@ LIST = os.path.join(APP, "python_sources.txt")
 WF = os.path.join(HERE, ".github", "workflows", "android.yml")
 MANIFEST = os.path.join(APP, "app", "src", "main", "AndroidManifest.xml")
 ENTRY = os.path.join(APP, "app", "src", "main", "python", "entry.py")
-LAUNCHER = "run_with_ollama_judge.py"
+LAUNCHER = "run_node.py"
 EXCLUDED = {"covenant_github_judge.py": "policy-only import, needs a token, drags covenant_quiet.py"}
 results = []
 

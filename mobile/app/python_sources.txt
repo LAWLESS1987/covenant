@@ -4,7 +4,7 @@
 # never reach the APK because nothing here can name them.
 #
 # launcher (run as-is, the same flags mobile/covenant_phone.sh passes)
-run_with_ollama_judge.py
+run_node.py
 # the launcher's transitive import closure (test_m5_app.py M5.2 proves this set
 # equals what the AST says, minus the one documented exclusion below)
 covenant_unified_v8.py

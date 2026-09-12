@@ -4,7 +4,8 @@
 WHAT BROKE. ops/quorum_policy.json was untracked from the repository on
 2026-09-11 (11f22a8: the policy is the operator's answer, and a clone should
 inherit the question, not the answer). Correct on its own terms -- and it
-silently changed what a clone's gate is, because run_with_ollama_judge.py fell
+silently changed what a clone's gate is, because the launcher (then named
+run_with_ollama_judge.py, run_node.py since 2026-09-12) fell
 back to a HARD-CODED "local,semantic" whenever there was no policy file,
 discarding COVENANT_JUDGE_PROVIDERS entirely. Provider "local" is OllamaJudge.
 
@@ -58,7 +59,7 @@ SKIP_DIRS = {".git", ".venv", "venv", ".claude", "logs", "__pycache__",
 PROBE = r'''
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import run_with_ollama_judge          # module-level: applies policy, resolves providers
+import run_node          # module-level: applies policy, resolves providers
 import covenant_unified_v8 as cov
 providers = os.environ["COVENANT_JUDGE_PROVIDERS"]
 first = providers.split(",")[0].strip()

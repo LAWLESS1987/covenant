@@ -11,7 +11,7 @@ WHY THIS FILE EXISTS
   covenant_judge_local.py registers the "local", "deepseek" and "mistral"
   providers at import time (its last three lines). covenant_unified_v8.py never
   imports it. So starting the node with COVENANT_JUDGE_PROVIDERS=local -- the
-  wiring OLLAMA_JUDGE.md section 2 tells you to use -- dies at startup with:
+  wiring docs/history/LOCAL_MODEL_JUDGE_SEAT_2026-08.md section 2 told you to use -- dies at startup with:
 
       ValueError: unknown judge provider: 'local'
                   (known: ['claude', 'google', 'mock', 'openai'])

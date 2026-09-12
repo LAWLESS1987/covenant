@@ -397,7 +397,7 @@ def judge_outbound(text):
     The covenant's own draft post names this exact failure: "If there are two
     code paths to the same irreversible action, one of them is not enforcing
     your rules." So the second path is gone rather than patched. This now calls
-    build_semantic_quorum() -- the same constructor run_with_ollama_judge uses
+    build_semantic_quorum() -- the same constructor run_node uses
     at node start, under the same ops/quorum_policy.json -- and reads its
     answer the same way the node does.
 

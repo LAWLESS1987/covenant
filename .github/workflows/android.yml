@@ -27,7 +27,7 @@ on:
       - "mobile/app/**"
       - ".github/workflows/android.yml"
       # every name in mobile/app/python_sources.txt (test_m5_app.py M5.11 keeps this list equal to it)
-      - "run_with_ollama_judge.py"
+      - "run_node.py"
       - "covenant_unified_v8.py"
       - "covenant_path_pattern.py"
       - "covenant_semantic_judge.py"

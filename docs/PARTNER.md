@@ -59,12 +59,12 @@ Two lines, on a laptop, offline:
 
 ```bash
 python launch_check.py
-python run_with_ollama_judge.py --port 5000 --node-id A --genesis genesis.json
+python run_node.py --port 5000 --node-id A --genesis genesis.json
 ```
 
-**Ignore the filename — you do not need Ollama.** It was removed from this
-project on 2026-09-07 and is out of the ethics quorum by policy. The launcher
-kept its name because the watchdog and restart scripts identify nodes by it.
+(The launcher was named `run_with_ollama_judge.py` until 2026-09-12, for a local
+model server removed on 2026-09-07; a one-line shim keeps the old name for one
+release. You need no model server and no key.)
 
 **What judges, on your machine, with no account.** The gate answers from a
 distilled student: a 130 KB JSON file tracked in this repo and read into the

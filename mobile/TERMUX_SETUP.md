@@ -134,7 +134,7 @@ wins, so the probe is known to discriminate.
 
 The gate you actually get is the deferring seat (both distilled students) plus
 the deterministic semantic judge. See KNOWN_ISSUES A38 and A93. The command run is
-`python run_with_ollama_judge.py --real --port $PHONE_PORT --node-id $NODE_ID --genesis genesis.json --peers $PC_PEER`.
+`python run_node.py --real --port $PHONE_PORT --node-id $NODE_ID --genesis genesis.json --peers $PC_PEER`.
 The shared `genesis.json` in the clone is the canonical one; a node that mints its own
 cannot converge with anyone.
 

@@ -19,7 +19,7 @@ import traceback
 import zipfile
 
 DEFAULTS = {"port": 5000, "pc_peer": "", "node_id": "phone", "autostart": False}
-LAUNCHER = "run_with_ollama_judge.py"      # the tracked launcher, byte for byte (its name is historical)
+LAUNCHER = "run_node.py"      # the tracked launcher, byte for byte
 REQUIRED = (LAUNCHER, "covenant_unified_v8.py", "genesis.json",
             "semantic_judge_model.json", "fallback_model.json")
 
