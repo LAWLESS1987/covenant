@@ -1,32 +1,59 @@
 #!/usr/bin/env python3
-"""covenant_chat.py -- talk to the covenant the way you talk to a cloud model,
-except it runs here, on the covenant's own judge, with the covenant's own
-constitution and live state in front of it.
+"""covenant_chat.py -- talk to the covenant with its binding text, its live
+state and its own memory in front of it, so it answers as the covenant rather
+than as a generic assistant.
+
+WHERE THE ANSWER IS MADE -- read this first (corrected 2026-09-11)
+  This docstring said "Nothing leaves this machine." main() prints it verbatim
+  as --help (:699), so that sentence was the summary a reader took away, and it
+  had been false since 2026-09-07, when Ollama was deleted from this PC.
+
+  With no local model, chat_tools() raises on EVERY turn, _ollama_dead() matches
+  the refused connection, and the turn goes to a judge on a GitHub Actions
+  runner (:529). So the conversation LEAVES THIS PC, base64'd into a
+  workflow_dispatch input on a repository that is PUBLIC. It is not a fallback
+  any more; with nothing local it is the only path. The opening banner probes
+  and tells you which of those worlds you are in, and `!github off` stops it --
+  after which the chat has no model at all and says so.
+
+  What does NOT leave, since 2026-09-11: the private half of the system prompt.
+  _offsite_system() cuts MEMORY and the LIVE STATE -- money posture, launch
+  gates, freshness -- before the window is sent, and says in the text the judge
+  receives that they were withheld, so it can tell you when it needed them. The
+  conversation itself is NOT redacted, because it is the question being asked.
+  Pinned behaviourally by test_a90_offsite_redaction.py.
 
 WHAT IT IS
-  A conversation with the LOCAL judge (Ollama, qwen3:8b -- the model the
-  nodes' ethics gate calls). Its system prompt is built from what binds this
-  project (CONTRIBUTING.md's protected text, CONSTITUTION.md I-II) plus what is
-  true right now (money posture, trader freshness, launch gates, the last
-  self-evaluation), so it answers as the covenant, not as a generic chatbot.
-  Nothing leaves this machine. Every exchange is appended to ops/chat/<date>.md
-  (rule 5: the record is kept, including the answers that were wrong).
+  Its system prompt is built from what binds this project (CONTRIBUTING.md's
+  protected text, CONSTITUTION.md I-II) plus what is true right now (money
+  posture, trader freshness, launch gates, the last self-evaluation). Every
+  exchange is appended to ops/chat/<date>.md (rule 5: the record is kept,
+  including the answers that were wrong).
 
-BROWSING AND IMPROVEMENT (2026-09-02)
-  The judge may call web_search / web_fetch itself, or you can with !search
-  and !fetch. Only the query or URL leaves the PC; the conversation and the
-  memory do not. On exit it extracts facts AND lessons about itself into
-  MEMORY.md ([session], [lesson]) and reads them back next time -- that is
-  how it improves. !improve makes it PROPOSE changes to its own prompt,
-  tools or memory into ops/chat/PROPOSALS.md; it never applies them
-  (CONSTITUTION II.3: a loop that can edit its own constraints has none).
+BROWSING (2026-09-02, qualified 2026-09-11)
+  The judge may call web_search / web_fetch itself, or you can with !search and
+  !fetch. Only the query or the URL goes to the search engine -- but that is a
+  statement about BROWSING, not about the turn. While no local model is
+  installed the conversation is already leaving, by the paragraph above.
+
+MEMORY AND IMPROVEMENT (corrected 2026-09-11)
+  On exit it asks the judge for durable facts and lessons and appends them to
+  MEMORY.md ([session], [lesson]), reading them back next time. That call is
+  still made (:854) -- but extract_facts and reflect use chat(), which talks
+  ONLY to Ollama and has no GitHub fallback, so with Ollama gone both raise,
+  both are swallowed by `except Exception: return []`, and every session
+  silently learns nothing. The call is live; the capability is not.
+  !improve makes it PROPOSE changes to its own prompt, tools or memory into
+  ops/chat/PROPOSALS.md; it never applies them (CONSTITUTION II.3: a loop that
+  can edit its own constraints has none).
 
 WHAT IT IS NOT
-  It is an 8-billion-parameter model. It is slower (10-60 s a reply on this
-  laptop), knows nothing past its training unless it fetches it, and can be
-  wrong with confidence. It places no order, reads no key, edits no file. When you
-  need the cloud model's reach, use the cloud model; this is for the day-to-day
-  questions that should not cost tokens.
+  It is not a large model and, at the moment, not a local one either. It knows
+  nothing past its training unless it fetches it, and can be wrong with
+  confidence. It places no order and holds no key. It DOES write files -- all
+  of them under ops/chat, none of them code: <date>.md, MEMORY.md, VOICE.json
+  and PROPOSALS.md. ("edits no file" stood here until 2026-09-11 and was never
+  true of those four.)
 
 COMMANDS inside the chat
   !status     re-read the live state (gates, posture, freshness) into context
@@ -371,9 +398,14 @@ def voices():
 
 # ---------------------------------------------------------------- browsing
 # Two tools the judge may call on its own (qwen3 tool calling via /api/chat) or
-# that you can call with !search / !fetch. Only the query or the URL leaves this
-# PC; the conversation, the memory and the state never do. Every fetch is
-# logged in the transcript. Reading only: no forms, no logins, no downloads.
+# that you can call with !search / !fetch. Only the query or the URL goes to the
+# SEARCH ENGINE; browsing sends it neither the conversation nor the memory nor
+# the state. Qualified 2026-09-11: that is a claim about this tool, not about
+# the turn. With no local model the whole conversation is already leaving by
+# another road -- chat_github at :529 -- so "the conversation never leaves" was
+# true of browsing and false of the session, and the unqualified form read as
+# the second. Every fetch is logged in the transcript. Reading only: no forms,
+# no logins, no downloads.
 _BROWSE = {"on": os.environ.get("COVENANT_CHAT_BROWSE", "1") == "1", "log": []}
 TOOLS = [
     {"type": "function", "function": {"name": "web_search", "description":

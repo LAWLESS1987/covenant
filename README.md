@@ -394,20 +394,42 @@ client of a PC node; it cannot carry a judge.
 
 ## Talking to the covenant, and the tools around it
 
-Everything below runs on this machine, on the covenant's own local judge — the
-distilled student the nodes' ethics gate actually calls, a 130 KB JSON model read
-into the process with no socket and no model server. Nothing leaves the PC unless
-a line says so.
+**Two of these tools do not run on this machine. Corrected 2026-09-11.**
 
-*(This paragraph said "Ollama, the model the nodes' ethics gate calls" until
-2026-09-09. Ollama was deleted from this machine on 2026-09-07 and is out of the
-quorum by policy; the sentence was describing a component that no longer exists.)*
+Until today this paragraph said "Everything below runs on this machine… Nothing
+leaves the PC unless a line says so." That was false for the first two entries in
+the block, and the escape clause is what carried it: the lines did not say so.
+
+`covenant_chat.py` and `covenant_route.py` both talk to Ollama at
+`127.0.0.1:11434` first. Ollama was deleted from this machine on 2026-09-07, so
+every connection is refused, and each tool takes its GitHub Actions fallback —
+`covenant_chat.py:529`, `covenant_route.py:189-197`. The turn therefore **leaves
+this PC**, base64'd into a `workflow_dispatch` input on a repository that is
+public. That is not a fallback any more; with no local model it is the only path.
+
+The distilled student — a 130 KB JSON model read into the process with no socket
+and no model server — is real, and it is what the nodes' **ethics gate** calls. It
+is not what the chat calls, and this paragraph previously conflated the two.
+
+*(It also said "Ollama, the model the nodes' ethics gate calls" until 2026-09-09.
+That was rewritten around the deletion without re-checking the tools it
+introduces, which is how the claim survived a correction.)*
 
 ```
 python covenant_chat.py            # a conversation with the covenant: its binding text,
                                    # the live checker state and its own memory in front of it;
-                                   # speaks its replies; !help for commands
-python covenant_route.py --selftest  # judge / refute / rank / summarize a bounded task locally
+                                   # speaks its replies; !help for commands.
+                                   # THE TURN LEAVES THE PC while no local model is
+                                   # installed (see above); !github off stops it, and the
+                                   # opening banner says which world you are in. MEMORY and
+                                   # the live state are withheld from what is sent; the
+                                   # conversation is not.
+python covenant_route.py --selftest  # judge / refute / rank / summarize a bounded task.
+                                   # THE PROMPT LEAVES THE PC the same way: COVENANT_ROUTE_GITHUB
+                                   # defaults to "auto" and every local model is dead, so
+                                   # local_dead is permanently true. COVENANT_ROUTE_GITHUB=off
+                                   # disables it. --file/--prompt-file/--evidence-file mean an
+                                   # arbitrary local file can be the payload.
 python covenant_scenarios.py --show  # nine scenarios, re-weighed by hand (NOT a loop)
 python trader_freshness.py         # did the scheduled trader actually run today? (exit 1 = no)
 python covenant_align_set.py --no-judge  # input->output pairs that teach a model to answer as the covenant does
@@ -417,7 +439,10 @@ python covenant_gemini.py --selftest     # Gemini as an opt-in data source (a qu
 What each refuses, by construction: the chat never places an order, holds no key, and
 proposes changes to its own prompt or tools into a file it does not apply
 (CONSTITUTION II.3); the router refuses any `:cloud` model unless told otherwise, because
-that name means the prompt is forwarded off the machine; the Gemini adapter answers
+that name means the prompt is forwarded off the machine — **but that is not the
+router's only way off the machine, and reading it as one is the mistake this
+section made until 2026-09-11**: the GitHub fallback above bypasses the `:cloud`
+check entirely, and it is on by default; the Gemini adapter answers
 "not configured" until a person puts a key outside the repository, and never asks for
 one; the scenario table labels every probability a stated credence, never a measurement,
 and flags a weight that moved without a cited change.
