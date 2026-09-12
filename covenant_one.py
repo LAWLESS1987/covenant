@@ -331,6 +331,7 @@ SUITES = [
     # scratch copy happily: its judge is a stub, so it measures the decision
     # logic and cannot go green or red because a model was retrained.
     ("test_a98_sync_hold_waiver.py",     120,  "JUDGE"),
+    ("test_teacher_panel.py",            120,  "JUDGE"),
     ("test_a88_evidence_cut.py",         120,  "JUDGE"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),

@@ -39,6 +39,7 @@ import covenant_judge_defer as D                                         # noqa:
 _f2tmp = tempfile.mkdtemp()
 D.VERDICTS = os.path.join(_f2tmp, "f2_verdicts.jsonl")                  # a stub that answers must never write the real ledger
 D.AUDIT_PATH = os.path.join(_f2tmp, "f2_audit.jsonl")                   # nor the real student audit trail
+D.LIVE_VERDICTS = os.path.join(_f2tmp, "f2_live.jsonl")                 # nor the live ledger (A102: 114 rows leaked before 2026-09-12)
 import covenant_distill as X                                             # noqa: E402
 
 OK = []

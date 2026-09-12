@@ -1,0 +1,10 @@
+{
+  "_what": "The operator's bars for the distilled students judging WITHOUT an online teacher. covenant_distill.run_without_status measures each nightly and keeps the streak in ops/RUN_WITHOUT.json; the decision to stop teaching is a person's.",
+  "exam_met_streak": 3,
+  "own_traffic_hold_max": 0.05,
+  "holdout_false_clear_max": 0.025,
+  "holdout_decided_min": 0.60,
+  "panel_coverage_min": 0.90,
+  "contest_on_split": false,
+  "decided_by": "Lawrence, 2026-09-12"
+}

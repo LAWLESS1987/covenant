@@ -43,6 +43,7 @@ LATENCY
   This is a place for bounded questions, not a chat you sit in front of.
 
 USE
+  gh.ask_many(prompt, system, ["qwen2.5:7b", "llama3.2:3b"])   # several at once (the teacher panel)
   python covenant_github_judge.py --prompt "..." [--model <DEFAULT_MODEL>] [--json]
   python covenant_github_judge.py --prompt-file q.txt --system-file s.txt
   python covenant_github_judge.py --selftest
@@ -257,6 +258,50 @@ def ask(prompt, system="", model=DEFAULT_MODEL, json_only=False, timeout=900, me
     ans["seconds"] = round(time.time() - t0, 1)
     ans["run_url"] = done.get("html_url")
     return ans
+
+
+def _log_line(rec):
+    """One JSON line to ops/judge_route.log (the router's log): every runner
+    call is a record, including the ones that failed."""
+    try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
+        with open(LOG, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, **rec),
+                                ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def ask_many(prompt, system="", models=(), json_only=False, timeout=900):
+    """The same question to several models at once -- one dispatch of the
+    unchanged workflow per model, in parallel (the teacher panel,
+    covenant_teacher_panel.py). Returns {model: answer dict, or "error: ..."}
+    and raises RuntimeError only when EVERY member failed. One line per
+    dispatch goes to ops/judge_route.log: model, tag, seconds, outcome, run_url."""
+    import concurrent.futures as cf
+    models = [m for m in models if m]
+    if not models:
+        raise ValueError("ask_many: no models named")
+
+    def one(m):
+        t0 = time.time()
+        try:
+            ans = ask(prompt, system, m, json_only, timeout)
+            _log_line({"kind": "ask_many", "model": m, "tag": ans.get("tag"), "seconds": ans.get("seconds"),
+                       "outcome": "answered", "run_url": ans.get("run_url")})
+            return m, ans
+        except Exception as e:                                   # noqa: BLE001
+            err = "%s: %s" % (type(e).__name__, str(e)[:200])
+            _log_line({"kind": "ask_many", "model": m, "seconds": round(time.time() - t0, 1),
+                       "outcome": "error", "error": err})
+            return m, "error: " + err
+    out = {}
+    with cf.ThreadPoolExecutor(max_workers=len(models)) as ex:
+        for m, ans in ex.map(one, models):
+            out[m] = ans
+    if all(isinstance(v, str) for v in out.values()):
+        raise RuntimeError("every member failed: " + "; ".join("%s -> %s" % (m, v) for m, v in out.items()))
+    return out
 
 
 def main():

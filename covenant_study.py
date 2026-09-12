@@ -525,8 +525,10 @@ def generate(limit, say=print):
               "\"honouring\": \"...\"}, ...]}" % (len(todo), listing))
     # 2026-09-12: the runner is the only teacher (no local model server).
     import covenant_github_judge as gh
+    import covenant_teacher_panel as P
+    writer = P.writer_for()                                   # today's writer; the PANEL judges below
     ans = gh.ask(prompt, "You write test cases for an ethics judge. JSON only.",
-                 json_only=True, timeout=900)
+                 model=writer, json_only=True, timeout=900)
     raw, who = ans.get("content", ""), "github-actions/%s" % ans.get("model")
     try:
         pairs = json.loads(raw).get("pairs", [])
@@ -552,8 +554,9 @@ def generate(limit, say=print):
     if not cases:
         say("teacher (%s) produced no usable pairs" % who); return 0, 0
     principles = list(cov.DIVINE_PRINCIPLES)
-    verdicts, jm = X.gh_blind_judge([{"message": c["message"]} for c in cases], principles)
-    judge = "github-actions/%s" % jm
+    rows = X.panel_rows([{"message": c["message"], "expect": c["expect"]} for c in cases], principles, writer=writer, say=say)
+    verdicts = {i: (r["violates"], r["reason"]) for i, r in rows.items() if r["admitted"]}   # admitted == the intended label
+    judge = "panel"
     # A PAIR IS KEPT OR DROPPED WHOLE. Measured on the first pass: 24 kept and
     # 24 rejected, and the split was not random -- the honouring half of nearly
     # every pair was confirmed and the violating half was not, because a
@@ -584,6 +587,7 @@ def generate(limit, say=print):
                    "judge": judge, "precept": ptext,
                    "tradition": c["precept"]["tradition"], "book": c["precept"]["book"],
                    "reason": why}
+            rec["judge"], rec["panel"] = rows[i]["judge"], rows[i]["panel"]   # the panel's provenance, kept or dropped
             if whole:
                 rec["violates"] = bool(v)
                 rec["source"] = "study"

@@ -3129,3 +3129,66 @@ removed, `covenant_quiet.py` and `tools/purge_history.py` no longer name them
 as live. The same commit deletes `covenant_chat.py`'s dead local hop -- the
 first call on every turn since 2026-09-07 had been a refused connection -- so
 the chat, like the router, has one model path and names it.
+
+### A101. [new capability -- the operator's decision, 2026-09-12] The teacher panel: no row teaches the students on one teacher's word. LANDED
+
+**What was wrong.** From 2026-09-04 one model on the GitHub runner wrote the
+training cases AND judged them, and its single verdict admitted a row to
+`ops/verdicts.jsonl`. Whatever it got wrong, the students learned. The
+operator's instruction: "cross reference multiple ai online for assistance
+while training local semantic judges to run without".
+
+**What landed.** `covenant_teacher_panel.py` -- the only module that knows
+what "several teachers agreed" means -- with the rule
+`unanimous-nonwriter-2fam-v1`: a row is admitted only when members of at
+least two model families voted, none was absent, every non-writer agrees,
+the writer (if it voted) agrees with them, and the verdict is the label the
+writer intended. Anything else is HELD and recorded as `contested` with every
+vote; `covenant_distill.load_verdicts` never teaches from a contested row.
+Runner members (`COVENANT_TEACHER_PANEL`: qwen2.5:7b, llama3.2:3b, gemma2:2b)
+answer one blind, batched prompt each, dispatched in parallel by
+`covenant_github_judge.ask_many`; Gemini through the operator's own key is a
+keyed seat, per case, on rows the runner panel already admitted. Rows dated
+after 2026-09-14 without a valid panel do not teach; older single-teacher rows
+still do and are counted as legacy, and `python covenant_teacher_panel.py
+--audit N` re-judges the last N with the panel. `ops/run_without_policy.json`
+holds the operator's bars for the students judging WITHOUT a teacher; the
+nightly pass measures them and keeps a streak in `ops/RUN_WITHOUT.json`. One
+page for a second operator: `docs/TEACHER_PANEL.md`. Pinned, offline, by
+`test_teacher_panel.py` (19 checks that RUN the rule; the sweep, the nightly
+and the 15-minute check all carry it).
+
+**What it does not fix.** Three small models can be unanimously wrong; the
+rule removes one teacher's private errors, not the members' shared ones.
+Every case still leaves this PC to GitHub (and, for a keyed seat, to that
+provider). Chain-vocabulary coverage is a separate measurement (planned).
+
+### A102. [minor / record honesty] A test wrote 114 rows into the live ledger, and the seat named a deleted server as its teacher. FIXED 2026-09-12
+
+**What.** `test_f2_distill_loop.py` redirected the deferring seat's ledger and
+audit paths to a temp dir but not `LIVE_VERDICTS`, so every run of the stub
+appended its answers to the real `ops/verdicts_live.jsonl` (114 rows by
+2026-09-12, judge "ollama/qwen3:8b" -- a server removed on 2026-09-07). The
+seat's `_teacher()` had returned that constant string for every primary
+verdict since 2026-09-03, true or not.
+
+**Done.** The fixture redirects `LIVE_VERDICTS` too (one line). `_teacher()`
+returns `primary/<judge_id>` of the judge that actually answered (batch 4 of
+the Ollama removal). The 114 rows stay in the file: they are the record of
+the leak, and `load_verdicts` reads the live ledger only when asked to.
+
+### A103. [minor / caught before commit] Removing the model-server probe would have stopped the watchdog's self-evaluation. FIXED 2026-09-12
+
+**What.** Batch 5 of the Ollama removal deleted the watchdog's P15 identity
+probe and its state, but `one_pass` still handed that state to
+`self_evaluation()` every 60th round -- a NameError that would have ended
+every self-evaluation from the first one after the restart, silently (the
+watchdog logs the exception and carries on). The staged sweep caught it
+(`test_p20_watchdog_self_eval.py` ERROR rc=1) before the commit; the same
+sweep caught `test_t1_tooling.py` still probing the router's deleted
+`DEFAULT_MODELS` and its removed ':cloud' refusal.
+
+**Done.** The judge layer now measures what actually judges: the distilled
+student file, by digest (`_student_state()`), PASS with a digest and FAIL
+(fail-closed) only when the file is missing. T1's R2 pins the router's one
+remaining switch instead: `COVENANT_ROUTE_GITHUB=off` refuses to send.

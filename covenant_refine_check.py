@@ -74,6 +74,7 @@ SUITES = [
     ("test_g1_doc_consistency.py", []),
     ("test_p18_version_collision.py", []),
     ("test_f2_distill_loop.py", []),
+    ("test_teacher_panel.py", []),
     ("test_f4_capability.py", []),
     ("test_f6_stuffing.py", []),
     ("test_g3_behavioural_guards.py", []),
