@@ -333,7 +333,7 @@ f09620528d2ac0464965822b45aca4bd53b7c220fd0878775746dc0f2b5324ce  mobile/app/.gi
 672247d3b73b4dba2f3a9fe5f7157fd1bb9f7d4eb12afc35b4cd7425be8b5872  mobile/app/README.md
 81ba37243592e39a51084165030ce2ed3f311f91a00f14a09ecaa308679d5b35  mobile/app/app/build.gradle
 717656e7b14801f67c95729ac93c4469a1cb138f75f3a49f816f80d260fb8a0b  mobile/app/app/requirements-android.txt
-206f1af37f27a23f4446536c9418b780bef5091091e34744217c889361994a6b  mobile/app/app/src/main/AndroidManifest.xml
+9659ed1899decdbda2f9ce5852f9bd996bac3e4148e34923550f46f786c85b66  mobile/app/app/src/main/AndroidManifest.xml
 d4020bbbdabd2a40ebc4a54029bfce4eb2c10e00186a5683ae1d85753a6265c0  mobile/app/app/src/main/java/org/covenant/node/AppsActivity.java
 b0fcd1a4f5e699c2f56015a8af0964e518ff237b8f8f0b27c3a012c7e0bb9c70  mobile/app/app/src/main/java/org/covenant/node/BootReceiver.java
 3331bf47214d3a23543b67ff6690ed5749b3059d4430b907b90389a42ce64768  mobile/app/app/src/main/java/org/covenant/node/CovenantActuator.java
@@ -348,14 +348,14 @@ a7c087b62c8d0c7409b32d3732a5b6543537b5f56905bbadab60d75e1415e67a  mobile/app/app
 006e4fae409a65bdd569e1a557e85deca9ba36e1bb111e2ad1ea3079491e1ec9  mobile/app/app/src/main/res/drawable/bg_pill_wait.xml
 b832d544e65aceacc795a82e749dd021777067170a320d4cc6e21ba32beb3efc  mobile/app/app/src/main/res/drawable/btn_primary.xml
 3e29a22fccf96078573bfa40d8aa92d7fba83ee8416ea0e1c3a5e31c57c0709f  mobile/app/app/src/main/res/drawable/btn_secondary.xml
-7cb64e4a00e9c912e91651168bc67fd2d2c12532a828bb64356a50d4b47218ba  mobile/app/app/src/main/res/drawable/ic_covenant_mark.xml
-9c020600cd245ef30e01abcc7881605da301427845b89b88bea8e52acf41f7ec  mobile/app/app/src/main/res/drawable/ic_launcher_fg.xml
+2c043ec90c31a16a69d31132e358900aff02774d3ca0d75394dd569e0fb08738  mobile/app/app/src/main/res/drawable/ic_covenant_mark.xml
+5c58a4197336e1948b641f9995c05c500f5c1f577a253653386353cff8229738  mobile/app/app/src/main/res/drawable/ic_launcher_fg.xml
 12c4abd2b39dabcd62c60cc9527149013a97faafaa75b226b2959e3eb927783d  mobile/app/app/src/main/res/layout/activity_main.xml
 ce78c352072d0e0d4af40535fb02d7332745ca9892a351f500537d6b8706cfee  mobile/app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 cdf14ed65f4ccdb50fe86a32372a39470db67f7be383fcc9f36e315363fc7f2c  mobile/app/app/src/main/res/values-night/colors.xml
 41abaf823f24c31b006ae7a3bba0657f62598303cac7bd770588ef54ff734cf8  mobile/app/app/src/main/res/values-night/styles.xml
 8d938aac169875b2214f75a38600542894e0aeb6d7870a7e9931eb8cb650daf8  mobile/app/app/src/main/res/values/colors.xml
-11e2f6466ac702c0bd120d7cfa1d471e21b3fad0ed84eb81e62caf24fd8a575f  mobile/app/app/src/main/res/values/strings.xml
+c94bbb3f51e798731782df8c456cc44fbec640bbc2e401c39f5b57b1669aa354  mobile/app/app/src/main/res/values/strings.xml
 a7a343a337e33a1d723c1672a6a8bac2cc77d840b7f1e3933548bfc7c7da15a1  mobile/app/app/src/main/res/values/styles.xml
 a93fc425b76bef9c4d98a1a9eb40bc1d2ce1484fcd06815dcd2c0db1f03014f9  mobile/app/app/src/main/res/xml/actuator_config.xml
 3abfb2fcb06505ce3e1cbd1683e908d382dc2f3e9aaf649a04b560d77bf5c8e2  mobile/app/app/src/main/res/xml/network_security_config.xml
