@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/bg" android:fillViewport="true" android:scrollbars="none">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp"
+        android:paddingTop="20dp" android:paddingBottom="28dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="16dp">
+            <ImageView android:layout_width="48dp" android:layout_height="48dp"
+                android:src="@drawable/ic_covenant_mark" android:contentDescription="@string/app_name"/>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:orientation="vertical" android:layout_marginStart="12dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/app_name" android:textSize="22sp" android:textStyle="bold"
+                    android:textColor="@color/ink" android:fontFamily="sans-serif-medium"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/tagline" android:textSize="13sp" android:textColor="@color/ink_soft"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical">
+                <TextView android:id="@+id/pill" style="@style/Pill" android:text="CHECKING"/>
+                <TextView android:id="@+id/checked_at" android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:gravity="end" android:textSize="12sp" android:textColor="@color/ink_soft"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginTop="16dp">
+                <TextView android:id="@+id/height" style="@style/Figure" android:text="-"/>
+                <TextView android:id="@+id/peers" style="@style/Figure" android:text="-"/>
+                <TextView android:id="@+id/pending" style="@style/Figure" android:text="-"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:layout_marginBottom="12dp">
+                <TextView style="@style/FigureLabel" android:text="height"/>
+                <TextView style="@style/FigureLabel" android:text="peers"/>
+                <TextView style="@style/FigureLabel" android:text="pending"/>
+            </LinearLayout>
+            <TextView android:id="@+id/detail" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textSize="12sp" android:textColor="@color/ink_soft" android:typeface="monospace"
+                android:textIsSelectable="true" android:text="checking the node..."/>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="12dp">
+            <Button android:id="@+id/btn_start" style="@style/Primary" android:text="Start"/>
+            <Button android:id="@+id/btn_stop" style="@style/Primary" android:text="Stop"
+                android:background="@drawable/btn_secondary" android:textColor="@color/accent" android:layout_marginStart="10dp"/>
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="Connection"/>
+            <TextView style="@style/Label" android:text="PC peer (host:port; blank runs alone)"/>
+            <EditText android:id="@+id/pc_peer" style="@style/Field" android:hint="10.0.0.174:5001"
+                android:inputType="text" android:importantForAutofill="no"/>
+            <TextView style="@style/Label" android:text="API port"/>
+            <EditText android:id="@+id/port" style="@style/Field" android:hint="5000" android:inputType="number"/>
+            <Switch android:id="@+id/autostart" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Start at boot" android:textColor="@color/ink" android:layout_marginTop="6dp" android:paddingTop="6dp" android:paddingBottom="6dp"/>
+            <Button android:id="@+id/btn_save" style="@style/Secondary" android:text="Save (applies on next Start)"/>
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="Tools"/>
+            <Button android:id="@+id/btn_judge" style="@style/Secondary" android:text="Judge a text…"/>
+            <Button android:id="@+id/btn_dashboard" style="@style/Secondary" android:text="Open the dashboard"/>
+            <Button android:id="@+id/btn_share" style="@style/Secondary" android:text="Share status"/>
+            <Button android:id="@+id/btn_battery" style="@style/Secondary" android:text="Battery: allow unrestricted"/>
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="Node log"/>
+            <TextView android:id="@+id/log" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:typeface="monospace" android:textSize="11sp" android:textColor="@color/ink"
+                android:textIsSelectable="true" android:text="(no log yet)"/>
+        </LinearLayout>
+
+        <TextView android:id="@+id/hint" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/hint" android:textSize="12sp" android:textColor="@color/ink_soft" android:lineSpacingExtra="2dp"/>
+    </LinearLayout>
+</ScrollView>

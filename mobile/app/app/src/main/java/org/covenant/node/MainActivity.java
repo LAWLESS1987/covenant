@@ -5,19 +5,14 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
-import android.text.InputType;
-import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,9 +36,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The minimum UI, built in code, ugly on purpose: Start/Stop, one status line
- * from /health, the PC_PEER and port fields, "Start at boot", Save, Open
- * dashboard, the battery exemption, the last log lines and the last exit reason.
+ * The phone's face for the node (res/layout/activity_main.xml, no library
+ * beyond the platform): a state pill and three figures from /health, Start and
+ * Stop, the connection fields, the tools, the log tail and the last exit reason.
+ * Until 2026-09-12 this was built in code, ugly on purpose; the operator asked
+ * for something a person would want to look at.
  *
  * SHARE IN / SHARE OUT. Any app's Share sheet can hand this Activity a text
  * (ACTION_SEND text/plain); it is judged IN THIS PROCESS by the same gate the
@@ -53,50 +50,42 @@ import java.util.Locale;
  * the node does not need to be running for a share to be judged.
  */
 public class MainActivity extends Activity {
-    private TextView status, log;
+    private TextView pill, checkedAt, height, peers, pending, detail, log, hint;
     private EditText pcPeer, port;
-    private CheckBox autostart;
+    private Switch autostart;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean polling = false;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (12 * getResources().getDisplayMetrics().density);
-        col.setPadding(pad, pad, pad, pad);
+        setContentView(R.layout.activity_main);
+        pill = findViewById(R.id.pill);
+        checkedAt = findViewById(R.id.checked_at);
+        height = findViewById(R.id.height);
+        peers = findViewById(R.id.peers);
+        pending = findViewById(R.id.pending);
+        detail = findViewById(R.id.detail);
+        log = findViewById(R.id.log);
+        hint = findViewById(R.id.hint);
+        pcPeer = findViewById(R.id.pc_peer);
+        port = findViewById(R.id.port);
+        autostart = findViewById(R.id.autostart);
 
-        status = mono(col);
-        status.setText("checking...");
-
-        pcPeer = new EditText(this);
-        pcPeer.setHint("PC peer host:port, e.g. 10.0.0.174:5001 (PC API port + 1); over the USB cable 127.0.0.1:15001; blank = run alone");
-        // Plain text, not TYPE_TEXT_VARIATION_URI: Samsung Keyboard's URL layout
-        // would not take ":" or "." here and refused a paste (Galaxy S25+, 2026-09-12).
-        pcPeer.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        col.addView(pcPeer);
-
-        port = new EditText(this);
-        port.setHint("API port (default 5000); the node also binds +1 and +11");
-        port.setInputType(InputType.TYPE_CLASS_NUMBER);
-        col.addView(port);
-
-        autostart = new CheckBox(this);
-        autostart.setText("Start at boot");
-        col.addView(autostart);
-
-        button(col, "Save settings (takes effect on next Start)", v -> save(true));
-        button(col, "Start", v -> {
+        findViewById(R.id.btn_start).setOnClickListener(v -> {
             if (!save(false)) return;
             new File(getFilesDir(), "last_exit.txt").delete();
             startForegroundService(new Intent(this, NodeService.class));
+            showState("STARTING", R.drawable.bg_pill_wait);
         });
-        button(col, "Stop", v -> stopService(new Intent(this, NodeService.class)));
-        button(col, "Open dashboard", v -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:" + currentPort() + "/"))));
-        button(col, "Share status", v -> shareText(status.getText() + "\nhttp://127.0.0.1:" + currentPort() + "/health"));
-        button(col, "Judge a text...", v -> askForText());
-        button(col, "Battery: allow unrestricted", v -> {
+        findViewById(R.id.btn_stop).setOnClickListener(v -> stopService(new Intent(this, NodeService.class)));
+        findViewById(R.id.btn_save).setOnClickListener(v -> save(true));
+        findViewById(R.id.btn_dashboard).setOnClickListener(v ->
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:" + currentPort() + "/"))));
+        findViewById(R.id.btn_share).setOnClickListener(v ->
+                shareText(pill.getText() + "  " + detail.getText() + "\nhttp://127.0.0.1:" + currentPort() + "/health"));
+        findViewById(R.id.btn_judge).setOnClickListener(v -> askForText());
+        findViewById(R.id.btn_battery).setOnClickListener(v -> {
             PowerManager pm = getSystemService(PowerManager.class);
             if (pm.isIgnoringBatteryOptimizations(getPackageName())) {
                 Toast.makeText(this, "already unrestricted", Toast.LENGTH_SHORT).show();
@@ -104,18 +93,6 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
             }
         });
-
-        TextView hint = new TextView(this);
-        hint.setText("Samsung: Settings > Apps > Covenant Node > Battery > Unrestricted, and Battery > Background usage limits > Never sleeping apps. "
-                + "Add this phone's IP:5001 to the PC node's --peers, or use mobile/usb_link.py over a cable. "
-                + "Share any text to this app from another app to judge it.");
-        col.addView(hint);
-
-        log = mono(col);
-
-        ScrollView sv = new ScrollView(this);
-        sv.addView(col);
-        setContentView(sv);
 
         Settings s = Settings.load(this);
         pcPeer.setText(s.pcPeer);
@@ -198,12 +175,12 @@ public class MainActivity extends Activity {
         s.nodeId = "phone";
         s.autostart = autostart.isChecked();
         try { s.port = Integer.parseInt(port.getText().toString().trim()); } catch (Exception e) { s.port = -1; }
-        if (!Settings.validPeer(s.pcPeer)) { status.setText("PC peer must be host:port (one colon, port 1-65535) or blank"); return false; }
-        if (!Settings.validPort(s.port)) { status.setText("port must be 1024-65000 (the node also binds +1 and +11)"); return false; }
+        if (!Settings.validPeer(s.pcPeer)) { detail.setText("PC peer must be host:port (one colon, port 1-65535) or blank"); return false; }
+        if (!Settings.validPort(s.port)) { detail.setText("port must be 1024-65000 (the node also binds +1 and +11)"); return false; }
         try {
             Settings.save(this, s);
         } catch (Exception e) {
-            status.setText("could not save settings: " + e);
+            detail.setText("could not save settings: " + e);
             return false;
         }
         if (toast) Toast.makeText(this, "saved; Stop then Start to apply", Toast.LENGTH_SHORT).show();
@@ -215,11 +192,17 @@ public class MainActivity extends Activity {
     @Override protected void onResume() { super.onResume(); polling = true; handler.post(this::poll); }
     @Override protected void onPause() { super.onPause(); polling = false; }
 
+    private void showState(String text, int background) {
+        pill.setText(text);
+        pill.setBackgroundResource(background);
+    }
+
     private void poll() {
         if (!polling) return;
         final int p = currentPort();
         new Thread(() -> {
-            String line;
+            String state, det, h = "-", pe = "-", pen = "-";
+            int bg;
             try {
                 HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + p + "/health").openConnection();
                 c.setConnectTimeout(2000); c.setReadTimeout(2000);
@@ -227,22 +210,35 @@ public class MainActivity extends Activity {
                 try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8))) {
                     String s; while ((s = r.readLine()) != null) sb.append(s);
                 }
-                JSONObject h = new JSONObject(sb.toString());   // ANY HTTP answer = UP; `degraded` is true on every keyless phone and is ignored
-                String genesis = h.optString("genesis", "");
-                boolean own = h.optBoolean("own_genesis", false);
-                line = "UP  node=" + h.optString("node_id") + "  height=" + h.opt("chain_height") + "  peers=" + h.opt("peers") + "  pending=" + h.opt("pending_transactions")
-                        + "\ngenesis=" + (genesis.length() > 12 ? genesis.substring(0, 12) : genesis) + "  own_genesis=" + own
+                JSONObject j = new JSONObject(sb.toString());   // ANY HTTP answer = UP; `degraded` is true on every keyless phone and is ignored
+                String genesis = j.optString("genesis", "");
+                boolean own = j.optBoolean("own_genesis", false);
+                h = String.valueOf(j.opt("chain_height"));
+                pe = String.valueOf(j.opt("peers"));
+                pen = String.valueOf(j.opt("pending_transactions"));
+                state = "RUNNING"; bg = R.drawable.bg_pill_up;
+                det = "node " + j.optString("node_id") + "  ·  genesis " + (genesis.length() > 12 ? genesis.substring(0, 12) : genesis)
                         + (own ? "\n!! own_genesis=true: this node cannot converge with peers" : "")
-                        + "\njudge=" + h.optString("judge") + "  wsgi=" + h.optString("wsgi") + "  version=" + h.optString("version")
-                        + "\nchecked " + new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+                        + "\njudge " + j.optString("judge")
+                        + "\n" + j.optString("version") + "  ·  " + j.optString("wsgi");
             } catch (Exception e) {
-                line = "DOWN (" + e.getClass().getSimpleName() + ")";
+                state = "STOPPED"; bg = R.drawable.bg_pill_down;
+                det = "not answering (" + e.getClass().getSimpleName() + ")";
                 File exit = new File(getFilesDir(), "last_exit.txt");
-                if (exit.exists()) line += "\nlast exit:\n" + tail(exit, 12);
+                if (exit.exists()) det += "\nlast exit:\n" + tail(exit, 12);
             }
-            final String l = line;
+            final String fState = state, fDet = det, fH = h, fPe = pe, fPen = pen;
+            final int fBg = bg;
             final String tailLog = tail(new File(getFilesDir(), "node.log"), 20);
-            handler.post(() -> { status.setText(l); log.setText(tailLog); if (polling) handler.postDelayed(this::poll, 3000); });
+            final String when = "checked " + new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+            handler.post(() -> {
+                showState(fState, fBg);
+                checkedAt.setText(when);
+                height.setText(fH); peers.setText(fPe); pending.setText(fPen);
+                detail.setText(fDet);
+                log.setText(tailLog.isEmpty() ? "(no log yet)" : tailLog);
+                if (polling) handler.postDelayed(this::poll, 3000);
+            });
         }, "covenant-poll").start();
     }
 
@@ -254,22 +250,5 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             return "";
         }
-    }
-
-    // ------------------------------------------------------------- widgets
-
-    private TextView mono(LinearLayout col) {
-        TextView t = new TextView(this);
-        t.setTypeface(Typeface.MONOSPACE);
-        t.setTextIsSelectable(true);
-        col.addView(t);
-        return t;
-    }
-
-    private void button(LinearLayout col, String label, android.view.View.OnClickListener l) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setOnClickListener(l);
-        col.addView(b);
     }
 }

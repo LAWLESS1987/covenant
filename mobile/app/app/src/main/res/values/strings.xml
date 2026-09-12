@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Covenant Node</string>
+    <string name="tagline">a node in your pocket — the same ledger, the same judge</string>
+    <string name="hint">Samsung: Settings › Apps › Covenant Node › Battery › Unrestricted, and Battery › Background usage limits › Never sleeping apps. Add this phone\'s IP:5001 to the PC node\'s --peers, or use mobile/usb_link.py over a cable. Share any text to this app from another app to judge it.</string>
+</resources>
