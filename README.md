@@ -4,7 +4,7 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `73e4a0ce0b7a` · 11,283 lines · **95 suites, 2,745 checks, 1 failed** on win32 <!--TOTALS-->
+**v8.40** · source `138311e283c3` · 11,322 lines · **96 suites, 2,742 checks, 0 failed** on win32 <!--TOTALS-->
 Totals re-measured 2026-09-12 by `covenant_one.py --all`; version, hash and
 line count re-measured 2026-09-09 from the core module itself. What
 that number does and does not cover is in [Suite coverage](#suite-coverage), and it is
@@ -386,11 +386,13 @@ is missing is the second person.
 
 ## On a phone
 
-An Android phone can run the same node with its own, smaller judge and peer to your PC:
-[mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md): Termux from F-Droid, then one line,
-`curl -sL https://raw.githubusercontent.com/LAWLESS1987/covenant/main/mobile/install.sh | sh`.
-The judge tier and what it costs in strictness are stated there. An iPhone can only be a
-client of a PC node; it cannot carry a judge.
+An Android phone runs the same node with the same judge -- the distilled students and
+the semantic judge, in-process, no model server -- and peers with your PC. Two ways:
+the packaged app in [mobile/app](mobile/app/README.md) (**private for now**: GitHub
+builds and proves it on an emulator but publishes no release; the APK is the run's
+artifact or a cable build), or the Termux kit in [mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md).
+The phone's rule, written into the app: a phone is private to the person holding it.
+An iPhone can only be a client of a PC node; it cannot carry a judge.
 
 ## Talking to the covenant, and the tools around it
 
@@ -470,7 +472,7 @@ claims a profit edge or promises a return; it claims what a reader can verify.
 
 ## Suite coverage
 
-**95 suites · 2,745 checks · 1 failed**, win32, 2026-09-12 <!--TOTALS-->
+**96 suites · 2,742 checks · 0 failed**, win32, 2026-09-12 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.

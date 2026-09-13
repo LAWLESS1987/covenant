@@ -173,54 +173,11 @@ jobs:
             health3.json
             logcat.txt
             app_files.txt
-          retention-days: 7
+          retention-days: 14
           if-no-files-found: ignore
 
-  release:
-    name: publish this build as a release
-    needs: [build, verify]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: covenant-node-apk
-      - name: Name and hash the artefacts
-        run: |
-          SHA7=${GITHUB_SHA::7}
-          cp covenant-node.apk "covenant-node-$SHA7.apk"
-          sha256sum covenant-node.apk "covenant-node-$SHA7.apk" > SHA256SUMS
-          cat SHA256SUMS
-      # Releases here are IMMUTABLE (a repository setting): a published tag
-      # name can never be reused, so the first run's moving "android-latest"
-      # -- deleted and re-created on every build -- was refused the second
-      # time ("tag_name was used by an immutable release") and the APK went
-      # missing from the release page (2026-09-12). One release per verified
-      # build, tagged by commit, marked latest, never deleted; the stable URL
-      # is GitHub's own: releases/latest/download/covenant-node.apk.
-      - name: Publish this build as an immutable release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          SHA7=${GITHUB_SHA::7}
-          if gh release view "android-$SHA7" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "android-$SHA7 is already published (immutable); nothing to do"
-            exit 0
-          fi
-          gh release create "android-$SHA7" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
-            --title "Covenant Node $SHA7" \
-            --notes "Built by android.yml from $GITHUB_SHA on $(date -u +%FT%TZ). Emulator-verified /health. Signed with the public debug-class key in mobile/app/signing (installs over previous builds). Install notes: mobile/app/README.md. Stable URL: releases/latest/download/covenant-node.apk" \
-            covenant-node.apk "covenant-node-$SHA7.apk" SHA256SUMS
-      - name: Publish a permanent tag when asked
-        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          SHA7=${GITHUB_SHA::7}
-          gh release create "${{ inputs.release_tag }}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "Covenant Node ${{ inputs.release_tag }}" \
-            --notes "Built by android.yml from $GITHUB_SHA. See mobile/app/README.md." \
-            "covenant-node-$SHA7.apk" SHA256SUMS
+  # PRIVATE FOR NOW (the operator, 2026-09-12). The release job that published
+  # every verified build as a public GitHub release is gone, and the eight
+  # releases it made were taken down. The APK is the run's artifact
+  # (covenant-node-apk, 14 days, a GitHub login required to fetch it), or a
+  # cable build: sh mobile/app/build.sh. The source stays in this repository.

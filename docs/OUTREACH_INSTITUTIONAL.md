@@ -118,7 +118,7 @@ Claims that are defensible today, each verifiable by the recipient:
 | a fork can prove agreement without your code | conformance root `0c398099…0f0ddcef` |
 | dissent survives composition | `python scale.py` exits non-zero with the dissent named |
 | the limits are published, not hidden | `CONSTITUTION.md` V, `GOVERNANCE.md` IX |
-| the test suite is real | 95 suites, 2,745 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
+| the test suite is real | 96 suites, 2,742 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
 
 ## Why there is no list of addresses attached
 

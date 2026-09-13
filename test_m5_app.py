@@ -182,9 +182,11 @@ def main():
         head = re.match(r"\n?  (\w+):\n", blk)
         if head and re.search(r"\n    permissions:\n      contents: write", blk):
             writes.append(head.group(1))
-    check("M5.9b only the job named release holds contents: write", writes == ["release"], writes)
+    # 2026-09-12: the release job is gone (the app is private for now), so NO job
+    # may hold contents: write -- the workflow can build and prove, never publish.
+    check("M5.9b no job holds contents: write (the release job was removed; the app is private for now)", writes == [], writes)
     secrets = set(re.findall(r"secrets\.([A-Za-z_]+)", y))
-    check("M5.9c the only secret referenced is GITHUB_TOKEN", secrets == {"GITHUB_TOKEN"}, sorted(secrets))
+    check("M5.9c no secret is referenced at all (the release job was the only reader of GITHUB_TOKEN)", secrets == set(), sorted(secrets))
     check("M5.9d concurrency group starts with android- (never the sweep's group)", re.search(r"group: android-", y) is not None)
     check("M5.9e the workflow runs no sweep and installs no requirements.txt", "covenant_one.py" not in y and "pip install -r requirements.txt" not in y)
     uses = re.findall(r"uses: ([^\s]+)", y)
