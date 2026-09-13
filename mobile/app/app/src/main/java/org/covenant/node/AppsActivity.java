@@ -92,8 +92,33 @@ public class AppsActivity extends Activity {
             none.setText("No launchable apps visible (the manifest's <queries> lists the launcher intent; if this is empty, Android hid them).");
             col.addView(none);
         }
+        skin(col);
+        col.setBackgroundColor(getColor(R.color.bg));
         ScrollView sv = new ScrollView(this);
+        sv.setBackgroundColor(getColor(R.color.bg));
         sv.addView(col);
         setContentView(sv);
+    }
+
+    /** The main screen's look, applied to a screen built in code: paper, ink, the rounded secondary button. */
+    private void skin(android.view.View v) {
+        if (v instanceof Button) {
+            Button b = (Button) v;
+            b.setBackgroundResource(R.drawable.btn_secondary);
+            b.setTextColor(getColor(R.color.accent));
+            b.setAllCaps(false);
+            b.setStateListAnimator(null);
+            if (b.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) b.getLayoutParams();
+                lp.topMargin = (int) (6 * getResources().getDisplayMetrics().density);
+                b.setLayoutParams(lp);
+            }
+        } else if (v instanceof TextView) {
+            ((TextView) v).setTextColor(getColor(R.color.ink));
+        }
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) skin(g.getChildAt(i));
+        }
     }
 }

@@ -334,13 +334,13 @@ da3e3f2112a0aa6b386dc83f15b08b31c53bc8344e516ad3c369f2309846bb88  mobile/app/REA
 81ba37243592e39a51084165030ce2ed3f311f91a00f14a09ecaa308679d5b35  mobile/app/app/build.gradle
 717656e7b14801f67c95729ac93c4469a1cb138f75f3a49f816f80d260fb8a0b  mobile/app/app/requirements-android.txt
 528e13d1fbdc2a74f6671679053749fde7a51baf2bdb6a287f50b211187219dc  mobile/app/app/src/main/AndroidManifest.xml
-d4020bbbdabd2a40ebc4a54029bfce4eb2c10e00186a5683ae1d85753a6265c0  mobile/app/app/src/main/java/org/covenant/node/AppsActivity.java
+7634855162a6e74a9034fc667eba5bd74a4c2cce7101ce7be2916efd9d0e4c94  mobile/app/app/src/main/java/org/covenant/node/AppsActivity.java
 b0fcd1a4f5e699c2f56015a8af0964e518ff237b8f8f0b27c3a012c7e0bb9c70  mobile/app/app/src/main/java/org/covenant/node/BootReceiver.java
 16747abcd14201c20834873857576a46198c811b9604dfe708ec1a51d1328ac8  mobile/app/app/src/main/java/org/covenant/node/CovenantActuator.java
 80b79d053eaeb92e6e01ba7a7801fb6abb32e357eb929eca964040d26a43a3b6  mobile/app/app/src/main/java/org/covenant/node/MainActivity.java
 f17d6dcc568fbf3fa13b185892023010c8b883cbf9d1ca77f83b9467ac595bae  mobile/app/app/src/main/java/org/covenant/node/NodeService.java
 6d2ce803e28e1daff04381aac0e49d10339ef9f9cc521635f2730ad0e44f0aab  mobile/app/app/src/main/java/org/covenant/node/Recipe.java
-3a0fc86cb476df8d7ced8e78f8b0456223353291c9a6bdaa019460067755f7eb  mobile/app/app/src/main/java/org/covenant/node/RecipesActivity.java
+a5a46e1830229f492c4e1b5160c527d6ce18b084bc50234fea48cf79570a13ab  mobile/app/app/src/main/java/org/covenant/node/RecipesActivity.java
 a7c087b62c8d0c7409b32d3732a5b6543537b5f56905bbadab60d75e1415e67a  mobile/app/app/src/main/java/org/covenant/node/Settings.java
 3d6a15936bfaa5973ace9f883401371abeb60e679918fdbea1b6f280afce4553  mobile/app/app/src/main/python/entry.py
 97de1ff36eb2f226a35eda1d6dba33936229d5e70c13b4c8c168c7d9664587ee  mobile/app/app/src/main/res/drawable/bg_card.xml
