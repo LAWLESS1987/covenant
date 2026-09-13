@@ -333,7 +333,7 @@ f09620528d2ac0464965822b45aca4bd53b7c220fd0878775746dc0f2b5324ce  mobile/app/.gi
 da3e3f2112a0aa6b386dc83f15b08b31c53bc8344e516ad3c369f2309846bb88  mobile/app/README.md
 81ba37243592e39a51084165030ce2ed3f311f91a00f14a09ecaa308679d5b35  mobile/app/app/build.gradle
 717656e7b14801f67c95729ac93c4469a1cb138f75f3a49f816f80d260fb8a0b  mobile/app/app/requirements-android.txt
-528e13d1fbdc2a74f6671679053749fde7a51baf2bdb6a287f50b211187219dc  mobile/app/app/src/main/AndroidManifest.xml
+308455dae2838d181a05841eb8ff2de3177a60befae536665f7ab6a14d0b7db5  mobile/app/app/src/main/AndroidManifest.xml
 7634855162a6e74a9034fc667eba5bd74a4c2cce7101ce7be2916efd9d0e4c94  mobile/app/app/src/main/java/org/covenant/node/AppsActivity.java
 b0fcd1a4f5e699c2f56015a8af0964e518ff237b8f8f0b27c3a012c7e0bb9c70  mobile/app/app/src/main/java/org/covenant/node/BootReceiver.java
 16747abcd14201c20834873857576a46198c811b9604dfe708ec1a51d1328ac8  mobile/app/app/src/main/java/org/covenant/node/CovenantActuator.java
@@ -351,9 +351,11 @@ a7c087b62c8d0c7409b32d3732a5b6543537b5f56905bbadab60d75e1415e67a  mobile/app/app
 b832d544e65aceacc795a82e749dd021777067170a320d4cc6e21ba32beb3efc  mobile/app/app/src/main/res/drawable/btn_primary.xml
 3e29a22fccf96078573bfa40d8aa92d7fba83ee8416ea0e1c3a5e31c57c0709f  mobile/app/app/src/main/res/drawable/btn_secondary.xml
 2c043ec90c31a16a69d31132e358900aff02774d3ca0d75394dd569e0fb08738  mobile/app/app/src/main/res/drawable/ic_covenant_mark.xml
-5c58a4197336e1948b641f9995c05c500f5c1f577a253653386353cff8229738  mobile/app/app/src/main/res/drawable/ic_launcher_fg.xml
+dc963456f03fce286b76e0e6d60a7461ef96da28699b0d5e2a7a504f3df9d5a0  mobile/app/app/src/main/res/drawable/ic_launcher_bg.xml
+ff0c9aa2f10520b89f404bdab3f6a4ddf99bff0fa856e65e62dda099b6b16cd0  mobile/app/app/src/main/res/drawable/ic_launcher_fg.xml
 a5c5d9112d9e73a6d69ec67a27ade074a0ffa79d44524324fb8174dc30347afa  mobile/app/app/src/main/res/layout/activity_main.xml
-ce78c352072d0e0d4af40535fb02d7332745ca9892a351f500537d6b8706cfee  mobile/app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+bfdd0f847161e120512143fcaf6025390c1c3808fa1f6e067b26bf837d493726  mobile/app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+bfdd0f847161e120512143fcaf6025390c1c3808fa1f6e067b26bf837d493726  mobile/app/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 cdf14ed65f4ccdb50fe86a32372a39470db67f7be383fcc9f36e315363fc7f2c  mobile/app/app/src/main/res/values-night/colors.xml
 41abaf823f24c31b006ae7a3bba0657f62598303cac7bd770588ef54ff734cf8  mobile/app/app/src/main/res/values-night/styles.xml
 8d938aac169875b2214f75a38600542894e0aeb6d7870a7e9931eb8cb650daf8  mobile/app/app/src/main/res/values/colors.xml
