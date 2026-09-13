@@ -1,5 +1,11 @@
 # Covenant Node for Android (mobile/app)
 
+**The phone's rule (the operator, 2026-09-12): a phone is private to the
+person holding it.** Nothing on it is readable by anyone else -- not the PC
+operator, not another node, not the assistant -- unless that person sends it.
+Every design choice below is measured against that sentence; "What leaves the
+phone" further down is the list.
+
 The same node the PC runs, inside a phone app. Asked 2026-09-12: "create an app
 for this to run my phone ... use the git hub also for this ... give it the
 ability to interact with my other apps".
@@ -132,3 +138,35 @@ whoever did. Remote driving waits for a signing key only you hold
   Google services and the carrier see what they see regardless of any app;
   the APK's public debug key means only builds you trust should be installed
   (`mobile/app/signing/README.md`).
+
+## The preliminary brain (phase 2, 2026-09-12)
+
+Asked: "build a preliminary brain that learns ... let it watch ... and have
+access to the other AI apps on my phone". Under the phone's rule, the brain
+lives on the phone and learns from the person holding it -- no model, no
+network, no screen leaves.
+
+- **A recipe is a demonstration.** Record one: pick a green-lit app, name it,
+  do the thing once while the actuator watches (taps, text, scrolls), come
+  back and tap Stop. It is kept as `files/recipes/<name>.json`, readable.
+- **It learns which locator to trust.** Every step keeps four ways to find
+  its target (view id, text, description, class + position) with a score
+  each; a replay tries the best first and scores up what worked, down what
+  missed -- so a relabelled button or a moved control is survived, and each
+  run leaves the recipe surer.
+- **Typed text is a slot.** One demonstration of "post this" serves every
+  later post: the run asks for the text, the node's gate judges it (REFUSED
+  never goes in; a hold that alleges nothing is logged and passes), then it
+  is typed.
+- **It reads the answer back.** When a run finishes, what the app shows --
+  an AI app's reply, a confirmation -- is kept as the recipe's last answer,
+  on the phone, with a Share button for the owner. This is how the phone's
+  other AI apps become tools it can consult without an API or a key: green-
+  light the app, record "ask it something", run it with a slot.
+- **Every run is written down** (`actions.log`, and the recipe's own run
+  list), and a recipe can be deleted the moment it learned something wrong.
+
+What it is not: it does not plan. It repeats what it was shown, better each
+time, in the apps it was allowed. "Watch the assistant" -- recording what I
+do over the cable so the phone can repeat it without me -- waits, like any
+remote driving, for a signing key only the operator holds.

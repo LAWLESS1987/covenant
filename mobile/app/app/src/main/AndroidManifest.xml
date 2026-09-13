@@ -57,6 +57,7 @@
          action. No gestures are requested. Remote driving waits for the operator's own
          signing key (this APK's key is public). -->
     <activity android:name=".AppsActivity" android:exported="false" android:label="Apps Covenant may use"/>
+    <activity android:name=".RecipesActivity" android:exported="false" android:label="Recipes"/>
     <service android:name=".CovenantActuator"
         android:exported="true"
         android:label="Covenant actuator"

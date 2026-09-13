@@ -3218,3 +3218,26 @@ one-time uninstall (new key = new identity; documented in
 mobile/app/signing/README.md). The Send-button finder knows English words
 only. Not verified on the emulator (the CI check starts no accessibility
 service); verified by the operator's use on the phone, or not at all.
+
+### A105. [new capability -- the operator's decision, 2026-09-12] The preliminary brain: recipes by demonstration, locators that learn, answers read back. PHASE 2 LANDED
+
+**Asked.** "build a preliminary brain that learns", "let it watch you and
+have access to the other ai apps on my phone/browser too", under his rule
+that a phone is private to the person holding it, and with "mutual benefit"
+as the only constraint.
+
+**Built.** `Recipe` (the model: steps with four scored locators, slots, a
+run list, the last answer), recording and replay in `CovenantActuator`
+(only in green-lit apps; only from this phone; every action logged),
+`RecipesActivity` (record, run, read what was learned, share an answer,
+delete). Learning is explicit and inspectable: locator scores move by
++0.15/-0.25 per hit/miss, bounded; typed text becomes a slot; the app's
+visible text at the end of a run is kept as the answer. Slot text goes
+through the node's gate first (the mutual-benefit constraint, in code).
+
+**Not built, and why.** No planner: it repeats demonstrations. No
+"watch the assistant": recording what the assistant does over a cable is
+remote driving, gated on the operator's private signing key. No trading
+apps: refused outright (see the daily-approval design instead). Not
+verified on the emulator (CI starts no accessibility service); verified by
+use on the phone, or not at all.

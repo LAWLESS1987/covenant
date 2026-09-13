@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_judge).setOnClickListener(v -> askForText());
         findViewById(R.id.btn_apps).setOnClickListener(v -> startActivity(new Intent(this, AppsActivity.class)));
         findViewById(R.id.btn_use).setOnClickListener(v -> useAnApp());
+        findViewById(R.id.btn_recipes).setOnClickListener(v -> startActivity(new Intent(this, RecipesActivity.class)));
         findViewById(R.id.btn_battery).setOnClickListener(v -> {
             PowerManager pm = getSystemService(PowerManager.class);
             if (pm.isIgnoringBatteryOptimizations(getPackageName())) {
