@@ -7497,6 +7497,40 @@ class CovenantAPI:
             code, out = _dp.record_checkin(body, who)
             return jsonify(out), code
 
+        # THE PHONE'S UPDATE (2026-09-13): the newest build of the operator's
+        # private app repository, fetched on this PC with this PC's credential
+        # (covenant_app_update.py), served only to a signed GET from a
+        # registered signer. The phone verifies the sha256 and hands the file to
+        # Android's installer, which asks the person holding the phone.
+        @self.app.route("/app/latest", methods=["GET"])
+        def app_latest():
+            ok, who, _pem = _daily_plan_auth(request, b"")
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _au = importlib.import_module("covenant_app_update")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "app update unavailable on this node: %s" % type(e).__name__}), 503
+            d = _au.latest()
+            if not d:
+                return jsonify({"status": "error", "message": "no build fetched yet (python covenant_app_update.py --fetch)"}), 404
+            return jsonify({"status": "success", "latest": {k: v for k, v in d.items() if k != "path"}})
+
+        @self.app.route("/app/apk", methods=["GET"])
+        def app_apk():
+            ok, who, _pem = _daily_plan_auth(request, b"")
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _au = importlib.import_module("covenant_app_update")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "app update unavailable on this node: %s" % type(e).__name__}), 503
+            d = _au.latest()
+            if not d:
+                return jsonify({"status": "error", "message": "no build fetched yet"}), 404
+            from flask import send_file
+            return send_file(d["path"], mimetype="application/vnd.android.package-archive", as_attachment=True, download_name="covenant-node.apk")
+
         @self.app.route("/transactions", methods=["POST"])
         def add_transaction():
             data = request.json or {}

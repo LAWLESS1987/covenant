@@ -40,6 +40,17 @@ prints "phone X last seen N min ago" each pass and raises an alert when a
 phone that reported within the day has been silent for an hour. Only the
 named fields are kept; the switch is in the app's settings.
 
+## The phone's update
+
+The nightly pass (or `python covenant_app_update.py --fetch`) downloads the
+newest green build of the private app repository with this PC's GitHub
+credential -- which therefore never leaves the PC -- into `ops/app/`
+(gitignored). The node serves it to a signed GET from a registered signer:
+`/app/latest` (the build's sha and sha256) and `/app/apk` (the bytes). The
+phone asks on its heartbeat, downloads when the build is not its own,
+verifies the sha256 and hands it to Android's installer, which asks the
+person holding the phone. Nothing installs silently.
+
 What it is not: advice. The plan is the covenant's measured posture and its
 own validated rules, of which none has cleared walk-forward, deflation and
 PBO as of 2026-09-12 -- so plans read "hold", and approving one is how you

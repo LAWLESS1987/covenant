@@ -3317,3 +3317,14 @@ decision by the operator's own rule.
 
 **Housekeeping.** Forty stale worktrees from earlier sessions (copies of the
 whole tree under `.claude/worktrees`) and their forty-two branches removed.
+
+### A109. [the operator's ask, 2026-09-13] The phone updates itself from the PC. PC SIDE LANDED; the app side in the private repository
+
+`covenant_app_update.py` fetches the newest green build of the private app
+repository with this PC's credential into `ops/app/` (nightly, or
+`--fetch`); the node serves `/app/latest` and `/app/apk` to registered
+signers only. The phone checks on its heartbeat, downloads a build whose
+sha is not its own, verifies the sha256, and hands it to Android's
+PackageInstaller, which asks the person holding the phone before anything
+is installed (one notification, one tap). The credential stays on the PC;
+an unsigned caller gets 403 and no bytes.

@@ -184,6 +184,12 @@ def main():
         DP.write(say=say)
     except Exception as e:                                       # noqa: BLE001
         say("daily plan FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+    # THE PHONE'S UPDATE (2026-09-13): keep the newest green build of the private app here
+    try:
+        import covenant_app_update as AU
+        AU.fetch(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("app update FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X
