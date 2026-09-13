@@ -70,6 +70,7 @@ PT_URL = "https://dl.google.com/android/repository/platform-tools-latest-windows
 PT_MB = 7.7                                   # measured 2026-09-12 (Content-Length 8,044,989)
 
 PHONE_SIDE_TO_PC = ("15001", "5001")           # adb reverse: phone localhost -> PC
+PHONE_SIDE_TO_PC_API = ("15000", "5000")       # 2026-09-13: and the PC API, for the plan, the heartbeat, the updates
 PC_SIDE_TO_PHONE = ("15000", "5000")           # adb forward: PC localhost -> phone
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
@@ -197,11 +198,12 @@ def cmd_link(adb):
     serial = the_one(adb)
     if not serial:
         return 2
-    ph, pc = PHONE_SIDE_TO_PC
-    rc, out = run_adb(adb, "-s", serial, "reverse", "tcp:%s" % ph, "tcp:%s" % pc)
-    if rc:
-        say("adb reverse failed:\n" + out.strip()); return 4
-    say("phone 127.0.0.1:%s  ->  this PC's :%s   (the phone node peers with PC_PEER=127.0.0.1:%s)" % (ph, pc, ph))
+    for ph, pc in (PHONE_SIDE_TO_PC, PHONE_SIDE_TO_PC_API):
+        rc, out = run_adb(adb, "-s", serial, "reverse", "tcp:%s" % ph, "tcp:%s" % pc)
+        if rc:
+            say("adb reverse failed:" + chr(10) + out.strip()); return 4
+        say("phone 127.0.0.1:%s  ->  this PC's :%s" % (ph, pc))
+    say("the phone node peers with PC_PEER=127.0.0.1:%s; the app reads the plan at 127.0.0.1:%s" % (PHONE_SIDE_TO_PC[0], PHONE_SIDE_TO_PC_API[0]))
     pcp, php = PC_SIDE_TO_PHONE
     rc, out = run_adb(adb, "-s", serial, "forward", "tcp:%s" % pcp, "tcp:%s" % php)
     if rc:

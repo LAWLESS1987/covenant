@@ -109,8 +109,8 @@ def main():
         rev = [x for x in c if "reverse" in x]
         fwd = [x for x in c if "forward" in x]
         check("M4.4 one device -> link exits 0", rc == 0, out[-300:])
-        check("M4.4b it ran exactly one adb reverse, addressed to that serial, phone 15001 -> PC 5001",
-              rev == [["-s", "R5CX1234ABC", "reverse", "tcp:15001", "tcp:5001"]], rev)
+        check("M4.4b it ran two adb reverses, addressed to that serial: 15001 -> 5001 (peer) and 15000 -> 5000 (API, 2026-09-13)",
+              rev == [["-s", "R5CX1234ABC", "reverse", "tcp:15001", "tcp:5001"], ["-s", "R5CX1234ABC", "reverse", "tcp:15000", "tcp:5000"]], rev)
         check("M4.4c it ran exactly one adb forward, PC 15000 -> phone 5000",
               fwd == [["-s", "R5CX1234ABC", "forward", "tcp:15000", "tcp:5000"]], fwd)
         check("M4.4d it tells the phone which PC_PEER to use over the cable",
