@@ -123,7 +123,7 @@ check(s["clears"] and s["p_value"] <= 0.05,
 # --- T: the trader applies both halves of the gate ---------------------------
 import covenant_trader as T          # noqa: E402
 cfg = dict(T.DEFAULT_CONFIG)
-cfg.update({"armed": True, "seal_required": False, "rule5_require_significance": True})
+cfg.update({"armed": True, "seal_required": False, "rule5_require_significance": True, "daily_plan_required": False})   # Rule 5, not the plan gate (A106)
 order = {"sym": "XLM", "side": "sell", "qty": 1, "usd": 10, "rule": "R1"}
 pf = {"total": 1000, "cash": 500, "positions": []}
 
@@ -161,7 +161,7 @@ class _Stub:
 _saved = []
 T.save_state = lambda st: _saved.append(json.dumps(st, sort_keys=True))
 armed = dict(T.DEFAULT_CONFIG)
-armed.update({"armed": True, "seal_required": False, "rule5_require_significance": False})
+armed.update({"armed": True, "seal_required": False, "rule5_require_significance": False, "daily_plan_required": False})
 def run(stub):
     T.venue_for = lambda o, lv: stub
     T.V.all_venues = lambda: [stub]

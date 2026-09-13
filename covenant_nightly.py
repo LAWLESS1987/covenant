@@ -178,6 +178,13 @@ def main():
         except Exception as e:                                   # noqa: BLE001
             say("strategy FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    # THE DAY'S PLAN (2026-09-12): written every pass, approved by a person.
+    try:
+        import covenant_daily_plan as DP
+        DP.write(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("daily plan FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
     try:
         import covenant_distill as X
         X.cycle(a.cycle, say=say)

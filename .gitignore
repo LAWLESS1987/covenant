@@ -262,6 +262,10 @@ ops/verdicts_live.jsonl
 # already treats absence as valid (covenant_judge_defer.apply_policy:101,
 # "if not p: return ''"), which is exactly what a fresh clone gets.
 ops/quorum_policy.json
+# the day's plan carries the money posture; the approvals and signers are the operator's
+ops/daily_plan/
+ops/daily_approvals.jsonl
+ops/daily_plan_signers.json
 
 # Delivery folder holding duplicate copies of suites that already live at the
 # repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are

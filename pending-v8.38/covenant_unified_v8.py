@@ -221,6 +221,7 @@ PATCH LOG — v7.2 (balance ledger + /stake signature requirement)
    Fixed: the route now reads both fields from the request body.
 """
 
+import importlib
 import json
 import time
 import hashlib
@@ -7440,6 +7441,48 @@ class CovenantAPI:
         @self.app.route("/peers", methods=["GET"])
         def get_peers():
             return jsonify({"peers": self.node.peers})
+
+        # THE DAILY PLAN (2026-09-12, the operator's decision). The plan carries
+        # the money posture, so it is served ONLY to a signed GET from a
+        # registered signer (ops/daily_plan_signers.json), and a decision is
+        # recorded ONLY from a signed POST by one. The scheme is this file's
+        # own operator-request signature; covenant_daily_plan adds the
+        # registry, the time window and the nonce. covenant_daily_plan.py is
+        # optional here: without it both routes answer 503.
+        def _daily_plan_auth(req, body):
+            try:
+                _dp = importlib.import_module("covenant_daily_plan")   # by name: the phone app's import closure (M5.2) must not grow
+            except Exception as e:                                # noqa: BLE001
+                return False, "daily plan unavailable on this node: %s" % type(e).__name__, ""
+            try:
+                pem = base64.b64decode(req.headers.get("X-Operator-Pubkey", "")).decode()
+            except Exception:                                     # noqa: BLE001
+                return False, "bad X-Operator-Pubkey", ""
+            ok, who = _dp.verify_signed(pem, req.method, req.path, body, req.headers.get("X-Operator-Nonce", ""),
+                                        req.headers.get("X-Operator-Timestamp", ""), req.headers.get("X-Operator-Signature", ""))
+            return ok, who, pem
+
+        @self.app.route("/daily_plan", methods=["GET"])
+        def daily_plan_get():
+            ok, who, _pem = _daily_plan_auth(request, b"")
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            _dp = importlib.import_module("covenant_daily_plan")
+            plan = _dp.load()
+            if not plan:
+                return jsonify({"status": "error", "message": "no plan written for today"}), 404
+            d, row = _dp.decision(plan["date"], plan["sha256"])
+            return jsonify({"status": "success", "plan": plan, "decision": d, "decided": row, "reader": who})
+
+        @self.app.route("/daily_plan/approve", methods=["POST"])
+        def daily_plan_approve():
+            body = request.get_data() or b""
+            ok, who, pem = _daily_plan_auth(request, body)
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            _dp = importlib.import_module("covenant_daily_plan")
+            code, out = _dp.handle_decision(body, who, pem)
+            return jsonify(out), code
 
         @self.app.route("/transactions", methods=["POST"])
         def add_transaction():

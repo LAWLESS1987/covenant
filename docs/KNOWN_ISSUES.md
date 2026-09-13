@@ -3241,3 +3241,34 @@ remote driving, gated on the operator's private signing key. No trading
 apps: refused outright (see the daily-approval design instead). Not
 verified on the emulator (CI starts no accessibility service); verified by
 use on the phone, or not at all.
+
+### A106. [new capability -- the operator's decision, 2026-09-12] The daily plan: a person approves each day's strategy before the trader may act. PC SIDE LANDED; the phone's Today screen follows
+
+**Asked.** "i'll have to daily approve of the strategy it lays out", after
+declining to let anything tap his trading apps.
+
+**Built.** `covenant_daily_plan.py`: the nightly writes
+`ops/daily_plan/<date>.json` -- money posture, the Rule 5 record, the caps,
+the trader's own proposed orders (`run_once(plan_only=True)`), the reason
+there is nothing to do; sha256 over its canonical bytes; a plan whose bytes
+move is no plan. A decision (approve / decline, with a note) is signed by a
+REGISTERED signer -- the phone node's key, this PC's node key -- with the
+core's operator-request signature (method, path, body hash, nonce,
+timestamp), checked against a registry, a 300 s window and a nonce set;
+one line per decision in `ops/daily_approvals.jsonl`; the last wins.
+`guards.preconditions` reason 7: no order goes live without an approved
+plan for today (`daily_plan_required`, default true), for every executor
+that asks guards. The node serves the plan to a signed GET (`/daily_plan`)
+and records a signed POST (`/daily_plan/approve`); an unsigned or
+unregistered caller gets 403, never the posture. `test_dp1_daily_plan.py`,
+18 checks offline, in the sweep. The three files are gitignored: the plan
+carries the posture.
+
+**What it means today.** Plans read "no order proposed; Rule 5 does not
+clear" and will until a rule clears validation; approving one is how you
+show you looked. The plan is the covenant's measured posture and its own
+validated rules, not advice.
+
+**Next.** The phone's Today screen (signed GET, Approve / Decline signed by
+the phone node's key), and registering that key here with
+`python covenant_daily_plan.py --register-signer phone phone.pem`.

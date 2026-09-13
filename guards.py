@@ -1123,6 +1123,17 @@ def preconditions(order, cfg=None, st=None, sealed_ok=None, guard_blocks=None,
         bad.append("armed=false in trader_config.json")
     if os.path.exists(HALT):
         bad.append("TRADER_HALT file present")
+    # 7. THE DAY'S PLAN IS APPROVED (2026-09-12, the operator's decision: "i'll
+    # have to daily approve of the strategy it lays out"). No order goes live
+    # without a signed approve for TODAY's plan, matching its hash --
+    # covenant_daily_plan.py. cfg "daily_plan_required" false switches it off,
+    # and only that.
+    if cfg.get("daily_plan_required", True):
+        try:
+            import covenant_daily_plan as _dp
+            bad.extend(_dp.gate_reasons(now=now))
+        except Exception as e:                                   # noqa: BLE001
+            bad.append("daily plan gate unavailable (%s: %s) -- nothing may go live" % (type(e).__name__, str(e)[:80]))
 
     # THE CAPS ARE GUARDS, and this asks them rather than repeating their
     # arithmetic. A number absent from cfg falls back through caps() to the
