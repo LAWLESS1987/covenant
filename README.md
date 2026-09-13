@@ -388,9 +388,9 @@ is missing is the second person.
 
 An Android phone runs the same node with the same judge -- the distilled students and
 the semantic judge, in-process, no model server -- and peers with your PC. Two ways:
-the packaged app in [mobile/app](mobile/app/README.md) (**private for now**: GitHub
-builds and proves it on an emulator but publishes no release; the APK is the run's
-artifact or a cable build), or the Termux kit in [mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md).
+the packaged app, which lives in the operator's **private** repository since
+2026-09-12 (its workflow builds against this public core and proves the APK on an
+emulator; nothing of it is published), or the Termux kit in [mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md).
 The phone's rule, written into the app: a phone is private to the person holding it.
 An iPhone can only be a client of a PC node; it cannot carry a judge.
 

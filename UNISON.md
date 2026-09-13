@@ -36,7 +36,7 @@ asked for in the session, and even then every branch head is tagged under
 | | authoritative for | cannot answer |
 |---|---|---|
 | **GitHub Actions** (`covenant.yml`) | the Linux sweep, every push and PR, on 3.11 and 3.12 | win32, the launch gates, anything needing a judge or a node |
-| **GitHub Actions** (`android.yml`, 2026-09-12) | building the phone app from `mobile/app`, proving it on an x86_64 emulator, keeping the APK as the run's artifact (no public release since 2026-09-12) -- the first job in this repository holding `contents: write`, and only that job | arm64 on a real phone, the Start button's tap path, Samsung's sleep policy |
+| **GitHub Actions, private** (`covenant-phone`, 2026-09-12) | building the phone app against this public core, proving it on an x86_64 emulator, keeping the APK as the run's artifact in the operator's private repository | arm64 on a real phone, the Start button's tap path, Samsung's sleep policy |
 | **`ONE.bat`** on the box | win32 — the platform production runs on | nothing else runs there automatically |
 | **`ONE_UP.bat`** | the launch itself, gates first | — |
 

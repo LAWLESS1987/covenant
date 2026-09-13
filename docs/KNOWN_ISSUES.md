@@ -3272,3 +3272,18 @@ validated rules, not advice.
 **Next.** The phone's Today screen (signed GET, Approve / Decline signed by
 the phone node's key), and registering that key here with
 `python covenant_daily_plan.py --register-signer phone phone.pem`.
+
+### A107. [posture -- the operator's decision, 2026-09-12] The phone app moved to a private repository. DONE
+
+**Asked.** "make the phone app private for now" and, on hearing that
+half of it was still public, "move it just the phone part".
+
+**Done.** `mobile/app`, its workflow and `test_m5_app.py` now live in
+`LAWLESS1987/covenant-phone` (private). Its workflow checks out this
+public core at the root and itself into `mobile/app`, so every script runs
+as written and the APK carries the public core byte for byte; the APK is
+each run's artifact, visible only to people with access there. The eight
+public releases were taken down earlier the same day. What stays public:
+the Termux kit, `mobile/usb_link.py`, and this repository's history, which
+still holds the app's source up to this commit (rewriting history was not
+asked for).

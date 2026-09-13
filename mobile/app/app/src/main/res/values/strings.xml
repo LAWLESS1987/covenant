@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Lawless 87</string>
-    <string name="tagline">a Covenant node in your pocket — the same ledger, the same judge</string>
-    <string name="actuator_description">Acts only inside apps you have green-lit in Covenant Node, only on a job you place from this phone, and writes every action to the app\'s actions.log. No gestures. Nothing remote.</string>
-    <string name="hint">Samsung: Settings › Apps › Covenant Node › Battery › Unrestricted, and Battery › Background usage limits › Never sleeping apps. Add this phone\'s IP:5001 to the PC node\'s --peers, or use mobile/usb_link.py over a cable. Share any text to this app from another app to judge it.</string>
-</resources>

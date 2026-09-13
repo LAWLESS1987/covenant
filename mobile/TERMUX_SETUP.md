@@ -27,10 +27,9 @@ rather you read before you run: `curl -sLO .../mobile/install.sh`, then `less in
 then `sh install.sh`.
 
 Why Termux at all: Android will not run a Python node from a link. It needs a terminal app,
-and Termux is that app. **Since 2026-09-12 there is also a packaged app** -- `mobile/app/`,
-built and emulator-proved by GitHub Actions (private for now: no public release;
-the APK is the run's artifact); see
-`mobile/app/README.md`. The app and this kit run the same node with the same flags.
+and Termux is that app. **Since 2026-09-12 there is also a packaged app**, kept in the operator's
+private repository (it builds against this public core and is proved on an
+emulator there). The app and this kit run the same node with the same flags.
 
 ## Requirements
 
