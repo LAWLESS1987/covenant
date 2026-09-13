@@ -3287,3 +3287,33 @@ public releases were taken down earlier the same day. What stays public:
 the Termux kit, `mobile/usb_link.py`, and this repository's history, which
 still holds the app's source up to this commit (rewriting history was not
 asked for).
+
+### A108. [the operator's "do them all", 2026-09-12] The phone's heartbeat, the held flag, the raised bar, the release key, the encryption draft, the worktrees. DONE
+
+**Heartbeat.** `POST /checkin` (registered signers only) records one line per
+ten minutes from a running phone node -- height, peers, app version, battery
+-- in `ops/phone_checkins.jsonl` (gitignored); the watchdog prints "phone X
+last seen N min ago" every pass and alerts when a phone that reported within
+the day is silent for an hour. Three checks in DP1 (D19-D21).
+
+**Held flag.** The deferring seat's rows (`ops/judged_by_student.jsonl`,
+`ops/verdicts*.jsonl`) now carry `held`, so the run-without bar
+`own_traffic_hold_max` is measured from the seat's own trail instead of
+reading "unmeasured" (A101's open item).
+
+**The decided bar** `holdout_decided_min` is 0.75, from 0.60 (Gemini's
+reading on 2026-09-12, agreed: 0.60 let a student abstain its way past the
+false-clear bar).
+
+**The release key** for the phone app was generated on this PC, outside every
+repository (`~/.covenant/phone-signing/`, 4096-bit RSA, self-signed, 30
+years); the operator alone holds it, and the private repository's workflow
+signs with it once he adds it as two secrets. A build signed with it is a
+new app identity: one fresh install.
+
+**Encrypting the peer link** is drafted in `docs/PEER_ENCRYPTION_DRAFT.md`
+and held: it changes the protocol every node speaks, which is the group's
+decision by the operator's own rule.
+
+**Housekeeping.** Forty stale worktrees from earlier sessions (copies of the
+whole tree under `.claude/worktrees`) and their forty-two branches removed.

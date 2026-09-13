@@ -237,20 +237,26 @@ def record_verdict(data, result, judge, source, path=None):
     """Append an ANSWERED verdict to the ledger the fallback learns from.
     Silence, abstention and uncertainty are not verdicts and are not written.
     Returns True when a line was written."""
-    if getattr(result, "infrastructure_failure", False) or getattr(result, "not_understood", False) \
-            or getattr(result, "uncertain", False):
+    if getattr(result, "infrastructure_failure", False):
         return False
+    # 2026-09-12: a HOLD (nothing alleged) is recorded too, marked held=True and
+    # WITHOUT a label -- the loaders teach only from rows that carry `violates`,
+    # so a hold never teaches, but the run-without bar own_traffic_hold_max can
+    # now be measured from the seat's own trail (it read "unmeasured" before).
+    held = bool(getattr(result, "not_understood", False) or getattr(result, "uncertain", False))
     text = payload_text(data)
     if not text.strip():
         return False
     rec = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "text": text[:4000],
            "violates": bool(result.violates), "judge": judge, "source": source,
-           "reason": (getattr(result, "reasoning", "") or "")[:240]}
+           "reason": (getattr(result, "reasoning", "") or "")[:240], "held": held}
+    if held:
+        rec.pop("violates", None)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        return True
+        return not held      # a hold is written to the trail, but it is not a label (F2 L4/L5)
     except OSError:
         return False
 

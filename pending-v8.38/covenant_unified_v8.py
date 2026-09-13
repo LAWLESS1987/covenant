@@ -7484,6 +7484,19 @@ class CovenantAPI:
             code, out = _dp.handle_decision(body, who, pem)
             return jsonify(out), code
 
+        @self.app.route("/checkin", methods=["POST"])
+        def phone_checkin():
+            """The phone's heartbeat (2026-09-12): a signed line from a registered
+            signer -- its node's height, peers, the app's version, battery. Only
+            the named fields are kept; the watchdog reads the ledger."""
+            body = request.get_data() or b""
+            ok, who, _pem = _daily_plan_auth(request, body)
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            _dp = importlib.import_module("covenant_daily_plan")
+            code, out = _dp.record_checkin(body, who)
+            return jsonify(out), code
+
         @self.app.route("/transactions", methods=["POST"])
         def add_transaction():
             data = request.json or {}

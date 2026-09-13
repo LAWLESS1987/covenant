@@ -149,6 +149,9 @@ def main():
     check("L3 unreachable is not a label", not D.record_verdict({"message": "x"}, R(True, "down", infrastructure_failure=True), "t", "test", ledger))
     check("L4 held/abstained is not a label", not D.record_verdict({"message": "x"}, R(True, "held", not_understood=True), "t", "test", ledger))
     check("L5 uncertain is not a label", not D.record_verdict({"message": "x"}, R(True, "unsure", uncertain=True), "t", "test", ledger))
+    _last = json.loads(open(ledger, encoding="utf-8").read().splitlines()[-1])
+    check("L5b ...but a hold IS written to the trail, marked held and carrying NO label (2026-09-12: so own_traffic_hold_max is measurable and nothing learns from it)",
+          _last.get("held") is True and "violates" not in _last)
     # L6 REWRITTEN 2026-09-09 -- it could not fail, and it never reached the
     # guard it names. It read
     #     not D.record_verdict({"origin": "human"}, ...) or True

@@ -266,6 +266,7 @@ ops/quorum_policy.json
 ops/daily_plan/
 ops/daily_approvals.jsonl
 ops/daily_plan_signers.json
+ops/phone_checkins.jsonl
 
 # Delivery folder holding duplicate copies of suites that already live at the
 # repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are

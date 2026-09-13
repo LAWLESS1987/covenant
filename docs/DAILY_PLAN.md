@@ -31,6 +31,15 @@ Approve / Decline is `POST /daily_plan/approve`, signed by the phone node's
 key, which must be registered here first. An unsigned or unregistered
 caller gets 403 and never sees the posture.
 
+## The phone's heartbeat
+
+While its node runs, the app sends one signed line every ten minutes to
+`POST /checkin` -- its node's height and peers, the app's version, the
+battery -- which the PC appends to `ops/phone_checkins.jsonl`. The watchdog
+prints "phone X last seen N min ago" each pass and raises an alert when a
+phone that reported within the day has been silent for an hour. Only the
+named fields are kept; the switch is in the app's settings.
+
 What it is not: advice. The plan is the covenant's measured posture and its
 own validated rules, of which none has cleared walk-forward, deflation and
 PBO as of 2026-09-12 -- so plans read "hold", and approving one is how you

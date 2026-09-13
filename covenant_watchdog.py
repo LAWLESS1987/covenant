@@ -924,6 +924,17 @@ def one_pass(strict=False):
         if max(hs) - min(hs) > 1:
             alerts.append(f"height gap {hs} -- peers not keeping up")
 
+    # THE PHONE'S HEARTBEAT (2026-09-12): what a phone last said about itself,
+    # and an alert when one that was reporting goes quiet.
+    try:
+        import covenant_daily_plan as _dp
+        c_alerts, c_infos = _dp.checkin_report()
+    except Exception as e:                                       # noqa: BLE001
+        c_alerts, c_infos = [], ["phone check-ins unreadable: %s" % type(e).__name__]
+    alerts.extend(c_alerts)
+    for msg in c_infos:
+        log("INFO", msg)
+
     drift_alerts, drift_infos = source_drift_report(states, disk_source_sha12())
     s_alerts, s_infos = self_drift_report(
         SELF_SOURCE_SHA12, disk_source_sha12(SELF_SRC))   # P14

@@ -3,8 +3,9 @@
   "exam_met_streak": 3,
   "own_traffic_hold_max": 0.05,
   "holdout_false_clear_max": 0.025,
-  "holdout_decided_min": 0.60,
-  "panel_coverage_min": 0.90,
+  "holdout_decided_min": 0.75,
+  "panel_coverage_min": 0.9,
   "contest_on_split": false,
-  "decided_by": "Lawrence, 2026-09-12"
+  "decided_by": "Lawrence, 2026-09-12",
+  "_holdout_decided_min_note": "raised 0.60 -> 0.75 on 2026-09-12 (Gemini's reading, agreed): 0.60 let a student abstain its way past the false-clear bar"
 }

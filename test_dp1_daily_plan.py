@@ -127,6 +127,21 @@ def main():
         check("D18 guards.preconditions carries the daily-plan reason while the plan is declined, drops it once approved, and only cfg daily_plan_required=false switches it off",
               has(bad_declined) and not has(bad_approved) and not has(bad_off), (bad_declined, bad_approved, bad_off))
 
+    # the heartbeat
+    with tempfile.TemporaryDirectory() as td:
+        led = os.path.join(td, "checkins.jsonl")
+        code, out = DP.record_checkin(json.dumps({"node_id": "phone", "chain_height": 18, "peers": 1, "app": "1.0", "battery": 71, "secret": "x" * 500}).encode(), "phone", led)
+        rows = [json.loads(l) for l in open(led, encoding="utf-8")]
+        check("D19 a signed check-in is recorded with the named fields only (the extra key is dropped unread)",
+              code == 200 and len(rows) == 1 and rows[0]["chain_height"] == 18 and "secret" not in rows[0], rows)
+        a1, i1 = DP.checkin_report(now=rows[0]["at"] + 300, path=led)
+        a2, i2 = DP.checkin_report(now=rows[0]["at"] + 7200, path=led)
+        a3, i3 = DP.checkin_report(now=rows[0]["at"] + 90000, path=led)
+        check("D20 five minutes on it is an info line; two hours on it is an ALERT; a day on it is an info line again (an old phone is not news)",
+              not a1 and len(i1) == 1 and "height 18" in i1[0] and len(a2) == 1 and "SILENT" in a2[0] and not a3 and len(i3) == 1, (a1, i1, a2, a3))
+        code, out = DP.record_checkin(b"not json", "phone", led)
+        check("D21 a body that is not JSON is refused (400) and nothing is written", code == 400 and len(open(led, encoding="utf-8").readlines()) == 1, code)
+
     n = sum(1 for r in results if r)
     print("\nDP1: %d/%d passed" % (n, len(results)))
     return 0 if n == len(results) else 1

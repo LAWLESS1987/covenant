@@ -281,6 +281,66 @@ def gate_reasons(now=None, plan_dir=None, approvals=None):
     return [] if ok else ["no approved daily plan for %s: %s (ops/daily_plan; python covenant_daily_plan.py --approve)" % (today(now), why)]
 
 
+# ---------------------------------------------------------------- the phone's heartbeat (2026-09-12)
+
+CHECKINS = os.path.join(HERE, "ops", "phone_checkins.jsonl")
+SILENT_AFTER_S = 3600          # a phone that reported within a day and then went quiet this long is an alert
+
+
+def record_checkin(body_bytes, who, path=None):
+    """One signed line from a phone: what its node says about itself. Only the
+    named fields are kept; anything else in the body is dropped unread."""
+    try:
+        data = json.loads(body_bytes.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return 400, {"status": "error", "message": "body is not JSON"}
+    if not isinstance(data, dict):
+        return 400, {"status": "error", "message": "body is not an object"}
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1), "signer": who}
+    for k in ("node_id", "chain_height", "peers", "app", "battery", "when"):
+        if k in data:
+            row[k] = data[k] if isinstance(data[k], (int, float, bool)) else str(data[k])[:80]
+    path = path or CHECKINS
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return 200, {"status": "success", "recorded": row}
+
+
+def last_checkins(path=None):
+    """{signer: last row} from the ledger."""
+    out = {}
+    try:
+        with open(path or CHECKINS, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if r.get("signer"):
+                    out[r["signer"]] = r
+    except OSError:
+        pass
+    return out
+
+
+def checkin_report(now=None, path=None):
+    """(alerts, infos) for the watchdog: one info line per phone that has ever
+    reported, and an ALERT for a phone that reported within a day and has
+    been silent for SILENT_AFTER_S."""
+    now = now if now is not None else time.time()
+    alerts, infos = [], []
+    for who, r in sorted(last_checkins(path).items()):
+        age = now - float(r.get("at", 0))
+        line = "phone %s last seen %d min ago: height %s, peers %s, battery %s" % (
+            who, int(age // 60), r.get("chain_height", "?"), r.get("peers", "?"), r.get("battery", "?"))
+        if SILENT_AFTER_S < age < 86400:
+            alerts.append("phone %s: SILENT for %d min after reporting (last: height %s) -- the node or the app stopped, or the Wi-Fi did" % (who, int(age // 60), r.get("chain_height", "?")))
+        else:
+            infos.append(line)
+    return alerts, infos
+
+
 # ---------------------------------------------------------------- signing on this PC
 
 def load_key(path=None):
