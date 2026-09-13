@@ -51,6 +51,12 @@ phone asks on its heartbeat, downloads when the build is not its own,
 verifies the sha256 and hands it to Android's installer, which asks the
 person holding the phone. Nothing installs silently.
 
+## By mail, sealed
+
+When the phone cannot reach the PC, the plan travels as a sealed block in an
+email and the decision comes back the same way; see `docs/SEALED_MAIL.md`.
+Same keys, same ledger, same gate.
+
 What it is not: advice. The plan is the covenant's measured posture and its
 own validated rules, of which none has cleared walk-forward, deflation and
 PBO as of 2026-09-12 -- so plans read "hold", and approving one is how you

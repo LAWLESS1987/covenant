@@ -3328,3 +3328,20 @@ sha is not its own, verifies the sha256, and hands it to Android's
 PackageInstaller, which asks the person holding the phone before anything
 is installed (one notification, one tap). The credential stays on the PC;
 an unsigned caller gets 403 and no bytes.
+
+### A110. [the operator's ask, 2026-09-13] The plan and the decision by email, sealed. LANDED
+
+"encode the email in a way only you and the node understand for security but
+explain to me when asked." `covenant_sealed_mail.py` seals the day's plan to
+the phone's registered key (RSA-OAEP-wrapped AES-256-GCM, signed RSA-PSS by
+the PC's key) as one text block; the app opens it with no connection to the
+PC, pins the PC's key on first use, and seals the decision back to the PC's
+key signed by the phone's. The PC records it through `handle_decision`, the
+same path as the route and `--approve`, after the registry, the date (today
+only), the plan's sha and a nonce ledger on disk all agree. Both ends log the
+plaintext; the method is `docs/SEALED_MAIL.md`. SM1 43 checks; M5.13 proves
+the phone's mirror of the primitives opens what the PC seals and vice versa.
+Open: a PC-side mailer needs a credential only the operator can create (a
+Gmail app password); until then the assistant's mail connector carries the
+blocks at the operator's word. The first pin is trust-on-first-use, so the
+fingerprint is shown on both ends.
