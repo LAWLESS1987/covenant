@@ -3744,10 +3744,18 @@ green list and every charter.
 
 **Still open, ranked, with who has to be where.**
 
-1. *[high] No version floor on updates.* The freshness test is "not equal to my
-   own sha", so a stale or hostile-but-signed manifest can move the phone
-   BACKWARD to an older signed build. Fix: carry a monotonic versionCode in the
-   signed document and refuse a lower one.
+1. ~~*[high] No version floor on updates.*~~ **CLOSED the same day.** The
+   freshness test was only "not equal to my own sha", so a correctly SIGNED
+   manifest for an older build was a valid instruction to install a version
+   with whatever holes the newer one closed. The phone now remembers the newest
+   `built` it has ACCEPTED and refuses an older one by name. A watermark, not a
+   version compare: the phone cannot know its own build's date, only what it
+   has been told before. Going back deliberately still means installing that
+   build by hand, which is the honest place for that decision. M5.33d runs it;
+   mutation-tested by removing the comparison. Found while writing that test:
+   the watermark write assumed a directory Java may not have made, and a guard
+   that cannot save its note must not refuse the update -- nor raise at the
+   Java boundary -- so the write is wrapped and the check proceeds either way.
 2. *[high] The node's HTTP API answers every app on the phone.* Binding
    127.0.0.1 makes it only-this-phone, not only-this-app; any installed app can
    read `/health`, the dashboard and `/peers`. Fix: a per-install token, or a
@@ -3759,9 +3767,16 @@ green list and every charter.
    answers the learning sync carries. `docs/PEER_ENCRYPTION_DRAFT.md` exists and
    was deliberately HELD (A108) because it changes the protocol every node
    speaks, which is the group's decision by his own rule.
-5. *[high] The PC key is pinned silently on first use*, with no fingerprint
-   confirmation before it is written -- and the text can arrive from any app
-   through the share sheet.
+5. ~~*[high] The PC key is pinned silently on first use.*~~ **CLOSED the same
+   day.** The first sealed block to open wrote the sender's key into
+   settings.json on a worker thread, and a block can arrive from ANY app
+   through the share sheet -- while that one write decides which PC this phone
+   believes for every later plan, every piece of guidance it obeys, and the key
+   its own identity gets sealed to. The candidate is now carried to the main
+   thread and the owner is shown the fingerprint, with the command that prints
+   the PC's own, before anything is written. The plan he just read is on screen
+   either way, because reading is not trusting; both answers are logged,
+   including the refusal.
 6. *[medium] The peer and bridge listeners bind 0.0.0.0 on the phone*: on a cafe
    network, anything can reach them.
 7. *[medium] No tapjacking protection on the consent surfaces* the whole model
