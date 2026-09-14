@@ -68,7 +68,7 @@ SEEN = os.path.join(HERE, "ops", "sealed_mail_seen.json")
 BEGIN = "-----BEGIN COVENANT SEALED-----"
 END = "-----END COVENANT SEALED-----"
 VERSION = 1
-KINDS = ("plan", "decision")
+KINDS = ("plan", "decision", "identity")
 ENVELOPE_KEYS = ("v", "kind", "to", "from", "ek", "iv", "ct")
 MAX_BLOCK_BYTES = 1 << 20          # a block larger than this is not one of ours
 # the marker lines as a mail client may show them: a no-break space, a double
@@ -430,6 +430,53 @@ def _apply_decision(dp, env, obj, spk, plan_dir, approvals, signers_path, seen_p
 EXPLAIN = __doc__.split("Run:")[0].strip()
 
 
+IDENTITY_DIR = os.path.join(os.path.expanduser("~"), ".covenant", "phone-identity")
+
+
+def open_identity(text, key_path=None, dest_dir=None):
+    """Open a sealed IDENTITY block from the phone and save the key it carries.
+
+    WHY IT COMES THIS WAY (2026-09-14). The phone node's private key had exactly one route
+    off the phone -- `adb run-as` -- which needs a cable and a debuggable build. The security
+    audit closed debuggable, and the operator's phone offers no wireless debugging, so the
+    app now seals its own key to THIS PC's public key and hands the block to whatever will
+    carry it. In transit it is ciphertext only this machine can open, which is a better
+    posture than the file `run-as` used to hand over in the clear.
+
+    Saved outside every repository, beside the phone signing key, and never overwritten: a
+    second, different key arriving where one is already saved is a question, not a refresh."""
+    key, pem = my_key(key_path)
+    env, obj, spk = open_block(text, key, pem, kind="identity")
+    body = str(obj.get("key_pem") or "")
+    if "PRIVATE KEY" not in body:
+        raise SealedError("the block opened but carries no private key")
+    claimed = str(obj.get("pubkey_fingerprint") or "")
+    if claimed and claimed != fingerprint(spk):
+        raise SealedError("the key inside does not match the phone that signed the block")
+    d = dest_dir or IDENTITY_DIR
+    os.makedirs(d, exist_ok=True)
+    dest = os.path.join(d, "covenant_unified_%s.db.key" % (str(obj.get("node_id") or "phone")[:40]))
+    if os.path.exists(dest):
+        raise SealedError("a key is already saved at %s -- move it aside yourself if you mean to replace it" % dest)
+    tmp = "%s.%d.tmp" % (dest, os.getpid())
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+    try:
+        os.chmod(dest, 0o600)
+    except OSError:
+        pass
+    _log("identity key from %s opened and saved (%s)" % (obj.get("node_id"), fingerprint(spk)))
+    return dest, fingerprint(spk)
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="the plan and the decision, sealed for the mail")
@@ -437,6 +484,7 @@ def main(argv=None):
     g.add_argument("--seal-plan", action="store_true")
     g.add_argument("--open", metavar="FILE")
     g.add_argument("--peek", metavar="FILE")
+    g.add_argument("--open-identity", metavar="FILE", dest="open_identity")
     g.add_argument("--fingerprint", action="store_true")
     g.add_argument("--explain", action="store_true")
     g.add_argument("--log", nargs="?", const=20, type=int, metavar="N")
@@ -456,6 +504,26 @@ def main(argv=None):
     if a.open:
         code, out = open_decision(read(a.open), key_path=a.key)
         print(json.dumps(out, indent=1)); return 0 if code == 200 else 1
+    if a.open_identity:
+        try:
+            dest, fp = open_identity(read(a.open_identity), key_path=a.key)
+        except SealedError as e:
+            print("cannot open: %s" % e); return 1
+        print("saved the phone node's identity key")
+        print("  file:        %s" % dest)
+        print("  fingerprint: %s" % fp)
+        reg = ""
+        try:
+            import covenant_daily_plan as _dp
+            for name, pem2 in _dp.signers().items():
+                if fingerprint(pem2) == fp:
+                    reg = name
+                    break
+        except Exception:                                         # noqa: BLE001
+            reg = ""
+        print("  check:       %s" % ("MATCHES the signer this PC has registered as '%s'" % reg if reg
+                                     else "NOT a key this PC has registered -- worth understanding before relying on it"))
+        return 0
     if a.peek:
         for p in peek(read(a.peek)) or [{"shape": "no sealed block in the text"}]:
             print(json.dumps(p))
