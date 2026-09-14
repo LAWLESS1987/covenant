@@ -3613,6 +3613,26 @@ one to add. Not done here: adding a peer is a change to his running mesh, and
 this session did not touch it for the same reason it did not force the
 restart.
 
+**New measurement, 2026-09-14 after the rolling restart.** The phone is not
+invisible to node A after all -- it is visible in exactly one direction, and
+the restart made that legible. Node A's `/health` mesh view now reads
+`by_source: {"27a9bf2b01ad": ["100.86.158.1:?"], "2f5e4e914bb5":
+["127.0.0.1:5021", ...]}` while `GET /peers` still lists only node B. So node
+A HAS heard from the phone -- it recorded the tailnet address as a tracked
+peer -- but with `?` for the port, which is why nothing is ever sent back: it
+has an address it cannot dial. The phone is a sender, never a recipient, which
+is precisely why height 12 never moves. The `?` is the concrete thing to look
+at before adding a peer by hand; the peer is already half-known.
+
+It also means node A now raises A20's real alert -- "mesh is running more than
+one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad']" -- because the
+phone runs the core the PC was running this morning. That alert is correct and
+it is not new damage: the phone has always been behind, the PC simply moved.
+It will clear when the phone takes an app update built from the current core,
+not by anything done on the PC. Adding the phone as a peer while the two are
+on different sources is exactly the situation A20 exists to warn about, which
+is one more reason this stays the operator's call rather than a repair.
+
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
 `brain/**` branch, then main. "Every accessibility behaviour -- recording now
