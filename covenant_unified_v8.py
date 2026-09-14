@@ -7597,7 +7597,22 @@ class CovenantAPI:
             d = _au.latest()
             if not d:
                 return jsonify({"status": "error", "message": "no build fetched yet (python covenant_app_update.py --fetch)"}), 404
-            return jsonify({"status": "success", "latest": {k: v for k, v in d.items() if k != "path"}})
+            # BOTH SHAPES, on purpose (2026-09-14). `latest` is what every build up to
+            # 0.1.421 reads, and the operator's phone is running one of those: drop it and
+            # his current app can never see the build that would replace it. `doc`/`sig`/
+            # `spk` is the signed manifest a newer build verifies against the PC key it
+            # pinned -- the same envelope covenant_actuator_guide uses, so the phone
+            # verifies it with the verify_doc it already has. The signature covers the
+            # canonical doc and echoes the phone's nonce; an unsigned answer (no key on
+            # this node) still carries `latest`, and a phone that has pinned a key refuses
+            # to act on it.
+            out = {"status": "success", "latest": {k: v for k, v in d.items() if k != "path"}}
+            signed = _au.latest_signed(request.args.get("n", "")[:64])
+            if isinstance(signed, dict) and signed.get("status") == "success":
+                out["doc"], out["sig"], out["spk"] = signed["doc"], signed["sig"], signed["spk"]
+            elif isinstance(signed, dict):
+                out["unsigned_because"] = signed.get("message", "the manifest could not be signed")
+            return jsonify(out)
 
         @self.app.route("/app/apk", methods=["GET"])
         def app_apk():

@@ -78,6 +78,45 @@ def latest():
         return None
 
 
+def latest_signed(nonce, key=None):
+    """The update manifest as a document the PHONE can verify, or None when no build
+    has been fetched.
+
+    WHY THIS EXISTS (2026-09-14). The phone asked `/app/latest`, was told a sha256, then
+    downloaded `/app/apk` and checked the bytes against THAT SAME SERVER'S number. So the
+    hash proved the download was not corrupted and nothing else: anything that could answer
+    on the PC's address -- a machine that took the IP on the LAN, a stale tailnet
+    name -- could serve its own APK and its own matching hash, and the check would pass.
+    What actually stopped a hostile APK was Android refusing an install whose signing
+    certificate differs from the installed app's, and the key that signs these builds is
+    the PUBLIC debug key in the app repository. That is one guard, and it is a guard
+    anybody can pick up.
+
+    So the manifest is signed here with the PC's daily-plan key -- the same key sealed mail
+    signs with, the one the phone pins -- over the canonical JSON, echoing the nonce the
+    phone sent, with an `issued` stamp. A phone that has pinned the key refuses a manifest
+    that does not verify; a phone that has not pinned one keeps working and says out loud
+    that it is trusting an unauthenticated manifest.
+
+    The envelope shape and the signature are covenant_actuator_guide's, deliberately:
+    the phone already has verify_doc for it, and one verified-document format on this
+    channel is easier to reason about than two."""
+    d = latest()
+    if not d:
+        return None
+    doc = {"v": 1, "issued": int(time.time()), "nonce": str(nonce or "")[:64],
+           "sha": str(d.get("sha", "")), "sha7": str(d.get("sha7", "")),
+           "sha256": str(d.get("sha256", "")), "size": int(d.get("size") or 0),
+           "built": str(d.get("built", ""))}
+    try:
+        import covenant_actuator_guide as _ag
+        return _ag.sign_doc(doc, _ag._key(key))
+    except Exception as e:                                        # noqa: BLE001
+        # Never a traceback to the phone, and never an unsigned document dressed as one:
+        # the route turns this into a plain error and the phone keeps the build it has.
+        return {"status": "error", "message": "cannot sign the update manifest: %s" % type(e).__name__}
+
+
 def fetch(say=print):
     """The newest green build's APK from the private repository, kept under ops/app/.
     Returns the latest.json dict, or None with the reason said."""
