@@ -68,7 +68,13 @@ set CE=set COVENANT_LOCAL_JUDGE_TIMEOUT=600^&^& set COVENANT_JUDGE_TIMEOUT=600
 curl -s -m 5 http://127.0.0.1:5000/health >nul 2>nul
 if %errorlevel% neq 0 (
   call :stamp "starting node A on 5000"
-  start "Covenant Node A" /min cmd /c "set COVENANT_DB_PATH=nodeA_prod.db&& %CE%&& python run_node.py --port 5000 --node-id A --genesis genesis.json --peers 127.0.0.1:5021 >> logs\nodeA.log 2>&1"
+REM  Node A also peers the OPERATOR'S PHONE over the tailnet (2026-09-14).
+REM  100.86.158.1 is lawrences-s25, whose tailnet address is stable where its
+REM  LAN address is not; :5001 is its P2P port (API 5000 + 1), and the only one
+REM  reachable, because the phone binds its API to loopback. This line and
+REM  covenant_watchdog.py's NODES must stay identical -- test_3node_config.py N5
+REM  compares them and failed the moment only one of them was edited.
+  start "Covenant Node A" /min cmd /c "set COVENANT_DB_PATH=nodeA_prod.db&& %CE%&& python run_node.py --port 5000 --node-id A --genesis genesis.json --peers 127.0.0.1:5021,100.86.158.1:5001 >> logs\nodeA.log 2>&1"
 ) else ( call :stamp "node A already up" )
 
 curl -s -m 5 http://127.0.0.1:5020/health >nul 2>nul

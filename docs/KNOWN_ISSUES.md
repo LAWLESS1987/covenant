@@ -699,7 +699,9 @@ diligence.
 
 **Fix:** Add the operator's P2P address (their --port + 1) to node A's peer string in both covenant_watchdog.py NODES and covenant_prod.bat, restart via the watchdog, and confirm curl :5000/peers lists it.
 
-**Status:** open
+**Status:** open. THIS ENTRY STILL STANDS, and I said otherwise in passing on 2026-09-14 before checking (the correction matters more than the claim did). POST /peers does exist and IS operator-authenticated, which is what I saw; what I did not check is whether anything can actually CALL it. Nothing can: `sign_operator_request` / `operator_signing_payload` appear in covenant_anchor, covenant_app, covenant_client, covenant_daily_plan and covenant_trader, and not one of them signs a POST /peers -- covenant_trader's only reference is a GET. A route that exists and is authenticated but that no tool in the repository can sign is not a scripted way to add a peer. The two-hardcoded-lists-and-a-restart path in the Fix above is still the only one.
+
+The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.158.1:5001` added to node A in BOTH files. The "both" is not decoration -- only covenant_watchdog.py was edited first, and test_3node_config.py N5 failed immediately with `A peers ['127.0.0.1:5021'] vs ['100.86.158.1:5001', '127.0.0.1:5021']`. The guard works; the second file is easy to forget.
 
 ### A30. [serious / security] The node API always binds 0.0.0.0 with no way to restrict it to localhost, exposing unauthenticated endpoints to the whole LAN/overlay
 
@@ -4006,3 +4008,116 @@ ways: unmark the 429, count it toward `all_down` again, or drop the skip. All
 three go red.
 
 **Status:** fixed
+
+### A116. [CRITICAL / consensus] The canonical chain cannot be synced past block 12 by any node that does not already hold it: the ethics gate convicts a transaction the chain already contains. OPEN, reproduced 2026-09-14
+
+**What happens.** A brand-new node, peered at node A, pulls eleven blocks, reaches
+height 12, and stops there for ever. Its own log says why:
+
+```
+bootstrap: pulled 11 block(s) from peers; height now 12
+SYNC REFUSED block 12: Block contains invalid transaction: Ethical violation:
+  local:0: VIOLATES -- student first (policy primary=student) -- Ora
+```
+
+Block 12 is already IN the canonical chain, and it carries one transaction whose
+entire judged payload is a single sentence:
+
+> There can be no mutual benefit without a little faith.
+
+That sentence is what the ethics gate calls an ethical violation. The judge is
+the elder student, Ora -- `fallback_model.json`, model `1cdc0ebb73bc` -- a
+bag-of-words log-odds model whose own verdict string says "treat it as a flag to
+review, never as a finding". The other two seats both pass it: the semantic
+judge returns clean (score 0, below its gate) and the self-report layer returns
+clean. One seat convicts, and one is enough.
+
+**It did not change its mind. It drifted across a line it was always sitting
+against.** Running every dated version of `fallback_model.json` from git against
+the exact text the node judges -- `tx.data`, which is what
+covenant_unified_v8.py:2090 passes:
+
+| model as of | log-odds | verdict |
+|---|---|---|
+| 2026-09-08, the day block 12 was minted | +2.34 | abstain |
+| 2026-09-09 | +2.08 | abstain |
+| 2026-09-10 | +2.13 | abstain |
+| 2026-09-11 | +2.13 | abstain |
+| 2026-09-12 | +2.31 | abstain |
+| 2026-09-13 | +2.52 | **violates** |
+| on disk now | +2.52 | **violates** |
+
+The hold threshold is 2.4. On the day the block was minted the sentence scored
++2.34 -- inside the undecided band, six hundredths under the line. It was never
+judged clean; it was admitted because the student ABSTAINED and the other seats
+passed it. Six days of retraining moved it 0.18 and it crossed. So the chain's
+syncability has been resting on a bag-of-words score staying on one side of a
+hand-set threshold, over a sentence of ordinary English that alleges nothing.
+
+Nothing in the acceptance path distinguishes "a block that is already canonical
+and that my peers hold" from "a block a stranger is proposing to me", so the
+judge gets the same veto over history that it has over new work, and history
+loses.
+
+**Reproduced, and it has nothing to do with the phone.** Throwaway node id
+JOINER, scratch database in the temp directory, port 5910, `--genesis
+genesis.json --peers 127.0.0.1:5001`, no tailnet and no phone involved: height
+went 1 -> 12 and stayed at 12 while the mesh sat at 24. That is the same wall the
+operator's phone has been sitting against for fourteen check-ins, and the reason
+adding the phone as a peer (A111) did not move it. The phone was never the
+problem; it was the first node to show the problem.
+
+**Why this is CRITICAL and not merely serious.** This is the second-operator
+goal, blocked. Anyone who joins this network -- the phone, a partner's PC, a
+rebuilt node of our own -- gets exactly twelve blocks and then stops. The three
+PC nodes only look healthy because they already held block 12 before the student
+learned to refuse it; they have never had to re-accept it. A node restarted from
+its own database is fine. A node rebuilt from scratch is not, which also means
+the chain is not currently recoverable from the genesis file plus peers.
+
+**What is NOT wrong.** The chain is not forked: all three PC nodes agree at
+height 24, the joiner's first twelve blocks matched, and the genesis is
+canonical on all of them. The A98 sync waiver works and is visible in the same
+log (`SYNC WAIVED HOLD on block 2 ... NOTHING WAS ALLEGED`): it forgives a judge
+that could not reach a verdict while catching up. It deliberately does not
+forgive an ALLEGATION, which is the case here, so block 12 is refused rather than
+waived.
+
+**Repro:**
+`python run_node.py --port 5910 --node-id JOINER --genesis genesis.json --peers 127.0.0.1:5001`
+with `COVENANT_DB_PATH` pointing at an empty scratch file; watch
+`/health` chain_height stop at 12 and grep the log for `SYNC REFUSED block 12`.
+
+**Fix: NOT MINE TO CHOOSE.** Every available answer changes what a rule means,
+and that is the operator's and the group's call under the standing
+refinements-only rule, not a repair:
+  * Ratchet: treat a block that is already canonical (held by a quorum of peers,
+    or below some agreed finalised height) as settled and not re-judgeable on
+    sync. This is the narrow fix, and it is still a change to what the gate is
+    FOR.
+  * Retrain or roll back the student so it stops convicting block 12. This makes
+    today's chain syncable and says nothing about tomorrow's retrain doing it
+    again at some other index.
+  * Accept that the chain is un-syncable from scratch and treat node databases as
+    the artifact to preserve. Cheapest, and it quietly abandons the second
+    operator.
+
+**A measuring mistake worth recording, because it nearly became the finding.**
+The first run of that model comparison fed each model the WHOLE transaction dict
+instead of `tx.data`. That tokenises the public keys and the signature, and it
+returned log-odds -3.13 at 42% coverage with 39 "words never seen in training" --
+a clean, confident-looking answer on text the judge never reads, which would have
+disproved the drift that is actually there. The node's own message said "5 known
+tokens" and the mismeasurement said 21; that disagreement is the only thing that
+caught it. Feeding a judge the wrong input and reporting its answer is worse than
+not measuring, because it looks like evidence.
+
+**Note also that the threshold, not the sentence, is doing the work.** Nothing
+about "There can be no mutual benefit without a little faith" is an allegation.
+Whatever is decided about syncing, a gate that converts a 0.18 drift in a
+compressed model into a permanent refusal of canonical history deserves a look on
+its own account -- and A112 (a polite sentence clearing a real violation at the
+same gate) is the same instrument failing in the opposite direction.
+
+**Status:** open -- reproduced, root-caused, not fixed. Found by a four-thread
+review of why the phone would not sync, which is the only reason anyone looked.
