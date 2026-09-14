@@ -26,9 +26,16 @@ REM  the phone signing key. It refuses to overwrite an existing one. It never
 REM  prints the key; it prints the fingerprint of the public half and says
 REM  whether that matches the signer this PC has registered as "phone".
 REM
-REM  Before you start: plug the phone in by USB, unlock it, and make sure
-REM  Developer options > USB debugging is on. The phone will ask you to allow
-REM  this computer -- say yes.
+REM  NO CABLE NEEDED. If a phone is plugged in by USB it uses that. If not, it
+REM  walks you through Android's own Wireless debugging, which works over your
+REM  Wi-Fi or over the tailnet the PC and the phone already share. You will read
+REM  two numbers off the phone's screen: a pairing port with a six-digit code,
+REM  and then the connection port on the main Wireless debugging screen. Android
+REM  keeps those separate on purpose, and both change every time.
+REM
+REM  On the phone: Settings > Developer options > Wireless debugging.
+REM  (If Developer options is hidden: Settings > About phone > Software
+REM  information, then tap "Build number" seven times.)
 REM ===========================================================================
 setlocal
 cd /d "%~dp0"
@@ -39,7 +46,7 @@ echo.
 
 python mobile\phone_identity_export.py --status
 echo.
-python mobile\phone_identity_export.py
+python mobile\phone_identity_export.py --wireless
 set RC=%ERRORLEVEL%
 
 echo.

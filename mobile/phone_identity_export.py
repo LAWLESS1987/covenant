@@ -33,10 +33,18 @@ overwrite an existing one. What it prints is the SHA-256 fingerprint of the
 PUBLIC half, which is safe to read aloud and is what lets you check that the
 file you just saved is the signer this PC has registered.
 
+NO CABLE NEEDED. Android's own Wireless debugging does the same job over Wi-Fi,
+or over the tailnet the PC and the phone already share. The wireless option
+walks through it: Android separates a one-time PAIRING (its own port, a
+six-digit code) from the CONNECTION (a different port, new every time the
+switch is toggled), so both numbers are read off the phone's screen once. The
+cable is used when one is plugged in and asked for otherwise.
+
 Run:
-  python mobile/phone_identity_export.py            save it (refuses if one exists)
-  python mobile/phone_identity_export.py --status    what is on the phone and what is saved, changing nothing
-  python mobile/phone_identity_export.py --explain   this, in the module's words
+  python mobile/phone_identity_export.py             save it over USB (refuses if one exists)
+  python mobile/phone_identity_export.py --wireless  same, walking through Wireless debugging when no cable is present
+  python mobile/phone_identity_export.py --status     what is on the phone and what is saved, changing nothing
+  python mobile/phone_identity_export.py --explain    this, in the module's words
 """
 import argparse
 import hashlib
@@ -144,6 +152,105 @@ def pull(adb, say):
     return out, ""
 
 
+def _ask(prompt, allow_blank=False):
+    try:
+        v = input(prompt).strip()
+    except EOFError:
+        return ""
+    if not v and not allow_blank:
+        return ""
+    return v
+
+
+def _endpoint(v):
+    """'10.0.0.61:41234' -> ('10.0.0.61', '41234'), tolerating stray spaces and a
+    trailing dot. Returns ('','') when it is not host:port."""
+    v = (v or "").strip().strip(".").replace(" ", "")
+    if v.count(":") != 1:
+        return "", ""
+    host, port = v.split(":", 1)
+    if not host or not port.isdigit():
+        return "", ""
+    return host, port
+
+
+def hints():
+    """Addresses this phone is known to answer on, so he can recognise the one the
+    phone is showing him rather than wonder which is which."""
+    out = []
+    tail = os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Tailscale", "tailscale.exe")
+    if os.path.isfile(tail):
+        try:
+            rc, o, _e = 0, subprocess.run([tail, "status"], capture_output=True, timeout=20).stdout.decode("utf-8", "replace"), ""
+            for line in o.splitlines():
+                parts = line.split()
+                if len(parts) >= 4 and parts[3] == "android":
+                    out.append("%s  (%s, over Tailscale)" % (parts[0], parts[1]))
+                    if "direct" in line:
+                        seg = line.split("direct", 1)[1].strip().split(",")[0]
+                        if ":" in seg:
+                            out.append("%s  (%s, on your Wi-Fi)" % (seg.split(":")[0], parts[1]))
+        except Exception:                                         # noqa: BLE001
+            pass
+    return out
+
+
+def wireless_connect(adb, say=print):
+    """Android's Wireless debugging, walked through. True when a device is connected.
+
+    Deliberately interactive: the pairing code and both ports are shown on the phone
+    and change every time, so there is nothing to remember and nothing to store. Both
+    numbers are read off the screen and typed once."""
+    say("")
+    say("  WIRELESS DEBUGGING -- no cable needed")
+    say("")
+    say("  On the phone, open:  Settings > Developer options > Wireless debugging")
+    say("  Turn it ON. (If Developer options is hidden: Settings > About phone >")
+    say("  Software information, then tap 'Build number' seven times.)")
+    for h in hints():
+        say("      this phone should appear as %s" % h)
+    say("")
+    say("  Now tap 'Pair device with pairing code'. A box appears showing an")
+    say("  'IP address & Port' and a six-digit 'Wi-Fi pairing code'.")
+    say("")
+    ep = _ask("  Type the IP address & Port from that box (e.g. 10.0.0.61:41234): ")
+    host, port = _endpoint(ep)
+    if not host:
+        say("  That did not look like an address and port. Nothing was done.")
+        return False
+    code = _ask("  Type the six-digit pairing code: ")
+    if not code.isdigit() or len(code) != 6:
+        say("  A pairing code is six digits. Nothing was done.")
+        return False
+    say("")
+    say("  pairing with %s:%s ..." % (host, port))
+    rc, out, err = run(adb, ["pair", "%s:%s" % (host, port), code], timeout=90)
+    blob = (out or "") + (err or "")
+    if "Successfully paired" not in blob:
+        say("  Pairing did not succeed: %s" % blob.strip().splitlines()[-1][:160] if blob.strip() else "  Pairing did not succeed.")
+        say("  The code and port change every time that box is closed -- reopen it and try again.")
+        return False
+    say("  paired.")
+    say("")
+    say("  Close that pairing box. The main Wireless debugging screen shows its own")
+    say("  'IP address & Port' -- a DIFFERENT port from the one you just used.")
+    say("")
+    ep2 = _ask("  Type that IP address & Port (e.g. %s:37000): " % host)
+    host2, port2 = _endpoint(ep2)
+    if not host2:
+        say("  That did not look like an address and port. The pairing is kept; run this again.")
+        return False
+    say("")
+    say("  connecting to %s:%s ..." % (host2, port2))
+    rc, out, err = run(adb, ["connect", "%s:%s" % (host2, port2)], timeout=60)
+    blob = ((out or "") + (err or "")).strip()
+    if "connected to" not in blob:
+        say("  Could not connect: %s" % (blob.splitlines()[-1][:160] if blob else "no answer"))
+        return False
+    say("  connected.")
+    return True
+
+
 def status(say=print):
     adb = adb_path()
     say("phone identity key -- status, changing nothing")
@@ -178,6 +285,8 @@ def status(say=print):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="save the phone node's identity key off the phone")
     ap.add_argument("--status", action="store_true", help="what is on the phone and what is saved; changes nothing")
+    ap.add_argument("--wireless", action="store_true",
+                    help="no cable: walk through Android's Wireless debugging (pair, then connect) first")
     ap.add_argument("--explain", action="store_true", help="why this exists, in the module's own words")
     a = ap.parse_args(argv)
     if a.explain:
@@ -202,6 +311,16 @@ def main(argv=None):
         print("adb could not run: %s" % why)
         return 2
     live = [r for r in rows if r[1] == "device"]
+    if not live and a.wireless:
+        # No cable. Android's own Wireless debugging does the same job over Wi-Fi (or over
+        # the tailnet, since both machines are on it) and needs nothing installed on either
+        # side. It is two steps because Android deliberately separates them: a one-time
+        # PAIRING on one port with a six-digit code, then the CONNECTION on a different
+        # port that changes every time the switch is toggled.
+        if not wireless_connect(adb):
+            return 2
+        rows, why = devices(adb)
+        live = [r for r in (rows or []) if r[1] == "device"]
     if not live:
         if any(r[1] == "unauthorized" for r in rows):
             print("The phone is connected but has not authorised this computer.")
@@ -209,6 +328,10 @@ def main(argv=None):
             return 2
         print("No phone is connected over USB.")
         print("Plug it in, unlock it, turn on Developer options > USB debugging, then run this again.")
+        print("")
+        print("No cable? Run this instead and it will walk you through Android's own")
+        print("Wireless debugging, which needs no cable and nothing installed:")
+        print("    python mobile\\phone_identity_export.py --wireless")
         return 2
     if len(live) > 1:
         print("More than one device is connected: %s" % ", ".join(r[0] for r in live))
