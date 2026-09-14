@@ -60,6 +60,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
                 "test_selfaudit.py", "test_teacher_panel.py", "test_sm1_sealed_mail.py", "test_ac1_ai_consult.py", "test_al1_actuator_learn.py",
+                "test_al2_actuator_brain.py",
                 "covenant_quiet.py"]
 
 
@@ -190,6 +191,12 @@ def main():
         AU.fetch(say=say)
     except Exception as e:                                       # noqa: BLE001
         say("app update FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+    # THE PHONE BRAIN'S DIGEST (2026-09-13, phase 3): what the learning ledger says, as numbers
+    try:
+        import covenant_actuator_learn as AL
+        AL.digest_write(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("actuator digest FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X

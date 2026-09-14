@@ -277,6 +277,19 @@ ops/sealed_mail_seen.json
 ops/ai_consult.jsonl
 # the phone actuator/brain's learning, synced (2026-09-14)
 ops/actuator_learning.jsonl
+# phase 3 (2026-09-13): the PC's reduce-only guide to the phone brain, its log, the card library, the nightly digest
+ops/actuator_guide.json
+ops/actuator_guide.log
+ops/actuator_library/
+ops/ACTUATOR_DIGEST.md
+
+# THE PRIVATE PHONE APP, checked out here as its own repository (A107, 2026-09-12).
+# Found untracked-but-not-ignored on 2026-09-14: `git status` listed `?? mobile/app/`,
+# so one `git add -A` in this PUBLIC repository would have committed the app the
+# operator deliberately made private -- and a second copy of the core with it, which
+# test_p18 and M5.4 both forbid. The workflow checks this path out itself, so ignoring
+# it here costs nothing and closes the accident.
+mobile/app/
 
 # Delivery folder holding duplicate copies of suites that already live at the
 # repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are

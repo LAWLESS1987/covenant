@@ -3219,6 +3219,8 @@ mobile/app/signing/README.md). The Send-button finder knows English words
 only. Not verified on the emulator (the CI check starts no accessibility
 service); verified by the operator's use on the phone, or not at all.
 
+*2026-09-14: phase 3 (A111) opens, signed and reduce-only, the PC's hold, cap, deny and taps-off, and PC-listed recipe cards imported by the owner's tap; still withheld: any push, job placement or remote driving. The service now declares screenshots of the green-lit window and one bounded tap (off per recipe by default); "No gestures" above is history.*
+
 ### A105. [new capability -- the operator's decision, 2026-09-12] The preliminary brain: recipes by demonstration, locators that learn, answers read back. PHASE 2 LANDED
 
 **Asked.** "build a preliminary brain that learns", "let it watch you and
@@ -3241,6 +3243,8 @@ remote driving, gated on the operator's private signing key. No trading
 apps: refused outright (see the daily-approval design instead). Not
 verified on the emulator (CI starts no accessibility service); verified by
 use on the phone, or not at all.
+
+*2026-09-14: A111 amends this entry -- "no trading apps: refused outright" was prose until phase 3 made it a denylist in code; "no network" is retired for the brain and replaced by an enumerated list of what leaves the phone; the recorder's event mask never delivered a click until phase 3 fixed it, so the phase-2 recording path was never exercised as written.*
 
 ### A106. [new capability -- the operator's decision, 2026-09-12] The daily plan: a person approves each day's strategy before the trader may act. PC SIDE LANDED; the phone's Today screen follows
 
@@ -3345,3 +3349,187 @@ Open: a PC-side mailer needs a credential only the operator can create (a
 Gmail app password); until then the assistant's mail connector carries the
 blocks at the operator's word. The first pin is trust-on-first-use, so the
 fingerprint is shown on both ends.
+
+### A111. [new capability -- the operator's own direction, 2026-09-13/14] The phone brain, phase 3: OCR eyes, a bounded tap, chains across green-lit apps, owner charters, and the learning loop to the PC. BUILT; CI-compiled; verified on the phone item by item, or not at all
+
+**Asked.** "we need to drastically improve the phone nodes ability to learn and
+grow with more autonomy but still alligned with our goals", then "recursively
+using all apps allowed and improve the recipe section needs ocr extraction",
+then "go bundled ocr, keep it fully offline". Designed by a three-lens panel
+with six adversarial critiques (20 blocking flaws raised, each answered in the
+spec before a line was written); the operator's decision on OCR governs.
+
+**Built -- on the phone (private repo).**
+- *Eyes.* `Ocr.java`, the one file that imports ML Kit: on-device Latin text
+  recognition (`com.google.mlkit:text-recognition:16.0.1`, the BUNDLED model,
+  offline, no key, no download) over `takeScreenshotOfWindow` of the green-lit
+  app's OWN window -- never the display, never another app, never persisted,
+  never sent. The service config gains `canTakeScreenshot` and
+  `canPerformGestures` (attributes, not permissions; the nine permissions are
+  unchanged and CI now diffs them from the BUILT apk). The event mask gains the
+  three view types phase 2's recorder switched on but never received (found
+  while designing: phase-2 recording had never seen a click).
+- *A fifth locator, always last.* A step may carry an `ocr` label (guessed at
+  recording time from the line under the tap, editable); replay tries it only
+  after the four tree locators miss, maps the line's box to the node under it,
+  and -- only when the owner allowed it for that recipe and the PC has not
+  switched it off -- performs ONE 60 ms tap, refused if any other window sits
+  over the point. No PC value can promote `ocr` above the tree.
+- *Read-back that is the answer.* The final screen minus the screen before
+  minus the typed prompt, merged with OCR lines when the tree is thin, capped
+  at 6000 chars, labelled tree/ocr/both.
+- *Chains.* Up to 5 hops across green-lit apps, hop N's answer filling hop
+  N+1's slot through a template (`{{input}}`, `{{answer}}`, `{{answer:N}}`),
+  up to 2 fallback recipes per hop by reliability, a 10-minute wall clock;
+  every hop's text passes the leak check then the node's gate.
+- *Charters.* Autonomy is granted per recipe or chain, on the phone, by the
+  owner: unattended yes/no, runs per day (ceiling 12; AI apps 3 per PACKAGE
+  across recipes, chains and fallbacks; browsers attended only), hours,
+  spacing (>= 5 min), a standing slot text (judged when granted), the OCR tap,
+  and "may send unattended" for chains; expires in 30 days. Five straight
+  failures quarantine it; a gate refusal switches it off. Chains need 3
+  attended OK runs first. A 60 s tick, alive only while the actuator is bound,
+  starts a due run only on an unlocked, interactive screen, with the launcher
+  or Covenant in front, no call, 60 s without the owner's touch, and
+  notifications on -- and shows an ongoing notification with STOP.
+- *STOP ALL* on the Recipes screen and on the notification: the owner's hold,
+  which no other writer can clear (a pre-existing bug in `MainActivity.save`
+  that rebuilt Settings from scratch and wiped the green list and the pinned
+  PC key was found while designing and fixed).
+- *The learning loop, both ways, reduce-only downward.* Upward: the phone's
+  learning syncs to the PC on the heartbeat under a switch that defaults OFF
+  (`/actuator_learn` v2: names, apps, goals, step COUNTS, locator scores, run
+  outcomes as codes, autonomous runs and holds; the last answer only for
+  recipes switched on individually; NO slot text, templates, step labels,
+  green list or images -- there is no field for them). The PC side existed
+  since A105's follow-up but the app never called it; now it does. Downward:
+  `covenant_actuator_guide.py` on the PC writes a signed guidance document the
+  phone fetches and verifies against the PC key it already pinned from sealed
+  mail: hold (max 7 days), a runs-per-day cap, extra denied apps, taps off, a
+  note. Nothing else: any grant-like key is dropped, counted as an attempted
+  grant and reported. A PC-curated recipe library (`--library-add`) the OWNER
+  imports by tap; imported cards arrive manual-only, every type step a slot.
+- *The Recipes screen*, rewritten: reliability, per-step trust, step editor
+  (OCR label, delete), charter dialog with the ceilings and the AI-account
+  warning, chain builder, Preview OCR, Export card, Import from PC, autoruns
+  and holds tails, the PC's word ("PC says:"), a files audit.
+
+**Built -- on the PC (this repo).** `covenant_actuator_guide.py` (guidance +
+library + CLI; `status()` in the watchdog), `covenant_actuator_learn.py` v2
+(allowlisted rows, not-text refusal, `--digest` -> `ops/ACTUATOR_DIGEST.md`
+nightly), three signed GET routes beside `/actuator_learn`,
+`test_al2_actuator_brain.py` in the sweep and the nightly's green set.
+
+**Where the rules live.** Every decision is a pure function in the app's
+`entry.py` that tests RUN: `leak_check`, `charter_normalize`, `charter_allows`,
+`brain_next`, `record_outcome`, `chain_plan`, `chain_slot`, `learn_payload`,
+`verify_doc`, `guidance_apply`, `card_clean`. Java renders decisions and holds
+the eyes and hands. A denylist of money apps (`DENIED_APPS`/`DENIED_RE`, the
+same text on both sides) is refused on every path -- A105's "no trading apps:
+refused outright" was prose until now.
+
+**Found by the adversarial review, before any of it ran, and fixed.** Six
+reviewers read the finished code against the invariants; the findings that
+survived a second reading are listed here because a capability entry that only
+records what was intended is worth little. Four of them were holes in the
+gates this entry claims: (1) the phase-1 "use an app" path ran only the
+judge, never the deterministic leak check, so a key pasted into that box
+would have been typed into another app; (2) an owner-started chain hop failed
+OPEN -- if the judge raised, the text was typed unjudged; (3) normalizing a
+chain REPAIRS it, and the scheduler gated on the repaired copy, so a six-hop
+chain ran its first five and a chain whose second hop was junk ran as a
+different, shorter chain; (4) the unattended send gate read only a button's
+text, description and OCR label, so an unlabelled send button -- an id and
+nothing else -- let a chain post without the owner's tick. Also fixed: an OCR
+capture could be applied to the step AFTER the one that asked for it (a stale
+screen locating a live control); a root fallback could act in another app's
+window; the prompt echo could reach `last_answer` when the before/after diff
+came out empty; a chain edit wrote the screen's stale copy of the charter back
+over what Python had just written; a type-confused sync body raised a 500 that
+the phone would have re-sent every ten minutes for ever; a single corrupt
+recipe file (one score of 10**400) stopped the WHOLE brain and the learn sync;
+and one signed row with an absurd date permanently broke the nightly digest.
+Each fix is pinned by a check that RUNS it, and each check was mutation-tested
+by reverting its fix and confirming it fails (A74's lesson applied to this
+change). Two hazards outside the phone were found in passing, both of them
+A85's own subject. The private app repository sits inside this public one as
+an untracked checkout that was not ignored, so a single `git add -A` here
+would have published it; `mobile/app/` is now in `.gitignore`. Ignoring it
+then exposed the second: `git ls-files --others --ignored` COLLAPSES a wholly
+ignored directory to one entry with a trailing slash -- and cannot descend
+into a nested repository at all -- while `covenant_seal.walk()` compared only
+FILE paths against that set, so regenerating `MANIFEST.sha256` wrote 52
+`mobile/app/...` paths into a TRACKED file in this PUBLIC repository. That is
+exactly what A85 exists to prevent, reached by a mechanism A85 did not cover;
+the walk now prunes the subtree, and `test_a85_manifest_privacy.py` gains M6
+and M6b, which fail with 194 and 52 leaked paths when the prune is reverted.
+
+**Not built, and why.** Remote driving of any kind (no phone route accepts a
+job, recipe, chain or run; the PC's document has no executable key). Acting
+on a locked or dark screen, or under the owner's fingers. Any gesture but the
+one bounded tap. A full-display capture, or OCR of any window but the
+recipe's. A telemetry-free OCR engine (tesseract4android: a second JNI
+dependency with training data, uncompilable here). A planner or model
+choosing steps; nested chains, loops, conditionals. Locator priors from the
+PC (a prior re-orders which control gets clicked -- not a reduction, so not
+the PC's to send). Syncing step labels, templates, slot text or the green
+list. Unverified guidance of any kind. A tenth permission.
+
+**Outbound paths now, all stated.** (1) The heartbeat's six fields (A108).
+(2) The learning sync's enumerated fields, under two switches both off by
+default. (3) Text the owner typed or chartered, into a green-lit app, through
+that app's own service, after the leak check and the gate. (4) ML Kit's
+library reports performance/utilization metrics to Google under Google's
+terms -- no image, no text; this is the cost of bundled offline recognition
+and it is named in the service description the owner reads when enabling it.
+The arm64 APK grows by roughly the bundled model; the mailed-APK path (25 MB)
+is over -- OTA from the PC and the workflow artifact carry builds.
+
+**Judge note.** The node's theft/deception quorum is the wrong domain for a
+question bound for another app (measured in covenant_ai_consult.py); so the
+deterministic leak check runs FIRST on every typed text and blocks, the gate
+second (R2 kept). Unattended: REFUSED turns the charter off; HELD fails
+closed with a "tap to run" notification.
+
+**A104 / A105 cross-reference.** Opened here: the PC's hold, cap, deny and
+taps-off (signed, reduce-only) and PC-listed cards by the owner's tap. Still
+withheld: any push, any job placement, remote driving -- every phone-side
+invariant presupposes an APK the operator trusts (the release key, A108) or a
+signed `/app/latest` (named follow-up: sign `latest.json` with `sign_doc`).
+A105's "no network" is retired for the brain and replaced by the enumerated
+list above.
+
+**The refinements-only rule (2026-09-09).** New capability, at the operator's
+own direction on 2026-09-13; the defaults leave nothing armed: no charter
+exists until he grants one, both sync switches are off, the tap is off per
+recipe, chains are attended.
+
+**Open risks, his to weigh.** Unattended driving of ChatGPT/Gemini/Claude/Grok
+can rate-limit or close his account (covenant_ai_consult's warning, quoted in
+the charter dialog); the code caps AI apps at 3 starts per package per day
+and spaces them. Whatever a green-lit app shows becomes the next hop's
+`{{answer}}`: the leak check blocks secrets, not instructions -- chains
+default attended and a Send hop unattended needs an explicit tick. One UI may
+refuse the background launch: the observable is `launch-refused` in autoruns
+and a "tap to run" notification, never a retry storm.
+
+**Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
+green in place. Java: compiled by the private repository's workflow on a
+`brain/**` branch, then main. "Every accessibility behaviour -- recording now
+receiving clicks, OCR capture and the fifth locator, the before/after diff,
+the settle timer, the bounded tap and its refusal over a dialog, an
+unattended run firing only unlocked and at home, STOP from the notification,
+the PC hold within one heartbeat, quarantine after five failures, import
+arriving manual-only -- is unverified on the emulator (CI starts no
+accessibility service) and is verified by the operator's use on the phone,
+ticked and dated here, or not at all." The checklist: (1) record two steps ->
+`recorded: click` lines; (2) a WebView click -> an ocr label on the step; (3)
+replay -> `by ocr: ok` only after tree misses; (4) Preview OCR shows lines;
+(5) charter 1/day, window now, unlock, wait -> an autoruns row and the
+notification; (6) STOP ALL, then Start on the main screen -> Recipes still
+shows held; (7) flip unattended off mid-run -> the card still says manual
+only; (8) `covenant_actuator_guide.py --hold test` on the PC -> "PC says:
+hold test" within ten minutes and no run; then `--release`; (9) a permission
+dialog over the app -> `tap refused` in actions.log; (10) import a card ->
+"Manual only"; `covenant_actuator_learn.py --log 3` shows v2 rows with no
+slot text; OCR works with Wi-Fi off.

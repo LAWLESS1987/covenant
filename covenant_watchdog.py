@@ -931,6 +931,12 @@ def one_pass(strict=False):
         c_alerts, c_infos = _dp.checkin_report()
     except Exception as e:                                       # noqa: BLE001
         c_alerts, c_infos = [], ["phone check-ins unreadable: %s" % type(e).__name__]
+    # THE PC'S SAY TO THE PHONE BRAIN (2026-09-13, phase 3): one status line.
+    try:
+        import covenant_actuator_guide as _ag
+        c_infos.append(_ag.status())
+    except Exception as e:                                       # noqa: BLE001
+        c_infos.append("phone brain guide unreadable: %s" % type(e).__name__)
     alerts.extend(c_alerts)
     for msg in c_infos:
         log("INFO", msg)

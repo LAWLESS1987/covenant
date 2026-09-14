@@ -202,7 +202,24 @@ def walk(ignored=_SENTINEL):
     if ignored is _SENTINEL:
         ignored = git_ignored_set()
     for root, dirs, files in os.walk(HERE):
-        dirs[:] = sorted(d for d in dirs if d not in EXCLUDE_DIRS)
+        rel_root = os.path.relpath(root, HERE).replace("\\", "/")
+        keep = []
+        for d in sorted(dirs):
+            if d in EXCLUDE_DIRS:
+                continue
+            # AN IGNORED DIRECTORY ARRIVES AS ONE ENTRY, NOT AS ITS FILES (2026-09-14).
+            # `git ls-files --others --ignored --exclude-standard` COLLAPSES a wholly
+            # ignored directory to "path/" with a trailing slash -- and for a nested
+            # repository it cannot descend at all. The membership test below compares
+            # FILE paths, so every file underneath slipped through it. Measured the day
+            # the private phone app was gitignored here: regenerating the manifest wrote
+            # 52 `mobile/app/...` paths into a TRACKED file in this PUBLIC repository --
+            # A85's exact defect, by a mechanism A85 did not cover. Prune the subtree.
+            reld = d if rel_root == "." else rel_root + "/" + d
+            if ignored and (reld + "/") in ignored:
+                continue
+            keep.append(d)
+        dirs[:] = keep
         for f in sorted(files):
             if f in EXCLUDE_NAMES or os.path.splitext(f)[1] in EXCLUDE_EXT:
                 continue

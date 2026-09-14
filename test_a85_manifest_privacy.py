@@ -156,6 +156,35 @@ def main():
               "artifact on disk, not only the generator",
               not leaked, "%d line(s)" % len(leaked))
 
+    # M6 (2026-09-14) -- AN IGNORED DIRECTORY ARRIVES AS ONE ENTRY, NOT AS ITS FILES.
+    #
+    # `git ls-files --others --ignored --exclude-standard` COLLAPSES a wholly ignored
+    # directory to "path/" with a trailing slash, and for a NESTED REPOSITORY it cannot
+    # descend at all. The walk's membership test compares FILE paths, so every file under
+    # such a directory slipped past it -- M3 above could not see it either, because
+    # `git check-ignore` answers about the directory, not about paths the walk never
+    # matched. Measured the day the operator's private phone app was gitignored here:
+    # regenerating the manifest wrote 52 `mobile/app/...` paths into a TRACKED file in
+    # this PUBLIC repository. A85's own defect, by a mechanism A85 did not cover.
+    #
+    # This check RUNS the walk with a directory-style entry, so it holds in the staged
+    # copy too, where there is no git to ask.
+    pruned = [rel for rel, _f in S.walk(ignored={"docs/"})]
+    under_docs = [f for f in pruned if f.startswith("docs/")]
+    check("M6 a trailing-slash DIRECTORY in the ignored set prunes the whole subtree, "
+          "because that is how git reports a wholly ignored directory",
+          not under_docs and len(pruned) > 100,
+          "%d still under docs/, %d walked" % (len(under_docs), len(pruned)))
+
+    if os.path.isdir(os.path.join(HERE, "mobile", "app")):
+        under_app = [f for f in walked if f.startswith("mobile/app/")]
+        check("M6b ...so the operator's private phone app, gitignored here, is never "
+              "named in this public repository's manifest",
+              not under_app, "%d found: %s" % (len(under_app), under_app[:3]))
+    else:
+        check("M6b the private phone app is not named in the manifest -- N/A here, "
+              "no mobile/app checkout in this tree", True, "nothing to exclude")
+
     n = sum(1 for _, ok in results if ok)
     print("\nA85: %d/%d passed" % (n, len(results)))
     return 0 if n == len(results) else 1

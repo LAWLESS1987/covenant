@@ -7511,8 +7511,74 @@ class CovenantAPI:
                 _al = importlib.import_module("covenant_actuator_learn")
             except Exception as e:                                # noqa: BLE001
                 return jsonify({"status": "error", "message": "actuator learning unavailable on this node: %s" % type(e).__name__}), 503
-            code, out = _al.record_sync(body, who)
+            # 2026-09-14: a raise here used to become a Flask 500, and a 500 is the one
+            # answer the phone retries for ever -- learn_sync only advances its state
+            # file on success, so the SAME body would come back every heartbeat. A
+            # type-confused v2 body did exactly that until the allowlists were made
+            # type-safe; this catch is the belt for the next one, and it answers 503
+            # (the phone's "try later" code) with no traceback.
+            try:
+                code, out = _al.record_sync(body, who)
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "this sync could not be recorded: %s" % type(e).__name__}), 503
             return jsonify(out), code
+
+        # THE PC'S SAY TO THE PHONE'S BRAIN (2026-09-13, phase 3): reduce-only
+        # guidance (hold, cap, deny, taps off) and a library of recipe cards the
+        # owner imports with a tap. Signed GETs only, no POST: the phone verifies
+        # the PC's daily-plan signature and its own nonce on every document
+        # (covenant_actuator_guide.py). No route on this side accepts a job.
+        @self.app.route("/actuator_guide", methods=["GET"])
+        def actuator_guide():
+            ok, who, _pem = _daily_plan_auth(request, b"")
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _ag = importlib.import_module("covenant_actuator_guide")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "actuator guide unavailable on this node: %s" % type(e).__name__}), 503
+            n = request.args.get("n", "")[:64]
+            out = _ag.guide_signed(n)
+            if out is None:
+                return jsonify({"status": "error", "message": "no guide written (python covenant_actuator_guide.py --show)"}), 404
+            if out.get("status") != "success":
+                # 2026-09-14 (review finding 19): this used to answer 409 with the
+                # refusal text, which NAMES the offending operator-file keys --
+                # INTERFACE 8 lists 403/404/503 only, and which key a person here
+                # tried to add is this PC's business, not the phone's. The reason
+                # is already in ops/actuator_guide.log, written by guide_signed().
+                return jsonify({"status": "error", "message": "guide refused on the PC; see ops/actuator_guide.log"}), 503
+            return jsonify(out), 200
+
+        @self.app.route("/actuator_library", methods=["GET"])
+        def actuator_library():
+            ok, who, _pem = _daily_plan_auth(request, b"")
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _ag = importlib.import_module("covenant_actuator_guide")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "actuator guide unavailable on this node: %s" % type(e).__name__}), 503
+            n = request.args.get("n", "")[:64]
+            out = _ag.library_signed(n)
+            # An unloadable signing key answers the JSON error, not a 200 that
+            # carries no document (2026-09-14, review finding 18).
+            return jsonify(out), (200 if out.get("status") == "success" else 503)
+
+        @self.app.route("/actuator_library/<sha>", methods=["GET"])
+        def actuator_library_item(sha):
+            ok, who, _pem = _daily_plan_auth(request, b"")
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _ag = importlib.import_module("covenant_actuator_guide")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "actuator guide unavailable on this node: %s" % type(e).__name__}), 503
+            n = request.args.get("n", "")[:64]
+            out = _ag.item_signed(sha, n)
+            if out is None:
+                return jsonify({"status": "error", "message": "no such card in the library"}), 404
+            return jsonify(out), (200 if out.get("status") == "success" else 503)
 
         # THE PHONE'S UPDATE (2026-09-13): the newest build of the operator's
         # private app repository, fetched on this PC with this PC's credential
