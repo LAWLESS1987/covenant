@@ -139,6 +139,19 @@ def main():
         a3, i3 = DP.checkin_report(now=rows[0]["at"] + 90000, path=led)
         check("D20 five minutes on it is an info line; two hours on it is an ALERT; a day on it is an info line again (an old phone is not news)",
               not a1 and len(i1) == 1 and "height 18" in i1[0] and len(a2) == 1 and "SILENT" in a2[0] and not a3 and len(i3) == 1, (a1, i1, a2, a3))
+        # D20b (2026-09-14) -- THE ALERT TEXT MUST NOT CHANGE WHILE THE CONDITION DOES NOT.
+        # The watchdog keys an alert on its first 80 characters and treats any change as
+        # news, so a minute count inside the text made this line alert and CLEAR once a
+        # minute for five hours while the phone sat switched off (measured live in
+        # logs/watchdog.log). A60's lesson. Two readings an hour apart must be the same
+        # string, and the first 80 characters -- the watchdog's actual key -- must match.
+        a4, _i4 = DP.checkin_report(now=rows[0]["at"] + 7200, path=led)
+        a5, _i5 = DP.checkin_report(now=rows[0]["at"] + 10800, path=led)
+        check("D20b the SILENT alert says WHEN the phone went quiet, so its text (and the watchdog's "
+              "key, its first 80 characters) is identical an hour later -- one alert, not one a minute",
+              len(a4) == 1 and len(a5) == 1 and a4[0] == a5[0] and a4[0][:80] == a5[0][:80], (a4, a5))
+        check("D20c ...and the changing minute count is still reported, in the INFO heartbeat line",
+              "min ago" in i1[0], i1)
         code, out = DP.record_checkin(b"not json", "phone", led)
         check("D21 a body that is not JSON is refused (400) and nothing is written", code == 400 and len(open(led, encoding="utf-8").readlines()) == 1, code)
 

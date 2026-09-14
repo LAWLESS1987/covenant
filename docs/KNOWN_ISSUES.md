@@ -3513,6 +3513,15 @@ default attended and a Send hop unattended needs an explicit tick. One UI may
 refuse the background launch: the observable is `launch-refused` in autoruns
 and a "tap to run" notification, never a retry storm.
 
+**NOT LIVE UNTIL THE NODES RESTART.** The three PC nodes are running an older
+core (the watchdog says which), so `/actuator_guide` and `/actuator_library`
+answer 404 there until they are restarted -- and `AB_RESTART_NODES.bat` refuses
+a healthy mesh on purpose, because forcing one took the chain down twice on
+2026-09-06. Nothing was forced here. The phone's guidance fetch fails softly
+(one logged line, no run affected) until the operator restarts on his own
+schedule; `/checkin` and `/actuator_learn` are unaffected, and the phone needs
+a hand-installed build with the actuator re-enabled before any of this matters.
+
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
 `brain/**` branch, then main. "Every accessibility behaviour -- recording now

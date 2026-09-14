@@ -335,7 +335,17 @@ def checkin_report(now=None, path=None):
         line = "phone %s last seen %d min ago: height %s, peers %s, battery %s" % (
             who, int(age // 60), r.get("chain_height", "?"), r.get("peers", "?"), r.get("battery", "?"))
         if SILENT_AFTER_S < age < 86400:
-            alerts.append("phone %s: SILENT for %d min after reporting (last: height %s) -- the node or the app stopped, or the Wi-Fi did" % (who, int(age // 60), r.get("chain_height", "?")))
+            # THE ALERT NAMES WHEN, NOT HOW LONG (2026-09-14). The watchdog keys an alert on
+            # its first 80 characters and prints it again whenever that text changes, so a
+            # minute count inside it made every single round "news": measured live, this one
+            # line alerted and CLEARED once a minute for five hours while the phone was
+            # simply switched off. That is A60's lesson exactly -- a reworded warning turning
+            # a documented non-event into permanent noise. The moment the phone went quiet
+            # does not change while it stays quiet, so the alert is printed once, rolled up
+            # every 30 rounds, and CLEARED once when the phone comes back. The changing
+            # minute count still exists, in the INFO line above, which is a heartbeat.
+            alerts.append("phone %s: SILENT since %s (last: height %s) -- the node or the app stopped, or the Wi-Fi did" % (
+                who, time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(float(r.get("at", 0)))), r.get("chain_height", "?")))
         else:
             infos.append(line)
     return alerts, infos
