@@ -157,12 +157,39 @@ def main():
        f"gaps {gaps}")
 
     # ------------------------------------------------------------- N2 the P2P
+    # HOST-AWARE SINCE 2026-09-14. These checks used to do
+    # `int(peer.rsplit(":", 1)[1])` and throw the host away, which is only safe
+    # while every peer is on loopback. The operator's phone was added to node A
+    # as 100.86.158.1:5001, and 5001 IS node A's own P2P port -- so N2 read it
+    # as "A peers with A", N3 gained a self-edge, and the suite reported 11/11
+    # on a graph that was wrong. It passed by coincidence of port numbers, and
+    # the next remote peer whose port happened NOT to collide would have been
+    # reported as "no configured node's P2P port" -- a false FAIL on a correct
+    # configuration. A peer somewhere else on the network is a legitimate thing
+    # this file had no way to say.
+    LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+    def split_peer(p):
+        host, _, port = p.rpartition(":")
+        return host, int(port)
+
     p2p_of = {n["api"] + 1: nid for nid, n in nodes.items()}
     api_of = {n["api"]: nid for nid, n in nodes.items()}
-    bad, good = [], []
+    bad, good, external = [], [], []
     for nid, n in sorted(nodes.items()):
         for peer in n["peers"]:
-            port = int(peer.rsplit(":", 1)[1])
+            host, port = split_peer(peer)
+            if host not in LOCAL_HOSTS:
+                # Off-box peer. Nothing here can check that it is reachable or
+                # that it is really a node; what it CAN check is that it is not
+                # silently malformed, and that it is not aimed at an API port,
+                # which is the one mistake the shape can reveal.
+                if port in api_of and port not in p2p_of:
+                    bad.append(f"{nid} points at {host}:{port}, an API port number; "
+                               f"--peers wants the P2P port ({port + 1})")
+                else:
+                    external.append(f"{nid}->{host}:{port}")
+                continue
             if port in p2p_of:
                 good.append(f"{nid}->{p2p_of[port]}")
             elif port in api_of:
@@ -171,15 +198,20 @@ def main():
             else:
                 bad.append(f"{nid} points at {port}, which is no configured "
                            f"node's P2P port")
-    ok("N2", "every --peers entry is a configured node's P2P port (API+1)",
-       not bad, "; ".join(bad) if bad else " ".join(good))
+    ok("N2", "every LOCAL --peers entry is a configured node's P2P port (API+1); "
+             "off-box peers are allowed and named",
+       not bad, "; ".join(bad) if bad else
+       " ".join(good) + (("  | external: " + " ".join(external)) if external else ""))
 
     # ------------------------------------------------------------ N3/N4 shape
+    # LOCAL edges only. An off-box peer is not part of the three-node line these
+    # two checks describe, and counting one as an edge produced a self-loop
+    # (A->A) the moment the phone was added -- see the note on N2 above.
     edges = set()
     for nid, n in nodes.items():
         for peer in n["peers"]:
-            port = int(peer.rsplit(":", 1)[1])
-            if port in p2p_of:
+            host, port = split_peer(peer)
+            if host in LOCAL_HOSTS and port in p2p_of:
                 edges.add((nid, p2p_of[port]))
     undirected = {tuple(sorted(e)) for e in edges}
     ids = sorted(nodes)

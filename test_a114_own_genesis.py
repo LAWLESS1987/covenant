@@ -147,7 +147,19 @@ def main():
     check("A114.3c the warning names both hashes",
           d.node.chain[0].hash[:16] in w and canonical_hash[:16] in w,
           w[:80] or "no genesis warning")
-    check("A114.3d and it is reported degraded", hd.get("degraded") is True, "")
+    # A114.3d WAS "and it is reported degraded", asserting hd["degraded"] is
+    # True. That check was DECORATIVE and an adversarial review proved it: in
+    # this environment `degraded` is already True from `keyless` alone, so it
+    # passed whatever own_genesis did, including with the fix reverted. A check
+    # that cannot fail is not a check. What is actually worth pinning is the
+    # CONTRAST -- the same field differing between the founder and a node that
+    # really did mint its own chain -- because that is the whole change.
+    check("A114.3d own_genesis differs between the founder and a self-minted node",
+          h.get("own_genesis") is False and hd.get("own_genesis") is True,
+          "founder %r vs self-minted %r" % (h.get("own_genesis"), hd.get("own_genesis")))
+    check("A114.3e and only the self-minted one carries a genesis warning",
+          genesis_warning(h) == "" and genesis_warning(hd) != "",
+          "founder: %s" % (genesis_warning(h) or "none"))
 
     # ------------------------------------ the divergence the OLD test MISSED
     # A node that adopted a genesis somebody else minted -- just not the one
@@ -236,6 +248,17 @@ def main():
     else:
         check("A114.7 live node A is not own_genesis",
               live.get("own_genesis") is False, "own_genesis=%r" % live.get("own_genesis"))
+        # SAY WHAT THIS DID NOT DO. The commit is named for the founder no
+        # longer calling itself unable to converge, and a reader could take
+        # that to mean node A is no longer degraded. It is still degraded, for
+        # reasons that have nothing to do with genesis -- no provider key, and
+        # no usable code sandbox on win32. Pinning the honest version here
+        # stops the entry from quietly becoming a bigger claim than it is.
+        gw = genesis_warning(live)
+        check("A114.7b and no genesis warning remains on the live node", gw == "", gw or "none")
+        check("A114.7c degraded is still true, and NOT because of genesis",
+              live.get("degraded") is True and gw == "",
+              "reasons now: %s" % "; ".join(w[:44] for w in (live.get("warnings") or [])) or "none")
 
     passed = sum(1 for _, o, _ in RESULTS if o is True)
     failed = sum(1 for _, o, _ in RESULTS if o is False)

@@ -57,6 +57,7 @@ RUN
 """
 import argparse
 import hashlib
+import http.client            # HTTPException: not an OSError, not a URLError (A115b)
 import json
 import os
 import subprocess
@@ -610,7 +611,7 @@ _RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
 
 
 def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
-                    round_no=0):
+                    round_no=0, rate_limited=()):
     """(block, overall) -- every layer, judged from what this pass sensed.
 
     Pure, the same shape as topology_report and judge_identity_report:
@@ -627,7 +628,14 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
         layers.append((name, verdict, detail))
 
     up = {k: s for k, s in states.items() if s}
-    if not up:
+    if not up and rate_limited and len(rate_limited) >= len(states):
+        # A115b: every node answered 429. The ledger must not record a healthy
+        # chain as down -- this file's own history is that a permanent false
+        # reading is how a true one stops being believed.
+        layer("nodes", "UNKNOWN", "every node was rate-limiting /health (429) this pass: %s. "
+                                  "Alive and refusing to be asked again; nothing was measured."
+                                  % ", ".join(sorted(rate_limited)))
+    elif not up:
         layer("nodes", "FAIL", "no node reachable -- the chain is not running")
     else:
         down = sorted(set(states) - set(up))
@@ -753,6 +761,15 @@ def health(port, timeout=8):
         if e.code == 429:
             return None, "429 rate-limited (the node is UP and refusing to be asked again)"
         return None, f"HTTPError {e.code}"
+    except http.client.HTTPException as e:
+        # A truncated body, a bad status line, a connection closed mid-response.
+        # http.client.HTTPException is NOT an OSError and NOT a URLError, so
+        # until 2026-09-14 it escaped this function entirely and aborted the
+        # whole pass -- every node after the bad one went unchecked, and the
+        # loop that restarts a dead node never ran. Exactly the shape of the
+        # 429 bug one layer along: an unclassified failure is worse than a
+        # misclassified one, because it takes the monitor down with it.
+        return None, f"{type(e).__name__}: {e}"
     except (urllib.error.URLError, OSError, ValueError, TimeoutError) as e:
         return None, f"{type(e).__name__}: {e}"
 
@@ -880,6 +897,16 @@ def one_pass(strict=False):
     # have restarted every node on the first pass. A node that answers 429 is
     # answering.
     all_down = all(h is None and not str(e).startswith("429") for _, h, e in probes)
+    # WHO IS MERELY RATE-LIMITED (2026-09-14, A115b). `states` below maps a node
+    # to its /health dict or None, and a 429 lands in it as None -- so every
+    # later test of the form "is anything alive" counts a node that answered in
+    # under two milliseconds as absent. The restart path was taught the
+    # difference; these were not, and an adversarial review measured a fully
+    # healthy mesh still raising "NO node is reachable -- the chain is not
+    # running" while every node was answering 429. That sentence is the loudest
+    # thing this file can say, and saying it about a healthy chain is how an
+    # operator learns to disbelieve it.
+    rate_limited = {n["id"] for n, h, e in probes if h is None and str(e).startswith("429")}
 
     # TENDING, on a pass where something is actually up. Moved here from
     # covenant_watchdog_guard.py on 2026-09-07: the guard's stated property is
@@ -983,7 +1010,16 @@ def one_pass(strict=False):
             alerts.append(f"node {n['id']}: {w}")
 
     live = [s for s in states.values() if s]
-    if not live:
+    if not live and rate_limited and len(rate_limited) == len(NODES):
+        # Every node answered, and every one of them answered "stop asking".
+        # That is a statement about the caller, not the chain.
+        log("INFO", "every node is rate-limiting /health (429): %s -- alive, asked "
+                    "too often. Not reporting the chain down." % ", ".join(sorted(rate_limited)))
+    elif not live and rate_limited:
+        alerts.append("no node returned a health document; %s were rate-limiting (429, alive) "
+                      "and the rest were unreachable"
+                      % ", ".join(sorted(rate_limited)))
+    elif not live:
         alerts.append("NO node is reachable -- the chain is not running")
     if len(live) == len(NODES):
         hs = [s.get("chain_height", 0) for s in live]
@@ -1092,7 +1128,7 @@ def one_pass(strict=False):
             states, dict(_topo_prev), _student_state(),
             list(s_alerts), list(alerts),
             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            round_no=_self_eval["round"])
+            round_no=_self_eval["round"], rate_limited=rate_limited)
         if _self_eval_write(block):
             log("INFO", f"self-evaluation: {overall} "
                         f"(round {_self_eval['round']}) -> {SELF_EVAL_PATH}")

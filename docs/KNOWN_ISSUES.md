@@ -4109,6 +4109,25 @@ here.) So anyone can reproduce this, and any candidate fix can be tested
 deterministically against the committed model rather than against whatever the
 last retrain happened to leave on disk.
 
+**How big is it? One block, and nothing else is close.** Every transaction in
+the chain scored by the elder exactly as the node scores it (`tx.data` through
+`_payload_text` then `verdict`), with the run refusing to report at all unless
+block 12 first reproduces at +2.52:
+
+| | |
+|---|---|
+| blocks / transactions judged | 24 / 25 |
+| judged VIOLATES | 1 (block 12) |
+| its log-odds | +2.52 |
+| next highest in the whole chain | -4.99 (block 0) |
+
+So this is not a rising tide. It is one sentence sitting alone above a threshold
+of 2.4 with a seven-point gap to the next transaction in the chain. Whatever is
+decided, only block 12 is at stake today. An independent review measured the
+same set across every dated elder back to 2026-09-06 and found the refused set
+has never had more than one member -- the score oscillates in a band of roughly
++2.0 to +2.6 and has crossed 2.4 twice in eight days.
+
 **Fix: NOT MINE TO CHOOSE.** Every available answer changes what a rule means,
 and that is the operator's and the group's call under the standing
 refinements-only rule, not a repair:
@@ -4142,3 +4161,64 @@ same gate) is the same instrument failing in the opposite direction.
 
 **Status:** open -- reproduced, root-caused, not fixed. Found by a four-thread
 review of why the phone would not sync, which is the only reason anyone looked.
+
+### A115b. [serious / monitoring] Five more defects in the same afternoon's work, four of them in the fixes themselves. FIXED 2026-09-14
+
+A115 taught the watchdog that a 429 is not a dead node. An adversarial review of
+that change found it had stopped one call short of its own blast radius, in
+three separate places, and found two more defects alongside. All five are fixed
+and pinned here because the pattern is the point: a fix that is not chased to
+the end of its own consequences leaves the bug in the places nobody looked.
+
+**1. The suite that named the deleted mute was shipped RED.** A114 removed
+"node minted its OWN genesis" from `FALSE_POSITIVE_WARNINGS`, and
+`test_watchdog_outage.py` F4 asserts that mute exists. It is registered in
+covenant_one. It was green at `450bd06^` and exit 1 immediately after, and
+nothing noticed for four commits. Deleting a suppression is a behaviour change,
+and the test that named it is part of the change. F4 is now INVERTED -- the
+warning must ALERT -- so it pins the fix instead of the bug.
+
+**2. `health()` still raised on a truncated response.** `http.client.HTTPException`
+(`IncompleteRead`, `BadStatusLine`) is neither an `OSError` nor a `URLError`, so
+it escaped the function entirely and aborted the whole pass: every node after
+the bad one went unchecked, and the branch that restarts a dead node never ran.
+A node killed mid-response produces exactly this, which is the moment a watchdog
+matters most. Caught now, classified, and never confused with a 429.
+
+**3. `one_pass` still shouted "NO node is reachable -- the chain is not
+running" when every node answered 429.** The restart path learned the
+difference; this did not. `states` maps a node to its health dict or None, and a
+429 lands there as None like any other failure, so the loudest sentence this
+file can produce was being said about a healthy chain. Both sites are fixed --
+the alert, and the self-evaluation ledger's `nodes` layer, which now records
+UNKNOWN with the reason rather than FAIL.
+
+**4. `test_3node_config.py`'s peer checks were host-blind, so 11/11 was a
+coincidence.** N2/N3/N4 did `int(peer.rsplit(":", 1)[1])` and discarded the
+host. The phone was added to node A as `100.86.158.1:5001`, and 5001 IS node A's
+own P2P port -- so N2 read it as "A peers with A", N3 gained a self-edge, and
+the suite passed on a graph that was wrong. The next remote peer whose port did
+NOT collide would have been reported as "no configured node's P2P port": a false
+FAIL on a correct configuration. The checks are host-aware now, off-box peers
+are a named category rather than an error, and the topology graph counts only
+local edges. The printed graph changed from `A->A A->B ...` to `A->B B->A B->C
+C->B | external: A->100.86.158.1:5001`.
+
+**5. `rolling_restart.port_free()` called a live-but-slow port free.** A probe
+timeout was classified as "down", and `port_free` returns True on "down" -- so a
+node mid-boot, which accepts the connection and then takes its time building its
+judges, read as an empty port. That is the single thing the function's own
+docstring promises it will not do. A refused connection and an accepted-then-
+silent connection are now distinguished; only a refusal counts as free.
+
+**Pinned by.** `test_a115_rate_limited_is_not_down.py`, grown from 13 checks to
+24, including the first coverage `rolling_restart.py` has ever had. Mutation-
+tested serially across BOTH files with each restored by sha256: six mutations,
+six caught. `test_a114_own_genesis.py` grew from 21 to 24, and its A114.3d --
+which the same review proved DECORATIVE, since `degraded` was already true from
+`keyless` alone so the check passed whatever own_genesis did -- was replaced
+with the contrast it should always have measured, plus two live checks that say
+plainly what A114 did NOT do: node A is still degraded, for reasons that have
+nothing to do with genesis.
+
+**Status:** fixed

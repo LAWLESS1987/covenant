@@ -74,8 +74,24 @@ LIVE = [
      "F2 ...and so is the wording it replaced, so an old node is not noisy either"),
     ("code sandbox unavailable -- no usable 'fork' start method on this platform (win32)",
      True, "F3 a platform fact that fails closed is suppressed, not shouted every pass"),
-    ("node minted its OWN genesis -- it cannot converge with peers", True,
-     "F4 the single-founder genesis note is suppressed"),
+    # F4 INVERTED 2026-09-14 (A114). This asserted that "node minted its OWN
+    # genesis" is SUPPRESSED, and it was, because /health raised it permanently
+    # on the founder: own_genesis asked who SIGNED the genesis rather than
+    # whether this node's genesis IS the canonical one, so node A -- whose key
+    # signed the genesis B and C adopted -- declared itself unable to converge
+    # for ever while running a chain identical to theirs. The mute was the right
+    # answer to a false alarm and the wrong answer to a true one.
+    #
+    # The false alarm is fixed upstream now, so the mute is gone, and this check
+    # has to say the opposite or it pins the bug. A node that raises this today
+    # genuinely cannot converge with its peers, and the watchdog must alert.
+    # The suite was shipped RED by the commit that removed the mute (450bd06):
+    # it is registered in covenant_one, it went from green to exit 1, and
+    # nothing noticed until an adversarial review ran it. Deleting a
+    # suppression is a behaviour change, and the test that named it is part of
+    # the change.
+    ("node minted its OWN genesis -- it cannot converge with peers", False,
+     "F4 the genesis warning ALERTS again (A114: it is no longer a false positive)"),
     ("anomaly spike: ['peer_message_error']", False, "F5 a real anomaly still alerts"),
     ("INSECURE mock judge active -- ethics gate is keyword matching", False,
      "F6 an insecure judge still alerts -- suppression must never reach a safety claim"),

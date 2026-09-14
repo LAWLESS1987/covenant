@@ -37,6 +37,7 @@ import os
 import socket
 import sys
 import threading
+import time
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -66,8 +67,51 @@ class Stub(http.server.BaseHTTPRequestHandler):
         return
 
 
-def serve(code, body=None):
-    srv = http.server.HTTPServer(("127.0.0.1", 0), Stub)
+class Truncating(http.server.BaseHTTPRequestHandler):
+    """Promises more body than it sends, then hangs up.
+
+    urllib raises http.client.IncompleteRead for this, and IncompleteRead is an
+    HTTPException, which is NEITHER an OSError NOR a URLError. So it used to
+    escape covenant_watchdog.health entirely and abort the whole pass: every
+    node after the bad one went unchecked, and the branch that restarts a dead
+    node never ran. A node killed mid-response is the realistic way to produce
+    it -- which is precisely the moment a watchdog is most needed."""
+
+    def do_GET(self):                                             # noqa: N802
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", "4096")
+        self.end_headers()
+        self.wfile.write(b'{"node_id": "TRUNC"')
+        self.close_connection = True
+
+    def log_message(self, *_a):
+        return
+
+
+class Slow(http.server.BaseHTTPRequestHandler):
+    """Accepts the connection, then takes far too long to answer.
+
+    A node mid-boot building its judges looks exactly like this. The connection
+    is ACCEPTED, so something is listening; it just does not answer inside the
+    probe's timeout. Reporting that as an empty port is how a rolling restart
+    starts a second node on an occupied one."""
+
+    def do_GET(self):                                             # noqa: N802
+        time.sleep(12)
+        try:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+        except Exception:                                         # noqa: BLE001
+            pass
+
+    def log_message(self, *_a):
+        return
+
+
+def serve(code, body=None, handler=Stub):
+    srv = http.server.HTTPServer(("127.0.0.1", 0), handler)
     srv.code = code
     srv.body = body if body is not None else {"status": "error", "message": "rate limited"}
     t = threading.Thread(target=srv.serve_forever, daemon=True)
@@ -106,6 +150,24 @@ def main():
         check("A115.3a a refused connection yields no document", h3 is None, "")
         check("A115.3b and is NOT marked as a rate limit",
               not str(err3).startswith("429"), str(err3)[:60])
+
+        # A truncated response raises http.client.IncompleteRead, which is an
+        # HTTPException -- neither an OSError nor a URLError. It used to escape
+        # health() and abort the whole pass, leaving every later node unchecked
+        # and the restart branch unreached.
+        srvT, pT = serve(200, handler=Truncating)
+        try:
+            raised = ""
+            try:
+                h4, err4 = W.health(pT, timeout=5)
+            except Exception as exc:                              # noqa: BLE001
+                h4, err4, raised = None, "", "%s: %s" % (type(exc).__name__, exc)
+            check("A115.10a a truncated response does not escape health()",
+                  raised == "", raised or "returned an error instead of raising")
+            check("A115.10b it yields no document and is not a rate limit",
+                  h4 is None and not str(err4).startswith("429"), str(err4)[:60])
+        finally:
+            srvT.shutdown()
 
         # -------------------------------------------- the restart decision
         # Drive the real one_pass. Only the two tending helpers are stubbed --
@@ -179,6 +241,43 @@ def main():
             finally:
                 srv429b.shutdown(); srv429c.shutdown()
 
+            # A115.8: THE ALERT, not just the restart. one_pass says "NO node
+            # is reachable -- the chain is not running", the loudest sentence
+            # this file can produce, from `states` -- where a 429 lands as None
+            # like any other failure. The restart path was taught the
+            # difference and this was not, so a fully healthy mesh answering
+            # 429 still reported the chain down. Measured by an adversarial
+            # review, not by this suite, which stayed green through it.
+            started.clear()
+            srv8a, p8a = serve(429)
+            srv8b, p8b = serve(429)
+            try:
+                W.NODES = [{"id": "R1", "port": p429, "db": "u.db", "key": "u.key", "peers": ""},
+                           {"id": "R2", "port": p8a, "db": "u.db", "key": "u.key", "peers": ""},
+                           {"id": "R3", "port": p8b, "db": "u.db", "key": "u.key", "peers": ""}]
+                W._fail_counts = {"R1": 0, "R2": 0, "R3": 0}
+                alerts = W.one_pass(strict=False) or []
+                bad = [a for a in alerts if "chain is not running" in a]
+                check("A115.8a an all-429 mesh is NOT reported as 'the chain is not running'",
+                      bad == [], "; ".join(bad) or "no such alert")
+                check("A115.8b and nothing is restarted over it",
+                      started == [], "restarted %s" % (started or "nobody"))
+            finally:
+                srv8a.shutdown(); srv8b.shutdown()
+
+            # A115.9: a genuinely dead mesh MUST still say it out loud, or
+            # A115.8 would be satisfied by deleting the alert.
+            started.clear()
+            d9a, d9b, d9c = closed_port(), closed_port(), closed_port()
+            W.NODES = [{"id": "D1", "port": d9a, "db": "u.db", "key": "u.key", "peers": ""},
+                       {"id": "D2", "port": d9b, "db": "u.db", "key": "u.key", "peers": ""},
+                       {"id": "D3", "port": d9c, "db": "u.db", "key": "u.key", "peers": ""}]
+            W._fail_counts = {"D1": 0, "D2": 0, "D3": 0}
+            alerts9 = W.one_pass(strict=False) or []
+            check("A115.9 a really-dead mesh still reports the chain not running",
+                  any("chain is not running" in a for a in alerts9),
+                  "; ".join(a for a in alerts9 if "chain" in a)[:90] or "NO SUCH ALERT")
+
             # And a mesh that really IS all gone must still restart on one strike.
             started.clear()
             d2, d3 = closed_port(), closed_port()
@@ -195,6 +294,37 @@ def main():
     finally:
         srv429.shutdown()
         srv200.shutdown()
+
+    # ------------------------------------- the tool that caused the incident
+    # rolling_restart.py polled /health hard enough to trip the limiter and
+    # then reported the healthy nodes it had silenced as NOT ANSWERING. Until
+    # now nothing tested it at all. These drive its real probe/port_free.
+    import rolling_restart as RR
+
+    srvR, pR = serve(429)
+    srvS, pS = serve(200, handler=Slow)
+    deadR = closed_port()
+    try:
+        st, _d = RR.probe(pR, timeout=5)
+        check("A115.11a rolling_restart calls a 429 'rate_limited', not 'down'",
+              st == "rate_limited", "got %r" % st)
+        st2, _d2 = RR.probe(deadR, timeout=5)
+        check("A115.11b and a refused connection 'down'", st2 == "down", "got %r" % st2)
+        st3, d3 = RR.probe(pS, timeout=3)
+        check("A115.11c and a listener too slow to answer 'slow', NOT 'down'",
+              st3 == "slow", "got %r (%s)" % (st3, d3))
+
+        # port_free decides whether it is safe to start a node on that port.
+        # It must say NO for anything that is listening, however it answers.
+        check("A115.12a port_free refuses a port that is merely slow",
+              RR.port_free(pS, time.time() + 6, lambda *_a: None) is False, "")
+        check("A115.12b port_free refuses a port that is rate-limiting",
+              RR.port_free(pR, time.time() + 6, lambda *_a: None) is False, "")
+        check("A115.12c port_free allows a port with nothing on it",
+              RR.port_free(deadR, time.time() + 6, lambda *_a: None) is True, "")
+    finally:
+        srvR.shutdown()
+        srvS.shutdown()
 
     passed = sum(1 for _, o, _ in RESULTS if o)
     failed = sum(1 for _, o, _ in RESULTS if not o)

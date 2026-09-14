@@ -94,6 +94,17 @@ def probe(port, timeout=4):
     except urllib.error.HTTPError as e:
         return ("rate_limited" if e.code == 429 else "http_error"), e.code
     except Exception as e:                                        # noqa: BLE001
+        # A TIMEOUT IS NOT AN EMPTY PORT (2026-09-14). A connection that is
+        # refused means nothing is listening; a connection that is accepted and
+        # then does not answer in time means something IS listening and is
+        # busy -- a node mid-boot building its judges, or one held up on a slow
+        # verdict. Collapsing both into "down" let port_free() below declare an
+        # occupied port free, which is the single thing its docstring promises
+        # it will not do.
+        inner = getattr(e, "reason", None)
+        blob = ("%s %s %s" % (type(e).__name__, type(inner).__name__ if inner else "", e)).lower()
+        if "timed out" in blob or "timeout" in blob:
+            return "slow", type(inner).__name__ if inner else type(e).__name__
         return "down", type(e).__name__
 
 
@@ -137,11 +148,14 @@ def port_free(port, deadline, say):
     refuse. Polls every 2 s rather than every 1 s so that waiting here does not
     itself push the limiter over."""
     while time.time() < deadline:
-        state, detail = probe(port, timeout=2)
+        state, detail = probe(port, timeout=4)
         if state == "down":
             return True
         if state == "rate_limited":
             say("    port %d is rate-limiting (429), so something is still listening; waiting" % port)
+        elif state == "slow":
+            say("    port %d accepted a connection and did not answer in time (%s) -- "
+                "that is a busy listener, not an empty port; waiting" % (port, detail))
         time.sleep(2)
     say("    port %d is STILL answering; stopping here rather than starting a second node on it" % port)
     return False
@@ -235,6 +249,10 @@ def status(say=print):
             say("  node %-2s port %-5d answering HTTP %s -- alive, but /health is erroring"
                 % (node["id"], node["port"], h))
             continue
+        if state == "slow":
+            say("  node %-2s port %-5d accepted the connection but did not answer in time (%s) "
+                "-- listening and busy, not down" % (node["id"], node["port"], h))
+            continue
         if state != "up":
             say("  node %-2s port %-5d NOT ANSWERING (%s)" % (node["id"], node["port"], h))
             continue
@@ -277,9 +295,11 @@ def main(argv=None):
         # /health too often was enough to make this script take a healthy node
         # down and stand it back up. A restart is the one thing here that costs
         # something; it must never be the consequence of a rate limit.
-        if state == "rate_limited" and not a.all and not a.only:
-            print("  node %s is rate-limiting (429): ALIVE, but its source cannot be read right now." % i)
-            print("     Not restarting it on an unread answer. Wait 60 s and run again.")
+        if state in ("rate_limited", "slow") and not a.all and not a.only:
+            print("  node %s is %s: ALIVE, but its source cannot be read right now." % (
+                i, "rate-limiting (429)" if state == "rate_limited"
+                else "accepting connections without answering in time"))
+            print("     Not restarting it on an unread answer. Wait and run again.")
             skipped.append(i)
             continue
         if state == "up" and not a.all and not a.only and str(h.get("source_sha256", ""))[:12] == want:
