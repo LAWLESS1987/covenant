@@ -65,12 +65,43 @@ def disk_sha():
         return hashlib.sha256(fh.read()).hexdigest()[:12]
 
 
-def health(port, timeout=4):
+def probe(port, timeout=4):
+    """(state, detail) for one node. State is one of:
+
+        "up"            answered 200 and detail is the parsed /health
+        "rate_limited"  answered 429: the node is ALIVE and refusing to be asked again
+        "http_error"    answered some other status: alive, but something is wrong
+        "down"          nothing answered: refused, timed out, or unreachable
+
+    THE DISTINCTION IS THE WHOLE POINT (2026-09-14). This used to collapse every
+    failure into None and the caller printed "NOT ANSWERING". /health is an
+    unlisted read endpoint, so it carries RATE_LIMIT_DEFAULT: 20 requests per 60
+    seconds per source. The watchdog polls all three nodes every 60 s, this
+    script polls once per second while waiting for a port to free, and a couple
+    of manual status checks sit on top -- and 127.0.0.1 is ONE source to the
+    limiter. Cross 20 and healthy nodes start answering 429.
+
+    Measured today: nodes B and C were reported NOT ANSWERING by this very
+    script while their processes were alive, listening, and returning 429 in
+    1.5 milliseconds. That is the same mistake as the own_genesis alarm this
+    script stopped on earlier -- a check reporting an emergency for a benign
+    cause -- and here it is worse, because the obvious response to "two nodes
+    are down" is to restart them, which would be a real outage caused entirely
+    by having asked too often."""
     try:
         with urllib.request.urlopen("http://127.0.0.1:%d/health" % port, timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8", "replace"))
-    except Exception:                                             # noqa: BLE001
-        return None
+            return "up", json.loads(r.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        return ("rate_limited" if e.code == 429 else "http_error"), e.code
+    except Exception as e:                                        # noqa: BLE001
+        return "down", type(e).__name__
+
+
+def health(port, timeout=4):
+    """The parsed /health, or None if it could not be read for ANY reason.
+    Callers that must tell 'alive' from 'dead' use probe() instead."""
+    state, detail = probe(port, timeout)
+    return detail if state == "up" else None
 
 
 def pids_for(node_id):
@@ -100,19 +131,46 @@ def stop(node_id, say):
 
 
 def port_free(port, deadline, say):
+    """True only when NOTHING is on the port. A 429 means a live process is
+    still holding it -- treating that as free would start a second node on an
+    occupied port, which is the footgun run_node's own preflight exists to
+    refuse. Polls every 2 s rather than every 1 s so that waiting here does not
+    itself push the limiter over."""
     while time.time() < deadline:
-        if health(port, timeout=2) is None:
+        state, detail = probe(port, timeout=2)
+        if state == "down":
             return True
-        time.sleep(1)
+        if state == "rate_limited":
+            say("    port %d is rate-limiting (429), so something is still listening; waiting" % port)
+        time.sleep(2)
     say("    port %d is STILL answering; stopping here rather than starting a second node on it" % port)
     return False
 
 
 def wait_up(node, want_sha, before_height, say):
+    """Wait for the node to answer, WITHOUT spending the /health budget doing it.
+
+    /health allows 20 requests per 60 s from one source. This used to ask every
+    2 seconds for up to 120 -- up to 60 requests, three times the budget -- so
+    on any boot slower than about forty seconds it guaranteed the very 429 it
+    would then report as "did not answer". It did exactly that today. A probe
+    frequent enough to break what it is measuring is not a measurement.
+
+    So: three quick looks, because most boots land inside six seconds, then one
+    every eight. And on a 429, back off hard -- the answer to being over the
+    limit is to stop asking, never to ask again immediately."""
     deadline = time.time() + UP_TIMEOUT_S
+    saw_429 = False
+    tries = 0
     while time.time() < deadline:
-        h = health(node["port"])
-        if h:
+        state, h = probe(node["port"])
+        tries += 1
+        if state == "rate_limited":
+            saw_429 = True
+            say("    /health is rate-limited (429); backing off 30 s rather than asking harder")
+            time.sleep(30)
+            continue
+        if state == "up":
             src = str(h.get("source_sha256", ""))[:12]
             height = h.get("chain_height")
             say("    up: height %s, source %s, peers %s, genesis %s" % (
@@ -137,7 +195,11 @@ def wait_up(node, want_sha, before_height, say):
             except (TypeError, ValueError):
                 pass
             return (not problems), problems
-        time.sleep(2)
+        time.sleep(2 if tries <= 3 else 8)
+    if saw_429:
+        return False, ["it answered 429 (rate limited) and never got to 200 within %d s -- the node is "
+                       "ALIVE and refusing to be asked again, not dead. Do NOT restart it; wait 60 s "
+                       "and run --status." % UP_TIMEOUT_S]
     return False, ["it did not answer /health within %d s" % UP_TIMEOUT_S]
 
 
@@ -164,9 +226,17 @@ def status(say=print):
     say("disk source: %s" % want)
     import covenant_watchdog as W
     for node in W.NODES:
-        h = health(node["port"])
-        if not h:
-            say("  node %-2s port %-5d NOT ANSWERING" % (node["id"], node["port"]))
+        state, h = probe(node["port"])
+        if state == "rate_limited":
+            say("  node %-2s port %-5d ALIVE but rate-limiting (429) -- asked too often, not down; "
+                "wait 60 s and ask again" % (node["id"], node["port"]))
+            continue
+        if state == "http_error":
+            say("  node %-2s port %-5d answering HTTP %s -- alive, but /health is erroring"
+                % (node["id"], node["port"], h))
+            continue
+        if state != "up":
+            say("  node %-2s port %-5d NOT ANSWERING (%s)" % (node["id"], node["port"], h))
             continue
         src = str(h.get("source_sha256", ""))[:12]
         say("  node %-2s port %-5d height %-4s peers %-2s source %s  %s" % (
@@ -201,8 +271,18 @@ def main(argv=None):
     done, skipped = [], []
     for i in ids:
         node = by_id[i]
-        h = health(node["port"])
-        if h and not a.all and not a.only and str(h.get("source_sha256", ""))[:12] == want:
+        state, h = probe(node["port"])
+        # REFUSE TO RESTART A NODE WE CANNOT READ (2026-09-14). A 429 used to
+        # read as "no health", which fell through to "restart it" -- so asking
+        # /health too often was enough to make this script take a healthy node
+        # down and stand it back up. A restart is the one thing here that costs
+        # something; it must never be the consequence of a rate limit.
+        if state == "rate_limited" and not a.all and not a.only:
+            print("  node %s is rate-limiting (429): ALIVE, but its source cannot be read right now." % i)
+            print("     Not restarting it on an unread answer. Wait 60 s and run again.")
+            skipped.append(i)
+            continue
+        if state == "up" and not a.all and not a.only and str(h.get("source_sha256", ""))[:12] == want:
             print("  node %s is already on the disk source; leaving it alone" % i)
             skipped.append(i)
             continue

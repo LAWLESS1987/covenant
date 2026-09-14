@@ -301,6 +301,14 @@ SUITES = [
     ("test_r6_contribution.py",           60,  "MONEY"),
     ("test_xrpl_record.py",               60,  "MONEY"),
     ("test_watchdog_outage.py",           90,  "SECURITY"),
+    # A115 (2026-09-14), registered in the change that created it. Sits beside
+    # the outage suite above because it guards the opposite mistake: that one
+    # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.
+    # A 429 from a rate-limited /health used to be indistinguishable from a
+    # refused connection, and three of those restart a node -- with the
+    # threshold dropping to one when every node trips at once. Real HTTP
+    # servers over real sockets, the real one_pass; mutation-tested three ways.
+    ("test_a115_rate_limited_is_not_down.py", 120, "SECURITY"),
     ("test_sentinels.py",                 60,  "SECURITY"),
     ("test_selfaudit.py",                 90,  "SECURITY"),
     ("test_g12_inflight.py",              60,  "SECURITY"),

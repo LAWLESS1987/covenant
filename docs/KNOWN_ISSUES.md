@@ -3633,6 +3633,42 @@ not by anything done on the PC. Adding the phone as a peer while the two are
 on different sources is exactly the situation A20 exists to warn about, which
 is one more reason this stays the operator's call rather than a repair.
 
+**The operator made that call the same day: "can't you use tailscale".** So the
+phone is now in node A's peer list as `100.86.158.1:5001`, in
+`covenant_watchdog.NODES`, and node A has been restarted onto it. Checked
+first, because the phone runs an older core: the phone is on the canonical
+genesis; the entire diff between core `27a9bf2b01ad` and `2f5e4e914bb5` is four
+HTTP routes, the signed update manifest and the own_genesis field, none of which
+touches block validation, proof-of-work, transaction verification, the wire
+protocol, the handshake or fork choice; and there is no chain-REPLACEMENT path
+in this codebase at all -- the chain only grows by append through
+`_accept_block_common`, so a peer at height 12 cannot roll these nodes back.
+Reachability was measured, not assumed: `100.86.158.1:5001` accepts from the PC
+(`:5000` refuses, the phone binds its API to loopback), the PC's own p2p ports
+listen on `0.0.0.0`, and the phone had already been reaching node A -- which is
+how node A knew its source.
+
+**What that fixed, and what it did not.** Node A now holds the phone as
+`peer_100.86.158.1_5001` with a KNOWN port instead of `?`, `dead_peers` is 0,
+and its boot announce went to two peers instead of one. The phone has NOT caught
+up: two check-ins later it still reports height 12, peers 1. So the missing port
+was real but was not the whole cause, and the remaining fault is on the phone
+side, where the node's log lives on the device and its API is loopback-only.
+
+**Where to look next, with the mechanism already traced.** A13 (v8.25) exists
+for exactly this shape -- `covenant_unified_v8.py` `_send_announce` reads the
+height in the reply to its own announce, and on a height above its own calls
+`on_peer_ahead` -> `_pull_from_peer_ahead` -> `request_missing_blocks`. The
+phone announces to the PC (proved: node A learned the phone's core hash from a
+digest riding one of those announces), and node A answers with height 24. So the
+phone should already be pulling and is not. The three candidates, in order, are:
+`on_peer_ahead` never installed on that build; the reply's height not being
+read; or `request_missing_blocks` failing outbound to the PC's p2p port. Each
+one writes a distinct line to the phone's own anomaly monitor --
+`peer_ahead_filled`, `peer_ahead_empty` or `peer_ahead_failed` -- which is
+readable from the phone at `127.0.0.1:5000/anomalies` and nowhere else. That
+one reading decides it.
+
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
 `brain/**` branch, then main. "Every accessibility behaviour -- recording now
@@ -3910,5 +3946,63 @@ so does keeping the new comparison but never recording the canonical hash.
 **Also in this change.** "node minted its OWN genesis" was removed from
 covenant_watchdog's FALSE_POSITIVE_WARNINGS, per that file's own instruction.
 Leaving it would have converted a fixed false positive into a swallowed true one.
+
+**Status:** fixed
+
+### A115. [serious / monitoring] A rate-limited /health was indistinguishable from a dead node, so asking too many questions could restart the whole mesh. FIXED 2026-09-14
+
+**What it was.** `/health` is an unlisted read endpoint, so it carries
+`RATE_LIMIT_DEFAULT`: twenty requests per sixty seconds, keyed by source
+address. `127.0.0.1` is ONE source no matter which tool is asking -- the
+watchdog every sixty seconds, `rolling_restart.py` once every two seconds while
+it waits for a boot, and a person running `--status`. Cross twenty and healthy
+nodes answer 429.
+
+`urllib` raises `HTTPError` for that, `HTTPError` is a SUBCLASS of `URLError`,
+and `covenant_watchdog.health` caught `URLError`. So a rate-limited node came
+back indistinguishable from a refused connection. Three consecutive misses
+restart a node; and `all_down`, which drops that threshold from three strikes to
+ONE, was also computed from the same undifferentiated `h is None`. The answer to
+"I asked too often" was therefore to restart every node in the mesh, on the
+first pass.
+
+**How it was found.** Not by reading. While the phone was being peered to node A
+the mesh went quiet: `rolling_restart.py --status` printed NOT ANSWERING for
+nodes B and C, and `logs/nodeB.log` and `logs/nodeC.log` showed the watchdog had
+already tried to start second copies of both. A probe with a long timeout got
+`HTTP 429 in 0.0015 s` from each -- the processes were alive, listening, and
+answering in under two milliseconds. The only thing standing between that and a
+real outage was run_node's port preflight refusing to bind an occupied port.
+Nothing was wrong with either node; the monitoring had manufactured the
+emergency and was one bind-check away from causing it.
+
+**The fix, in three places.**
+  * `covenant_watchdog.health` catches `HTTPError` before `URLError` and marks a
+    429 distinctly. Any other HTTP status is still an error.
+  * The probe loop skips a 429 entirely: not a restart, not a strike, and
+    deliberately NOT a counter reset either -- a real outage that began during a
+    rate-limited window must not have its tally wiped by one 429.
+  * `all_down` excludes rate-limited nodes, so a burst of polling can never be
+    read as "the whole mesh is gone". This also matters beyond restarts:
+    `all_down` gates the tending block, so the old expression silently stopped
+    the watchdog tending the seal service and the pending pool for as long as
+    the limiter was tripped.
+
+**And in the tool that caused it.** `rolling_restart.py` polled `/health` every
+two seconds for up to 120 -- up to sixty requests against a budget of twenty, so
+on any boot slower than about forty seconds it GUARANTEED the 429 it would then
+report as "did not answer". A probe frequent enough to break what it is
+measuring is not a measurement. It now takes three quick looks, then one every
+eight seconds, backs off thirty seconds on a 429, distinguishes all four states
+in `--status`, and refuses to restart a node whose source it could not read.
+
+**Pinned by.** `test_a115_rate_limited_is_not_down.py`, 13 checks, registered in
+covenant_one under SECURITY beside `test_watchdog_outage.py` -- that one pins
+the watchdog NOTICING an outage, this one pins it not INVENTING one. Real HTTP
+servers on real sockets driving the real `covenant_watchdog.health` and the real
+`one_pass`; only the two tending helpers are stubbed, because they mine the
+pending pool. Mutation-tested serially with the original restored by sha, three
+ways: unmark the 429, count it toward `all_down` again, or drop the skip. All
+three go red.
 
 **Status:** fixed

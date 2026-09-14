@@ -77,9 +77,32 @@ LOG_KEEP = 5
 # A22 compares each node's ACTUAL peers against the "peers" string below, so
 # this is the expectation, not a comment -- an unexpected peer is an alert, and
 # POST /peers is operator-authenticated, so one did not arrive by accident.
+# THE PHONE IS PEERED TO NODE A OVER THE TAILNET (2026-09-14, the operator's
+# "can't you use tailscale"). It heartbeats to node A's API and node A had
+# already recorded it inbound as 100.86.158.1 with an UNKNOWN port, which is an
+# address it could never dial -- so the acquaintance ran one way and the phone
+# sat at chain height 12 through fourteen check-ins while these three went to
+# 23. The tailnet address is the stable one (lawrences-s25); the phone's LAN
+# address is not. Port 5001 is its P2P port (API 5000 + 1, the same convention
+# as the loopback entries below), and it is the only one reachable: the phone
+# binds its API to loopback, so 5000 refuses and 5001 accepts.
+#
+# CHECKED BEFORE ADDING IT, because the phone runs an OLDER core (27a9bf2b01ad,
+# the build of 2026-09-13) than these three (2f5e4e914bb5):
+#   * The phone is on the CANONICAL genesis 00009b31c6c6, not one of its own.
+#   * The whole diff between those two cores is four HTTP routes, the signed
+#     update manifest and the own_genesis health field. Nothing in it touches
+#     block validation, proof-of-work, transaction verification, the P2P wire
+#     protocol, the peer handshake or fork choice. The delta is inert with
+#     respect to consensus.
+#   * There is no chain-REPLACEMENT path in this codebase to abuse: the chain
+#     only ever grows by append, and every append goes through
+#     _accept_block_common. A peer at height 12 cannot roll these nodes back.
+# What node A does with it is announce its tip at boot, which is what tells the
+# phone it is behind so it can pull the gap itself.
 NODES = [
     {"id": "A", "port": 5000, "db": "nodeA_prod.db", "key": "nodeA_prod.db.key",
-     "peers": "127.0.0.1:5021"},
+     "peers": "127.0.0.1:5021,100.86.158.1:5001"},
     {"id": "B", "port": 5020, "db": "nodeB_prod.db", "key": "nodeB_prod.db.key",
      "peers": "127.0.0.1:5001,127.0.0.1:5061"},
     {"id": "C", "port": 5060, "db": "nodeC_prod.db", "key": "nodeC_prod.db.key",
@@ -714,6 +737,22 @@ def health(port, timeout=8):
         with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/health", timeout=timeout) as r:
             return json.loads(r.read().decode()), None
+    except urllib.error.HTTPError as e:
+        # A 429 means the node is UP and refusing to be asked again (2026-09-14).
+        # /health is an unlisted read endpoint carrying RATE_LIMIT_DEFAULT -- 20
+        # requests per 60 s from one source -- and 127.0.0.1 is ONE source no
+        # matter which tool is asking. urllib raises HTTPError for it, HTTPError
+        # is a SUBCLASS of URLError, and the clause below caught URLError: a
+        # rate-limited node was indistinguishable from a refused connection.
+        # Three in a row restarts it, and when every node trips together the
+        # threshold drops from three to one, so the answer to "I asked too
+        # often" was to restart the whole mesh. Measured today: B and C returned
+        # 429 in 1.5 ms, were logged unreachable, and this watchdog tried to
+        # start second copies of both. The only thing standing between that and
+        # an outage was run_node's port preflight refusing them.
+        if e.code == 429:
+            return None, "429 rate-limited (the node is UP and refusing to be asked again)"
+        return None, f"HTTPError {e.code}"
     except (urllib.error.URLError, OSError, ValueError, TimeoutError) as e:
         return None, f"{type(e).__name__}: {e}"
 
@@ -833,7 +872,14 @@ def one_pass(strict=False):
     # mesh, and in a seven-minute outage that day the watchdog never reached
     # the third strike at all. A total outage restarts on the first miss.
     probes = [(n,) + health(n["port"]) for n in NODES]
-    all_down = all(h is None for _, h, _ in probes)
+    # "Whole mesh down" drops the restart threshold from three strikes to one,
+    # so it must mean UNREACHABLE, never merely rate-limited (2026-09-14). A
+    # burst of polling trips all three limiters at once -- they are separate
+    # limiters but they all see the same 127.0.0.1 and the same burst -- and
+    # under the old test that read as the whole mesh being down, which would
+    # have restarted every node on the first pass. A node that answers 429 is
+    # answering.
+    all_down = all(h is None and not str(e).startswith("429") for _, h, e in probes)
 
     # TENDING, on a pass where something is actually up. Moved here from
     # covenant_watchdog_guard.py on 2026-09-07: the guard's stated property is
@@ -851,6 +897,15 @@ def one_pass(strict=False):
 
     for n, h, err in probes:
         states[n["id"]] = h
+        if h is None and str(err).startswith("429"):
+            # NOT A FAILURE. The node answered -- it answered "stop asking".
+            # Counting this would let a busy minute of polling restart a healthy
+            # node, and restarting is the only thing here that costs anything.
+            # The counter is NOT reset either: a real outage that began during a
+            # rate-limited window should not have its tally wiped by one 429.
+            log("INFO", f"node {n['id']} :{n['port']} is rate-limiting /health "
+                        "(429) -- alive, asked too often; not counted as down")
+            continue
         if h is None:
             if strict:
                 alerts.append(f"node {n['id']} :{n['port']} unreachable ({err})")
