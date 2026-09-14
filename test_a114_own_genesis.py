@@ -37,7 +37,19 @@ import sys
 import tempfile
 import traceback
 
-os.environ.setdefault("COVENANT_JUDGE_PROVIDERS", "semantic")
+# SET, NOT setdefault (2026-09-14, second try). This suite builds real node
+# objects, so the judge quorum has to construct -- and `setdefault` respects
+# whatever the caller already exported. The CI sweep exports
+# COVENANT_JUDGE_PROVIDERS with `mock` in it, so on the runner this suite
+# inherited that, build_semantic_quorum raised
+#   ValueError: provider 'mock' requires COVENANT_INSECURE_MOCK_JUDGE=1
+# before the first check ran, and covenant_one reported NO RESULT -- which is
+# not a pass, and is exactly the "green here, red there" shape the house rule
+# about running it where the runner runs it exists to catch. It passed locally
+# and from a staged copy because neither had that variable set. The judge this
+# suite needs is not a matter of taste: it needs one that builds with no API
+# key and no insecure mock, which is the semantic one.
+os.environ["COVENANT_JUDGE_PROVIDERS"] = "semantic"
 os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
 os.environ.pop("COVENANT_DB_PATH", None)          # never inherit a real node's database
 

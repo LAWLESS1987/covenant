@@ -1,0 +1,59 @@
+#!/bin/sh
+# HELD-COPY AUTOSYNC hook (asked 2026-09-14: "it should automatically adjust").
+# Install once:  cp ops/pre-commit.synchold .git/hooks/pre-commit
+#
+# WHAT IT IS FOR. test_p18_version_collision.py V3 forbids any other copy of
+# covenant_unified_v8*.py from declaring the live COVENANT_VERSION with different
+# bytes. Keeping that true when the core changes was a manual `cp`, and manual
+# steps are forgotten: on 2026-09-14 the core changed three times in an afternoon,
+# the held copy under pending-v8.38/ was re-synced once, and because
+# .git/hooks/post-commit pushes every commit at once, the sweep went red on GitHub
+# THIRTY-SEVEN times in a row -- one per commit -- for a copy nobody had made.
+# P18's own docstring already called pending-v8.38 the case V3 was written for
+# "twice". This was the third. So the copy happens here now, in the same commit
+# as the core change, which is the only place it is ever correct.
+#
+# IT MUST NEVER BLOCK A COMMIT. Same rule as the post-commit autosync beside it:
+# what to do about something this cannot fix is the operator's call, and a hook
+# that refuses work is a hook that gets deleted. A .PRE- backup colliding with the
+# live version, or a copy this repository does not track, is REPORTED at length
+# and left alone -- never silently flattened. Every path below ends `exit 0`.
+#
+# It regenerates MANIFEST.sha256 ONLY when it actually changed a file, because a
+# file it changed would otherwise fail launch_check G1 in the very commit this
+# hook was trying to help. It deliberately does NOT rewrite the manifest on every
+# commit: verify_bundle hashes the WORKING TREE, so on a partial commit
+# (`git add -p`) that would record a manifest describing content the commit does
+# not contain, which is a worse bug than the one this fixes.
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" 2>/dev/null || exit 0
+
+# Only when the core itself is part of this commit. A commit that does not touch
+# the core cannot have broken the rule, and a hook that runs a scan on every
+# commit for nothing is a hook that gets deleted too.
+if ! git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"; then
+  exit 0
+fi
+
+out=$(python covenant_sync_held_core.py 2>&1)
+rc=$?
+echo "$out" | sed 's/^/pre-commit: /'
+
+if echo "$out" | grep -q "^  re-synced"; then
+  echo "$out" | grep "^  re-synced" | awk '{print $2}' | while read -r f; do
+    git add -- "$f" 2>/dev/null && echo "pre-commit: staged $f into this commit"
+  done
+  if python verify_bundle.py --write >/dev/null 2>&1; then
+    git add -- MANIFEST.sha256 2>/dev/null
+    echo "pre-commit: MANIFEST.sha256 regenerated and staged (a file changed, so G1 would have blocked)"
+  else
+    echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write' yourself" >&2
+  fi
+fi
+
+if [ "$rc" -ne 0 ]; then
+  echo "pre-commit: something above was left for a person. The commit is NOT blocked." >&2
+  echo "pre-commit: read the REFUSED / left alone lines -- a .PRE- backup must be renamed by hand, never overwritten." >&2
+fi
+exit 0

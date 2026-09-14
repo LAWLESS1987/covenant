@@ -4272,3 +4272,72 @@ plainly what A114 did NOT do: node A is still degraded, for reasons that have
 nothing to do with genesis.
 
 **Status:** fixed
+
+### A117. [process / the operator's instruction, 2026-09-14] "It should automatically adjust": the held copies of the core now follow the live one, in the same commit. DONE
+
+**What kept breaking.** `test_p18_version_collision.py` V3 forbids any other
+`covenant_unified_v8*.py` under the bundle root from declaring the live
+`COVENANT_VERSION` with different bytes -- a node reporting a version two files
+both claim tells an operator nothing. Keeping that true when the core changed
+was a manual `cp`. On 2026-09-14 the core changed three times in an afternoon
+and the held copy under `pending-v8.38/` was re-synced once, in the morning.
+Because `.git/hooks/post-commit` pushes every commit immediately, there was no
+window to notice: **the sweep went red on GitHub thirty-seven times in a row**,
+one per commit, for a copy nobody had made. P18's own docstring already called
+`pending-v8.38` the case V3 was written for "twice". This was the third.
+
+**What was actually red, and what was not.** Only the `covenant` sweep. The
+judge workflow was 26 for 26 green and the phone app's newest build was green.
+Two causes, both now fixed: this one, and `test_a114_own_genesis.py` using
+`os.environ.setdefault` for the judge provider, so on the runner it inherited
+the sweep's own setting (which names `mock`) and raised
+`ValueError: provider 'mock' requires COVENANT_INSECURE_MOCK_JUDGE=1` before its
+first check. It was green locally and green from a staged copy, because neither
+had that variable set. Reproduced with
+`COVENANT_JUDGE_PROVIDERS="claude,mock" python test_a114_own_genesis.py`: the
+old file fails exactly as CI did, the new one passes 24/24.
+
+**The automation.** `covenant_sync_held_core.py` re-syncs held copies;
+`ops/pre-commit.synchold`, installed at `.git/hooks/pre-commit`, runs it and
+stages what it changed into the same commit. It imports the scan, the version
+parse and the skip list from `test_p18_version_collision`, whose checker is
+deliberately kept free of its own assertions -- ONE implementation, because a
+fixer that disagreed with the test would be worse than no fixer.
+
+**What it refuses to do, which is most of the design.** It overwrites files, so
+it earns trust by what it will not touch:
+
+| case | what happens |
+|---|---|
+| a tracked held copy | re-synced, staged into the same commit |
+| a `.PRE-vX.Y.py` backup | REFUSED and reported; overwriting one destroys the only copy of what a rollback restores |
+| a copy this repository does not track | left alone and named |
+| a tree with no `.git` (the staged copy) | "cannot tell" -- changes nothing, rather than reading silence as permission |
+| a copy declaring a DIFFERENT version | not touched; the rule is narrow on purpose |
+
+The hook runs only when `covenant_unified_v8.py` is in the commit, never blocks
+(same rule as the autosync hook beside it: what it cannot fix is the operator's
+call, and a hook that refuses work is a hook that gets deleted), and regenerates
+`MANIFEST.sha256` ONLY when it actually changed a file -- because rewriting the
+manifest on every commit would, on a partial `git add -p`, record a manifest
+describing content the commit does not contain.
+
+**Pinned by.** `test_a117_held_core_autosync.py`, 23 checks, registered IN_PLACE
+in covenant_one beside P18 -- in place because it asserts the hook IS INSTALLED
+and byte-identical to the tracked source, and an automation nobody can prove is
+installed is one that silently stops running. Everything else runs against
+planted trees in the temp directory. Mutation-tested serially across the script
+and the hook, each restored by sha256 (the INSTALLED hook too, or the next run
+is red for the wrong reason): five mutations -- overwrite backups, treat "cannot
+tell" as permission, drop the version check, let `--check` write, run the hook on
+every commit -- and all five caught.
+
+**Status:** done
+
+**One thing this does NOT cover, said plainly.** A suite failing locally for an
+uncommitted reason still looks like a red sweep here and is green on the runner.
+`test_f3_gate_end_to_end.py` is 7/8 in this working tree and 8/8 from a staged
+tree carrying the COMMITTED models -- the difference is `fallback_model_2.json`,
+retrained by the nightly loop at 07:46 and not committed. That is A112's
+oscillation, it belongs to the loop rather than to this change, and CI does not
+see it.

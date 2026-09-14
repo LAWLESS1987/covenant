@@ -830,6 +830,16 @@ IN_PLACE = [
      "hashes the DELIVERY against MANIFEST.sha256 -- a copy is not the delivery"),
     ("test_p18_version_collision.py", 180,
      "walks the tree for other copies of the core -- a copy has a different tree"),
+    # A117 (2026-09-14), registered in the change that created it. IN PLACE for
+    # the same reason P18 is above it, plus one of its own: it asserts that
+    # .git/hooks/pre-commit IS INSTALLED and is byte-identical to the tracked
+    # ops/pre-commit.synchold. The staged copy has no .git, so from there those
+    # two checks can only SKIP -- and an automation nobody can prove is
+    # installed is an automation that silently stops running, which is the
+    # failure this whole project keeps finding. Its planted-tree checks work
+    # anywhere; these two need the folder.
+    ("test_a117_held_core_autosync.py", 180,
+     "asserts the pre-commit hook is installed in THIS folder -- a copy has no .git"),
     # G1 belongs here for the reason stated at the top of SUITES: it is a claim
     # about THE FOLDER's documents, and running it from the scratch copy
     # measures the scratch copy. It failed 11/13 in the sweep before this move,

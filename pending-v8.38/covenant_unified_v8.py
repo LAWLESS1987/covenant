@@ -6685,6 +6685,11 @@ class P2PNode:
         self.peers: Dict[str, Tuple[str, int]] = {}
         self.peers_lock = threading.Lock()
         self.chain: List[Block] = []
+        # A114 (2026-09-14): the hash of the canonical genesis this node was
+        # pointed at, recorded whether or not it adopted one this boot. Empty
+        # means no genesis file was supplied and the node has no way to tell a
+        # shared chain from one it minted alone. Read by /health's own_genesis.
+        self.canonical_genesis_hash: str = ""
         self.pending_transactions: List[Transaction] = []
         self.chain_lock = threading.Lock()
         self.staging_chain: List[Block] = []
@@ -7597,7 +7602,22 @@ class CovenantAPI:
             d = _au.latest()
             if not d:
                 return jsonify({"status": "error", "message": "no build fetched yet (python covenant_app_update.py --fetch)"}), 404
-            return jsonify({"status": "success", "latest": {k: v for k, v in d.items() if k != "path"}})
+            # BOTH SHAPES, on purpose (2026-09-14). `latest` is what every build up to
+            # 0.1.421 reads, and the operator's phone is running one of those: drop it and
+            # his current app can never see the build that would replace it. `doc`/`sig`/
+            # `spk` is the signed manifest a newer build verifies against the PC key it
+            # pinned -- the same envelope covenant_actuator_guide uses, so the phone
+            # verifies it with the verify_doc it already has. The signature covers the
+            # canonical doc and echoes the phone's nonce; an unsigned answer (no key on
+            # this node) still carries `latest`, and a phone that has pinned a key refuses
+            # to act on it.
+            out = {"status": "success", "latest": {k: v for k, v in d.items() if k != "path"}}
+            signed = _au.latest_signed(request.args.get("n", "")[:64])
+            if isinstance(signed, dict) and signed.get("status") == "success":
+                out["doc"], out["sig"], out["spk"] = signed["doc"], signed["sig"], signed["spk"]
+            elif isinstance(signed, dict):
+                out["unsigned_because"] = signed.get("message", "the manifest could not be signed")
+            return jsonify(out)
 
         @self.app.route("/app/apk", methods=["GET"])
         def app_apk():
@@ -8336,11 +8356,33 @@ class CovenantAPI:
             insecure = "mock_insecure" in judge_id
             keyless = "quorum(" in judge_id and not insecure and not any(
                 os.environ.get(v) for v in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"))
-            own_genesis = bool(self.node.chain) and \
-                self.node.chain[0].transactions[0].sender_pubkey == \
-                self.node.public_key.public_bytes(
-                    serialization.Encoding.PEM,
-                    serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+            # A114 (2026-09-14). This alarm means "my genesis is not the one my
+            # peers hold, so I can never converge with them". It used to ask a
+            # DIFFERENT question -- "did my own key sign the genesis block?" --
+            # and those two come apart on exactly one node: the founder. Node A
+            # minted the canonical genesis on 2026-08-19; B and C adopted the
+            # file it exported. All three then run the identical chain, and A
+            # alone reported own_genesis=true and degraded=true forever. The
+            # health block above exists because this system can look healthy
+            # while being useless; a permanent false alarm is the same failure
+            # inverted, and it trains whoever reads it to ignore the flag.
+            #
+            # So: when the node knows what the canonical genesis is, compare
+            # against it and ignore who signed it -- which also catches a node
+            # that adopted somebody ELSE's genesis file, a real divergence the
+            # signer test scored as clean. Only when no genesis file was
+            # supplied does the signer test remain the sole available signal.
+            canon = getattr(self.node, "canonical_genesis_hash", "")
+            if not self.node.chain:
+                own_genesis = False
+            elif canon:
+                own_genesis = self.node.chain[0].hash != canon
+            else:
+                own_genesis = bool(self.node.chain[0].transactions) and \
+                    self.node.chain[0].transactions[0].sender_pubkey == \
+                    self.node.public_key.public_bytes(
+                        serialization.Encoding.PEM,
+                        serialization.PublicFormat.SubjectPublicKeyInfo).decode()
             warnings = []
             if keyless and ("local:" in judge_id or "semantic:" in judge_id):
                 # Keyless is not judgeless: the deferring seat (the distilled
@@ -8356,7 +8398,11 @@ class CovenantAPI:
                                 "this node will reject every transaction")
             if insecure:
                 warnings.append("INSECURE mock judge active -- ethics gate is keyword matching")
-            if own_genesis:
+            if own_genesis and canon:
+                warnings.append(f"this node's genesis {self.node.chain[0].hash[:16]} is NOT the "
+                                f"canonical {canon[:16]} it was pointed at -- it cannot converge "
+                                "with peers on the canonical chain")
+            elif own_genesis:
                 warnings.append("node minted its OWN genesis -- it cannot converge with peers "
                                 "that did not adopt the same genesis file (use --genesis)")
             if not self.node.peers:
@@ -10039,6 +10085,18 @@ class CovenantUnifiedMaster:
         proof-of-work is re-checked, and the embedded transaction signature is
         re-verified against the key inside it. A tampered genesis is rejected.
         """
+        # A114. Record WHICH genesis this node was pointed at before deciding
+        # whether to adopt it, because on a restart the chain is already in the
+        # database and this returns early -- and /health still has to be able
+        # to say whether the chain it resumed is the shared one. Failure to
+        # read the file leaves the hash empty and is not fatal: a restart that
+        # worked yesterday with a corrupt genesis.json must still work today,
+        # since nothing is adopted on that path anyway.
+        try:
+            with open(path) as fh:
+                self.node.canonical_genesis_hash = str(json.load(fh).get("hash") or "")
+        except (OSError, ValueError, AttributeError):
+            self.node.canonical_genesis_hash = ""
         if self.node.chain:
             return False
         with open(path) as fh:
