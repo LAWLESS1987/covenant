@@ -3482,8 +3482,15 @@ that app's own service, after the leak check and the gate. (4) ML Kit's
 library reports performance/utilization metrics to Google under Google's
 terms -- no image, no text; this is the cost of bundled offline recognition
 and it is named in the service description the owner reads when enabling it.
-The arm64 APK grows by roughly the bundled model; the mailed-APK path (25 MB)
-is over -- OTA from the PC and the workflow artifact carry builds.
+MEASURED on the first green build, because the design's guess was wrong: the
+arm64 APK went from 24,684,443 to 46,629,140 bytes. The bundled model and its
+native pipeline cost 21.9 MB -- nearly doubling the app, where about 11 MB was
+expected. The mailed-APK path (25 MB) is therefore well out, OTA from the PC
+and the workflow artifact carry builds, and every update is a 44.5 MB download
+on the phone's link. The way back, if that ever binds, is the UNBUNDLED ML Kit
+model, which keeps recognition on-device but fetches the model from Play
+Services -- giving up the "fully offline, nothing downloaded" property the
+operator asked for by name. Not taken here; his call if it ever is.
 
 **Judge note.** The node's theft/deception quorum is the wrong domain for a
 question bound for another app (measured in covenant_ai_consult.py); so the
