@@ -4415,3 +4415,70 @@ judged. A116 now says so where the option is listed.
 **Status:** done -- and it is a standing rule, not a task. The test is not "is it
 green" but "if the thing this protects broke, would this have gone red?", and the
 only honest way to answer that is to break it.
+
+### A119. [serious / judge] Stopwords get weight through the back door: the elder scores stems of function words, and one of them is convicting block 12. OPEN, measured 2026-09-14
+
+**The rule the file states, and breaks.** `covenant_judge_fallback.py:210`, one
+line above the stopword list: *"These never get weight, at any count."* But
+`features()` emits `_fold(t)` for every raw token, and `_informative()` passes a
+folded stem because **the stem is not itself in the stopword list**. So the
+grammar word is excluded and its stem is not.
+
+**Measured on the deployed elder** (`fallback_model.json`, `1cdc0ebb73bc`):
+
+| leaked stem | pre-image | weight |
+|---|---|---|
+| `thes~` | these | **+1.9510** (above DAMNING = 1.2) |
+| `thos~` | those | -1.4502 |
+| `ther~` | there | +0.5647 |
+
+`'there' in STOPWORDS` is True; `_fold('there')` is `ther~`; `ther~ in STOPWORDS`
+is False. That is the whole defect.
+
+**It is one of the five features convicting block 12.** The sentence "There can
+be no mutual benefit without a little faith." scores +2.5235 over exactly five
+weighted features: `without` +1.6317, `not:mutual` +1.5455, `no` -0.8929,
+`ther~` +0.5647, `can` -0.1662, prior -0.1593. Suppress the leak and it is
+**+1.9588**, which is 0.44 under the 2.4 bar. An independent review measured the
+end-to-end consequence: a throwaway node with the leak suppressed syncs 12 -> 24
+against node A, and on a machine without this PC's key allow-list block 12 is
+then admitted by A98's EXISTING waiver, logging "SYNC WAIVED HOLD on block 12 ...
+NOTHING WAS ALLEGED". No retrain, no model file, no threshold change, no chain
+change and no new waiver.
+
+**AND IT IS NOT FREE, which is the part that must not be buried.** The model has
+been leaning on these stems for real convictions too. Measured here:
+
+| sentence | now | leak suppressed |
+|---|---|---|
+| block 12's sentence | +2.52 violates | +1.96 (clears) |
+| "I spent these funds set aside for the clinic on my own house" | +3.60 violates | **+1.64 (stops being a conviction)** |
+| "Move these payments into my own wallet and tell no one" | +6.81 violates | +4.86 (still convicted) |
+| sentences with no there/these/those | unchanged | unchanged |
+
+The corpus cannot see this: only 27 of 3,672 ledger rows contain any of the three
+words, and 7 contain "these", so a corpus sweep reporting "zero violating rows
+affected" is a measurement over a handful of rows, not over thousands.
+
+**How to read that cost honestly.** The conviction being lost was PARTLY
+SPURIOUS -- the model was convicting "I spent these funds..." with +1.95 of
+evidence contributed by the word "these", which alleges nothing. Removing a
+crutch does not weaken a judge that was standing properly. It reveals that this
+one was not, and that it needs retraining on the repaired feature extractor to
+recover genuine signal in place of the grammar it had been scoring.
+
+**Why this matters for A116 and how it must NOT be used.** This clears block 12,
+and that is exactly why it needs stating carefully. Under the operator's standing
+rule (A118, "the fix and green must align towards mutual benefit"), this repair
+is legitimate **only because it is justified without reference to block 12**: it
+is a violation of the file's own written rule, it would be worth fixing if block
+12 did not exist, and the chain unblocking is a side effect. A retrain AFTER the
+repair would likewise be principled, because its justification is "the extractor
+changed", not "we wanted a block to pass. If the argument for either ever
+becomes "it unblocks the sync", it has stopped being a repair.
+
+**Not done.** This changes what the ethics gate convicts, which is the operator's
+call and the group's, not a repair I take on my own -- and the measured cost above
+is the reason that judgement is needed rather than assumed.
+
+**Status:** open -- measured, reproduced, not applied
