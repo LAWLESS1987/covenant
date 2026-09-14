@@ -4069,7 +4069,10 @@ loses.
 **Reproduced, and it has nothing to do with the phone.** Throwaway node id
 JOINER, scratch database in the temp directory, port 5910, `--genesis
 genesis.json --peers 127.0.0.1:5001`, no tailnet and no phone involved: height
-went 1 -> 12 and stayed at 12 while the mesh sat at 24. That is the same wall the
+went 1 -> 12 and stayed at 12 while the mesh sat at 24. Repeated against node B
+instead (`--peers 127.0.0.1:5021`, port 5912): identical, `bootstrap: pulled 11
+block(s)`, then the same refusal. It is not node A, and it is not one peer
+serving a bad block -- it is the chain and the judge. That is the same wall the
 operator's phone has been sitting against for fourteen check-ins, and the reason
 adding the phone as a peer (A111) did not move it. The phone was never the
 problem; it was the first node to show the problem.
