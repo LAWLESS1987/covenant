@@ -190,7 +190,25 @@ def main():
                 else:
                     external.append(f"{nid}->{host}:{port}")
                 continue
-            if port in p2p_of:
+            if port in p2p_of and p2p_of[port] == nid:
+                # A NODE LISTED AS ITS OWN PEER. Added 2026-09-14 after an audit
+                # asked whether making this check CORRECT had made it
+                # PROTECTIVE, and the answer was no: planting
+                # `127.0.0.1:5001` in node A's peers -- node A's own P2P port --
+                # left every check in this file green. Before the host-aware
+                # fix above, the phone's off-box `100.86.158.1:5001` was being
+                # MISREAD as exactly this and passing; the fix stopped the
+                # misreading without ever making the real thing fail, which is
+                # a report that got truer while protecting nothing.
+                #
+                # run_node's preflight does refuse this, fatally, at startup
+                # (covenant_unified_v8.py: "A node cannot peer with itself").
+                # That is the guarantee; this is the place it is cheap to
+                # learn, because the alternative is finding out when a node
+                # will not come back up.
+                bad.append(f"{nid} lists its OWN P2P port {port} as a peer -- a node "
+                           f"cannot peer with itself, and run_node will refuse to start")
+            elif port in p2p_of:
                 good.append(f"{nid}->{p2p_of[port]}")
             elif port in api_of:
                 bad.append(f"{nid} points at {api_of[port]}'s API port {port}, "

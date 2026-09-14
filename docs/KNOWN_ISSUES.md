@@ -4187,7 +4187,18 @@ refinements-only rule, not a repair:
     FOR.
   * Retrain or roll back the student so it stops convicting block 12. This makes
     today's chain syncable and says nothing about tomorrow's retrain doing it
-    again at some other index.
+    again at some other index. **AND IT IS NOT CO-EQUAL WITH THE OTHERS, which
+    is how it was first written here.** It is tuning the ethics gate until it
+    returns the answer we wanted, on a sentence that alleges nothing and that
+    reads "There can be no mutual benefit without a little faith." A green
+    obtained that way is worth less than the red it replaced: the gate's whole
+    value is that it was not adjusted to suit the thing being judged. If the
+    student is wrong about this sentence it is wrong for reasons that exist
+    independently of block 12, and the case for retraining has to be made on
+    those reasons and measured against the whole corpus -- never on the ground
+    that it would unblock a sync. The operator's standing instruction, 2026-09-14:
+    **the fix and the green must align towards mutual benefit.** A fix whose only
+    merit is that it turns a check green is the exact shape that rule forbids.
   * Accept that the chain is un-syncable from scratch and treat node databases as
     the artifact to preserve. Cheapest, and it quietly abandons the second
     operator.
@@ -4358,3 +4369,49 @@ wrong. Measured both ways rather than reasoned about: 23/23 on this machine, and
 21 passed with 2 honest SKIPs in a fresh `git clone` of this repository, which is
 exactly what the runner does. "A thing that exists and cannot answer is still a
 failure" -- and a thing that was never there is not.
+
+### A118. [standing instruction, 2026-09-14] "The fix and green must always align towards mutual benefit." Today's green, audited against it. DONE
+
+**The instruction.** Green is not the goal. A change that makes a check pass
+earns nothing unless the thing the check protects is actually better off. The
+failure mode it names is the ordinary one: a test goes red, the quickest way to
+green is to move the test, and the report gets truer while the protection quietly
+goes away.
+
+**Audited rather than asserted.** Six checks were changed today. Three had
+already been mutation-tested when they were written (A114, A115, A117). Two had
+NOT been, so their green was a guess -- `test_watchdog_outage` F4, inverted so
+the genesis warning must ALERT, and `test_3node_config` N2/N3/N4, made
+host-aware. Each was broken on purpose to see whether it noticed:
+
+| probe | caught? |
+|---|---|
+| put the genesis mute back in FALSE_POSITIVE_WARNINGS | yes, F4 |
+| add the phone peer to the watchdog but not the launcher | yes, N5 |
+| aim the phone peer at an API port instead of the P2P port | yes, N2 |
+| tell node A to peer with ITSELF | **NO -- nothing went red** |
+
+**The one that failed the test was the one this instruction is about.** Before
+today, N2/N3/N4 threw the host away, so the phone's off-box `100.86.158.1:5001`
+was MISREAD as node A's own P2P port and every check passed on a graph that said
+"A peers with A". The host-aware fix stopped the misreading -- the report became
+correct -- and a real self-peer still sailed through. The fix made the output
+true without making the check protective, which is exactly the shape the
+instruction forbids, and it took deliberately planting the fault to see it. N2
+now fails on a node listed as its own peer, and the probe is caught. (run_node's
+preflight already refuses a self-peer fatally at startup; the guarantee was never
+missing. What was missing was learning it in a sweep rather than when a node
+will not come back up.)
+
+**Applied to the decision that matters.** A116 offers three answers to the chain
+stopping at block 12, and one of them was "retrain or roll back the student so it
+stops convicting it" -- written as co-equal with the others. It is not. That is
+tuning the ethics gate until it returns the answer we wanted, on a sentence that
+alleges nothing and that reads "There can be no mutual benefit without a little
+faith". A green obtained that way is worth less than the red it replaced, because
+the gate's whole value is that it was not adjusted to suit the thing being
+judged. A116 now says so where the option is listed.
+
+**Status:** done -- and it is a standing rule, not a task. The test is not "is it
+green" but "if the thing this protects broke, would this have gone red?", and the
+only honest way to answer that is to break it.
