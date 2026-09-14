@@ -3526,8 +3526,23 @@ answer 404 there until they are restarted -- and `AB_RESTART_NODES.bat` refuses
 a healthy mesh on purpose, because forcing one took the chain down twice on
 2026-09-06. Nothing was forced here. The phone's guidance fetch fails softly
 (one logged line, no run affected) until the operator restarts on his own
-schedule; `/checkin` and `/actuator_learn` are unaffected, and the phone needs
-a hand-installed build with the actuator re-enabled before any of this matters.
+schedule.
+
+Measured against the running node rather than assumed, because which half is
+live decides whether he has to do anything today:
+
+    /app/latest        403  the route is there; an unsigned caller is refused
+    /checkin           405  there; POST only
+    /actuator_guide    404  NOT there
+    /actuator_library  404  NOT there
+
+So the UPDATE path is already live: the PC can fetch the new build and the
+phone will be offered it on a heartbeat, with no restart and nothing done to
+the chain. What waits for a restart is only the PC's reduce-only word to the
+brain -- hold, cap, deny, taps off -- and the card library. Everything the
+phone does on its own is unaffected either way, and none of it matters until
+he installs the build and re-enables the actuator, which the changed
+capabilities force him to do by hand.
 
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
