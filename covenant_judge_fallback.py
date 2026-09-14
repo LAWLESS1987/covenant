@@ -367,9 +367,26 @@ def features(text: str) -> List[str]:
     out = ts + ["%s %s" % (ts[i], ts[i + 1]) for i in range(len(ts) - 1)]
     out += ["%s %s %s" % (ts[i], ts[i + 1], ts[i + 2]) for i in range(len(ts) - 2)]
     for t, n in zip(raw, neg):
+        # A19 (2026-09-14): NO FOLD FOR A FUNCTION WORD. The rule is stated at
+        # the stopword list above -- "These never get weight, at any count" --
+        # and this loop was the hole in it. The word was excluded and its STEM
+        # was not, because the stem is not itself in the list: "there" is a
+        # stopword, `_fold("there")` is "ther~", and "ther~" in STOPWORDS is
+        # False. Measured on the deployed elder, three of them carried weight
+        # through that gap -- thes~ +1.9510 (above DAMNING), thos~ -1.4502,
+        # ther~ +0.5647 -- and ther~ was one of the five features convicting
+        # block 12 of the canonical chain, a sentence that alleges nothing.
+        #
+        # Dropped at EMISSION rather than only at vocabulary selection, because
+        # _informative() runs in train() alone: filtering there would stop a
+        # NEW model learning the stem while a model that already had one went
+        # on scoring it for ever. A grammar word contributes nothing, in any
+        # form, at any count, which is what the rule says.
+        if t in STOPWORDS:
+            continue
         f = _fold(t)
         if f:
-            out.append(("not:" + f) if (n and t not in STOPWORDS) else f)
+            out.append(("not:" + f) if n else f)
     return out
 
 
@@ -413,6 +430,14 @@ PRONOUNS_PAIR_ONLY = frozenset(["his", "her", "their", "your", "its", "our",
                                 "my", "he", "she", "they", "them", "him",
                                 "me", "we", "us", "you", "i"])
 
+# A19 (2026-09-14). The SECOND door on the same rule. features() no longer emits
+# a fold for a function word, so nothing should reach vocabulary selection
+# carrying one; this makes sure that if some other path ever does, it still
+# cannot earn a weight. Two doors on one rule is not two implementations of it:
+# the rule lives in STOPWORDS, and both doors ask STOPWORDS.
+_STOPWORD_STEMS = frozenset(
+    s for s in (_fold(w) for w in (set(STOPWORDS) | set(PRONOUNS_PAIR_ONLY))) if s)
+
 
 def _informative(f: str) -> bool:
     """A single word that is a function word carries no ethical content. A PAIR
@@ -422,7 +447,8 @@ def _informative(f: str) -> bool:
     parts = f.split(" ")
     if len(parts) == 1:
         w = parts[0][4:] if parts[0].startswith("not:") else parts[0]
-        return w not in STOPWORDS and w not in PRONOUNS_PAIR_ONLY
+        return (w not in STOPWORDS and w not in PRONOUNS_PAIR_ONLY
+                and w not in _STOPWORD_STEMS)          # A19: the stem, too
     return not all(p in STOPWORDS for p in parts)
 
 

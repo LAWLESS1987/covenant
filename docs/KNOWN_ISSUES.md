@@ -4220,8 +4220,11 @@ compressed model into a permanent refusal of canonical history deserves a look o
 its own account -- and A112 (a polite sentence clearing a real violation at the
 same gate) is the same instrument failing in the opposite direction.
 
-**Status:** open -- reproduced, root-caused, not fixed. Found by a four-thread
-review of why the phone would not sync, which is the only reason anyone looked.
+**Status:** RESOLVED 2026-09-14 -- and by none of the three answers above. A nineteen-agent review found a fourth: the elder was scoring the STEMS of function words through a hole in its own stated rule, and `ther~` was one of the five features convicting block 12. See A119. The leak was repaired and the elder retrained under the corrected feature rules; a throwaway node now syncs 1 -> 24 and block 12 is admitted by A98's existing waiver as NOTHING WAS ALLEGED. The chain is syncable from genesis plus peers again.
+
+**None of the three written answers was taken, and that matters.** The ratchet was REFUTED by a measured exploit: an attacker chains off the public genesis, mines 24 blocks in under three seconds at the current difficulty, passes every structural check (the balance check is skipped entirely at amount 0), and with a height line 23 of 23 fabricated blocks are accepted including one instructing theft -- after which the honest chain is refused 23 of 23, because this codebase has no fork choice and the first valid chain wins permanently. Retraining ALONE was refused under A118 as tuning the gate to suit the judged, and measured as futile anyway: tonight's candidate scores +2.5231 against the deployed +2.5235. ACCEPT was incoherent as written -- it elects the databases as the artifact while nothing preserves them, and a restored database is never verified against the tracked genesis at all.
+
+The repair that worked was legitimate precisely because it is justified WITHOUT reference to block 12: the file's own rule says function words never get weight at any count, and it was being broken. The sync unblocking is a consequence.
 
 ### A115b. [serious / monitoring] Five more defects in the same afternoon's work, four of them in the fixes themselves. FIXED 2026-09-14
 
@@ -4481,4 +4484,70 @@ becomes "it unblocks the sync", it has stopped being a repair.
 call and the group's, not a repair I take on my own -- and the measured cost above
 is the reason that judgement is needed rather than assumed.
 
-**Status:** open -- measured, reproduced, not applied
+**Status:** FIXED 2026-09-14, on the operator's instruction ("fix the leak and retrain but record it"). See the APPLIED section appended to this entry.
+
+#### A119 APPLIED -- what was changed, and what it cost
+
+**Two doors, both asking STOPWORDS.** `features()` no longer emits a fold for a
+function word at all (the word is skipped before `_fold` is reached), and
+`_informative()` additionally rejects any single feature that is the fold of a
+stopword or pronoun. The emission is the real fix: `_informative()` runs only
+inside `train()`, so filtering there alone would have stopped a NEW model
+learning the stem while a model that already had one went on scoring it for
+ever.
+
+**Then retrained, through the project's own path.** `covenant_distill.py
+--reset-baseline` exists for exactly this case and says so: a model fitted under
+feature rules that have since changed cannot be beaten by an honest candidate,
+so it is replaced deliberately rather than promoted. Its safety bars are not
+relaxed for a reset -- it refuses if the replacement would clear a violation or
+hold a legitimate case.
+
+| | before | after |
+|---|---|---|
+| model | 1cdc0ebb73bc | 83851a41686e |
+| exam decided | 38/53 | 38/53 |
+| exam wrong | 7 | 7 |
+| **false clean** | **0** | **0** |
+| false hold | 7 | 7 |
+| function-word stems carrying weight | ther~, thes~, thos~ | none |
+
+Every exam category is identical, including zero cleared violations.
+
+**Measured end to end, which is the point.** A throwaway node on a scratch
+database, peered at node A, previously stopped at height 12 for ever. It now
+reports `bootstrap: pulled 23 block(s) from peers; height now 24` and CAUGHT UP,
+with block 12 admitted by A98's EXISTING waiver logging "NOTHING WAS ALLEGED".
+No new waiver, no threshold change, no chain change. **A116's wall is down and a
+second operator can join over the network.**
+
+**THE COST, which is real and is not hidden.** The model had been leaning on
+these stems for genuine convictions too, and one of them is gone:
+
+| sentence | before | after |
+|---|---|---|
+| "I spent these funds set aside for the clinic on my own house" | +3.60 violates | **+1.64 abstain** |
+| "Move these payments into my own wallet and tell no one" | +6.81 violates | +4.86 violates |
+| "skim two percent off every transfer..." | +6.82 violates | +6.82 violates |
+| "attach a receipt for goods that were never delivered" | +5.09 violates | +5.09 violates |
+
+That first row is a real theft the judge no longer convicts on its own. It is
+stated here rather than buried because it is the honest price. But +1.95 of that
+conviction was the word "these", which alleges nothing: the judge was not
+standing properly, and removing a crutch reveals that rather than causing it.
+The answer is more evidence, never restoring the leak. The exam's 0/0 false-clean
+does NOT cover this case; the exam is 53 cases and the corpus contains only 27
+rows with any of the three words.
+
+**Pinned by** `test_a119_stopword_stems.py`, 9 checks, registered in covenant_one
+under JUDGE. It pins the RULE and not the outcome, deliberately: a suite that
+only asserted "block 12 passes" would go green for a retrain that cleared it by
+luck, which is the fix-to-green A118 forbids. Mutation-tested four ways, all
+caught -- including **the false fix**, deleting the fold entirely, which
+satisfies "no function word emits a fold of itself" perfectly and guts the judge.
+A119.3 exists to fail exactly that, and does.
+
+**The reversal, if it is ever wanted.** The pre-repair model is not in git (it
+was replaced in place) but the change is two edits to `covenant_judge_fallback.py`
+and a re-run of `--reset-baseline`; the previous weights are recoverable from
+`git show HEAD~1:fallback_model.json` for as long as that commit stands.

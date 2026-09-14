@@ -345,6 +345,13 @@ SUITES = [
     # scratch copy happily: its judge is a stub, so it measures the decision
     # logic and cannot go green or red because a model was retrained.
     ("test_a98_sync_hold_waiver.py",     120,  "JUDGE"),
+    # A119 (2026-09-14), registered in the change that created it. Pins the RULE
+    # -- a function word carries no weight in any form, including its stem --
+    # and NOT the outcome, because a suite that only checked "block 12 passes"
+    # would go green for a retrain that cleared it by luck, which is the
+    # fix-to-green A118 rules out. Its A119.3 exists to fail the cheapest false
+    # fix, deleting the fold entirely, and mutation-testing confirms it does.
+    ("test_a119_stopword_stems.py",      120,  "JUDGE"),
     ("test_teacher_panel.py",            120,  "JUDGE"),
     ("test_dp1_daily_plan.py",           120,  "TRADER"),
     ("test_sm1_sealed_mail.py",          120,  "TRADER"),
