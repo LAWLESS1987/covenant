@@ -3683,3 +3683,106 @@ is a structural change to how the gate decides, not a repair -- the operator's
 refinements-only rule of 2026-09-09 puts that behind group consensus. Recorded
 so the next pass that turns it green is known to have turned it green, rather
 than found green.
+
+### A113. [security / the operator's ask, 2026-09-14] A security audit of the phone app: the update channel is closed, and what is still open is written down here. PARTLY FIXED
+
+**Asked.** "start to improve phone security", after the phase-3 brain landed.
+
+**How.** Four read-only lenses over the app he installs on his own phone -- the
+signing and update chain, what another app on the same phone can reach, what is
+stored at rest, and the trust boundaries between phone, PC and the green-lit
+apps -- each lens's findings then put to a skeptic whose brief was to knock them
+down. Forty-nine survived: three critical, ten high, eighteen medium, seventeen
+low.
+
+**The three criticals were one defect, found three times independently: the
+update channel was the only thing the PC sends that carried no signature.** The
+phone asked `/app/latest`, was told a sha256, downloaded `/app/apk`, and checked
+the bytes against that same server's number -- which proves the download was not
+corrupted and nothing about who answered. Anything that could take the PC's
+address on the LAN or the tailnet could serve its own APK with a matching hash.
+What stood behind that was Android refusing an install signed by a different
+certificate, and these builds are signed with the PUBLIC debug key from the app
+repository. A substituted build keeps the package name, so it inherits the
+accessibility grant, the node's RSA identity (a registered daily-plan signer,
+which off the phone can approve the day's trading plan), the pinned PC key, the
+green list and every charter.
+
+**Closed today.**
+
+- *The manifest is signed.* `covenant_app_update.latest_signed()` signs it with
+  the PC's daily-plan key -- the key the phone already pins from sealed mail --
+  over the canonical document, echoing a nonce the phone chose;
+  `entry.app_latest` verifies before anything is downloaded. Measured: a
+  substituted sha256, another key's signature, a replayed nonce and a missing
+  signature are each refused. `/app/latest` serves the old shape too, because
+  dropping it would leave the phone he is holding unable to parse the answer and
+  therefore unable to ever reach the build that fixes this.
+- *A phone with no pinned key is not frozen out.* It keeps working and says in
+  actions.log that it is trusting an unauthenticated manifest. Turning the guard
+  on stays his act: open one sealed plan.
+- *The download is bounded* by the size the verified manifest named. A hash
+  cannot refuse what it has not finished reading; an answer that never ended was
+  written into the cache until the disk filled. Measured against an endless
+  stream: stopped, discarded.
+- *The shipped APK is no longer debuggable* (four lenses reached this one).
+  `run-as` handed the whole private directory, identity key first, to anyone
+  with brief USB access to an unlocked phone. `debuggable false` keeps the build
+  type, the key and the app identity and closes only run-as and the debugger. It
+  also stops HIM exporting that key, so `signing/README.md` now opens with the
+  export step.
+- *v3 signing is on*, which is what can carry a key-rotation lineage, and CI
+  asserts it. Without it, moving off the public debug key could only ever mean
+  an uninstall that deletes the node identity.
+- *Every build now states which key signed it*, read back off the APK and
+  compared against the debug certificate's known fingerprint, with an error when
+  a provided release key did not actually sign -- the silent fallback.
+- *settings.json* was the last file written through a shared scratch name, and it
+  holds the green list, the pinned PC key and the STOP ALL hold; an unreadable
+  one falls back to defaults, which is an empty green list and `brain_hold`
+  false.
+
+**Still open, ranked, with who has to be where.**
+
+1. *[high] No version floor on updates.* The freshness test is "not equal to my
+   own sha", so a stale or hostile-but-signed manifest can move the phone
+   BACKWARD to an older signed build. Fix: carry a monotonic versionCode in the
+   signed document and refuse a lower one.
+2. *[high] The node's HTTP API answers every app on the phone.* Binding
+   127.0.0.1 makes it only-this-phone, not only-this-app; any installed app can
+   read `/health`, the dashboard and `/peers`. Fix: a per-install token, or a
+   unix socket.
+3. *[high] One unencrypted RSA key is three credentials* -- node identity,
+   daily-plan signer, sealed-mail recipient -- with no keystore wrapping and no
+   rotation path.
+4. *[high] Every phone-PC exchange is plaintext HTTP*, including the read-back
+   answers the learning sync carries. `docs/PEER_ENCRYPTION_DRAFT.md` exists and
+   was deliberately HELD (A108) because it changes the protocol every node
+   speaks, which is the group's decision by his own rule.
+5. *[high] The PC key is pinned silently on first use*, with no fingerprint
+   confirmation before it is written -- and the text can arrive from any app
+   through the share sheet.
+6. *[medium] The peer and bridge listeners bind 0.0.0.0 on the phone*: on a cafe
+   network, anything can reach them.
+7. *[medium] No tapjacking protection on the consent surfaces* the whole model
+   rests on (the green list, the charter dialog, the install prompt).
+8. *[medium] What is written TO the phone is never secret-filtered* the way what
+   leaves it is: an answer read off another app's screen is stored raw.
+9. *[medium] actions.log and logcat* keep strings read off other apps' screens,
+   unbounded, and logcat is outside the app's own storage.
+10. *[medium] The PC accepts an artifact into the update channel* without
+    checking which workflow or key produced it; and nothing triggers a phone
+    build when the PUBLIC core changes, so a core security fix never reaches the
+    phone on its own.
+
+**The one thing only he can do.** His release key has been ready on his PC since
+2026-09-08 and the repository has no Actions secrets at all, so every build to
+this day is signed with a key anyone can take from the repository. Two secrets
+and one deliberate uninstall close it; the order that loses nothing is in
+`mobile/app/signing/README.md`, and it starts with exporting the node identity
+while the installed app is still debuggable enough to allow it.
+
+**Honest limit.** This audit read code. Nothing in it was tried against a
+device, no exploit was written, and the emulator check starts no accessibility
+service. The fixes above are verified by running their own paths with the
+transport stubbed, and by CI reading the built APK -- not by attacking a phone.
