@@ -3464,6 +3464,59 @@ exactly what A85 exists to prevent, reached by a mechanism A85 did not cover;
 the walk now prunes the subtree, and `test_a85_manifest_privacy.py` gains M6
 and M6b, which fail with 194 and 52 leaked paths when the prune is reverted.
 
+**A SECOND REVIEW, after it compiled, found worse.** The first pass read the
+code against the invariants; this one read it for what happens at RUNTIME --
+the actuator's state machine, and the scheduler with the screen, each lens
+refuted by a skeptic. Twenty-eight findings survived, three of them blocking,
+and all three are the autonomy behaving as though nobody were holding the
+phone:
+
+1. **The idle clock had never been started.** `lastUserEventAt` is a static
+   initialised to zero and nothing seeded it, so "sixty seconds without a
+   user event" was TRUE at every process start. Enable the actuator, reboot,
+   or be killed for memory, and sixty seconds later a chartered recipe could
+   launch its app over whatever the operator was doing -- including over the
+   Recipes screen he had just used to grant it. Seeded at connect now.
+2. **The eyes could act on a control that had moved.** A capture is read 100
+   to 500 ms after it is taken, and its coordinates were applied to the LIVE
+   tree; if the app scrolled in between, `nodeAt` returns whatever is under
+   that point now. The request carries the app's event count, and an answer
+   whose screen moved underneath it is discarded. The skeptic's correction
+   was taken over the reviewer's fix: the node's text is NOT required to
+   match the label, because the OCR path exists for exactly the canvas and
+   WebView controls that have no text to match.
+3. **The ledger the caps are counted from could lose rows.** Every chain
+   failure started two `record_outcome` workers microseconds apart, both
+   doing a read-modify-write through ONE shared scratch name. Measured on
+   POSIX with six writers: 119 failures -- lost rows, truncated files, a
+   second `open` clobbering the inode the first was still buffering into.
+   `brain_next` counts the per-name, per-package and global daily caps from
+   that file, so a lost row lets a chartered recipe run past its limit. Both
+   halves closed: the Java callers serialised onto one executor, and every
+   scratch file in `entry.py`, `Recipe.java` and `Chain.java` now carries the
+   process, the thread and eight random bytes. Re-measured: zero.
+
+Also fixed from that pass: a zero-step recipe finished "ok", took the whole
+screen as its answer, and could never be quarantined; the tap counted a
+dispatched gesture as a hit; `mergeAndSave` copied stats and runs wholesale
+over whatever another writer had just added (a delta merge now); the charter
+dialog could grant autonomy from a screen rendered before Python quarantined
+the recipe; a fallback's failure was recorded against the primary hop; the
+whole Recipes screen was built on the UI thread. Two categories came back
+CLEAN and are recorded as such rather than padded into findings: no Chaquopy
+call sits on a UI or service thread, and every timer is cancelled on every
+path. M5 247 -> 253.
+
+**A cost of fix 2, stated because only the phone can settle it.** The eyes now
+decline when the app's screen moved during the capture -- and a streaming AI
+answer is a screen that moves continuously. In ChatGPT or Gemini mid-response
+the OCR locator will log that it dropped the answer rather than click. A step
+gets three looks across its twenty seconds, so a settled screen still works;
+an app that never settles inside that window will fail the step as "never
+appeared". That is the intended reduction -- acting there is precisely the
+wrong-control click -- but whether it is too strict for the apps he actually
+uses is his to report from the phone.
+
 **Not built, and why.** Remote driving of any kind (no phone route accepts a
 job, recipe, chain or run; the PC's document has no executable key). Acting
 on a locked or dark screen, or under the owner's fingers. Any gesture but the
