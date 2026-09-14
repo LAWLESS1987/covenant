@@ -334,6 +334,8 @@ SUITES = [
     ("test_teacher_panel.py",            120,  "JUDGE"),
     ("test_dp1_daily_plan.py",           120,  "TRADER"),
     ("test_sm1_sealed_mail.py",          120,  "TRADER"),
+    ("test_ac1_ai_consult.py",           120,  "TRADER"),
+    ("test_al1_actuator_learn.py",       120,  "TRADER"),
     ("test_a88_evidence_cut.py",         120,  "JUDGE"),
     ("test_b1_judge_parser.py",          180,  "JUDGE"),
     ("test_b2_quorum_diversity.py",      180,  "JUDGE"),

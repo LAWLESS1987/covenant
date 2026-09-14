@@ -273,6 +273,10 @@ ops/app/
 ops/sealed_mail/
 ops/sealed_mail.log
 ops/sealed_mail_seen.json
+# AI-consult ledger (2026-09-14): bounded, judged exchanges with the other AI apps
+ops/ai_consult.jsonl
+# the phone actuator/brain's learning, synced (2026-09-14)
+ops/actuator_learning.jsonl
 
 # Delivery folder holding duplicate copies of suites that already live at the
 # repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are

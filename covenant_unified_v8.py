@@ -7497,6 +7497,23 @@ class CovenantAPI:
             code, out = _dp.record_checkin(body, who)
             return jsonify(out), code
 
+        # THE PHONE'S LEARNING, SYNCED (2026-09-14, the operator's ask: "the
+        # phone app should send back info to learn from"). Same signed-request
+        # scheme as /checkin; the actual judging and ledger writing live in
+        # covenant_actuator_learn.py so this route is a thin, testable wrapper.
+        @self.app.route("/actuator_learn", methods=["POST"])
+        def actuator_learn():
+            body = request.get_data() or b""
+            ok, who, _pem = _daily_plan_auth(request, body)
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _al = importlib.import_module("covenant_actuator_learn")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "actuator learning unavailable on this node: %s" % type(e).__name__}), 503
+            code, out = _al.record_sync(body, who)
+            return jsonify(out), code
+
         # THE PHONE'S UPDATE (2026-09-13): the newest build of the operator's
         # private app repository, fetched on this PC with this PC's credential
         # (covenant_app_update.py), served only to a signed GET from a
