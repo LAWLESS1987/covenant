@@ -679,7 +679,7 @@ diligence.
 
 **Fix:** In load_canonical_genesis, when a chain already exists compare chain[0].hash to the file's hash and refuse to start (naming the DB to delete) on mismatch; add the same check to preflight.py.
 
-**Status:** open
+**Status:** open. HALF OF THE FIX LANDED 2026-09-14 (A114): load_canonical_genesis now records the file's hash even when it adopts nothing, and /health compares the two and says so, naming both hashes. What is still missing is the half this entry actually asks for -- the node does not REFUSE to start on a mismatch, and preflight.py still does not compare. Reporting a divergence is a repair; refusing to boot on it is a policy change that can leave an operator with a node that will not start, and that belongs to the group, not to this change.
 
 ### A28. [serious / peering] README/DEPLOYMENT quick start tells every reader to run --export-genesis genesis.json first, which silently overwrites the canonical genesis in their clone with a new one that /health will not flag
 
@@ -839,7 +839,7 @@ stale claim about now.
 
 **Fix:** Do not raise own_genesis/degraded when chain[0].hash equals the hash in the --genesis file that was loaded; report 'founder' instead.
 
-**Status:** open
+**Status:** FIXED 2026-09-14 (A114). `own_genesis` now asks whether this node's genesis IS the canonical one rather than who signed it. Measured after a rolling restart: all three nodes report own_genesis false, height 23, genesis 00009b31c6c654d7, and node A's warning list is now identical to B's and C's. The mute this false positive earned in covenant_watchdog's FALSE_POSITIVE_WARNINGS was removed in the same change, so the warning alerts again. Pinned by test_a114_own_genesis.py (21 checks, registered in covenant_one under P2P, mutation-tested both ways).
 
 ### A41. [minor / peering] --peers parsing in main() splits on every colon, so an IPv6 or any host:port with an extra colon crashes with ValueError while preflight parses the same string with rsplit
 
@@ -3826,3 +3826,69 @@ while the installed app is still debuggable enough to allow it.
 device, no exploit was written, and the emulator check starts no accessibility
 service. The fixes above are verified by running their own paths with the
 transport stubbed, and by CI reading the built APK -- not by attacking a phone.
+
+### A114. [minor / peering] The founder node called itself unable to converge for 26 days, because own_genesis asked who SIGNED the genesis rather than whether it is the canonical one. FIXED 2026-09-14
+
+**What it was.** `/health`'s `own_genesis` warning reads "node minted its OWN
+genesis -- it cannot converge with peers". The code behind it asked a different
+question: does the genesis block's first transaction carry MY public key? Those
+two answers agree on every node in a network except one -- the founder, whose
+key signed the canonical genesis that everyone else adopted. Node A minted this
+network's genesis on 2026-08-19 and exported the file B and C loaded. Node A
+therefore reported own_genesis=true, and so degraded=true, permanently, from the
+day the network started. It was filed as A40 and left open.
+
+**Why it was worth fixing rather than annotating.** The health block it lives in
+exists, in its own words, because this system has repeatedly been able to look
+healthy while being useless. A permanent false alarm is that failure inverted:
+covenant_watchdog had already muted the warning in FALSE_POSITIVE_WARNINGS, and
+its own note said to delete that mute if the reporting were ever fixed. Until it
+was, a node that genuinely could not converge would have said so and been
+ignored. It also cost a real decision: the rolling restart of 2026-09-14 stopped
+at node A and refused to continue, correctly by its own rules, on this
+non-problem.
+
+**Evidence it was false.** All three nodes were byte-identical at the time of
+the alarm -- 23 blocks each, genesis 00009b31c6c654d7, tip 0000689bd2d0f5dd, the
+same on A, B and C. nodeA_prod.db.key's public key equals genesis.json's
+transactions[0].sender_pubkey; nodeB's and nodeC's do not. That is the whole
+defect: A is the founder.
+
+**The change.** `load_canonical_genesis` records the hash of the file it was
+pointed at before deciding whether to adopt it, because on a restart the chain
+is already in the database and the function returns early -- and /health still
+has to be able to say whether the chain it resumed is the shared one. A failure
+to read that file is not fatal and leaves the hash empty, so a restart that
+worked with an unreadable genesis.json still works. `own_genesis` is then: my
+genesis differs from the canonical one I was pointed at; or, when no genesis
+file was supplied and there is nothing to compare against, the old signer test,
+which is the only signal available there. The warning names both hashes.
+
+**What this also closes, and what it does NOT.** A node that adopted some other
+network's genesis file and is now pointed at this one used to score CLEAN -- its
+own key signed nothing -- while sitting on a chain its peers cannot reach. That
+case is now flagged (check A114.4). A28 is NOT closed by this: an operator who
+runs `--export-genesis genesis.json` over the canonical file and then starts a
+node against it has a chain and a genesis file that agree with each other and
+with nothing else, and own_genesis cannot see that by construction. A28 needs
+the joiner documentation fix it already asks for.
+
+**Measured after the fix.** Rolling restart C then B then A onto source
+2f5e4e914bb5; all three up at height 23, genesis 00009b31c6c654d7, own_genesis
+false on all three, and node A's warning list now identical to B's and C's (the
+two that remain are the keyless ethics seat and the absent win32 code sandbox --
+both pre-existing environmental facts, neither this issue).
+
+**Pinned by.** test_a114_own_genesis.py, 21 checks, registered in covenant_one
+under P2P in this same change. It drives the real /health route through Flask's
+test client on real node objects with real databases and real keys -- it does
+not read the source looking for words, which is the failure mode 35 of 36
+audited guards had on 2026-09-09. Mutation-tested serially on one tree with the
+original restored by sha: reinstating the signer test turns four checks red, and
+so does keeping the new comparison but never recording the canonical hash.
+
+**Also in this change.** "node minted its OWN genesis" was removed from
+covenant_watchdog's FALSE_POSITIVE_WARNINGS, per that file's own instruction.
+Leaving it would have converted a fixed false positive into a swallowed true one.
+
+**Status:** fixed

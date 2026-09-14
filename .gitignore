@@ -330,3 +330,10 @@ pc_report.txt
 
 # 2026-09-12: Google platform-tools (adb) fetched by mobile/usb_link.py; a binary, not the delivery
 tools/platform-tools/
+
+# Transient working files written by scripts and sweeps into ops/ during a
+# session -- rolling-restart transcripts, sweep captures, one-off probes.
+# Added 2026-09-14 after a rolling restart and two sweeps left six of them
+# sitting untracked next to the real records, which is how something that
+# should never have been committed eventually is (the A85 lesson).
+ops/_*

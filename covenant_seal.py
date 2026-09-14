@@ -43,7 +43,7 @@ FOUR THINGS WORTH BEING BLUNT ABOUT
    and the archive is gone.
 
    AND THE ONE THAT ACTUALLY BITES: --keyfile is only secrecy if the key file
-   lives somewhere the archive does not. Both in covenant\ means anyone who
+   lives somewhere the archive does not. Both in covenant\\ means anyone who
    copies the folder has the lock and the key. The tool warns, and then does
    what you asked -- integrity still holds, secrecy does not.
 
@@ -489,12 +489,36 @@ def cmd_verify(_):
     if not os.path.exists(path):
         print("  no MANIFEST.sha256 -- run `manifest` first")
         return 2
-    old = {}
+    # READ BOTH FORMATS, AND SKIP COMMENTS (2026-09-14). A85b records that two
+    # tools write this filename: verify_bundle.py --write, which maintains the
+    # COMMITTED artifact and emits a header comment plus `digest  path`, and
+    # cmd_manifest above, which emits `digest  size  path` with no header. This
+    # reader understood only the second, and only by accident: it took any line
+    # splitting into three fields, so the committed manifest's first line --
+    # "# covenant bundle manifest -- sha256 of every shipped file." -- reached
+    # int("covenant") and the command died with a ValueError before printing
+    # anything. `covenant_seal.py verify` has therefore never once run against
+    # the manifest this repository actually ships. A verifier that cannot read
+    # the artifact it verifies is worse than no verifier: it is a green check
+    # nobody ever saw fail, because nobody ever saw it run.
+    old, sizes_known = {}, True
     with open(path, encoding="utf-8") as f:
         for line in f:
-            p = line.rstrip("\n").split(None, 2)
-            if len(p) == 3:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            p = line.split(None, 2)
+            if len(p) == 3 and p[1].isdigit():
                 old[p[2]] = (int(p[1]), p[0])
+            elif len(p) >= 2:
+                # verify_bundle's format: no size column. Size is not used to
+                # decide whether a file CHANGED -- the digest is -- so this
+                # compares what matters and declines to fake a root hash below.
+                old[line.split(None, 1)[1].strip()] = (None, p[0])
+                sizes_known = False
+    if not old:
+        print("  MANIFEST.sha256 has no readable entries -- refusing to report a match")
+        return 2
     rows = build_manifest()
     new = {r: (s, d) for r, s, d in rows}
     changed = [k for k in old.keys() & new.keys() if old[k][1] != new[k][1]]
@@ -509,8 +533,12 @@ def cmd_verify(_):
     if not (changed or added or removed):
         print(f"  {len(rows)} files, all match. root {root_hash(rows)}")
         return 0
-    old_rows = sorted((rel, sz, dg) for rel, (sz, dg) in old.items())
-    print(f"  root was {root_hash(old_rows)}")
+    if sizes_known:
+        old_rows = sorted((rel, sz, dg) for rel, (sz, dg) in old.items())
+        print(f"  root was {root_hash(old_rows)}")
+    else:
+        print("  root was (not computable: this manifest carries no size column, "
+              "so it was written by verify_bundle.py -- ask that tool for its root)")
     print(f"  root now {root_hash(rows)}")
     print(f"  {len(changed)} changed, {len(added)} added, {len(removed)} removed")
     return 1

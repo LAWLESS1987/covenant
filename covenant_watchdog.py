@@ -22,19 +22,23 @@ THE CHECK THAT MATTERS
 
 THE WARNINGS IT IGNORES, AND WHY
   /health reports `degraded: true` permanently on a correct keyless setup,
-  because two of the four inputs to `degraded` are false positives:
+  because one of the four inputs to `degraded` is a false positive:
 
     keyless      (line 6142) tests for ANTHROPIC/OPENAI/GOOGLE_API_KEY in the
                  environment. It never checks whether a judge is reachable or
                  working, so a functioning local judge always trips it.
-    own_genesis  (line 6144) tests WHO MINTED the genesis, not whether this
-                 node minted it. Adopting a genesis your own founder key
-                 created sets the flag -- and the node then converges fine.
 
-  A monitor that pages on those two would page forever and be muted within a
-  day, taking `insecure` and `crisis_mode` -- the two that are real -- with
-  it. So they are recorded at INFO and never alert. If you fix the health
-  reporting upstream, delete FALSE_POSITIVE_WARNINGS below.
+  A monitor that pages on that would page forever and be muted within a day,
+  taking `insecure` and `crisis_mode` -- the ones that are real -- with it. So
+  it is recorded at INFO and never alerts. If you fix the health reporting
+  upstream, delete FALSE_POSITIVE_WARNINGS below.
+
+  own_genesis USED TO BE ON THAT LIST and no longer is (2026-09-14, A114). It
+  tested WHO MINTED the genesis rather than whether this node's genesis is the
+  canonical one, so the founder -- node A, whose key signed the genesis every
+  other node adopted -- declared itself unable to converge, forever, while
+  running a chain identical to its peers block for block. That is fixed
+  upstream, so the mute is gone and this warning alerts again.
 
 WHAT IT ALERTS ON
   node unreachable          restarts it after 3 consecutive failures
@@ -94,7 +98,14 @@ FALSE_POSITIVE_WARNINGS = (
     # -- a rewording turned a documented non-event into permanent noise, which
     # is how an operator learns to ignore alerts. Match the stable fragment.
     "provider key",
-    "node minted its OWN genesis",
+    # "node minted its OWN genesis" WAS HERE UNTIL 2026-09-14 (A114/A40).
+    # The instruction above says to delete these once the health reporting is
+    # fixed upstream, and it now is: own_genesis asks whether this node's
+    # genesis is the canonical one rather than who signed it, so the founder
+    # no longer trips it and every node that still does is genuinely on a
+    # chain its peers cannot reach. Leaving the mute in place would have
+    # turned a fixed false positive into a swallowed true one -- the same
+    # trade the "provider key" comment above describes, run backwards.
     # A platform fact on Windows, not an incident: without a usable 'fork'
     # start method the sandbox cannot enforce its limits, so /propose_code
     # REFUSES every proposal rather than running one unbounded. It fails

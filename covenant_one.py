@@ -229,6 +229,12 @@ SUITES = [
     ("test_a20_peer_version.py",         300,  "P2P"),
     ("test_a22_topology_vigilance.py",   180,  "P2P"),
     ("test_a23_ack_health.py",           180,  "P2P"),
+    # A114 (2026-09-14), registered in the change that created it -- the A91/A98
+    # lesson, and the one covenant_one already calls INCOMPLETE rather than a
+    # pass. Drives the real /health route in-process (no boot, no socket), so
+    # it costs a second, and it has been mutation-tested both ways: reinstating
+    # either half of the defect turns four of its checks red.
+    ("test_a114_own_genesis.py",         120,  "P2P"),
     ("test_multinode_live.py",           600,  "P2P"),
     ("test_p11_version_identity.py",     180,  "IDENTITY"),
     ("test_p12_substrate_sensing.py",    180,  "IDENTITY"),
