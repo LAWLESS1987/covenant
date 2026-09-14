@@ -3678,6 +3678,56 @@ know the phone, and it now does, with a real port instead of `?` -- but it was
 never going to move the height on its own. What moves the height is whatever the
 operator decides about A116.
 
+**AND THE APP IS NOT LEARNING EITHER, FOR A SEPARATE AND SIMPLER REASON.** Asked
+on 2026-09-14 whether the phone was learning, the answer measured out as: not at
+all, and it cannot. `ops/ACTUATOR_DIGEST.md` reads 0 ledger rows, 0 syncs, last
+sync never, 0 recipes, 0 chains, 0 cards. The cause is not a broken sync. The
+build on the phone does not contain the learning code. Reading the function
+names out of the bytecode of the APK whose bundled core hash matches what the
+phone reports:
+
+| | phone's build | current build |
+|---|---|---|
+| Python bytecode | 33 KB | 142 KB |
+| `record_outcome`, `learn_payload` | absent | present |
+| `brain_next`, `chain_plan`, `guidance_apply` | absent | present |
+| `actuator_learn`, `actuator_guide` | absent | present |
+| anything OCR, in Python or dex | absent | present |
+
+So there is nothing on that phone that can record an outcome, let alone send
+one. Everything built in this session is in an APK the phone has never
+installed.
+
+**Made installable in one step, 2026-09-14.** The released build carried core
+`db1c5d9587bc`, one commit behind the mesh, so installing it would have started
+the learning and left the node behind -- two installs. The app repository needed
+no change: its workflow checks out the PUBLIC repository at main and vendors
+that core at build time, so an empty commit rebuilds against whatever main
+holds. Pushed after running the app's own checks against the core it would
+actually vendor (`test_m5_app.py` 271/271, `java_syntax_check.py` clean on 15
+files), and after confirming on the REMOTE ref -- not the local log -- that
+`origin/main` carried `2f5e4e914bb5`.
+
+Build `3327b32` verified on arrival rather than assumed: bundled core
+`2f5e4e914bb5`, identical to what the three nodes run; 142 KB of bytecode with
+every learning function present; text recognition, the brain, the guidance
+receiver and the chain runner all present in the dex.
+
+**The signer was checked too, because it is the step that can fail silently.**
+Android refuses an update signed by a different key, and the only way past that
+is an uninstall, which destroys the node's database and its identity key. Every
+APK on the PC is signed by one key, `564990a0d6e1a5a6`, and that is the
+certificate in the committed `signing/debug.p12` (`O=covenant, CN=Covenant Node
+debug key`), under both v2 and v3. So this installs over what is there.
+
+**What remains is one tap.** The phone asks `/app/latest` on every heartbeat, it
+is still heartbeating every ten minutes, and the PC now answers with `3327b32`
+in both the legacy shape that build reads and the signed shape. It will download
+and verify on its own; Android then asks the person holding the phone. Nothing
+on the PC can do that part. Note also that the learning loop runs over its own
+authenticated HTTP route and does NOT depend on the chain, so the learning
+starts on install even though A116 still stops the node at height 12.
+
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
 `brain/**` branch, then main. "Every accessibility behaviour -- recording now
