@@ -3544,6 +3544,22 @@ phone does on its own is unaffected either way, and none of it matters until
 he installs the build and re-enables the actuator, which the changed
 capabilities force him to do by hand.
 
+**And when he does restart, there is a second thing to do in the same breath.**
+The phone node is stuck. It has reported chain height 12 in every one of the
+fourteen check-ins on record -- through last night, through a charge from 57%
+to 98%, through an app restart -- while the PC chain went to 23, and while the
+phone reports one peer the whole time. `GET /peers` on node A says its only
+peer is `127.0.0.1:5021`, node B: the PC does not know the phone at all. That
+is the limitation `mobile/TERMUX_SETUP.md:169` already states in its own words
+-- "your version does not learn peers from inbound connections; add
+`PHONE_IP:5001` to the PC node's `--peers`" -- so the phone knows the PC,
+the PC has never known the phone, and a one-way acquaintance leaves the phone
+at the height it started with. Its tailnet address is stable
+(`lawrences-s25`, 100.86.158.1) where its LAN address is not, so that is the
+one to add. Not done here: adding a peer is a change to his running mesh, and
+this session did not touch it for the same reason it did not force the
+restart.
+
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
 `brain/**` branch, then main. "Every accessibility behaviour -- recording now
