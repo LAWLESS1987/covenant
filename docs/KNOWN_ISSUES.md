@@ -3775,6 +3775,31 @@ green list and every charter.
     build when the PUBLIC core changes, so a core security fix never reaches the
     phone on its own.
 
+**Added after the audit, the same day, because the route it assumed did not
+exist.** The audit's fixes rested on him being able to save the node's identity
+key before ever uninstalling, and every route to that key needed `adb`: he has
+no USB cable, his phone offers no Wireless debugging, and the audit's own
+`debuggable false` closes `run-as` from the next build on. So the app now does
+it itself -- Today > "Save this node's identity to the PC (sealed)" seals the
+node's PRIVATE key to the pinned PC key, signed by its own, in the envelope the
+plan and the decision already travel in; `covenant_sealed_mail.py
+--open-identity` saves it on this side, refuses to overwrite, and says whether
+it matches a registered signer. What travels is ciphertext only this PC can
+open, which is a better posture than the plaintext file `run-as` handed over.
+M5.34 runs the whole hand-off across the two repositories, M5.13f pins that both
+sides know the same seal kinds, and both were mutation-tested. A correction went
+with it: the instruction to export BEFORE installing was true only of the `adb`
+route -- installing over the app keeps its data, and only an uninstall destroys
+the key.
+
+**And a debugging tool, asked for by name.** A failed replay said "step 3 never
+appeared", which is true and useless when the four locators are matched against
+a node tree nobody can see. "Inspect screen" now prints that tree for one
+green-lit app -- class and ordinal counted in the matcher's own order, id, text,
+description, the click and type flags, the bounds -- so a step that will not
+match can be held against what is actually there. A read: nothing acted on,
+nothing stored, and it leaves the phone only if he shares it.
+
 **The one thing only he can do.** His release key has been ready on his PC since
 2026-09-08 and the repository has no Actions secrets at all, so every build to
 this day is signed with a key anyone can take from the repository. Two secrets
