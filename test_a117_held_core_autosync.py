@@ -46,6 +46,13 @@ def check(label, ok, detail=""):
     return bool(ok)
 
 
+def skip(label, why):
+    """Not a pass. 'There is no subject for this question here' is its own
+    answer and has to be said out loud, never collapsed into green."""
+    RESULTS.append((label, None, why))
+    print("%-6s %-58s %s" % ("SKIP", label, why))
+
+
 def sha(path):
     import hashlib
     with open(path, "rb") as fh:
@@ -157,18 +164,36 @@ def main():
           "rc=%d" % rc)
 
     # ---------------------------------------------- the hook, as actually installed
+    # THREE ANSWERS, NOT TWO -- and this check got it wrong first time, on the
+    # very day the lesson was written down. It gated on "does .git exist", so on
+    # the GitHub runner -- which has a .git and, like every fresh clone, no
+    # installed hooks -- it reported FAIL and took the sweep red. A checkout
+    # where hooks were never installed is not a checkout where the hook is
+    # MISSING; it is a checkout where the question has no subject.
+    #
+    # The discriminator is the OTHER hook. ops/AUTOSYNC.md says the operator
+    # installs post-commit once, by hand. Where that one is present, hooks are
+    # installed on this machine and pre-commit belongs beside it. Where it is
+    # absent, nothing here is installed and nothing is wrong.
     src = os.path.join(HERE, "ops", "pre-commit.synchold")
     inst = os.path.join(HERE, ".git", "hooks", "pre-commit")
+    sibling = os.path.join(HERE, ".git", "hooks", "post-commit")
     check("A117.8a the tracked hook source exists", os.path.isfile(src), src)
-    if os.path.isdir(os.path.join(HERE, ".git")):
-        check("A117.8b the hook is installed", os.path.isfile(inst), inst)
-        if os.path.isfile(inst) and os.path.isfile(src):
-            check("A117.8c the installed hook is the tracked one",
-                  sha(inst) == sha(src), "")
+    if not os.path.isdir(os.path.join(HERE, ".git")):
+        skip("A117.8b the hook is installed", "no .git here (staged copy)")
+    elif not os.path.isfile(sibling):
+        skip("A117.8b the hook is installed",
+             "hooks are not installed on this checkout (no post-commit either) -- "
+             "a fresh clone or a CI runner; see ops/AUTOSYNC.md")
     else:
-        RESULTS.append(("A117.8b the hook is installed", None, "no .git here (staged copy)"))
-        print("%-6s %-58s %s" % ("SKIP", "A117.8b the hook is installed",
-                                 "no .git here (staged copy)"))
+        check("A117.8b the hook is installed beside post-commit, which is how "
+              "this machine says hooks are in use", os.path.isfile(inst), inst)
+    # Whenever one IS installed, wherever we are, it must be the tracked one --
+    # an automation that has drifted from its source is worse than none.
+    if os.path.isfile(inst) and os.path.isfile(src):
+        check("A117.8c the installed hook is the tracked one", sha(inst) == sha(src), "")
+    else:
+        skip("A117.8c the installed hook is the tracked one", "none installed here")
 
     # The hook must do NOTHING when the commit does not touch the core, and must
     # never block. Driven for real in a planted repository.
@@ -203,8 +228,7 @@ def main():
               p.returncode == 0, "rc=%d; %s" % (p.returncode, "said so" if "MANIFEST" in out6 else "silent"))
     else:
         for lbl in ("A117.9a", "A117.9b", "A117.9c", "A117.9d"):
-            RESULTS.append((lbl + " hook behaviour", None, "no POSIX sh on this machine"))
-            print("%-6s %-58s %s" % ("SKIP", lbl + " hook behaviour", "no POSIX sh"))
+            skip(lbl + " hook behaviour", "no POSIX sh on this machine")
 
     passed = sum(1 for _, o, _ in RESULTS if o is True)
     failed = sum(1 for _, o, _ in RESULTS if o is False)

@@ -4341,3 +4341,20 @@ tree carrying the COMMITTED models -- the difference is `fallback_model_2.json`,
 retrained by the nightly loop at 07:46 and not committed. That is A112's
 oscillation, it belongs to the loop rather than to this change, and CI does not
 see it.
+
+**A117 was shipped red once, for the lesson it was written beside.** `A117.8b`
+("the hook is installed") gated on whether `.git` exists. A GitHub runner has a
+`.git` and, like every fresh clone, no installed hooks -- so the check called a
+correct checkout broken and took the sweep red on the very commit that fixed the
+previous red. It is the third suite in one day green here and red there, and the
+second where the cause was the environment rather than the directory.
+
+A checkout where hooks were never installed is not a checkout where the hook is
+MISSING; it is one where the question has no subject. The discriminator is the
+OTHER hook: `ops/AUTOSYNC.md` says the operator installs `post-commit` once by
+hand, so where that is present hooks are in use on this machine and `pre-commit`
+belongs beside it, and where it is absent nothing is installed and nothing is
+wrong. Measured both ways rather than reasoned about: 23/23 on this machine, and
+21 passed with 2 honest SKIPs in a fresh `git clone` of this repository, which is
+exactly what the runner does. "A thing that exists and cannot answer is still a
+failure" -- and a thing that was never there is not.
