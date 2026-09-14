@@ -3657,19 +3657,26 @@ up: two check-ins later it still reports height 12, peers 1. So the missing port
 was real but was not the whole cause, and the remaining fault is on the phone
 side, where the node's log lives on the device and its API is loopback-only.
 
-**Where to look next, with the mechanism already traced.** A13 (v8.25) exists
-for exactly this shape -- `covenant_unified_v8.py` `_send_announce` reads the
-height in the reply to its own announce, and on a height above its own calls
-`on_peer_ahead` -> `_pull_from_peer_ahead` -> `request_missing_blocks`. The
-phone announces to the PC (proved: node A learned the phone's core hash from a
-digest riding one of those announces), and node A answers with height 24. So the
-phone should already be pulling and is not. The three candidates, in order, are:
-`on_peer_ahead` never installed on that build; the reply's height not being
-read; or `request_missing_blocks` failing outbound to the PC's p2p port. Each
-one writes a distinct line to the phone's own anomaly monitor --
-`peer_ahead_filled`, `peer_ahead_empty` or `peer_ahead_failed` -- which is
-readable from the phone at `127.0.0.1:5000/anomalies` and nowhere else. That
-one reading decides it.
+**ANSWERED THE SAME DAY, AND IT IS NOT A PHONE PROBLEM AT ALL. See A116.** My
+first guess here was that the phone's A13 pull path was broken, and I listed
+three candidates to check on the device. All three were wrong, and the entry is
+left corrected rather than quietly rewritten because the wrong guess is the
+useful part: everything about this looked like a phone-and-network fault, and it
+was not one.
+
+A brand-new node booted on the PC itself -- scratch database, throwaway port,
+peered at node A over loopback, no phone and no tailnet anywhere in it -- does
+exactly the same thing. It pulls eleven blocks, reaches height 12, and stops:
+`SYNC REFUSED block 12`, because the ethics gate convicts a transaction that is
+already in the canonical chain. The phone is not stuck because it is a phone, or
+because of the tailnet, or because the PC never dialled it. It is stuck at the
+same wall every joining node hits, and it was simply the first node anyone had
+tried to join with in a long time.
+
+The peering in this entry is still right and still worth having -- the PC should
+know the phone, and it now does, with a real port instead of `?` -- but it was
+never going to move the height on its own. What moves the height is whatever the
+operator decides about A116.
 
 **Verified, and where.** PC side: AL1 and AL2 green in the staged copy; M5
 green in place. Java: compiled by the private repository's workflow on a
@@ -4087,6 +4094,17 @@ waived.
 `python run_node.py --port 5910 --node-id JOINER --genesis genesis.json --peers 127.0.0.1:5001`
 with `COVENANT_DB_PATH` pointing at an empty scratch file; watch
 `/health` chain_height stop at 12 and grep the log for `SYNC REFUSED block 12`.
+
+**And it reproduces from a clean clone, which not every finding here does.** The
+convicting seat is the ELDER student, `fallback_model.json`, and its content is
+identical to HEAD -- checked by parsing both rather than hashing them, because
+`.gitattributes` carries `* text=auto eol=lf` with `*.json text`, so the working
+copy and the blob differ in bytes while being the same model. (The YOUNGER
+student, `fallback_model_2.json`, genuinely is uncommitted -- retrained
+2026-09-14T07:46:09Z by the nightly loop -- but it is not the seat that convicts
+here.) So anyone can reproduce this, and any candidate fix can be tested
+deterministically against the committed model rather than against whatever the
+last retrain happened to leave on disk.
 
 **Fix: NOT MINE TO CHOOSE.** Every available answer changes what a rule means,
 and that is the operator's and the group's call under the standing
