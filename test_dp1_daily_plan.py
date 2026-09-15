@@ -155,6 +155,38 @@ def main():
         code, out = DP.record_checkin(b"not json", "phone", led)
         check("D21 a body that is not JSON is refused (400) and nothing is written", code == 400 and len(open(led, encoding="utf-8").readlines()) == 1, code)
 
+        # D22 (2026-09-14). An empty order list means one of two completely
+        # different things and the plan used to say the same calm sentence for
+        # both: the planner ran and proposed nothing, or the planner could not
+        # be asked at all. The second is what a person reads on their phone at
+        # 07:26 before approving, so a crashed planner looked exactly like a
+        # quiet market -- every morning, indefinitely. Both directions are
+        # pinned: the crash must be LOUD, and an honest quiet day must NOT be.
+        import tempfile as _tf
+        _td = _tf.mkdtemp(prefix="dp1_d22_")
+
+        def _g(planner, clears):
+            def _inner(say=print):
+                return {"posture": "", "rule5": {"clears": clears, "why": "because"},
+                        "armed": True, "halt": False, "caps": {},
+                        "orders_placed_today": 0, "proposed_orders": [], "planner": planner}
+            return _inner
+
+        crashed = DP.write(day="2099-01-01", say=lambda *a, **k: None, plan_dir=_td,
+                           gatherer=_g("planner unavailable: RuntimeError: boom", True))
+        quiet = DP.write(day="2099-01-02", say=lambda *a, **k: None, plan_dir=_td,
+                         gatherer=_g("covenant_trader.run_once(plan_only=True)", False))
+        check("D22a a planner that could not run says NOT ASKED, not 'no order proposed'",
+              "NOT ASKED" in crashed["no_action_reason"]
+              and "boom" in crashed["no_action_reason"],
+              crashed["no_action_reason"][:70])
+        check("D22b ...and a genuine quiet day still reads as one",
+              quiet["no_action_reason"].startswith("no order proposed")
+              and "NOT ASKED" not in quiet["no_action_reason"],
+              quiet["no_action_reason"][:70])
+        check("D22c ...and the two are not the same sentence",
+              crashed["no_action_reason"] != quiet["no_action_reason"], "")
+
     n = sum(1 for r in results if r)
     print("\nDP1: %d/%d passed" % (n, len(results)))
     return 0 if n == len(results) else 1

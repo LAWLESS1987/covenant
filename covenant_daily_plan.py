@@ -128,7 +128,20 @@ def write(day=None, say=print, plan_dir=None, gatherer=None):
     live = [o for o in g.get("proposed_orders", []) if o.get("status") not in ("NO VENUE",)]
     why = ""
     if not live:
-        why = "no order proposed"
+        # THREE ANSWERS, NOT TWO (2026-09-14). An empty order list means one of
+        # two completely different things: the planner ran and proposed nothing,
+        # or the planner could not be asked at all. gather() already records the
+        # difference in `planner`, and this line ignored it -- so a crashed
+        # planner produced the calm sentence "no order proposed", which is the
+        # one a person reads on their phone before approving. Every morning it
+        # failed would look exactly like every morning it had nothing to do.
+        # "Could not determine" is its own answer and has to be said out loud.
+        planner = str(g.get("planner") or "")
+        if planner.startswith("planner unavailable") or not planner:
+            why = ("NOT ASKED -- the planner did not run, so this is NOT "
+                   "'nothing to do': %s" % (planner or "no planner recorded"))
+        else:
+            why = "no order proposed"
         if not g.get("rule5", {}).get("clears"):
             why += "; Rule 5 does not clear: " + str(g.get("rule5", {}).get("why", ""))
         if not g.get("armed"):
