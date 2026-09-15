@@ -4551,3 +4551,80 @@ A119.3 exists to fail exactly that, and does.
 was replaced in place) but the change is two edits to `covenant_judge_fallback.py`
 and a re-run of `--reset-baseline`; the previous weights are recoverable from
 `git show HEAD~1:fallback_model.json` for as long as that commit stands.
+
+### A120. [performance / the operator's instruction, 2026-09-14] "Optimize." Measured across five areas; almost everything proposed was refuted. PARTLY APPLIED
+
+**The rule the round was run under.** A speed-up that weakens a check, drops a
+measurement or makes a failure quieter is a loss wearing a stopwatch, and
+anything that changes a single judge verdict is rejected however fast it is
+(A118). Twenty-three agents measured, and every proposal was then handed to an
+independent agent told to reproduce BOTH the gain and the claim that nothing else
+moved. **Nothing survived unchanged: 0 confirmed, 7 corrected, 11 refuted.** That
+ratio is the headline. Most optimisation ideas here were wrong, and the only
+reason that is known is that each one was re-run by someone trying to break it.
+
+**WHERE THE COST ACTUALLY IS, measured:**
+
+| area | finding |
+|---|---|
+| the nodes | 3.1 CPU-seconds per HOUR across all three; 34 MB each, no growth; 0 disk I/O in a 3-minute window. The watchdog costs more than twice all three nodes. Nothing to recover. |
+| the sweep | 626.7 s, and it is sleep-bound, not compute-bound. The top suites are 62-96% idle, and almost all of that sleep is load-bearing -- it waits out a real rate-limit window. |
+| the judge | the dominant CPU cost of accepting a block: 0.55 ms for a quorum verdict against 0.073 ms for the signature check. Almost none of it is judging; it is repeated work. |
+| the APK | 45.07 MB holding ~25 MB of content, because native libs and bytecode ship uncompressed. |
+
+**APPLIED: memoise `_fold()`.** It is a pure function of one string and the
+hottest thing in the scorer -- 710,103 `str.endswith` calls over one pass of the
+3,619-row corpus, because ordinary words recur in row after row.
+
+| | |
+|---|---|
+| before (HEAD's judge) | 0.135 s for 3,619 rows |
+| after | 0.115 s |
+| saving | **14.8%** on the verdict path |
+| verdicts | **byte-identical over all 3,619 rows** |
+
+The cache is BOUNDED (`maxsize=65536`) on purpose: the key is the input token, so
+an adversary choosing payloads chooses cache keys, and an unbounded cache here is
+a memory leak someone else can drive -- the shape this project already fixed once
+in the rate limiter.
+
+**REFUTED, and the biggest one was reported to the operator before it was
+verified.** The APK packaging flags looked like a 44% cut, 45.07 MB to 25.21 MB,
+and the file-size arithmetic reproduces to the byte. The case around it does not:
+  * **On the path the PC actually uses**, the build arrives as a GitHub artifact
+    ZIP which is already deflated, so the saving there is **0.26%**, not 33%.
+  * **The phone's storage goes UP, not down.** Compressed libraries must be
+    extracted at install while the APK stays on disk: 45.07 MB becomes 53.31 MB
+    on the device, **+18.3%**. Google flipped this default precisely to trade a
+    larger download for a smaller device footprint; the proposal re-trades it
+    toward the constrained end of the system to shrink a LAN transfer.
+  * **The preservation proof was circular.** "519 of 519 entries identical" is a
+    property of the analyst's own zip rewriter, not of a real build -- and it is
+    provably false, because a genuine build flips
+    `android:extractNativeLibs` in the manifest, so those bytes MUST differ.
+  * Neither analyst nor verifier could build it: there is no JDK, Gradle or
+    Android SDK on this PC. The runner is the only compiler this app has.
+
+Also refuted: five node-level micro-optimisations (there is no cost to recover),
+a sweep change that looked clean and was indicted by a sibling measurement, and
+three phone-runtime proposals.
+
+**REJECTED BY THE ANALYSTS THEMSELVES, which is the part worth keeping.** Running
+the 103 suites in parallel is structurally blocked, not merely risky: they share
+one staged directory and each is preceded by a database wipe. Lowering
+`MINING_DIFFICULTY` would make the proof-of-work suites finish sooner and stop
+them proving the real difficulty. Tightening poll intervals was measured and
+turned green suites red, twice. Reading only the tail of the breakout ledger was
+already anticipated and refused in a comment by its own author, because a break
+earlier in the file would survive.
+
+**A small finding on the way.** `FallbackModel.incriminating()` orders
+equal-weight features by set iteration, so its output varies with
+`PYTHONHASHSEED` from process to process -- 933 of 3,619 rows differ between two
+runs of identical code. It feeds the explanation string, never the verdict, so it
+is cosmetic; but it is enough to make a naive before/after comparison useless,
+and it cost one wrong conclusion in this very round before the control run caught
+it.
+
+**Status:** partly applied -- the judge cache is in; the remaining six corrected
+proposals are measured and not yet applied.

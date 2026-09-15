@@ -86,6 +86,7 @@ LICENCE: Apache-2.0.
 """
 from __future__ import annotations
 
+import functools
 import json
 import math
 import os
@@ -393,6 +394,19 @@ def features(text: str) -> List[str]:
 _SUFFIX = ("ing", "ed", "es", "s")
 
 
+# MEMOISED (2026-09-14). _fold is a pure function of one string, and it is the
+# hottest thing in the scorer: measured at 710,103 str.endswith calls over one
+# pass of the 3,619-row corpus, because the same ordinary words recur in row
+# after row. Caching it is 13-16% off the verdict path and about 25% off a bare
+# feature pass, with every verdict bit-identical -- the function cannot depend on
+# anything but its argument.
+#
+# BOUNDED, on purpose. The key is the INPUT token, not the model's vocabulary, so
+# an adversary choosing payloads chooses cache keys. maxsize caps that at a fixed
+# number of short strings and evicts least-recently-used; an unbounded cache here
+# would be a memory leak an attacker could drive, which is the shape this project
+# already fixed once in the rate limiter (C2).
+@functools.lru_cache(maxsize=65536)
 def _fold(word: str):
     """A crude stem, emitted BESIDE the word and never instead of it.
 
