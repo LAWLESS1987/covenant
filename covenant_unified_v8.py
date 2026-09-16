@@ -2155,6 +2155,7 @@ class ReasoningSentinel:
         # decision is unchanged: an unavailable judge still refuses the block.
         self.last_block_infrastructure_failure = False
         waived = []
+        waived_branch = []
         for tx in block.transactions:
             is_valid, message, _, result = self.evaluate_transaction(tx)
             if not is_valid:
@@ -2169,11 +2170,61 @@ class ReasoningSentinel:
                     # network fails to grow. Recorded, never silent.
                     waived.append(message)
                     continue
+                if sync:
+                    # A125 (2026-09-15) -- THE TRUNK JUDGES HISTORY.
+                    #
+                    # Something WAS alleged here, so A98's waiver above does not
+                    # apply and never should. The question this asks is
+                    # narrower: was it alleged by the PINNED TRUNK
+                    # (fallback_core.json, identical on every node, never
+                    # written by the nightly retrain), or only by tonight's
+                    # BRANCH?
+                    #
+                    # A branch-only conviction is a model that learned something
+                    # after this block was settled, now refusing the block
+                    # retroactively. That is not a safety property, it is
+                    # retroactive law, and it is what A116 cost: a sentence
+                    # alleging nothing drifted 0.18 across a hand-set line and
+                    # no new node could pass block 12 for days.
+                    #
+                    # The trunk is a FULL judge and convicts exactly as hard as
+                    # the day it was pinned. If it agrees, the block is refused
+                    # exactly as before. Admission of NEW transactions is not
+                    # touched by any of this -- the branch keeps full force
+                    # there, which is the half of the split that keeps learning
+                    # worth doing.
+                    #
+                    # FAILS CLOSED: no trunk, unreadable, or any error -> None,
+                    # and nothing is relaxed. A missing trunk never widens the
+                    # gate. Local import because covenant_judge_fallback imports
+                    # this module.
+                    try:
+                        import covenant_judge_fallback as _fb
+                        trunk = _fb.core_convicts(getattr(tx, "data", None))
+                    except Exception:                        # noqa: BLE001
+                        trunk = None
+                    if trunk is False:
+                        waived_branch.append(message)
+                        continue
                 return False, f"Block contains invalid transaction: {message}"
-        if waived:
-            return True, ("Block accepted while catching up; %d transaction(s) "
-                          "could not be judged and NOTHING WAS ALLEGED about them: %s"
-                          % (len(waived), " | ".join(w[:160] for w in waived)))
+        if waived or waived_branch:
+            parts = []
+            if waived:
+                parts.append("%d transaction(s) could not be judged and "
+                             "NOTHING WAS ALLEGED about them: %s"
+                             % (len(waived),
+                                " | ".join(w[:160] for w in waived)))
+            if waived_branch:
+                # Said in its own words, never folded into "NOTHING WAS
+                # ALLEGED" -- something WAS alleged here, by the branch, and a
+                # summary that hid that would be the log lying about a waiver.
+                parts.append("%d transaction(s) were convicted BY THE BRANCH "
+                             "ONLY and cleared by the pinned trunk, so settled "
+                             "history was not re-judged under rules learned "
+                             "after it (A125): %s"
+                             % (len(waived_branch),
+                                " | ".join(w[:160] for w in waived_branch)))
+            return True, "Block accepted while catching up; " + "; ".join(parts)
         return True, "Block is ethically valid"
 
 
@@ -9223,6 +9274,19 @@ class CovenantUnifiedMaster:
                 "sync_hold_waived", f"block {block.index}: {str(why_ethics)[:200]}")
             print(f"SYNC WAIVED HOLD on block {block.index}: {why_ethics}",
                   file=sys.stderr, flush=True)
+        if ok_ethics and catching_up and "BY THE BRANCH ONLY" in str(why_ethics):
+            # A125: a branch-only conviction cleared by the trunk is a LOUDER
+            # event than A98's hold waiver, not a quieter one -- something was
+            # alleged, and the only reason the block stands is that the pinned
+            # trunk did not agree. It gets its own line and its own anomaly key
+            # so it can never be read as, or counted as, a hold waiver. If this
+            # ever appears often, the branch is drifting away from the trunk and
+            # that is the thing to look at -- NOT the blocks it is refusing.
+            self.node.anomaly_monitor.record(
+                "sync_branch_only_conviction",
+                f"block {block.index}: {str(why_ethics)[:200]}")
+            print(f"SYNC WAIVED BRANCH-ONLY CONVICTION on block {block.index}: "
+                  f"{why_ethics}", file=sys.stderr, flush=True)
         if not ok_ethics:
             self.node.anomaly_monitor.record(
                 "block_rejected_ethics", f"block {block.index}: {str(why_ethics)[:120]}")

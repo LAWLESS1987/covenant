@@ -4975,3 +4975,78 @@ and runs for real from `run_all_tests.sh` in the working tree.
 **Not decided here.** Whether a nightly-retrained model can be part of a
 consensus rule at all is the structural question under A116, and it remains the
 operator's and the group's. This entry adds an alarm, not an answer.
+
+---
+
+### A125. [CRITICAL / consensus] A nightly-retrained model was a consensus rule. The trunk now judges history; the branch judges new work. FIXED 2026-09-15
+
+**The contradiction, not a bug.** Block validity on sync depended on
+`fallback_model.json`, which retrains every night. A consensus rule has to be
+the same on every node and the same tomorrow as today. A nightly-retrained
+model is neither — so two nodes on different retrains technically hold
+different chains, and history can become invalid retroactively without anyone
+touching it. A116 was the bill: *"There can be no mutual benefit without a
+little faith"* — a sentence alleging nothing — drifted +2.34 → +2.52 across a
+hand-set line of 2.4, and no new node could pass block 12 for days. Three PC
+nodes reported perfect health throughout, because they already held block 12
+and never had to re-accept it.
+
+**The operator's shape for the fix, 2026-09-15:** *"as long as the retrain
+builds on the core like the mycelium branching it can always be trimmed."*
+
+| | |
+|---|---|
+| **TRUNK** `fallback_core.json` | Pinned, committed, identical on every node, **never written by the nightly loop**. Judges **history** — blocks a node is fetching to catch up. |
+| **BRANCH** `fallback_model.json` | Retrained nightly. Keeps **full force over every new transaction**. Judges the present. |
+
+So history is judged by something that does not move, new work is judged by
+everything learned since, and the branch can be trimmed back to the trunk at
+any time without disturbing what the chain already settled.
+
+**What this is NOT.** It is not the gate switched off during sync. The trunk is
+a full judge and convicts exactly as hard as the day it was pinned — pinned by
+`A125.T3`, which fails if the trunk ever stops convicting plain theft, so the
+split can never decay into a back door. A block the trunk convicts is refused on
+sync exactly as before. What can no longer happen is a conviction existing
+**only in tonight's branch** rewriting what the chain already accepted.
+Re-judging settled history under rules learned afterwards is retroactive law,
+and it is the thing that stopped anybody joining.
+
+**Admission is untouched**, and `A125.N1`/`N2` pin it: the trunk is consulted on
+the sync path only — one call site, gated on `sync` — and the branch still
+convicts at full strength for every new transaction. If that ever stops being
+true the split has become an excuse rather than a design.
+
+**It fails closed, and getting that wrong was caught by its own test.**
+`FallbackModel.load()` never raises: an unreadable file returns an **untrained**
+model that abstains on everything. For a judge seat that is right — an
+abstention clears nobody. Here it inverted the mechanism: an abstaining trunk
+convicts nothing, so every branch conviction would read as "branch-only" and a
+corrupt or truncated trunk would have retired the sync gate silently. `A125.F2`
+was written to assert fail-closed and found the code failing **open**. An empty
+or untrained trunk is now treated as **no trunk**, and no trunk relaxes nothing.
+
+**Never silent.** A branch-only waiver gets its own anomaly key
+(`sync_branch_only_conviction`) and its own log line (`SYNC WAIVED BRANCH-ONLY
+CONVICTION`), and is never folded into A98's *NOTHING WAS ALLEGED* summary —
+something **was** alleged here, and a summary hiding that would be the log lying
+about its own waiver. If the line appears often, the branch is drifting from the
+trunk and **that** is what to look at — not the blocks it is refusing.
+
+**Mutation-tested**, serially: neutering the trunk so it convicts nothing (the
+back door) fails `T3`; changing `trunk is False` to a truthiness test, so a
+missing trunk would also waive, fails `H2`. A third mutation happened by
+accident and is the most useful — `A125.H3` first searched the source for a
+sentence Python had wrapped across two lines by implicit concatenation, and
+reported it absent from correct code. That is **A74's own defect**, a check
+reading source *text* rather than what the source *means*, reproduced by the
+same hand that had just written A74 up. The check now joins concatenated
+literals before searching, with the reason attached.
+
+**To trim the branch back to the trunk:** copy the trunk over the branch and
+retrain from there. Nothing in the tree writes the trunk, by construction.
+
+**What this does not settle.** The trunk is pinned from one day's elder. When
+and how a trunk is *advanced* — who agrees, against what evidence — is a
+governance question and is not decided here. Until it is, the trunk only moves
+by a deliberate, visible commit.

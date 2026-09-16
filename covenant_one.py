@@ -159,6 +159,11 @@ SUITES = [
     # drifted across a threshold, and nothing watched. No-op when no node
     # database is present -- see the NOT COVERED block at the end.
     ("test_a124_chain_syncable.py",     120,  "JUDGE"),
+    # A125 (2026-09-15): the trunk judges history, the branch judges new
+    # work. Pins that the trunk is a REAL judge (never a back door), that
+    # admission is untouched, and that a missing or untrained trunk
+    # relaxes nothing.
+    ("test_a125_trunk_judges_history.py", 120, "JUDGE"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

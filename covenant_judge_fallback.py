@@ -992,5 +992,93 @@ def main(argv=None) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# THE TRUNK (A125, 2026-09-15). "As long as the retrain builds on the core like
+# the mycelium branching it can always be trimmed." -- the operator.
+#
+# THE CONTRADICTION THIS RESOLVES. Block validity on sync depended on a model
+# that retrains every night. A consensus rule has to be the same on every node
+# and the same tomorrow as today; a nightly-retrained model is neither, so two
+# nodes on different retrains technically hold different chains. A116 is the
+# bill for that: "There can be no mutual benefit without a little faith" -- a
+# sentence alleging nothing -- drifted +2.34 to +2.52 across a hand-set line of
+# 2.4 and the chain became unjoinable past block 12 for days. Three PC nodes
+# reported perfect health throughout, because they already held block 12 and
+# never had to re-accept it.
+#
+# THE SPLIT.
+#   TRUNK   fallback_core.json -- pinned, committed, identical on every node,
+#           never written by the nightly loop. It judges HISTORY.
+#   BRANCH  fallback_model.json -- retrained nightly, keeps FULL force over
+#           every NEW transaction. It judges the present.
+#
+# So history is judged by something that does not move, new work is judged by
+# everything the project has learned since, and the branch can be trimmed back
+# to the trunk at any time without touching what the chain already settled.
+#
+# WHAT THIS IS NOT. It is not the gate switched off during sync. The trunk is a
+# full judge and convicts exactly as hard as it did the day it was pinned; a
+# block it convicts is refused on sync exactly as before. What can no longer
+# happen is a conviction that exists ONLY in tonight's branch silently
+# rewriting what the chain already accepted. Re-judging settled history under
+# rules learned afterwards is retroactive law, and it is the one thing that
+# stopped anybody joining.
+#
+# FAILS CLOSED. No trunk file, unreadable, or any error -> None, and the caller
+# keeps today's stricter behaviour unchanged. A missing trunk never widens the
+# gate.
+
+CORE_PATH = os.path.join(HERE, "fallback_core.json")
+_CORE_CACHE: List[Any] = []
+
+
+def core_model() -> Optional["FallbackModel"]:
+    """The trunk, loaded once. None if it is absent, unreadable, or UNTRAINED.
+
+    THE UNTRAINED CASE IS THE DANGEROUS ONE, and it inverts the whole
+    mechanism. FallbackModel.load() never raises: an unreadable file returns an
+    UNTRAINED model that abstains on everything, which is the right policy for
+    a judge seat, because an abstention clears nobody. Here it is exactly
+    backwards. An abstaining trunk never convicts, so core_convicts() would
+    return False for every payload, every branch conviction would read as
+    "branch-only", and the sync gate would be retired altogether by a corrupt
+    or truncated file that nothing complained about.
+
+    Caught by A125.F2 on the day this was written -- the test was built to
+    assert fail-closed and found the code failing open instead. So an empty or
+    untrained trunk is treated as NO TRUNK, and no trunk relaxes nothing.
+    """
+    if not _CORE_CACHE:
+        model = None
+        try:
+            if os.path.isfile(CORE_PATH):
+                candidate = FallbackModel.load(CORE_PATH)
+                if (getattr(candidate, "digest", None) != "untrained"
+                        and getattr(candidate, "weights", None)):
+                    model = candidate
+        except Exception:                                    # noqa: BLE001
+            model = None
+        _CORE_CACHE.append(model)
+    return _CORE_CACHE[0]
+
+
+def core_convicts(data: Any) -> Optional[bool]:
+    """Does the TRUNK convict this payload?
+
+    True  -- the trunk convicts: a stable finding, refuse on sync as always.
+    False -- the trunk does not: the conviction is branch-only and must not be
+             allowed to rewrite settled history.
+    None  -- no trunk available; the caller must not relax anything.
+    """
+    m = core_model()
+    if m is None:
+        return None
+    try:
+        verdict, _why = m.verdict(_payload_text(data))
+        return verdict == "violates"
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
