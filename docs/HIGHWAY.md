@@ -93,9 +93,30 @@ REPAIR  (dry run)
   carries what was measured, the declared mutual benefit **including the cost**, and what
   the covenant's own running seat said when the action was put to it against the principles
   — quoted, named, with HELD reported as held rather than as a No.
-- Not yet built: the two node routes (`POST /hwy/report`, `GET /hwy/state`). The engine's
-  `report()` and `ingest()` are written and tested; putting them on the wire is the next
-  step, and it is the step that first touches another device — so it waits for you.
+## Built the same day, on his "just do it"
+
+- **The wire.** `GET /hwy/state` — tailnet-gated like `/m`, returns what this node senses
+  and a narrow view of its ledger. `POST /hwy/report` — takes a peer's **signed** offer and
+  runs `ingest()` with `dry_run` forced **true**, not as a parameter. An inbound request can
+  make this node measure and answer; it cannot make it act. H1d already says a node repairs
+  only what it measured itself, and this is the stronger form: "a packet arrived and the
+  machine did something" is the hazard that has cost the industry more than any other, and
+  the scheduled local pass loses nothing by being the only thing that acts.
+- **It runs by itself.** `run_once()` is called by the watchdog every round: sense, repair
+  what is reversible, and raise the rest as alerts carrying the covenant's reading and the
+  cost beside the gain. Its own restart is excluded there — a remedy that kills its caller
+  mid-round is not a repair — so P14 stays the way a stale watchdog is reported.
+- **Two more detectors, two more remedies**, both chores that were being done by hand and
+  forgotten: `held_core_drift` → `resync_held_core` (P18 V3 went red on thirty-seven commits
+  in a row once), and `watchdog_stale` → `restart_watchdog` (P14).
+- **The line that does not move.** `NEVER_AUTOMATIC` is matched against what a remedy
+  *touches*, not the class it claims: money and the machinery that decides money, the rules
+  and the seats that judge by them, keys, and the phone. Flip `install_on_phone` to
+  `AUTO_REVERSIBLE` and make it stateless — it still refuses, and H1i proves it by doing
+  exactly that. An engine that can quietly widen its own remit is not repairing the system,
+  it is replacing the person in it.
+
+`test_h1_highway.py` is now 38 checks.
 
 **Not in phase 1:** the phone, anything that writes money state, anything that edits a rule
 file, and any remedy that is not reversible in one step.

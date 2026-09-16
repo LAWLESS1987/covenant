@@ -1039,6 +1039,19 @@ def one_pass(strict=False):
         # sha it was handed.
         b_alerts, b_infos = _dp.build_report()
         c_alerts, c_infos = list(c_alerts) + b_alerts, list(c_infos) + b_infos
+        # THE HIGHWAY'S PASS (2026-09-16). Sense, and repair what is reversible:
+        # a held copy out of sync, a build not fetched, a log eating the disk.
+        # Its own restart is EXCLUDED here for the obvious reason -- a remedy
+        # that kills its caller mid-round is not a repair -- so P14's alert
+        # above stays the way a stale watchdog gets reported. Anything the
+        # engine may not run comes back as an alert carrying the covenant's own
+        # reading and the cost beside the gain, not as a silent skip.
+        try:
+            import covenant_highway as _hw
+            h_alerts, h_infos = _hw.run_once(dry_run=False, exclude=("restart_watchdog",))
+            c_alerts, c_infos = c_alerts + h_alerts, c_infos + h_infos
+        except Exception as e:                                   # noqa: BLE001
+            c_infos.append("highway pass unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
     except Exception as e:                                       # noqa: BLE001
         c_alerts, c_infos = [], ["phone check-ins unreadable: %s" % type(e).__name__]
     # THE PC'S SAY TO THE PHONE BRAIN (2026-09-13, phase 3): one status line.

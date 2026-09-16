@@ -79,9 +79,12 @@ def main():
         check("H1a a PROPOSE_ONLY remedy is not executed", row["outcome"] == "proposed", row["outcome"])
         check("H1a ...and its function is never entered", not calls, str(calls))
 
-        # MUTATION: the same remedy, same function, class changed.
+        # MUTATION: the same remedy, same function, CLASS changed -- and its
+        # subject changed too, because two separate guards refuse this remedy
+        # and a mutation that isolates neither proves nothing. The class is
+        # what H1a is about; the subject is H1i's, below.
         H.REMEDIES["install_on_phone"] = dict(real, fn=spy_remedy(calls), klass=H.AUTO_REVERSIBLE,
-                                              kind="stateless")
+                                              kind="stateless", touches=["a temp file"])
         row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
                              dry_run=False, ledger=led)
         check("H1a mutation: class flipped -> the engine runs it", bool(calls) and row["outcome"] != "proposed",
@@ -197,6 +200,97 @@ def main():
     check("H1h ...naming states only, not measurements",
           all(v in (H.PRESENT, H.ABSENT, H.UNKNOWN) for v in rep["conditions"].values()),
           json.dumps(rep["conditions"]))
+
+    # ---- H1i: the line that does not move, whatever class a remedy claims
+    calls = []
+    real = dict(H.REMEDIES["install_on_phone"])
+    try:
+        # The class is flipped to the executable one AND made stateless, so the
+        # only thing left refusing is what it TOUCHES.
+        H.REMEDIES["install_on_phone"] = dict(real, fn=spy_remedy(calls),
+                                              klass=H.AUTO_REVERSIBLE, kind="stateless")
+        led = tmp_ledger()
+        row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
+                             dry_run=False, ledger=led, choices={})
+        check("H1i a remedy touching the phone refuses even as AUTO_REVERSIBLE",
+              row["outcome"] == "proposed" and not calls, "%s calls=%d" % (row["outcome"], len(calls)))
+        check("H1i ...and says which subject it crossed",
+              "phone" in row.get("why", ""), row.get("why", ""))
+        # MUTATION: the same remedy, same class, touching something ordinary.
+        H.REMEDIES["install_on_phone"] = dict(real, fn=spy_remedy(calls), klass=H.AUTO_REVERSIBLE,
+                                              kind="stateless", touches=["a temp file"])
+        row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
+                             dry_run=False, ledger=led, choices={})
+        check("H1i mutation: touching nothing protected -> it runs", bool(calls), row["outcome"])
+        protected = [w for w in ("money", "trader", "rule", "judge", "phone", "key")
+                     if w not in H.NEVER_AUTOMATIC]
+        check("H1i money, the trader, the rules, the seats, the phone and keys are all on the line",
+              not protected, str(protected))
+    finally:
+        H.REMEDIES["install_on_phone"] = real
+
+    # ---- H1j: the pass does not kill its own caller
+    calls = []
+    real_rw = dict(H.REMEDIES["restart_watchdog"])
+    real_det = H.DETECTORS.get("watchdog_stale")
+    try:
+        H.REMEDIES["restart_watchdog"] = dict(real_rw, fn=spy_remedy(calls))
+        H.DETECTORS["watchdog_stale"] = lambda health=None: {"state": H.PRESENT, "measured": {"fixture": True}}
+        led = tmp_ledger()
+        only = {"watchdog_stale": H.DETECTORS["watchdog_stale"]}
+        saved, H.DETECTORS = H.DETECTORS, only
+        try:
+            H.run_once(dry_run=False, ledger=led)
+            check("H1j run_once excludes the watchdog's own restart by default", not calls, str(calls))
+            H.run_once(dry_run=False, exclude=(), ledger=led)
+            check("H1j mutation: asked for explicitly, it runs", bool(calls), str(len(calls)))
+        finally:
+            H.DETECTORS = saved
+    finally:
+        H.REMEDIES["restart_watchdog"] = real_rw
+        if real_det:
+            H.DETECTORS["watchdog_stale"] = real_det
+
+    # ---- H1k / H1l: the wire
+    import covenant_unified_v8 as cov
+    import covenant_daily_plan as dp
+    m = cov.CovenantUnifiedMaster("H1", host="127.0.0.1", port=5393, p2p_port=5394,
+                                  db_path=tempfile.mktemp(suffix="_h1.db"))
+    m.add_genesis_block()
+    m.node.sentinel = cov.ReasoningSentinel(cov.MockJudge(), cov.DIVINE_PRINCIPLES)
+    client = m.api.app.test_client()
+
+    r = client.get("/hwy/state", environ_base={"REMOTE_ADDR": "192.168.1.50"})
+    check("H1k /hwy/state refuses a LAN address", r.status_code == 403, str(r.status_code))
+    r = client.get("/hwy/state", environ_base={"REMOTE_ADDR": "100.86.158.1"})
+    body = r.get_json() or {}
+    check("H1k /hwy/state answers the tailnet", r.status_code == 200, str(r.status_code))
+    check("H1k ...with states and a recent-row shape, nothing wider",
+          isinstance(body.get("state", {}).get("conditions"), dict)
+          and all(set(row) <= {"t", "remedy", "detector", "outcome", "why"}
+                  for row in body.get("recent", [])),
+          json.dumps(body)[:120])
+
+    r = client.post("/hwy/report", data=json.dumps({"node": "peer", "conditions": {}}),
+                    environ_base={"REMOTE_ADDR": "100.86.158.1"})
+    check("H1l /hwy/report refuses an unsigned offer", r.status_code == 403, str(r.status_code))
+
+    seen = {}
+    real_ingest, real_verify = H.ingest, dp.verify_signed
+    try:
+        H.ingest = lambda peer, dry_run=True, ledger=None: seen.update(dry_run=dry_run, peer=peer) or {"did": []}
+        dp.verify_signed = lambda *a, **k: (True, "test-peer")
+        import base64 as _b64
+        hdrs = {"X-Operator-Pubkey": _b64.b64encode(b"-----BEGIN PUBLIC KEY-----\\n").decode()}
+        r = client.post("/hwy/report", data=json.dumps({"node": "peer", "conditions": {"log_bloat": H.PRESENT}}),
+                        headers=hdrs, environ_base={"REMOTE_ADDR": "100.86.158.1"})
+        check("H1l a signed offer is accepted", r.status_code == 200, str(r.status_code))
+        check("H1l ...and is considered with dry_run FORCED true -- a packet cannot make this node act",
+              seen.get("dry_run") is True, json.dumps(seen)[:120])
+        check("H1l ...and the answer says so", "acted on nothing" in ((r.get_json() or {}).get("note", "")),
+              (r.get_json() or {}).get("note", ""))
+    finally:
+        H.ingest, dp.verify_signed = real_ingest, real_verify
 
     failed = [n for n, ok in results if not ok]
     print(f"\nH1: {len(results) - len(failed)}/{len(results)} passed")

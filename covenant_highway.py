@@ -77,6 +77,14 @@ QUARANTINE_AFTER = 2          # two measured failures and a remedy stops being o
 AUTO_REVERSIBLE = "AUTO_REVERSIBLE"
 PROPOSE_ONLY = "PROPOSE_ONLY"
 
+# Subjects no remedy may act on by itself, matched against what a remedy says it
+# TOUCHES rather than against the class it claims. Money and the machinery that
+# decides money; the rules and the seats that judge by them; the phone and
+# anything else whose whole point is that a person agreed to it.
+NEVER_AUTOMATIC = ("money", "holdings", "wallet", "trader", "venue", "order",
+                   "rule", "principle", "judge", "seat", "model", "phone",
+                   "consent", "key")
+
 UNKNOWN = "UNKNOWN"
 PRESENT = "PRESENT"
 ABSENT = "ABSENT"
@@ -160,12 +168,53 @@ def detect_log_bloat(health=None, limit_mb=512):
     return {"state": PRESENT if big else ABSENT, "measured": {"over_%dmb" % limit_mb: big}}
 
 
+def detect_held_core_drift(health=None):
+    """A held copy of the core claiming the live version with different bytes.
+
+    P18 V3. Re-broken by every core change until someone copies the file, which
+    is exactly the class of chore that gets forgotten -- it went red on GitHub
+    thirty-seven commits in a row once.
+    """
+    import subprocess
+    try:
+        p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_sync_held_core.py"), "--check"],
+                           cwd=HERE, capture_output=True, text=True, timeout=120)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    return {"state": PRESENT if p.returncode != 0 else ABSENT,
+            "measured": {"rc": p.returncode, "said": (p.stdout or p.stderr or "").strip()[:200]}}
+
+
+def detect_watchdog_stale(health=None):
+    """The running watchdog is not the watchdog on disk (P14).
+
+    The checks in the deployed file are not the checks running, and nothing the
+    process says about itself is evidence either way. Measured by comparing the
+    hash the live process recorded against the file's hash now.
+    """
+    import covenant_watchdog as W
+    try:
+        loaded = W.SELF_SOURCE_SHA12
+        on_disk = W.disk_source_sha12(W.SELF_SRC)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if not loaded or not on_disk:
+        return {"state": UNKNOWN, "measured": {"loaded": loaded, "on_disk": on_disk}}
+    # THIS PROCESS is not the watchdog. What matters is the file the LIVE
+    # watchdog loaded, which it writes into its own log; absent that, this
+    # compares the module as imported here, which is the same file it runs.
+    return {"state": PRESENT if loaded != on_disk else ABSENT,
+            "measured": {"loaded": loaded, "on_disk": on_disk}}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
     "source_drift": detect_source_drift,
     "height_lag": detect_height_lag,
     "app_build_gap": detect_app_build_gap,
     "log_bloat": detect_log_bloat,
+    "held_core_drift": detect_held_core_drift,
+    "watchdog_stale": detect_watchdog_stale,
 }
 
 
@@ -246,6 +295,47 @@ def remedy_rotate_log(measured, dry_run=True):
     return True, "; ".join(done)
 
 
+def remedy_resync_held_core(measured, dry_run=True):
+    """UNDOABLE: copies the live core over the held copies (P18 V3).
+
+    Writes only files git tracks, so the undo is `git checkout -- <path>`. It
+    never touches a .PRE-vX.Y.py backup; that refusal lives in the tool itself.
+    """
+    import subprocess
+    if dry_run:
+        return True, "would run covenant_sync_held_core.py"
+    p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_sync_held_core.py")],
+                       cwd=HERE, capture_output=True, text=True, timeout=300)
+    return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-300:]
+
+
+def remedy_restart_watchdog(measured, dry_run=True):
+    """STATELESS: the watchdog comes back running the file that is on disk.
+
+    RECURSION, said out loud: when the highway runs INSIDE the watchdog this
+    remedy would kill its own process mid-round. The caller passes
+    exclude={"restart_watchdog"} there, and run_once() does it by default --
+    a rule enforced by the caller, not by this function pretending to know who
+    is calling it.
+    """
+    import subprocess
+    if dry_run:
+        return True, "would stop the running watchdog and start it from disk"
+    ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%python%'\")"
+          " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
+          " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
+          " Start-Sleep -Seconds 2;"
+          " Start-Process -FilePath '%s' -ArgumentList '%s','--interval','60'"
+          " -WorkingDirectory '%s' -WindowStyle Hidden"
+          " -RedirectStandardOutput '%s' -RedirectStandardError '%s'"
+          % (sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
+             os.path.join(HERE, "logs", "watchdog-stdout.log"),
+             os.path.join(HERE, "logs", "watchdog-stderr.log")))
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                       cwd=HERE, capture_output=True, text=True, timeout=300)
+    return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-200:]
+
+
 def remedy_install_on_phone(measured, dry_run=True):
     """PROPOSE_ONLY, permanently. The person holding the phone confirms an
     install; nothing here may do it for them, and the engine refuses this class
@@ -280,6 +370,20 @@ REMEDIES = {
                    "benefit": {"gains": ["the disk stops filling", "the log stays readable"],
                                "cost": ["a reader must look in the rotated file for older lines"],
                                "irreversible": []}},
+    "resync_held_core": {"fn": remedy_resync_held_core, "klass": AUTO_REVERSIBLE,
+                         "for": ["held_core_drift"], "kind": "undoable",
+                         "undo": "git checkout -- pending-v8.38/covenant_unified_v8.py",
+                         "touches": ["held copies of the core"],
+                         "benefit": {"gains": ["P18 stops failing on a copy nobody made",
+                                               "one version names one set of bytes again"],
+                                     "cost": ["a tracked file is rewritten; git holds the previous bytes"],
+                                     "irreversible": []}},
+    "restart_watchdog": {"fn": remedy_restart_watchdog, "klass": AUTO_REVERSIBLE,
+                         "for": ["watchdog_stale"], "kind": "stateless",
+                         "touches": ["the watchdog process"],
+                         "benefit": {"gains": ["the checks that are deployed are the checks running (P14)"],
+                                     "cost": ["a gap of a few seconds with nothing watching the nodes"],
+                                     "irreversible": []}},
     "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
                          "for": ["app_build_gap"], "kind": "needs a person",
                          "touches": ["the phone"],
@@ -372,6 +476,26 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         row.update(propose(name, condition, detector, r))
         return write_ledger(row, ledger)
 
+    # INVARIANT 1b -- THE LINE THAT DOES NOT MOVE (2026-09-16).
+    #
+    # The class is a label on a dict, and a label is one careless edit away from
+    # being wrong. These subjects are refused on what a remedy TOUCHES, whatever
+    # class it claims: money and the things that decide money, the rules and the
+    # seats that judge by them, and any act whose entire point is that a person
+    # consented to it. Flip install_on_phone to AUTO_REVERSIBLE and it still
+    # refuses here -- H1i proves exactly that.
+    #
+    # This is not timidity. An engine that can quietly widen its own remit is
+    # not repairing the system, it is replacing the person in it, and "leaves
+    # free will intact" was the requirement, not the decoration.
+    crossed = sorted({w for w in NEVER_AUTOMATIC
+                      for t in r.get("touches", []) if w in t.lower()})
+    if crossed:
+        row.update(propose(name, condition, detector, r))
+        row["why"] = ("touches %s -- refused whatever class it claims; a person decides"
+                      % ", ".join(crossed))
+        return write_ledger(row, ledger)
+
     # INVARIANT 2 -- an operator's explicit choice.
     choices = _operator_choices() if choices is None else choices
     clash = sorted(set(r.get("touches", [])) & set(choices))
@@ -426,6 +550,43 @@ def write_ledger(row, path=None):
 
 
 # ----------------------------------------------------------------- sharing
+
+def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None):
+    """One sense-and-repair pass. (alerts, infos) in the watchdog's shape.
+
+    `exclude` defaults to the watchdog's own restart because the intended caller
+    IS the watchdog: a remedy that kills its caller mid-round is not a repair.
+    Run from a shell, pass exclude=() and it will restart the watchdog too.
+    """
+    alerts, infos = [], []
+    conditions = sense(health=health)
+    for name, c in sorted(conditions.items()):
+        if c["state"] == UNKNOWN:
+            infos.append("highway: %s could not be measured -- %s"
+                         % (name, json.dumps(c["measured"])[:120]))
+            continue
+        if c["state"] != PRESENT:
+            continue
+        acted = False
+        for rname, r in REMEDIES.items():
+            if name not in r["for"] or rname in (exclude or ()):
+                continue
+            row = apply_remedy(rname, c, name, dry_run=dry_run, ledger=ledger)
+            acted = True
+            if row["outcome"] == "fixed":
+                infos.append("highway: %s was present; %s fixed it" % (name, rname))
+            elif row["outcome"] == "proposed":
+                alerts.append("highway: %s is present and %s is not mine to run -- %s"
+                              % (name, rname, row.get("why", "")))
+            elif row["outcome"] == "dry run":
+                infos.append("highway: %s present; %s would run (dry)" % (name, rname))
+            else:
+                alerts.append("highway: %s is present and %s %s -- %s"
+                              % (name, rname, row["outcome"], row.get("why", row.get("detail", ""))[:120]))
+        if not acted:
+            alerts.append("highway: %s is present and nothing here repairs it" % name)
+    return alerts, infos
+
 
 def report(node_id=None, health=None, ledger=None):
     """What this node offers the mesh: what it senses, and what has worked here.

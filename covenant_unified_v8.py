@@ -7922,6 +7922,60 @@ class CovenantAPI:
                              as_attachment=True,
                              download_name="covenant-node-%s.apk" % d.get("sha7", "build"))
 
+        # ------------------------------------------------------------------
+        # THE HIGHWAY ON THE WIRE (2026-09-16). Two routes, and the asymmetry
+        # between them is the point.
+        #
+        # /hwy/state is a READ, gated like /m to the tailnet: what this node
+        # senses about itself and what its repairs have actually achieved.
+        #
+        # /hwy/report takes a PEER'S offer, and takes it as data. It runs
+        # ingest() with dry_run forced TRUE: an inbound request can cause this
+        # node to MEASURE and to answer, and cannot cause it to act. H1d
+        # already says a node only repairs what it measured itself, which would
+        # be enough -- this is the stronger form, because "a packet arrived and
+        # the machine did something" is the hazard that has cost this industry
+        # more than any other, and the scheduled local pass (run_once, called
+        # by the watchdog) loses nothing by being the only thing that acts.
+        # ------------------------------------------------------------------
+        @self.app.route("/hwy/state", methods=["GET"])
+        def highway_state():
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("highway_state_refused", addr or "unknown")
+                return jsonify({"status": "error", "message": "the tailnet only"}), 403
+            try:
+                _hw = importlib.import_module("covenant_highway")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "highway unavailable: %s" % type(e).__name__}), 503
+            rows = [{k: r.get(k) for k in ("t", "remedy", "detector", "outcome", "why")}
+                    for r in _hw.read_ledger()[-25:]]
+            return jsonify({"status": "success", "state": _hw.report(node_id=self.node.node_id),
+                            "recent": rows})
+
+        @self.app.route("/hwy/report", methods=["POST"])
+        def highway_report():
+            body = request.get_data() or b""
+            ok, who, _pem = _daily_plan_auth(request, body)
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _hw = importlib.import_module("covenant_highway")
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "highway unavailable: %s" % type(e).__name__}), 503
+            try:
+                peer = json.loads(body.decode("utf-8")) if body else {}
+            except (ValueError, UnicodeDecodeError):
+                return jsonify({"status": "error", "message": "body is not JSON"}), 400
+            if not isinstance(peer, dict):
+                return jsonify({"status": "error", "message": "body is not an object"}), 400
+            peer["node"] = str(peer.get("node", who))[:64]
+            # dry_run=True is NOT a parameter of this route on purpose.
+            out = _hw.ingest(peer, dry_run=True)
+            return jsonify({"status": "success", "signer": who, "considered": out,
+                            "note": "measured here, acted on nothing -- this node repairs "
+                                    "on its own schedule, never on an inbound request"})
+
         @self.app.route("/transactions", methods=["POST"])
         def add_transaction():
             data = request.json or {}
