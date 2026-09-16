@@ -490,7 +490,8 @@ REMEDIES = {
                                   "cost": ["one node unreachable for a few seconds, one at a time"],
                                   "irreversible": []}},
     "fetch_build": {"fn": remedy_fetch_build, "klass": AUTO_REVERSIBLE,
-                    "for": ["build_stale_on_pc"], "kind": "undoable",
+                    "for": ["build_stale_on_pc", "phone_build_behind_core"],
+                    "async_for": ["phone_build_behind_core"], "kind": "undoable",
                     "undo": "restore the previous ops/app/latest.json",
                     "touches": ["ops/app"],
                     "benefit": {"gains": ["the newest build is here when the phone asks"],
@@ -712,7 +713,14 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     if dry_run:
         row.update(outcome="dry run", after=before)
         return write_ledger(row, ledger)
-    if r.get("async"):
+    # A remedy can be synchronous for one condition and asynchronous for
+    # another. fetch_build clears build_stale_on_pc the moment it runs, but it
+    # clears phone_build_behind_core only once the runner has finished making
+    # the build -- so the same function must be graded differently depending on
+    # which condition it was called for. Without this, the hourly retry while
+    # CI is still building would record two "did not fix" and quarantine it:
+    # fault 1 of the first live hour, reproduced in a new costume.
+    if r.get("async") or detector in (r.get("async_for") or ()):
         # GRADED BY THE NEXT PASS, not by this one. A build takes ten minutes;
         # measuring a second after the dispatch would record "did not fix"
         # every time and quarantine a remedy that works -- which is precisely

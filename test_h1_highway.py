@@ -299,6 +299,21 @@ def main():
                        ledger=led, choices={}, cooldown_s=0)
         check("H1o mutation: graded on the spot, two runs quarantine it",
               H.quarantined("_fixture_async", led))
+
+        # The same function, graded differently per condition: synchronous for
+        # one, asynchronous for the other. fetch_build is both -- it clears
+        # build_stale_on_pc at once, and phone_build_behind_core only after the
+        # runner has finished building.
+        H.REMEDIES["_fixture_async"]["for"] = ["log_bloat", "height_lag"]
+        H.REMEDIES["_fixture_async"]["async_for"] = ["height_lag"]
+        led2 = tmp_ledger()
+        sync_row = H.apply_remedy("_fixture_async", present(), "log_bloat", dry_run=False,
+                                  ledger=led2, choices={}, cooldown_s=0)
+        async_row = H.apply_remedy("_fixture_async", present(), "height_lag", dry_run=False,
+                                   ledger=led2, choices={}, cooldown_s=0)
+        check("H1o one remedy, graded synchronously for one condition and not the other",
+              sync_row["outcome"] == "did not fix" and async_row["outcome"] == "started",
+              "%s / %s" % (sync_row["outcome"], async_row["outcome"]))
     finally:
         H.REMEDIES.pop("_fixture_async", None)
         if real_det:
