@@ -518,7 +518,7 @@ REMEDIES = {
                                      "irreversible": []}},
     "dispatch_phone_build": {"fn": remedy_dispatch_phone_build, "klass": AUTO_REVERSIBLE,
                              "for": ["phone_build_behind_core"], "kind": "stateless",
-                             "async": True,
+                             "async": True, "cooldown_s": 86400,
                              "touches": ["the build runner"],
                              "benefit": {"gains": ["an APK carrying the core that is on main",
                                                    "the phone's auto-update has something newer to find"],
@@ -644,7 +644,14 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     # The cooldown comes FIRST, before any work: a repeat within the hour costs
     # a subprocess, a model load, or a download, and buys a line identical to
     # the one above it.
-    prev = None if cooldown_s == 0 else _recent_identical(name, detector, ledger, cooldown_s)
+    # A remedy may ask for a longer budget than the default hour. The first one
+    # to need it is dispatch_phone_build: the hourly default would ask for up
+    # to twenty-four ten-minute CI runs a day on his account, which is his
+    # money spent by my scheduler. Once a day is what the thing is actually
+    # for -- the core does not change hourly, and nothing is waiting on it
+    # faster than a person can tap an install.
+    eff = cooldown_s if cooldown_s is not None else r.get("cooldown_s", ROW_COOLDOWN_S)
+    prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff)
     if prev is not None:
         out = dict(prev)
         out["repeat"] = True

@@ -304,6 +304,35 @@ def main():
         if real_det:
             H.DETECTORS["log_bloat"] = real_det
 
+    # ---- H1p: a remedy that spends his money asks for a longer budget
+    calls = []
+    real_d = dict(H.REMEDIES["dispatch_phone_build"])
+    try:
+        H.REMEDIES["dispatch_phone_build"] = dict(real_d, fn=spy_remedy(calls))
+        led = tmp_ledger()
+        H.apply_remedy("dispatch_phone_build", present(), "phone_build_behind_core",
+                       dry_run=False, ledger=led, choices={})
+        # Two hours later by the ledger's own clock: the global hour would let
+        # this through; the remedy's own day must not.
+        rows = H.read_ledger(led)
+        rows[-1]["at"] = rows[-1]["at"] - 7200
+        with open(led, "w", encoding="utf-8") as fh:
+            for r_ in rows:
+                fh.write(json.dumps(r_) + chr(10))
+        again = H.apply_remedy("dispatch_phone_build", present(), "phone_build_behind_core",
+                               dry_run=False, ledger=led, choices={})
+        check("H1p a CI dispatch is not repeated two hours later -- it has a daily budget",
+              len(calls) == 1 and again.get("repeat") is True,
+              "calls=%d repeat=%s" % (len(calls), again.get("repeat")))
+        check("H1p ...and that budget is declared on the remedy, not hidden in the engine",
+              H.REMEDIES["dispatch_phone_build"].get("cooldown_s", 0) >= 86400,
+              str(real_d.get("cooldown_s")))
+        check("H1p ...and its cost is declared where a person reads it",
+              any("Actions" in c or "minute" in c for c in real_d["benefit"]["cost"]),
+              str(real_d["benefit"]["cost"]))
+    finally:
+        H.REMEDIES["dispatch_phone_build"] = real_d
+
     # ---- H1n: a quarantine is cleared on the record, never by forgetting
     led = tmp_ledger()
     for _ in range(2):
