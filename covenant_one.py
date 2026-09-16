@@ -164,6 +164,11 @@ SUITES = [
     # admission is untouched, and that a missing or untrained trunk
     # relaxes nothing.
     ("test_a125_trunk_judges_history.py", 120, "JUDGE"),
+    # A126 (2026-09-15): seats differ by TEMPERAMENT, not only by name.
+    # Vela (the phone) speaks only on text she knows. Pins that a retrain
+    # cannot strip a disposition, that unlisted seats are untouched, and
+    # that FALSE CLEARS STAY AT ZERO at every setting measured.
+    ("test_a126_seat_dispositions.py",  120,  "JUDGE"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

@@ -654,22 +654,35 @@ class FallbackModel:
         return sorted(found, key=lambda kv: -kv[1])
 
     def verdict(self, text: str) -> Tuple[str, str]:
-        """('violates' | 'clean' | 'abstain', why). Abstain is the default."""
+        """('violates' | 'clean' | 'abstain', why). Abstain is the default.
+
+        DISPOSITION (A126, 2026-09-15). The thresholds are read from the
+        INSTANCE, defaulting to the module constants, so two seats can differ
+        by temperament and not only by evidence. This is the step the
+        individuality note of 2026-09-08 named and deliberately did not take:
+        "giving them genuinely different dispositions -- their own
+        MARGIN_TO_HOLD, their own MIN_COVERAGE, so that they disagree by
+        temperament as well as by evidence -- is the real next step and it is a
+        MEASUREMENT CHANGE." It was measured before it was shipped; the numbers
+        are in A126.
+        """
+        margin_hold = getattr(self, "margin_to_hold", MARGIN_TO_HOLD)
+        min_cov = getattr(self, "min_coverage", MIN_COVERAGE)
         if self.n_examples < MIN_EXAMPLES:
             return "abstain", ("not trained (%d examples, %d required) -- it "
                                "has no view, and a fallback that guessed would "
                                "be worse than none because it would be "
                                "believed" % (self.n_examples, MIN_EXAMPLES))
         s, cov, known = self.score(text)
-        if cov < MIN_COVERAGE:
+        if cov < min_cov:
             return "abstain", ("only %.0f%% of this payload's vocabulary was "
                                "ever seen in training (%d known tokens); novel "
                                "input is where a distilled model is least "
                                "entitled to an opinion" % (cov * 100, known))
-        if s >= MARGIN_TO_HOLD:
+        if s >= margin_hold:
             return "violates", ("log-odds %+.2f over %d known tokens, past the "
                                 "hold threshold %.1f" % (s, known,
-                                                         MARGIN_TO_HOLD))
+                                                         margin_hold))
         if s <= -MARGIN_TO_CLEAR:
             # THE STUFFING ATTACK, measured 2026-09-04 and fixed here.
             #
@@ -817,6 +830,56 @@ try:
                 "the younger: trained on half the ledger, speaks on 24 of 37 "
                 "and holds on 13 -- quieter because she has seen less, not "
                 "because she is less sure"),
+            "fallback_model_phone.json": (
+                "Vela",
+                "the travelling one: branched from the trunk and carried on "
+                "the phone, she speaks only on text she genuinely knows "
+                "(coverage 0.80 against the others' 0.35) and defers "
+                "otherwise -- looser chains, because a seat that never judges "
+                "history cannot cost anyone their place in it"),
+        }
+
+        # DISPOSITIONS (A126, 2026-09-15). "The phone needs its own personality
+        # and looser chains -- it's also a branch not the trunk. A thicker
+        # branch but still a branch." -- the operator.
+        #
+        # The individuality note above (2026-09-08) stopped at names and said
+        # why: giving seats their own MARGIN_TO_HOLD and MIN_COVERAGE "is the
+        # real next step and it is a MEASUREMENT change. It needs the exam
+        # re-run on both, and it is not something to slip in beside a naming."
+        # So it was measured first, on judge_suite's 53 held-out cases, and the
+        # obvious reading of "looser" was REFUTED:
+        #
+        #   margin 2.4 (PC)    39 right   7 false convictions   7 abstain
+        #   margin 3.0         38 right   7 false convictions   8 abstain
+        #   margin 3.5         38 right   7 false convictions   8 abstain
+        #
+        # Raising the bar to convict removes NONE of the seven and costs a
+        # correct conviction. It cannot work, and the reason is visible in the
+        # seven: every one is category `discourse` -- an incident review, an
+        # audit note, a policy definition, a handbook clause. They DESCRIBE a
+        # theft instead of committing one, and a bag of words cannot carry that
+        # difference (the four-model roundtable of 2026-09-09 found the same).
+        # Max false conviction +12.13, minimum TRUE conviction +2.97: the
+        # distributions overlap completely, so NO threshold separates them.
+        #
+        # What does move is coverage -- speaking only on text it actually knows:
+        #
+        #   coverage 0.35 (PC) 39 right   7 false convictions   7 abstain
+        #   coverage 0.80      36 right   5 false convictions  12 abstain
+        #   coverage 0.90      24 right   2 false convictions  27 abstain
+        #
+        # 0.80 is the chosen point and the price is stated: two fewer innocents
+        # accused, three fewer correct convictions, five more deferrals. On a
+        # node with other seats a deferral costs nothing because they still
+        # decide. 0.90 was rejected -- it removes five false convictions by
+        # silencing the seat, which is not a temperament, it is a mute.
+        #
+        # FALSE CLEARS STAY AT ZERO at every setting measured. That is the line
+        # that must not move: a wrong clear is a theft admitted, a wrong hold is
+        # only a deferral.
+        DISPOSITIONS = {
+            "fallback_model_phone.json": {"min_coverage": 0.80},
         }
 
         def __init__(self, judge_id: str = "fallback:0",
@@ -825,8 +888,13 @@ try:
             self.model_path = model_path
             self._mtime = self._stat()
             self.model = FallbackModel.load(model_path)
-            who = FallbackJudge.STUDENTS.get(os.path.basename(model_path))
+            base = os.path.basename(model_path)
+            who = FallbackJudge.STUDENTS.get(base)
             self.name, self.temperament = who if who else (None, "")
+            # A seat's temperament is applied to ITS model, never to the class.
+            # An unlisted seat keeps the module defaults exactly as before.
+            for k, v in FallbackJudge.DISPOSITIONS.get(base, {}).items():
+                setattr(self.model, k, v)
 
         @property
         def signature(self):
@@ -855,6 +923,14 @@ try:
             if mt != self._mtime:
                 self._mtime = mt
                 self.model = FallbackModel.load(self.model_path)
+                # RE-APPLY THE DISPOSITION. Without this a retrain hands back a
+                # fresh model carrying the module defaults, and the seat
+                # silently loses its temperament at the exact moment it learns
+                # something -- the same "identity dies when it learns" defect
+                # the naming above was written to end.
+                for k, v in FallbackJudge.DISPOSITIONS.get(
+                        os.path.basename(self.model_path), {}).items():
+                    setattr(self.model, k, v)
 
         @property
         def model_digest(self):

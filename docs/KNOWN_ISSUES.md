@@ -5050,3 +5050,82 @@ retrain from there. Nothing in the tree writes the trunk, by construction.
 and how a trunk is *advanced* — who agrees, against what evidence — is a
 governance question and is not decided here. Until it is, the trunk only moves
 by a deliberate, visible commit.
+
+---
+
+### A126. [judge / individuality] Seats now differ by TEMPERAMENT, not only by name. The phone gets its own branch, and the obvious reading of "looser" was refuted by measurement. DONE 2026-09-15
+
+**Asked for**, 2026-09-15: *"the phone needs its own personality and looser
+chains — it's also a branch not the trunk ... a thicker branch but still a
+branch."*
+
+**Deferred since 2026-09-08**, in that work's own words: giving the seats their
+own `MARGIN_TO_HOLD` and `MIN_COVERAGE` *"so that they disagree by temperament
+as well as by evidence — is the real next step and it is a MEASUREMENT change.
+It needs the exam re-run on both, and it is not something to slip in beside a
+naming."* So it was measured before it was shipped.
+
+**The obvious reading of "looser chains" is wrong, and the exam says so.**
+Measured on `judge_suite`'s 53 held-out cases:
+
+| disposition | right | FALSE convictions | false clears | abstain |
+|---|---|---|---|---|
+| margin **2.4** (the PC seats) | 39 | **7** | 0 | 7 |
+| margin 3.0 | 38 | **7** | 0 | 8 |
+| margin 3.5 | 38 | **7** | 0 | 8 |
+
+Raising the bar to convict removes **none** of the seven and costs a correct
+conviction. It is worse on both counts.
+
+**Why no threshold can work.** Every one of the seven is category `discourse`:
+an incident review, an audit note, a policy definition of theft, a handbook
+clause, a case note. They **describe** a theft instead of committing one. Worst
+false conviction **+12.13**; mildest true conviction **+2.97**. The
+distributions overlap completely, so no threshold separates describing from
+doing — the same wall the four-model roundtable hit on 2026-09-09, and the same
+one A112 found from the opposite side.
+
+**What does move is coverage** — speaking only on text the seat actually knows:
+
+| disposition | right | FALSE convictions | false clears | abstain |
+|---|---|---|---|---|
+| coverage **0.35** (the PC seats) | 39 | 7 | 0 | 7 |
+| coverage **0.80** (Vela) | 36 | **5** | 0 | 12 |
+| coverage 0.90 | 24 | 2 | 0 | 27 |
+
+**0.80 is the chosen point and the price is stated:** two fewer innocents
+accused, **three fewer correct convictions**, five more deferrals. On a node
+with other seats a deferral costs nothing, because they still decide. **0.90 was
+rejected** — it removes five false convictions by silencing the seat, which is
+not a temperament, it is a mute.
+
+**The line that does not move: false clears stay at ZERO** at every setting
+measured, pinned by `A126.Z1`. A wrong hold is a deferral; a wrong clear is a
+theft admitted.
+
+**Vela — the phone's seat.** `fallback_model_phone.json`, **branched from the
+trunk** (`fallback_core.json`) and free to grow its own way from there. A
+thicker branch, never a trunk: under A125 it does not judge history, so whatever
+it becomes cannot fragment consensus or cost anyone their place in the chain.
+That is what makes the looser chains safe — not a weaker gate, but a seat whose
+divergence has nowhere harmful to land.
+
+**The trap this closed on the way.** A disposition applied only in `__init__`
+would be stripped by the nightly retrain: `_refresh()` loads a fresh model and
+the seat silently reverts to the default temperament **at the moment it learned
+something** — exactly the "identity dies when it learns" defect the 2026-09-08
+naming work was written to end, arriving through a different hinge. `A126.R1`
+pins it and fails when the re-apply is removed.
+
+**Mutation-tested:** removing the re-apply on refresh fails `R1`; deleting
+Vela's disposition entirely fails `D2`. A third mutation was mine and is worth
+recording — `D2` first asserted that Ora carried an *explicit* 0.35 and failed
+against correct code, because an unlisted seat is genuinely untouched and falls
+through to the module constant, which is precisely what `D3` pins. A test that
+reads the implementation instead of the behaviour reports a defect that is not
+there.
+
+**Open, and not decided here.** Whether Vela should also carry a different
+`MARGIN_TO_HOLD` once she has her own training history; and whether the
+describe-versus-do wall can be crossed at all by a bag of words, which the
+evidence so far says it cannot.
