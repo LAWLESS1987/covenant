@@ -429,6 +429,12 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # G4 (2026-09-16): all eleven reasons guards.preconditions() can refuse an
+    # order, each driven ON and OFF. Hermetic -- every seam is a parameter, the
+    # halt file is a temp path via guards.HALT, and it writes nothing. The two
+    # failures on its first run were both the fixture's fault, not the gate's,
+    # and both are written into the file where the next reader will meet them.
+    ("test_g4_money_gates.py", 120, "DAILY + GUARDS"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
