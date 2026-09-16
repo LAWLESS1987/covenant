@@ -175,6 +175,10 @@ SUITES = [
     # that it still learns every new feature, and that the promotion gate
     # measures the object that actually ships.
     ("test_a127_refine_not_rebuild.py", 180,  "JUDGE"),
+    # A129 (2026-09-16): a third party's name is in no TRACKED file. The
+    # list lives in private/ and is gitignored, so this is a no-op in a
+    # clone or a staged sweep and says so rather than passing.
+    ("test_a129_bystanders.py",        120,  "SECURITY"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

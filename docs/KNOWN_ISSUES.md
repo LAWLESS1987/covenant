@@ -4847,7 +4847,12 @@ This entry exists so the answer is already written down.
 
 **A second breach, into the one community that mattered most.** In mid-August, before
 any of the above, letters went to **Carver Mead** (Caltech) and **Rodney Douglas**
-(INI Zurich) with subjects including *"Sir. This is important. Ive spoken with Sheila."*
+(INI Zurich) with subjects including *"Sir. This is important. Ive spoken with
+[a third party, name withheld]."* **(Redacted 2026-09-16, A129: the subject line
+was quoted verbatim here on 2026-09-16 and carried a bystander's name into a file
+in the PUBLIC repository. That was my error. It is out of the working tree; it
+remains in this repository's git history, which only a history rewrite removes,
+and that is the operator's call.)**
 and *"I have some twighlight zone shit i think you'd be interested in."* Mead founded
 neuromorphic engineering; Douglas co-founded the Institute of Neuroinformatics. The
 2025 Misha Mahowald Prize shortlist that `conformance.py` was built from is named for
@@ -5215,3 +5220,92 @@ test**, and `candidate_path` does not mean "do not deploy".
 safer and slower to learn, a larger one approaches rebuilding. What it should be
 is a measurement nobody has made. And refining cannot fix the describe-versus-do
 wall (A126); it only stops the wall from moving underfoot.
+
+---
+
+### A128. [privacy / honesty] The summarise step said it was local and had not been for four days, so it published video content to a public Actions page. DOCUMENTED, and the tool now says where the prompt goes. 2026-09-16
+
+**What the tool promised.** `x_video_text.py`'s docstring: *"covenant_route.py
+summarize (**local Ollama judge**)"* and *"**Nothing here uses a cloud model.**"*
+
+**What it did.** `covenant_route.py`'s own header, since the Ollama removal of
+2026-09-12: *"judge on a GitHub Actions runner … **There is no local path.**"*
+The repository it dispatches to is resolved from `git remote get-url origin` —
+the **public** `LAWLESS1987/covenant`. The prompt travels as a
+`workflow_dispatch` input, and the runner writes a **job summary that a public
+repository renders publicly**.
+
+**Measured, not feared.** Run `35064624218`, 2026-09-16, publishes on the public
+Actions page, in plain readable text:
+
+> *"The conversation discusses the recognition of a user across different AI
+> models and sessions. The AI systems acknowledge recognizing the user but do
+> not confirm sharing a hidden identity representation…"*
+
+That is the summarised content of one of the operator's videos. Three transcripts
+from `private/` were dispatched that way before anyone looked. Five judge runs
+that night.
+
+**The defect is the CLAIM, not the publishing.** The operator's posture, stated
+directly on 2026-09-16: *"I'm not aiming for private,"* and *"there's safety in
+transparency."* Publishing his own material is his call and he makes it
+deliberately. A tool that promises local-only and publishes anyway is wrong
+regardless of that posture, because it removes the choice by lying about it.
+
+**The first fix was wrong too, and that is worth recording.** It refused to send
+anything under `private/` by default — a privacy preference imposed on an
+operator who does not hold one. It was replaced within the hour. The tool now
+**announces** the destination on every call and sends; `COVENANT_HOLD_PRIVATE=1`
+refuses instead.
+
+**Where the guard lives.** In `covenant_route.py`, not in the one caller that
+tripped it, because every caller inherits the same hazard the moment it passes
+`--file` — `covenant_chat.py` and `covenant_align_set.py` both do.
+
+**Untouched:** the OCR and transcript path never left the machine and still does
+not. Frames are read straight from the mp4 URL; nothing is written but the
+transcript. Only the SUMMARY step travelled.
+
+**Residual, and stated rather than fixed:** a caller passing `--prompt` instead
+of `--file` carries no path, so nothing can classify it. The notice cannot fire
+there.
+
+---
+
+### A129. [CRITICAL / a third party] A bystander's name was quoted into a public file. REDACTED and GUARDED 2026-09-16
+
+**The rule, in the operator's words:** *"there's safety in transparency — just
+leave [her] out."* Transparency is the default for **his** material, and that is
+his to choose. A third party never consented to any of it, so their name is the
+one thing in the record that is not his to publish.
+
+**What happened.** Writing up A122 on 2026-09-16 I quoted an August email subject
+line verbatim into `docs/KNOWN_ISSUES.md`. It carried a bystander's name, and
+that file is in the **public** repository. It was committed and pushed. Nothing
+in the tree would have caught it: the name reads as ordinary prose, which is why
+this failure mode is silent by nature.
+
+**Done.** Redacted to *"[a third party, name withheld]"*, with the redaction
+noted in place rather than performed quietly. **It remains in this repository's
+git history** — only a history rewrite removes that, and that is the operator's
+call, not mine.
+
+**The guard.** `test_a129_bystanders.py`, registered in `covenant_one.py` and
+`run_all_tests.sh`, fails if a protected name appears in **any file git tracks**
+— a tracked file is a published file. Untracked and ignored paths are the
+operator's own workspace and are deliberately not policed.
+
+**Where the list lives, and that is the whole design.**
+`private/bystanders.txt` is **gitignored**. The names never enter the public
+repository; the check that enforces them does. A list committed beside the check
+would publish exactly what it protects — and a hash list would be no better,
+because a first name falls to a dictionary in seconds. The suite never prints a
+name, not even in a failure message, because that message goes to a public CI
+log.
+
+**Honest when it cannot run.** With no list present — a fresh clone, a staged
+sweep — it reports **NOT MEASURED** and claims nothing.
+
+**It has teeth.** `A129.T1` plants a name in a scratch file every run and
+requires that it is caught, because this suite greps text, which is the exact
+shape A74 found fake in 35 of 36 guards.

@@ -61,6 +61,18 @@ CHUNK_CHARS = 9000            # a summarize input above this is split and reduce
 GITHUB = os.environ.get("COVENANT_ROUTE_GITHUB", "on").lower()
 
 
+def _judge_repo():
+    """Which repository the runner dispatch actually lands in. Named here so the
+    A128 notice states the real destination rather than a remembered one -- it is
+    resolved from `git remote get-url origin` unless COVENANT_GITHUB_REPO is set,
+    and today that resolves to the PUBLIC LAWLESS1987/covenant."""
+    try:
+        import covenant_github_judge as gh
+        return gh.repo()
+    except Exception:                                            # noqa: BLE001
+        return "the configured repository"
+
+
 def _github_model():
     """One source for the runner's model: covenant_github_judge.DEFAULT_MODEL
     (COVENANT_GITHUB_MODEL). Until 2026-09-12 this file carried its own default
@@ -195,6 +207,49 @@ def main():
         return selftest()
     if not a.task:
         ap.error("task required (judge|refute|rank|summarize) or --selftest")
+
+    # A128 (2026-09-16) -- SAY WHERE THE PROMPT GOES. DO NOT DECIDE FOR HIM.
+    #
+    # There is no local judge any more (see the header: Ollama was removed on
+    # 2026-09-12). Every task dispatches a workflow to the repository resolved
+    # from `git remote get-url origin` -- the PUBLIC LAWLESS1987/covenant. The
+    # prompt travels as a workflow input and the runner writes a JOB SUMMARY
+    # that a public repository RENDERS PUBLICLY. Measured: run 35064624218 on
+    # 2026-09-16 published a readable summary of one of the operator's videos
+    # on the public Actions page.
+    #
+    # THE DEFECT WAS THE CLAIM, NOT THE PUBLISHING. x_video_text.py's docstring
+    # still said "local Ollama judge" and "Nothing here uses a cloud model"
+    # while every call left the machine. A tool that promises local-only and
+    # publishes anyway is wrong whatever the operator's posture is.
+    #
+    # His posture, stated 2026-09-16: "I'm not aiming for private." So this
+    # does NOT refuse and does not hold his own material back -- it ANNOUNCES,
+    # every time, so the choice is visible instead of assumed. The first draft
+    # of this guard refused by default and that was me imposing a preference he
+    # does not hold.
+    #
+    # WHAT IS STILL HELD BACK, because it is not his to publish: material naming
+    # a third party. His own bystander rule covers everyone named in that
+    # material, and it is absolute. Set COVENANT_HOLD_PRIVATE=1 to refuse
+    # private/ inputs outright when working on anything that touches one.
+    if getattr(a, "file", None):
+        _parts = os.path.abspath(a.file).replace("\\", "/").lower().split("/")
+        if "private" in _parts:
+            if os.environ.get("COVENANT_HOLD_PRIVATE") == "1":
+                sys.stderr.write(
+                    "refused: %s is under private/ and COVENANT_HOLD_PRIVATE=1 "
+                    "(A128).\n" % a.file)
+                print(json.dumps({"outcome": "refused", "answer": None,
+                                  "why": "private input held back (A128)",
+                                  "views": [], "log": LOG}, indent=1))
+                return 2
+            sys.stderr.write(
+                "note: %s is under private/ and this judge dispatches to the "
+                "PUBLIC %s -- the run's job summary is rendered publicly "
+                "(A128). COVENANT_HOLD_PRIVATE=1 refuses instead.\n"
+                % (os.path.basename(a.file), _judge_repo()))
+
     prompt, primary = build_prompt(a.task, a)
     rec, ok = route(a.task, prompt, primary, a.timeout)
     out = {"outcome": rec["outcome"], "answer": ok[0] if ok else None,
