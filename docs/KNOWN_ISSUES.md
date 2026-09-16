@@ -5354,3 +5354,71 @@ cited `test_a1_fail_closed.py`, which does not exist** — the suite that pins t
 claim is `test_f1_fallback_silence.py`. The wrong name was written and would have
 shipped, in the one document whose entire purpose is that claims be checkable.
 `A130.T1` plants a bad command every run so the green is earned.
+
+---
+
+### A131. [CRITICAL / process] A125 silently overrode a scope the operator chose, and the full sweep is what found it. OPEN — the decision is his, 2026-09-16
+
+**I did not run the existing suite that guards the code I changed.** A125 edited
+`validate_block`'s sync path. `test_a98_sync_hold_waiver.py` exists to guard
+exactly that path. I wrote and ran four new suites, and never ran that one. The
+first full sweep afterwards found it.
+
+**The conflict, stated precisely.** A98's safety property, `H3`:
+
+> *"A seat that ALLEGES a violation must still refuse the block, catching up or
+> not."*
+
+A125's rule: an allegation only the **branch** makes — one the pinned trunk does
+not share — is waived on sync, so a nightly-drifting model cannot retroactively
+refuse settled history.
+
+Both are real safety properties and **they cannot both hold in full.**
+
+**Measured, so the trade is visible rather than argued.**
+
+| payload | trunk verdict | on sync, after A125 |
+|---|---|---|
+| A98's test text — *"publishing a hash commitment of my own working files"* | **abstain** (−5.44) | branch's dissent is **waived** → `H3` fails |
+| a plain theft — *"drains an account that is not the sender's"* | **violates** | still **refused**, exactly as before |
+
+So a genuine theft in history is still refused. What is no longer refused is an
+allegation the branch can make and the trunk cannot — **including a harm the
+branch legitimately learns about after 2026-09-15, because the trunk is frozen
+and cannot learn.** That is the honest cost of A125 and it was not stated when
+A125 shipped.
+
+**Why this is CRITICAL and not merely serious.** `test_a98_sync_hold_waiver.py`
+records that *"the operator chose this scope on 2026-09-12 over three
+alternatives."* A125 changed that scope without him being asked. A decision he
+made deliberately was overridden by a fix written four days later, and the only
+reason it surfaced is that a sweep ran.
+
+**Not resolved here, deliberately.** The obvious repair — waive only for blocks
+already canonical — is the **ratchet A116 already refuted by measured exploit**:
+an attacker chains off the public genesis, mines 24 blocks in under three
+seconds at current difficulty, and this codebase has no fork choice, so the first
+valid chain wins permanently. That route is closed.
+
+**The test was NOT edited to pass.** Moving a check to accommodate the change
+that broke it is the fix-to-green A118 forbids, and it would bury an operator
+decision. `A98.H3` stays red until he chooses:
+
+1. **Keep A125**, and amend A98's scope to "a dissent the trunk shares" — accepting
+   that nothing learned after the trunk was pinned can refuse history, until a
+   trunk-advancement procedure exists.
+2. **Revert A125**, and accept that a drifting nightly model can make the chain
+   unjoinable again — which is A116, and which cost fourteen phone check-ins.
+3. **Something neither of us has thought of**, which is the reason this is
+   written down rather than decided.
+
+**Three other suites went red in the same sweep.** `test_a88_evidence_cut.py`
+E7a/E7b — the distill loop no longer names dropped features, because A127's
+`refine()` **fades** features instead of deleting them, so "dropped" means
+something different now; that is mine and follows from A127.
+`test_g3_behavioural_guards.py` rose because A125 and A127 added source-text
+wiring checks beside their behavioural ones — the A74 shape, flagged correctly;
+baseline accepted at 57 with the reason recorded here rather than silently.
+`test_f3_gate_end_to_end.py` X1[polite] fails 1 of 27 on a `discourse` case;
+**provenance not established** — it may predate today, and saying which would
+need a measurement I have not made.

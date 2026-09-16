@@ -1,0 +1,55 @@
+{
+ "when": "2026-09-15T07:45:42Z",
+ "digests": {
+  "ora": "3100c521fb24",
+  "sena": "e5801c148c98"
+ },
+ "conditions": {
+  "exam_met_streak": {
+   "measured": 0,
+   "bar": 3.0,
+   "met": false
+  },
+  "holdout_false_clear_max": {
+   "measured": 0.0,
+   "bar": 0.025,
+   "met": true
+  },
+  "holdout_decided_min": {
+   "measured": 0.7358,
+   "bar": 0.75,
+   "met": false
+  },
+  "panel_coverage_min": {
+   "measured": 0.0408,
+   "bar": 0.9,
+   "met": false
+  },
+  "own_traffic_hold_max": {
+   "measured": 0.0,
+   "bar": 0.05,
+   "met": true
+  }
+ },
+ "met_count": 2,
+ "of": 5,
+ "exam_streak": 0,
+ "streak": 0,
+ "history": [
+  {
+   "when": "2026-09-13T07:52:13Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-14T07:46:09Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-15T07:45:42Z",
+   "met_count": 2,
+   "streak": 0
+  }
+ ]
+}

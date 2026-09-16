@@ -1,5 +1,7 @@
 {
  "per_file": {
+  "test_a125_trunk_judges_history.py": 2,
+  "test_a127_refine_not_rebuild.py": 5,
   "test_b6_balance_batching.py": 1,
   "test_breakout_ledger.py": 2,
   "test_c3_guard.py": 3,
@@ -18,5 +20,5 @@
   "test_sem4_degraded_model.py": 2,
   "test_sentinel_gate.py": 1
  },
- "total": 50
+ "total": 57
 }

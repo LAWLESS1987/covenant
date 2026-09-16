@@ -2519,3 +2519,45 @@ judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
 
+## 2026-09-16T01:43:36Z  overall WARN  (round 840)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T02:47:05Z  overall WARN  (round 900)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T03:50:31Z  overall WARN  (round 960)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T04:53:55Z  overall WARN  (round 1020)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T05:57:22Z  overall WARN  (round 1080)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T07:00:56Z  overall WARN  (round 1140)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
