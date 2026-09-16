@@ -447,6 +447,11 @@ SUITES = [
     # vanished. Three of its own fixtures were wrong before the sentinels were,
     # and G6.0 now makes the fixture prove itself first.
     ("test_g6_sentinels_fail.py", 120, "SECURITY"),
+    # G7 (2026-09-16): one actor pauses without stopping the others, and a
+    # pause never blinds anything. Drives the highway and the watchdog's
+    # restart action both ways with spies, so no node is launched and nothing
+    # real is paused; the trader's switch is reported, never re-implemented.
+    ("test_g7_pause.py", 120, "DEPLOYMENT"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

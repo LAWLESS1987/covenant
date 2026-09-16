@@ -794,7 +794,24 @@ def balance(db, of_key, timeout=45):
 
 def start_node(node):
     """Relaunch a dead node. Does NOT delete or recreate its database --
-    production resumes a chain, it does not rebuild one."""
+    production resumes a chain, it does not rebuild one.
+
+    PAUSABLE (2026-09-16). With ops/pause/watchdog-restarts present this
+    refuses to launch and says why, so a node can be taken down for an update
+    without the watchdog putting it back up mid-edit. The watchdog goes on
+    watching and alerting either way -- the pause stops the ACTION, never the
+    observation, because a monitor silenced for an update is how an outage
+    becomes an incident nobody saw.
+    """
+    try:
+        import covenant_pause as _p
+        is_paused, why = _p.paused("watchdog-restarts")
+    except Exception:                                            # noqa: BLE001
+        is_paused, why = False, ""
+    if is_paused:
+        log("WARN", "node %s is down and restarts are PAUSED (%s) -- not starting it"
+            % (node.get("id", "?"), why))
+        return False
     env = dict(os.environ)
     env["COVENANT_DB_PATH"] = node["db"]
     env.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "600")
@@ -1052,6 +1069,16 @@ def one_pass(strict=False):
             c_alerts, c_infos = c_alerts + h_alerts, c_infos + h_infos
         except Exception as e:                                   # noqa: BLE001
             c_infos.append("highway pass unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
+        # EVERY STANDING PAUSE, SAID ON EVERY ROUND (2026-09-16). A pause is a
+        # decision and never an alert -- but a pause nobody is reminded of is
+        # how a system runs half-off for a week and the operator finds out
+        # from a consequence. The line carries its age for that reason.
+        try:
+            import covenant_pause as _pz
+            p_alerts, p_infos = _pz.report()
+            c_alerts, c_infos = c_alerts + p_alerts, c_infos + p_infos
+        except Exception as e:                                   # noqa: BLE001
+            c_infos.append("pause states unreadable: %s" % type(e).__name__)
     except Exception as e:                                       # noqa: BLE001
         c_alerts, c_infos = [], ["phone check-ins unreadable: %s" % type(e).__name__]
     # THE PC'S SAY TO THE PHONE BRAIN (2026-09-13, phase 3): one status line.

@@ -961,6 +961,22 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     """
     alerts, infos = [], []
     conditions = sense(health=health)
+    # PAUSED MEANS NO ACTION, NOT NO SIGHT (2026-09-16, the operator's
+    # instruction: "ensure they all running independent so you can pause tasks
+    # for restart and update"). The sensing above has already happened and is
+    # still reported; what stops here is every repair. A pause that also
+    # blinded the pass would make updating the highway cost the operator his
+    # visibility, which is the opposite of the point.
+    try:
+        import covenant_pause as _p
+        is_paused, why = _p.paused("highway")
+    except Exception:                                            # noqa: BLE001
+        is_paused, why = False, ""
+    if is_paused:
+        present = sorted(k for k, v in conditions.items() if v["state"] == PRESENT)
+        infos.append("highway: PAUSED (%s) -- sensing only. Present now: %s"
+                     % (why, ", ".join(present) or "nothing"))
+        return alerts, infos
     for name, c in sorted(conditions.items()):
         if c["state"] == UNKNOWN:
             infos.append("highway: %s could not be measured -- %s"

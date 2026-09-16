@@ -227,7 +227,12 @@ def restart_one(node, want_sha, say):
     stop(node["id"], say)
     if not port_free(node["port"], time.time() + PORT_FREE_TIMEOUT_S, say):
         return False
-    W.start_node(node)
+    if W.start_node(node) is False:
+        # start_node refuses while ops/pause/watchdog-restarts is present. Say
+        # that, rather than "started" followed by a puzzling timeout: the node
+        # is down because someone asked for it to stay down.
+        say("    NOT started -- restarts are paused (covenant_pause.py --list)")
+        return False
     say("    started; waiting for it to answer")
     ok, problems = wait_up(node, want_sha, before_height, say)
     for p in problems:
