@@ -4730,3 +4730,65 @@ repository. He reached the repository anyway. The next recipient might not.
 **Status:** REFUTED and recorded. The claim is corrected everywhere it was
 asserted in the tree; the outbound copies already sent cannot be corrected except
 by writing back.
+
+### A121b. [the timeline] Nineteen days from first commit to an expert refutation and a same-day correction. Recorded 2026-09-15
+
+**Measured from the tree, not remembered.**
+
+| | |
+|---|---|
+| Repository's first commit | **2026-08-27** (`Initial commit: Covenant v8.37`) |
+| Today | 2026-09-15 — **19 days**, **454 commits** |
+| `conformance.py` written | **2026-08-30** — *"Compare the computation, not the artefact"* |
+| Spec published, one-command check | **2026-08-31** |
+| First letters citing it (Padon; NIST TEVV) | **2026-08-31** |
+| Five rival readings found; 11 → 23 vectors | **2026-08-31** |
+| Two clean-room builds | **2026-09-03** |
+| Cited to NSF SaTC | **2026-09-03**, revised **2026-09-11** |
+| Email to Pedersen asking him to break it | **2026-09-15 01:30 UTC** |
+| His refutation | **2026-09-15 13:58 UTC** — **12h 28m later** |
+| Reproduced, corrected across 11 files, pushed | **2026-09-15**, same day |
+| Every recipient of the claim written to | **2026-09-15**, unprompted |
+
+**What the timeline shows.** Nineteen days from an empty repository to a published
+conformance apparatus, a review by the author of the idea it was built on, a refutation,
+and a complete correction — with the defect, the reproduction, and the notifications all
+on the public record the same day. The cadence that put the claim into the world quickly
+is the cadence that retracted it quickly. Both are the same property, and the second is
+the one worth keeping.
+
+**The practice that failed, stated once.** Three rounds of adversarial review confirmed
+the claim was *stated consistently* and never asked whether passing the published check
+required doing the computation. That is a nine-line question. It is now the standing
+question for any conformance artifact here: **state what an implementation must compute
+in order to pass, then demonstrate the check fails when it is not computed.** A121 is the
+worked example; the mutation test in this commit's predecessor is the method.
+
+**Reach of the correction.** `OUTREACH_STRATEGY.md` §5 had named one event as the thing
+that would change the project's standing — *"someone independent reproduces the
+conformance root"* — and `OUTREACH_US_ROUTING.md` carried it twice as "Event A", the gate
+on approaching CISA. That target could be hit by reading a file. Both now name the real
+and still-unmet event: computing all 23 vectors from their inputs and matching every
+answer.
+
+**Written to on 2026-09-15**, before any of them raised it:
+
+| Recipient | Substance |
+|---|---|
+| Jens Egholm Pedersen (DTU) | thanks; what changed; the timeline |
+| NIST AI Standards / TEVV (cc ai-standards) | claim withdrawn; the failure offered as the more useful TEVV contribution — a conformance artifact whose published test can be passed without performing the computation is a general hazard worth naming in the draft |
+| Daniela Oliveira, NSF SaTC (cc satc@nsf.gov) | Objective 2 of the 09-11 summary cannot succeed as written; a stronger replacement question offered |
+| Oded Padon (Weizmann) | he was asked in August whether the approach was the wrong shape; it was |
+| Wetzel, Du (Stevens); Shi (NJIT); Chen (Rutgers) | correction before they decide whether to lead a proposal |
+
+The NSF letter is the consequential one. The summary proposed growing vectors *"until
+implementations written independently from the specification can no longer reproduce the
+hash while misreading the rules."* No vector count stops a wrong implementation
+reproducing a hash it never had to compute, and a suite never converges on a
+specification. The replacement offered is better science than the original and moves
+toward what the program officer had already asked for — *can the semantics of a policy
+decision be specified independently of any implementation, when the component enforcing
+the policy is a learned model?*
+
+**Uncorrectable:** the bulk sends of 2026-08-31 to foreign ministries, MIT lists, OSTP
+and xAI carry the claim and have no live correspondent to write back to.
