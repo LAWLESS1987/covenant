@@ -319,6 +319,34 @@ def main():
         if real_det:
             H.DETECTORS["log_bloat"] = real_det
 
+    # ---- H1r: the manifest is rewritten only over a clean tree
+    import subprocess
+    real_run = subprocess.run
+    seen = {}
+
+    def fake_run(cmd, *a, **k):
+        if cmd[:2] == ["git", "status"]:
+            class R:
+                returncode, stdout, stderr = 0, seen.get("status", ""), ""
+            return R()
+        seen["wrote"] = seen.get("wrote", 0) + 1
+        class R2:
+            returncode, stdout, stderr = 0, "wrote MANIFEST.sha256", ""
+        return R2()
+
+    try:
+        subprocess.run = fake_run
+        seen["status"] = " M covenant_highway.py" + chr(10) + " M docs/HIGHWAY.md"
+        ok, why = H.remedy_rehash_bundle({}, dry_run=False)
+        check("H1r a dirty tree refuses the rehash -- a manifest would describe nothing that exists",
+              not ok and "uncommitted" in why and not seen.get("wrote"), why[:90])
+        seen["status"] = " M MANIFEST.sha256" + chr(10) + " M ops/SELF_EVAL.md" + chr(10) + "?? SWEEP_END.txt"
+        ok, why = H.remedy_rehash_bundle({}, dry_run=False)
+        check("H1r mutation: a clean tree (bar the manifest and the hourly self-eval) -> it writes",
+              ok and seen.get("wrote") == 1, why[:90])
+    finally:
+        subprocess.run = real_run
+
     # ---- H1q: "running != deployed" covers the modules, not just the file
     files = H._watchdog_module_files()
     names = [os.path.basename(f) for f in files]

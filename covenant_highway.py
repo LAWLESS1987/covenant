@@ -240,6 +240,30 @@ def detect_phone_build_behind_core(health=None):
                          "build": d.get("sha7"), "behind_by_min": round((head_t - built_t) / 60.0, 1)}}
 
 
+def detect_manifest_stale(health=None):
+    """MANIFEST.sha256 no longer describes the tree it claims to.
+
+    WHY IT IS WORTH A DETECTOR. The pre-commit hook rewrites the manifest only
+    when IT changed a file, and deliberately not on every commit: verify_bundle
+    hashes the WORKING TREE, so on a partial commit that would record a
+    manifest describing content the commit does not contain. The consequence is
+    that a normal commit leaves the manifest one step behind, the sweep's
+    integrity phase reports FAIL, and every run ends "gates BLOCKED" -- which
+    is A60's defect at the top of the report: a permanent red teaches its
+    reader to skip the line where a real one would appear.
+    """
+    import subprocess
+    try:
+        p_ = subprocess.run([sys.executable, os.path.join(HERE, "verify_bundle.py")],
+                            cwd=HERE, capture_output=True, text=True, timeout=300)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    changed = [l.split(None, 1)[1].strip() for l in (p_.stdout or "").splitlines()
+               if l.startswith("CHANGED/MISSING")]
+    return {"state": PRESENT if p_.returncode != 0 else ABSENT,
+            "measured": {"rc": p_.returncode, "changed": changed[:10], "n_changed": len(changed)}}
+
+
 def detect_held_core_drift(health=None):
     """A held copy of the core claiming the live version with different bytes.
 
@@ -339,6 +363,7 @@ DETECTORS = {
     "phone_build_behind_core": detect_phone_build_behind_core,
     "log_bloat": detect_log_bloat,
     "held_core_drift": detect_held_core_drift,
+    "manifest_stale": detect_manifest_stale,
     "watchdog_stale": detect_watchdog_stale,
 }
 
@@ -494,6 +519,34 @@ def remedy_dispatch_phone_build(measured, dry_run=True):
         return False, "%s: %s" % (type(e).__name__, e)
 
 
+def remedy_rehash_bundle(measured, dry_run=True):
+    """UNDOABLE: rewrite MANIFEST.sha256 -- but only over a clean tree.
+
+    The hook's reasoning is the constraint: verify_bundle hashes the WORKING
+    TREE, so writing the manifest while tracked files are modified records a
+    claim about content no commit contains. So this refuses unless the only
+    tracked modification is the manifest itself. On a dirty tree it says so and
+    leaves the condition standing, which is the honest outcome -- a person is
+    mid-change and the manifest is theirs to settle.
+    """
+    import subprocess
+    p_ = subprocess.run(["git", "status", "--porcelain"], cwd=HERE,
+                        capture_output=True, text=True, timeout=120)
+    dirty = [l[3:].strip() for l in (p_.stdout or "").splitlines()
+             if l[:2].strip() and not l.startswith("??")]
+    # ops/SELF_EVAL.md is appended hourly by the watchdog and is excluded from
+    # the manifest for exactly that reason; it is not a change in flight.
+    dirty = [f for f in dirty if f not in ("MANIFEST.sha256", "ops/SELF_EVAL.md")]
+    if dirty:
+        return False, ("the tree has uncommitted tracked changes (%s) -- a manifest written "
+                       "now would describe content no commit contains" % ", ".join(dirty[:4]))
+    if dry_run:
+        return True, "would run verify_bundle.py --write over a clean tree"
+    r = subprocess.run([sys.executable, os.path.join(HERE, "verify_bundle.py"), "--write"],
+                       cwd=HERE, capture_output=True, text=True, timeout=300)
+    return r.returncode == 0, ((r.stdout or "") + (r.stderr or "")).strip()[-160:]
+
+
 def remedy_install_on_phone(measured, dry_run=True):
     """PROPOSE_ONLY, permanently. The person holding the phone confirms an
     install; nothing here may do it for them, and the engine refuses this class
@@ -551,6 +604,14 @@ REMEDIES = {
                                                    "the phone's auto-update has something newer to find"],
                                          "cost": ["about ten minutes of his GitHub Actions account"],
                                          "irreversible": []}},
+    "rehash_bundle": {"fn": remedy_rehash_bundle, "klass": AUTO_REVERSIBLE,
+                      "for": ["manifest_stale"], "kind": "undoable",
+                      "undo": "git checkout -- MANIFEST.sha256",
+                      "touches": ["the delivery manifest"],
+                      "benefit": {"gains": ["the sweep's integrity phase means something again",
+                                            "\"gates BLOCKED\" stops being permanent furniture"],
+                                  "cost": ["one tracked file rewritten, to be carried by the next commit"],
+                                  "irreversible": []}},
     "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
                          "for": ["app_build_gap"], "kind": "needs a person",
                          "touches": ["the phone"],
