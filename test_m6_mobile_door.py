@@ -198,6 +198,23 @@ def main():
         except OSError:
             pass
 
+
+    # ---- M6h: a build is a RUN, not a commit --------------------------
+    # The workflow makes one tree from TWO checkouts -- the private app repo
+    # and the PUBLIC core at main -- so the same app commit rebuilt an hour
+    # later is a different APK carrying a newer core. The updater used to
+    # compare head_sha and discard it as "already have the newest build".
+    # Measured the day the highway learned to ask for a rebuild: the dispatch
+    # succeeded, the APK existed, and the fetch refused to collect it.
+    import covenant_app_update as AU
+    same = {"id": 101, "head_sha": "abc1234def"}
+    rebuilt = {"id": 102, "head_sha": "abc1234def"}
+    held = {"run_id": 101, "sha": "abc1234def", "sha7": "abc1234"}
+    check("M6h nothing held yet -> any build is new", AU.is_new_build(None, same))
+    check("M6h the run we already hold is not new", not AU.is_new_build(held, same))
+    check("M6h a SECOND run of the SAME commit is a new build",
+          AU.is_new_build(held, rebuilt), "same head_sha, different run")
+
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     if failed:

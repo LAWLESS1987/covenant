@@ -117,6 +117,24 @@ def latest_signed(nonce, key=None):
         return {"status": "error", "message": "cannot sign the update manifest: %s" % type(e).__name__}
 
 
+
+def is_new_build(current, run):
+    """Is this workflow run a build we do not already hold?
+
+    A BUILD IS A RUN, NOT A COMMIT (2026-09-16). This used to compare
+    head_sha -- the commit in the PRIVATE app repo -- and the workflow builds
+    ONE tree from TWO checkouts: that repo plus the PUBLIC core at main. So the
+    same app commit, rebuilt an hour later, carries a newer core and is a
+    different APK, and the old test called it "already have the newest build"
+    and threw it away. Measured the same day the highway learned to ask for a
+    rebuild: the dispatch succeeded, the APK existed, and the fetch refused to
+    collect it. Two builds of one commit are two builds.
+    """
+    if not current:
+        return True
+    return current.get("run_id") != run.get("id")
+
+
 def fetch(say=print):
     """The newest green build's APK from the private repository, kept under ops/app/.
     Returns the latest.json dict, or None with the reason said."""
@@ -131,13 +149,23 @@ def fetch(say=print):
             continue
         sha7 = run["head_sha"][:7]
         cur = latest()
-        if cur and cur.get("sha") == run["head_sha"]:
-            say("app update: already have the newest build %s" % sha7); return cur
+        # A BUILD IS A RUN, NOT A COMMIT (2026-09-16). This compared
+        # head_sha -- the commit in the PRIVATE app repo -- and the workflow
+        # builds ONE tree from TWO checkouts: that repo plus the PUBLIC core at
+        # main. So the same app commit, rebuilt an hour later, produces a
+        # different APK carrying a newer core, and this test called it "already
+        # have the newest build" and threw it away. Measured the same day the
+        # highway learned to ask for a rebuild: the dispatch succeeded, the APK
+        # existed, and the fetch refused to collect it. Two builds of one commit
+        # are two builds.
+        if not is_new_build(cur, run):
+            say("app update: already have build %s from run %d" % (sha7, run["id"])); return cur
         blob = _download(arts[0]["archive_download_url"], tok)
         with zipfile.ZipFile(io.BytesIO(blob)) as z:
             apk = z.read("covenant-node.apk")
         os.makedirs(DIR, exist_ok=True)
-        fname = "covenant-node-%s.apk" % sha7
+        # The name carries the run as well, for the same reason.
+        fname = "covenant-node-%s-r%d.apk" % (sha7, run["id"])
         with open(os.path.join(DIR, fname), "wb") as fh:
             fh.write(apk)
         d = {"sha": run["head_sha"], "sha7": sha7, "run_id": run["id"], "run_url": run["html_url"], "built": run["updated_at"],

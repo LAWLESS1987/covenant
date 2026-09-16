@@ -319,6 +319,23 @@ def main():
         if real_det:
             H.DETECTORS["log_bloat"] = real_det
 
+    # ---- H1q: "running != deployed" covers the modules, not just the file
+    files = H._watchdog_module_files()
+    names = [os.path.basename(f) for f in files]
+    check("H1q the staleness check watches the watchdog's imports, not only itself",
+          "covenant_watchdog.py" in names and "covenant_highway.py" in names and len(names) > 2,
+          str(names[:6]))
+    check("H1q ...and reads them from the source, so a new import is covered the day it lands",
+          "covenant_daily_plan.py" in names, str(names))
+    st = H.detect_watchdog_stale()
+    check("H1q it reports a state it can defend, and names the file it measured",
+          st["state"] in (H.PRESENT, H.ABSENT, H.UNKNOWN)
+          and (st["state"] == H.UNKNOWN or "newest_file" in st["measured"]),
+          json.dumps(st)[:140])
+    check("H1q no watchdog running is UNKNOWN, never ABSENT -- unknown is not pass",
+          st["state"] != H.ABSENT or st["measured"].get("running", 0) >= 1,
+          json.dumps(st["measured"])[:120])
+
     # ---- H1p: a remedy that spends his money asks for a longer budget
     calls = []
     real_d = dict(H.REMEDIES["dispatch_phone_build"])
@@ -342,6 +359,16 @@ def main():
         check("H1p ...and that budget is declared on the remedy, not hidden in the engine",
               H.REMEDIES["dispatch_phone_build"].get("cooldown_s", 0) >= 86400,
               str(real_d.get("cooldown_s")))
+        # And a person cannot wave the budget away: cooldown_s=0 skips the
+        # global hour, never a remedy's declared day.
+        manual = H.apply_remedy("dispatch_phone_build", present(), "phone_build_behind_core",
+                                dry_run=False, ledger=led, choices={}, cooldown_s=0)
+        check("H1p a person typing --repair cannot spend the budget again",
+              len(calls) == 1 and manual.get("repeat") is True,
+              "calls=%d repeat=%s" % (len(calls), manual.get("repeat")))
+        check("H1p ...while a remedy with no declared budget still obeys the person",
+              H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True,
+                             ledger=led, choices={}, cooldown_s=0).get("repeat") is not True)
         check("H1p ...and its cost is declared where a person reads it",
               any("Actions" in c or "minute" in c for c in real_d["benefit"]["cost"]),
               str(real_d["benefit"]["cost"]))

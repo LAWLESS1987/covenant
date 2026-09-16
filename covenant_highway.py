@@ -60,6 +60,7 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sys
@@ -256,30 +257,54 @@ def detect_held_core_drift(health=None):
             "measured": {"rc": p.returncode, "said": (p.stdout or p.stderr or "").strip()[:200]}}
 
 
-def detect_watchdog_stale(health=None):
-    """The running watchdog is not the watchdog on disk (P14).
+def _watchdog_module_files():
+    """covenant_watchdog.py and every covenant_* module it imports.
 
-    The checks in the deployed file are not the checks running, and nothing the
-    process says about itself is evidence either way. Measured by comparing the
-    hash the live process recorded against the file's hash now.
+    Read from the source rather than hardcoded, so a new import is covered the
+    day it is added and not the day someone remembers this list.
     """
-    # WHAT THIS MUST NOT DO, and did in its first draft: import the watchdog
-    # here and compare THAT module's hash to the file. A fresh import always
-    # matches disk, so the check would have reported ABSENT every time,
-    # including the two occasions today when the running watchdog really was
-    # stale. A guard that measures itself is the 2026-09-09 fake-guard defect
-    # exactly, and it was written into this file within the hour of writing
-    # that rule down.
-    #
-    # The live process cannot be asked what bytes it loaded, so the question is
-    # asked in the one way that works from outside: was the FILE last written
-    # after the PROCESS started? A touch with no edit would read as stale, and
-    # that is the harmless direction to be wrong in.
-    import subprocess
+    import re
     src = os.path.join(HERE, "covenant_watchdog.py")
+    files = [src]
     try:
-        mtime = os.path.getmtime(src)
-    except OSError as e:
+        text = io.open(src, encoding="utf-8").read()
+    except OSError:
+        return files
+    for name in sorted(set(re.findall(r"import\s+(covenant_[a-z0-9_]+)", text))):
+        f = os.path.join(HERE, name + ".py")
+        if os.path.exists(f):
+            files.append(f)
+    return files
+
+
+def detect_watchdog_stale(health=None):
+    """The running watchdog is older than the code it runs.
+
+    TWO MISTAKES ARE BURIED HERE, both mine, both caught by running the thing.
+
+    The first draft imported the watchdog in THIS process and compared that
+    module's hash to the file. A fresh import always matches, so it would have
+    reported ABSENT every time, including twice today when the running watchdog
+    really was stale. A guard that measures itself is the 2026-09-09 fake-guard
+    defect, written within the hour of writing that rule down.
+
+    The second was narrower and worse. Comparing only covenant_watchdog.py to
+    the process start missed the thing that actually bit: Python caches
+    imports, so a watchdog started at 06:44 went on executing the
+    covenant_highway it loaded THEN -- through six commits of fixes, still
+    pairing fetch_build with a condition fetching cannot clear, re-quarantining
+    it every 66 seconds while the corrected file sat on disk. `import X` inside
+    the loop re-binds a cached module; it does not re-read the file. So the
+    question is not "is the watchdog's own file newer" but "is ANY file this
+    process runs newer than the process".
+
+    A touched-but-unedited file reads as stale, which is the harmless direction.
+    """
+    import subprocess
+    files = _watchdog_module_files()
+    try:
+        newest, newest_name = max((os.path.getmtime(f), os.path.basename(f)) for f in files)
+    except (OSError, ValueError) as e:
         return {"state": UNKNOWN, "measured": {"error": str(e)}}
     ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\" |"
           " Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' } |"
@@ -291,17 +316,18 @@ def detect_watchdog_stale(health=None):
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
     if not stamps:
-        # No watchdog running at all is a different condition with a different
-        # remedy; this detector does not get to call it "fine".
+        # No watchdog at all is a different condition with a different remedy;
+        # this detector does not get to call that "fine".
         return {"state": UNKNOWN, "measured": {"running": 0, "why": "no watchdog process found"}}
     import datetime
     try:
         started = min(datetime.datetime.fromisoformat(s).timestamp() for s in stamps)
     except ValueError as e:
         return {"state": UNKNOWN, "measured": {"stamps": stamps, "error": str(e)}}
-    return {"state": PRESENT if mtime > started else ABSENT,
-            "measured": {"file_written": round(mtime, 1), "process_started": round(started, 1),
-                         "running": len(stamps), "stale_by_s": round(mtime - started, 1)}}
+    return {"state": PRESENT if newest > started else ABSENT,
+            "measured": {"newest_file": newest_name, "written": round(newest, 1),
+                         "process_started": round(started, 1), "running": len(stamps),
+                         "watched_files": len(files), "stale_by_s": round(newest - started, 1)}}
 
 
 DETECTORS = {
@@ -651,7 +677,19 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     # money spent by my scheduler. Once a day is what the thing is actually
     # for -- the core does not change hourly, and nothing is waiting on it
     # faster than a person can tap an install.
-    eff = cooldown_s if cooldown_s is not None else r.get("cooldown_s", ROW_COOLDOWN_S)
+    # A DECLARED BUDGET IS NOT NOISE SUPPRESSION. cooldown_s=0 means "a person
+    # typed --repair, do not make them wait an hour for a line they have
+    # already read" -- and it used to skip a remedy's OWN budget too, which is
+    # how one manual run of mine asked the build runner for a second
+    # ten-minute job inside twenty minutes. A budget a caller can wave away is
+    # not a budget; the hour is mine to skip, the day is not.
+    declared = r.get("cooldown_s")
+    if cooldown_s is None:
+        eff = declared if declared is not None else ROW_COOLDOWN_S
+    elif declared is not None:
+        eff = max(cooldown_s, declared)
+    else:
+        eff = cooldown_s
     prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff)
     if prev is not None:
         out = dict(prev)
