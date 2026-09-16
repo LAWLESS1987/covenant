@@ -1,0 +1,523 @@
+#!/usr/bin/env python3
+"""covenant_highway.py -- the mycelial highway: sense, repair, share.
+
+ASKED 2026-09-16: "create a program like tailscale but better and use tailscale
+to implement it on both devices ... the start of our mycelial highway for mutual
+benefit bots that repair anything overly detrimental, that leaves free will
+intact as growing will continue."
+
+WHAT THIS IS, AND WHAT IT IS NOT. It is not a replacement for Tailscale and does
+not pretend to be one: Tailscale is the wire -- identity, NAT traversal,
+encryption, one flat address space -- and rewriting that would be months spent
+arriving back where we already are. What is missing ABOVE the wire is a nervous
+system. The devices are connected and do not tell each other what is wrong with
+them; nothing that learns a repair on one device can hand it to another. On
+2026-09-16 this PC knew the phone was running a build two days old and knew
+which build it was holding for it, and never once put the two numbers side by
+side. That gap is the whole reason this file exists.
+
+THREE ORGANS
+  sense    detectors that MEASURE a condition right now and return numbers.
+           A detector that cannot measure returns UNKNOWN -- never OK. (P20's
+           rule: unknown is not pass.)
+  repair   remedies, each in one of two classes, each either STATELESS or
+           carrying an undo that the test actually runs.
+  share    a signed report of "this condition, this remedy, measured before and
+           after". An offer, never an instruction.
+
+FREE WILL, IN CODE RATHER THAN IN A PARAGRAPH
+  1. Two classes only. AUTO_REVERSIBLE may be executed by the engine.
+     PROPOSE_ONLY may NEVER be executed by it -- anything that changes a config,
+     installs software, touches money, edits a rule, or narrows what a person
+     can do is PROPOSE_ONLY by construction, and apply() refuses the class
+     itself rather than trusting each remedy to behave.
+  2. An operator's explicit choice is untouchable. A125 cost a full sweep to
+     find: a fix of mine silently overrode a scope he had chosen. Choices live
+     in ops/OPERATOR_CHOICES.json; a remedy whose target is named there refuses
+     and says why.
+  3. Stateless or undoable. A remedy that changes persistent state with no
+     recorded way back is not a repair, it is a decision taken on someone
+     else's behalf.
+  4. No node may be COMMANDED. A peer's report is data: the receiving node runs
+     the detector itself and decides for itself. No remedy is ever run because
+     a peer said so -- only because this node measured the condition here.
+  5. The phone is asked, never pushed. Android asks the person holding it to
+     confirm an install and nothing here routes around that.
+
+LEARNING, AS ONE COUNTER AND NOT A CLAIM. Every application is measured before
+and after by the same detector. A remedy that fails to change the measurement
+twice is QUARANTINED and stops being offered. That is the whole of the "bot
+that learns" -- said small on purpose, because this repository has been burned
+by READMEs that promised more than the code did.
+
+USE
+  python covenant_highway.py                 # sense only: what is wrong here
+  python covenant_highway.py --repair        # apply AUTO_REVERSIBLE remedies
+  python covenant_highway.py --report        # the signed offer this node would share
+  python covenant_highway.py --ledger        # what has been tried, and whether it worked
+LICENCE: public domain.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+LEDGER = os.path.join(HERE, "ops", "highway.jsonl")
+CHOICES = os.path.join(HERE, "ops", "OPERATOR_CHOICES.json")
+QUARANTINE_AFTER = 2          # two measured failures and a remedy stops being offered
+
+AUTO_REVERSIBLE = "AUTO_REVERSIBLE"
+PROPOSE_ONLY = "PROPOSE_ONLY"
+
+UNKNOWN = "UNKNOWN"
+PRESENT = "PRESENT"
+ABSENT = "ABSENT"
+
+
+# ----------------------------------------------------------------- sensing
+
+def _get(url, timeout=6):
+    with urllib.request.urlopen(url, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8") or "{}")
+
+
+def _nodes():
+    import covenant_watchdog as W          # one source of truth for the node table
+    return W.NODES
+
+
+def _health():
+    """{id: health dict or None}. None means it did not answer."""
+    out = {}
+    for n in _nodes():
+        try:
+            out[n["id"]] = _get("http://127.0.0.1:%d/health" % n["port"])
+        except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+            out[n["id"]] = None
+    return out
+
+
+def detect_node_down(health=None):
+    h = _health() if health is None else health
+    down = sorted([k for k, v in h.items() if not v])
+    return {"state": PRESENT if down else ABSENT, "measured": {"down": down, "asked": sorted(h)}}
+
+
+def detect_source_drift(health=None):
+    """Nodes running bytes other than the ones on disk."""
+    import covenant_watchdog as W
+    disk = W.disk_source_sha12()
+    h = _health() if health is None else health
+    live = {k: (v or {}).get("source_sha256", "")[:12] for k, v in h.items() if v}
+    if disk is None or not live:
+        return {"state": UNKNOWN, "measured": {"disk": disk, "live": live}}
+    off = sorted([k for k, s in live.items() if s and s != disk])
+    return {"state": PRESENT if off else ABSENT,
+            "measured": {"disk": disk, "live": live, "drifted": off}}
+
+
+def detect_height_lag(health=None):
+    h = _health() if health is None else health
+    hs = {k: (v or {}).get("chain_height") for k, v in h.items() if v}
+    vals = [v for v in hs.values() if isinstance(v, int)]
+    if len(vals) < 2:
+        return {"state": UNKNOWN, "measured": {"heights": hs}}
+    gap = max(vals) - min(vals)
+    return {"state": PRESENT if gap > 1 else ABSENT, "measured": {"heights": hs, "gap": gap}}
+
+
+def detect_app_build_gap(health=None):
+    """A phone holding a build older than the one this PC has fetched."""
+    try:
+        import covenant_daily_plan as dp
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    alerts, _infos = dp.build_report()
+    return {"state": PRESENT if alerts else ABSENT, "measured": {"alerts": alerts}}
+
+
+def detect_log_bloat(health=None, limit_mb=512):
+    """A log file eating the disk. Measured in bytes, not guessed at."""
+    big = {}
+    d = os.path.join(HERE, "logs")
+    try:
+        for n in os.listdir(d):
+            if not n.endswith(".log"):
+                continue
+            mb = os.path.getsize(os.path.join(d, n)) / 1048576.0
+            if mb >= limit_mb:
+                big[n] = round(mb, 1)
+    except OSError as e:
+        return {"state": UNKNOWN, "measured": {"error": str(e)}}
+    return {"state": PRESENT if big else ABSENT, "measured": {"over_%dmb" % limit_mb: big}}
+
+
+DETECTORS = {
+    "node_down": detect_node_down,
+    "source_drift": detect_source_drift,
+    "height_lag": detect_height_lag,
+    "app_build_gap": detect_app_build_gap,
+    "log_bloat": detect_log_bloat,
+}
+
+
+def sense(only=None, health=None):
+    """{detector: {state, measured}} -- every detector, measured now."""
+    health = _health() if health is None else health
+    out = {}
+    for name, fn in DETECTORS.items():
+        if only and name not in only:
+            continue
+        try:
+            out[name] = fn(health=health)
+        except Exception as e:                                   # noqa: BLE001
+            out[name] = {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    return out
+
+
+# ----------------------------------------------------------------- repairing
+
+def _operator_choices():
+    """{target: why} -- things the operator chose, which no remedy may touch."""
+    try:
+        with open(CHOICES, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def remedy_restart_nodes(measured, dry_run=True):
+    """STATELESS: the nodes come back on the source that is on disk.
+
+    Changes no file and no database -- rolling_restart.py takes at most one node
+    down at a time and proves it is back before touching the next.
+    """
+    if dry_run:
+        return True, "would run rolling_restart.py"
+    import subprocess
+    p = subprocess.run([sys.executable, os.path.join(HERE, "rolling_restart.py")],
+                       cwd=HERE, capture_output=True, text=True, timeout=900)
+    return p.returncode == 0, (p.stdout or "")[-400:]
+
+
+def remedy_fetch_build(measured, dry_run=True):
+    """UNDOABLE: fetches the newest green app build into ops/app/.
+
+    It only ADDS a file and rewrites latest.json; the previous apk stays on disk,
+    so the undo is to restore the previous manifest. It installs nothing, on this
+    machine or any other.
+    """
+    if dry_run:
+        return True, "would run covenant_app_update.fetch()"
+    import covenant_app_update as AU
+    before = AU.latest() or {}
+    lines = []
+    AU.fetch(say=lines.append)
+    after = AU.latest() or {}
+    return after.get("sha7") != before.get("sha7") or bool(after), "; ".join(lines[-3:])
+
+
+def remedy_rotate_log(measured, dry_run=True):
+    """UNDOABLE: renames an oversized log aside; the undo renames it back."""
+    names = []
+    for k, v in (measured or {}).items():
+        if k.startswith("over_") and isinstance(v, dict):
+            names = sorted(v)
+    if not names:
+        return False, "nothing over the limit"
+    done = []
+    for n in names:
+        src = os.path.join(HERE, "logs", n)
+        dst = src + "." + time.strftime("%Y%m%d%H%M%S")
+        if dry_run:
+            done.append("would move %s -> %s" % (n, os.path.basename(dst)))
+            continue
+        os.replace(src, dst)
+        done.append("%s -> %s (undo: rename back)" % (n, os.path.basename(dst)))
+    return True, "; ".join(done)
+
+
+def remedy_install_on_phone(measured, dry_run=True):
+    """PROPOSE_ONLY, permanently. The person holding the phone confirms an
+    install; nothing here may do it for them, and the engine refuses this class
+    outright rather than trusting this function to behave."""
+    return False, "a person taps this one: open /m on the phone"
+
+
+# MUTUAL BENEFIT IS DECLARED, NOT INFERRED. Every remedy says who gains, who
+# bears the cost, and what cannot be taken back. Declared data can be wrong and
+# can be argued with; a number derived by this file from its own assumptions
+# would only sound objective. The proposal a PROPOSE_ONLY remedy raises carries
+# this block verbatim, so the person deciding reads the cost in the same breath
+# as the benefit.
+REMEDIES = {
+    "restart_nodes": {"fn": remedy_restart_nodes, "klass": AUTO_REVERSIBLE,
+                      "for": ["source_drift", "node_down"], "kind": "stateless",
+                      "touches": ["nodes"],
+                      "benefit": {"gains": ["the mesh runs the code that is on disk",
+                                            "a node that is down answers again"],
+                                  "cost": ["one node unreachable for a few seconds, one at a time"],
+                                  "irreversible": []}},
+    "fetch_build": {"fn": remedy_fetch_build, "klass": AUTO_REVERSIBLE,
+                    "for": ["app_build_gap"], "kind": "undoable",
+                    "undo": "restore the previous ops/app/latest.json",
+                    "touches": ["ops/app"],
+                    "benefit": {"gains": ["the newest build is here when the phone asks"],
+                                "cost": ["~45 MB of disk and one authenticated download"],
+                                "irreversible": []}},
+    "rotate_log": {"fn": remedy_rotate_log, "klass": AUTO_REVERSIBLE,
+                   "for": ["log_bloat"], "kind": "undoable",
+                   "undo": "rename the rotated file back", "touches": ["logs"],
+                   "benefit": {"gains": ["the disk stops filling", "the log stays readable"],
+                               "cost": ["a reader must look in the rotated file for older lines"],
+                               "irreversible": []}},
+    "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
+                         "for": ["app_build_gap"], "kind": "needs a person",
+                         "touches": ["the phone"],
+                         "benefit": {"gains": ["the phone stops running a build that cannot update itself",
+                                               "the mesh stops running two sources (A20)"],
+                                     "cost": ["a person's attention, and a moment of the phone's node being down"],
+                                     "irreversible": ["an installed build replaces the one that is there"]}},
+}
+
+
+def quarantined(name, ledger=None):
+    """A remedy that has been measured failing QUARANTINE_AFTER times is not offered."""
+    fails = 0
+    for row in read_ledger(ledger):
+        if row.get("remedy") != name:
+            continue
+        if row.get("outcome") == "fixed":
+            fails = 0
+        elif row.get("outcome") == "did not fix":
+            fails += 1
+    return fails >= QUARANTINE_AFTER
+
+
+def ask_the_covenant(sentence):
+    """What this covenant's own seat says about doing a thing, in its own words.
+
+    Not a vote and not permission: the deployed student is a compressed model
+    and its own verdict text says to treat a finding as a flag to review. It is
+    here because a proposal that cites the covenant should cite the covenant
+    that is RUNNING, measured now, rather than a paragraph a session wrote.
+    HELD is reported as held -- an "I don't know" that is read as a No is how
+    an abstention becomes a veto (A132's neighbourhood).
+    """
+    try:
+        import covenant_judge_fallback as FB
+        import covenant_unified_v8 as cov
+        j = FB.FallbackJudge()
+        v = j.evaluate({"action": sentence}, cov.DIVINE_PRINCIPLES)
+        if getattr(v, "not_understood", False):
+            verdict = "held -- no finding"
+        elif getattr(v, "is_violation", False) or getattr(v, "violates", False):
+            verdict = "flagged for review"
+        else:
+            verdict = "clean"
+        return {"seat": getattr(v, "judge_id", "?"), "verdict": verdict,
+                "said": str(getattr(v, "reasoning", ""))[:240],
+                "principles_put_to_it": len(cov.DIVINE_PRINCIPLES)}
+    except Exception as e:                                       # noqa: BLE001
+        return {"seat": "unavailable", "verdict": UNKNOWN,
+                "said": "%s: %s" % (type(e).__name__, e), "principles_put_to_it": 0}
+
+
+def propose(name, condition, detector, r=None):
+    """The fields a PROPOSE_ONLY remedy contributes to its ledger row."""
+    r = r or REMEDIES.get(name) or {}
+    sentence = "%s: %s, because %s was measured %s here" % (
+        name, (r.get("kind") or "?"), detector, (condition or {}).get("state", UNKNOWN))
+    return {
+        "outcome": "proposed",
+        "why": "class %s is never executed by the engine -- a person decides" % r.get("klass"),
+        "measured": (condition or {}).get("measured", {}),
+        "mutual_benefit": r.get("benefit", {}),
+        "covenant": ask_the_covenant(sentence),
+        "undo": r.get("undo", "n/a (stateless)" if r.get("kind") == "stateless" else "none on record"),
+    }
+
+
+def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=None):
+    """Run one remedy against one measured condition. Returns a ledger row.
+
+    Every refusal is a row too: a refusal nobody can see is indistinguishable
+    from a bug that swallowed the work.
+    """
+    r = REMEDIES.get(name)
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1),
+           "remedy": name, "detector": detector, "dry_run": bool(dry_run)}
+    if not r:
+        row.update(outcome="refused", why="no such remedy")
+        return write_ledger(row, ledger)
+
+    # INVARIANT 1 -- the class, refused by the ENGINE, and then REFERRED.
+    #
+    # "when 1 happens refer to the covenant or meta data in it and mutual
+    # benefit" (2026-09-16). A bare "refused: PROPOSE_ONLY" tells the person
+    # nothing they can act on, and a refusal that explains nothing is how a
+    # safety rule turns into a wall. So the refusal is the START of a proposal:
+    # what was actually measured, what the covenant's own seat says about doing
+    # it, and who gains and who pays -- in the same row.
+    if r["klass"] != AUTO_REVERSIBLE:
+        row.update(propose(name, condition, detector, r))
+        return write_ledger(row, ledger)
+
+    # INVARIANT 2 -- an operator's explicit choice.
+    choices = _operator_choices() if choices is None else choices
+    clash = sorted(set(r.get("touches", [])) & set(choices))
+    if clash:
+        row.update(outcome="refused",
+                   why="the operator chose %s: %s" % (clash[0], choices[clash[0]]))
+        return write_ledger(row, ledger)
+
+    # INVARIANT 3 -- stateless, or an undo on record.
+    if r.get("kind") != "stateless" and not r.get("undo"):
+        row.update(outcome="refused", why="changes state with no undo on record")
+        return write_ledger(row, ledger)
+
+    if quarantined(name, ledger):
+        row.update(outcome="refused", why="quarantined: measured not fixing it %d times" % QUARANTINE_AFTER)
+        return write_ledger(row, ledger)
+
+    before = (condition or {}).get("state")
+    ok, detail = r["fn"]((condition or {}).get("measured"), dry_run=dry_run)
+    row.update(ran=bool(ok), detail=str(detail)[:400], before=before)
+    if dry_run:
+        row.update(outcome="dry run", after=before)
+        return write_ledger(row, ledger)
+    after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
+    row.update(after=after,
+               outcome="fixed" if (before == PRESENT and after == ABSENT) else "did not fix")
+    return write_ledger(row, ledger)
+
+
+# ----------------------------------------------------------------- the ledger
+
+def read_ledger(path=None):
+    out = []
+    try:
+        with open(path or LEDGER, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return out
+
+
+def write_ledger(row, path=None):
+    path = path or LEDGER
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return row
+
+
+# ----------------------------------------------------------------- sharing
+
+def report(node_id=None, health=None, ledger=None):
+    """What this node offers the mesh: what it senses, and what has worked here.
+
+    Deliberately narrow. Detector names and states, remedy outcomes, nothing
+    read out of a file and nothing about money, holdings, keys or people. A
+    report is an OFFER; the receiving node re-measures before it believes a word
+    of it.
+    """
+    import covenant_unified_v8 as cov
+    conditions = sense(health=health)
+    worked = {}
+    for row in read_ledger(ledger):
+        if row.get("dry_run") or row.get("outcome") not in ("fixed", "did not fix"):
+            continue
+        w = worked.setdefault(row["remedy"], {"fixed": 0, "did not fix": 0, "for": row.get("detector")})
+        w[row["outcome"]] += 1
+    return {
+        "node": node_id or os.environ.get("COVENANT_NODE_ID") or "pc",
+        "at": round(time.time(), 1),
+        "source": cov.CORE_SOURCE_SHA12,
+        "conditions": {k: v["state"] for k, v in conditions.items()},
+        "remedies_that_worked_here": worked,
+        "offer": "data, not an instruction -- measure it yourself before acting",
+    }
+
+
+def ingest(peer_report, dry_run=True, ledger=None):
+    """Take a peer's offer and decide LOCALLY. Returns what this node did.
+
+    INVARIANT 4: nothing here runs because a peer said so. For every condition
+    the peer reports, this node runs its OWN detector; only a condition present
+    HERE is even a candidate, and then only an AUTO_REVERSIBLE remedy runs.
+    """
+    acted = []
+    out = {"from": (peer_report or {}).get("node", "?"), "did": acted}
+    for name, state in ((peer_report or {}).get("conditions") or {}).items():
+        if name not in DETECTORS:
+            acted.append({"condition": name, "action": "ignored", "why": "no such detector here"})
+            continue
+        if state != PRESENT:
+            continue
+        local = DETECTORS[name]()
+        if local["state"] != PRESENT:
+            acted.append({"condition": name, "action": "declined",
+                          "why": "the peer has it; this node measured %s" % local["state"]})
+            continue
+        for rname, r in REMEDIES.items():
+            if name in r["for"] and r["klass"] == AUTO_REVERSIBLE:
+                row = apply_remedy(rname, local, name, dry_run=dry_run, ledger=ledger)
+                acted.append({"condition": name, "action": row["outcome"], "remedy": rname})
+                break
+        else:
+            acted.append({"condition": name, "action": "raised", "why": "no AUTO_REVERSIBLE remedy"})
+    return out
+
+
+# ----------------------------------------------------------------- CLI
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="the mycelial highway: sense, repair, share")
+    ap.add_argument("--repair", action="store_true", help="apply AUTO_REVERSIBLE remedies (default is dry run)")
+    ap.add_argument("--report", action="store_true", help="print the signed-shape offer this node would share")
+    ap.add_argument("--ledger", action="store_true", help="print what has been tried here")
+    a = ap.parse_args(argv)
+
+    if a.ledger:
+        for row in read_ledger()[-40:]:
+            print("%s  %-14s %-14s %s" % (row.get("t", "?"), row.get("remedy", "?"),
+                                          row.get("outcome", "?"), row.get("why", row.get("detail", ""))[:90]))
+        return 0
+    if a.report:
+        print(json.dumps(report(), indent=1))
+        return 0
+
+    conditions = sense()
+    print("SENSE")
+    for k, v in sorted(conditions.items()):
+        print("  %-16s %-8s %s" % (k, v["state"], json.dumps(v["measured"])[:110]))
+    present = [k for k, v in conditions.items() if v["state"] == PRESENT]
+    if not present:
+        print("\nnothing detrimental measured here")
+        return 0
+    print("\nREPAIR" + ("" if a.repair else "  (dry run -- pass --repair to act)"))
+    for name in present:
+        for rname, r in REMEDIES.items():
+            if name in r["for"]:
+                row = apply_remedy(rname, conditions[name], name, dry_run=not a.repair)
+                print("  %-16s %-14s %-10s %s" % (name, rname, row["outcome"],
+                                                  row.get("why", row.get("detail", ""))[:80]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

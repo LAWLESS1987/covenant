@@ -423,6 +423,12 @@ SUITES = [
     ("probe_final_pass.py",              120,  "XRP OFFLINE"),
     ("test_xrp_signer.py",               120,  "XRP OFFLINE"),
     ("test_xrp_mainnet.py",              180,  "XRP OFFLINE"),
+    # H1 (2026-09-16): the mycelial highway's five invariants -- the class the
+    # engine refuses, the operator's choice it will not touch, the undo it
+    # demands, the peer it will not obey, and the quarantine counter. Every one
+    # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
+    # no network, so it measures the rules rather than the machine.
+    ("test_h1_highway.py", 180, "DAILY + GUARDS"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
