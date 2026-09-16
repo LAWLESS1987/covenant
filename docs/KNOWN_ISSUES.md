@@ -5357,7 +5357,15 @@ shipped, in the one document whose entire purpose is that claims be checkable.
 
 ---
 
-### A131. [CRITICAL / process] A125 silently overrode a scope the operator chose, and the full sweep is what found it. OPEN — the decision is his, 2026-09-16
+### A131. [CRITICAL / process] A125 silently overrode a scope the operator chose, and the full sweep is what found it. RESOLVED 2026-09-16 by narrowing A125, not by moving the check
+
+> **Status corrected the same night.** This was written as OPEN with three
+> options for the operator. A fourth was then found, tested and adopted: require
+> the trunk to **affirmatively clear** rather than merely fail to convict. A98.H3
+> passes (6/7 → 7/7), A124 stays green, and the test was never edited. The price
+> is stated in `core_clears()`: this would not have prevented A116, which A124
+> now detects instead. Leaving the heading OPEN after resolving it would be the
+> stale-status defect this register caught in A116 and A119 hours earlier.
 
 **I did not run the existing suite that guards the code I changed.** A125 edited
 `validate_block`'s sync path. `test_a98_sync_hold_waiver.py` exists to guard
