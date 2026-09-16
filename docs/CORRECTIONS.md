@@ -97,8 +97,15 @@ Its first run found two live sites the hand sweep had missed.
 
 - **The bulk sends of 2026-08-31** stand wrong in other people's inboxes. There is no
   correspondent in those threads to write back to.
-- **Pedersen's prescription** — write the specification of `climb` and `attest` as
-  semantics independent of any implementation — is recorded and **not done**. It is new
-  structure, and new structure waits for more than one operator.
+- ~~**Pedersen's prescription** — write the specification of `climb` and `attest`.~~
+  **DONE 2026-09-15.** [`docs/SEMANTICS.md`](SEMANTICS.md) states the rules independently
+  of any implementation; [`spec_reference.py`](../spec_reference.py) implements them and
+  is forbidden (and mechanically checked) to read `triangulate.py` or `scale.py`; and
+  [`test_r2_semantics.py`](../test_r2_semantics.py) compares the two over **every input in
+  a bounded space** — 30,273 `attest` cases and 70,007 `climb` cases, enumerated rather
+  than sampled, plus all 23 published vectors reproduced from the specification alone.
+  Writing it up found one real inconsistency in the code (A123). Inside the bound this is
+  not a sample; outside it, it proves nothing, which is why the bound is printed with the
+  result.
 - **`peers.txt` still reads `self`.** No second party has run the vectors. The federation
   is one node, and section IX's cap, L5 = 1, applies to every claim in this repository.

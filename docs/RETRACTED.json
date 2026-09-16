@@ -17,7 +17,7 @@
    "id": "A121",
    "claim": "That reproducing the published conformance root is evidence an independent build performed the computation, and that this is NIR's move applied to governance.",
    "refuted_by": "Jens Egholm Pedersen (DTU), 2026-09-15, author of the borrowed idea",
-   "truth": "The root is sha256 over the expected outputs printed inside docs/CONFORMANCE_SPEC.json itself, so it reproduces in nine lines with no implementation of climb or attest at all. The real evidence is per-vector: compute each expected from its input and compare. That is an ordinary test-vector suite and pins the computation only where it samples.",
+   "truth": "The root is sha256 over the expected outputs printed inside docs/CONFORMANCE_SPEC.json itself, so it reproduces in nine lines with no implementation of climb or attest at all. The real evidence is per-vector: compute each expected from its input and compare. That is an ordinary test-vector suite and pins the computation only where it samples. REPLACED 2026-09-15 by docs/SEMANTICS.md, which states the rules independently of any implementation, with spec_reference.py and test_r2_semantics.py checking them over an exhaustively enumerated space.",
    "verbatim": [
     "The root `0c398099...0f0ddcef` is a claim that an independent build, in any language, sharing none of this code, produces the same number.",
     "A matching root means two implementations sharing no code agree; a different one is a finding.",

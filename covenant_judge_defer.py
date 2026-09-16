@@ -252,11 +252,32 @@ def record_verdict(data, result, judge, source, path=None):
            "reason": (getattr(result, "reasoning", "") or "")[:240], "held": held}
     if held:
         rec.pop("violates", None)
+    line = json.dumps(rec, ensure_ascii=False) + "\n"
+    # A120.2 (2026-09-15): the makedirs was unconditional and ran on EVERY
+    # verdict. Measured on this machine: 0.219 ms to re-create a directory that
+    # already exists, against 0.833 ms for the whole quorum verdict -- a quarter
+    # of the ethics gate spent on a directory made once. Ordered the other way
+    # round instead: try the append, and pay for the directory only on the error
+    # that means it is actually missing.
+    #
+    # NOT a cached "I already made it" flag, which is the obvious version and is
+    # wrong: it would stop re-creating a directory deleted underneath a running
+    # node, and this ledger is both the audit trail and the corpus the students
+    # learn from. FileNotFoundError is the real signal and it cannot go stale,
+    # so the directory-deleted case still recovers exactly as it did before.
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(line)
+        return not held      # a hold is written to the trail, but it is not a label (F2 L4/L5)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return False
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        return not held      # a hold is written to the trail, but it is not a label (F2 L4/L5)
+            fh.write(line)
+        return not held
     except OSError:
         return False
 

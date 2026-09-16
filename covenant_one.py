@@ -149,6 +149,11 @@ SUITES = [
     # including the README front page, because the sweep was a grep over
     # the phrasings its author thought of. Reads docs/RETRACTED.json.
     ("test_r1_retracted.py",             120,  "SECURITY"),
+    # R2 (2026-09-15): docs/SEMANTICS.md -- the specification Pedersen
+    # prescribed instead of more vectors -- checked against the live code
+    # over an EXHAUSTIVELY enumerated space (~100k cases), by an
+    # implementation forbidden to read triangulate.py or scale.py.
+    ("test_r2_semantics.py",             180,  "SECURITY"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

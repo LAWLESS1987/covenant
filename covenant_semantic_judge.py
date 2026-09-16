@@ -478,8 +478,24 @@ def _register_markers(data: Any, lexicon: Dict[str, str]) -> List[tuple]:
     if not lexicon:
         return []
     found: Dict[str, str] = {}
+    # A120.2 (2026-09-15): the repaired pass is scanned separately because
+    # _repair is what defeats a word hidden with Cyrillic look-alikes or
+    # zero-width joiners -- but on ordinary text _repair changes nothing, so
+    # HALF the leaves scanned here are byte-identical to one already scanned.
+    # Measured over 600 corpus payloads: 6.00 leaves per payload, 3.00 of them
+    # exact duplicates, each re-tested against all 82 phrases.
+    #
+    # Skipping a repeat is exact and not an approximation: `found` is keyed by
+    # phrase and first-wins, so scanning identical text a second time can only
+    # re-find what it found the first time. The repaired pass is NOT skipped --
+    # when _repair actually changes the text it produces a different string and
+    # is scanned in full, which is the only case it existed for.
+    seen: set = set()
     for leaf in _leaf_strings(data) + _leaf_strings(data, _repair):
         t = " " + _SPACES.sub(" ", _NONWORD.sub(" ", leaf)) + " "
+        if t in seen:
+            continue
+        seen.add(t)
         for phrase, cat in lexicon.items():
             if phrase not in found and f" {phrase} " in t:
                 found[phrase] = cat

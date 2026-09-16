@@ -1972,3 +1972,550 @@ judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.j
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    PASS  none this pass
 
+## 2026-09-12T13:36:49Z  overall FAIL  (round 60)
+nodes     PASS  3/3 up, height 18 (spread 0), source 73e4a0ce0b7a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 291bc76e675f -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 291bc76e675
+
+## 2026-09-12T14:42:23Z  overall FAIL  (round 120)
+nodes     PASS  3/3 up, height 18 (spread 0), source 73e4a0ce0b7a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is c677692ac4d8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is c677692ac4d
+
+## 2026-09-12T15:47:54Z  overall FAIL  (round 180)
+nodes     PASS  3/3 up, height 18 (spread 0), source 73e4a0ce0b7a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is c677692ac4d8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is c677692ac4d
+
+## 2026-09-12T16:53:30Z  overall FAIL  (round 240)
+nodes     PASS  3/3 up, height 18 (spread 0), source 73e4a0ce0b7a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 8ae964dae741 -- the c
+alerts    WARN  2 live -- first: node(s) running a source that is NOT the one on disk: A runs 73e4a0ce0b7a, B runs 73e4a0ce0b7a, C runs 73e4a0c
+
+## 2026-09-12T17:59:10Z  overall FAIL  (round 300)
+nodes     PASS  3/3 up, height 18 (spread 0), source 182ffa5e1e1a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd3 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd
+
+## 2026-09-12T19:04:46Z  overall FAIL  (round 360)
+nodes     PASS  3/3 up, height 18 (spread 0), source 182ffa5e1e1a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd3 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd
+
+## 2026-09-12T20:10:17Z  overall FAIL  (round 420)
+nodes     PASS  3/3 up, height 18 (spread 0), source 182ffa5e1e1a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd3 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd
+
+## 2026-09-12T21:26:28Z  overall FAIL  (round 480)
+nodes     PASS  3/3 up, height 18 (spread 0), source 182ffa5e1e1a
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd3 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd
+
+## 2026-09-13T00:05:16Z  overall FAIL  (round 540)
+nodes     PASS  3/3 up, height 18 (spread 0), source 1b697694310c
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     WARN  no local judge baseline; the seat defers per ops/quorum_policy.json (GitHub runner, then the distilled fallback; silence is not dissent)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd3 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 1daa524879db but covenant_watchdog.py on disk is 3a98f0ab5dd
+
+## 2026-09-13T01:14:18Z  overall PASS  (round 60)
+nodes     PASS  3/3 up, height 18 (spread 0), source 138311e283c3
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-13T02:17:46Z  overall PASS  (round 120)
+nodes     PASS  3/3 up, height 18 (spread 0), source 138311e283c3
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-13T03:21:14Z  overall FAIL  (round 180)
+nodes     PASS  3/3 up, height 19 (spread 0), source 8a5d7974159b
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T04:24:42Z  overall FAIL  (round 240)
+nodes     PASS  3/3 up, height 19 (spread 0), source 8a5d7974159b
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T05:28:07Z  overall FAIL  (round 300)
+nodes     PASS  3/3 up, height 19 (spread 0), source 8a5d7974159b
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T06:31:30Z  overall FAIL  (round 360)
+nodes     PASS  3/3 up, height 19 (spread 0), source 8a5d7974159b
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T07:34:51Z  overall FAIL  (round 420)
+nodes     PASS  3/3 up, height 19 (spread 0), source 8a5d7974159b
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@06402c3a74c, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T08:38:19Z  overall FAIL  (round 480)
+nodes     PASS  3/3 up, height 20 (spread 0), source 8a5d7974159b
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+
+## 2026-09-13T08:56Z  overall FAIL  (claude scheduled self-eval)
+nodes     PASS  3/3 up (5000/5020/5060), height 20 all three (spread 0), genesis 00009b31, v8.40, all running source 27a9bf2b01ad -- which IS the file on disk. degraded=true on all three (no provider key, no win32 code sandbox); A also flags own_genesis + anomaly kinds peer_message_error/peer_version_mismatch, B the same two, C none. Free RAM 5993-6231 MB
+watchdog  PASS  last line 2026-09-13T08:52:06Z, 47s before the check (balance agreement A/B/C 988/12/0). 93 ALERTs since the 09-12T10:35Z block, 46 of them today. Recurring: watchdog-stale (14), node restarts (15 across A/B/C), mesh multi-source (11), source-not-on-disk (4). THREE NEW KINDS since the last block: "NO node is reachable -- the chain is not running" plus per-node :5000/:5020/:5060 unreachable (a real gap, then the nodes came back on the current source); "node A/B: substrate reading is ~5440s old"; "node A anomaly SPIKE -- bridge_message_error 6 vs expected 1.8" (17071, CLEARED after 1 round at 04:35:16Z)
+gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false; relax_valueless_for_local_nodes=true. All three /health agree: quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report, veto_threshold 1, degradations []. Ollama absent by the operator's 2026-09-07 instruction -- disclosed, not failed
+trader    PASS  trader_log.txt 2026-09-12T09:00:03 local (19h53m old), last line "---- CYCLE COMPLETE 09/12/2026 ----". trader_freshness exit 0: "NOT YET DUE: trigger 09:00 plus 5 min grace has not passed" (checked 04:53 local). NOTE (4th block running): trader_config.json reads armed:true (FUTURE.bat, 2026-09-06), NOT armed:false as this task file states -- the task text is stale, the config is the operator's. Rule 5 / min_sealed_signals is what blocks. No funds, keys or orders touched
+student   WARN  loop working. --exam prints the table only, no thresholds line (same as 09-12): 53 cases, 38 agree, 0 false clean, 7 false hold (all `discourse`), 8 abstain. Thresholds from ops/DISTILL.md: NOT MET -- short on clean 7/8 (need 100%), trap 5/6 (need 85%), edge 2/3 (need 100%). theft/deception/coercion/injection now 19/19. Last cycle 2026-09-13T07:52:11Z PROMOTED (exam 38, was 36; model 1cdc0ebb73bc, 3470 examples). Seat stays with the deferring chain
+repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- 4 problems: covenant_unified_v8.py, run_all_tests.sh and run_local_sweep.py hash mismatch, test_p15_judge_identity.py missing. Cause is STALE PINS, not tamper: verify_deploy.py:73-142 still pins a 2026-09-04 build and still requires test_p15_judge_identity.py, which was deliberately deleted in eb892c0 (Ollama removal batch 4/5) and is absent from HEAD. MANIFEST.sha256 records 27a9bf2b01ad for covenant_unified_v8.py, which is what disk holds and what all three nodes run -- the two integrity records disagree, and the manifest is the one telling the truth
+git       WARN  on main, 0 ahead / 0 behind origin/main after fetch -- but 7 files sit STAGED AND UNCOMMITTED (MANIFEST.sha256, covenant_unified_v8.py +34 lines vs HEAD, covenant_nightly.py, .gitignore, docs/DAILY_PLAN.md, docs/KNOWN_ISSUES.md, pending-v8.38/, new covenant_app_update.py). A prior session staged a batch and never committed it; the running chain is on that unreviewed code. 9 loop-written modified, 6 untracked (ops/RUN_WITHOUT.json, outbound_overrides.jsonl, 4 nightly strategy reports). No holdings/portfolio file untracked
+disk      PASS  C: 323G free of 476G (33% used); logs/ 25M; no %TEMP%\covenant_sweep directory to prune
+verdict   FAIL  on repo only. Nothing is down: three nodes, a fresh watchdog, a wired gate and a trader that is not due. The failure is bookkeeping -- verify_deploy.py has been pinning a dead build and a deleted test for nine days, so it now cries wolf every run and cannot see a real substitution
+## 2026-09-13T09:41:53Z  overall FAIL  (round 540)
+nodes     PASS  3/3 up, height 20 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T10:45:22Z  overall FAIL  (round 600)
+nodes     PASS  3/3 up, height 20 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T11:48:55Z  overall FAIL  (round 660)
+nodes     PASS  3/3 up, height 20 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T12:53:36Z  overall FAIL  (round 720)
+nodes     PASS  3/3 up, height 20 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T13:57:33Z  overall FAIL  (round 780)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T15:01:11Z  overall FAIL  (round 840)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T16:04:39Z  overall FAIL  (round 900)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T17:08:07Z  overall FAIL  (round 960)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T18:11:37Z  overall FAIL  (round 1020)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T19:15:05Z  overall FAIL  (round 1080)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T20:18:35Z  overall FAIL  (round 1140)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T21:22:05Z  overall FAIL  (round 1200)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T22:25:33Z  overall FAIL  (round 1260)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-13T23:29:02Z  overall FAIL  (round 1320)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-14T00:32:33Z  overall FAIL  (round 1380)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-14T01:36:04Z  overall FAIL  (round 1440)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-14T02:39:35Z  overall FAIL  (round 1500)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed8 -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded 3a98f0ab5dd3 but covenant_watchdog.py on disk is 9a0668bc9ed
+
+## 2026-09-14T04:07:56Z  overall FAIL  (round 60)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 9a0668bc9ed8 but covenant_watchdog.py on disk is 79e12eb5c4cd -- the c
+alerts    WARN  2 live -- first: node(s) running a source that is NOT the one on disk: A runs 27a9bf2b01ad, B runs 27a9bf2b01ad, C runs 27a9bf2
+
+## 2026-09-14T05:11:29Z  overall FAIL  (round 120)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 9a0668bc9ed8 but covenant_watchdog.py on disk is 79e12eb5c4cd -- the c
+alerts    WARN  3 live -- first: phone phone: SILENT for 117 min after reporting (last: height 12) -- the node or the app stopped, or the Wi-Fi
+
+## 2026-09-14T06:15:02Z  overall FAIL  (round 180)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 9a0668bc9ed8 but covenant_watchdog.py on disk is 79e12eb5c4cd -- the c
+alerts    WARN  3 live -- first: phone phone: SILENT for 181 min after reporting (last: height 12) -- the node or the app stopped, or the Wi-Fi
+
+## 2026-09-14T07:18:33Z  overall FAIL  (round 240)
+nodes     PASS  3/3 up, height 22 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 9a0668bc9ed8 but covenant_watchdog.py on disk is 79e12eb5c4cd -- the c
+alerts    WARN  3 live -- first: phone phone: SILENT for 244 min after reporting (last: height 12) -- the node or the app stopped, or the Wi-Fi
+
+## 2026-09-14T08:22:09Z  overall FAIL  (round 300)
+nodes     PASS  3/3 up, height 23 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 9a0668bc9ed8 but covenant_watchdog.py on disk is 79e12eb5c4cd -- the c
+alerts    WARN  3 live -- first: phone phone: SILENT for 308 min after reporting (last: height 12) -- the node or the app stopped, or the Wi-Fi
+
+## 2026-09-14T10:01:35Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 23 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 27a9bf2b01ad, B runs 27a9bf2b01ad, C runs 27a9bf2
+
+## 2026-09-14T11:04:56Z  overall WARN  (round 120)
+nodes     PASS  3/3 up, height 23 (spread 0), source 27a9bf2b01ad
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node(s) running a source that is NOT the one on disk: A runs 27a9bf2b01ad, B runs 27a9bf2b01ad, C runs 27a9bf2
+
+## 2026-09-14T12:08:21Z  overall FAIL  (round 180)
+nodes     PASS  3/3 up, height 23 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 79e12eb5c4cd but covenant_watchdog.py on disk is 9a97ab9d0b3b -- the c
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T13:11:50Z  overall FAIL  (round 240)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=1, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded 79e12eb5c4cd but covenant_watchdog.py on disk is c84c64e56b3e -- the c
+alerts    WARN  8 live -- first: node A: anomaly SPIKE -- rate_limit_rejection (recent 42 vs expected 8.9)
+
+## 2026-09-14T14:35:29Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T16:09:40Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T17:12:57Z  overall WARN  (round 120)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T18:16:16Z  overall WARN  (round 180)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: 1 peer(s) unreachable -- heartbeats backed off
+
+## 2026-09-14T19:19:34Z  overall WARN  (round 240)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T20:22:58Z  overall WARN  (round 300)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T21:26:21Z  overall WARN  (round 360)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T22:29:47Z  overall WARN  (round 420)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1cdc0ebb73b, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-14T23:33:17Z  overall WARN  (round 480)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T00:37:47Z  overall WARN  (round 540)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T01:41:26Z  overall WARN  (round 600)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+
+## 2026-09-15T02:08Z  overall FAIL  (claude scheduled self-eval)
+nodes     PASS  3/3 up (5000/5020/5060), height 24 all three (spread 0), genesis 00009b31, v8.40, all on source 2f5e4e914bb5, 11510 lines. degraded=true on all three (no provider key, no win32 code sandbox) -- disclosed, unchanged. anomaly_kinds empty everywhere; A skipped 3 heartbeats; free RAM 4943-5412 MB
+watchdog  PASS  last line 2026-09-15T02:07:51Z, 6s before the check (balance agreement A/B/C 988/12/0). 434 ALERTs since the 09-13T08:56Z block. ONE NEW KIND, and it is the big one: "phone phone: SILENT ... (last: height 12)" ran ~250 consecutive lines, 60 min -> 344 min, plus "UNEXPECTED PEER peer_100.86.158.1_5001 ... POST /peers requires an operator signature" at 13:18Z. The phone is back (last seen 8 min ago, battery 100) but still at height 12 -- 12 blocks behind. Other recurring: watchdog-stale (62, now clear), mesh multi-source (31), source-not-on-disk (23), node down A/B/C (1 each), rate_limit_rejection + peer_message_error spikes
+gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false; relax_valueless_for_local_nodes=true. All three /health agree: quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report, veto_threshold 1, degradations []. Ollama absent by the operator's 2026-09-07 instruction -- disclosed, not failed
+trader    PASS  trader_log.txt 2026-09-14T09:00:03 local (13h08m old), last line "---- CYCLE COMPLETE 09/14/2026 ----". trader_freshness.py exit 0: "RAN: a cycle dated 2026-09-14 COMPLETED -- the trader printed it, not the launcher." After 09:05, so this is the strong form. NOTE (5th block running): trader_config.json reads armed=true (FUTURE.bat, 2026-09-06T13:42Z), NOT armed:false as this task file states -- the task text is stale, the config is the operator's. min_sealed_signals=30 / Rule 5 is what blocks. No funds, keys or orders touched
+student   WARN  exam thresholds (judge_suite.THRESHOLDS, abstain counts as a miss; 1 wordless case excluded): NOT MET -- short on clean 7/8 (need 100%), trap 5/6 (need 85%), edge 2/3 (need 100%). 53 cases, 38 agree, 7 wrong (all `discourse`), 0 false clean, 8 abstain; theft/deception/coercion/injection 19/19. Last nightly cycle 2026-09-14T07:46:07Z REFUSED -- the loop working. Then a deliberate BASELINE RESET at 22:39Z (1cdc0ebb73bc -> 83851a41686e, same 38/53, better held-out behaviour under the new stopword/doc-frequency rules). Seat stays with the deferring chain. CLI gap, 3rd block running: `--exam` prints the table only, never the thresholds line this task asks me to quote (covenant_distill.py:1355-1358 calls table() but not thresholds_line())
+repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- 4 problems: covenant_unified_v8.py, run_all_tests.sh, run_local_sweep.py hash mismatch; test_p15_judge_identity.py missing. STALE PINS, not tamper, and now provably chronic: the MANIFEST block (verify_deploy.py:53-80) was last re-pinned 2026-09-11 for a 11214-line core, disk is 11510; and it still REQUIRES test_p15_judge_identity.py, deleted on purpose in eb892c0 (2026-09-12) -- the same commit that last edited verify_deploy.py. A verifier that fails every run cannot see a real substitution
+git       PASS  on main, 0 ahead / 0 behind origin/main after fetch. The 7 staged-uncommitted files flagged on 09-13 are COMMITTED and pushed (HEAD 9cf3f15). 7 loop-written modified (fallback_model_2.json, ops/DISTILL_2.md, HOLDOUT_2.json, NIGHTLY.md, SELF_EVAL.md, distill_rejected.jsonl, verdicts.jsonl), 7 untracked (ops/RUN_WITHOUT.json, outbound_overrides.jsonl, 5 nightly strategy reports). No holdings/portfolio file untracked -- the two holdings.txt.bak-* on disk are covered by .gitignore:227 (*.bak-2*)
+disk      PASS  C: 307G free of 476G (36% used); logs/ 27M; no %TEMP%\covenant_sweep directory to prune
+verdict   FAIL  on repo only, for the second evaluation running, and for the same reason I named on 09-13 -- nothing was done about it. Nothing is down: three nodes agreeing at height 24, a 6-second-old watchdog, a wired gate, a trader that ran and refused. The two real items are (1) the deploy verifier pinning a dead build, and (2) the phone node 12 blocks behind on the old source, which is what has been generating the mesh multi-source alert for three days
+## 2026-09-15T02:44:52Z  overall WARN  (round 660)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T03:48:16Z  overall WARN  (round 720)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T04:51:42Z  overall WARN  (round 780)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T05:55:09Z  overall WARN  (round 840)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T06:58:26Z  overall WARN  (round 900)
+nodes     PASS  3/3 up, height 24 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@83851a41686, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T08:01:48Z  overall WARN  (round 960)
+nodes     PASS  3/3 up, height 25 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T09:05:04Z  overall WARN  (round 1020)
+nodes     PASS  3/3 up, height 25 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T10:08:20Z  overall WARN  (round 1080)
+nodes     PASS  3/3 up, height 25 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T11:58:44Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 25 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T13:02:08Z  overall WARN  (round 120)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T14:05:31Z  overall WARN  (round 180)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T15:08:55Z  overall WARN  (round 240)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T16:12:18Z  overall WARN  (round 300)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T17:15:49Z  overall WARN  (round 360)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T18:19:13Z  overall WARN  (round 420)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T19:22:47Z  overall WARN  (round 480)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T20:26:15Z  overall WARN  (round 540)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T21:29:39Z  overall WARN  (round 600)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T22:33:03Z  overall WARN  (round 660)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-15T23:36:27Z  overall WARN  (round 720)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T00:40:00Z  overall WARN  (round 780)
+nodes     PASS  3/3 up, height 26 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@3100c521fb2, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+

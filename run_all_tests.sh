@@ -640,6 +640,7 @@ run test_s1_scale.py 60
 # shortlist (Pedersen, Neuromorphic Intermediate Representation).
 run test_n1_conformance.py 60
 run test_r1_retracted.py 60
+run test_r2_semantics.py 120
 # C4 (2026-08-30) pins three unauthenticated paths that grew without a bound:
 # succession register (5,000 guardians, 48.8s, lock held throughout), the
 # rate limiter's own key map (200,000 keys, 40.76 MB), and peer-supplied

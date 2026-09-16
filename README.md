@@ -48,9 +48,11 @@ nine lines by reading that file and hashing what is already in it — no `climb`
 Intermediate Representation this borrowed from, did exactly that and said so. Full
 account: [A121](docs/KNOWN_ISSUES.md) and [Corrections and missteps](docs/CORRECTIONS.md).
 
-**So the ask is not "match the root."** It is: implement the two operations the spec
-describes, in whatever language you like, compute each of the 23 `expected` values from
-its `input`, and compare **per vector**. That is an ordinary test-vector suite — real
+**So the ask is not "match the root."** The rules of both operations are now written out
+independently of any implementation in **[`docs/SEMANTICS.md`](docs/SEMANTICS.md)** — that
+is the thing to build from, and it is what Pedersen said to write instead of more vectors.
+Implement the two operations in whatever language you like, compute each of the 23
+`expected` values from its `input`, and compare **per vector**. That is an ordinary test-vector suite — real
 evidence of the ordinary kind, pinning the computation only where it samples — and it is
 what the two clean-room builds actually did on 2026-09-03, one in PowerShell and one in
 Python, each by an AI agent forbidden to read this tree and audited for it

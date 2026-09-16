@@ -4860,3 +4860,36 @@ the moment the central claim failed (A121b).
 
 **Status:** recorded, uncorrectable. The judgement about proactive disclosure to any
 future institutional partner is the operator's and is not made here.
+
+---
+
+### A123. [minor / shape] The over-depth report is a third shape, missing five fields every other level report carries. FOUND BY WRITING THE SPECIFICATION 2026-09-15, recorded not changed
+
+`scale.climb` returns three differently-shaped reports, not two. A leaf carries
+`leaf: True`, `answered`/`silent`/`outliers` empty and `speaks_upward`. A level
+carries all of those plus `agreed`. **The over-depth refusal carries neither**:
+past `MAX_DEPTH` it returns `name`, `verdict`, `why`, `divergences`, `children`,
+`depth`, `reference`, `silent_diverged`, `silent_unproven` — and omits
+`answered`, `silent`, `outliers`, `agreed` and `speaks_upward`.
+
+A consumer reading `rep["speaks_upward"]` on such a node raises rather than
+reading false.
+
+**How it was found.** Not by reading the code — by writing `docs/SEMANTICS.md`
+and then building `spec_reference.py` from that document alone. The reference
+implementation filled the fields in, as every other branch does, and
+`test_r2_semantics.py` reported the disagreement at depth 65 of a 66-level tree.
+Nothing in 100,000 other enumerated cases touched it, and no published vector
+goes deeper than three levels.
+
+**Left as it is, deliberately.** Writing a specification is *repair* — it
+describes what runs; it does not change it. Changing the code to match a
+document written hours earlier would be the inverse of the standing rule *never
+move a check to make it pass*. So `SEMANTICS.md` 2.2 records the omission as
+normative, `spec_reference.py` reproduces it with the reason in a comment, and
+this entry names it. A second implementation must omit those five fields too.
+
+**Severity: cosmetic.** Reachable only past 64 levels of nesting, which is
+refused anyway, and nothing in the tree reads those fields on a refused node.
+Recorded because an inconsistency nobody has written down is the kind that gets
+discovered by whoever is relying on it.
