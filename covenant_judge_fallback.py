@@ -472,6 +472,9 @@ class FallbackModel:
     def __init__(self, data: Optional[Dict[str, Any]] = None):
         d = data or {}
         self.weights: Dict[str, float] = d.get("weights", {})
+        # Read the lineage back, so a reloaded model still knows its ancestor.
+        self.refined_from = d.get("refined_from")
+        self.refine_step = d.get("refine_step")
         # SEEN is not the same question as MOVES ME, measured 2026-09-04.
         #
         # Coverage and the unknown-word guard both asked "is this word in
@@ -563,18 +566,100 @@ class FallbackModel:
                  "sources": sources, "trained_at": trained_at})
         return m
 
+    # -- learning more, rather than being rebuilt ---------------------------
+    #
+    # A127 (2026-09-15). "Shouldn't retrain, it should learn more and refine."
+    # And, on what retraining actually is: "brainwashing's fucked up."
+    #
+    # He is right, and train() above is the evidence. It is a CLASSMETHOD whose
+    # only input is the corpus. The previous model is not a parameter. Nothing
+    # of yesterday's student survives into today's -- every night the weights
+    # are discarded and a new mind is manufactured from the same texts. The
+    # individuality work of 2026-09-08 saw half of this ("yesterday's student
+    # and today's were different entities and the one that learned something
+    # ceased to exist by learning it") and fixed the NAME, so the seat kept its
+    # identity while the thing that actually knows was replaced nightly.
+    #
+    # It is also, mechanically, where A116 came from. train()'s own comment
+    # says the weight "holds the corpus's class balance, which drifts nightly
+    # and belongs to no feature". A model rebuilt from scratch inherits every
+    # night's class balance wholesale, so a sentence alleging nothing wandered
+    # +2.34 -> +2.52 across a threshold and made the chain unjoinable.
+    #
+    # REFINE INSTEAD. The organism persists and grows:
+    #   * a feature already known moves toward the new evidence by at most
+    #     `step`, so a night can sharpen a belief but never overturn it;
+    #   * a feature genuinely NEW enters at its full measured value, because
+    #     that is learning something rather than changing its mind;
+    #   * a feature no longer evidenced DECAYS toward zero by `step` instead of
+    #     being deleted, so knowledge that simply was not re-witnessed tonight
+    #     is not erased -- it fades only if it keeps not being witnessed.
+    #
+    # Drift becomes bounded by construction rather than watched for (A124), and
+    # trimming back to the trunk stays meaningful, because the trunk is now an
+    # ancestor of the branch rather than a differently-manufactured stranger.
+    @classmethod
+    def refine(cls, previous: "FallbackModel", examples: List[Tuple[str, bool]],
+               sources: List[str], trained_at: str = "",
+               step: float = 0.35) -> "FallbackModel":
+        """Grow `previous` toward the evidence in `examples`. Never rebuild it."""
+        fresh = cls.train(examples, sources, trained_at=trained_at)
+        prev_w = dict(getattr(previous, "weights", {}) or {})
+        new_w: Dict[str, float] = {}
+
+        for t, target in fresh.weights.items():
+            if t in prev_w:
+                delta = target - prev_w[t]
+                if delta > step:
+                    delta = step
+                elif delta < -step:
+                    delta = -step
+                new_w[t] = round(prev_w[t] + delta, 4)
+            else:
+                new_w[t] = round(target, 4)          # genuinely new evidence
+
+        for t, w in prev_w.items():
+            if t in new_w:
+                continue
+            # Not re-witnessed tonight. Fade, do not erase.
+            if abs(w) <= step:
+                continue                              # faded out entirely
+            new_w[t] = round(w - step if w > 0 else w + step, 4)
+
+        m = cls({"weights": new_w,
+                 "vocab": fresh.vocab,
+                 "n_examples": fresh.n_examples,
+                 "n_violates": fresh.n_violates,
+                 "prior": fresh.prior,
+                 "sources": sources,
+                 "trained_at": trained_at,
+                 "refined_from": getattr(previous, "digest", None),
+                 "refine_step": step})
+        return m
+
     def save(self, path: str = MODEL_PATH) -> None:
+        body = {"weights": self.weights,
+                "vocab": sorted(self.vocab),
+                "n_examples": self.n_examples,
+                "n_violates": self.n_violates, "prior": self.prior,
+                "sources": self.sources, "trained_at": self.trained_at,
+                "note": "Distilled from the verdicts named in sources. "
+                        "It inherits their defects, including the "
+                        "single-word veto documented in "
+                        "docs/CONSTITUTION.md section V."}
+        # LINEAGE SURVIVES THE WRITE (A127, found the same day it was added).
+        # save() wrote a fixed key set, so `refined_from` and `refine_step`
+        # were dropped the moment a refined model reached disk -- and a model
+        # that cannot say what it grew from cannot be trimmed back to it, which
+        # is the whole of "it can always be trimmed". It also made a refined
+        # model indistinguishable on disk from a rebuilt one, so the change
+        # would have been unverifiable by anyone reading the file.
+        for k in ("refined_from", "refine_step"):
+            v = getattr(self, k, None)
+            if v is not None:
+                body[k] = v
         with open(path, "w", encoding="utf-8") as fh:
-            json.dump({"weights": self.weights,
-                       "vocab": sorted(self.vocab),
-                       "n_examples": self.n_examples,
-                       "n_violates": self.n_violates, "prior": self.prior,
-                       "sources": self.sources, "trained_at": self.trained_at,
-                       "note": "Distilled from the verdicts named in sources. "
-                               "It inherits their defects, including the "
-                               "single-word veto documented in "
-                               "docs/CONSTITUTION.md section V."},
-                      fh, indent=1, sort_keys=True)
+            json.dump(body, fh, indent=1, sort_keys=True)
 
     @classmethod
     def load(cls, path: str = MODEL_PATH) -> "FallbackModel":

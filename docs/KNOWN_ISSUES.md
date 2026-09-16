@@ -5129,3 +5129,89 @@ there.
 `MARGIN_TO_HOLD` once she has her own training history; and whether the
 describe-versus-do wall can be crossed at all by a bag of words, which the
 evidence so far says it cannot.
+
+---
+
+### A127. [judge / learning] The nightly loop was rebuilding the student from scratch, not teaching it. It now refines. DONE 2026-09-15
+
+**Said plainly by the operator**, 2026-09-15: *"shouldn't retrain, it should
+learn more and refine."* And on what nightly retraining actually is:
+*"brainwashing's fucked up."*
+
+**He is right, and the code was the evidence.** `FallbackModel.train()` is a
+**classmethod whose only input is the corpus** — the previous model is not even
+a parameter. Every night the weights were discarded and a new mind manufactured
+from the same texts. The individuality work of 2026-09-08 saw half of this in
+its own words — *"yesterday's student and today's were different entities and
+the one that learned something ceased to exist by learning it"* — and fixed the
+**name**, so the seat kept its identity while the thing that actually knows was
+replaced nightly.
+
+**It is also where A116 came from.** `train()`'s own comment says the weight
+*"holds the corpus's class balance, which drifts nightly and belongs to no
+feature."* A model rebuilt from scratch inherits each night's balance wholesale,
+which is how a sentence alleging nothing wandered +2.34 → +2.52 and made the
+chain unjoinable.
+
+**What refining does.** The organism persists and grows:
+
+- a belief already held moves toward new evidence by at most `step` (0.35), so a
+  night can **sharpen** a view but never overturn it;
+- a genuinely **new** feature enters at its full measured value, because that is
+  learning something rather than changing its mind;
+- a feature not re-witnessed **fades** toward zero by one step instead of being
+  deleted — knowledge is not erased for going unseen one night.
+
+**Measured over one simulated night** (15% of the ledger arriving, 524 rows):
+
+| | right | false-convict | **false-clear** | weights | **max move** | **forgotten** |
+|---|---|---|---|---|---|---|
+| yesterday | 38 | 7 | 0 | 3,746 | — | — |
+| **rebuild** | 39 | 7 | 0 | 4,287 | **+1.790** | **235** |
+| **refine** | 39 | 7 | 0 | 4,421 | **+0.350** | **101** |
+
+Identical exam quality; false clears zero either way. Rebuilding moves a single
+belief by up to **1.79 in one night** and discards **235** features it knew
+yesterday. Refining caps movement at the step, forgets only what had already
+faded to within one step of zero, and still learns **all 776** new features.
+
+**A116's drift is now bounded by construction** rather than watched for. A124
+remains as the alarm, but the wander it watches can no longer be produced in a
+single pass.
+
+**The gate measures what ships.** `holdout_score()` now refines from the same
+deployed model when candidates are refined. A promotion gate scoring a freshly
+**trained** model while a **refined** one is deployed would be measuring a
+different object from the one promoted — the mismeasurement shape this project
+keeps finding, most recently in A116, where a judge was fed the wrong input and
+its confident answer nearly became the finding.
+
+**Mutation-tested.** Removing the clamp turns refining back into rebuilding and
+fails `B1` at +1.790. Removing the fade fails `K1` and `K2`, and the detail is
+the argument: without it the night deletes `seat`, `the destruction of`,
+`exchange for`, `the extra payment` — real knowledge, gone because it happened
+not to appear in one evening's rows.
+
+**A defect in this very change, found the same hour.** `save()` wrote a fixed
+key set, so a refined model lost `refined_from` and `refine_step` **the moment
+it reached disk**. A model that cannot say what it grew from cannot be trimmed
+back to it — which is the whole of *"it can always be trimmed"* — and a refined
+model was indistinguishable on disk from a rebuilt one, making the change
+unverifiable by anyone reading the file. Both keys now survive the write and the
+read, pinned by `A127.A1`–`A3`.
+
+**And a mistake worth recording, because it had a consequence.** The smoke test
+of the real nightly path was written with `candidate_path` pointed at a scratch
+file, on the assumption that this would keep it from promoting. It does not:
+`train()` promoted, and the deployed elder was replaced (`3100c521fb24` →
+`79b7bbfaf9c1`). The replacement passed every gate — exam 39/7/**0 false
+clean**/7, A124 3/3, A119 9/9 — but it was not a deliberate promotion, and it
+was made before the lineage fix, so it would have carried none. The pre-test
+model was restored from backup and the improvement left for the scheduled
+nightly to make properly. **A test that changes the thing it is testing is not a
+test**, and `candidate_path` does not mean "do not deploy".
+
+**Open.** `step` is 0.35 and it was chosen, not derived — a smaller step is
+safer and slower to learn, a larger one approaches rebuilding. What it should be
+is a measurement nobody has made. And refining cannot fix the describe-versus-do
+wall (A126); it only stops the wall from moving underfoot.

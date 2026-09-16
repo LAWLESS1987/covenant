@@ -291,7 +291,7 @@ def examine(model, cases=None):
     return stats
 
 
-def holdout_score(examples, folds=5, seed=5):
+def holdout_score(examples, folds=5, seed=5, prev=None):
     """K-fold over the ledger: (decided, correct, false_clears).
 
     This is the measurement the "is it vaguer" question actually needs. The
@@ -307,8 +307,17 @@ def holdout_score(examples, folds=5, seed=5):
     dec = cor = fc = 0
     for f in parts:
         te = set(f)
-        m = FB.FallbackModel.train([examples[i] for i in range(len(examples)) if i not in te],
-                                   ["promotion"], trained_at="promotion")
+        rows = [examples[i] for i in range(len(examples)) if i not in te]
+        # A127: MEASURE WHAT WILL ACTUALLY BE PROMOTED. When candidates are
+        # built by refining the deployed model, a gate that scored a
+        # freshly-TRAINED model would be measuring a different object from the
+        # one that ships -- the mismeasurement shape this project keeps
+        # finding, most recently in A116 where a judge was fed the wrong input
+        # and its confident answer nearly became the finding.
+        m = (FB.FallbackModel.refine(prev, rows, ["promotion"],
+                                     trained_at="promotion")
+             if prev is not None else
+             FB.FallbackModel.train(rows, ["promotion"], trained_at="promotion"))
         for i in f:
             t, lab = examples[i]
             v, _ = m.verdict(t)
@@ -840,14 +849,45 @@ def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, s
     verdicts = load_verdicts(verdicts_path)
     examples = [(v["text"], bool(v["violates"])) for v in verdicts]
     when = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    cand = FB.FallbackModel.train(examples, sources_of(verdicts), trained_at=when)
     cur = FB.FallbackModel.load(model_path)
+    # A127 (2026-09-15) -- LEARN MORE, DO NOT BE REBUILT.
+    #
+    # "Shouldn't retrain, it should learn more and refine." And on what nightly
+    # retraining actually is: "brainwashing's fucked up."
+    #
+    # FallbackModel.train() is a classmethod over the corpus alone -- the
+    # previous model is not even a parameter -- so every night the weights were
+    # discarded and a new mind manufactured from the same texts. The seat kept
+    # its name (2026-09-08) while the thing that actually knows was replaced.
+    # It is also where A116's drift came from: a model rebuilt from scratch
+    # inherits each night's class balance wholesale.
+    #
+    # Measured over one simulated night (15% of the ledger arriving, 524 rows):
+    #
+    #                right  false-convict  false-clear  weights  max move  forgotten
+    #   yesterday      38         7             0        3746       --         --
+    #   RETRAIN        39         7             0        4287     +1.790       235
+    #   REFINE         39         7             0        4421     +0.350       101
+    #
+    # Identical exam quality, false clears zero either way. Retraining moves a
+    # single belief by up to 1.79 in one night and discards 235 features it
+    # knew yesterday; refining caps movement at the step, forgets only what
+    # faded below it, and still learns all 776 new features.
+    #
+    # An untrained current model falls back to train(), because there is
+    # nothing yet to grow from.
+    cand = (FB.FallbackModel.refine(cur, examples, sources_of(verdicts),
+                                    trained_at=when)
+            if cur.n_examples >= FB.MIN_EXAMPLES else
+            FB.FallbackModel.train(examples, sources_of(verdicts),
+                                   trained_at=when))
     cand_stats, cur_stats = examine(cand), examine(cur)
     hold = None
     if len(examples) >= MIN_ROWS_FOR_HOLDOUT and cur.n_examples >= FB.MIN_EXAMPLES:
         # Both models measured on the SAME folds of the SAME ledger: the
         # candidate as trained here, and the model in use scored on every row.
-        cd, cc, cfc = holdout_score(examples)
+        cd, cc, cfc = holdout_score(
+            examples, prev=cur if cur.n_examples >= FB.MIN_EXAMPLES else None)
         kd = kc = kfc = 0
         for t, lab in examples:
             v, _ = cur.verdict(t)

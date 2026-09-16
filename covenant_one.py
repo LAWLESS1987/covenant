@@ -169,6 +169,12 @@ SUITES = [
     # cannot strip a disposition, that unlisted seats are untouched, and
     # that FALSE CLEARS STAY AT ZERO at every setting measured.
     ("test_a126_seat_dispositions.py",  120,  "JUDGE"),
+    # A127 (2026-09-15): the student LEARNS MORE rather than being rebuilt
+    # nightly. Pins that no belief moves further than the step in one
+    # pass, that unwitnessed knowledge fades instead of being deleted,
+    # that it still learns every new feature, and that the promotion gate
+    # measures the object that actually ships.
+    ("test_a127_refine_not_rebuild.py", 180,  "JUDGE"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed
