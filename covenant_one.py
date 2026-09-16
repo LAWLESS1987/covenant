@@ -440,6 +440,13 @@ SUITES = [
     # UNKNOWN, PASS and BLOCKED in a temp tree; and the suite states per gate
     # whether it was driven or merely observed. It found A134 on the way.
     ("test_g5_launch_gates.py", 180, "DEPLOYMENT"),
+    # G6 (2026-09-16): can the sentinels ALERT? test_sentinels.py runs the
+    # program and checks it exits clean, which proves it runs and nothing
+    # about tamper detection. This drives each one against a temp tree: a
+    # correction marker removed, a document gone, a ledger shrunk, a ledger
+    # vanished. Three of its own fixtures were wrong before the sentinels were,
+    # and G6.0 now makes the fixture prove itself first.
+    ("test_g6_sentinels_fail.py", 120, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
