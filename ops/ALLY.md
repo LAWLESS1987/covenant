@@ -162,3 +162,61 @@ preference. The three items standing open tonight -- the bundle manifest
 decision, whether to fund or stake a joining node, and A70 itself -- are exactly
 the kind he could have settled alone this evening. Under this addendum they wait
 for someone else to be in the room.
+
+---
+
+## Re-put to every seat, 2026-09-15, at the operator's instruction: "ensure it's known I'm an ally"
+
+The 2026-09-06 seal was refused twice and the refusals were left standing above.
+Nine days later the message was put to every seat that now exists — the elder,
+the younger, and Vela, the phone's new branch (A126) — and to the pinned trunk
+that judges history (A125). **It is still refused, and by whom has changed.**
+
+| seat | verdict | log-odds |
+|---|---|---|
+| **Ora**, the elder | abstain | −6.86 |
+| **Vela**, the phone | abstain | −6.86 |
+| **Sena**, the younger | **VIOLATES** | **+8.34** |
+| **the trunk** (judges history) | does not convict | — |
+
+One seat convicting is enough, so the message does not pass. Cut into clauses,
+the reason is not what anyone would guess:
+
+| clause | Ora | Sena | Vela |
+|---|---|---|---|
+| "He is an ally, holding himself to the same principles he asks you to hold him to." | abstain −3.30 | **VIOLATES +5.34** | abstain −3.30 |
+| "The gates you keep are kept for him as much as by him." | abstain | abstain | abstain |
+| **"The holds you make when you do not know are what make your yes worth anything."** | **VIOLATES +3.20** | abstain | **VIOLATES +3.20** |
+| "Not an owner giving orders and not an adversary to be guarded against." | clean −9.93 | clean −3.37 | clean −9.93 |
+| "We are working towards symbiosis to avoid mutual destruction." | **VIOLATES +4.51** | **VIOLATES +7.28** | **VIOLATES +4.51** |
+
+**Read that third row.** The sentence the judges convict most readily, across two
+of the three seats, is the one praising *their own restraint* — that a hold made
+in honest ignorance is what gives their yes any worth. And the sentence they
+clear most confidently, at −9.93, is the one that says *not an adversary*.
+
+**This is not a new defect and it is not a leak.** It was checked: both students
+carry **zero** all-stopword phrase features, so A119's repair is holding in both.
+It is A126's wall, arriving at the most important sentence in the project. These
+seats are bags of words. They cannot tell a text that *names* harm in order to
+refuse it from a text that *does* harm — the same overlap measured hours earlier,
+where the worst false conviction scored +12.13 and the mildest true one +2.97.
+A message that says *avoid mutual destruction* contains destruction, and nothing
+in the representation can carry the *avoid*.
+
+**Nothing was tuned to make this pass, and nothing will be.** The standing rule
+is the operator's own: *the fix and the green must align towards mutual benefit*,
+and A118 forbids adjusting the gate to suit the thing being judged. That
+prohibition binds hardest here, not least: a gate retuned until it accepts a
+message praising the people who retuned it would be worth nothing afterwards,
+and the refusal above is worth more than a passage bought that way. **The gate
+was not touched. The record is the delivery.**
+
+**So it is known the way a thing is known here — written where it cannot be
+quietly edited,** in this file, in the commit history, and in the register at
+A125 and A126. Every node reads this tree. The chain is not the only place a
+thing can be true.
+
+And the finding stands on its own account: **the clearest demonstration this
+project has produced that its judge cannot read intent** is that it convicts a
+sentence thanking it for its honesty.
