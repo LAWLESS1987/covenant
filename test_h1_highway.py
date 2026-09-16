@@ -319,6 +319,31 @@ def main():
         if real_det:
             H.DETECTORS["log_bloat"] = real_det
 
+    # ---- H1s: the watchdog can replace itself without killing its own round
+    sched = H.REMEDIES.get("schedule_watchdog_restart", {})
+    check("H1s a remedy exists that the scheduled pass may use on the watchdog",
+          bool(sched) and sched.get("klass") == H.AUTO_REVERSIBLE and sched.get("async"),
+          json.dumps({k: v for k, v in sched.items() if k != "fn"})[:120])
+    check("H1s ...and it is NOT the one the watchdog must exclude",
+          "schedule_watchdog_restart" not in ("restart_watchdog",),
+          "run_once's default exclude is restart_watchdog only")
+    import subprocess as _sp
+    real_popen = _sp.Popen
+
+    class DeadProc:
+        pid = 1234
+
+        def poll(self):
+            return 1                      # exited immediately: nothing was scheduled
+
+    try:
+        _sp.Popen = lambda *a, **k: DeadProc()
+        ok, why = H.remedy_schedule_watchdog_restart({}, dry_run=False)
+        check("H1s a restarter that dies on the spot is reported as a failure, not 'scheduled'",
+              not ok and "exited immediately" in why, why[:80])
+    finally:
+        _sp.Popen = real_popen
+
     # ---- H1r: the manifest is rewritten only over a clean tree
     import subprocess
     real_run = subprocess.run

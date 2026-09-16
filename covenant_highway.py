@@ -547,6 +547,54 @@ def remedy_rehash_bundle(measured, dry_run=True):
     return r.returncode == 0, ((r.stdout or "") + (r.stderr or "")).strip()[-160:]
 
 
+def remedy_schedule_watchdog_restart(measured, dry_run=True):
+    """ASYNCHRONOUS, and the only remedy the watchdog may use on itself.
+
+    restart_watchdog kills its caller, so the scheduled pass excludes it --
+    which left the watchdog stale after every commit that touched a module it
+    imports, waiting for a person. That is the opposite of the point.
+
+    This hands the job to a DETACHED process that waits five seconds and then
+    does the stop-and-start, so the round that asked for it finishes normally
+    and the replacement happens a moment later. Being killed is not a hazard
+    for the watchdog -- rolling_restart and the guard already do exactly that,
+    and it writes its state as it goes rather than at the end.
+    """
+    import subprocess
+    inner = ("Start-Sleep -Seconds 5;"
+             " $w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+             " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
+             " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
+             " Start-Sleep -Seconds 2;"
+             " Start-Process -FilePath '%s' -ArgumentList '%s','--interval','60'"
+             " -WorkingDirectory '%s' -WindowStyle Hidden"
+             " -RedirectStandardOutput '%s' -RedirectStandardError '%s'"
+             % (sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
+                os.path.join(HERE, "logs", "watchdog-stdout.log"),
+                os.path.join(HERE, "logs", "watchdog-stderr.log")))
+    if dry_run:
+        return True, "would schedule a detached restart in 5s"
+    # CREATE_NO_WINDOW, not DETACHED_PROCESS, and the difference is not
+    # cosmetic: the first version used DETACHED_PROCESS and the child never ran
+    # at all -- measured with a marker file, twice -- while this function
+    # cheerfully returned "scheduled". A remedy that reports success it has not
+    # observed is the failure mode this whole file exists to avoid, so the
+    # spawn is now CHECKED: half a second later, a process that has already
+    # exited is reported as the failure it is.
+    try:
+        proc = subprocess.Popen(
+            ["powershell", "-NoProfile", "-Command", inner], cwd=HERE,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as e:                                       # noqa: BLE001
+        return False, "%s: %s" % (type(e).__name__, e)
+    time.sleep(0.5)
+    rc = proc.poll()
+    if rc is not None:
+        return False, "the restarter exited immediately (rc %s) -- nothing was scheduled" % rc
+    return True, "restart scheduled in 5s (pid %d); this round finishes first" % proc.pid
+
+
 def remedy_install_on_phone(measured, dry_run=True):
     """PROPOSE_ONLY, permanently. The person holding the phone confirms an
     install; nothing here may do it for them, and the engine refuses this class
@@ -612,6 +660,13 @@ REMEDIES = {
                                             "\"gates BLOCKED\" stops being permanent furniture"],
                                   "cost": ["one tracked file rewritten, to be carried by the next commit"],
                                   "irreversible": []}},
+    "schedule_watchdog_restart": {"fn": remedy_schedule_watchdog_restart,
+                                  "klass": AUTO_REVERSIBLE, "for": ["watchdog_stale"],
+                                  "kind": "stateless", "async": True,
+                                  "touches": ["the watchdog process"],
+                                  "benefit": {"gains": ["the watchdog runs the modules that are on disk, without a person"],
+                                              "cost": ["a few seconds with nothing watching the nodes"],
+                                              "irreversible": []}},
     "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
                          "for": ["app_build_gap"], "kind": "needs a person",
                          "touches": ["the phone"],
@@ -895,7 +950,13 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
                 alerts.append("highway: %s is present and %s %s -- %s"
                               % (name, rname, row["outcome"], row.get("why", row.get("detail", ""))[:120]))
         if not acted:
-            alerts.append("highway: %s is present and nothing here repairs it" % name)
+            held_back = [n for n, rr in REMEDIES.items()
+                         if name in rr["for"] and n in (exclude or ())]
+            if held_back:
+                alerts.append("highway: %s is present; %s could fix it but this caller "
+                              "excluded it" % (name, ", ".join(held_back)))
+            else:
+                alerts.append("highway: %s is present and nothing here repairs it" % name)
     return alerts, infos
 
 
