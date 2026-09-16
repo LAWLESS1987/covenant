@@ -319,6 +319,30 @@ def main():
         if real_det:
             H.DETECTORS["log_bloat"] = real_det
 
+    # ---- H1u: a pass that did nothing must not report someone else's action
+    calls = []
+    real_rl = dict(H.REMEDIES["rotate_log"])
+    real_det = H.DETECTORS.get("log_bloat")
+    saved_dets = H.DETECTORS
+    try:
+        H.REMEDIES["rotate_log"] = dict(real_rl, fn=spy_remedy(calls))
+        H.DETECTORS = {"log_bloat": lambda health=None: {"state": H.PRESENT, "measured": {}}}
+        led = tmp_ledger()
+        a1, i1 = H.run_once(dry_run=False, ledger=led, cooldown_s=0)      # really acts
+        a2, i2 = H.run_once(dry_run=False, ledger=led)                    # cooled down
+        check("H1u the second pass does not run the remedy again", len(calls) == 1, "calls=%d" % len(calls))
+        check("H1u ...and says nothing was done, instead of repeating the first pass's detail",
+              any("nothing done this pass" in x for x in i2) and not a2,
+              (i2[0] if i2 else "") + " | alerts=" + str(a2)[:60])
+        check("H1u ...and the ledger gains no row for a pass that did nothing",
+              len([r for r in H.read_ledger(led) if r.get("remedy") == "rotate_log"]) == 1,
+              str(len(H.read_ledger(led))))
+    finally:
+        H.DETECTORS = saved_dets
+        H.REMEDIES["rotate_log"] = real_rl
+        if real_det:
+            H.DETECTORS["log_bloat"] = real_det
+
     # ---- H1t: a node that rate-limits is ANSWERING (A115), and it cost a restart
     #
     # At 11:22 today this detector called three healthy nodes "down" because

@@ -975,6 +975,16 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
             row = apply_remedy(rname, c, name, dry_run=dry_run, ledger=ledger,
                                cooldown_s=cooldown_s)
             acted = True
+            if row.get("repeat"):
+                # SAY THAT NOTHING HAPPENED. The cooldown returns the previous
+                # row, and this used to print ITS detail as though it had just
+                # happened -- "dispatch accepted (HTTP 204)" for a dispatch
+                # made four hours earlier, with no new build and no new cost.
+                # An accurate ledger under a report that misreads it is still a
+                # system that lies to its operator.
+                infos.append("highway: %s still present; %s last %s at %s -- nothing done this pass"
+                             % (name, rname, row.get("outcome", "?"), row.get("t", "?")))
+                continue
             if row["outcome"] == "fixed":
                 infos.append("highway: %s was present; %s fixed it" % (name, rname))
             elif row["outcome"] == "proposed":
