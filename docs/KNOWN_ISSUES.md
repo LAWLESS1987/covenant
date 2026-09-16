@@ -5566,3 +5566,53 @@ tap; it cannot be zero. Taildrop (`tailscale file cp`) was tried first as the
 no-typing path and the transfer never completed against the phone -- the CLI sat
 open for 25 minutes on a direct link that carries the node's own traffic fine.
 Not diagnosed further: `/m` works and needs no second mechanism.
+
+### A134. [HIGH / gate] G12 accepts a transcript of ONE suite as proof the suites ran green. OPEN, found 2026-09-16
+
+**What happened.** G12 asks the question the whole battery rests on: *when did
+the suites last run, and on which platform?* At 12:12 it answered honestly —
+
+```
+G12  UNKNOWN  no transcript proves a green sweep of THIS core on THIS platform
+              within a week -- ONE_SWEEP.txt (2026-09-16 08:24): 1 failed | ...
+```
+
+At 13:21, after `python covenant_one.py --only test_g4_money_gates.py` wrote a
+transcript of that single suite, it answered:
+
+```
+G12  PASS  ONE_RUN.txt: 1 suites, 0 failed, core ddfaaa9f704f == disk,
+           platform Windows 11 (AMD64), 2026-09-16 13:21 (0.0 d old).
+```
+
+Nothing about the machine improved between those two readings. The full sweep
+still ends `3074 passed, 1 failed` on `test_f3_gate_end_to_end.py` (A132, open
+on purpose). What changed is that a one-suite run produced a document with the
+shape G12 reads: recent, right core, right platform, zero failures. **One suite
+is not the suites**, and a gate satisfied by a token instead of the thing is the
+defect this repository keeps finding in itself (M30, P14, A121).
+
+It is worth being precise about the direction of the error: G12 does not lie
+about what it read — the detail line says "1 suites" plainly. The fault is that
+PASS is the verdict it draws from it. A reader who trusts the state and skips
+the detail is told the suites are green when one suite is.
+
+**Why it is open rather than fixed.** What counts as a sweep is a rule, not an
+implementation detail: a threshold ("at least N suites", "the runner's own
+listed count", "a full run only") changes what the battery certifies, and
+changing it unilaterally is the A125 mistake — overriding a scope the operator
+chose. The obvious candidates:
+
+- require the transcript's suite count to match the runner's registered count;
+- or refuse any transcript written by `--only`, which is what a marker in the
+  transcript would make visible;
+- or keep PASS but state the count in the state itself rather than the detail.
+
+That choice belongs to the operator.
+
+**Pinned meanwhile** by `test_g5_launch_gates.py` G5.10/G5.10b, which records
+the count G12 accepted and asserts the behaviour is what this entry describes,
+so the day it changes something says so. G5 also drives G1 through UNKNOWN, PASS
+and BLOCKED, observes the other ten, and — in G5.9/G5.9b — states per gate which
+of those two it did, because a coverage claim that is not itself measured is how
+this started.

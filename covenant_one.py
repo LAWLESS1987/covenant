@@ -435,6 +435,11 @@ SUITES = [
     # failures on its first run were both the fixture's fault, not the gate's,
     # and both are written into the file where the next reader will meet them.
     ("test_g4_money_gates.py", 120, "DAILY + GUARDS"),
+    # G5 (2026-09-16): the launch battery audited the same way -- every gate
+    # runs, records one result and returns a legal state; G1 is driven through
+    # UNKNOWN, PASS and BLOCKED in a temp tree; and the suite states per gate
+    # whether it was driven or merely observed. It found A134 on the way.
+    ("test_g5_launch_gates.py", 180, "DEPLOYMENT"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
