@@ -108,14 +108,33 @@ def climb(node: Dict[str, Any], depth: int = 0) -> Tuple[Optional[str], Dict[str
     SILENCE, which attest already refuses to count as agreement.
     """
     if depth > MAX_DEPTH:
+        # A123, FIXED 2026-09-15. This report used to be a THIRD SHAPE: it
+        # omitted `answered`, `silent`, `outliers`, `agreed` and
+        # `speaks_upward`, which every other level report carries, so a caller
+        # doing rep["speaks_upward"] on a refused node raised KeyError instead
+        # of reading False. Found by writing docs/SEMANTICS.md and building
+        # spec_reference.py from it -- the reference filled the fields in, as
+        # every other branch does, and test_r2_semantics.py reported the
+        # disagreement at depth 65 of a 66-level tree. Nothing in 100,000
+        # other enumerated cases reached it and no published vector goes
+        # deeper than three levels, which is exactly why it survived.
+        #
+        # Filling them in is safe in the one direction that matters: every
+        # value here is the honest one for a level that judged nothing. It
+        # refused, so it answered nobody, heard nobody, has no outliers, did
+        # not agree, and speaks silence upward. No conformance vector reaches
+        # this branch, so the published root is unchanged -- checked, not
+        # assumed.
         return None, {"name": node.get("name", "?"), "verdict": UNPROVEN,
+                      "agreed": False,
                       "why": "nesting deeper than %d levels; refused rather "
                              "than recursed into, because this is far more "
                              "likely to be a cycle than a hierarchy"
                              % MAX_DEPTH,
+                      "answered": [], "silent": [], "outliers": [],
                       "divergences": [], "children": [], "depth": depth,
                       "reference": None, "silent_diverged": [],
-                      "silent_unproven": []}
+                      "silent_unproven": [], "speaks_upward": False}
 
     if "children" not in node:
         # A leaf's reference is simply what it holds: the same field name for

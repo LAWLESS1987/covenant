@@ -4066,7 +4066,21 @@ three go red.
 
 **Status:** fixed
 
-### A116. [CRITICAL / consensus] The canonical chain cannot be synced past block 12 by any node that does not already hold it: the ethics gate convicts a transaction the chain already contains. OPEN, reproduced 2026-09-14
+### A116. [CRITICAL / consensus] The canonical chain cannot be synced past block 12 by any node that does not already hold it: the ethics gate convicts a transaction the chain already contains. RESOLVED 2026-09-14 by A119's repair; GUARDED since 2026-09-15 by A124
+
+> **Heading corrected 2026-09-15.** This said `OPEN, reproduced 2026-09-14` while its
+> own Status line five hundred words below said `RESOLVED 2026-09-14`. Anyone scanning
+> headings -- which is how this file is read -- saw the project's only CRITICAL issue
+> standing open when it had been fixed the day before. Verified before relabelling,
+> not taken on the document's word: the block-12 sentence now scores **+1.91**, verdict
+> **abstain**, against a hold line of 2.4 (it was +2.52 when it blocked sync), and
+> `ther~` no longer appears among its features.
+>
+> **What is still true, and is now watched.** Block validity on sync depends on a model
+> that retrains every night, and the margin is **0.49** while this model has already
+> been measured moving **0.18 in six days**. Nothing checked for that, which is why the
+> failure was invisible for days and was mistaken for a phone problem. `A124` now
+> measures it every run.
 
 **What happens.** A brand-new node, peered at node A, pulls eleven blocks, reaches
 height 12, and stops there for ever. Its own log says why:
@@ -4419,7 +4433,7 @@ judged. A116 now says so where the option is listed.
 green" but "if the thing this protects broke, would this have gone red?", and the
 only honest way to answer that is to break it.
 
-### A119. [serious / judge] Stopwords get weight through the back door: the elder scores stems of function words, and one of them is convicting block 12. OPEN, measured 2026-09-14
+### A119. [serious / judge] Stopwords get weight through the back door: the elder scores stems of function words, and one of them is convicting block 12. FIXED 2026-09-14, heading corrected 2026-09-15 (it read OPEN while the body described the repair and its pinning suite; `test_a119_stopword_stems.py` passes 9/9, re-run before relabelling)
 
 **The rule the file states, and breaks.** `covenant_judge_fallback.py:210`, one
 line above the stopword list: *"These never get weight, at any count."* But
@@ -4863,7 +4877,7 @@ future institutional partner is the operator's and is not made here.
 
 ---
 
-### A123. [minor / shape] The over-depth report is a third shape, missing five fields every other level report carries. FOUND BY WRITING THE SPECIFICATION 2026-09-15, recorded not changed
+### A123. [minor / shape] The over-depth report was a third shape, missing five fields every other level report carries. FOUND BY WRITING THE SPECIFICATION 2026-09-15, FIXED the same day
 
 `scale.climb` returns three differently-shaped reports, not two. A leaf carries
 `leaf: True`, `answered`/`silent`/`outliers` empty and `speaks_upward`. A level
@@ -4882,14 +4896,82 @@ implementation filled the fields in, as every other branch does, and
 Nothing in 100,000 other enumerated cases touched it, and no published vector
 goes deeper than three levels.
 
-**Left as it is, deliberately.** Writing a specification is *repair* — it
-describes what runs; it does not change it. Changing the code to match a
-document written hours earlier would be the inverse of the standing rule *never
-move a check to make it pass*. So `SEMANTICS.md` 2.2 records the omission as
-normative, `spec_reference.py` reproduces it with the reason in a comment, and
-this entry names it. A second implementation must omit those five fields too.
+**First recorded, then fixed on the operator's instruction** (2026-09-15: *"you
+can fix issues if needed just notate where and why"*). It was initially left
+alone because writing a specification is *repair* — it describes what runs — and
+editing code to match a document written hours earlier is the inverse of *never
+move a check to make it pass*. With the fix authorised, the honest resolution is
+the one that removes the trap rather than documenting it: a refused level judged
+nothing, so it now reports `answered: []`, `silent: []`, `outliers: []`,
+`agreed: false` and `speaks_upward: false` — every value the true one for a level
+that refused. `scale.py`, `docs/SEMANTICS.md` 2.2 and `spec_reference.py` were
+changed **in the same commit**, so the code, the specification and the
+independent implementation never disagreed.
+
+**Checked, not assumed:** the published conformance root is unchanged
+(`0c398099…0f0ddcef`) because no vector reaches this branch; `test_r2_semantics.py`
+still agrees across all ~100,000 enumerated cases; and the fix was verified
+behaviourally — `climb` on a 66-level tree now returns `speaks_upward: False` at
+depth 65 where it previously raised `KeyError`.
 
 **Severity: cosmetic.** Reachable only past 64 levels of nesting, which is
 refused anyway, and nothing in the tree reads those fields on a refused node.
 Recorded because an inconsistency nobody has written down is the kind that gets
 discovered by whoever is relying on it.
+
+---
+
+### A124. [serious / consensus] Nothing watched whether the chain was still joinable, so A116 was invisible for days and was mistaken for a phone problem. GUARD ADDED 2026-09-15
+
+**The gap, not a new bug.** A116 is fixed. What was never fixed is that
+*nothing looked*. A new node pulled eleven blocks, stopped at height 12, and
+stayed there; the operator's phone sat against that wall for **fourteen
+check-ins** and was assumed to be a phone. Three PC nodes looked healthy the
+whole time, because they already held block 12 and never had to re-accept it.
+The chain was unrecoverable from genesis plus peers and every green sweep said
+nothing about it.
+
+**Why it can happen again, measured rather than feared.** Block validity on sync
+depends on `fallback_model.json`, a bag-of-words model **retrained every night**.
+A116 clocked the block-12 sentence moving **+2.34 → +2.52 in six days** and
+crossing the 2.4 hold line **twice in eight days**. Today it sits at **+1.91**,
+a margin of **0.49** — comfortable, and less than three times the drift already
+observed.
+
+**What the guard does.** `test_a124_chain_syncable.py` reads a node database
+read-only, reduces every transaction payload with the judge's **own**
+`_payload_text` (never the raw dict — feeding a judge the wrong input and
+reporting its answer is worse than not measuring, the mistake A116 nearly
+shipped), scores each with the deployed elder, and:
+
+- **A124.1** fails if any payload already in the chain is **convicted**. A98's
+  sync waiver forgives a judge that reached no verdict; it deliberately does not
+  forgive an allegation, so a conviction anywhere in history is a joiner
+  stopping at that height for ever.
+- **A124.2** fails when the closest payload's margin falls below **0.18** — the
+  drift this very model has already been measured making in six days. A measured
+  floor, not a chosen one: a margin thinner than that is one ordinary retrain
+  from closing.
+
+**Mutation-tested.** Dropping the hold line from 2.4 to 1.5 reproduces the A116
+condition exactly: A124.1 and A124.2 both go red and name block 12 by index,
+score and text. A second mutation happened by accident and is worth more — an
+early draft read the wrong field and extracted no payloads, and the suite
+**failed** rather than reporting a serene green over nothing.
+
+**What it must never become.** If A124.1 goes red, the answer is **not** to
+retrain the student until it clears. That is tuning the gate to suit the thing
+being judged, which A118 forbids in the operator's own words — *the fix and the
+green must align towards mutual benefit* — and A116 already measured that route
+as futile anyway (+2.5231 against a deployed +2.5235). The answer is to decide
+what block validity should depend on.
+
+**The limit, stated.** Node databases are gitignored and `covenant_one.py`
+stages into a temp directory and wipes them, so in a staged sweep or a fresh
+clone this suite is a **no-op** — it says so in six lines and claims nothing.
+It is named in covenant_one's *NOT COVERED BY THIS RUN* block for that reason,
+and runs for real from `run_all_tests.sh` in the working tree.
+
+**Not decided here.** Whether a nightly-retrained model can be part of a
+consensus rule at all is the structural question under A116, and it remains the
+operator's and the group's. This entry adds an alarm, not an answer.

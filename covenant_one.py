@@ -154,6 +154,11 @@ SUITES = [
     # over an EXHAUSTIVELY enumerated space (~100k cases), by an
     # implementation forbidden to read triangulate.py or scale.py.
     ("test_r2_semantics.py",             180,  "SECURITY"),
+    # A124 (2026-09-15): can a new node still join? A116 left the chain
+    # unjoinable past block 12 for days because a nightly-retrained judge
+    # drifted across a threshold, and nothing watched. No-op when no node
+    # database is present -- see the NOT COVERED block at the end.
+    ("test_a124_chain_syncable.py",     120,  "JUDGE"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed
@@ -1376,6 +1381,12 @@ def main():
         say("    test_xrp_live.py   XRP autofill/submit against a FUNDED testnet")
         say("                       account. Mainnet stays BLOCKED until it runs once.")
         say("    test_covenant_app.py  needs the chain STOPPED (binds real ports).")
+        say("    test_a124_chain_syncable.py  CAN A NEW NODE STILL JOIN? Needs a")
+        say("                       node database, which is gitignored and which")
+        say("                       this run wipes, so it is a NO-OP here. A116")
+        say("                       left the chain unjoinable past block 12 for")
+        say("                       days and nothing said so. Run it in the")
+        say("                       working tree, beside a node database.")
         say("")
         say.close()
     return code

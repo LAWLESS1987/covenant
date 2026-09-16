@@ -94,16 +94,17 @@ def climb(node: Dict[str, Any],
     """SEMANTICS.md section 2."""
     name = node.get("name", "?")            # 2.1 -- a missing name is "?"
 
-    # 2.2 -- the depth limit, refused rather than followed. THE OMISSIONS ARE
-    # DELIBERATE and are the behaviour, not an oversight in this file: the
-    # over-depth report is a third shape carrying neither `answered`,
-    # `silent`, `outliers`, `agreed` nor `speaks_upward`. Adding them here
-    # would make this file disagree with the code it describes. Recorded as
-    # A123; SEMANTICS.md 2.2 states it.
+    # 2.2 -- the depth limit, refused rather than followed. A refused level
+    # judged nothing, so every field is the honest value for that: it answered
+    # nobody, heard nobody, has no outliers, did not agree, and speaks silence.
+    # (Until A123 was fixed on 2026-09-15 the live code omitted five of these,
+    # making the over-depth report a third shape. This file's first draft
+    # reproduced the omission, because a specification describes what runs.)
     if depth > MAX_DEPTH:
-        return None, {"name": name, "verdict": UNPROVEN,
+        return None, {"name": name, "verdict": UNPROVEN, "agreed": False,
+                      "answered": [], "silent": [], "outliers": [],
                       "reference": None, "divergences": [], "children": [],
-                      "depth": depth,
+                      "depth": depth, "speaks_upward": False,
                       "silent_diverged": [], "silent_unproven": []}
 
     # 2.3 -- a LEAF is a node with no `children` KEY. `children: []` is a level

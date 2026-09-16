@@ -174,16 +174,15 @@ Levels are counted from 0 at the node first passed in. If a node is reached at d
 verdict `UNPROVEN`. Nesting that deep is far more likely to be a cycle than a hierarchy,
 so it is refused rather than followed.
 
-> **A documented wart, found by this specification and left as it is.** The over-depth
-> report is a **third shape** — neither a leaf's nor a level's. It carries `name`,
-> `verdict`, `why`, `divergences`, `children`, `depth`, `reference`, `silent_diverged`
-> and `silent_unproven`, and it **omits** `answered`, `silent`, `outliers`, `agreed` and
-> `speaks_upward`, which every other level report carries. A consumer reading
-> `speaks_upward` on such a node would fail rather than read false. Nothing does, and it
-> is only reachable past 64 levels of nesting, which is refused anyway — so this is
-> recorded rather than changed. Writing this specification is what surfaced it; see
-> `KNOWN_ISSUES.md` A123. A second implementation must reproduce the omission to match
-> field-for-field.
+> **Uniform with every other level report (A123, fixed 2026-09-15).** A refused level
+> judged nothing, and every field says so honestly: it answered nobody, heard nobody, has
+> no outliers, did not agree, and speaks silence. Until this specification was written the
+> over-depth report was a **third shape** — it omitted `answered`, `silent`, `outliers`,
+> `agreed` and `speaks_upward`, so a caller reading `speaks_upward` on a refused node
+> raised rather than reading false. Writing the rules down is what surfaced it: the
+> reference implementation filled the fields in, as every other branch does, and the
+> differential check reported the disagreement at depth 65 of a 66-level tree. No
+> conformance vector reaches this branch, so the published root is unchanged.
 
 ### 2.3 A leaf
 
