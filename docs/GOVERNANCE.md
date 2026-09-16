@@ -399,7 +399,7 @@ gets hashed.
 a claim about twenty-three vectors, it is not a proof of correctness, and it
 decides nothing. No second party has ever RUN THE VECTORS — reproducing the root
 is not that, and one outside reviewer has now done the latter precisely to show it
-proves nothing — and `peers.txt` still reads `self`; and section IX's cap, **L5 = 1**, applies to every sentence below.
+proves nothing (`KNOWN_ISSUES.md` A121) — and `peers.txt` still reads `self`; and section IX's cap, **L5 = 1**, applies to every sentence below.
 
 ### Why the rule legislates conduct and not creed
 

@@ -144,6 +144,11 @@ SUITES = [
     # behaviour root that is blind to prose and mutation-tested against two
     # real semantic breaks. 14/14 before wiring.
     ("test_n1_conformance.py",           120,  "SECURITY"),
+    # R1 (2026-09-15): a retracted claim must not come back. Added after
+    # A121 was corrected in eleven files and survived in five more,
+    # including the README front page, because the sweep was a grep over
+    # the phrasings its author thought of. Reads docs/RETRACTED.json.
+    ("test_r1_retracted.py",             120,  "SECURITY"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

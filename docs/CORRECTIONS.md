@@ -56,6 +56,43 @@ demonstrated the defect instead.
 implementation must compute in order to pass, then demonstrate the check **fails** when
 it is not computed. Breaking a green on purpose is the only proof the green was earned.
 
+## How a retracted claim is stopped from coming back
+
+Not by promising to sweep more carefully. By a suite that runs on every sweep.
+
+**[`docs/RETRACTED.json`](RETRACTED.json)** is the machine-readable ledger: each
+retraction carries its id, what was claimed, what is true, the **verbatim original
+wording** (preserved, because deleting it is how a record dies), the regex patterns that
+detect it, and the record files exempt from the check.
+
+**[`test_r1_retracted.py`](../test_r1_retracted.py)** enforces three things, and is
+registered in `covenant_one.py` and `run_all_tests.sh`:
+
+| | what it pins |
+|---|---|
+| **L** | Every pattern must still match inside the record. A pattern matching nothing is a dead regex passing silently — and this makes the record load-bearing: delete it and the build breaks |
+| **C** | A retracted phrasing may appear anywhere, in any framing, **provided the retraction's id appears within 10 lines of it.** A regex cannot separate an assertion from a description of one — this project's own judge cannot either — so the check does not try. It demands the citation, which is checkable |
+| **V** | The scan reports how many files it read and **fails below a floor**, and names any expected directory that was absent instead of counting it clean. `conformance_indep/` is not in the runner's staging list, so a check written against the working tree can quietly scan less where the runner runs it |
+
+**Proven by breaking it,** serially, on 2026-09-15 — a green that has never been made to
+fail is not known to work:
+
+| mutation | result |
+|---|---|
+| Claim reintroduced 380 lines from any citation | **FAILED as designed**, both patterns naming it |
+| One pattern typo'd to match nothing | **FAILED as designed** (L) |
+| Scan extension list emptied, 0 files read | **FAILED as designed** (V) |
+| Claim reintroduced *immediately beside* an existing A121 citation | **passed — the limit** |
+
+That last row is the honest boundary and it is written into the suite's own docstring.
+The rule is proximity, so text planted next to a retraction notice is exempt. This
+guards **accidental** reintroduction — a new section, a rewritten front page, a fresh
+letter that restates the old claim with no correction in sight, which is precisely what
+happened to the README — and it does not guard a claim planted beside its own retraction,
+where a reader sees the retraction anyway.
+
+Its first run found two live sites the hand sweep had missed.
+
 ## What has not been corrected
 
 - **The bulk sends of 2026-08-31** stand wrong in other people's inboxes. There is no

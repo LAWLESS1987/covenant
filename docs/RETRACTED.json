@@ -1,0 +1,76 @@
+{
+ "what": "Claims this project published and then retracted. Machine-read by test_r1_retracted.py, which fails if a retracted claim reappears anywhere in the tree without a pointer to its retraction beside it. Written 2026-09-15 after the conformance claim was corrected in eleven files and survived in five more, including the README front page, because the sweep was a hand-written grep over the phrasings its author happened to think of.",
+ "rule": "A retracted phrasing may appear ANYWHERE, in any framing, on one condition: the retraction's id must appear within `window` lines of it. Records listed in `allow` are exempt entirely, because their whole purpose is to hold the original wording unedited. A regex cannot tell an assertion from a description of an assertion -- that is a known limit of this project's own judge -- so this check does not try. It requires the citation instead, which is checkable.",
+ "window": 10,
+ "coverage_floor": 400,
+ "expect_dirs": [
+  "docs",
+  "ops",
+  "tools"
+ ],
+ "optional_dirs": [
+  "conformance_indep",
+  "private"
+ ],
+ "retractions": [
+  {
+   "id": "A121",
+   "claim": "That reproducing the published conformance root is evidence an independent build performed the computation, and that this is NIR's move applied to governance.",
+   "refuted_by": "Jens Egholm Pedersen (DTU), 2026-09-15, author of the borrowed idea",
+   "truth": "The root is sha256 over the expected outputs printed inside docs/CONFORMANCE_SPEC.json itself, so it reproduces in nine lines with no implementation of climb or attest at all. The real evidence is per-vector: compute each expected from its input and compare. That is an ordinary test-vector suite and pins the computation only where it samples.",
+   "verbatim": [
+    "The root `0c398099...0f0ddcef` is a claim that an independent build, in any language, sharing none of this code, produces the same number.",
+    "A matching root means two implementations sharing no code agree; a different one is a finding.",
+    "Two builds sharing no code either produce the same root or they do not.",
+    "a fork can now prove it agrees without running these exact bytes",
+    "so an independent build in any language reproduces the root without reading any Python",
+    "Two instances sharing no source can then produce the same conformance root, and an instance that copied the text but broke the behaviour cannot."
+   ],
+   "patterns": [
+    "reproduc\\w*\\s+(?:the\\s+)?(?:published\\s+|current\\s+|previous\\s+|same\\s+)?root",
+    "match(?:ing|es|ed)?\\s+the\\s+(?:published\\s+)?root",
+    "matching root means",
+    "prove\\s+(?:it\\s+)?agree(?:s|ment)",
+    "same root or they do not",
+    "produces?\\s+the\\s+same\\s+number",
+    "produc\\w*\\s+the\\s+same\\s+conformance\\s+root"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "docs/SPEC_SUFFICIENCY_2026-08-31.md",
+    "docs/OUTREACH_COMPILED.md",
+    "docs/OUTREACH_US_IL.md",
+    "docs/ROUNDTABLE_2026-09-03.md",
+    "docs/RUN_LOG_ARCHIVE.md",
+    "docs/IMPROVEMENT_LOG.md",
+    "conformance_check.sh",
+    "conformance_check.ps1",
+    "conformance_indep/",
+    "private/",
+    "test_r1_retracted.py"
+   ],
+   "note_on_patterns": "Deliberately NOT a generic 'same root': test_v1_verifier_agreement.py asserts that three verifiers in three languages produce the same CONSTITUTION hash, which is a different claim and still true. A pattern that convicts it would be a false positive, and a guard that cries wolf gets switched off."
+  },
+  {
+   "id": "A122",
+   "claim": "That a git clone line composed in Gmail arrives usable. It arrives wrapped as a google.com/url redirect and clones an EMPTY repository.",
+   "refuted_by": "the sent copies themselves, every letter until 2026-09-15",
+   "truth": "Gmail wraps on SEND, not on paste, so checking the draft proves nothing. Verify the sent copy, or use no URLs at all.",
+   "verbatim": [
+    "git clone https://www.google.com/url?q=https://github.com/LAWLESS1987/covenant&source=gmail"
+   ],
+   "patterns": [
+    "google\\.com/url\\?q="
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py"
+   ]
+  }
+ ]
+}

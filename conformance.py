@@ -64,7 +64,8 @@ WHAT IT IS NOT
 
   IT IS NOT NIR'S MOVE. That was this file's founding claim and it is wrong.
   Jens Egholm Pedersen, whose idea it borrowed, read the repository on
-  2026-09-15 and refuted it in the reply that was asked for:
+  2026-09-15 and refuted it in the reply that was asked for (A121 in
+  docs/KNOWN_ISSUES.md; docs/RETRACTED.json makes this machine-checkable):
 
       "The conformance root is sha256 over the expected outputs listed in
       CONFORMANCE_SPEC.json, keyed by vector id. I recomputed it directly
