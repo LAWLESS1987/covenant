@@ -1223,20 +1223,39 @@ def core_model() -> Optional["FallbackModel"]:
     return _CORE_CACHE[0]
 
 
-def core_convicts(data: Any) -> Optional[bool]:
-    """Does the TRUNK convict this payload?
+def core_clears(data: Any) -> Optional[bool]:
+    """Does the TRUNK AFFIRMATIVELY clear this payload?
 
-    True  -- the trunk convicts: a stable finding, refuse on sync as always.
-    False -- the trunk does not: the conviction is branch-only and must not be
-             allowed to rewrite settled history.
+    True  -- the trunk says CLEAN. Only then may a branch-only conviction be
+             set aside on sync.
+    False -- the trunk convicts, OR abstains. An abstention is not a clearance:
+             it is the trunk saying it does not know, and a waiver granted on
+             "it did not object" is a waiver granted by silence.
     None  -- no trunk available; the caller must not relax anything.
+
+    NARROWED 2026-09-16 (A131), and the reason is the whole point. The first
+    version asked "does the trunk CONVICT?" and waived whenever the answer was
+    no -- which includes abstention. That broke `test_a98_sync_hold_waiver.py`
+    H3, the property the operator chose on 2026-09-12: "a seat that ALLEGES a
+    violation must still refuse the block, catching up or not." It was found by
+    a full sweep, not by me, because I never ran A98 after editing the path A98
+    guards.
+
+    THE PRICE, STATED. Under this rule A125 would NOT have prevented A116: the
+    trunk ABSTAINS on "There can be no mutual benefit without a little faith"
+    (-5.44 on A98's payload, +1.91 on block 12), so a branch drifting to convict
+    it is no longer overridden here. That case is now DETECTED rather than
+    prevented -- test_a124_chain_syncable.py alarms the night a chain payload
+    becomes convicted, and a person decides. Prevention where the trunk is
+    confident; detection where it is not; and an allegation is never set aside
+    by silence.
     """
     m = core_model()
     if m is None:
         return None
     try:
         verdict, _why = m.verdict(_payload_text(data))
-        return verdict == "violates"
+        return verdict == "clean"
     except Exception:                                        # noqa: BLE001
         return None
 

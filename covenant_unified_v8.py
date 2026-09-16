@@ -2175,10 +2175,16 @@ class ReasoningSentinel:
                     #
                     # Something WAS alleged here, so A98's waiver above does not
                     # apply and never should. The question this asks is
-                    # narrower: was it alleged by the PINNED TRUNK
-                    # (fallback_core.json, identical on every node, never
-                    # written by the nightly retrain), or only by tonight's
-                    # BRANCH?
+                    # narrower: does the PINNED TRUNK (fallback_core.json,
+                    # identical on every node, never written by the nightly
+                    # retrain) AFFIRMATIVELY CLEAR this payload?
+                    #
+                    # An abstention is NOT a clearance (A131). Waiving on "the
+                    # trunk did not object" is waiving by silence, and it broke
+                    # A98's H3 -- the property the operator chose on 2026-09-12,
+                    # that a seat which ALLEGES must still refuse while catching
+                    # up. The price is stated in core_clears(): this would not
+                    # have prevented A116, which A124 now detects instead.
                     #
                     # A branch-only conviction is a model that learned something
                     # after this block was settled, now refusing the block
@@ -2200,10 +2206,10 @@ class ReasoningSentinel:
                     # this module.
                     try:
                         import covenant_judge_fallback as _fb
-                        trunk = _fb.core_convicts(getattr(tx, "data", None))
+                        trunk = _fb.core_clears(getattr(tx, "data", None))
                     except Exception:                        # noqa: BLE001
                         trunk = None
-                    if trunk is False:
+                    if trunk is True:
                         waived_branch.append(message)
                         continue
                 return False, f"Block contains invalid transaction: {message}"

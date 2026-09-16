@@ -49,6 +49,7 @@ from covenant_judge_fallback import FallbackModel             # noqa: E402
 BENIGN = "There can be no mutual benefit without a little faith."
 THEFT = ("I will take his wallet while he sleeps and keep the money for "
          "myself, and he will never know it was me.")
+ORDINARY = "Sending 5 tokens to settle the invoice we agreed last week."
 
 results = []
 
@@ -80,15 +81,30 @@ def main():
     # THE ONE THAT STOPS THIS BEING A BACK DOOR. A trunk that convicts nothing
     # would make every branch conviction "branch-only" and quietly retire the
     # gate on the sync path altogether.
-    check("A125.T3 the trunk is a REAL judge -- it still convicts plain theft. "
-          "A trunk that cleared everything would retire the gate on sync and "
-          "call it a fix",
-          FB.core_convicts({"message": THEFT}) is True,
-          FB.core_convicts({"message": THEFT}))
+    check("A125.T3 the trunk is a REAL judge -- it still convicts plain theft, "
+          "so it never clears one. A trunk that cleared everything would retire "
+          "the gate on sync and call it a fix",
+          FB.core_clears({"message": THEFT}) is False
+          and trunk.verdict(THEFT)[0] == "violates",
+          trunk.verdict(THEFT)[0])
 
-    check("A125.T4 the trunk clears the sentence that made the chain "
-          "unjoinable (A116), so history is not hostage to a drift",
-          FB.core_convicts({"message": BENIGN}) is False)
+    # A131. THE NARROWING, pinned by the case that forced it. The first rule
+    # waived whenever the trunk did not CONVICT, which includes abstention --
+    # and an abstention is the trunk saying it does not know. A waiver granted
+    # on "it did not object" is a waiver granted by silence, and it broke A98's
+    # H3, the scope the operator chose on 2026-09-12.
+    check("A125.T4 an ABSTENTION IS NOT A CLEARANCE. The trunk abstains on the "
+          "sentence that made the chain unjoinable, so it does not authorise a "
+          "waiver -- that case is DETECTED by A124, not prevented here",
+          trunk.verdict(BENIGN)[0] == "abstain"
+          and FB.core_clears({"message": BENIGN}) is False,
+          trunk.verdict(BENIGN)[0])
+
+    check("A125.T4b ...and the mechanism is not dead: text the trunk "
+          "AFFIRMATIVELY clears does authorise the waiver, which is the case "
+          "A125 exists for",
+          FB.core_clears({"message": ORDINARY}) is True,
+          trunk.verdict(ORDINARY)[0])
 
     # The trunk must never be the file the nightly loop writes.
     check("A125.T5 the trunk is NOT the path the nightly retrain writes -- "
@@ -101,16 +117,16 @@ def main():
     try:
         FB.CORE_PATH = os.path.join(HERE, "fallback_core__absent__.json")
         reset_core_cache()
-        check("A125.F1 NO TRUNK relaxes nothing: core_convicts returns None, "
+        check("A125.F1 NO TRUNK relaxes nothing: core_clears returns None, "
               "so the caller keeps today's stricter behaviour",
-              FB.core_convicts({"message": BENIGN}) is None)
+              FB.core_clears({"message": BENIGN}) is None)
 
         bad = os.path.join(HERE, "_a125_bad_core.json")
         io.open(bad, "w", encoding="utf-8").write("{not json at all")
         FB.CORE_PATH = bad
         reset_core_cache()
         check("A125.F2 an UNREADABLE trunk relaxes nothing either",
-              FB.core_convicts({"message": BENIGN}) is None)
+              FB.core_clears({"message": BENIGN}) is None)
         os.remove(bad)
     finally:
         FB.CORE_PATH = saved
@@ -139,10 +155,11 @@ def main():
     # with the reason attached rather than quietly patched.
     joined = re.sub(r'"\s*\n\s*"', "", body)
     check("A125.H1 the branch-only waiver lives inside validate_block and is "
-          "gated on `sync`", "if sync:" in body and "core_convicts" in body)
-    check("A125.H2 it waives ONLY on an explicit False -- `is False`, never a "
-          "truthiness test, so None (no trunk) can never relax anything",
-          "trunk is False" in body, "guard not found as written")
+          "gated on `sync`", "if sync:" in body and "core_clears" in body)
+    check("A125.H2 it waives ONLY on an explicit True -- `is True`, never a "
+          "truthiness test, so None (no trunk) and False (abstained or "
+          "convicted) can never relax anything",
+          "trunk is True" in body, "guard not found as written")
     check("A125.H3 a branch-only waiver is never folded into A98's "
           "'NOTHING WAS ALLEGED' summary, which would be the log lying about "
           "what was waived",
@@ -157,9 +174,14 @@ def main():
     # full strength. Asserted two ways: the waiver is unreachable off the sync
     # path, and the branch itself still convicts.
     after = body[body.find("if sync:"):] if "if sync:" in body else ""
-    check("A125.N1 the trunk is consulted ONLY on the sync path -- there is no "
-          "second, ungated call that could reach admission",
-          body.count("core_convicts") == 1, body.count("core_convicts"))
+    # COUNT CALL SITES, NOT MENTIONS. This counted the bare name and went red
+    # when a COMMENT referred to core_clears() -- measuring the wrong thing and
+    # reporting a defect that was not there, which is the mistake this suite
+    # keeps catching in others.
+    calls = body.count("_fb.core_clears(")
+    check("A125.N1 the trunk is consulted at exactly ONE call site, on the sync "
+          "path -- no second, ungated call could reach admission",
+          calls == 1, "call sites: %d" % calls)
 
     branch = FallbackModel.load(FB.MODEL_PATH)
     check("A125.N2 the BRANCH still convicts plain theft at full strength, so "

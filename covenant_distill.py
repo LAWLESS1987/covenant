@@ -843,16 +843,44 @@ def vocabulary_moved(cur, cand, limit=12):
     by hand. covenant_judge_fallback.MIN_EVIDENCE_* fixed that cause; this makes
     the next one visible whatever the cause turns out to be.
 
+    EXTENDED 2026-09-16 (A131) BECAUSE THE LOSS CHANGED SHAPE. This counted only
+    features that VANISHED -- present in the model in use, absent from the
+    candidate. A127 made the nightly pass REFINE rather than rebuild, and a
+    refined model does not delete an unwitnessed feature: it FADES it one step
+    toward zero, and only drops it once it is within a step of zero. So the loss
+    became gradual and this report went quiet about it, which is the exact
+    failure the function was written for -- a number in the ledger and the loss
+    not in it. A88's E7 went red and was right to.
+
+    Fading is now reported beside vanishing. Both are loss; one is just slower.
+
     Returns a line for the block, or "" when nothing left -- silence here means
     nothing was lost, never that nothing was looked at."""
     gone = sorted(set(cur.weights) - set(cand.weights),
                   key=lambda t: -abs(cur.weights[t]))
-    if not gone:
+    # A feature is FADING when it is still present but has moved toward zero.
+    # Movement away from zero is the model learning, not losing, and is not
+    # reported here.
+    faded = sorted(
+        (t for t in set(cur.weights) & set(cand.weights)
+         if abs(cand.weights[t]) < abs(cur.weights[t]) - 1e-9),
+        key=lambda t: -(abs(cur.weights[t]) - abs(cand.weights[t])))
+    if not gone and not faded:
         return ""
     added = len(set(cand.weights) - set(cur.weights))
-    shown = ", ".join("%s (%+.2f)" % (t, cur.weights[t]) for t in gone[:limit])
-    return ("features dropped: %d (%d added). The model can no longer weigh: %s%s"
-            % (len(gone), added, shown, "" if len(gone) <= limit else ", ..."))
+    parts = []
+    if gone:
+        shown = ", ".join("%s (%+.2f)" % (t, cur.weights[t]) for t in gone[:limit])
+        parts.append("The model can no longer weigh: %s%s"
+                     % (shown, "" if len(gone) <= limit else ", ..."))
+    if faded:
+        shownf = ", ".join("%s (%+.2f -> %+.2f)"
+                           % (t, cur.weights[t], cand.weights[t])
+                           for t in faded[:limit])
+        parts.append("Weakened: %s%s"
+                     % (shownf, "" if len(faded) <= limit else ", ..."))
+    return ("features dropped: %d (%d faded, %d added). %s"
+            % (len(gone), len(faded), added, " ".join(parts)))
 
 
 def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, say=print):
