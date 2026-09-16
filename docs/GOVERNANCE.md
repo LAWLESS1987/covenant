@@ -209,7 +209,12 @@ be removed from.
 3. Add your endpoint to your own `peers.txt`. Nobody else's copy needs to change.
 4. `federation.py` reports **SAME CORE**, **DIVERGED**, or **UNREACHABLE**.
 
-**A fork does not have to run these bytes to prove it agrees.** Until
+**A fork does not have to run these bytes to demonstrate agreement** — at the
+ordinary strength of a test-vector suite, by computing each published vector from
+its input and matching the expected output, and **not** by reproducing the root,
+which hashes those expected outputs and falls out of the published file with no
+implementation at all (refuted 2026-09-15 by the author of the borrowed idea;
+`KNOWN_ISSUES.md` A121). Until
 2026-08-30 it did: `federation.py` compared a hash over the *text* of the rules,
 so the same constitution translated into another language, or the same
 behaviour reimplemented in another runtime, read as DIVERGED — while an

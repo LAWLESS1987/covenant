@@ -40,12 +40,15 @@ minutes by anyone with a laptop:
    outvoted into invisibility. The obvious implementation does the opposite,
    and produces a system that looks cleaner the higher you look.
 
-2. **A participant can prove it agrees without adopting anyone's code.** The
-   check compares *behaviour* on fixed test vectors, not source text. An
-   independent implementation — another language, another jurisdiction's
-   procurement rules, the rules translated — can demonstrate it computes the
-   same thing while sharing no code. That is the difference between a standard
-   and a dependency.
+2. **A participant can demonstrate agreement without adopting anyone's code**,
+   at the strength of an ordinary test-vector suite. The check compares
+   *behaviour* on fixed vectors, not source text: an independent implementation
+   computes each of the 23 vectors from its input and matches the expected
+   output, sharing no code. **Not by matching the published root** — that hashes
+   the expected outputs and reproduces from the file with no implementation at
+   all, as the author of the borrowed idea demonstrated on 2026-09-15
+   (`KNOWN_ISSUES.md` A121). A suite pins the computation only where it samples,
+   so this is evidence, not proof.
 
 3. **Rules cannot be changed silently.** The text that binds the operator is
    hashed and published. Three independent verifiers, written in three

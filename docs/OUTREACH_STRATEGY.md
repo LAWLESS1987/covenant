@@ -17,8 +17,10 @@ running on the machine it verifies.
 
 **Offered:** three mechanisms, each checkable in about ten minutes.
 
-1. Conformance proved by **behaviour**, so a party can demonstrate agreement
-   without adopting anyone's implementation.
+1. Conformance evidenced by **behaviour** — a party computes the 23 published
+   vectors from their inputs and matches every expected output, sharing no code.
+   An ordinary test-vector suite, offered as that and not more: the published
+   root is **not** the test (A121).
 2. Disagreement that **survives composition**, so a dissent cannot be outvoted
    into invisibility as authority nests.
 3. Amendment that **cannot be silent**, verified by three independent programs.

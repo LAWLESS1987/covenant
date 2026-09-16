@@ -15,7 +15,7 @@ modes, pointing opposite ways:
   FALSE DIVERGENCE  a faithful reimplementation -- another language, the
                     constitution translated -- reads DIVERGED though it behaves
                     identically. This is the limiting one: it means a sovereign
-                    fork must run this author's exact bytes to prove agreement,
+                    fork must run this author's exact bytes to show agreement,
                     which is the gatekeeper property GOVERNANCE.md VI claims to
                     have removed.
   FALSE AGREEMENT   an instance that copied the text and changed the CODE reads

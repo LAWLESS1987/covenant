@@ -347,7 +347,9 @@ of six, in a section whose entire purpose is to be checkable.
 
 - **`conformance.py`** compares behaviour rather than source text, so an
   independent implementation can demonstrate agreement without adopting these
-  bytes. That is non-domination — but the party spared is the *operator* of the
+  bytes — **by computing each vector from its input and matching `expected` per
+  vector, never by matching the published root**, which hashes those expecteds
+  and so proves nothing on its own (refuted 2026-09-15; `KNOWN_ISSUES.md` A121). That is non-domination — but the party spared is the *operator* of the
   other implementation, who is a person. It belongs to this principle only at
   one remove.
 - **The credit to Misha Mahowald** for the address-event design, in the README

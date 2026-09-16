@@ -4792,3 +4792,71 @@ the policy is a learned model?*
 
 **Uncorrectable:** the bulk sends of 2026-08-31 to foreign ministries, MIT lists, OSTP
 and xAI carry the claim and have no live correspondent to write back to.
+
+### A122. [process / outreach conduct] The outreach tiering rule was broken sixteen hours after it was written, by the person who wrote it. Recorded 2026-09-15, no live correspondent to correct
+
+Recorded because the register is meant to hold the operator's own conduct, not only
+the code's defects, and because institutional diligence reads sent mail. Naming this
+first is worth more than answering it later.
+
+**The rule.** `docs/OUTREACH_STRATEGY.md` §7 sets three stages and forbids skipping
+them: **Stage 1** named researchers and open consultations; **Stage 2** standards
+bodies, *carrying whatever stage 1 produced*; **Stage 3** regulators and agencies,
+*once a standards body has engaged*. `docs/OUTREACH_US_ROUTING.md` restates it —
+arriving at a federal office without a third-party reproduction "asks a federal office
+to be first mover, which is the tier-skip §6 forbids."
+
+**The breach, by the clock.**
+
+| | UTC |
+|---|---|
+| Tiering rule committed (`Map the outreach by reasoning…`) | **2026-08-31 05:54** |
+| → OSTP `engagement@ostp.eop.gov` | 2026-08-31 22:25 |
+| → `contact@beijing-aisi.ac.cn`, `moeit@gov.in`, `ia@def.gouv.fr` | 2026-08-31 23:04 |
+| → `newsdesk@mod.gov.uk`, `secretary@nsd.gov.pk`, `dprk_embassy_pek@163.com`, `press@mil.ru` | 2026-08-31 23:07 |
+| → MIT news lists (`news@csail.mit.edu`, `scc-info@mit.edu`, `mitgenai@mit.edu`) | 2026-08-31 23:18 |
+| → `pmoh@pmo.gov.il` | 2026-09-01 07:12 |
+
+**Sixteen hours.** Subject lines: *"Ethics-gated ledger technology for sovereign
+secure systems"* and *"…for secure sovereign systems."* Stage 1 had produced nothing
+at that point — the conformance mechanism was one day old and no outside party had
+looked at anything. Every one of these was Stage 3 or beyond, sent first, with no card
+to carry.
+
+**Why it is a liability and not only an embarrassment.** A United States person
+offering "sovereign secure systems" technology to the DPRK embassy in Beijing and to
+the Russian Ministry of Defence press desk is a fact with no context that improves it.
+Nobody replied, which is the fortunate outcome and not a mitigating one. The project is
+currently asking four universities to consider leading an NSF proposal and is corresponding
+with an NSF program officer; diligence on a prospective PI relationship reads sent mail.
+This entry exists so the answer is already written down.
+
+**A second breach, into the one community that mattered most.** In mid-August, before
+any of the above, letters went to **Carver Mead** (Caltech) and **Rodney Douglas**
+(INI Zurich) with subjects including *"Sir. This is important. Ive spoken with Sheila."*
+and *"I have some twighlight zone shit i think you'd be interested in."* Mead founded
+neuromorphic engineering; Douglas co-founded the Institute of Neuroinformatics. The
+2025 Misha Mahowald Prize shortlist that `conformance.py` was built from is named for
+Mead's student and Douglas's collaborator, and Jens Egholm Pedersen — the one outside
+reviewer this project has ever had (A121) — works in that field. These are not separate
+audiences. They are one small community that now holds two very different letters from
+the same person, sixteen days apart.
+
+**A third, mechanical one.** Every outbound clone line composed in Gmail arrived wrapped
+as `https://www.google.com/url?q=…&source=gmail`, which clones to an **empty repository**.
+It is in the Padon letters, the NIST submissions, the Stevens/NJIT/Rutgers letters, the
+NSF correspondence, and the Pedersen letter — whose own drafting notes claimed "links
+typed by hand, never pasted," because the precaution was aimed at pasting when the wrap
+happens on **send**. Anyone who followed the instruction rather than navigating manually
+got nothing. Fixed only by using **no URLs at all** in the 2026-09-15 corrections, whose
+sent copies were verified clean.
+
+**What changed.** Nothing can be sent to undo the above; there is no live correspondent
+in any of those threads. What exists instead is the September practice, which is the
+tiering rule actually followed: one named researcher (Pedersen, Stage 1) asked to break
+the work and answering in twelve hours; a standards body and a program officer carrying
+that result; and, on 2026-09-15, unprompted corrections to all seven live correspondents
+the moment the central claim failed (A121b).
+
+**Status:** recorded, uncorrectable. The judgement about proactive disclosure to any
+future institutional partner is the operator's and is not made here.
