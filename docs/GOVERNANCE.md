@@ -369,8 +369,19 @@ governance primitives and hashes the **semantic results** — verdicts, quorum
 outcomes, whether a divergence survived a climb — and never the prose that
 explains them. [`CONFORMANCE_SPEC.json`](CONFORMANCE_SPEC.json) publishes all
 twenty-three: inputs, expected outputs, and the hashing rule. Someone who has
-never read this Python can rebuild it in another language and either reproduce
-`0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef` or not.
+never read this Python can rebuild it in another language and either match every
+`expected` from its `input` or not.
+
+**Not by matching the root.** Reproducing
+`0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef` demonstrates
+nothing: that hash is taken over the expected outputs printed in the spec file
+itself, so it falls out of the file in nine lines with no implementation at all.
+Jens Egholm Pedersen (DTU), whose Neuromorphic Intermediate Representation this
+borrowed from, demonstrated exactly that on 2026-09-15 and refuted the claim that
+this is NIR's move; NIR checks backends against a specification of the semantics
+written independently of any implementation, whereas this reference is an oracle
+of this code's own outputs. What remains is an ordinary test-vector suite, which
+pins the computation only where it samples. See `KNOWN_ISSUES.md` A121.
 
 **The omission is the subject of this section.** No attribute of the party doing
 the computing is an input to that root — not their name, their language, their
@@ -381,8 +392,9 @@ gets hashed.
 
 **The limits, before a reader finds them.** A root over twenty-three vectors is
 a claim about twenty-three vectors, it is not a proof of correctness, and it
-decides nothing. No second party has ever reproduced it — `peers.txt` still reads
-`self` — and section IX's cap, **L5 = 1**, applies to every sentence below.
+decides nothing. No second party has ever RUN THE VECTORS — reproducing the root
+is not that, and one outside reviewer has now done the latter precisely to show it
+proves nothing — and `peers.txt` still reads `self`; and section IX's cap, **L5 = 1**, applies to every sentence below.
 
 ### Why the rule legislates conduct and not creed
 

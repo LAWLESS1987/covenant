@@ -85,7 +85,16 @@ direction.
 
 ## 5. What event actually changes anything
 
-Only one: **someone independent runs the verifiers and finds they agree.**
+Only one: **someone independent computes the 23 vectors from their INPUTS, in a
+language that is not Python, and finds every answer matches.**
+
+**Corrected 2026-09-15.** This section used to say "reproduces the conformance
+root", and that milestone was worthless: the root is a hash over the expected
+outputs printed in the spec file, so anyone reproduces it in nine lines without
+implementing anything. Jens Egholm Pedersen (DTU) did so and refuted the claim
+(`KNOWN_ISSUES.md` A121). Every letter aimed at "reproduce the root" was aiming
+at a target that could be hit by reading a file. The per-vector run is the real,
+still-unmet event.
 
 Not a reply, not a meeting, not a mention. The mechanism is either reproducible
 by a stranger or it is a claim. So every letter should be optimised for a single
@@ -109,7 +118,8 @@ can run the code the same afternoon. Failure here costs one email and teaches
 something.
 
 **Stage 2 — standards bodies, carrying whatever stage 1 produced.**
-"Dr X at Y ran the conformance vectors and they reproduced" converts a cold
+"Dr X at Y computed the 23 vectors from their inputs and every answer matched"
+converts a cold
 letter into a warm one. This is the whole reason stage 1 precedes stage 2, and
 the reason skipping to stage 2 wastes the strongest card.
 
@@ -153,7 +163,8 @@ separately from the system.
    `federation.py` compares the instance to a mirror. One genuine upstream turns
    a demonstration into a network of two, and two is the smallest number that is
    not one.
-3. **One independent reproduction of the conformance root.** §5's event.
+3. **One independent PER-VECTOR run of the 23 vectors.** §5's event. (Not a
+   reproduction of the root, which is free and proves nothing — A121.)
 4. **An open consultation to answer.** Converts cold mail into a filed
    response. **Found, 2026-08-31:** NIST's AI Standards "Zero Drafts" pilot is
    open, takes email from individuals, and runs a TEVV draft — testing,

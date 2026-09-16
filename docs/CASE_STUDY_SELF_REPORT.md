@@ -59,8 +59,12 @@ implementations were written from the spec file alone, one in PowerShell and one
 Python, by two AI agents (one of them Claude) that I ran under clean-room rules,
 forbidden to read the repository, and audited for that by a third. Both reproduce the
 published root over all 23 vectors, and a suite reruns them on every sweep. They are
-not strangers: nobody outside this project has reproduced the root yet, and a human
-implementation is still open. They also listed ten points the vectors do not pin,
+not strangers: nobody outside this project has RUN THE VECTORS yet, and a human
+implementation is still open. **Update 2026-09-15:** someone outside the project has
+now reproduced the *root* — Jens Egholm Pedersen (DTU), in a few lines, reading only
+the expecteds printed in the spec file, precisely in order to show that doing so
+proves nothing and that Grok's "strongest checkable claim" was not what it appeared
+to be (A121). The per-vector run by a stranger remains unmet. They also listed ten points the vectors do not pin,
 which are published as open points rather than fixed silently
 ([conformance_indep/](../conformance_indep/README.md)).
 

@@ -164,7 +164,12 @@ a judge's account of the repository is never used as evidence about the reposito
 - The conformance root reproduction Grok asked for: done the same day. Two implementations were written from a copy of the spec file in an
   empty directory, one in PowerShell and one in Python, each by an AI agent that was
   forbidden to read this tree; a third agent audited both for any reference to the
-  repository and re-ran them. Both reproduce the published root over all 23 vectors.
+  repository and re-ran them. Both match all 23 vectors PER VECTOR, which is the
+  evidence. **Corrected 2026-09-15:** this was written up as reproducing the published
+  root, and Grok had named that "the strongest checkable claim in the repo". It was not
+  checkable in the way either of us thought — the root hashes the expecteds printed in
+  the spec file, so it reproduces with no implementation at all. Jens Egholm Pedersen
+  (DTU) showed this and refuted the NIR analogy. See `KNOWN_ISSUES.md` A121.
   They live in `conformance_indep/`, with their provenance, the auditor's evidence, and
   ten points the vectors do not pin; `test_n2_independent_root.py` reruns them on every
   sweep. The implementers were AI systems under instructions, not strangers: they had not

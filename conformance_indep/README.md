@@ -41,7 +41,9 @@ See `docs/ROUNDTABLE_2026-09-03.md`.
 
 ## What the vectors do not pin (found by implementing them)
 
-Both implementers reproduced the root, and both listed what they had to assume because
+Both implementers matched all 23 vectors per vector — which is the evidence; the root
+match beside it is not, since the root hashes the expecteds printed in the spec (A121).
+Both listed what they had to assume because
 no vector decides it. These are open points of the spec, kept here rather than fixed
 silently; adding vectors would change the root, which is an amendment, not a patch.
 

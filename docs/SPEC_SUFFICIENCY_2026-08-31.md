@@ -1,5 +1,18 @@
 # Is the published conformance spec sufficient on its own?
 
+> **READ THIS FIRST — added 2026-09-15, nothing below is edited.** This document is
+> accurate and was used to support a conclusion it does not support. It was cited as
+> the conformance method *catching its own failure and being repaired by twelve more
+> vectors*. Jens Egholm Pedersen (DTU) read the repository on 2026-09-15 and named the
+> correct reading: underdetermination is **what a sample-based test-vector suite does**,
+> and twelve more samples is still a sample. No vector count turns a suite into a
+> semantic specification. Note also that "reproduced the published root" appears
+> throughout below as though it were a hurdle the rival readings cleared — it is not a
+> hurdle at all: the root hashes the expected outputs printed in the spec file, so any
+> reading reproduces it, including one that implements nothing. See `KNOWN_ISSUES.md`
+> A121.
+
+
 > **SUPERSEDED AS A CURRENT CLAIM — kept verbatim as the record of the test.**
 > Every root, count and verdict below describes the **11-vector spec whose root
 > was `9d630fee…6f1c2784`**. Later on 2026-08-31 twelve vectors were added to

@@ -83,7 +83,7 @@ def main():
         roots = roots_in(out, "py")
         check("N2.3 python build exits 0", rc == 0, out)
         check("N2.4 python build prints a root over its own outputs", bool(roots), out)
-        check("N2.5 python build's root equals the published root", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
+        check("N2.5 python build's root equals the published root (WEAK: a root matches by hashing the spec's own expecteds -- N2.6 is the real check. See KNOWN_ISSUES A121)", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
         m = re.search(r"(\d+)\s*/\s*(\d+)", out)
         check("N2.6 python build matched every vector (%d)" % n, bool(m) and m.group(1) == m.group(2) == str(n), m.group(0) if m else out[-200:])
 
@@ -91,7 +91,7 @@ def main():
             rc, out = run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(tmp, "conformance_ps.ps1")], tmp, timeout=300)
             roots = roots_in(out, "ps")
             check("N2.7 powershell build ran", rc == 0, out)
-            check("N2.8 powershell build's root equals the published root", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
+            check("N2.8 powershell build's root equals the published root (WEAK: see N2.5 and KNOWN_ISSUES A121)", bool(roots) and all(r == published for r in roots), "%s vs %s" % (roots[:1], published))
             m = re.search(r"(\d+)\s*/\s*(\d+)", out)
             check("N2.9 powershell build matched every vector (%d)" % n, bool(m) and m.group(1) == m.group(2) == str(n), m.group(0) if m else out[-200:])
         else:

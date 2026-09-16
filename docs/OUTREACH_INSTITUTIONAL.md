@@ -115,7 +115,7 @@ Claims that are defensible today, each verifiable by the recipient:
 | claim | evidence |
 |---|---|
 | three verifiers, three languages, one hash | `0f0b3162…5f`, agreeing; `test_v1` |
-| a fork can prove agreement without your code | conformance root `0c398099…0f0ddcef` |
+| a fork can prove agreement without your code | **REFUTED 2026-09-15 — do not use this row.** The root `0c398099…0f0ddcef` hashes the expecteds printed in the spec file and proves nothing on its own (A121). The true row: *a fork can compute all 23 vectors from their inputs and match every answer* — evidence of the ordinary test-vector kind. |
 | dissent survives composition | `python scale.py` exits non-zero with the dissent named |
 | the limits are published, not hidden | `CONSTITUTION.md` V, `GOVERNANCE.md` IX |
 | the test suite is real | 96 suites, 2,742 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
