@@ -44,6 +44,8 @@ import tempfile
 
 import covenant_highway as H
 
+HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+
 results = []
 
 
@@ -532,6 +534,88 @@ def main():
               (r.get_json() or {}).get("note", ""))
     finally:
         H.ingest, dp.verify_signed = real_ingest, real_verify
+
+    # ---- H1w: the three the audit below caught as undriven
+    #
+    # held_core_drift, manifest_stale and resync_held_core were registered and
+    # never once exercised by a test. Each reads another program's exit code,
+    # which is the easiest thing in this file to get backwards, so each is
+    # driven both ways with that program stubbed.
+    import subprocess as _sp2
+    real_run2 = _sp2.run
+    stub = {}
+
+    class R3:
+        def __init__(self, rc=0, out=""):
+            self.returncode, self.stdout, self.stderr = rc, out, ""
+
+    try:
+        _sp2.run = lambda cmd, *a, **k: R3(stub.get("rc", 0), stub.get("out", ""))
+        stub.update(rc=1, out="held copies: OUT OF SYNC")
+        d1 = H.detect_held_core_drift()
+        stub.update(rc=0, out="held copies: in sync")
+        d0 = H.detect_held_core_drift()
+        check("H1w held_core_drift reads the sync tool's exit code, both ways",
+              d1["state"] == H.PRESENT and d0["state"] == H.ABSENT,
+              "%s / %s" % (d1["state"], d0["state"]))
+
+        stub.update(rc=1, out="CHANGED/MISSING  covenant_highway.py\n613 in manifest, 1 changed")
+        m1 = H.detect_manifest_stale()
+        stub.update(rc=0, out="613 in manifest, 0 changed or missing")
+        m0 = H.detect_manifest_stale()
+        check("H1w manifest_stale reads verify_bundle both ways and names the file",
+              m1["state"] == H.PRESENT and m0["state"] == H.ABSENT
+              and m1["measured"]["changed"] == ["covenant_highway.py"],
+              "%s / %s / %s" % (m1["state"], m0["state"], m1["measured"].get("changed")))
+
+        ok_dry, why_dry = H.remedy_resync_held_core({}, dry_run=True)
+        stub.update(rc=0, out="synced")
+        ok_run, _ = H.remedy_resync_held_core({}, dry_run=False)
+        check("H1w resync_held_core says what it would do, and reports the tool's result",
+              ok_dry and "would run" in why_dry and ok_run, why_dry[:60])
+    finally:
+        _sp2.run = real_run2
+
+    # ---- H1v: nothing registered may go undriven, and every detector must
+    # be able to say UNKNOWN
+    #
+    # Today's errors were one family: asserting from a derived source instead
+    # of the primary one, and never asking whether the check could fail. A
+    # detector nobody drives is the purest form of it -- it has never been
+    # observed returning anything, so its silence means nothing. This audit
+    # names the gap instead of trusting that the suite grew with the registry.
+    import io as _io
+    src = _io.open(os.path.join(HERE, "test_h1_highway.py"), encoding="utf-8").read()
+    undriven_d = [k for k in H.DETECTORS if k not in src]
+    undriven_r = [k for k in H.REMEDIES if k not in src]
+    check("H1v every registered detector is named somewhere in this suite",
+          not undriven_d, str(undriven_d))
+    check("H1v every registered remedy is named somewhere in this suite",
+          not undriven_r, str(undriven_r))
+
+    # Each detector, driven for real, must return one of the three states and
+    # must not raise. UNKNOWN is the answer that matters: a detector that
+    # cannot measure has to say so rather than report ABSENT, which is how a
+    # broken instrument reads as good news (P20).
+    bad = []
+    for name, fn in sorted(H.DETECTORS.items()):
+        try:
+            got = fn()
+            if got.get("state") not in (H.PRESENT, H.ABSENT, H.UNKNOWN) or "measured" not in got:
+                bad.append("%s -> %s" % (name, str(got)[:60]))
+        except Exception as e:                                   # noqa: BLE001
+            bad.append("%s raised %s" % (name, type(e).__name__))
+    check("H1v every detector runs and returns a state with its measurement",
+          not bad, str(bad))
+
+    unknown_capable = []
+    for name, fn in sorted(H.DETECTORS.items()):
+        srcfn = _io.open(os.path.join(HERE, "covenant_highway.py"), encoding="utf-8").read()
+        body = srcfn.split("def %s(" % fn.__name__, 1)[-1].split("\ndef ", 1)[0]
+        if "UNKNOWN" not in body:
+            unknown_capable.append(name)
+    check("H1v every detector has a path that says UNKNOWN rather than ABSENT",
+          not unknown_capable, str(unknown_capable))
 
     failed = [n for n, ok in results if not ok]
     print(f"\nH1: {len(results) - len(failed)}/{len(results)} passed")
