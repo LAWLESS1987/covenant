@@ -9,10 +9,13 @@ WHERE THIS CAME FROM
   The 2025 Misha Mahowald Prize shortlist, read for what it implies rather than
   for what it builds. Three works, and one idea underneath all of them:
 
-    * Jens Egholm Pedersen (KTH), Neuromorphic Intermediate Representation --
+    * Jens Egholm Pedersen (DTU), Neuromorphic Intermediate Representation --
       a standardised set of computational primitives so a model defined once
       runs on many backends. Its move is to stop comparing IMPLEMENTATIONS and
       start comparing a canonical description of the COMPUTATION.
+      (Affiliation corrected 2026-09-15 by Pedersen himself: DTU, not KTH.
+      The same reply refuted this file's central analogy -- see below, and
+      docs/KNOWN_ISSUES.md A121.)
     * Mark Iskarous (JHU), invariant neuromorphic representations of touch --
       a texture representation invariant to force and speed. The identity
       survives; the incidental variation is discarded.
@@ -59,11 +62,40 @@ WHAT IT DOES
 
 WHAT IT IS NOT
 
-  It is not a proof of correctness, and it cannot be. It says an implementation
-  answers these vectors the way this one does. Vectors nobody thought to write
-  are not covered, which is why the count is printed with the root -- a root
-  over three vectors and a root over three hundred are different claims, and
-  quoting one as the other is the failure this project keeps finding.
+  IT IS NOT NIR'S MOVE. That was this file's founding claim and it is wrong.
+  Jens Egholm Pedersen, whose idea it borrowed, read the repository on
+  2026-09-15 and refuted it in the reply that was asked for:
+
+      "The conformance root is sha256 over the expected outputs listed in
+      CONFORMANCE_SPEC.json, keyed by vector id. I recomputed it directly
+      from that file in a few lines without implementing climb or attest at
+      all. So 'an independent build reproduces the root' reduces to 'an
+      independent build produces the outputs written in the same file',
+      which is an ordinary test-vector suite."
+
+  Reproduced here in nine lines that never read `input`: the published root
+  falls out of the published file. So the ROOT is not evidence that anybody
+  implemented anything. What IS evidence is the weaker, real thing the
+  independent builds did anyway -- compute each vector and match `expected`
+  per vector. That is a test-vector suite, and a test-vector suite pins the
+  computation only where it samples. Adding twelve vectors moved the samples;
+  it did not change the kind of claim. The 11-vector underdetermination was
+  not a bug in the suite, it was the suite behaving as suites behave.
+
+  The direction is reversed from NIR. NIR's reference is a specification of
+  the semantics -- primitives with defined dynamics, written independently of
+  any implementation -- and backends are checked against it. Here the
+  reference is a set of outputs produced by this very Python and then hashed,
+  so the clean-room builds were matching an ORACLE, not a description. His
+  prescription, recorded and not yet acted on: "the thing to write is the
+  specification of the two operations, not more vectors."
+
+  It is also not a proof of correctness, and it cannot be. It says an
+  implementation answers these vectors the way this one does. Vectors nobody
+  thought to write are not covered, which is why the count is printed with the
+  root -- a root over three vectors and a root over three hundred are
+  different claims, and quoting one as the other is the failure this project
+  keeps finding.
 
   It also decides nothing. Conformance is evidence about an implementation,
   never a licence to overwrite one. Divergence stays reported and unpunished.
@@ -508,12 +540,20 @@ def main(argv=None) -> int:
                  "expected": by_id[v["id"]]["result"]}
                 for v in sorted(VECTORS, key=lambda v: v["id"])],
              "roots": {"A": A, "B": B, "C": C},
-             "note": "Reproduce `root` from `input` -> `expected` in any "
-                     "language, sharing none of this code. Hash: sha256 over "
+             "note": "Compute each `expected` from its `input` in any "
+                     "language, sharing none of this code, and compare PER "
+                     "VECTOR. That per-vector agreement is the whole of the "
+                     "evidence. THE ROOT IS NOT EVIDENCE: it is sha256 over "
                      "spec, then for each vector sorted by id, a NUL byte, "
                      "the id, a NUL byte, and the canonical JSON of expected "
-                     "(sorted keys, no spaces). A differing root is a finding "
-                     "worth reporting, not a failure to hide."},
+                     "(sorted keys, no spaces) -- all of which is written "
+                     "above, so anyone can reproduce the root in nine lines "
+                     "without implementing climb or attest at all. Jens "
+                     "Egholm Pedersen (DTU) demonstrated exactly that on "
+                     "2026-09-15; see docs/KNOWN_ISSUES.md A121. The root is "
+                     "a label for WHICH expecteds these are, nothing more. A "
+                     "per-vector disagreement is a finding worth reporting, "
+                     "not a failure to hide."},
             indent=1, sort_keys=True, default=str))
         return 1 if failed else 0
 
@@ -550,10 +590,17 @@ def main(argv=None) -> int:
             print("      %-28s %s" % (r["id"], r["error"]))
         return 1
 
-    print("  Publish this root beside the constitution hash. Another instance")
-    print("  matching it computes what this one computes -- in any language,")
-    print("  with any wording, on any hardware. That is what a fork needs in")
-    print("  order to prove it agrees WITHOUT running these exact bytes.")
+    print("  MATCHING THIS ROOT PROVES NOTHING BY ITSELF. It is a hash over")
+    print("  the expected outputs printed in docs/CONFORMANCE_SPEC.json, so")
+    print("  anyone can reproduce it from that file in nine lines without")
+    print("  implementing climb or attest -- Jens Egholm Pedersen (DTU) did")
+    print("  exactly that on 2026-09-15, refuting this file's founding claim")
+    print("  to be NIR's move. See docs/KNOWN_ISSUES.md A121.")
+    print()
+    print("  What a fork must do instead: compute each vector from its INPUT")
+    print("  and match `expected` PER VECTOR, sharing none of this code. That")
+    print("  is an ordinary test-vector suite -- real evidence, of the")
+    print("  ordinary kind, and it pins the computation only where it samples.")
     print()
     print("  What it does not say: that either instance is CORRECT, or that")
     print("  vectors nobody wrote are covered. A root over %d vectors is a"

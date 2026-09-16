@@ -576,11 +576,19 @@ The 2025 Misha Mahowald Prize shortlist was read here for what it implies, not
 for what it builds, and one idea runs under all three entries: **canonical
 meaning survives incidental form.**
 
-- **Jens Egholm Pedersen** (KTH), *Neuromorphic Intermediate Representation* —
+- **Jens Egholm Pedersen** (DTU), *Neuromorphic Intermediate Representation* —
   stop comparing implementations, compare a canonical description of the
-  computation. `conformance.py` and the CONFORMANT verdict in `federation.py`
-  are that idea applied to governance: a fork can now prove it agrees without
-  running these exact bytes.
+  computation. `conformance.py` was built as that idea applied to governance.
+  **He read this repository on 2026-09-15 and refuted that.** The conformance
+  root is a hash over the expected outputs printed in the same file that
+  publishes the root, so it can be reproduced in nine lines without
+  implementing anything; NIR's reference is a specification of the semantics,
+  written independently of any implementation, and this is the reverse
+  direction — an oracle, not a description. What survives is an ordinary
+  test-vector suite, which is worth having and is not what was claimed. His
+  prescription is on record and not yet acted on: write the specification of
+  the two operations, not more vectors. Full account, with the nine lines
+  reproduced: `docs/KNOWN_ISSUES.md` A121.
 - **Mark Iskarous** (Johns Hopkins) — a texture representation invariant to
   force and speed. The identity survives, the incidental variation is
   discarded. The same move fixed two real bugs here in one day: a heading's em

@@ -4628,3 +4628,105 @@ it.
 
 **Status:** partly applied -- the judge cache is in; the remaining six corrected
 proposals are measured and not yet applied.
+
+---
+
+### A121. [CRITICAL / the central claim] The conformance root is not evidence of anything: it is a hash over outputs printed in the same file that publishes it, and the author of the borrowed idea reproduced it without implementing the mechanism. REFUTED BY AN OUTSIDE REVIEWER 2026-09-15, reproduced here the same day
+
+**The first outside review this project has ever had, and it went against us.**
+
+On 2026-09-14 an email went to Jens Egholm Pedersen, author of the Neuromorphic
+Intermediate Representation, saying the project had borrowed his idea, credited
+him, and wanted him to break it. The closing line asked for one specific answer:
+"If you think the adaptation misreads NIR, that is the reply I would most like
+to have." He replied on 2026-09-15 with exactly that, and he is right.
+
+**His finding, in his words:**
+
+> The conformance root is sha256 over the expected outputs listed in
+> CONFORMANCE_SPEC.json, keyed by vector id. I recomputed it directly from that
+> file in a few lines without implementing climb or attest at all. So "an
+> independent build reproduces the root" reduces to "an independent build
+> produces the outputs written in the same file", which is an ordinary
+> test-vector suite. The underdetermination you found at 11 vectors is the
+> expected behaviour of such a suite: it pins the computation only at the points
+> it samples, and adding twelve more does not change that.
+
+> NIR's move is different. The reference is a specification of the semantics
+> (primitives with defined dynamics), written independently of any
+> implementation, and backends are checked against it. In your repository the
+> reference is a set of outputs produced by your own Python and then hashed, so
+> the clean-room builds were matching an oracle rather than a description of the
+> computation. That is the reverse direction. If you want the NIR analogue, the
+> thing to write is the specification of the two operations, not more vectors.
+
+**Reproduced before it was recorded.** Nine lines, reading only `spec`, `id` and
+`expected` -- never `input`, never a line of governance logic:
+
+    import json, hashlib
+    d = json.load(open('docs/CONFORMANCE_SPEC.json'))
+    h = hashlib.sha256(d['spec'].encode())
+    for v in sorted(d['vectors'], key=lambda v: v['id']):
+        h.update(b'\x00' + v['id'].encode() + b'\x00'
+                 + json.dumps(v['expected'], sort_keys=True,
+                              separators=(',', ':')).encode())
+    print(h.hexdigest())
+    # 0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef
+    # == the published root, exactly.
+
+**Why this is the same defect this repository already named twice.** A119 and
+the fake-guards sweep of 2026-09-09 found thirty-five checks that read source
+text instead of running it -- guards that pass without the property holding.
+This is that shape, at the outreach layer and on the biggest claim in the tree:
+`check.sh` invited the world to reproduce a number that can be reproduced by
+copying it forward through a hash. The published test could not distinguish a
+genuine reimplementation from nine lines of file-reading. It never could have.
+
+**What actually survives, stated at its true strength.** The two clean-room
+builds did more than the published test demanded of them: `conformance_indep/`
+implements `climb` and `attest` and compares its own computed output against
+`expected` PER VECTOR, and its own docstring already half-saw the distinction --
+"the script computes the root over ITS OWN outputs (the real check) and,
+separately, over the spec's expected values". So there is real evidence here,
+and it is the ordinary kind: two independent implementations agree with this one
+at 23 sampled points. That is worth having. It is not what was claimed, and the
+gap between the two was published on the front page, in `check.sh`, and in
+outbound mail to NIST, to Oded Padon, and in the NSF drafts.
+
+**The 11-to-23 story was also told wrong.** It was presented as the method
+catching its own failure and being repaired. Pedersen's reading is correct and
+less flattering: underdetermination is what a sample-based suite does, twelve
+more samples is still a sample, and no vector count converts a suite into a
+semantic specification. The finding in `docs/SPEC_SUFFICIENCY_2026-08-31.md`
+stays exactly as it is -- it is still true, it was just cited as evidence for a
+conclusion it does not support.
+
+**Corrected in this commit:** `conformance.py` docstring and the `--spec` note
+(so the file no longer instructs readers to reproduce the root as the test),
+`docs/CONFORMANCE_SPEC.json` regenerated, `README.md`, and the `check.sh` [3]
+block. The root value and all 23 vectors are BYTE-IDENTICAL -- the note is not
+inside the hash, which was verified before and after.
+
+**Also corrected: he is at DTU, not KTH.** He is a postdoc at the Technical
+University of Denmark, Department of Electrical and Photonics Engineering. The
+email that reached him said KTH in the credit line, because `kth.se/profile/jeped`
+is live, is his, and is stale. Three verification passes checked that the profile
+was real and never checked whether it was current. A live page is evidence the
+person existed there, not evidence of where they are.
+
+**Not done, and it is the operator's call.** His prescription is to write the
+specification of the two operations -- `climb` and `attest` -- as semantics
+independent of this implementation, which is the thing that would make the NIR
+analogy true rather than claimed. That is new work, not a repair, and the
+standing rule since 2026-09-09 is that new structure waits for more than one
+operator. Recorded here so it is not quietly dropped.
+
+**One more defect, found in the sent copy.** The email's clone line arrived as
+`https://www.google.com/url?q=https://github.com/LAWLESS1987/covenant&source=gmail...`
+-- Gmail wrapped the URL despite the draft's pass-3 note saying links were typed
+by hand and never pasted. A `git clone` of a wrapped URL yields an empty
+repository. He reached the repository anyway. The next recipient might not.
+
+**Status:** REFUTED and recorded. The claim is corrected everywhere it was
+asserted in the tree; the outbound copies already sent cannot be corrected except
+by writing back.

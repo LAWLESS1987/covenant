@@ -1,5 +1,5 @@
 {
- "note": "Reproduce `root` from `input` -> `expected` in any language, sharing none of this code. Hash: sha256 over spec, then for each vector sorted by id, a NUL byte, the id, a NUL byte, and the canonical JSON of expected (sorted keys, no spaces). A differing root is a finding worth reporting, not a failure to hide.",
+ "note": "Compute each `expected` from its `input` in any language, sharing none of this code, and compare PER VECTOR. That per-vector agreement is the whole of the evidence. THE ROOT IS NOT EVIDENCE: it is sha256 over spec, then for each vector sorted by id, a NUL byte, the id, a NUL byte, and the canonical JSON of expected (sorted keys, no spaces) -- all of which is written above, so anyone can reproduce the root in nine lines without implementing climb or attest at all. Jens Egholm Pedersen (DTU) demonstrated exactly that on 2026-09-15; see docs/KNOWN_ISSUES.md A121. The root is a label for WHICH expecteds these are, nothing more. A per-vector disagreement is a finding worth reporting, not a failure to hide.",
  "root": "0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef",
  "roots": {
   "A": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

@@ -3,6 +3,25 @@
 Status: **DRAFTS. Nothing sent.** Verify every address on the organisation's own
 site on the day of sending; see the note at the end.
 
+> **CORRECTION, 2026-09-15 — READ BEFORE REUSING ANY TEXT BELOW.** Every draft
+> in this file that offers the conformance root as proof that an independent
+> build computes the same thing **overstates it, and the overstatement has been
+> refuted by the author of the borrowed idea.** Jens Egholm Pedersen (DTU)
+> reproduced the published root in a few lines straight from
+> `docs/CONFORMANCE_SPEC.json`, without implementing `climb` or `attest` at
+> all: the expected outputs are printed in the same file that publishes the
+> root. "An independent build reproduces the root" therefore reduces to "an
+> independent build produces the outputs written in the same file." This is an
+> ordinary test-vector suite, not NIR'''s move — NIR'''s reference is a
+> specification of the semantics written independently of any implementation,
+> whereas here the reference is an oracle of this project'''s own outputs.
+> The real, weaker, true claim: two builds sharing no code matched all 23
+> vectors **per vector**, which pins the computation only where it samples.
+> The text below is kept unedited because a draft rewritten after it was
+> refuted is not a record. Full account: `docs/KNOWN_ISSUES.md` A121.
+
+
+
 Both are built the same way and for the same reason. Each leads with mechanisms
 that can be checked in ten minutes, states the limits before the reader can find
 them, and asks to be **refuted rather than adopted**. An official can act on

@@ -266,9 +266,16 @@ def main():
         h.update(b"\x00")
         h.update(_json.dumps(v["expected"], sort_keys=True,
                              separators=(",", ":")).encode())
-    check("X2 THE CLAIM: the root rebuilds from the published file alone, "
-          "following only the rule the file states. If this fails, every "
-          "invitation to reproduce the root is an invitation to guess",
+    # This test passes by reading `expected` and never `input`, which is the
+    # whole of A121: the fact that it CAN pass that way is the defect Pedersen
+    # named on 2026-09-15, not a property worth advertising. It was labelled
+    # "THE CLAIM" here and in check.sh. It is kept because the hashing rule
+    # must still be stated correctly for anyone comparing per-vector output --
+    # but it is a check on the DOCUMENTATION, not on any implementation.
+    check("X2 the stated hash rule is accurate: the root rebuilds from the "
+          "published file following only the rule the file states. NOT "
+          "evidence of a reimplementation -- it reads `expected`, never "
+          "`input`. See docs/KNOWN_ISSUES.md A121",
           h.hexdigest() == spec["root"], h.hexdigest())
 
     def sugared(node):
