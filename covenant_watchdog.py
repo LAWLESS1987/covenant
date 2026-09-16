@@ -1031,6 +1031,14 @@ def one_pass(strict=False):
     try:
         import covenant_daily_plan as _dp
         c_alerts, c_infos = _dp.checkin_report()
+        # THE BUILD THE PHONE IS HOLDING (2026-09-16). The heartbeat has always
+        # carried it and nothing read it, which is how the phone sat two days on
+        # a build that predates the in-app updater -- a gap that cannot close
+        # itself, because that build has no way to ask for its successor. Said
+        # here, once, with the URL to open; it clears when the phone reports the
+        # sha it was handed.
+        b_alerts, b_infos = _dp.build_report()
+        c_alerts, c_infos = list(c_alerts) + b_alerts, list(c_infos) + b_infos
     except Exception as e:                                       # noqa: BLE001
         c_alerts, c_infos = [], ["phone check-ins unreadable: %s" % type(e).__name__]
     # THE PC'S SAY TO THE PHONE BRAIN (2026-09-13, phase 3): one status line.

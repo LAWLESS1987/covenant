@@ -337,6 +337,78 @@ def last_checkins(path=None):
     return out
 
 
+# ------------------------------------------------- the phone's BUILD (2026-09-16)
+#
+# The heartbeat above has always carried `app` -- the build the phone is running --
+# and nothing has ever read it. That is how the phone sat on 0.1.421+70c6200 for
+# two days while a newer build waited in ops/app/: the PC knew both numbers and
+# never compared them. Worse, the gap is not self-closing. 70c6200 predates the
+# in-app updater, so that build has never asked /app/latest and never will --
+# auto-update cannot bootstrap itself, and the one install that fixes it needs a
+# person and a browser. A condition only a person can clear has to be SAID, or it
+# is not being managed; it is being forgotten.
+#
+# The alert text is deliberately stable while the facts are (A60/M-rule: the
+# watchdog keys on the first 80 characters, so a changing number inside an alert
+# makes every round "news"). It names the two builds and the URL to open, and it
+# goes away by itself the moment the phone reports the sha it was handed.
+
+LATEST_BUILD = os.path.join(HERE, "ops", "app", "latest.json")
+
+
+def newest_build(path=None):
+    """The build covenant_app_update.py last fetched, or {} if there is none."""
+    try:
+        with open(path or LATEST_BUILD, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) and d.get("sha7") else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def pc_tailnet_address():
+    """This PC's Tailscale address, read from its own interfaces.
+
+    Not hardcoded: the operator is told to open this URL on a phone, and a URL
+    that silently rots into someone else's address is worse than no URL. Falls
+    back to the hostname, which is what MagicDNS resolves anyway.
+    """
+    import ipaddress
+    import socket
+    try:
+        cgnat = ipaddress.ip_network("100.64.0.0/10")
+        for fam, _t, _p, _c, sa in socket.getaddrinfo(socket.gethostname(), None):
+            if fam == socket.AF_INET:
+                try:
+                    if ipaddress.ip_address(sa[0]) in cgnat:
+                        return sa[0]
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return socket.gethostname().lower()
+
+
+def build_gap(row, build=None, port=5000):
+    """(alert, note) for one phone's reported build against the newest fetched one."""
+    build = newest_build() if build is None else build
+    have = str(row.get("app", "") or "")
+    if not build:
+        return None, "app %s (no build fetched on this PC)" % (have or "?")
+    sha7 = build.get("sha7", "")
+    if not have:
+        return None, "app unknown (newest fetched %s)" % sha7
+    if sha7 and sha7 in have:
+        return None, "app %s -- the newest fetched build" % have
+    url = "http://%s:%d/m" % (pc_tailnet_address(), port)
+    return ("phone %s: running %s, but build %s has been fetched and waiting since %s -- "
+            "that installed build predates the in-app updater so it cannot ask for it; "
+            "open %s on the phone and tap install"
+            % (row.get("node_id") or row.get("signer") or "?", have, sha7,
+               build.get("built", "?"), url),
+            "app %s, %s waiting (%s)" % (have, sha7, url))
+
+
 def checkin_report(now=None, path=None):
     """(alerts, infos) for the watchdog: one info line per phone that has ever
     reported, and an ALERT for a phone that reported within a day and has
@@ -345,8 +417,10 @@ def checkin_report(now=None, path=None):
     alerts, infos = [], []
     for who, r in sorted(last_checkins(path).items()):
         age = now - float(r.get("at", 0))
-        line = "phone %s last seen %d min ago: height %s, peers %s, battery %s" % (
-            who, int(age // 60), r.get("chain_height", "?"), r.get("peers", "?"), r.get("battery", "?"))
+        _gap, build_note = build_gap(r)
+        line = "phone %s last seen %d min ago: height %s, peers %s, battery %s, %s" % (
+            who, int(age // 60), r.get("chain_height", "?"), r.get("peers", "?"),
+            r.get("battery", "?"), build_note)
         if SILENT_AFTER_S < age < 86400:
             # THE ALERT NAMES WHEN, NOT HOW LONG (2026-09-14). The watchdog keys an alert on
             # its first 80 characters and prints it again whenever that text changes, so a
@@ -361,6 +435,32 @@ def checkin_report(now=None, path=None):
                 who, time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(float(r.get("at", 0)))), r.get("chain_height", "?")))
         else:
             infos.append(line)
+    return alerts, infos
+
+
+def build_report(now=None, path=None):
+    """(alerts, infos): the phones whose installed build is not the newest fetched.
+
+    Deliberately NOT part of checkin_report. That function answers one question --
+    is this phone still reporting -- and D20/D20b pin its alert list exactly so a
+    heartbeat cannot become a second source of noise. "You are holding a build
+    older than the one on the PC" is a different question with a different life:
+    it is true while the phone is switched off, it is cleared by a person rather
+    than by time, and it must not stand beside a SILENT alert for the same phone.
+    Two questions, two functions, two alert lists.
+    """
+    now = now if now is not None else time.time()
+    alerts, infos = [], []
+    build = newest_build()
+    for who, r in sorted(last_checkins(path).items()):
+        age = now - float(r.get("at", 0))
+        gap, note = build_gap(r, build=build)
+        if gap and age <= SILENT_AFTER_S:
+            alerts.append(gap)
+        elif gap:
+            infos.append("phone %s is on an older build but is not reporting; nothing to do until it is back (%s)" % (who, note))
+        else:
+            infos.append("phone %s: %s" % (who, note))
     return alerts, infos
 
 

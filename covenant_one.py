@@ -920,6 +920,15 @@ IN_PLACE = [
     # network are needed; in place for M3's reason -- mobile/ is not staged.
     ("test_m4_usb_link.py", 120,
      "it runs mobile/usb_link.py, which the scratch copy lacks"),
+    # M6 (2026-09-16): the phone's plain-browser door -- /m and /m/apk, the two
+    # unsigned routes whose only gate is the caller's source address. In place,
+    # not staged: M6e hashes the APK in ops/app/ against ops/app/latest.json,
+    # and the scratch copy carries neither, so from a staged tree the one check
+    # that proves the phone would receive the build it was promised would
+    # quietly degrade into "no build fetched". It writes nothing here: a node in
+    # a temp db, a check-ins fixture in a temp file, both removed.
+    ("test_m6_mobile_door.py", 180,
+     "it hashes the fetched APK in ops/app/, which the scratch copy lacks"),
     # M5 moved with the app to the operator's private repository, 2026-09-12
     # (covenant-phone); its workflow runs it against this public core.
     # A93 (2026-09-12): a CLONE must seat the distilled student, not a model

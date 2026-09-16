@@ -5497,3 +5497,72 @@ pattern, not an accident.** The decision is his:
 **F3 stays red until then.** The check is correct and the system is wrong;
 making the check green would be the fix-to-green A118 forbids, and it would hide
 a live admission hole.
+
+### A133. [HIGH / delivery] The phone could not be updated at all: auto-update could not bootstrap itself, and nothing on the PC ever compared the build the phone reports against the build the PC holds. RESOLVED 2026-09-16 (M6)
+
+**What was true.** `covenant_app_update.py --fetch` runs in the nightly pass, so
+`ops/app/` has held the newest green build of the private app repo for days. The
+node serves it at `/app/latest` and `/app/apk` to a **signed** GET. The phone's
+check-in ledger says what the phone is actually running:
+
+```
+{"t": "2026-09-16T05:44:07-0400", "signer": "phone", "chain_height": "12",
+ "app": "0.1.421+70c6200", "battery": 97}          # every 10 minutes, for days
+ops/app/latest.json: {"sha7": "6953f6d", "built": "2026-09-16T07:12:28Z"}
+```
+
+Two independent failures held it there:
+
+1. **Auto-update cannot bootstrap itself.** `0.1.421+70c6200` predates the
+   in-app updater. It has never asked `/app/latest` -- zero occurrences in any
+   log -- and never will, because that code is not in it. The signed path is
+   correct and unreachable: nothing signed can reach a phone whose app does not
+   know how to sign. The only client left on that phone is its browser, and a
+   browser holds no key.
+2. **Nobody compared the two numbers.** The heartbeat has carried `app` since
+   2026-09-12 and nothing read it. The PC knew both the installed build and the
+   fetched build and never put them side by side, so a gap that a person has to
+   close was not being managed -- it was being forgotten. It took a session
+   reading the ledger by hand to notice two days of drift.
+
+It also made the mesh's own `/health` warn permanently: A20 reports "mesh is
+running more than one source" because the phone's core is `27a9bf2b01ad` while
+A/B/C are not. That alert is honest and cannot clear until the phone is updated.
+
+**The fix, in two parts.**
+
+*`/m` and `/m/apk` (covenant_unified_v8.py).* Two deliberately UNSIGNED routes
+for the one client the phone has left. They pay for the missing signature with
+the network instead: `tailnet_ok()` answers only loopback and `100.64.0.0/10`,
+the CGNAT range Tailscale allocates from. The API binds `0.0.0.0`, so the house
+LAN can reach the port -- but a LAN packet arrives carrying its LAN address and
+there is no route from the LAN into the tailnet range, so the address cannot be
+borrowed. Both refusals are recorded as anomalies. `/m` is also the answer to
+"the dashboard doesn't work on the phone": `dashboard.html` is a local FILE with
+a 670 KB WebGL dependency that nothing ever served, so there was nothing for a
+phone to load. `/m` is served, mobile-shaped, and reads `/health`, `/mycelium`
+and `/anomalies` from the browser, with the same age badge the desk dashboard
+uses so a stale page cannot pass for a calm system.
+
+*`build_report()` (covenant_daily_plan.py, called by the watchdog).* The PC now
+compares what the phone says it is running against what the PC has fetched, and
+alerts while they differ -- naming both builds and the URL to open. It is a
+separate function from `checkin_report()` on purpose: that one answers "is this
+phone still reporting", and D20/D20b pin its alert list exactly. A phone that is
+switched off gets an info line, not a nag.
+
+**Pinned by `test_m6_mobile_door.py` (22 checks, registered IN_PLACE in
+covenant_one.py).** M6a the address table including both `/10` boundaries, an
+IPv4-mapped address and junk; M6b the page with every placeholder filled; M6c/M6f
+the LAN refused and the refusal RECORDED; M6d/M6f the mutation -- guard forced
+True, the same LAN request succeeds, guard restored, refused again; M6e the
+served bytes hashed against `ops/app/latest.json` (45,147,412 bytes, sha256
+`e6f43bbf…`); M6g the build gap alerting, and going quiet the moment the phone
+reports the sha it was handed.
+
+**What this does NOT fix.** Android will still ask the person holding the phone
+to confirm an install, and that consent is not ours to skip. The floor is one
+tap; it cannot be zero. Taildrop (`tailscale file cp`) was tried first as the
+no-typing path and the transfer never completed against the phone -- the CLI sat
+open for 25 minutes on a direct link that carries the node's own traffic fine.
+Not diagnosed further: `/m` works and needs no second mechanism.

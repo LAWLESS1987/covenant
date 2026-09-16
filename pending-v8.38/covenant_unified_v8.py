@@ -222,6 +222,7 @@ PATCH LOG — v7.2 (balance ledger + /stake signature requirement)
 """
 
 import importlib
+import ipaddress
 import json
 import time
 import hashlib
@@ -479,6 +480,146 @@ def _core_source_fingerprint():
 CORE_SOURCE_SHA256, CORE_SOURCE_LINES, CORE_SOURCE_UNREADABLE = \
     _core_source_fingerprint()
 CORE_SOURCE_SHA12 = CORE_SOURCE_SHA256[:12]
+
+# THE PHONE'S PAGE (2026-09-16). Served by /m to a tailnet caller. It is one
+# self-contained file with no external asset: dashboard.html needs a 670 KB
+# WebGL library from disk, which is why it was never a thing a phone could
+# open. Every number here is fetched by the BROWSER from this node's own
+# read-only routes, so a page left open cannot quietly go stale and keep
+# looking calm -- the age badge turns amber then red, the same honesty rule
+# the desk dashboard follows.
+# M-ROUTE GATE (2026-09-16). Module level on purpose: a predicate buried in a
+# closure is a predicate no test can drive from the outside, and this one is the
+# whole security story of /m and /m/apk. Loopback, or the CGNAT range Tailscale
+# allocates from (100.64.0.0/10) -- nothing else. A LAN client reaching the
+# 0.0.0.0 bind arrives as 192.168.x/10.x and is refused; there is no route from
+# the LAN into the tailnet range, so the source address cannot be borrowed.
+TAILNET_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def tailnet_ok(addr: str) -> bool:
+    """True only for loopback or a Tailscale CGNAT address. Unparseable -> False."""
+    try:
+        ip = ipaddress.ip_address((addr or "").strip().split("%")[0])
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.version == 4 and ip in TAILNET_CGNAT
+
+
+MOBILE_PAGE_HTML = """<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>covenant node __NODE__</title>
+<style>
+ :root{color-scheme:dark}
+ body{margin:0;background:#0b0f14;color:#e6edf3;font:15px/1.45 -apple-system,Roboto,Segoe UI,sans-serif;padding:14px 14px 40px}
+ h1{font-size:17px;margin:0 0 2px;font-weight:600}
+ .sub{color:#7d8896;font-size:12px;margin-bottom:14px;word-break:break-all}
+ .card{background:#121922;border:1px solid #1e2937;border-radius:12px;padding:12px 14px;margin:0 0 10px}
+ .card h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:#7d8896;margin:0 0 8px;font-weight:600}
+ .row{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+ .row span:last-child{color:#9fb0c2;text-align:right;word-break:break-all}
+ .ok{color:#3fb950}.warn{color:#d29922}.bad{color:#f85149}
+ .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid currentColor}
+ ul{margin:6px 0 0;padding-left:18px;color:#d29922}li{margin:3px 0}
+ a.btn{display:block;text-align:center;background:#1f6feb;color:#fff;text-decoration:none;padding:13px;border-radius:10px;font-weight:600;margin-top:8px}
+ a.ghost{background:transparent;border:1px solid #30363d;color:#9fb0c2}
+ pre{white-space:pre-wrap;color:#7d8896;font-size:11px;margin:6px 0 0}
+</style>
+<h1>covenant &middot; node __NODE__</h1>
+<div class="sub">__VERSION__ &middot; source __SOURCE__ &middot; <span id="age" class="pill ok">live</span></div>
+
+<div class="card"><h2>this node</h2><div id="health">reading /health &hellip;</div>
+ <ul id="warns"></ul></div>
+
+<div class="card"><h2>mycelium</h2><div id="myc">reading /mycelium &hellip;</div></div>
+
+<div class="card"><h2>phone</h2><div id="phone"></div><div id="update"></div></div>
+
+<div class="card"><h2>anomalies</h2><div id="anom">reading /anomalies &hellip;</div></div>
+
+<script>
+var BUILD = __BUILD__, PHONE = __PHONE__, last = 0;
+function row(k, v, cls){ return '<div class="row"><span>' + k + '</span><span' +
+  (cls ? ' class="' + cls + '"' : '') + '>' + v + '</span></div>'; }
+function ago(sec){ if (sec < 90) return Math.round(sec) + 's ago';
+  if (sec < 5400) return Math.round(sec/60) + ' min ago'; return (sec/3600).toFixed(1) + ' h ago'; }
+function get(path){ return fetch(path, {cache:'no-store'}).then(function(r){ return r.json(); }); }
+
+function paint(){
+  get('/health').then(function(h){
+    var d = h.degraded;
+    document.getElementById('health').innerHTML =
+      row('state', d ? 'DEGRADED' : 'healthy', d ? 'bad' : 'ok') +
+      row('chain height', h.chain_height) +
+      row('peers', (h.peers_configured === undefined ? (h.peers || '?') : h.peers_configured)) +
+      row('genesis', String(h.genesis_hash || '').slice(0, 12)) +
+      row('judge', h.judge_id || '?');
+    var w = h.warnings || [];
+    document.getElementById('warns').innerHTML =
+      w.map(function(x){ return '<li>' + x + '</li>'; }).join('');
+    last = Date.now();
+    document.getElementById('age').className = 'pill ok';
+    document.getElementById('age').textContent = 'live';
+  }).catch(function(e){
+    document.getElementById('health').innerHTML = row('state', 'unreachable', 'bad');
+  });
+
+  get('/mycelium').then(function(m){
+    var n = m.nodes || m.node_count || (m.topology && m.topology.nodes);
+    document.getElementById('myc').innerHTML =
+      row('reporting', (m.reporting !== undefined ? m.reporting : (n ? (n.length || n) : '?'))) +
+      '<pre>' + JSON.stringify(m).slice(0, 400) + '</pre>';
+  }).catch(function(){ document.getElementById('myc').textContent = 'unreachable'; });
+
+  get('/anomalies').then(function(a){
+    var kinds = a.per_kind || {}, ks = Object.keys(kinds);
+    document.getElementById('anom').innerHTML =
+      row('spike', a.spike_detected ? 'YES' : 'no', a.spike_detected ? 'bad' : 'ok') +
+      row('kinds', ks.length ? ks.slice(0, 6).join(', ') : 'none');
+  }).catch(function(){ document.getElementById('anom').textContent = 'unreachable'; });
+}
+
+function phoneCard(){
+  var p = PHONE || {}, b = BUILD || {}, out = '';
+  if (p.at) {
+    var age = (Date.now()/1000) - p.at;
+    out += row('last check-in', ago(age), age > 2400 ? 'bad' : 'ok');
+    out += row('installed', p.app || '?');
+    out += row('height / peers', (p.chain_height || '?') + ' / ' + (p.peers || '?'));
+    if (p.battery !== undefined) out += row('battery', p.battery + '%');
+  } else { out += row('last check-in', 'never', 'bad'); }
+  document.getElementById('phone').innerHTML = out;
+
+  var u = '';
+  if (b.sha7) {
+    var have = String((PHONE || {}).app || ''), behind = have.indexOf(b.sha7) < 0;
+    u += row('newest build', b.sha7 + ' (' + Math.round((b.size || 0)/1048576) + ' MB)',
+             behind ? 'warn' : 'ok');
+    u += row('built', b.built || '?');
+    if (behind) u += '<a class="btn" href="/m/apk">Install build ' + b.sha7 + '</a>';
+    else u += '<a class="btn ghost" href="/m/apk">Reinstall ' + b.sha7 + '</a>';
+  } else {
+    u += row('newest build', b.error ? b.error : 'none fetched', 'warn');
+  }
+  document.getElementById('update').innerHTML = u;
+}
+
+function tick(){
+  if (!last) return;
+  var s = (Date.now() - last) / 1000, e = document.getElementById('age');
+  if (s > 120) { e.className = 'pill bad'; e.textContent = ago(s); }
+  else if (s > 45) { e.className = 'pill warn'; e.textContent = ago(s); }
+}
+phoneCard(); paint();
+setInterval(paint, 20000); setInterval(tick, 5000);
+</script>
+"""
+
 
 # ---------------------------------------------------------------------------
 # P12 (v8.32) -- SUBSTRATE SENSING. WARNING ONLY, BY CONSTRUCTION.
@@ -7690,6 +7831,96 @@ class CovenantAPI:
                 return jsonify({"status": "error", "message": "no build fetched yet"}), 404
             from flask import send_file
             return send_file(d["path"], mimetype="application/vnd.android.package-archive", as_attachment=True, download_name="covenant-node.apk")
+
+        # ------------------------------------------------------------------
+        # THE PHONE'S PLAIN-BROWSER DOOR (2026-09-16).
+        #
+        # Everything above this line is for the APP: signed GETs, verified
+        # manifests, an installer session. That is the right shape once a build
+        # carrying the updater is installed -- and exactly the wrong shape for
+        # the case that actually happened. The phone is running 0.1.421+70c6200,
+        # a build from BEFORE the updater existed, so it has never once asked
+        # /app/latest (zero in any log) and cannot: auto-update cannot bootstrap
+        # itself. Nothing signed can reach a phone whose app does not know how to
+        # sign. The only client left on that phone is its browser, and a browser
+        # has no key.
+        #
+        # So these two routes are deliberately unsigned, and pay for it with the
+        # network instead: they answer ONLY a caller whose source address is
+        # loopback or in 100.64.0.0/10, the CGNAT range Tailscale hands out. The
+        # API binds 0.0.0.0, so the house LAN can reach this port -- but a packet
+        # from the LAN arrives carrying its LAN address, and no route exists from
+        # the LAN into the tailnet range. The gate is the address, not a secret
+        # the operator would have to type on a phone keyboard.
+        #
+        # /m is also the answer to "the dashboard doesn't work on the phone":
+        # dashboard.html is a local FILE with a 670 KB WebGL dependency, opened
+        # on the PC. Nothing served it, so there was nothing for a phone to load.
+        # This page is served, mobile-shaped, and reads the same live routes
+        # (/health, /mycelium, /anomalies) the dashboard reads -- in the browser,
+        # so a stale page cannot pretend to be a calm system.
+        # ------------------------------------------------------------------
+        def _tailnet_caller():
+            """(ok, addr) for the calling request -- the gate is `tailnet_ok`."""
+            addr = (request.remote_addr or "").strip()
+            return tailnet_ok(addr), addr
+
+        @self.app.route("/m", methods=["GET"])
+        def mobile_page():
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("mobile_page_refused", addr or "unknown")
+                return ("this door answers the tailnet only -- you are %s" % (addr or "unknown"), 403,
+                        {"Content-Type": "text/plain; charset=utf-8"})
+            build, phone = {}, {}
+            try:
+                _au = importlib.import_module("covenant_app_update")
+                build = {k: v for k, v in (_au.latest() or {}).items() if k != "path"}
+            except Exception as e:                                # noqa: BLE001
+                build = {"error": "%s: %s" % (type(e).__name__, e)}
+            try:
+                _ck = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "phone_checkins.jsonl")
+                with open(_ck, "r", encoding="utf-8") as fh:
+                    tail = fh.readlines()[-1:]
+                phone = json.loads(tail[0]) if tail else {}
+            except Exception:                                     # noqa: BLE001
+                phone = {}
+            page = MOBILE_PAGE_HTML.replace("__NODE__", str(self.node.node_id))
+            page = page.replace("__SOURCE__", CORE_SOURCE_SHA12 or "unreadable")
+            page = page.replace("__VERSION__", str(COVENANT_VERSION))
+            page = page.replace("__BUILD__", json.dumps(build))
+            page = page.replace("__PHONE__", json.dumps(phone))
+            return (page, 200, {"Content-Type": "text/html; charset=utf-8",
+                                "Cache-Control": "no-store"})
+
+        @self.app.route("/m/apk", methods=["GET"])
+        def mobile_apk():
+            """The bootstrap install: the APK bytes to a browser on the tailnet.
+
+            Android will still ask the person holding the phone to confirm the
+            install -- that consent is not ours to skip and this route does not
+            try to. One tap here, and every update after it goes back through
+            the signed /app/latest path, which the installed build will finally
+            know how to ask for.
+            """
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("mobile_apk_refused", addr or "unknown")
+                return ("this door answers the tailnet only -- you are %s" % (addr or "unknown"), 403,
+                        {"Content-Type": "text/plain; charset=utf-8"})
+            try:
+                _au = importlib.import_module("covenant_app_update")
+            except Exception as e:                                # noqa: BLE001
+                return ("app update unavailable on this node: %s" % type(e).__name__, 503,
+                        {"Content-Type": "text/plain; charset=utf-8"})
+            d = _au.latest()
+            if not d:
+                return ("no build fetched yet (python covenant_app_update.py --fetch)", 404,
+                        {"Content-Type": "text/plain; charset=utf-8"})
+            from flask import send_file
+            return send_file(d["path"], mimetype="application/vnd.android.package-archive",
+                             as_attachment=True,
+                             download_name="covenant-node-%s.apk" % d.get("sha7", "build"))
 
         @self.app.route("/transactions", methods=["POST"])
         def add_transaction():
