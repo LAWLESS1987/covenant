@@ -73,6 +73,7 @@ sys.path.insert(0, HERE)
 LEDGER = os.path.join(HERE, "ops", "highway.jsonl")
 CHOICES = os.path.join(HERE, "ops", "OPERATOR_CHOICES.json")
 QUARANTINE_AFTER = 2          # two measured failures and a remedy stops being offered
+ROW_COOLDOWN_S = 3600         # the same (remedy, condition) is not re-attempted, or re-written, more often
 
 AUTO_REVERSIBLE = "AUTO_REVERSIBLE"
 PROPOSE_ONLY = "PROPOSE_ONLY"
@@ -168,6 +169,76 @@ def detect_log_bloat(health=None, limit_mb=512):
     return {"state": PRESENT if big else ABSENT, "measured": {"over_%dmb" % limit_mb: big}}
 
 
+def detect_build_stale_on_pc(health=None, hours=24):
+    """This PC has not looked for a newer app build in `hours`.
+
+    SEPARATE FROM app_build_gap, and the separation was learned the hard way.
+    fetch_build was first paired with app_build_gap -- "the phone is behind" --
+    so every time it ran, the phone was still behind afterwards (fetching is
+    not installing), the outcome was recorded "did not fix", and the remedy
+    quarantined ITSELF after two correct runs. The effectiveness counter was
+    working exactly as designed on a pairing that was wrong: a remedy must be
+    graded against the condition it can actually clear.
+    """
+    try:
+        import covenant_app_update as AU
+        d = AU.latest() or {}
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if not d:
+        return {"state": PRESENT, "measured": {"fetched": None, "why": "no build fetched yet"}}
+    stamp = str(d.get("fetched", ""))
+    try:
+        import datetime
+        age_h = (time.time() - datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z").timestamp()) / 3600.0
+    except (ValueError, TypeError):
+        return {"state": UNKNOWN, "measured": {"fetched": stamp, "why": "unparseable timestamp"}}
+    return {"state": PRESENT if age_h > hours else ABSENT,
+            "measured": {"fetched": stamp, "age_hours": round(age_h, 1), "limit_hours": hours,
+                         "have": d.get("sha7")}}
+
+
+def detect_phone_build_behind_core(health=None):
+    """The newest app build predates the core that is on main now.
+
+    THE GAP THIS CLOSES. covenant-phone's workflow triggers on a push to
+    covenant-phone -- and the APK it produces is built from a checkout of the
+    PUBLIC core at main. So every change to the core leaves the phone's build
+    behind it, and nothing ever rebuilds: today's work would have sat here
+    forever while the phone auto-updated faithfully to a build made before it.
+    A delivery pipeline whose first step nobody triggers is not a pipeline.
+    """
+    import subprocess
+    try:
+        import covenant_app_update as AU
+        d = AU.latest() or {}
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if not d.get("built"):
+        return {"state": UNKNOWN, "measured": {"why": "no build fetched to compare against"}}
+    ref = "origin/main"
+    try:
+        p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
+                           capture_output=True, text=True, timeout=60)
+        if p.returncode != 0:
+            ref = "HEAD"
+            p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
+                               capture_output=True, text=True, timeout=60)
+        head = (p.stdout or "").strip()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    import datetime
+    try:
+        head_t = datetime.datetime.fromisoformat(head).timestamp()
+        built_t = datetime.datetime.strptime(d["built"], "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except (ValueError, TypeError) as e:
+        return {"state": UNKNOWN, "measured": {"head": head, "built": d.get("built"), "error": str(e)}}
+    return {"state": PRESENT if head_t > built_t else ABSENT,
+            "measured": {"core_committed": head, "ref": ref, "build_built": d["built"],
+                         "build": d.get("sha7"), "behind_by_min": round((head_t - built_t) / 60.0, 1)}}
+
+
 def detect_held_core_drift(health=None):
     """A held copy of the core claiming the live version with different bytes.
 
@@ -192,19 +263,45 @@ def detect_watchdog_stale(health=None):
     process says about itself is evidence either way. Measured by comparing the
     hash the live process recorded against the file's hash now.
     """
-    import covenant_watchdog as W
+    # WHAT THIS MUST NOT DO, and did in its first draft: import the watchdog
+    # here and compare THAT module's hash to the file. A fresh import always
+    # matches disk, so the check would have reported ABSENT every time,
+    # including the two occasions today when the running watchdog really was
+    # stale. A guard that measures itself is the 2026-09-09 fake-guard defect
+    # exactly, and it was written into this file within the hour of writing
+    # that rule down.
+    #
+    # The live process cannot be asked what bytes it loaded, so the question is
+    # asked in the one way that works from outside: was the FILE last written
+    # after the PROCESS started? A touch with no edit would read as stale, and
+    # that is the harmless direction to be wrong in.
+    import subprocess
+    src = os.path.join(HERE, "covenant_watchdog.py")
     try:
-        loaded = W.SELF_SOURCE_SHA12
-        on_disk = W.disk_source_sha12(W.SELF_SRC)
+        mtime = os.path.getmtime(src)
+    except OSError as e:
+        return {"state": UNKNOWN, "measured": {"error": str(e)}}
+    ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\" |"
+          " Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' } |"
+          " ForEach-Object { $_.CreationDate.ToUniversalTime().ToString('o') }")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        stamps = [x.strip() for x in (p.stdout or "").splitlines() if x.strip()]
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
-    if not loaded or not on_disk:
-        return {"state": UNKNOWN, "measured": {"loaded": loaded, "on_disk": on_disk}}
-    # THIS PROCESS is not the watchdog. What matters is the file the LIVE
-    # watchdog loaded, which it writes into its own log; absent that, this
-    # compares the module as imported here, which is the same file it runs.
-    return {"state": PRESENT if loaded != on_disk else ABSENT,
-            "measured": {"loaded": loaded, "on_disk": on_disk}}
+    if not stamps:
+        # No watchdog running at all is a different condition with a different
+        # remedy; this detector does not get to call it "fine".
+        return {"state": UNKNOWN, "measured": {"running": 0, "why": "no watchdog process found"}}
+    import datetime
+    try:
+        started = min(datetime.datetime.fromisoformat(s).timestamp() for s in stamps)
+    except ValueError as e:
+        return {"state": UNKNOWN, "measured": {"stamps": stamps, "error": str(e)}}
+    return {"state": PRESENT if mtime > started else ABSENT,
+            "measured": {"file_written": round(mtime, 1), "process_started": round(started, 1),
+                         "running": len(stamps), "stale_by_s": round(mtime - started, 1)}}
 
 
 DETECTORS = {
@@ -212,6 +309,8 @@ DETECTORS = {
     "source_drift": detect_source_drift,
     "height_lag": detect_height_lag,
     "app_build_gap": detect_app_build_gap,
+    "build_stale_on_pc": detect_build_stale_on_pc,
+    "phone_build_behind_core": detect_phone_build_behind_core,
     "log_bloat": detect_log_bloat,
     "held_core_drift": detect_held_core_drift,
     "watchdog_stale": detect_watchdog_stale,
@@ -321,7 +420,10 @@ def remedy_restart_watchdog(measured, dry_run=True):
     import subprocess
     if dry_run:
         return True, "would stop the running watchdog and start it from disk"
-    ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%python%'\")"
+    # %% throughout: this string is %-formatted below, and a bare '%python%'
+    # in the WMI filter blew up the first --repair run with "unsupported
+    # format character 'p'".
+    ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
           " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
           " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
           " Start-Sleep -Seconds 2;"
@@ -334,6 +436,36 @@ def remedy_restart_watchdog(measured, dry_run=True):
     p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
                        cwd=HERE, capture_output=True, text=True, timeout=300)
     return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-200:]
+
+
+def remedy_dispatch_phone_build(measured, dry_run=True):
+    """ASYNCHRONOUS: asks the build runner for an APK carrying the core on main.
+
+    It touches a build server and nothing else -- no device, no install, no
+    money. The cost is minutes on his Actions account, declared below. The
+    build takes about ten minutes, so this remedy is marked `async`: grading it
+    a second after it starts is the exact mistake that quarantined fetch_build.
+    """
+    import covenant_app_update as AU
+    import covenant_github_judge as gh
+    if dry_run:
+        return True, "would dispatch android.yml on %s" % AU.REPO
+    tok = gh.token()
+    if not tok:
+        return False, "no GitHub credential on this PC"
+    body = json.dumps({"ref": "main"}).encode()
+    req = urllib.request.Request(
+        "https://api.github.com/repos/%s/actions/workflows/android.yml/dispatches" % AU.REPO,
+        data=body, method="POST",
+        headers={"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json",
+                 "Content-Type": "application/json", "User-Agent": "covenant-highway"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.status in (200, 201, 204), "dispatch accepted (HTTP %d); the build takes ~10 min" % r.status
+    except urllib.error.HTTPError as e:
+        return False, "dispatch refused: HTTP %d %s" % (e.code, e.read()[:120].decode("utf-8", "replace"))
+    except Exception as e:                                       # noqa: BLE001
+        return False, "%s: %s" % (type(e).__name__, e)
 
 
 def remedy_install_on_phone(measured, dry_run=True):
@@ -358,7 +490,7 @@ REMEDIES = {
                                   "cost": ["one node unreachable for a few seconds, one at a time"],
                                   "irreversible": []}},
     "fetch_build": {"fn": remedy_fetch_build, "klass": AUTO_REVERSIBLE,
-                    "for": ["app_build_gap"], "kind": "undoable",
+                    "for": ["build_stale_on_pc"], "kind": "undoable",
                     "undo": "restore the previous ops/app/latest.json",
                     "touches": ["ops/app"],
                     "benefit": {"gains": ["the newest build is here when the phone asks"],
@@ -384,6 +516,14 @@ REMEDIES = {
                          "benefit": {"gains": ["the checks that are deployed are the checks running (P14)"],
                                      "cost": ["a gap of a few seconds with nothing watching the nodes"],
                                      "irreversible": []}},
+    "dispatch_phone_build": {"fn": remedy_dispatch_phone_build, "klass": AUTO_REVERSIBLE,
+                             "for": ["phone_build_behind_core"], "kind": "stateless",
+                             "async": True,
+                             "touches": ["the build runner"],
+                             "benefit": {"gains": ["an APK carrying the core that is on main",
+                                                   "the phone's auto-update has something newer to find"],
+                                         "cost": ["about ten minutes of his GitHub Actions account"],
+                                         "irreversible": []}},
     "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
                          "for": ["app_build_gap"], "kind": "needs a person",
                          "touches": ["the phone"],
@@ -395,16 +535,52 @@ REMEDIES = {
 
 
 def quarantined(name, ledger=None):
-    """A remedy that has been measured failing QUARANTINE_AFTER times is not offered."""
+    """A remedy measured failing QUARANTINE_AFTER times is not offered.
+
+    Reset by a measured success, or by an explicit `recalibrated` row -- see
+    recalibrate(). Never by deleting history: a counter you can clear by
+    forgetting is not a counter.
+    """
     fails = 0
     for row in read_ledger(ledger):
         if row.get("remedy") != name:
             continue
-        if row.get("outcome") == "fixed":
+        if row.get("outcome") in ("fixed", "recalibrated"):
             fails = 0
         elif row.get("outcome") == "did not fix":
             fails += 1
     return fails >= QUARANTINE_AFTER
+
+
+def recalibrate(name, why, ledger=None):
+    """Clear a quarantine that measured the wrong thing, on the record.
+
+    The first live pass quarantined fetch_build after two runs that both did
+    exactly what they should: it was being graded against app_build_gap -- "the
+    phone is behind" -- which fetching cannot clear. The counter was right
+    about the pairing and wrong about the remedy. This writes WHY the count no
+    longer applies, so the reset is auditable rather than invisible; the
+    failures stay in the file above it.
+    """
+    return write_ledger({"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1),
+                         "remedy": name, "outcome": "recalibrated", "why": why}, ledger)
+
+
+def _recent_identical(name, detector, ledger=None, within_s=None):
+    """The last row for this (remedy, detector) if it is younger than the cooldown.
+
+    The first hour of live running wrote the same proposal row every 66 seconds,
+    twenty-four times, each one re-loading the judge to re-ask a question whose
+    answer had not changed. A ledger that repeats itself is a ledger nobody
+    reads, and an alert nobody reads is A60's defect. Repeats are skipped, not
+    written, and the condition still surfaces through run_once's return.
+    """
+    within_s = ROW_COOLDOWN_S if within_s is None else within_s
+    now = time.time()
+    for row in reversed(read_ledger(ledger)):
+        if row.get("remedy") == name and row.get("detector") == detector:
+            return row if (now - float(row.get("at", 0))) < within_s else None
+    return None
 
 
 def ask_the_covenant(sentence):
@@ -451,7 +627,8 @@ def propose(name, condition, detector, r=None):
     }
 
 
-def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=None):
+def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=None,
+                 cooldown_s=None):
     """Run one remedy against one measured condition. Returns a ledger row.
 
     Every refusal is a row too: a refusal nobody can see is indistinguishable
@@ -463,6 +640,15 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     if not r:
         row.update(outcome="refused", why="no such remedy")
         return write_ledger(row, ledger)
+
+    # The cooldown comes FIRST, before any work: a repeat within the hour costs
+    # a subprocess, a model load, or a download, and buys a line identical to
+    # the one above it.
+    prev = None if cooldown_s == 0 else _recent_identical(name, detector, ledger, cooldown_s)
+    if prev is not None:
+        out = dict(prev)
+        out["repeat"] = True
+        return out
 
     # INVARIANT 1 -- the class, refused by the ENGINE, and then REFERRED.
     #
@@ -519,6 +705,15 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     if dry_run:
         row.update(outcome="dry run", after=before)
         return write_ledger(row, ledger)
+    if r.get("async"):
+        # GRADED BY THE NEXT PASS, not by this one. A build takes ten minutes;
+        # measuring a second after the dispatch would record "did not fix"
+        # every time and quarantine a remedy that works -- which is precisely
+        # what happened to fetch_build in this file's first live hour. An
+        # outcome of "started" is not counted as a failure by quarantined().
+        row.update(after=before, outcome="started",
+                   note="asynchronous -- the condition is re-measured next pass")
+        return write_ledger(row, ledger)
     after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
     row.update(after=after,
                outcome="fixed" if (before == PRESENT and after == ABSENT) else "did not fix")
@@ -551,7 +746,8 @@ def write_ledger(row, path=None):
 
 # ----------------------------------------------------------------- sharing
 
-def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None):
+def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None,
+             cooldown_s=None):
     """One sense-and-repair pass. (alerts, infos) in the watchdog's shape.
 
     `exclude` defaults to the watchdog's own restart because the intended caller
@@ -571,7 +767,8 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
         for rname, r in REMEDIES.items():
             if name not in r["for"] or rname in (exclude or ()):
                 continue
-            row = apply_remedy(rname, c, name, dry_run=dry_run, ledger=ledger)
+            row = apply_remedy(rname, c, name, dry_run=dry_run, ledger=ledger,
+                               cooldown_s=cooldown_s)
             acted = True
             if row["outcome"] == "fixed":
                 infos.append("highway: %s was present; %s fixed it" % (name, rname))
@@ -614,7 +811,7 @@ def report(node_id=None, health=None, ledger=None):
     }
 
 
-def ingest(peer_report, dry_run=True, ledger=None):
+def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None):
     """Take a peer's offer and decide LOCALLY. Returns what this node did.
 
     INVARIANT 4: nothing here runs because a peer said so. For every condition
@@ -636,7 +833,8 @@ def ingest(peer_report, dry_run=True, ledger=None):
             continue
         for rname, r in REMEDIES.items():
             if name in r["for"] and r["klass"] == AUTO_REVERSIBLE:
-                row = apply_remedy(rname, local, name, dry_run=dry_run, ledger=ledger)
+                row = apply_remedy(rname, local, name, dry_run=dry_run, ledger=ledger,
+                                   cooldown_s=cooldown_s)
                 acted.append({"condition": name, "action": row["outcome"], "remedy": rname})
                 break
         else:
@@ -674,7 +872,10 @@ def main(argv=None):
     for name in present:
         for rname, r in REMEDIES.items():
             if name in r["for"]:
-                row = apply_remedy(rname, conditions[name], name, dry_run=not a.repair)
+                # cooldown_s=0: a person typing --repair has asked for it now,
+                # and the hourly suppressor exists for the scheduled pass, not for them.
+                row = apply_remedy(rname, conditions[name], name, dry_run=not a.repair,
+                                   cooldown_s=0)
                 print("  %-16s %-14s %-10s %s" % (name, rname, row["outcome"],
                                                   row.get("why", row.get("detail", ""))[:80]))
     return 0

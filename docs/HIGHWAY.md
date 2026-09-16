@@ -130,3 +130,41 @@ is down, re-fetch a build, rotate a log. The interesting cases — "the judge is
 
 That is the right default. Say the word if you want any class of them auto-applied, and
 name which; I will not widen it on my own judgement.
+
+## What the first live hour taught it
+
+The watchdog started running the pass every ~66 seconds at 06:44. Inside the hour it
+fetched a build by itself — and then produced three faults of mine, which is the point of
+running a thing rather than describing it.
+
+1. **A remedy graded against a condition it cannot clear.** `fetch_build` was paired with
+   `app_build_gap` ("the phone is behind"), which fetching does not fix, so two correct runs
+   were recorded "did not fix" and the remedy **quarantined itself**. The counter was right;
+   the pairing was wrong. `fetch_build` now answers `build_stale_on_pc`, and a quarantine is
+   cleared only by `recalibrate()`, which writes *why* into the ledger and leaves the
+   failures above it. Never by deleting history.
+2. **An asynchronous remedy cannot be graded a second after it starts.** A CI build takes
+   ten minutes. Remedies marked `async` record `started`, and `quarantined()` does not count
+   that as a failure — the next pass measures the condition and tells the truth.
+3. **A guard that measured itself.** The first `watchdog_stale` imported the watchdog and
+   compared *that* to disk; a fresh import always matches, so it would have said ABSENT every
+   time, including twice today when the running watchdog really was stale. It now asks the
+   only question answerable from outside — was the file written after the process started —
+   and immediately reported PRESENT by 1702 seconds.
+
+It was also writing an identical proposal row every 66 seconds, re-loading the judge each
+time to re-ask a question whose answer had not changed. There is now an hourly cooldown,
+bypassed by `--repair` typed by a person, because the suppressor is for the scheduled pass.
+
+## The delivery gap it closed
+
+`covenant-phone` builds on a push to **itself**, and the APK it produces is a checkout of
+the **public core at main**. So every core change left the app build behind and nothing ever
+rebuilt: today's work would have sat here while the phone auto-updated faithfully to a build
+made before it. `phone_build_behind_core` measures that (main's last commit against the
+build's timestamp) and `dispatch_phone_build` asks the runner for one — the credential on
+this PC carries `workflow` scope. It touches a build server, not a device: no install, no
+money, and Android still asks the person holding the phone. First live dispatch: HTTP 204,
+133 minutes behind.
+
+`test_h1_highway.py` is 47 checks.

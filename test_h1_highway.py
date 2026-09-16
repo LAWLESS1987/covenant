@@ -75,7 +75,7 @@ def main():
         H.REMEDIES["install_on_phone"] = dict(real, fn=spy_remedy(calls))
         led = tmp_ledger()
         row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
-                             dry_run=False, ledger=led)
+                             dry_run=False, ledger=led, cooldown_s=0)
         check("H1a a PROPOSE_ONLY remedy is not executed", row["outcome"] == "proposed", row["outcome"])
         check("H1a ...and its function is never entered", not calls, str(calls))
 
@@ -86,7 +86,7 @@ def main():
         H.REMEDIES["install_on_phone"] = dict(real, fn=spy_remedy(calls), klass=H.AUTO_REVERSIBLE,
                                               kind="stateless", touches=["a temp file"])
         row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
-                             dry_run=False, ledger=led)
+                             dry_run=False, ledger=led, cooldown_s=0)
         check("H1a mutation: class flipped -> the engine runs it", bool(calls) and row["outcome"] != "proposed",
               "%s calls=%d" % (row["outcome"], len(calls)))
     finally:
@@ -98,13 +98,13 @@ def main():
     try:
         H.REMEDIES["rotate_log"] = dict(real_rl, fn=spy_remedy(calls))
         led = tmp_ledger()
-        row = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led,
+        row = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, cooldown_s=0, ledger=led,
                              choices={"logs": "I want the full log kept for the audit"})
         check("H1b a remedy that touches an operator's choice refuses",
               row["outcome"] == "refused" and "operator chose" in row.get("why", ""), row.get("why", ""))
         check("H1b ...without entering the remedy", not calls, str(calls))
         # MUTATION: the choice is withdrawn.
-        row = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led, choices={})
+        row = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, cooldown_s=0, ledger=led, choices={})
         check("H1b mutation: choice withdrawn -> it proceeds", bool(calls), row["outcome"])
     finally:
         H.REMEDIES["rotate_log"] = real_rl
@@ -117,13 +117,13 @@ def main():
     try:
         led = tmp_ledger()
         row = H.apply_remedy("_fixture_no_undo", present(), "log_bloat", dry_run=False,
-                             ledger=led, choices={})
+                             ledger=led, choices={}, cooldown_s=0)
         check("H1c a state-changing remedy with no undo refuses",
               row["outcome"] == "refused" and "undo" in row.get("why", ""), row.get("why", ""))
         check("H1c ...without entering the remedy", not calls, str(calls))
         H.REMEDIES["_fixture_no_undo"]["undo"] = "put it back"
         row = H.apply_remedy("_fixture_no_undo", present(), "log_bloat", dry_run=False,
-                             ledger=led, choices={})
+                             ledger=led, choices={}, cooldown_s=0)
         check("H1c mutation: an undo on record -> it proceeds", bool(calls), row["outcome"])
     finally:
         H.REMEDIES.pop("_fixture_no_undo", None)
@@ -137,7 +137,7 @@ def main():
         H.DETECTORS["log_bloat"] = lambda health=None: {"state": H.ABSENT, "measured": {"fixture": True}}
         led = tmp_ledger()
         out = H.ingest({"node": "peer", "conditions": {"log_bloat": H.PRESENT}},
-                       dry_run=False, ledger=led)
+                       dry_run=False, ledger=led, cooldown_s=0)
         did = out["did"][0]
         check("H1d a peer's PRESENT is declined when this node measures ABSENT",
               did["action"] == "declined", json.dumps(did))
@@ -145,7 +145,7 @@ def main():
         # MUTATION: the condition really is present here.
         H.DETECTORS["log_bloat"] = lambda health=None: {"state": H.PRESENT, "measured": {"fixture": True}}
         out = H.ingest({"node": "peer", "conditions": {"log_bloat": H.PRESENT}},
-                       dry_run=False, ledger=led)
+                       dry_run=False, ledger=led, cooldown_s=0)
         check("H1d mutation: present HERE too -> this node acts, on its own measurement",
               bool(calls), json.dumps(out["did"]))
     finally:
@@ -158,7 +158,7 @@ def main():
     for _ in range(2):
         H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix"}, led)
     check("H1e two measured failures quarantine a remedy", H.quarantined("rotate_log", led))
-    row = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=led, choices={})
+    row = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=led, choices={}, cooldown_s=0)
     check("H1e ...and the engine refuses it, saying why",
           row["outcome"] == "refused" and "quarantin" in row.get("why", ""), row.get("why", ""))
     H.write_ledger({"remedy": "rotate_log", "outcome": "fixed"}, led)
@@ -177,7 +177,7 @@ def main():
     # ---- H1g: the refusal is a referral, with the running seat's own words
     led = tmp_ledger()
     row = H.apply_remedy("install_on_phone", present({"alerts": ["the phone is two builds behind"]}),
-                         "app_build_gap", dry_run=True, ledger=led, choices={})
+                         "app_build_gap", dry_run=True, ledger=led, choices={}, cooldown_s=0)
     cov = row.get("covenant", {})
     check("H1g the proposal carries what was measured", bool(row.get("measured")), json.dumps(row.get("measured"))[:80])
     check("H1g ...the mutual benefit, cost included",
@@ -211,7 +211,7 @@ def main():
                                               klass=H.AUTO_REVERSIBLE, kind="stateless")
         led = tmp_ledger()
         row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
-                             dry_run=False, ledger=led, choices={})
+                             dry_run=False, cooldown_s=0, ledger=led, choices={})
         check("H1i a remedy touching the phone refuses even as AUTO_REVERSIBLE",
               row["outcome"] == "proposed" and not calls, "%s calls=%d" % (row["outcome"], len(calls)))
         check("H1i ...and says which subject it crossed",
@@ -220,7 +220,7 @@ def main():
         H.REMEDIES["install_on_phone"] = dict(real, fn=spy_remedy(calls), klass=H.AUTO_REVERSIBLE,
                                               kind="stateless", touches=["a temp file"])
         row = H.apply_remedy("install_on_phone", present(), "app_build_gap",
-                             dry_run=False, ledger=led, choices={})
+                             dry_run=False, cooldown_s=0, ledger=led, choices={})
         check("H1i mutation: touching nothing protected -> it runs", bool(calls), row["outcome"])
         protected = [w for w in ("money", "trader", "rule", "judge", "phone", "key")
                      if w not in H.NEVER_AUTOMATIC]
@@ -240,9 +240,9 @@ def main():
         only = {"watchdog_stale": H.DETECTORS["watchdog_stale"]}
         saved, H.DETECTORS = H.DETECTORS, only
         try:
-            H.run_once(dry_run=False, ledger=led)
+            H.run_once(dry_run=False, ledger=led, cooldown_s=0)
             check("H1j run_once excludes the watchdog's own restart by default", not calls, str(calls))
-            H.run_once(dry_run=False, exclude=(), ledger=led)
+            H.run_once(dry_run=False, exclude=(), ledger=led, cooldown_s=0)
             check("H1j mutation: asked for explicitly, it runs", bool(calls), str(len(calls)))
         finally:
             H.DETECTORS = saved
@@ -250,6 +250,71 @@ def main():
         H.REMEDIES["restart_watchdog"] = real_rw
         if real_det:
             H.DETECTORS["watchdog_stale"] = real_det
+
+    # ---- H1m: the hourly cooldown, learned from the first live hour
+    calls = []
+    real_rl = dict(H.REMEDIES["rotate_log"])
+    try:
+        H.REMEDIES["rotate_log"] = dict(real_rl, fn=spy_remedy(calls))
+        led = tmp_ledger()
+        H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led, choices={})
+        row2 = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led, choices={})
+        rows = [r for r in H.read_ledger(led) if r.get("remedy") == "rotate_log"]
+        check("H1m an identical attempt inside the hour is not repeated",
+              len(calls) == 1 and row2.get("repeat") is True, "calls=%d repeat=%s" % (len(calls), row2.get("repeat")))
+        check("H1m ...and writes no second row -- the ledger records changes, not ticks",
+              len(rows) == 1, "%d rows" % len(rows))
+        row3 = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led,
+                              choices={}, cooldown_s=0)
+        check("H1m mutation: asked for explicitly (cooldown_s=0) it runs again",
+              len(calls) == 2 and not row3.get("repeat"), "calls=%d" % len(calls))
+    finally:
+        H.REMEDIES["rotate_log"] = real_rl
+
+    # ---- H1o: a remedy whose effect is asynchronous is not graded on the spot
+    calls = []
+    H.REMEDIES["_fixture_async"] = {"fn": spy_remedy(calls), "klass": H.AUTO_REVERSIBLE,
+                                    "for": ["log_bloat"], "kind": "stateless", "async": True,
+                                    "touches": ["a build runner"],
+                                    "benefit": {"gains": ["x"], "cost": ["y"], "irreversible": []}}
+    real_det = H.DETECTORS.get("log_bloat")
+    try:
+        H.DETECTORS["log_bloat"] = lambda health=None: {"state": H.PRESENT, "measured": {}}
+        led = tmp_ledger()
+        r1 = H.apply_remedy("_fixture_async", present(), "log_bloat", dry_run=False,
+                            ledger=led, choices={}, cooldown_s=0)
+        r2 = H.apply_remedy("_fixture_async", present(), "log_bloat", dry_run=False,
+                            ledger=led, choices={}, cooldown_s=0)
+        check("H1o an async remedy records 'started', not a grade",
+              r1["outcome"] == "started" and r2["outcome"] == "started",
+              "%s, %s" % (r1["outcome"], r2["outcome"]))
+        check("H1o ...so two runs do not quarantine a remedy that works",
+              not H.quarantined("_fixture_async", led))
+        # MUTATION: drop the async flag and the same two runs condemn it, which
+        # is exactly what happened to fetch_build on its first live hour.
+        H.REMEDIES["_fixture_async"].pop("async")
+        H.apply_remedy("_fixture_async", present(), "log_bloat", dry_run=False,
+                       ledger=led, choices={}, cooldown_s=0)
+        H.apply_remedy("_fixture_async", present(), "log_bloat", dry_run=False,
+                       ledger=led, choices={}, cooldown_s=0)
+        check("H1o mutation: graded on the spot, two runs quarantine it",
+              H.quarantined("_fixture_async", led))
+    finally:
+        H.REMEDIES.pop("_fixture_async", None)
+        if real_det:
+            H.DETECTORS["log_bloat"] = real_det
+
+    # ---- H1n: a quarantine is cleared on the record, never by forgetting
+    led = tmp_ledger()
+    for _ in range(2):
+        H.write_ledger({"remedy": "fetch_build", "outcome": "did not fix"}, led)
+    check("H1n two failures quarantine it", H.quarantined("fetch_build", led))
+    H.recalibrate("fetch_build", "graded against the wrong condition", led)
+    check("H1n recalibrate() clears it", not H.quarantined("fetch_build", led))
+    kept = [r for r in H.read_ledger(led) if r.get("outcome") == "did not fix"]
+    said = [r for r in H.read_ledger(led) if r.get("outcome") == "recalibrated"]
+    check("H1n ...and the failures are still in the file, with the reason beside them",
+          len(kept) == 2 and len(said) == 1 and said[0].get("why"), "%d kept, %d notes" % (len(kept), len(said)))
 
     # ---- H1k / H1l: the wire
     import covenant_unified_v8 as cov
