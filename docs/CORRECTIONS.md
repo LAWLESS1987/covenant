@@ -27,6 +27,7 @@ perfection is not the goal, mutual benefit and honesty is.*
 | **The trading rules have a measurable edge** | Across three mechanisms and **2,276 variants**, nothing clears deflated Sharpe ≥ 0.95, walk-forward p ≤ 0.05 and PBO < 0.5 together. The one class that passed any single test still lost money out of sample in four folds of five. Equal-weight buy-and-hold over the same window lost 63%. The trader stays disarmed, and Constitution rule 2 is *"no claim of profit edge"* | [KNOWN_ISSUES](KNOWN_ISSUES.md) |
 | **35 of 36 "guards" protected what they named** | Confirmed fake by mutation: the dominant mechanism is a check that **greps the source text** instead of running it. A guard that passes without the property holding is not a guard | [A74](KNOWN_ISSUES.md) |
 | **A node earns something by running the chain** | Zero, measured. The only reward is 1% of value *moved*, paid exclusively to stakers; nothing has ever been staked, so all 0.12 tokens ever computed were discarded. Supply is still the 1000-token genesis mint | [PARTNER.md](PARTNER.md) |
+| **The summarise path runs a local judge and nothing leaves this machine** | There is no local path in `covenant_route.py` — since 2026-09-12 every task dispatches to a GitHub Actions runner in the **public** repo, and the runner's job summary is rendered publicly. Public run `35064624218` published a readable summary of one of the operator's videos. The defect was the **claim**, not the publishing: he is not aiming for private, so the tool now announces the destination rather than refusing | [A128](KNOWN_ISSUES.md) |
 | Two further claims of the author's that did not survive checking | Written out in full | [WHAT_WE_FOUND §7](WHAT_WE_FOUND.md) |
 
 ## Missteps of conduct, not of code
@@ -37,6 +38,8 @@ perfection is not the goal, mutual benefit and honesty is.*
 | August letters into the neuromorphic community — the same small field the one good September result came from | [A122](KNOWN_ISSUES.md) |
 | Every emailed `git clone` line arrived wrapped by Gmail and clones an **empty repository**. Present in every letter until 2026-09-15, including the one whose notes claimed the links were safe | [A122](KNOWN_ISSUES.md) |
 | An affiliation verified against a page that was real and not current: Pedersen is at **DTU**, not KTH | [A121](KNOWN_ISSUES.md) |
+| **A third party's name was quoted verbatim into a file in the public repository** while writing up A122 — a bystander who never consented to any of this. Redacted; it remains in git history, which only a rewrite removes | [A129](KNOWN_ISSUES.md) |
+| A privacy posture was **imposed on the operator who does not hold one** — the first fix for A128 refused to send anything under `private/` by default. Replaced within the hour: the tool announces, and he decides | [A128](KNOWN_ISSUES.md) |
 
 ## What the pattern is
 

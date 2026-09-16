@@ -71,6 +71,30 @@
     "private/",
     "test_r1_retracted.py"
    ]
+  },
+  {
+   "id": "A128",
+   "claim": "That covenant_route.py's judge runs locally and that the summarise path keeps everything on this machine.",
+   "refuted_by": "covenant_route.py's own header after the Ollama removal of 2026-09-12, and public Actions run 35064624218",
+   "truth": "There is no local path in covenant_route.py. Every task dispatches to a GitHub Actions runner in the repository resolved from `git remote get-url origin` -- the PUBLIC LAWLESS1987/covenant -- and the runner's job summary is rendered publicly. Run 35064624218 on 2026-09-16 published a readable summary of one of the operator's videos there. The defect was the CLAIM, not the publishing: the operator is not aiming for private, so the tool now ANNOUNCES the destination on every call rather than refusing. COVENANT_HOLD_PRIVATE=1 refuses instead, for material naming a third party (A129).",
+   "verbatim": [
+    "covenant_route.py summarize (local Ollama judge) -> summary + facts",
+    "Nothing here uses a cloud model."
+   ],
+   "patterns": [
+    "local\\s+Ollama\\s+judge",
+    "[Nn]othing\\s+here\\s+uses\\s+a\\s+cloud\\s+model"
+   ],
+   "note_on_patterns": "Deliberately NARROW. A generic 'local judge' pattern matches 256 places, and almost all are correct: covenant_judge_defer.py's local judge really is local -- the distilled student runs in-process on the node. Only covenant_route.py's path was misdescribed. A guard that convicted all 256 would cry wolf and get switched off, which is the same over-matching that was withdrawn from A121 during construction.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "docs/history/",
+    "private/",
+    "covenant_route.py",
+    "test_r1_retracted.py"
+   ]
   }
  ]
 }

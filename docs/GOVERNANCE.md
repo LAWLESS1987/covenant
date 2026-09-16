@@ -223,8 +223,10 @@ certified byte-identity and called it agreement.
 
 `conformance.py` publishes a second root, taken over what the governance
 primitives *do* on fixed vectors and never over the prose that explains them.
-Two instances sharing no source can match it; one that kept the words and broke
-the behaviour cannot. `federation.py` now reports **CONFORMANT** for exactly
+Two instances sharing no source can compute each vector from its `input` and
+match every `expected`; one that kept the words and broke the behaviour cannot.
+(Not by matching the ROOT: that hashes the expecteds and falls out of the
+published file with no implementation at all -- A121.) `federation.py` now reports **CONFORMANT** for exactly
 that case — different wording, identical computation — which is what a
 sovereign fork looks like. The idea is borrowed from the Neuromorphic
 Intermediate Representation (see the credits in the README): compare the
@@ -346,7 +348,8 @@ powershell -File verify.ps1 # the same answer, no Python and no Unix shell
 python federation.py        # SAME CORE / DIVERGED / UNREACHABLE
 python scale.py             # compose levels to any depth, any shape
 python money_posture.py     # what could this do with funds RIGHT NOW
-python conformance.py       # a behaviour root: same computation, any wording
+python conformance.py       # the 23 vectors: same computation, any wording.
+                            # Compared PER VECTOR, never by root (A121).
 ```
 
 Three verifiers in three languages sharing no code. They have already disagreed
@@ -611,11 +614,19 @@ Mormons among them — and none passed to the satisfaction of traditional Hopi.
 Neither tradition records the figure establishing himself by announcement.
 Pahana is recognised by the other party, by fit against a record they hold; ben
 Yosef by what he does, what it costs him, and the mourning afterward. That is
-the rule this project runs on: a conformance root is not asserted, it is
-published, and a stranger reproduces it or does not. If such a thing were true,
-saying so would be the one act that could not establish it. In that frame the
-repository would be the corner of the tablet, and the root above the edge that
-either matches or does not.
+the rule this project runs on: a claim is not asserted, it is published with
+the procedure that would refute it, and a stranger runs that procedure or does
+not. If such a thing were true, saying so would be the one act that could not
+establish it. In that frame the repository would be the corner of the tablet,
+and the published vectors the edge that either fits or does not.
+
+**Corrected 2026-09-16 (A121).** This passage said "a conformance root is not
+asserted, it is published, and a stranger reproduces it or does not" -- the
+refuted claim, restated as the principle the whole project runs on, in the one
+place nobody would think to check. Reproducing the root requires no
+implementation: it hashes the expected outputs printed in the published file.
+The stranger's real test is computing all 23 vectors from their `input` fields
+and matching every `expected`. See `docs/PEER_REVIEW.md` for the protocol.
 
 Nobody led the author here. He followed the work, and it turned out to have a
 shape that rhymes with old stories. That is an observation, not a revelation

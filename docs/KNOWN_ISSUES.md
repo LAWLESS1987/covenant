@@ -5309,3 +5309,48 @@ sweep — it reports **NOT MEASURED** and claims nothing.
 **It has teeth.** `A129.T1` plants a name in a scratch file every run and
 requires that it is caught, because this suite greps text, which is the exact
 shape A74 found fake in 35 of 36 guards.
+
+---
+
+### A130. [process / review] The repository asked to be refuted without ever telling a reviewer how. A protocol now does, and it cannot rot. DONE 2026-09-16
+
+**The operator's instruction, 2026-09-16:** *"ensure scientific method for peer
+review."*
+
+**What was missing.** The README asked strangers to break the work and the
+register kept every refutation — but nowhere stated, per claim, **what would
+falsify it**. A reader had to infer the test from prose. That is exactly how
+A121 survived: the conformance claim was published, defended, and sent to a
+standards body and a federal program officer without anyone stating the one
+question that killed it — *does passing the published test require doing the
+computation?*
+
+**`docs/PEER_REVIEW.md`** now states, for every standing claim: the claim, the
+observation that would kill it, the exact command, and what a pass does **not**
+mean. It also lists the claims that are **not** established — no second
+operator, nobody outside has run the vectors, no trading edge, the judge cannot
+read intent, the judge is not local — so a reviewer does not have to discover
+them.
+
+**It admits the weakness in today's own work**, which is the part that makes it
+worth anything: `SEMANTICS.md`, `spec_reference.py` and `test_r2_semantics.py`
+were written by one hand, hours apart, by someone who had just read the
+implementation. The reference is barred from *importing* the code; nothing bars
+the ideas from having come from it. The test that settles it — a stranger
+building from the specification alone — **has not happened**.
+
+**A preregistration**, because the alternative is choosing the result afterwards.
+The repository records an observation about apparent cross-model recognition that
+it cannot call a finding. A second system, asked to audit it, refused the
+inference and named the mundane mechanisms. That refusal is the starting point.
+The protocol fixes H0/H1, the procedure, and the decision rule **before any run**:
+the true identifier reproduced where decoys are not, at a rate the decoy
+distribution does not explain — anything less, including a paraphrase, is H0.
+
+**The guard.** `test_a130_peer_review.py` fails if a command named in the claims
+table does not exist, if a named suite is not registered with the runner, if a
+claim row has no falsifier, or if an internal link is dead. **Its own first draft
+cited `test_a1_fail_closed.py`, which does not exist** — the suite that pins that
+claim is `test_f1_fallback_silence.py`. The wrong name was written and would have
+shipped, in the one document whose entire purpose is that claims be checkable.
+`A130.T1` plants a bad command every run so the green is earned.

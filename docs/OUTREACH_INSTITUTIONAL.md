@@ -79,7 +79,9 @@ git clone https://github.com/LAWLESS1987/covenant
 cd covenant
 python constitution.py verify     # the published rules, unchanged
 sh verify.sh                      # the same answer, no Python
-python conformance.py             # the behaviour root a fork must match
+python conformance.py             # the 23 vectors a fork computes from their
+                                  # inputs, matched PER VECTOR -- not the
+                                  # root, which proves nothing (A121)
 python redundancy.py              # what this survives, and what it does not
 ```
 

@@ -646,6 +646,7 @@ run test_a125_trunk_judges_history.py 90
 run test_a126_seat_dispositions.py 90
 run test_a127_refine_not_rebuild.py 150
 run test_a129_bystanders.py 90
+run test_a130_peer_review.py 90
 # C4 (2026-08-30) pins three unauthenticated paths that grew without a bound:
 # succession register (5,000 guardians, 48.8s, lock held throughout), the
 # rate limiter's own key map (200,000 keys, 40.76 MB), and peer-supplied

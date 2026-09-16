@@ -8,7 +8,17 @@ others not available to keep running and recursive improve")
   covenant_judge_fallback.py is a judge that is never unreachable: a token
   log-odds model that commits when it has seen enough and abstains otherwise.
   It shipped untrained, because nothing fed it. This is the feeder, and the
-  examiner, and the only thing allowed to replace the model it runs on.
+  examiner, and the only thing allowed to change the model it runs on.
+
+  SINCE A127 (2026-09-15) IT REFINES RATHER THAN REPLACES. It used to
+  rebuild the student from the ledger every night -- train() is a
+  classmethod over the corpus and the previous model was not even a
+  parameter, so the weights were discarded and a new mind manufactured from
+  the same texts. FallbackModel.refine() now grows the deployed model: a
+  belief already held moves by at most one step (0.35), a genuinely new
+  feature enters at full value, and one not re-witnessed FADES instead of
+  being deleted. It falls back to train() only when there is nothing to
+  grow from.
 
 THE THREE PARTIES
 

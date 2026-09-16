@@ -179,6 +179,10 @@ SUITES = [
     # list lives in private/ and is gitignored, so this is a no-op in a
     # clone or a staged sweep and says so rather than passing.
     ("test_a129_bystanders.py",        120,  "SECURITY"),
+    # A130 (2026-09-16): docs/PEER_REVIEW.md hands a reviewer a claim, its
+    # falsifier and a command. This fails if a named command does not
+    # exist, a named suite is unregistered, or a claim has no falsifier.
+    ("test_a130_peer_review.py",       120,  "SECURITY"),
     # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
     # each measured before it was touched: /succession/register accepted 5,000
     # guardians and returned 200 OK after 48.8s while blocking a signed

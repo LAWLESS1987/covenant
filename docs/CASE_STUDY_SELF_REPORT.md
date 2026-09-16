@@ -57,8 +57,10 @@ Grok named the one test that would move it: an implementation of the published
 conformance spec by someone who had never seen the tree. The same day, two
 implementations were written from the spec file alone, one in PowerShell and one in
 Python, by two AI agents (one of them Claude) that I ran under clean-room rules,
-forbidden to read the repository, and audited for that by a third. Both reproduce the
-published root over all 23 vectors, and a suite reruns them on every sweep. They are
+forbidden to read the repository, and audited for that by a third. Both compute all 23
+vectors from their inputs and match every `expected`, and a suite reruns them on
+every sweep. (Said as root-matching until 2026-09-16; that is the refuted
+formulation -- A121.) They are
 not strangers: nobody outside this project has RUN THE VECTORS yet, and a human
 implementation is still open. **Update 2026-09-15:** someone outside the project has
 now reproduced the *root* — Jens Egholm Pedersen (DTU), in a few lines, reading only
