@@ -118,6 +118,65 @@ def latest_signed(nonce, key=None):
 
 
 
+
+VERSION_RE = None
+
+
+def apk_version(path):
+    """The versionName the APK declares, e.g. "0.1.475+13b946a", or None.
+
+    WHY THIS HAD TO EXIST (2026-09-16). The PC compared the build's identity --
+    `sha7`, the head commit of the PRIVATE app repo -- against what the phone
+    reports, which is its versionName carrying the PUBLIC core sha. Two
+    namespaces that never intersect: `c0de384` is not a commit in this
+    repository at all. So "is the phone on the newest build" could never answer
+    yes, not one second after a perfect install, and it alerted through a
+    successful update. Read the identity out of the artifact instead of
+    inferring it from the run that made it.
+
+    AndroidManifest.xml in an APK is binary XML with a UTF-16LE string pool, so
+    the version is found by decoding and matching, not by parsing -- which is
+    enough for one well-known string and adds no dependency.
+    """
+    global VERSION_RE
+    import re
+    import zipfile
+    if VERSION_RE is None:
+        VERSION_RE = re.compile(r"\d+\.\d+\.\d+\+[0-9a-f]{7,40}")
+    try:
+        with zipfile.ZipFile(path) as z:
+            raw = z.read("AndroidManifest.xml")
+    except (OSError, KeyError, zipfile.BadZipFile):
+        return None
+    for enc in ("utf-16-le", "utf-8"):
+        m = VERSION_RE.search(raw.decode(enc, "ignore"))
+        if m:
+            return m.group(0)
+    return None
+
+
+def latest_version(d=None):
+    """(version, core_sha) of the build on disk -- read from the APK if the
+    manifest predates `version` being recorded, and written back once."""
+    d = latest() if d is None else d
+    if not d:
+        return None, None
+    v = d.get("version")
+    if not v:
+        v = apk_version(d.get("path") or os.path.join(DIR, d.get("file", "")))
+        if v:
+            try:
+                cur = dict(d)
+                cur.pop("path", None)
+                cur["version"] = v
+                cur["core"] = v.split("+", 1)[1]
+                with open(LATEST, "w", encoding="utf-8") as fh:
+                    json.dump(cur, fh, indent=1)
+            except OSError:
+                pass
+    return v, (v.split("+", 1)[1] if v and "+" in v else None)
+
+
 def is_new_build(current, run):
     """Is this workflow run a build we do not already hold?
 
@@ -168,7 +227,9 @@ def fetch(say=print):
         fname = "covenant-node-%s-r%d.apk" % (sha7, run["id"])
         with open(os.path.join(DIR, fname), "wb") as fh:
             fh.write(apk)
+        ver = apk_version(os.path.join(DIR, fname))
         d = {"sha": run["head_sha"], "sha7": sha7, "run_id": run["id"], "run_url": run["html_url"], "built": run["updated_at"],
+             "version": ver, "core": (ver.split("+", 1)[1] if ver and "+" in ver else None),
              "fetched": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "file": fname, "size": len(apk), "sha256": hashlib.sha256(apk).hexdigest()}
         tmp = LATEST + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:

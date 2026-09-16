@@ -156,41 +156,82 @@ def main():
     finally:
         cov.tailnet_ok = real
 
-    # ---- M6g: the PC notices a phone holding an older build ------------
+    # ---- M6g: behind, level, and AHEAD -- told apart by commit order ----
+    #
+    # THE FIXTURE THAT CONFIRMED THE BUG. This block used to hand the phone
+    # "0.1.500+6953f6d" -- a version string I invented, carrying the head sha
+    # of the PRIVATE app repo. No phone has ever emitted one: a phone reports
+    # the PUBLIC core it was built from. So the fixture encoded the same
+    # misunderstanding as the code it was testing, passed, and the check went
+    # on alerting through a successful install. Real shas from THIS repository
+    # now, so "which is newer" is a question the test can actually ask.
     import covenant_daily_plan as dp
+    import subprocess
     now = 1789560000.0
+
+    def sha_at(n):
+        out = subprocess.run(["git", "log", "--format=%h", "-n", str(n + 1)],
+                             cwd=HERE, capture_output=True, text=True, timeout=60).stdout.split()
+        return out[n] if len(out) > n else ""
+
+    newer, older = sha_at(0), sha_at(6)
     fixture = tempfile.mktemp(suffix="_m6_checkins.jsonl")
-    with open(fixture, "w", encoding="utf-8") as fh:
-        fh.write(json.dumps({"signer": "phone", "node_id": "phone", "at": now - 120,
-                             "app": "0.1.421+70c6200", "chain_height": "12"}) + chr(10))
-    build = {"sha7": "6953f6d", "built": "2026-09-16T07:12:28Z", "size": 45147412}
+
+    def phone_says(app, age=120):
+        with open(fixture, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"signer": "phone", "node_id": "phone", "at": now - age,
+                                 "app": app, "chain_height": "28"}) + chr(10))
+
+    build = {"sha7": "c0de384", "built": "2026-09-16T11:37:06Z",
+             "version": "0.1.475+" + newer, "core": newer, "size": 45153060}
     real_newest = dp.newest_build
     try:
         dp.newest_build = lambda path=None: build
-        a, i = dp.build_report(now=now, path=fixture)
-        check("M6g a phone on an older build raises exactly one alert", len(a) == 1, str(a))
-        check("M6g the alert names both builds and where to go",
-              bool(a) and "70c6200" in a[0] and "6953f6d" in a[0] and "/m" in a[0],
-              a[0] if a else "")
 
-        # MUTATION: the phone reports the build it was handed -> silence.
-        with open(fixture, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps({"signer": "phone", "node_id": "phone", "at": now - 120,
-                                 "app": "0.1.500+6953f6d", "chain_height": "27"}) + chr(10))
+        check("M6g the two shas used here are real and ordered",
+              bool(newer) and bool(older) and newer != older, "%s vs %s" % (newer, older))
+
+        phone_says("0.1.400+" + older)
+        a, i = dp.build_report(now=now, path=fixture)
+        check("M6g a phone genuinely behind raises exactly one alert", len(a) == 1, str(a)[:120])
+        check("M6g the alert names both versions and where to go",
+              bool(a) and older in a[0] and newer in a[0] and "/m" in a[0], (a[0] if a else "")[:120])
+
+        # LEVEL: the phone reports exactly what the PC holds. This is the case
+        # the old check could never reach, because it was comparing the phone's
+        # public-core sha against a private-repo one.
+        phone_says(build["version"])
         a2, i2 = dp.build_report(now=now, path=fixture)
-        check("M6g mutation: a phone on the newest build raises nothing", not a2, str(a2))
-        check("M6g ...and says so as an info line", any("newest fetched build" in x for x in i2), str(i2))
+        check("M6g a phone on exactly the build this PC holds raises nothing", not a2, str(a2)[:120])
+        check("M6g ...and the info line says so", any("the build this PC holds" in x for x in i2), str(i2)[:120])
+
+        # AHEAD: the hour between an install and the next fetch. Being newer
+        # than the PC is not a fault of the phone's.
+        build_old = dict(build, version="0.1.400+" + older, core=older)
+        dp.newest_build = lambda path=None: build_old
+        phone_says("0.1.475+" + newer)
+        a3, i3 = dp.build_report(now=now, path=fixture)
+        check("M6g a phone AHEAD of the build on disk is not called behind", not a3, str(a3)[:120])
+        check("M6g ...and the PC is named as the one that must catch up",
+              any("AHEAD" in x and "catch up" in x for x in i3), str(i3)[:140])
+
+        # UNKNOWN: a core this repository has never seen. An unknown is not a
+        # finding, so it alerts on nothing and says why.
+        dp.newest_build = lambda path=None: build
+        phone_says("0.1.999+deadbee")
+        a4, i4 = dp.build_report(now=now, path=fixture)
+        check("M6g a core that cannot be placed in history raises nothing", not a4, str(a4)[:120])
+        check("M6g ...and says the order is unknown rather than guessing",
+              any("unknown" in x for x in i4), str(i4)[:140])
 
         # A phone that is switched off is not nagged: an info line, not an alert.
-        with open(fixture, "w", encoding="utf-8") as fh:
-            fh.write(json.dumps({"signer": "phone", "node_id": "phone", "at": now - 90000,
-                                 "app": "0.1.421+70c6200", "chain_height": "12"}) + chr(10))
-        a3, i3 = dp.build_report(now=now, path=fixture)
-        check("M6g a phone that is not reporting is not told to go install", not a3, str(a3))
+        phone_says("0.1.400+" + older, age=90000)
+        a5, i5 = dp.build_report(now=now, path=fixture)
+        check("M6g a phone that is not reporting is not told to go install", not a5, str(a5)[:120])
 
         dp.newest_build = lambda path=None: {}
-        a4, i4 = dp.build_report(now=now, path=fixture)
-        check("M6g no build fetched -> nothing to be behind", not a4, str(a4))
+        a6, i6 = dp.build_report(now=now, path=fixture)
+        check("M6g no build fetched -> nothing to be behind", not a6, str(a6)[:120])
     finally:
         dp.newest_build = real_newest
         try:
@@ -198,6 +239,19 @@ def main():
         except OSError:
             pass
 
+    # ---- M6i: the build's identity comes from the artifact, not the run ----
+    import covenant_app_update as AU
+    if manifest.get("file"):
+        apk = os.path.join(HERE, "ops", "app", manifest["file"])
+        v = AU.apk_version(apk)
+        check("M6i the APK declares its own versionName, and it is read from it",
+              bool(v) and "+" in v, str(v))
+        check("M6i ...and that version, not the private repo's sha, is what latest.json records",
+              manifest.get("version") == v, "%s vs %s" % (manifest.get("version"), v))
+        check("M6i ...and the core it names is a commit in THIS repository",
+              subprocess.run(["git", "cat-file", "-t", (v or "+").split("+")[-1]], cwd=HERE,
+                             capture_output=True, text=True).returncode == 0,
+              (v or "").split("+")[-1])
 
     # ---- M6h: a build is a RUN, not a commit --------------------------
     # The workflow makes one tree from TWO checkouts -- the private app repo

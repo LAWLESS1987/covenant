@@ -95,8 +95,21 @@ ABSENT = "ABSENT"
 # ----------------------------------------------------------------- sensing
 
 def _get(url, timeout=6):
-    with urllib.request.urlopen(url, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8") or "{}")
+    """The JSON at `url`, retrying ONCE on a 429.
+
+    A115, and I had to re-learn it the expensive way: a node that rate-limits
+    is answering. Asking it three times in a second and calling the refusal
+    "down" is a false positive that reaches for a restart of a healthy mesh.
+    """
+    for attempt in (0, 1):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == 0:
+                time.sleep(1.5)
+                continue
+            raise
 
 
 def _nodes():
@@ -105,20 +118,41 @@ def _nodes():
 
 
 def _health():
-    """{id: health dict or None}. None means it did not answer."""
+    """{id: health dict, or {"http": code} when it answered with an error, or None}.
+
+    THREE ANSWERS, NOT TWO. This returned None for every failure, so a node
+    that replied "429, you are asking too often" was indistinguishable from a
+    node whose socket is dead -- and at 11:22 today that cost a real
+    restart_nodes call against a mesh where all three were healthy. It was
+    rolling_restart.py that caught it, not me: "node A ALIVE but rate-limiting
+    (429) -- asked too often, not down", and it restarted nothing. The tool
+    written in September knew A115; the detector I wrote this morning did not.
+    """
     out = {}
     for n in _nodes():
         try:
             out[n["id"]] = _get("http://127.0.0.1:%d/health" % n["port"])
+        except urllib.error.HTTPError as e:
+            out[n["id"]] = {"http": e.code}          # it ANSWERED. Not down.
         except (urllib.error.URLError, OSError, ValueError, TimeoutError):
-            out[n["id"]] = None
+            out[n["id"]] = None                      # no answer at all
     return out
 
 
+
 def detect_node_down(health=None):
+    """A node whose socket does not answer. NOT one that refused to repeat itself."""
     h = _health() if health is None else health
-    down = sorted([k for k, v in h.items() if not v])
-    return {"state": PRESENT if down else ABSENT, "measured": {"down": down, "asked": sorted(h)}}
+    down = sorted([k for k, v in h.items() if v is None])
+    limited = sorted([k for k, v in h.items() if isinstance(v, dict) and "http" in v])
+    m = {"down": down, "answered_with_error": limited, "asked": sorted(h)}
+    if down:
+        return {"state": PRESENT, "measured": m}
+    if limited:
+        # Alive, and this pass could not read them. Unknown is not a finding,
+        # and it is certainly not grounds for restarting anything.
+        return {"state": UNKNOWN, "measured": m}
+    return {"state": ABSENT, "measured": m}
 
 
 def detect_source_drift(health=None):
@@ -126,7 +160,8 @@ def detect_source_drift(health=None):
     import covenant_watchdog as W
     disk = W.disk_source_sha12()
     h = _health() if health is None else health
-    live = {k: (v or {}).get("source_sha256", "")[:12] for k, v in h.items() if v}
+    live = {k: v.get("source_sha256", "")[:12] for k, v in h.items()
+            if isinstance(v, dict) and "http" not in v}
     if disk is None or not live:
         return {"state": UNKNOWN, "measured": {"disk": disk, "live": live}}
     off = sorted([k for k, s in live.items() if s and s != disk])
@@ -136,7 +171,8 @@ def detect_source_drift(health=None):
 
 def detect_height_lag(health=None):
     h = _health() if health is None else health
-    hs = {k: (v or {}).get("chain_height") for k, v in h.items() if v}
+    hs = {k: v.get("chain_height") for k, v in h.items()
+          if isinstance(v, dict) and "http" not in v}
     vals = [v for v in hs.values() if isinstance(v, int)]
     if len(vals) < 2:
         return {"state": UNKNOWN, "measured": {"heights": hs}}

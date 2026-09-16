@@ -319,6 +319,34 @@ def main():
         if real_det:
             H.DETECTORS["log_bloat"] = real_det
 
+    # ---- H1t: a node that rate-limits is ANSWERING (A115), and it cost a restart
+    #
+    # At 11:22 today this detector called three healthy nodes "down" because
+    # they 429'd health probes I was sending too fast, and the engine reached
+    # for restart_nodes on a live mesh. rolling_restart.py refused -- "node A
+    # ALIVE but rate-limiting (429) -- asked too often, not down ... restarted
+    # nothing" -- so nothing was lost, and the save was theirs, not mine.
+    up = {"chain_height": 28, "source_sha256": "ddfaaa9f704f00"}
+    limited = H.detect_node_down({"A": up, "B": {"http": 429}, "C": up})
+    dead = H.detect_node_down({"A": None, "B": {"http": 429}, "C": up})
+    fine = H.detect_node_down({"A": up, "B": up, "C": up})
+    check("H1t a 429 is not death -- UNKNOWN, never PRESENT",
+          limited["state"] == H.UNKNOWN and limited["measured"]["down"] == [],
+          json.dumps(limited)[:120])
+    check("H1t ...so nothing is restarted on account of it",
+          limited["state"] != H.PRESENT, limited["state"])
+    check("H1t mutation: a socket that does not answer IS down, and only that node",
+          dead["state"] == H.PRESENT and dead["measured"]["down"] == ["A"],
+          json.dumps(dead["measured"])[:120])
+    check("H1t three healthy nodes are healthy", fine["state"] == H.ABSENT, json.dumps(fine)[:90])
+    drift = H.detect_source_drift({"A": up, "B": {"http": 429}, "C": up})
+    check("H1t a node that could not be read is not counted as drifted either",
+          "B" not in drift["measured"].get("live", {}) and "B" not in drift["measured"].get("drifted", []),
+          json.dumps(drift["measured"])[:120])
+    lag = H.detect_height_lag({"A": up, "B": {"http": 429}, "C": up})
+    check("H1t ...nor as a height of zero",
+          lag["measured"]["heights"].get("B") is None, json.dumps(lag["measured"])[:110])
+
     # ---- H1s: the watchdog can replace itself without killing its own round
     sched = H.REMEDIES.get("schedule_watchdog_restart", {})
     check("H1s a remedy exists that the scheduled pass may use on the watchdog",

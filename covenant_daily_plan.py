@@ -389,24 +389,79 @@ def pc_tailnet_address():
     return socket.gethostname().lower()
 
 
+def _core_time(sha):
+    """When the public core commit `sha` was made, or None if it is not here."""
+    import subprocess
+    if not sha:
+        return None
+    try:
+        p = subprocess.run(["git", "log", "-1", "--format=%cI", sha], cwd=HERE,
+                           capture_output=True, text=True, timeout=60)
+        if p.returncode != 0 or not (p.stdout or "").strip():
+            return None
+        import datetime
+        return datetime.datetime.fromisoformat(p.stdout.strip()).timestamp()
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
 def build_gap(row, build=None, port=5000):
-    """(alert, note) for one phone's reported build against the newest fetched one."""
+    """(alert, note): is this phone behind the newest build this PC holds?
+
+    IT COMPARED TWO DIFFERENT REPOSITORIES (found 2026-09-16, after the install
+    it nagged through). The phone reports its versionName -- "0.1.475+13b946a",
+    carrying the PUBLIC core sha. This asked whether that string contained
+    `sha7` from latest.json, which is the head commit of the PRIVATE app repo:
+    `c0de384` is not a commit in this repository at all. Two namespaces that
+    never intersect, so the answer could never be "up to date", not one second
+    after a perfect install. It looked correct all morning only because the
+    phone really was behind.
+
+    My own test passed it, which is the part worth remembering: M6g's fixture
+    said the phone reported "0.1.500+6953f6d" -- a version string I invented,
+    containing a private-repo sha no phone has ever emitted. The fixture
+    encoded the same misunderstanding as the code and confirmed it.
+
+    Now it compares the build's OWN versionName, read out of the APK, against
+    what the phone says it is running. Equal is equal. When they differ, the
+    two core shas are put in commit order from this repository, and a phone
+    running something NEWER than the build on disk is not behind -- it is
+    ahead, which is what happens for the hour between an install and the next
+    fetch. When the order cannot be established, it says so and alerts on
+    nothing: an unknown is not a finding.
+    """
     build = newest_build() if build is None else build
     have = str(row.get("app", "") or "")
     if not build:
         return None, "app %s (no build fetched on this PC)" % (have or "?")
+    try:
+        import covenant_app_update as AU
+        version, core = AU.latest_version(build)
+    except Exception:                                            # noqa: BLE001
+        version, core = build.get("version"), build.get("core")
     sha7 = build.get("sha7", "")
     if not have:
-        return None, "app unknown (newest fetched %s)" % sha7
-    if sha7 and sha7 in have:
-        return None, "app %s -- the newest fetched build" % have
+        return None, "app unknown (newest fetched %s)" % (version or sha7)
+    if not version:
+        return None, ("app %s (the build on disk does not declare a version; "
+                      "nothing to compare it to)" % have)
+    if have == version:
+        return None, "app %s -- the build this PC holds" % have
+
+    mine = have.split("+", 1)[1] if "+" in have else ""
+    t_phone, t_build = _core_time(mine), _core_time(core)
+    if t_phone is None or t_build is None:
+        return None, ("app %s vs build %s -- neither core can be placed in this "
+                      "repository's history, so which is newer is unknown" % (have, version))
+    if t_phone >= t_build:
+        return None, ("app %s -- AHEAD of the build on disk (%s); the PC is what needs "
+                      "to catch up, not the phone" % (have, version))
     url = "http://%s:%d/m" % (pc_tailnet_address(), port)
-    return ("phone %s: running %s, but build %s has been fetched and waiting since %s -- "
-            "that installed build predates the in-app updater so it cannot ask for it; "
+    behind_h = round((t_build - t_phone) / 3600.0, 1)
+    return ("phone %s: running %s, and build %s is here and newer by %.1f h -- "
             "open %s on the phone and tap install"
-            % (row.get("node_id") or row.get("signer") or "?", have, sha7,
-               build.get("built", "?"), url),
-            "app %s, %s waiting (%s)" % (have, sha7, url))
+            % (row.get("node_id") or row.get("signer") or "?", have, version, behind_h, url),
+            "app %s, %s waiting (%s)" % (have, version, url))
 
 
 def checkin_report(now=None, path=None):
