@@ -370,7 +370,7 @@ They are not the whole picture, and the difference is worth a paragraph because
 a reader deciding whether to trust this deserves both halves.
 
 **This paragraph deliberately quotes no counts.** It used to, and every one of
-them rotted: it said "86 suites, 2,524 checks" while the header said 96 and
+them rotted: it said "86 suites, 2,524 checks" while the header said 96 and <!--HISTORICAL-->
 2,742, and "95 test files on disk" while there were 133. `readme_totals.py`
 updates the two lines marked `<!--TOTALS-->` from a real transcript, and it
 cannot update prose that restates the same numbers without the marker. A figure
@@ -504,7 +504,7 @@ lines above, so the published totals come from a measurement, not from typing.
 The two statements of this total -- here and at the top -- are held
 equal to each other, and to the one in
 `docs/OUTREACH_INSTITUTIONAL.md`, by test G1 T3. They disagreed until
-2026-08-31: the README said 60 suites and 1,765 checks while the
+2026-08-31: the README said 60 suites and 1,765 checks while the <!--HISTORICAL-->
 outreach draft said 62 and 1,636. Nobody was lying. One was measured
 later than the other and the older number was never revisited, which
 is how a reader who checks reaches a finding the author never had.
@@ -512,7 +512,7 @@ is how a reader who checks reaches a finding the author never had.
 This section previously said the opposite, and that history is kept because it
 is the more useful half.
 
-It once opened with *33 suites · 1,043 checks green on Linux*. That was
+It once opened with *33 suites · 1,043 checks green on Linux*. That was <!--HISTORICAL-->
 **withdrawn** on 2026-08-27, because the runner it came from could not have
 produced it honestly: `run_all_tests.sh` named **47** suites of which **36**
 existed, and its helper scraped a tally out of stdout — so a missing suite
@@ -559,7 +559,7 @@ loud, but does not redden — otherwise every in-progress suite turns the run
 amber, and permanent amber is skimmed past).
 
 **And one more, found while writing this paragraph.** An earlier run today
-reported *1,744 checks, 0 failed, RESULT: PASS* — and the same transcript said
+reported *1,744 checks, 0 failed, RESULT: PASS* — and the same transcript said <!--HISTORICAL-->
 `folder integrity  test_p18_version_collision.py=FAIL rc=1` a few lines above
 it. Both sentences were in one file. `--ci` discarded **every** in-place
 failure (`... if not args.ci else []`), so a real version collision —

@@ -183,9 +183,26 @@ def check_prose():
             # still caught is the real defect -- prose asserting a CURRENT count
             # in the present tense, which is how "the runner registers 93
             # suites" outlived 93 by thirty-three.
-            if "<!--HISTORICAL-->" in line or re.search(
-                    r"\b(said|says|once|used to|until|was|were|reported|"
-                    r"earlier|previously|rotted|opened with|had)\b", line, re.I):
+            # HEURISTIC REMOVED, 2026-09-17, same hour it was written.
+            # It exempted any line containing said/says/once/was/reported/...
+            # The judge on the runner was asked for its strongest failure mode
+            # and produced one immediately:
+            #
+            #   "The system says 1,744 checks, but it's actually 1,765,
+            #    as it was reported previously."
+            #
+            # That asserts a CURRENT count and was exempted whole, because the
+            # historical words are in the same line. Reproduced against the real
+            # guard before believing it: reported "Clean". The live claim rides
+            # in on the historical marker.
+            #
+            # So the exemption is now EXPLICIT ONLY. A line that deliberately
+            # records a past total carries <!--HISTORICAL-->; everything else is
+            # checked. Deterministic, no clause-scoping guesswork, and the same
+            # design docs/RETRACTED.json uses -- require the citation rather
+            # than infer the intent, because a regex cannot tell an assertion
+            # from a description of an assertion.
+            if "<!--HISTORICAL-->" in line:
                 continue
             for m in re.finditer(r"(\d[\d,]*)\s+(suites?|checks?)\b", line):
                 val = m.group(1).replace(",", "")
