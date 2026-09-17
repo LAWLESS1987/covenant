@@ -40,6 +40,7 @@ pattern rather than an intent, that is fair.
 | **H3** | An X `status_id` is a snowflake, so every row carries its own date | derived date == `date` column | any disagreement |
 | **H4** | Facebook ids are **not** snowflakes | derivation yields absurd dates | a plausible date |
 | **H5** | My own enumeration is the weak link, not the regex | a discovery walk finds catalogues a hardcoded list missed | walk == list |
+| **H6** | Rows written down and artifacts produced are independent, so counting one is a single route | transcripts on disk may disagree with catalogue rows | exact agreement in every store — **which is what happened**, so both counts corroborate |
 
 ## 2. Method
 
@@ -99,16 +100,37 @@ show, and the operator's 120 is a live reading of a tab that paginates. **Where
 a computed number is lower than the operator's, the catalogue is short — not the
 operator.** Here it is higher, so the question runs the other way and stays open.
 
-**Facebook is the real hole: 26 catalogued against 90 claimed.** Sixty-four
-uploads are asserted in `CORPUS_2026-09-09.md` and are not on disk in any file
-carrying a `status_id` column. Either they live somewhere this walk does not
-reach, or the 90 was never written down. That is the largest single gap in the
-corpus and it sits on the surface the operator named — *"plus facebook hosted
-videos"*.
+**Facebook, corrected the same day — my "64 unaccounted" was itself a units
+error, and it is rule 4 of `CLAUDE.md` broken by the person who wrote it.** I
+compared 26 transcribed reels against 90, which is *upload events including
+ordinary personal video*. The operator reconciled the three Facebook counts on
+2026-09-09 and the reconciliation was already in the record:
 
-FB coverage is also structurally weaker than X: `XREF_FACEBOOK_2026-09-03.md`
-says plainly that the timeline loads lazily and **older posts were not read**.
-The FB count has never had an honest denominator the way X now does.
+    90   video UPLOAD EVENTS in the activity log (includes personal video)
+    69   reel ids exposed by the profile grid
+    47   RELEVANT reels -- about AI, consciousness or this project
+
+**The in-scope corpus is 47.** On disk: **26 transcribed** — the 20 pre-6-July
+reels, SETTLED and read end to end, plus the 6 children of three multi-video
+posts, which `CORPUS_2026-09-09.md` still lists as OPEN and which have since been
+pulled. So the honest remaining gap is **21 relevant Facebook reels**, not 64.
+
+Both OPEN items from 2026-09-09 are now closed on disk: the 6 multi-post children
+are present, and the "9 X video posts missing from the catalogue" were taken up
+by the `x_missing` and `x_missing2` sweeps.
+
+**How that 47 was settled matters more than the number.** Three automated passes
+produced three figures and no way to choose between them; one sentence from the
+operator — *"47 relevant"* — resolved it. A denominator can be measured. What
+COUNTS cannot. That is now rule 5 of the standing method, because no amount of
+walking directories can decide which of a person's videos are about their work.
+
+**X is complete against its own catalogue.** A second, independent count —
+transcripts on disk rather than catalogue rows — agrees exactly in all five
+stores: 109, 7, 8 for X and 20, 6 for Facebook, with no item catalogued-but-unread
+and none read-but-uncatalogued. Three X ids that first appeared to be orphan
+transcripts turned out to live in `catalog_new.csv`, which shares the same `text/`
+directory; checked rather than reported.
 
 ## 5. Worked into the system
 
@@ -122,6 +144,11 @@ The FB count has never had an honest denominator the way X now does.
 
 Nothing here opens a video, reads a transcript, or visits X or Facebook. It
 counts rows and derives dates. It cannot confirm any claim about *content* —
-J-SPACE, CONTAINMENT, re-uploads — all of which came from footage. It cannot say
-whether the 64 missing FB uploads exist. And it cannot explain the four-post
-excess over the operator's 120; it can only show it.
+J-SPACE, CONTAINMENT, re-uploads — all of which came from footage. It cannot
+locate the **21 in-scope Facebook reels** that are not yet on disk, and it cannot
+judge relevance, so it could not have produced the 47 itself. And it cannot
+explain the four-post excess over the operator's 120; it can only show it.
+
+An earlier version of this section said "the 64 missing FB uploads". That number
+was retracted the same day — see §4. It counted transcribed reels against upload
+events including personal video.

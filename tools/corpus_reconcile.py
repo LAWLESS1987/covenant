@@ -222,6 +222,43 @@ def main():
     if not shown:
         print("      no FB id is even snowflake-SHAPED; nothing to derive.")
 
+    # ---- H6: artifacts on disk vs catalogue rows ------------------------
+    # A SECOND, INDEPENDENT count. Rows are what a sweep wrote down;
+    # transcripts are what it actually produced. They can disagree, and which
+    # one is short tells you whether the gap is in the reading or the record.
+    # Added 2026-09-17 because counting one of them and calling it the corpus
+    # is the same single-route error this file exists to stop.
+    print("\nH6  TRANSCRIPTS ON DISK vs CATALOGUE ROWS")
+    seen_dirs = set()
+    for label, path, kind, rows, ids in present:
+        d = os.path.dirname(os.path.join(HERE, path))
+        tdir = os.path.join(d, "text")
+        if not os.path.isdir(tdir) or tdir in seen_dirs:
+            continue
+        seen_dirs.add(tdir)
+        tx = set()
+        for fn in os.listdir(tdir):
+            m = re.search(r"(\d{15,20})", fn)
+            if m:
+                tx.add(m.group(1))
+        # Every catalogue that SHARES this text dir counts toward it.
+        share = set()
+        for _l, p2, _k, _r, i2 in present:
+            if os.path.dirname(os.path.join(HERE, p2)) == d:
+                share |= set(i2)
+        only_tx, only_cat = tx - share, share - tx
+        rel = os.path.relpath(tdir, HERE).replace(os.sep, "/")
+        print("    %-42s %3d transcripts, %3d catalogued"
+              % (rel, len(tx), len(share)))
+        if only_tx:
+            print("        %d read but NOT catalogued: %s"
+                  % (len(only_tx), sorted(only_tx)[:4]))
+        if only_cat:
+            print("        %d catalogued but NOT read: %s"
+                  % (len(only_cat), sorted(only_cat)[:4]))
+        if not only_tx and not only_cat:
+            print("        exact match -- every catalogued item has a transcript")
+
     # ---- H1: prose claims vs computed ----------------------------------
     print("\nH1  WHAT THE PROSE CLAIMS vs WHAT THE CATALOGUES HOLD")
     claims = {}
