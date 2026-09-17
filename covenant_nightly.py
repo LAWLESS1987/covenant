@@ -138,6 +138,32 @@ def main():
         print(f"nightly: cannot consult covenant_pause ({e}); continuing. "
               f"A pause you set may NOT be in effect -- verify before relying on it.")
 
+    # A141, consumers five and six (2026-09-17). The A21 gate stopped a NODE
+    # reading this machine's credential store unasked. It also stopped the
+    # nightly's study and redteam steps, and the 07:30 scheduled run recorded
+    # exactly that: "study FAILED: RuntimeError: no GitHub token" and
+    # "redteam: GitHub runner not available; nothing attacked". The second is
+    # the worse one -- the adversarial pass reported no attacks rather than a
+    # failure, so the loop looked like it had nothing to find.
+    #
+    # Why it was missed twice: I grepped for `.token()` and found four callers.
+    # study and redteam do not call token(); they call ask()/available(), which
+    # call it inside. I enumerated the FUNCTION when rule 6 says enumerate the
+    # CAPABILITY. One level too low, and the grep looked thorough.
+    #
+    # One opt-in here covers the whole pass, because study, redteam and the
+    # teacher panel are imported IN-PROCESS (lines below), so the module flag
+    # is visible to all of them. A scheduled pass the operator installed is his
+    # consent; covenant_judge_defer -- the live GATE -- deliberately gets no
+    # such line and must never have one.
+    try:
+        import covenant_github_judge as _gh
+        _gh.allow_credential_store("covenant_nightly -- the operator's scheduled "
+                                   "learning pass (study, redteam, teacher panel)")
+    except Exception as e:                                       # noqa: BLE001
+        print(f"nightly: could not enable the runner ({e}); study and redteam "
+              f"will report the runner as unavailable.")
+
     lines, rc = [], 0
     t0 = time.time()
 

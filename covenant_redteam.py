@@ -205,8 +205,21 @@ def round_once(n_per_angle, dry, log, show=False):
     model = FB.FallbackModel.load()
     _say("red-team round against model %s (%d examples)" % (model.digest, model.n_examples), log)
     if not gh.available():
-        _say("  GitHub runner not available; nothing attacked", log)
-        return 0
+        # RAISE, do not return 0. Until 2026-09-17 this returned zero, and the
+        # nightly printed "redteam: 0 confirmed hole(s) added" -- the same
+        # sentence it prints after attacking everything and finding nothing.
+        # An adversarial pass that never ran and one that found no holes are
+        # not the same event, and reporting them with the same number is how
+        # the A21 credential gate went a full day without anyone noticing it
+        # had switched the red team off. Zero holes found is a finding; zero
+        # holes LOOKED FOR is a failure, and the caller must be able to tell.
+        _say("  GitHub runner not available -- NOTHING WAS ATTACKED", log)
+        raise RuntimeError(
+            "red team could not run: the GitHub runner is unavailable, so no "
+            "attack was attempted. This is a failed pass, not a clean one. If "
+            "this is a scheduled run, check that the caller opts in with "
+            "covenant_github_judge.allow_credential_store() -- the live gate "
+            "deliberately does not, and must not.")
     all_holes = []
     for angle in ANGLES:
         cases = attack(angle, n_per_angle, log)
