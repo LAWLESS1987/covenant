@@ -292,6 +292,11 @@ SUITES = [
     # Added because a back-door audit pointed out that all three fixes existed
     # with no runner naming them, so a green sweep proved nothing about them.
     ("test_p23_second_operator_security.py", 180, "SECURITY"),
+    # P24 (2026-09-17): the corpus counts in prose must not drift from the
+    # catalogues on disk. Added after a "cross-check" validated a superseded
+    # document against itself and reported it as accuracy. SKIPS rather than
+    # fails when private/ is absent, which is always in a staged run.
+    ("test_p24_corpus_counts.py",         180,  "IDENTITY"),
     # C3 (2026-08-29): the guard that heals the watchdog -- pure
     # decide(), report-only by AST, no process started. 21/21.
     ("test_c3_guard.py",                 120,  "IDENTITY"),

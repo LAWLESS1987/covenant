@@ -237,6 +237,30 @@ count and the model's own quotation of it. Nothing was ever withheld.
 
 # Cross-check, 2026-09-17 — the entries against each other
 
+> **RETRACTED IN PART, 2026-09-17, same day, by the operator: "theres
+> inaccuracies ... your inability to count properly is no mistake."** He was
+> right. The section below is arithmetic about THIS FILE and nothing else, and
+> it was presented as if it were about the corpus. Three faults, kept visible
+> rather than edited away:
+>
+> 1. **This file is superseded.** `docs/CORPUS_2026-09-09.md` replaced it eight
+>    days earlier and is the current record.
+> 2. **The files-vs-posts finding was not new.** CORPUS_2026-09-09 had already
+>    caught it: *"114 of 114 read compared 114 video FILES against a Media-tab
+>    count of 114 video POSTS."* I presented a known correction as a discovery.
+> 3. **Neither document is data.** `private/*/catalog.csv` is. Counted there,
+>    the X corpus is **133 files across 124 posts, running to 2026-09-15** --
+>    not the 117/108 below, and not stale at all. The PROSE was 26 days out of
+>    date; the DATA was two.
+>
+> What survives: the snowflake method, and the arithmetic as a description of
+> this file. What does not: any implication that it describes the corpus.
+>
+> Re-run `python tools/corpus_reconcile.py`, which counts the catalogues by
+> WALKING them rather than by trusting any list, including its own.
+
+
+
 Run by `tools/media_index_crosscheck.py`. **No video was opened and no X session
 was used.** An X status ID is a snowflake: its top 41 bits are milliseconds since
 2010-11-04T01:42:54.657Z, so every entry in this file carries its own timestamp,
