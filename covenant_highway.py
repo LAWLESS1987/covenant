@@ -1015,8 +1015,25 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     # something did -- the exact asymmetry, sitting inside the mechanism
     # written to prevent it. The benefit now rides every row, so a repair that
     # succeeded can still be audited for what it cost.
+    # AND IT IS MARKED AS A CLAIM, BECAUSE IT IS ONE.
+    #
+    # The operator, 2026-09-17, on whether a thing is dangerous: "That's my
+    # call." He is right, and it lands on this dict. Every gains/cost line in
+    # REMEDIES was written by me, and so was every klass -- the judgment that a
+    # remedy is safe enough to run without asking him. A benefit stated in a
+    # ledger row reads as a finding. It is not. It is an assertion awaiting his
+    # ratification, and the difference matters precisely here, because a system
+    # that grades its own benefit and then acts on that grade has closed the
+    # loop his authority is supposed to sit inside.
+    #
+    # This is CLAUDE.md rule 5 in the one place it costs something: a
+    # denominator can be measured, what COUNTS cannot. Whether the gain is
+    # worth the cost is scope, and scope is his.
+    #
+    # ops/OPERATOR_CHOICES.json is the lever and it is currently EMPTY. Nothing
+    # in this file is presently constrained by anything he has written down.
     if isinstance(r.get("benefit"), dict):
-        row["benefit"] = r["benefit"]
+        row["benefit"] = dict(r["benefit"], claimed_by="claude, not ratified")
 
     # The cooldown comes FIRST, before any work: a repeat within the hour costs
     # a subprocess, a model load, or a download, and buys a line identical to
