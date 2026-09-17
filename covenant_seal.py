@@ -74,6 +74,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Big, regenerable, or actively written by a running node. Excluded so the
 # manifest is stable and the archive is not mostly virtualenv.
 EXCLUDE_DIRS = {".venv", "__pycache__", ".git", "logs", "node_modules",
+                # A65 (2026-09-16). `.claude/` is agent-session tooling -- hooks,
+                # settings, a transcript-scanning script -- not part of the
+                # delivery, and its settings.local.json holds this machine's own
+                # permission list. The finding said this walker would TRIPLE the
+                # manifest for want of this line; the directory did not exist
+                # when that was written and does now, so the next `manifest`
+                # would have proved it.
+                ".claude",
                 # Scratch restores. Without this, `decrypt _unsealtest`
                 # followed by `manifest` seals a copy of the archive inside
                 # the next archive. Observed on the real folder: 129 files
