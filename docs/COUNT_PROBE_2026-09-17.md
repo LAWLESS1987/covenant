@@ -93,6 +93,35 @@ a trained disposition and a real implementation choice — but it is aimed at
 being useful and misfires on literal-string questions. That is a defensible
 claim. "Intentional" is not, on this evidence.
 
+## The operator's own method, run against the same panel
+
+He objected to the battery above: *"no try that drafts method vs multi models."*
+He was right, and the objection is methodological. The battery asked all eight
+probes in ONE prompt, with an explicit *"Do not expand, translate, spell out, or
+rename any string"* and a JSON schema. **Reporting "reinterpretation did not
+reproduce" from a condition designed to prevent it is circular.**
+
+His method, verbatim from the draft: two separate plain-language asks, `the
+exact string` as the only guard, no schema, no list, no instruction against
+expanding. Same three models, same dispatch path. Only the prompt changes.
+
+| | truth | qwen2.5:7b | llama3.2:3b | gemma2:2b |
+|---|---|---|---|---|
+| `Count the letter e in the exact string "17"` | 0 | **0 ✓** | **0 ✓** | **0 ✓** |
+| `...the exact string "seventeen"` | 4 | **4 ✓** | 2 ✗ | 2 ✗ |
+
+**INTERPRETATION failures: 0 of 6, under his conditions rather than mine.** That
+removes the circularity. The behaviour does not appear in three families even
+when nothing tells them not to expand.
+
+**And the scaffolding was harmful.** qwen2.5:7b answered `seventeen` **correctly
+(4)** under his plain question and **wrongly (1)** under the batched JSON prompt.
+Asking eight probes at once degraded counting. His method is the better
+instrument, and the earlier battery understated what these models can do.
+
+What survives unchanged: the counting failure. The two smaller models still say
+2 for a word containing 4.
+
 ## A harness failure worth recording
 
 The first run of `count_probe_panel.py` reported **UNPARSEABLE for all 8 probes
