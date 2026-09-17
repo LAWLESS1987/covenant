@@ -147,6 +147,23 @@ def build_prompt(task, a):
 def route(task, prompt, primary, timeout):
     """Send one task to the judge on the runner; (record, [answer] or [])."""
     views, ok = [], []
+    # A141, fourth consumer (2026-09-17). The A21 gate stopped a NODE reading
+    # this machine's git credential store unasked; it also stopped this, and
+    # the distiller, and the phone-build fetch and dispatch. Four callers of
+    # token(); reasoning found two. Routing a bounded task to the judge is an
+    # operator running a tool -- that is the consent a long-running gate lacks --
+    # and repo() derives the target from `git remote get-url origin`, so a
+    # second operator routes to their own fork with their own token.
+    #
+    # Found by checking before using rather than by the call failing, which is
+    # the only reason it is not a fifth silent breakage.
+    if GITHUB != "off":
+        try:
+            import covenant_github_judge as _gh
+            _gh.allow_credential_store("covenant_route.route -- a bounded task "
+                                       "the operator sent to the judge")
+        except Exception:                                        # noqa: BLE001
+            pass
     if GITHUB == "off":
         v = {"model": "github-actions/" + _github_model(), "place": "none",
              "error": "COVENANT_ROUTE_GITHUB=off: the only judge is on the GitHub runner and sending is disabled"}
