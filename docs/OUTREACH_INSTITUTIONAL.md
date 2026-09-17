@@ -123,8 +123,8 @@ Claims that are defensible today, each verifiable by the recipient:
 | a fork can prove agreement without your code | **REFUTED 2026-09-15 — do not use this row.** The root `0c398099…0f0ddcef` hashes the expecteds printed in the spec file and proves nothing on its own (A121). The true row: *a fork can compute all 23 vectors from their inputs and match every answer* — evidence of the ordinary test-vector kind. |
 | dissent survives composition | `python scale.py` exits non-zero with the dissent named |
 | the limits are published, not hidden | `CONSTITUTION.md` V, `GOVERNANCE.md` IX |
-| the test suite is real | 120 suites, 3,137 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
-| and it does **not** currently pass | that same command ends `RESULT: FAIL`. Read this row before quoting the one above it: a green check count is not a green run. The failures and the blocked gate are named in the transcript it writes, and in the README's *Suite coverage*. Added 2026-09-17, because the row above on its own invites a reader to assume the opposite. |
+| the test suite is real | 120 suites, 3,160 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
+| and as of 2026-09-17 it **does** pass | `RESULT: PASS. Everything this runner names was measured and correct.` — 120 suites, 3,160 checks, 0 failed, and all twelve gates. This row said the opposite earlier the same day, when it ended `RESULT: FAIL`; both states are kept because the first is what an institution would have found had they checked then. A green check count is still not a green run: the gates are a separate question, and a sweep run while the chain is under load can block gates that pass when it is idle. |
 
 ## Why there is no list of addresses attached
 
