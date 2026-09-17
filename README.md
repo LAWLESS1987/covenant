@@ -393,10 +393,17 @@ And a green check count is not a green run: the sweep's verdict has read
 gates, and one of those — bundle integrity — blocks pending an owner decision.
 Reading "0 failed" without that is how the number flatters.
 
-The rest of what is not green: [KNOWN_ISSUES](docs/KNOWN_ISSUES.md) carries 85
-entries, **43** of them marked `**Status:** open` — that is the counting rule,
-stated because a previous version of this line said "about 47" and no rule
-produced 47.
+The rest of what is not green is in [KNOWN_ISSUES](docs/KNOWN_ISSUES.md). **The
+counting rule, which matters more than the count:** an entry is a `### A<n>.`
+heading, and an entry is open when its body carries `**Status:** open`. Stated
+as a rule because a version of this line once said "about 47" and no rule
+produced 47 — and because the numbers that replaced it, 85 and 43, were wrong
+by 2026-09-17: the register held 136 entries and 38 open. Count them rather
+than trust a sentence:
+
+    grep -cE '^### A[0-9]+\.' docs/KNOWN_ISSUES.md     entries
+    grep -c '^\*\*Status:\*\* open' docs/KNOWN_ISSUES.md   open
+    python tools/audit_a1_a46_status.py               the A1-A46 block, re-tested
 
 And the judge wrongly accuses legitimate traffic at a rate worth knowing:
 **12.8% held-out false holds** — about one legitimate transfer in eight — from a
