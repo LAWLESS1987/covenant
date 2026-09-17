@@ -5734,3 +5734,73 @@ from the claim. A recipient who never answered receives no correction.
 retraction is attached to the thread that carried the claim. **Standing lesson:**
 correct by searching for the CLAIM across everything sent, never by walking the list of
 people who wrote back.
+
+
+### A139. [serious / deploy] The verified-restart path cannot be used by anyone, and nothing said so. OPEN, found 2026-09-16
+
+**Evidence:** `python verify_deploy.py` refuses to restart -- *"STOPPING BEFORE
+RESTART: the files on disk are not the files that were built and tested"* -- reporting
+four problems: `covenant_unified_v8.py hash mismatch`, `run_all_tests.sh hash mismatch`,
+`run_local_sweep.py hash mismatch`, `test_p15_judge_identity.py missing`. Three of those
+four are files nobody touched on 2026-09-16, so this was already blocked before that
+day's work.
+
+**Why it matters:** `verify_deploy.py` is the ONE command that asks all three questions
+together -- does disk hash to what was built, are the companions present, and does the
+RUNNING node report the version that is on disk. Its whole reason for existing is that
+those three drift independently ("fourteen node versions delivered to a machine that ran
+none of them"). While it is blocked, every restart happens through
+`AB_RESTART_NODES.bat` or the guard, neither of which checks that disk and running agree.
+The drift detector is the thing that is broken.
+
+**Why it is not simply fixable:** the expected hashes are a hardcoded `MANIFEST` dict
+inside `verify_deploy.py`, pinned to a delivery package. Hand-editing those pins to match
+whatever is on disk would make the check green by moving it, which this project forbids.
+The real repair is either to re-cut a delivery package (the workflow the pins belong to)
+or to decide that the pinned-package model no longer matches how this repo ships.
+**That is the operator's call, not a code change to be made quietly.**
+
+**Repro:** `python verify_deploy.py --no-restart`
+
+### A140. [serious / privacy] A cloned node dials the owner's phone. OPEN, found 2026-09-16
+
+**Evidence:** `covenant_prod.bat:77` and `covenant_watchdog.py:106` both hardcode
+`--peers 127.0.0.1:5021,100.86.158.1:5001`. The second address is the owner's personal
+handset on the tailnet. A second operator who runs either file -- and `covenant_prod.bat`
+is the documented PC launcher -- gets a node that connects to the owner's phone unasked.
+Nothing gates it; it is a literal inside the argument string.
+
+**Not fixed here on purpose.** The obvious repair (read the peer from a gitignored local
+config, ship no address) changes how both launchers are configured, which is a structure
+change, and the operator's rule of 2026-09-09 defers those until there is a second node
+to agree with. Documented rather than done.
+
+**Repro:** `grep -n "100.86.158.1" covenant_prod.bat covenant_watchdog.py`
+
+### A141. [serious / process] Closing A21 silently killed the teacher, and the config file had already said it would. FIXED 2026-09-16, same day
+
+**Evidence:** the A21 fix gated `covenant_github_judge.token()` behind
+`COVENANT_GITHUB_JUDGE`, so a node could no longer read the machine's credential store
+unasked. Correct, tested both ways, committed and pushed. But `token()` has a second
+caller: `covenant_distill.generate_github`, the TEACHER. Nothing in the tree sets that
+variable, so corpus generation returned no token and stopped -- *silently*, because
+`available()` simply reports False and the nightly loop carries on with nothing to learn
+from. Measured after the fact: `token()` False, `available()` not attempted.
+
+**The answer was already written down.** `ops/quorum_policy.json`'s `_gate_vs_teacher`
+note, added when the operator asked to "stop going to git hub for a judge", states the
+distinction in full: the gate is a live payload leaving the machine and is now false; the
+runner is the teacher and writes 1583 of 3487 rows, and "cutting the second as well would
+stop the students learning at all, since Ollama is gone". The fix ignored a file that
+described the exact mistake it was about to make.
+
+**Fix (done):** the opt-in is explicit and carries a reason -- `allow_credential_store(why)`,
+called by `generate_github`. A node with no opt-in still gets nothing. Pinned by P23d,
+which drives the real call path with the writer stubbed to abort before any dispatch,
+asserting the flag is False before and True after; checking the source for the call would
+have proved only that somebody typed it.
+
+**Standing lesson:** a narrowing is a breaking change to every caller by default. Grep the
+callers of the CAPABILITY, not of the fix. The dangerous shape is a tightening that
+returns empty rather than raising, because callers were written to read that as "not
+available today" and carry on.
