@@ -5929,6 +5929,39 @@ a suite that passed. The line above is the first state in the record where all
 five are zero-or-green together. `ops/NIGHTLY.md` holds 47 verdicts; `green:
 yes` appears twice, and never with all twelve gates.
 
+### Open: 119 real checks never reach the published total (measured 2026-09-17)
+
+**`3,234` understates the coverage, and it is left understated rather than
+quietly raised.** Six suites finish with the word `all passed` and no number,
+so the runner logs them `ok` and adds **0** to `checks passed`:
+
+| suite | checks it actually runs |
+|---|---|
+| `test_rule5_ledger.py` | 36 |
+| `test_xrpl_record.py` | 22 |
+| `test_r6_contribution.py` | 21 |
+| `test_sentinels.py` | 18 |
+| `test_maker_orders.py` | 12 |
+| `test_watchdog_outage.py` | 10 |
+| **total** | **119** |
+
+Found by accident: seven checks were added to `test_rule5_ledger.py` and the
+headline did not move.
+
+**Why this is not the same defect as the two that made the sweep FAIL.** Those
+suites produced *no tally at all*, so a failure read as absence. These exit
+non-zero on failure and the runner marks them FAIL — nothing hides. Only the
+count is short, and it is short in the **conservative** direction: the published
+figure claims less coverage than exists.
+
+**Why it is not simply fixed.** The repair is mechanical — print
+`N passed, M failed` in six files — but it raises a published number and makes
+this project look better. Every other correction on this page moved a claim
+*down* toward what was measured. Raising one, even accurately, is the same
+report-versus-measurement gap pointed the other way, and it is the operator's
+call whether the coverage claim moves. Recorded here with the exact size so the
+decision is made on a number and not on a feeling.
+
 **What was closed, and by what kind of act — the distinction matters more than
 the result.**
 
