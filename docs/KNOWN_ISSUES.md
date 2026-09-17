@@ -5901,10 +5901,33 @@ deferred per the operator's 2026-09-09 rule.
 ## Green, 2026-09-17 — what it means and what it does not
 
     RESULT: PASS. Everything this runner names was measured and correct.
-    120 suites · 3,160 checks · 0 failed · G1-G12 all PASS
+    121 suites · 3,234 checks · 0 failed · 0 unclean · 0 unmeasured · G1-G12 all PASS
 
-The first fully green state in the record. `ops/NIGHTLY.md` holds 47 verdicts;
-`green: yes` appears twice, and never with all twelve gates.
+**CORRECTED 2026-09-17, later the same day. The claim this block first carried
+was false, and it is restated rather than deleted.** It read:
+
+    120 suites · 3,160 checks · 0 failed · G1-G12 all PASS
+    "The first fully green state in the record."
+
+It was not. A full sweep that day ended `RESULT: FAIL` with **two suites not
+clean** — `test_a1a_a2.py` and `test_a115_rate_limited_is_not_down.py` — each
+producing **no tally line**, which adds 0 to passed *and* 0 to failed. They
+read as coverage while measuring nothing, and the check count was quoted as
+green over the top of them.
+
+The cause under one of them was a live regression: `_owner_only()` had been
+wired into the node's identity load and made fail-closed (correct), but it
+shells out to `icacls`, which rejects a leading `/`, and that suite runs its
+nodes under `/tmp/covtest_a1a`. Every node it launched died at boot. The suite
+detected it, recorded the failure, then crashed before printing the tally — so
+a real regression scored as **absence**, not as red. That is M30/P14 exactly: a
+check that stopped checking still reads as coverage.
+
+**The number to read here is `unclean` and `unmeasured`, not `checks`.** A
+green check count is not a green run, and a suite that measured nothing is not
+a suite that passed. The line above is the first state in the record where all
+five are zero-or-green together. `ops/NIGHTLY.md` holds 47 verdicts; `green:
+yes` appears twice, and never with all twelve gates.
 
 **What was closed, and by what kind of act — the distinction matters more than
 the result.**
