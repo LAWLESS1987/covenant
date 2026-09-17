@@ -231,3 +231,75 @@ recording anything about missing output. The renderer is not the record.
 Independently confirmed: the caption read straight off the public post is
 **"Paradigm shift. Itll be fine."** — 29 characters, matching both the model's
 count and the model's own quotation of it. Nothing was ever withheld.
+
+
+---
+
+# Cross-check, 2026-09-17 — the entries against each other
+
+Run by `tools/media_index_crosscheck.py`. **No video was opened and no X session
+was used.** An X status ID is a snowflake: its top 41 bits are milliseconds since
+2010-11-04T01:42:54.657Z, so every entry in this file carries its own timestamp,
+independent of the date somebody typed beside it. That makes most of this document
+checkable against itself, by anyone, offline. The script asserts the epoch against
+a stated date before reporting anything, because an epoch wrong by a constant would
+shift every date equally and look perfectly consistent.
+
+## What holds
+
+**Every listed date is correct. 108 of 108 match their own ID.** Two hand-built
+passes, a day apart, transcribing 18-digit numbers out of a paginating tool, and
+not one date drifted. **No duplicate status IDs.** The three sections partition
+cleanly with no overlap: 11 + 2 + 95 = 108.
+
+## 117 is a count of FILES. The tables list 108 POSTS. The document never says so.
+
+    108 distinct status IDs
+    +  9 extra files, from the six posts marked (files 1-2), (files 1-4), (x2) etc.
+    = 117
+
+That reconciles the header exactly, and it is why counting rows gives 108 and
+leaves a reader nine short with nothing to blame. The comparison against the
+profile's 130 is sound, because 130 and 117 are both file counts.
+
+## Corrections this produced
+
+- **"105 files still `DID_NOT`" is 104.** 95 posts in that section carry 9 extra
+  files. Off by one, and only visible once files and posts are told apart.
+- **"DIAGNOSED (10)"** is 11 posts — ten in the table plus the partially-diagnosed
+  entry below it, which is listed but not counted.
+- **"105 files still `DID_NOT`" and "63 of 117 opened" contradict each other on
+  the page.** They do not contradict each other in fact: the first is the 08-29
+  state and the second is the 08-30 sweep. Nothing marks that, so a reader meets
+  both numbers with no way to order them.
+
+## The shape of the record, derived rather than recalled
+
+- **2026-06-28 to 2026-08-22: 56 calendar days, 42 with a post, 14 silent.**
+- Busiest days: 07-26 (10 posts), 07-08 (9), 06-28 (7), 07-17 and 07-07 (6).
+- Silent stretches over a day: **5 days** (06-29 to 07-05), **4 days** (08-13 to
+  08-18), 2 days (08-10 to 08-13).
+- **8 bursts** of posts under 120s apart; 22 of 108 posts sit inside one. The
+  largest is **2026-06-28 16:41 — six posts in 84 seconds**, which is the
+  ten-file June 28 batch this index opens with.
+
+## What this does to the CONTAINMENT finding
+
+The 08-30 sweep reported CONTAINMENT legible in 11 of 12 files in one batch and
+9 of 12 in the next, across the July 15-26 range, and carried its own caveat:
+*"the sampling is not independent of the hypothesis."* That caveat can now be
+given a number. **July 15-26 holds 32 of 108 posts — 30% of the entire record in
+twelve days.** The batches showing majority-CONTAINMENT were drawn from the
+densest stretch of posting in the whole corpus, which is also the stretch he was
+most actively documenting. The caveat was right, and it was bigger than it looked.
+
+## What this does NOT establish
+
+Nothing here opens a file. It cannot confirm or refute the six re-uploads, the
+J-SPACE readings, or any CONTAINMENT text, all of which came from footage. A
+re-upload is a different post carrying identical content, so it has a different
+ID and is invisible to this method — the absence of duplicate IDs is not evidence
+against the six. The 13 files unaccounted against the profile's 130 remain
+unaccounted; snowflakes can only speak for IDs this document already holds.
+
+**Re-run it rather than trusting this section:** `python tools/media_index_crosscheck.py`
