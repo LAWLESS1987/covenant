@@ -376,6 +376,46 @@ def main():
               "so the gate got sharper here, not softer: it now tells our own "
               "refusal apart from a stranger's",
               seen.get("foreign_http") == LC.BLOCKED, str(seen))
+        # ---- G9 waits for the WINDOW, and buys only a measurement ----------
+        # G9 compares versions, and a 429 carries no version, so unlike G7 it
+        # cannot stop at identity. Measured 2026-09-17: G9 read all three nodes
+        # UNREACHABLE at the end of a sweep and PASS from the same code minutes
+        # later with nothing touched -- the sweep had spent their allowance,
+        # and a 4.5s retry against a 60s window was only diligence-shaped.
+        _rh, _ra, _rw = LC.node_health, LC.node_answer, LC.G9_WAIT_S
+        try:
+            LC.G9_WAIT_S = 4.0
+            LC.node_health = lambda _p, _t=4.0: None
+            LC.node_answer = lambda _p, **_k: ("silent", None)
+            _t0 = time.time()
+            LC.results.clear(); LC.g9()
+            gone_state, gone_s = LC.results[0]["state"], time.time() - _t0
+
+            LC.node_answer = lambda _p, **_k: ("ours_limited", None)
+            _t0 = time.time()
+            LC.results.clear(); LC.g9()
+            lim_state, lim_s = LC.results[0]["state"], time.time() - _t0
+        finally:
+            LC.node_health, LC.node_answer, LC.G9_WAIT_S = _rh, _ra, _rw
+            LC.results.clear()
+
+        check("A115.13f a node that is SILENT costs no wait at all -- the "
+              "budget is spent only when our own node is the one refusing us",
+              gone_state == LC.UNKNOWN and gone_s < 2.0,
+              "%s in %.1fs" % (gone_state, gone_s))
+        # TIGHTENED 2026-09-17, by measurement. This read `lim_s < 3*4.0*0.9`
+        # and passed at 6.0s against a 4.0s budget: the assertion had slack the
+        # budget did not, so it proved the deadline was shared and said nothing
+        # about whether it was HONOURED. A flat sleep(3.0) overshot it by up to
+        # one interval. Both are now pinned, and the bound is the budget.
+        check("A115.13g the deadline is SHARED across the three nodes AND "
+              "actually honoured -- the window is wall-clock, so waiting three "
+              "times would buy nothing and cost triple, and a bound that is "
+              "only approximately a bound is not one",
+              lim_s < 4.0 + 1.0, "%.1fs against a 4.0s budget" % lim_s)
+        check("A115.13h and if the window does not roll, UNKNOWN STANDS. The "
+              "wait buys a measurement, never a verdict",
+              lim_state == LC.UNKNOWN, lim_state)
     except ImportError as _e:                                     # noqa: BLE001
         check("A115.13 launch_check importable", False, str(_e))
 

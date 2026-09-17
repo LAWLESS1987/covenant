@@ -51,6 +51,14 @@ WIN = sys.platform.startswith("win")
 NODES = [("A", 5000), ("B", 5020), ("C", 5060)]
 
 PASS, BLOCKED, UNKNOWN = "PASS", "BLOCKED", "UNKNOWN"
+
+# How long G9 may wait for a rate-limit window to roll before it reports
+# UNKNOWN. The node's own RATE_LIMIT_DEFAULT is 20 requests per 60s, so a
+# budget shorter than that window cannot succeed against a node the sweep has
+# just spent -- it only looks like diligence. Overridable for a machine where
+# a slower sweep is not worth the wait; 0 disables the wait entirely and
+# restores the single-probe behaviour.
+G9_WAIT_S = float(os.environ.get("COVENANT_G9_WAIT_S", "70"))
 results = []
 
 
@@ -541,6 +549,10 @@ def g9():
             ver = line.split("=", 1)[1].strip().strip('"\'')
             break
     rows, unknown, mismatch = [], [], []
+    # ONE deadline for the whole gate, not one per node: the rate-limit window
+    # is wall-clock and the three nodes are inside the same one, so waiting
+    # three times would pay for it three times and measure nothing more.
+    g9._deadline = time.time() + G9_WAIT_S
     for nid, port in NODES:
         # RETRY THROUGH A RATE LIMIT before calling a node unreachable. The
         # UNKNOWN verdict below is right and stays -- a node that cannot be
@@ -550,12 +562,35 @@ def g9():
         # Measuring properly is not the same as lowering the bar.
         h = node_health(port)
         if h is None and node_answer(port)[0] in ("ours", "ours_limited"):
-            # It IS our node and it is rate-limiting. G7 can stop there; G9
-            # cannot, because a 429 carries no version and this gate compares
-            # versions. So retry for a short while -- and if the window has not
-            # rolled, the UNKNOWN below is the correct answer and stands.
-            for _ in range(3):
-                time.sleep(1.5)
+            # It IS our node and it is rate-limiting. G7 can stop there,
+            # because identity is all G7 asks. G9 cannot: a 429 carries no
+            # version and this gate compares versions.
+            #
+            # THE BUDGET IS THE WINDOW, because anything less is a guess with a
+            # timer on it. RATE_LIMIT_DEFAULT is 20 per 60s, so a 4.5s retry
+            # could never have succeeded after a 13.5-minute sweep -- measured
+            # 2026-09-17: G9 read "A UNREACHABLE; B UNREACHABLE; C UNREACHABLE"
+            # at the end of a sweep and PASS from the same code minutes later,
+            # with the nodes untouched in between. The nodes were never
+            # unhealthy; the sweep had spent their allowance.
+            #
+            # COST, STATED: up to G9_WAIT_S of waiting, and only when our own
+            # node is rate-limiting us. On an idle machine this costs nothing,
+            # and the deadline is SHARED across the three nodes rather than
+            # paid three times. If the window still has not rolled, the UNKNOWN
+            # below is the correct answer and stands -- this buys a
+            # measurement, never a verdict.
+            # Sleep only as far as the deadline. A flat sleep(3.0) overshoots
+            # by up to one interval -- A115.13g measured 6.0s against a 4.0s
+            # budget and passed, because the assertion had slack the budget did
+            # not. A bound that is only approximately a bound is the sort of
+            # number this session has spent all day correcting.
+            deadline = g9._deadline
+            while True:
+                left = deadline - time.time()
+                if left <= 0:
+                    break
+                time.sleep(min(3.0, left))
                 h = node_health(port)
                 if h is not None:
                     break
