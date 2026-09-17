@@ -146,9 +146,22 @@ def main():
     print("      measured now: base %s | margin3.0 %s | margin3.5 %s | cov0.80 %s"
           % (base, m30, m35, c80))
 
-    check("A126.M1 RAISING THE BAR TO CONVICT IS REFUTED: margin 3.0 and 3.5 "
-          "remove none of the base false convictions",
-          m30[1] == base[1] and m35[1] == base[1], (base[1], m30[1], m35[1]))
+    # NARROWED 2026-09-17, by measurement, not to make it pass. This read
+    # "margin 3.0 and 3.5 remove none", asserting m30[1] == base[1] AND
+    # m35[1] == base[1]. After the student promoted on 2026-09-17 the numbers
+    # are base 7, m30 7, m35 6: at 3.5 it now removes ONE. The old sentence is
+    # false and the finding it carried is not -- raising the bar still fails to
+    # buy false convictions cheaply. So the claim is restated at the strength
+    # the data supports, and both halves stay falsifiable: if a future model
+    # made margin 3.0 remove convictions for free, M1a breaks; if 3.5 ever
+    # bought two or bought them without cost, M1b breaks.
+    check("A126.M1a margin 3.0 still removes NO false convictions and costs a "
+          "correct one -- strictly worse on both counts",
+          m30[1] == base[1] and m30[0] < base[0], (base, m30))
+    check("A126.M1b margin 3.5 removes at most ONE, and pays for it with a "
+          "correct conviction and more deferrals -- not a free win",
+          base[1] - m35[1] <= 1 and m35[0] < base[0] and m35[3] > base[3],
+          (base, m35))
     check("A126.M2 ...and it costs correct convictions, so it is worse on both "
           "counts", m30[0] < base[0], (base[0], m30[0]))
     check("A126.M3 coverage 0.80 DOES reduce false convictions, and the price "

@@ -5089,6 +5089,19 @@ by a deliberate, visible commit.
 
 ### A126. [judge / individuality] Seats now differ by TEMPERAMENT, not only by name. The phone gets its own branch, and the obvious reading of "looser" was refuted by measurement. DONE 2026-09-15
 
+**NARROWED 2026-09-17, by measurement.** M1 asserted that raising the conviction
+margin to 3.0 **or** 3.5 removes *none* of the base false convictions. After the
+student promoted on 2026-09-17 the measurement reads base `(38, 7, 0, 8)`,
+margin3.0 `(37, 7, 0, 9)`, margin3.5 `(37, 6, 0, 10)` -- so at 3.5 it now removes
+**one**. The sentence is false; the finding it carried is not. Raising the bar
+still fails to buy false convictions cheaply: at 3.0 it buys nothing and costs a
+correct conviction, and at 3.5 it buys one at the price of a correct conviction
+and two more deferrals. M1 is now M1a and M1b, each asserting the half the data
+supports, and each still able to fail -- M1a if a future model ever removes
+convictions for free at 3.0, M1b if 3.5 ever buys two, or buys them at no cost.
+Recorded rather than quietly edited: the claim was overturned by a retrain
+nobody performed to overturn it.
+
 **Asked for**, 2026-09-15: *"the phone needs its own personality and looser
 chains — it's also a branch not the trunk ... a thicker branch but still a
 branch."*
