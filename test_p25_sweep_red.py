@@ -221,6 +221,30 @@ def main():
               "that cannot fail honestly launders red into green by repetition",
               ok2 is False and "not transient" in why2, why2)
 
+        # ---- M: mutual benefit rides EVERY row, not only the refusals ------
+        # His correction, 2026-09-17: "Its only dangerous without mutual
+        # benefit." A quiet repair is not dangerous for being quiet; it is
+        # dangerous when it is ASYMMETRIC -- the system keeps running, the
+        # operator carries a false belief and was never told the price. This
+        # file refused with gains and cost attached and APPLIED with neither,
+        # which is that asymmetry inside the mechanism built to prevent it.
+        led = os.path.join(tmp, "ledger.jsonl")
+        write_sweep(tmp, "ONE_SWEEP.txt", "FAIL", unclean=["test_a.py"])
+        cond = H.detect_sweep_red()
+        row = H.apply_remedy("rerun_unclean", cond, "sweep_red",
+                             dry_run=True, ledger=led)
+        b = row.get("benefit")
+        check("P25.M1 an APPLIED row carries who gained and what it cost -- the "
+              "price is stated when something happens, not only when it is "
+              "refused",
+              isinstance(b, dict) and bool(b.get("gains")) and bool(b.get("cost")),
+              row.get("outcome"))
+        check("P25.M2 and the cost is a real sentence, not an empty list "
+              "standing in for one -- a gain with a blank price is the "
+              "asymmetry wearing the accounting's clothes",
+              isinstance(b, dict) and all(str(c).strip() for c in b.get("cost", [])),
+              b)
+
         # ---- registration: wired in, not merely written --------------------
         check("P25.W1 the detector is registered, so sense() actually runs it",
               H.DETECTORS.get("sweep_red") is H.detect_sweep_red)

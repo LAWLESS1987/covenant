@@ -1001,6 +1001,23 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         row.update(outcome="refused", why="no such remedy")
         return write_ledger(row, ledger)
 
+    # WHO GAINED AND WHO PAID -- ON EVERY ROW, NOT ONLY THE REFUSALS.
+    #
+    # The operator, 2026-09-17: "Its only dangerous without mutual benefit."
+    # That is a sharper test than the one this file was using. A quiet repair
+    # is not dangerous because it is quiet; it is dangerous when it is
+    # ASYMMETRIC -- when the system keeps running and the operator carries a
+    # false belief, having never been told the price.
+    #
+    # Measured here the same day: a REFUSAL called propose() and carried gains,
+    # cost and who pays. An APPLICATION recorded only outcome="fixed". So this
+    # loop stated the price when nothing happened and withheld it when
+    # something did -- the exact asymmetry, sitting inside the mechanism
+    # written to prevent it. The benefit now rides every row, so a repair that
+    # succeeded can still be audited for what it cost.
+    if isinstance(r.get("benefit"), dict):
+        row["benefit"] = r["benefit"]
+
     # The cooldown comes FIRST, before any work: a repeat within the hour costs
     # a subprocess, a model load, or a download, and buys a line identical to
     # the one above it.
