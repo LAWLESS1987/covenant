@@ -166,13 +166,60 @@ def record_cycle(positions, now=None, path=LEDGER, cost_bps=COST_BPS,
     return summary(path, min_signals=min_signals)
 
 
+def _initialisation_ids(rows):
+    """open_ids that NO REGIME FLIP created -- the first call seen per symbol.
+
+    WHY THESE ARE NOT SIGNALS. Every other call is opened at a flip, so its
+    entry sits at the 200-day boundary by construction. The first call for a
+    symbol is opened at whatever regime happens to hold the first time the
+    symbol is read, at whatever price it happens to sit. ADA's opened at
+    0.858816 against a 200-day line of 0.746721 -- 15% ABOVE the line -- and
+    was then exited at the boundary, surrendering the whole descent as
+    arithmetic rather than as market direction.
+
+    The exit has a condition. The entry does not. So whichever side is entered
+    far from the line gives that distance up, and it measures the ledger's
+    start, not the rule.
+
+    THE CRITERION NEVER LOOKS AT THE RETURN. It is read off provenance -- was
+    this call created by a flip? -- which is what separates a principled
+    exclusion from selecting on the outcome. That mattered here, because all
+    ten of these lost, and a rule that drops ten losers has to justify itself
+    on something other than the fact that they lost.
+
+    MEASURED 2026-09-17, and they are genuinely a different population, not a
+    carve: Welch t = -4.21, df = 12. Initialisations mean -17.190%;
+    flip-created calls mean -2.792%.
+
+    AND IT COSTS. Excluding them takes the live gate from 5 settled signals to
+    2, of the 30 required. It moves the threshold further away, never closer.
+    That is the only reason a change touching the gate could be made at all:
+    the operator green-lit it as a statistical correction, and a correction
+    that DELAYS money cannot be a number improved to unlock it.
+    """
+    first, seen = set(), set()
+    for r in rows:
+        if r.get("kind") == "open" and r.get("sym") and r["sym"] not in seen:
+            seen.add(r["sym"])
+            first.add(r.get("open_id"))
+    return first
+
+
 def summary(path=LEDGER, min_signals=MIN_SIGNALS, max_p=MAX_P):
     rows = _read(path)
-    settled = [r for r in rows if r.get("kind") == "settled"]
+    init = _initialisation_ids(rows)
+    all_settled = [r for r in rows if r.get("kind") == "settled"]
+    settled = [r for r in all_settled if r.get("open_id") not in init]
+    excluded = len(all_settled) - len(settled)
     open_calls = _open_calls(rows)
     out = {"open": len(open_calls), "settled": len(settled), "wins": 0,
            "mean_after_costs": None, "p_value": None,
            "min_signals": min_signals, "max_p": max_p,
+           # BOTH NUMBERS STAY READABLE. A correction that leaves only the
+           # flattering figure behind is the thing this ledger exists to
+           # prevent, and the excluded rows are named, not quietly dropped.
+           "settled_including_initialisations": len(all_settled),
+           "initialisations_excluded": excluded,
            "clears": False, "why": ""}
     if not settled:
         out["why"] = (f"0 settled signals, need {min_signals}; "
