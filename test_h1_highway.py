@@ -576,6 +576,27 @@ def main():
     finally:
         _sp2.run = real_run2
 
+    # ---- H1w: the two youngest registrations, driven HERE as well ----------
+    #
+    # sweep_red and rerun_unclean arrived 2026-09-17 and H1v caught them with
+    # no coverage in this file, which is exactly what H1v is for. The full
+    # behavioural pinning is test_p25_sweep_red.py (21 checks). These drive
+    # them here so the registry and this suite cannot drift apart -- and so
+    # H1v is satisfied by COVERAGE and not by the string appearing in a
+    # comment, which would be answering a guard by typing its trigger.
+    r_sr = H.detect_sweep_red()
+    check("H1w sweep_red returns a real state and carries its measurement",
+          r_sr["state"] in (H.PRESENT, H.ABSENT, H.UNKNOWN)
+          and isinstance(r_sr.get("measured"), dict), r_sr)
+    ok_rr, why_rr = H.remedy_rerun_unclean({"unclean": []}, dry_run=True)
+    check("H1w rerun_unclean REFUSES a red that named no unclean suite -- a "
+          "genuinely failing check is not a re-run's business",
+          ok_rr is False, why_rr)
+    ok_rr2, why_rr2 = H.remedy_rerun_unclean({"unclean": ["test_x.py"]},
+                                             dry_run=True)
+    check("H1w ...and a dry run says what it WOULD do without doing it",
+          ok_rr2 is True and "would re-run" in why_rr2, why_rr2)
+
     # ---- H1v: nothing registered may go undriven, and every detector must
     # be able to say UNKNOWN
     #
