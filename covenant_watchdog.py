@@ -598,7 +598,62 @@ SELF_EVAL_EVERY = int(os.environ.get("COVENANT_SELF_EVAL_ROUNDS", "60"))
 SELF_EVAL_PATH = os.environ.get(
     "COVENANT_SELF_EVAL_PATH", os.path.join(HERE, "ops", "SELF_EVAL.md"))
 SELF_EVAL_MAX_BYTES = 512 * 1024
-_self_eval = {"round": 0}
+_self_eval = {"round": 0, "persist": False}
+# The counter used to live only in memory, and that was wrong (found
+# 2026-09-16). covenant_highway.py's schedule_watchdog_restart kills and
+# respawns this process BY DESIGN -- five times in its own ledger -- and its
+# docstring justifies that with "it writes its state as it goes rather than at
+# the end". True of every other reading here. False of exactly this one, which
+# produces output only on reaching round SELF_EVAL_EVERY, i.e. at the end of an
+# hour. On 2026-09-16 four guard revivals (attempts #8-#11, each "no live
+# watchdog PID") truncated the count before it ever got there, so
+# ops/SELF_EVAL.md held nothing between 14:55Z and 18:53Z while every round
+# logged normally and the guard read the log as fresh. The ledger was not
+# broken; the counter could not survive the restart the system schedules.
+#
+# NOT resumed by --once. A one-shot run that inherited a count of 59 would
+# write a verdict block from a single pass's readings and number it as if an
+# hour of them stood behind it.
+SELF_EVAL_STATE = os.path.join(HERE, "logs", "self_eval_state.json")
+
+
+def _self_eval_resume():
+    """Daemon start only: restore the round counter across a restart.
+
+    Returns the resumed round, or 0 when there is nothing to resume or the
+    file is unreadable. Never raises: a lost counter costs one late block,
+    and a counter that can crash the pass costs the monitoring itself."""
+    try:
+        with open(SELF_EVAL_STATE, "r", encoding="utf-8") as fh:
+            n = int(json.load(fh).get("round", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0
+    if n < 0:
+        return 0
+    _self_eval["round"] = n
+    return n
+
+
+def _self_eval_persist():
+    """Write the counter where the next process will find it.
+
+    Atomic via os.replace: this process is killed with Stop-Process -Force, so
+    a plain write could be interrupted mid-file and leave a truncated JSON that
+    resets the count to zero -- reintroducing the bug in a form that only shows
+    up under the exact condition this exists to survive."""
+    if not _self_eval["persist"]:
+        return
+    try:
+        os.makedirs(os.path.dirname(SELF_EVAL_STATE), exist_ok=True)
+        tmp = SELF_EVAL_STATE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"round": _self_eval["round"],
+                       "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+                      fh)
+        os.replace(tmp, SELF_EVAL_STATE)
+    except OSError:
+        pass
+
 
 SELF_EVAL_HEADER = (
     "# covenant self-evaluation ledger\n"
@@ -1171,6 +1226,8 @@ def one_pass(strict=False):
     # boundary. Logged unconditionally (it is at most hourly, and a verdict
     # that Adaptation could mute would defeat the ledger's purpose).
     _self_eval["round"] += 1
+    _self_eval_persist()          # before the write, so a kill between the two
+                                  # costs a block, never a repeated one
     if SELF_EVAL_EVERY > 0 and _self_eval["round"] % SELF_EVAL_EVERY == 0:
         block, overall = self_evaluation(
             states, dict(_topo_prev), _student_state(),
@@ -1316,6 +1373,16 @@ def main():
                    f"{ROLL_UP_EVERY * a.interval // 60} min.")
                 + " A LONGER GAP THAN THAT MEANS THIS PROCESS IS DEAD, not "
                   "that all is well.")
+    # Daemon only, and only here: --once exits at the branch above without
+    # ever reaching this, so a one-shot run neither resumes nor persists.
+    _self_eval["persist"] = True
+    _resumed = _self_eval_resume()
+    if _resumed:
+        _next = ((_resumed // SELF_EVAL_EVERY) + 1) * SELF_EVAL_EVERY \
+            if SELF_EVAL_EVERY > 0 else 0
+        log("INFO", f"self-evaluation: resumed at round {_resumed}, next block "
+                    f"at round {_next} -- the count now survives the restarts "
+                    f"covenant_highway.py schedules and the guard performs")
     while True:
         try:
             one_pass()

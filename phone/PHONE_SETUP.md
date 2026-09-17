@@ -1,3 +1,9 @@
+> **HISTORICAL — superseded 2026-09-16. Do not follow this page.**
+> It is kept because this project does not quietly delete what it used to
+> say. The single current phone page is [`mobile/TERMUX_SETUP.md`](mobile/TERMUX_SETUP.md);
+> for a PC node see [`docs/PARTNER_NODE.md`](docs/PARTNER_NODE.md).
+> (KNOWN_ISSUES A33: three competing phone documents, none marked.)
+
 # Running the daily check on your Android phone
 
 Five steps. The whole thing takes about ten minutes, most of it downloads.

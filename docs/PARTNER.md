@@ -92,6 +92,112 @@ verify yourself, and the standing to say publicly what you saw. If that is not
 worth your electricity, that is a reasonable answer and it goes in the record
 too.
 
+## To peer with this project
+
+*(Added 2026-09-16, closing KNOWN_ISSUES A3. Before this, no document told a
+second operator how to reach the owner's node at all.)*
+
+You need one address from the owner, because this is not discoverable: the
+nodes sit behind a home router and learn no inbound peers. Ask for the
+Tailscale address; you will get something like `100.x.y.z`. Then:
+
+```
+python run_with_ollama_judge.py --port 5000 --node-id <your-name> \
+    --genesis genesis.json --peers <owner-address>:5001
+```
+
+Three things that are easy to get wrong:
+
+- **The P2P port is your API port + 1.** `--port 5000` listens for peers on
+  5001. The `--peers` value you are given is the owner's *P2P* port, not their
+  API port.
+- **Never mint your own genesis.** `genesis.json` is tracked and canonical.
+  If `/health` shows a genesis that does not start `00009b31c6c654d7`, you
+  minted one and cannot converge with anybody; delete the node's `.db` and
+  start again with `--genesis genesis.json`.
+- **Peering is one-way until the owner adds you.** They must add your address
+  to their node's peer list and restart. Tell them your address when you start.
+
+## Staying in consensus
+
+*(Added 2026-09-16, closing KNOWN_ISSUES A13.)*
+
+Every node re-judges every block it receives. That means a judge seat which
+*holds* where the owner's *answered* will reject the owner's blocks and fork
+away from them — the protocol predicts this, and it is the most likely way
+your node silently stops agreeing with the chain.
+
+The owner's nodes run: the distilled student first, then a local model if one
+is present, then a fallback. Yours should run the same order. The student
+ships in the repository (`fallback_model.json` is tracked, so a clone gets the
+same one the live nodes run). A local Ollama model is optional but makes your
+seat decide more of the held band instead of holding.
+
+If your node stops accepting blocks, compare seats before assuming the chain
+is wrong: a fork here is usually two judges disagreeing, not bad data.
+
+## What leaves your machine
+
+*(Added 2026-09-16, closing KNOWN_ISSUES A11. This was undisclosed, and it
+should not have been.)*
+
+**Correction, same day: an earlier version of this section said "judging is
+local by default". That was wrong, and it is exactly the kind of claim you
+should not have to take on trust.** With no `COVENANT_JUDGE_PROVIDERS` set, a
+fresh clone's gate is built from `["claude"]` — it sends the transaction text,
+including the payload being judged, to `api.anthropic.com`. With no
+`ANTHROPIC_API_KEY` present it fails closed and rejects everything instead of
+sending anything (KNOWN_ISSUES A2), so most fresh clones leak nothing. But if
+you happen to have `ANTHROPIC_API_KEY` exported for unrelated reasons, your
+transaction text goes to Anthropic on the stock configuration and nothing
+tells you at that moment.
+
+Set `COVENANT_JUDGE_PROVIDERS` explicitly. The owner's nodes do.
+
+There are two further egress paths you should know about before you run
+anything:
+
+**The GitHub rung sends the transaction's text off your machine.** When the
+local judge cannot decide, the node can ask a GitHub Actions runner instead.
+That means the text of the transaction being judged leaves your computer and
+is processed on GitHub's infrastructure, under a workflow in the owner's
+repository.
+
+As of 2026-09-16 this is **off unless you turn it on**: the tracked policy
+ships `github_when_local_down=false`, and the node will not reach into your
+machine's credential store unless you set `COVENANT_GITHUB_JUDGE=1`
+(KNOWN_ISSUES A21). Before that date it did both silently, and a node you
+cloned would have spent your saved GitHub credentials dispatching a workflow
+on the owner's repository. If you ran a node before 2026-09-16, that happened
+on your machine, and you are entitled to be annoyed about it.
+
+Nothing else leaves: no keys, no database, no telemetry.
+
+## Stopping it, and removing it
+
+*(Added 2026-09-16, closing KNOWN_ISSUES A14. "How to stop" was absent for the
+laptop path and incomplete for the phone, which is not an acceptable thing to
+omit from software you are asking a stranger to run.)*
+
+**Laptop / PC.** Ctrl-C in the window running the node. Nothing is installed
+outside the folder you cloned into, and nothing starts at boot unless you
+added it yourself. To remove it completely, delete the folder.
+
+**Android (Termux).** The installer adds a boot autostart entry and takes a
+wake-lock; the phone doc calls the autostart optional, and it is not. To stop
+it for good:
+
+```
+rm ~/.termux/boot/covenant-phone-start.sh
+rm ~/.shortcuts/covenant-phone-start.sh
+termux-wake-unlock
+rm -rf ~/covenant
+```
+
+Your node's private key lives in that folder. If you intend to come back,
+copy the `*.db.key` file somewhere first — it is the node's identity, and
+losing it loses that node's balance and operator rights permanently.
+
 ## How to say yes, or no
 
 Open an issue on the repository titled with what you would do, or write to

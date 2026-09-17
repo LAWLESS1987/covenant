@@ -1,3 +1,12 @@
+> **HISTORICAL — superseded 2026-09-16. Do not follow this page.**
+> It is kept because this project does not quietly delete what it used to
+> say. The single current phone page is [`mobile/TERMUX_SETUP.md`](mobile/TERMUX_SETUP.md);
+> for a PC node see [`docs/PARTNER_NODE.md`](docs/PARTNER_NODE.md).
+> (KNOWN_ISSUES A33: three competing phone documents, none marked.)
+
+> This page also opens by saying private keys sit in a folder that
+> leaves your machine. That was never true of the current layout.
+
 # What's in this folder, and what to actually run
 
 Audited 2026-08-20 against the real contents of `C:\Users\<user>\covenant`.

@@ -103,6 +103,41 @@ def main():
                     help="1 = re-run strategy_validate.py on the latest data each pass (30 min cap); 0 = skip")
     ap.add_argument("--no-verify", action="store_true", help="skip the green check (not advised)")
     a = ap.parse_args()
+
+    # GHOST CONTROL, found 2026-09-16 by a back-door audit and fixed here.
+    # covenant_pause.ACTORS has advertised "nightly: the nightly learning pass
+    # stops; nothing else is affected" since it was written. This file did not
+    # contain the string "pause" and never imported covenant_pause, so
+    # `--pause nightly` wrote the file, `--list` printed PAUSED, and
+    # covenant_watchdog.py reported the pause on every round -- while the
+    # 03:30 scheduled task retrained the student anyway. The operator was told
+    # the thing had stopped, and it had not.
+    #
+    # That is the worst shape a control can take. A missing switch is honest;
+    # a switch that reports success and does nothing spends the trust that
+    # every other switch relies on. And per KNOWN_ISSUES A124, block validity
+    # rides on this retraining, so "I paused the learning" was load-bearing.
+    #
+    # Fail OPEN on an unreadable pause module: not being able to ask whether
+    # you are paused is not a reason to stop the nightly pass, and a learning
+    # loop that silently stops is its own failure. It says so out loud.
+    # paused() returns (bool, reason), NOT a bool. `if paused(name):` is a
+    # non-empty tuple and is therefore ALWAYS true -- the first version of this
+    # fix did exactly that and would have silently disabled every nightly pass
+    # while reporting a pause nobody had set. Unpack it, the way
+    # covenant_highway.py:1007 and covenant_watchdog.py:863 both do.
+    try:
+        import covenant_pause
+        is_paused, why = covenant_pause.paused("nightly")
+        if is_paused:
+            print("nightly: PAUSED by covenant_pause%s -- doing nothing this run. "
+                  "Clear it with: python covenant_pause.py --resume nightly"
+                  % (" (%s)" % why if why else ""))
+            return 0
+    except ImportError as e:
+        print(f"nightly: cannot consult covenant_pause ({e}); continuing. "
+              f"A pause you set may NOT be in effect -- verify before relying on it.")
+
     lines, rc = [], 0
     t0 = time.time()
 

@@ -111,9 +111,22 @@ def token():
         return t
     if "token" in _CACHE:
         return _CACHE["token"]
+    # A21 (second-operator audit, fixed 2026-09-16). Setting GITHUB_TOKEN is an
+    # explicit act, so the branch above needs no gate. Reaching into the
+    # machine's credential store is NOT: on a stranger's PC this ran
+    # `git credential fill` unasked, took whatever token Git Credential Manager
+    # held, and dispatched a workflow on LAWLESS1987/covenant with it. A node
+    # someone cloned must never spend their credentials on the owner's repo
+    # without being told to. Opt in with COVENANT_GITHUB_JUDGE=1.
+    if os.environ.get("COVENANT_GITHUB_JUDGE", "").strip() not in ("1", "true", "yes"):
+        return ""
     try:
+        env = dict(os.environ)
+        # Never let the helper block on a prompt: under a parent with no
+        # console it would hang the pass instead of failing it.
+        env["GIT_TERMINAL_PROMPT"] = "0"
         p = covenant_quiet.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n",
-                           capture_output=True, text=True, timeout=20)
+                           capture_output=True, text=True, timeout=20, env=env)
         for line in p.stdout.splitlines():
             if line.startswith("password="):
                 _CACHE["token"] = line[9:].strip()

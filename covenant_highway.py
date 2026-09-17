@@ -597,17 +597,52 @@ def remedy_schedule_watchdog_restart(measured, dry_run=True):
     and it writes its state as it goes rather than at the end.
     """
     import subprocess
-    inner = ("Start-Sleep -Seconds 5;"
+    # 2026-09-16: the kill was reliable and the START was not. Four times that
+    # day covenant_watchdog_guard.py found "no live watchdog PID" with a gap of
+    # 200-294s -- meaning this remedy had killed the watchdog and left NOTHING
+    # running until the guard noticed, three to five minutes later, with the
+    # nodes unwatched the whole time. logs/watchdog-stderr.log was created and
+    # stayed 0 bytes, which is what a -Redirect that opens but never gets a
+    # process looks like: covenant_prod.bat starts the watchdog under a cmd
+    # wrapper holding those same log files with >>, and Start-Process cannot
+    # always take the handle straight after the kill.
+    #
+    # The check above (rc after 0.5s) proves the RESTARTER launched. It cannot
+    # prove a watchdog exists, because by then this process is gone. So the
+    # verification moves inside the script: start, wait, count; if none is
+    # alive, start again WITHOUT the redirects, which is the part that fails;
+    # then write what actually happened to logs/watchdog_restart_last.json so
+    # a failure is observable instead of silent. Verify the effect, not the
+    # invocation -- the rule this file states and this remedy was missing.
+    inner = (" $py='%s'; $wd='%s'; $here='%s'; $out='%s'; $err='%s';"
+             " $marker='%s'; $fb=0;"
+             " Start-Sleep -Seconds 5;"
              " $w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
              " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
              " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
              " Start-Sleep -Seconds 2;"
-             " Start-Process -FilePath '%s' -ArgumentList '%s','--interval','60'"
-             " -WorkingDirectory '%s' -WindowStyle Hidden"
-             " -RedirectStandardOutput '%s' -RedirectStandardError '%s'"
+             " try { Start-Process -FilePath $py -ArgumentList $wd,'--interval','60'"
+             " -WorkingDirectory $here -WindowStyle Hidden"
+             " -RedirectStandardOutput $out -RedirectStandardError $err }"
+             " catch { };"
+             " Start-Sleep -Seconds 4;"
+             " $a=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+             " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
+             " if ($a.Count -eq 0) { $fb=1;"
+             "   try { Start-Process -FilePath $py -ArgumentList $wd,'--interval','60'"
+             "   -WorkingDirectory $here -WindowStyle Hidden } catch { };"
+             "   Start-Sleep -Seconds 4;"
+             "   $a=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+             "   | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' } };"
+             " $o=[ordered]@{"
+             " at=((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'));"
+             " alive=$a.Count; fallback_used=$fb };"
+             " $o | ConvertTo-Json -Compress | Set-Content -Path $marker"
+             " -Encoding utf8"
              % (sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
                 os.path.join(HERE, "logs", "watchdog-stdout.log"),
-                os.path.join(HERE, "logs", "watchdog-stderr.log")))
+                os.path.join(HERE, "logs", "watchdog-stderr.log"),
+                os.path.join(HERE, "logs", "watchdog_restart_last.json")))
     if dry_run:
         return True, "would schedule a detached restart in 5s"
     # CREATE_NO_WINDOW, not DETACHED_PROCESS, and the difference is not

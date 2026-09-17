@@ -281,6 +281,17 @@ SUITES = [
     # P20 (2026-08-29): the watchdog's self-evaluation ledger -- every layer
     # it senses, one PASS/WARN/FAIL block, report-only by AST. 23/23.
     ("test_p20_watchdog_self_eval.py",   120,  "IDENTITY"),
+    # P21/P22 (2026-09-16): the self-eval round counter must survive the
+    # restart covenant_highway schedules (A136), and that restart must verify a
+    # watchdog EXISTS afterwards rather than that the restarter launched
+    # (A135). P21h and P22's parser check both drive the failing direction.
+    ("test_p21_self_eval_persist.py",    120,  "IDENTITY"),
+    ("test_p22_watchdog_restart_verifies.py", 180, "IDENTITY"),
+    # P23 (2026-09-16): the three second-operator security findings -- A31
+    # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
+    # Added because a back-door audit pointed out that all three fixes existed
+    # with no runner naming them, so a green sweep proved nothing about them.
+    ("test_p23_second_operator_security.py", 180, "SECURITY"),
     # C3 (2026-08-29): the guard that heals the watchdog -- pure
     # decide(), report-only by AST, no process started. 21/21.
     ("test_c3_guard.py",                 120,  "IDENTITY"),

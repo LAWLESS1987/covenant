@@ -319,7 +319,36 @@ re-ran every claimed finding on a **fresh public clone** before it counted.
 operator's point of view. Status is kept current below; a finding is
 closed only when its own repro no longer reproduces.
 
-### A1. [blocker / docs] README Quick start (the only laptop path) re-mints genesis over the canonical file, so a joiner cannot converge with the owner
+---
+
+## How to read the A1-A46 block
+
+Those 46 findings were written as **Evidence / Repro / Fix**, where *Fix* is a
+PRESCRIPTION, not a record that anyone carried it out. For months the register
+therefore could not say whether any of them was still real -- nine of them
+labelled `[blocker]`. That is worse than nine known blockers.
+
+On 2026-09-16 each one was **re-tested against the tree** rather than re-read,
+by `tools/audit_a1_a46_status.py`. Every A1-A46 heading below now carries the
+verdict that tool measured. Re-run it rather than trusting the stamp:
+
+```
+python tools/audit_a1_a46_status.py
+```
+
+`UNDETERMINED` is a real verdict, not a failure to decide: 23 of the 46 are
+runtime facts that need a fresh clone, a running node, a second machine, or an
+editorial decision. A tool that resolved all 46 from greps would be lying, and
+this register already records what that costs (A74: 35 of 36 suspected guards
+were fake because they grepped source text instead of running the code). Six
+false verdicts were found and corrected in the tool itself during the first
+run -- including one that reported a live `[blocker]` against code carrying
+both of its prescribed fixes, and one that convicted a heading of the very
+error it had already been corrected for.
+
+---
+
+### A1. [blocker / docs] README Quick start (the only laptop path) re-mints genesis over the canonical file, so a joiner cannot converge with the owner -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** README.md:396-403 step 2 is `python covenant_unified_v8.py --node-id FOUNDER --export-genesis genesis.json`; DEPLOYMENT.md:87-93 and HANDOFF.md:111 give the same founder-mint step. In a fresh clone: BEFORE sha256 9385820fde704c81 (git blob 0efed72186ec); after running that line: sha256 2a79a31cb9da3703, `git status` -> ` M genesis.json`. The owner's live nodes A/B/C (curl 127.0.0.1:5000|5020|5060 /health and /chain[0]) all run genesis 00009b31c6c654d7..., which is the SHIPPED genesis.json hash. mobile/TERMUX_SETUP.md:102-103 itself says a node that mints its own cannot converge with anyone.
 
@@ -329,7 +358,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** fixed 2026-09-05 -- see A3; same change.
 
-### A2. [blocker / docs] README Quick start boots the node with judge provider 'claude' (no key): it rejects every transaction and every peer block; the working path (run_with_ollama_judge.py + ops/quorum_policy.json) is named only in the Android page
+### A2. [blocker / docs] README Quick start boots the node with judge provider 'claude' (no key): it rejects every transaction and every peer block; the working path (run_with_ollama_judge.py + ops/quorum_policy.json) is named only in the Android page -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** covenant_unified_v8.py:10140 default providers = ['claude']. Fresh-clone probe `python covenant_unified_v8.py --port 5900 --node-id STRANGER --genesis genesis.json` -> /health quorum.judges = [('Anthropic','ClaudeReasoningJudge', credentialled=False), MockJudge]; warnings: 'ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction', '0 independent semantic judge(s) of 1 configured'. Received blocks are re-judged at covenant_unified_v8.py:8722 (`_accept_block_common` -> sentinel.validate_block); PHONE_NODE.md:108-111 says the same. Same clone booted via `python run_with_ollama_judge.py ...` -> judges [DeferringJudge, SemanticJudge], degradations []. run_with_ollama_judge.py is named only in mobile/TERMUX_SETUP.md:4,101 and covenant_prod.bat:108; docs/PARTNER.md:17 invites 'anyone with a laptop' but :52 links only mobile/TERMUX_SETUP.md.
 
@@ -339,7 +368,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** open
 
-### A3. [blocker / docs] No document tells the second operator how to peer with the owner: no address, no exchange procedure, inbound peers are not learned, POST /peers needs an allowlisted operator signature, and the owner's launcher hardcodes 127.0.0.1 peers
+### A3. [blocker / docs] No document tells the second operator how to peer with the owner: no address, no exchange procedure, inbound peers are not learned, POST /peers needs an allowlisted operator signature, and the owner's launcher hardcodes 127.0.0.1 peers -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** docs/PARTNER.md:44-59 ends at check.sh + three reads + an email; the word 'peer' does not appear. mobile/TERMUX_SETUP.md:22 `PC_PEER=10.0.0.174:5001 (your PC's address)` assumes the reader owns the PC; :133-135 'your version does not learn peers from inbound connections; add PHONE_IP:5001 to the PC node's --peers'. Confirmed in code: `add_peer(` is called only at covenant_unified_v8.py:7287 (POST /peers, which the comment at 7269-7275 says is in PROTECTED_OPERATOR_ENDPOINTS, signed+nonced, fails closed) and :10913 (startup --peers). covenant_prod.bat:108,114,130 start A/B/C with `--peers 127.0.0.1:...` only. NODES.md:106-116: off the LAN the peer needs Tailscale. The Windows firewall rule for 5001 exists only on the phone page (TERMUX_SETUP.md:38-42).
 
@@ -349,7 +378,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** open
 
-### A4. [blocker / install] Every fresh node stops at height 2: the shipped semantic judge crashes on the owner's block-2 `root` hash and vetoes the block
+### A4. [blocker / install] Every fresh node stops at height 2: the shipped semantic judge crashes on the owner's block-2 `root` hash and vetoes the block -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_semantic_judge.py:390-410 -- `_INWORD` matches any of `[0-9@$!|]` between letters, but `_LEET` maps only 0,1,3,4,5,7 (2,6,8,9 missing), so `_repair` does `_LEET[...]` and raises on a hex hash. Block 2 tx data (GET http://127.0.0.1:5000/chain): `"root": "ec9020572f74b7e83f9a9e9c536557e351f5fe720c3d4576123af8ec43d70d22"`. Direct call `SemanticModel.load().assess({"root": ...})` -> `KeyError: '9'` at covenant_semantic_judge.py:245 walk -> :409-410 _repair; the other four fields (files, kind, origin, utc) assess clean. covenant_semantic_judge.py:1128-1133 wraps it as violates=True infrastructure_failure=True; QuorumJudge strict mode (covenant_unified_v8.py:1899-1904, 1913-1916) counts it toward the veto threshold 1. Measured from a fresh clone (HEAD 702354c) through the real acceptance path `CovenantUnifiedMaster._accept_block_common`: block 1 -> True (height
 
@@ -359,7 +388,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** fixed 2026-09-05 -- `covenant_semantic_judge._repair` now uses `_LEET.get(ch, ch)` and leaves any 16+ character hex token untouched; the owner's block-2 root assesses without raising and comes back byte-identical. Pinned by `test_semantic_judge.py` H1-H3 (29/29). The live nodes are restarted on the fixed core so they re-validate block 2 through the repaired judge -- see the commit that closes this.
 
-### A5. [blocker / install] A PC partner without Ollama gets a gate that HOLDs the owner's real payloads and refuses them (7.6 s each), while launch_check G5 says Ollama is not needed
+### A5. [blocker / install] A PC partner without Ollama gets a gate that HOLDs the owner's real payloads and refuses them (7.6 s each), while launch_check G5 says Ollama is not needed -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/ops/quorum_policy.json is tracked and shipped (`providers: deferring,semantic`, `primary: student`, `silence_is_not_dissent: false`, `github_when_local_down: true`); run_with_ollama_judge.py:44-49 applies it on every clone. covenant_judge_defer.py:139-178: student -> Ollama (unreachable) -> GitHub (`RuntimeError: no GitHub token`) -> student again -> HELD (not_understood). Strict-mode quorum counts a HELD seat as a dissent (covenant_unified_v8.py:1899-1904 `clean=[r for r in results if not r.violates]`; 1913-1916 semantic veto). Measured on the clone with git configured with no credential helper, block-2 tx: `local:0: HELD -- local judge unreachable (ConnectionError ... 127.0.0.1:11434 ... | GitHub runner: RuntimeError: no GitHub token ...); deferred to the distilled fallback -- HELD, NOT JUDGED -- ... 6 content word(s) here were never seen in training [asserts, c
 
@@ -369,7 +398,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** open
 
-### A6. [blocker / install] README Quick start mints a new genesis over the canonical one and then boots a bare core that refuses every block
+### A6. [blocker / install] README Quick start mints a new genesis over the canonical one and then boots a bare core that refuses every block -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/README.md 'Quick start': `python covenant_unified_v8.py --node-id FOUNDER --export-genesis genesis.json` then `python covenant_unified_v8.py --port 5000 --node-id A --genesis genesis.json`. covenant_unified_v8.py:9487-9499 `export_genesis` opens the path with mode 'w' and never checks existence -- measured in a temp dir holding a copy of the committed genesis: sha256 changed 9385820fde704c81 -> 225ec247967ce6ef, block hash 00009b31... -> 0000be28..., 0.75 s, rc 0, output only `canonical genesis written to genesis.json`. covenant_unified_v8.py:10139-10140: with no COVENANT_JUDGE_PROVIDERS the default provider is `["claude"]`; measured in-process on the clone: judge `quorum(claude:0,mock_selfreport:0)`, owner's block 1 -> False `Ethical violation: claude:0: VIOLATES -- fail-closed: no Anthropic API key available (set ANTHROPIC_API_KEY)`. The launcher that applies th
 
@@ -379,7 +408,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** fixed 2026-09-05 -- `export_genesis` refuses to overwrite an existing file (`FileExistsError` naming the file as canonical); the mint step is removed from README.md, DEPLOYMENT.md and HANDOFF.md. The bare-core boot half of this finding is A7 and stays open until the partner gate posture is decided.
 
-### A7. [blocker / peering] A fresh node adopting the canonical genesis cannot converge with the owner's chain: every catch-up block is re-judged on arrival and the shipped judges refuse block 2 (semantic judge raises KeyError on the sha256 'root' field; student holds); only the INSECURE mock judge converged
+### A7. [blocker / peering] A fresh node adopting the canonical genesis cannot converge with the owner's chain: every catch-up block is re-judged on arrival and the shipped judges refuse block 2 (semantic judge raises KeyError on the sha256 'root' field; student holds); only the INSECURE mock judge converged -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_unified_v8.py:8722 `ok_ethics, why_ethics = self.node.sentinel.validate_block(block)` inside _accept_block_common (the path bootstrap/catch-up uses); :2013-2028 validate_block re-runs the quorum on every tx. Live chain (curl :5000/chain): block 1 = 10.0 transfer {origin:human}; block 2 = two 'seal-anchor' txs whose data carries `root` = 64-hex sha256. covenant_semantic_judge.py:390-398 `_LEET` has no entry for 2/6/8/9 while `_INWORD` matches any [0-9] between letters, so `_repair` does `_LEET[...]` -> KeyError; traceback: covenant_semantic_judge.py:467 _repaired_tokens -> :772 assess -> KeyError: '9'; :1128-1135 turns that into infrastructure_failure=True (refuse). Offline eval of block 2 tx0 (scratchpad/clone/eval_blocks.py): semantic -> `could not assess this payload (KeyError: '9')` infra_fail=True; deferring (no Ollama) -> student `HELD, NOT JUDGED --
 
@@ -389,7 +418,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** open
 
-### A8. [blocker / peering] No address a remote operator can reach: the owner's PC sits at a private Wi-Fi address with no Tailscale and no port-forward, the docs' example peer is that private address, and the documented firewall rule was never created (LAN-only inbound works via a generic 'Python' program rule)
+### A8. [blocker / peering] No address a remote operator can reach: the owner's PC sits at a private Wi-Fi address with no Tailscale and no port-forward, the docs' example peer is that private address, and the documented firewall rule was never created (LAN-only inbound works via a generic 'Python' program rule) -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** Get-NetIPAddress: only 10.0.0.174 (Wi-Fi) plus 169.254.* link-local; Get-NetConnectionProfile: Wi-Fi 'Get your own 4' NetworkCategory=Public; Test-Path 'C:\Program Files\Tailscale\tailscale.exe' = False and Get-Command tailscale = none. mobile/TERMUX_SETUP.md:41 tells the owner to create rule 'covenant peer 5001'; `netsh advfirewall firewall show rule name=covenant verbose` shows the only 'covenant' rule is TCP 7443 (description 'freedom'), so it was never made. Inbound to 5001 on the LAN is allowed anyway by four 'Python' program rules (Private+Public, program C:\program files\windowsapps\...python3.12.exe, LocalPort Any) and that is the image node A runs under (Get-Process 3972 Path). All three nodes bind 0.0.0.0 (netstat: 5000/5001/5011, 5020/5021/5031, 5060/5061/5071). A clone node peered to 10.0.0.174:5001 from this host did pull blocks, so LAN peering works; nothing documents what 
 
@@ -399,7 +428,7 @@ closed only when its own repro no longer reproduces.
 
 **Status:** open
 
-### A9. [blocker / security] Cloning the repo hands the second operator (and the whole public) the owner's real portfolio, which is still in git history on a PUBLIC repo
+### A9. [blocker / security] Cloning the repo hands the second operator (and the whole public) the owner's real portfolio, which is still in git history on a PUBLIC repo -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** GitHub API for LAWLESS1987/covenant returns "private": false / "visibility": "public". .gitignore ignores holdings.txt and TRADING_POLICY.json going forward but its own comment says they were TRACKED until 2dfe018 and 'any remote this repo is pushed to must be PRIVATE. Until that history is rewritten...'. Verified they are in history and reachable from origin/main: `git log --all --oneline -- holdings.txt TRADING_POLICY.json` lists <SHA-REDACTED>/5c3af47; `git branch -r --contains <SHA-REDACTED>` -> origin/main; `git show <SHA-REDACTED>:holdings.txt` returns a 13-line portfolio (quantities+avg prices) and `<SHA-REDACTED>:TRADING_POLICY.json` a 1345-byte policy (locked_positions, sleeve, ...). Publicly fetchable: `curl -sI https://raw.githubusercontent.com/LAWLESS1987/covenant/<SHA-REDACTED>/holdings.txt` -> HTTP 200. tools/purge_history.py exists to remove them but its header says it 'DOES NOT PUSH' and it has not been ru
 
@@ -441,7 +470,7 @@ It also answers the test GitHub applies before assisting, that the risk cannot b
 
 **Filing is not the fix, and this issue does not close on a ticket number.** It closes when `python covenant_ambassador.py --repo-check` stops finding HTTP 200. Measured again immediately after filing: **still 200 on both URLs, 505 and 1345 bytes.** The 09-05 force-push unpublished nothing, because GitHub serves by SHA; only the purge does. Until the live check goes quiet, this stays open and the link is shared knowingly.
 
-### A10. [serious / docs] DEPLOYMENT.md (README 'Start here' -> 'how it is deployed and configured') documents a judge setup the code no longer defaults to and names 7 commands that do not exist; G2 does not scan it
+### A10. [serious / docs] DEPLOYMENT.md (README 'Start here' -> 'how it is deployed and configured') documents a judge setup the code no longer defaults to and names 7 commands that do not exist; G2 does not scan it -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** DEPLOYMENT.md:39-46 'Production: set ANTHROPIC_API_KEY' (every judge prompt would go to https://api.anthropic.com/v1/messages, covenant_unified_v8.py:9866-9878, unstated as data leaving); :119-123 providers 'claude, openai, google, mock' while the registry also holds local, ollama, deepseek, mistral, deferring, fallback, semantic and named judges (covenant_unified_v8.py:10036-10070; covenant_judge_local.py:207-209; covenant_judge_ollama.py:449-450,530; covenant_judge_defer.py:187; covenant_judge_fallback.py:744). :182 `./run_all_tests.sh` still names 11 suites not on disk (test_ethics_judge, test_golden_ratio, test_judge_individuality, test_multi_provider_quorum, test_path_pattern, test_succession_seal, test_v86_bridge, test_v86_loss_tracking, verify_auth, verify_patches, verify_tx_aer). :190-197 table: verify_patches.py, verify_auth.py, test_path_pattern.py, test_succession_seal.py, tes
 
@@ -451,7 +480,7 @@ It also answers the test GitHub applies before assisting, that the risk cannot b
 
 **Status:** open
 
-### A11. [serious / docs] Undisclosed data egress on the shipped node path: the tracked policy enables the GitHub leg, which sends the transaction text off-machine using whatever github.com credential git holds on the joiner's machine, and it silently overrides the documented COVENANT_JUDGE_PROVIDERS=local
+### A11. [serious / docs] Undisclosed data egress on the shipped node path: the tracked policy enables the GitHub leg, which sends the transaction text off-machine using whatever github.com credential git holds on the joiner's machine, and it silently overrides the documented COVENANT_JUDGE_PROVIDERS=local -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** ops/quorum_policy.json is tracked (git ls-files) with "providers":"deferring,semantic", "github_when_local_down": true. run_with_ollama_judge.py:45-50 applies it over the environment; probe with COVENANT_JUDGE_PROVIDERS=local (what mobile/covenant_phone.sh:58 sets and TERMUX_SETUP.md:98-99 documents) logged '[ollama-judge] quorum policy (ops/quorum_policy.json): providers=deferring,semantic silence_is_not_dissent=False github_when_local_down=True'. covenant_judge_defer.py:139-178: student -> Ollama -> `covenant_github_judge.ask(prompt...)` -> fallback. covenant_github_judge.py:95-107 token() = GITHUB_TOKEN/GH_TOKEN else `git credential fill` for github.com; :84-91 repo = `git remote get-url origin` (the owner's repo for a clone, the joiner's own fork for a fork, where Actions logs are public). README.md:217-218 'Nothing leaves the PC unless a line says so' flags only Gemini; PARTNER.md a
 
@@ -476,7 +505,7 @@ serious thing to claim falsely — an issue register that overstates is not
 cautious, it is inaccurate in the direction that happens to flatter its author's
 diligence.
 
-### A12. [serious / docs] TERMUX_SETUP.md's judge-tier table, judges.json and README describe a PC reference judge (qwen3:8b on Ollama) that is not running; the PC seat is student -> GitHub runner -> fallback
+### A12. [serious / docs] TERMUX_SETUP.md's judge-tier table, judges.json and README describe a PC reference judge (qwen3:8b on Ollama) that is not running; the PC seat is student -> GitHub runner -> fallback -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** mobile/TERMUX_SETUP.md:63-79 ('PC | qwen3:8b ... the reference judge'; 'point COVENANT_OLLAMA_URL at the PC's Ollama over Tailscale'); judges.json pc_qwen/pc_mid/pc_small all 127.0.0.1:11434; README.md:217 'on the covenant's own local judge (Ollama, the model the nodes' ethics gate calls)'. Reality: `curl -s -m 3 http://127.0.0.1:11434/api/tags` -> not answering; ops/quorum_policy.json "primary":"student", decided_by '...get rid of it [ollama]'; live /health on :5000 quorum.judges = DeferringJudge + SemanticJudge.
 
@@ -486,7 +515,7 @@ diligence.
 
 **Status:** open
 
-### A13. [serious / docs] No doc tells the joiner which judge configuration converges with the owner's; the receiver re-judges every block, so a seat that HOLDS where the owner's answered (owner has a GitHub token, the joiner's dispatch fails) rejects the owner's blocks -- the fork PROTOCOL.md predicts
+### A13. [serious / docs] No doc tells the joiner which judge configuration converges with the owner's; the receiver re-judges every block, so a seat that HOLDS where the owner's answered (owner has a GitHub token, the joiner's dispatch fails) rejects the owner's blocks -- the fork PROTOCOL.md predicts -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** covenant_unified_v8.py:8722 re-judges inbound blocks; covenant_judge_defer.py:139-183 tier order and HELD -> not_understood; ops/quorum_policy.json silence_is_not_dissent=false with the note 'the gate keeps failing CLOSED when nothing competent answers'; docs/PROTOCOL.md:35-43 (B4: 'two nodes can reach different verdicts on identical data'); README.md:198-200 'It is not multi-operator ready'. Neither docs/PARTNER.md nor mobile/TERMUX_SETUP.md names the seat/model the joiner should run to match, or what a rejected-block anomaly means.
 
@@ -496,7 +525,7 @@ diligence.
 
 **Status:** open
 
-### A14. [serious / docs] 'How to stop it' is absent for the laptop path and incomplete for the phone: install.sh silently installs a boot autostart entry the doc calls optional, takes a wake-lock, and nothing says how to stop for good or uninstall
+### A14. [serious / docs] 'How to stop it' is absent for the laptop path and incomplete for the phone: install.sh silently installs a boot autostart entry the doc calls optional, takes a wake-lock, and nothing says how to stop for good or uninstall -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** The only stop instruction in any doc or script is mobile/install.sh:27 '(Ctrl-C to stop the node later)'. mobile/install.sh:52-53 copies covenant-phone-start.sh into ~/.termux/boot unconditionally when ~/.termux exists, while TERMUX_SETUP.md:114-115 presents Termux:Boot as an opt-in step; covenant_phone.sh:35 runs termux-wake-lock with no unlock. grep -n -i 'ctrl\|stop the node\|how to stop\|uninstall' over README.md DEPLOYMENT.md docs/PARTNER.md mobile/TERMUX_SETUP.md NODES.md LAUNCH.md returns nothing.
 
@@ -506,7 +535,7 @@ diligence.
 
 **Status:** open
 
-### A15. [serious / docs] What the gate reads and what 'refuse' means is stated in no stranger-facing doc; the nearest text is in ops/quorum_policy.json and module docstrings, and docs/semantic/SEMANTIC_JUDGE.md still says the semantic judge is not shipped
+### A15. [serious / docs] What the gate reads and what 'refuse' means is stated in no stranger-facing doc; the nearest text is in ops/quorum_policy.json and module docstrings, and docs/semantic/SEMANTIC_JUDGE.md still says the semantic judge is not shipped -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** docs/PARTNER.md:40-42 says only 'verdicts are coarse'; README.md:140-143 only 'fails closed'; docs/CONSTITUTION.md:177-181 'single words veto regardless of context'. The fields judged are message/description/reason/memo/text/purpose/body (covenant_judge_fallback.py:670); a HELD/abstain is a rejection under the shipped policy (ops/quorum_policy.json silence_is_not_dissent=false; covenant_judge_defer.py:30-36); docs/KNOWN_ISSUES.md:21-47 says 14 of 48 honest memos are still accused. docs/semantic/SEMANTIC_JUDGE.md:1-5 'DELIBERATELY NOT SHIPPED YET' while live /health :5000 shows SemanticJudge in the quorum.
 
@@ -516,7 +545,7 @@ diligence.
 
 **Status:** open
 
-### A16. [serious / docs] HANDOFF.md and LAUNCH.md, both in README's 'Start here' table, describe superseded versions and launch sequences
+### A16. [serious / docs] HANDOFF.md and LAUNCH.md, both in README's 'Start here' table, describe superseded versions and launch sequences -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** README.md:343-355 routes 'what is true and what is assumed' to HANDOFF.md and 'to launch it' to LAUNCH.md. HANDOFF.md:6 'v8.18 ... 266 checks'; :108 'ANTHROPIC_API_KEY -- preflight's only BLOCKING item'; :114 './run_all_tests.sh'. LAUNCH.md:3 'v8.37'; :78 'run_local_sweep.py ~45 min, 33 suites'. README.md:7 v8.40, 66 suites, 1,913 checks; live /health version v8.40 source 8f219285f268.
 
@@ -526,7 +555,7 @@ diligence.
 
 **Status:** open
 
-### A17. [serious / docs] UNISON.md (START_HERE's second read) says the repository is private and must stay private until history is rewritten; the repository is public and the named files are still in history
+### A17. [serious / docs] UNISON.md (START_HERE's second read) says the repository is private and must stay private until history is rewritten; the repository is public and the named files are still in history -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** UNISON.md:53-56 'this repository is private and must stay private until that history is rewritten'; START_HERE.md:10 'publish to GitHub (private)'. GitHub API for LAWLESS1987/covenant: private=False, visibility=public, license apache-2.0. `git log --all --oneline -- holdings.txt TRADING_POLICY.json | wc -l` = 4 (file contents not read).
 
@@ -536,7 +565,7 @@ diligence.
 
 **Status:** fixed 2026-09-05 -- see issue 15
 
-### A18. [serious / install] There is no PC runbook for a non-owner; every PC launcher, gate and the DEPLOYMENT.md install section assume the owner's machine
+### A18. [serious / install] There is no PC runbook for a non-owner; every PC launcher, gate and the DEPLOYMENT.md install section assume the owner's machine -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/docs/PARTNER.md:47-50 sends a node runner only to mobile/TERMUX_SETUP.md. covenant_prod.bat: `if not exist "covenant_A.db.key" ( call :stamp "ABORT: covenant_A.db.key missing" & exit /b 1 )` (the owner's founder key, gitignored by `*.key`) and `--peers 127.0.0.1:5021`. launch_check.py:51 `NODES = [("A",5000),("B",5020),("C",5060)]` -- on the clone G7/G9 PASS only because they read the owner's live nodes (`in use by our own nodes`), and G10/G12 are UNKNOWN (exit 2 'NOT A PASS'). covenant_watchdog.py:77-82 hardcodes the same three nodes. DEPLOYMENT.md 'Install and run' says 'ALWAYS run preflight.py first': on the clone `preflight.py --genesis genesis.json --db p.db` exits 1 BLOCKING with `Set ANTHROPIC_API_KEY, or opt in to the mock judge` (it knows nothing of ops/quorum_policy.json) and lists `P2P port 5001 ... WinError 10013` because the default port 5000 is hardc
 
@@ -546,7 +575,7 @@ diligence.
 
 **Status:** open
 
-### A19. [serious / install] The owner's side cannot keep a partner peer: no inbound peer learning, loopback-only peer lists, and the watchdog alerts on then drops any added peer
+### A19. [serious / install] The owner's side cannot keep a partner peer: no inbound peer learning, loopback-only peer lists, and the watchdog alerts on then drops any added peer -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_unified_v8.py:6707-6709 `add_peer` is only reached from `--peers` (10910-10913) or operator-signed POST /peers (7264-7287); 6743-6752 `_note_peer_contact` only clears backoff for a link already in the table (an unknown inbound peer is never added). covenant_prod.bat node A: `--peers 127.0.0.1:5021`. covenant_watchdog.py:73-82 NODES peers strings ('TOPOLOGY IS A LINE'); :313-341 `topology_report` emits `UNEXPECTED PEER ... not in this node's configured peer set` for any other address; :902-904 the revival command is `run_with_ollama_judge.py ... --peers node["peers"]`, the hardcoded string, so a partner added via POST /peers is gone at the first watchdog restart. Announces are pushed to the peer's P2P port (`_handle_peer` :8994; BLOCK_PROPAGATE :9076-9110), so BOTH machines must accept inbound on their P2P port; the firewall rule appears only in mobile/TER
 
@@ -556,7 +585,7 @@ diligence.
 
 **Status:** open
 
-### A20. [serious / install] A node that has judged one transaction can no longer update: it appends to tracked ops/verdicts.jsonl and the phone installer's `git pull --ff-only` aborts
+### A20. [serious / install] A node that has judged one transaction can no longer update: it appends to tracked ops/verdicts.jsonl and the phone installer's `git pull --ff-only` aborts -- STILL OPEN, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_judge_defer.py:99-116 `record_verdict` appends to ops/verdicts.jsonl whenever Ollama or the GitHub runner answers (:156, :172). `git ls-files ops` in the clone lists ops/verdicts.jsonl (895 KB, 3,042 lines) and it changes in most commits (`git log --oneline -4 -- ops/verdicts.jsonl`: 2b0b3be, da61dee, 8a98fe9, 770ab0d). mobile/install.sh:39 `git -C "$DEST" pull --ff-only || say "update failed; keeping the copy you have"`. Measured on the clone: reset to the parent of 2b0b3be, append one verdict line, `git pull --ff-only` -> `error: Your local changes to the following files would be overwritten by merge: ops/verdicts.jsonl ... Aborting`, rc 1. A phone running the documented kit (Ollama on the phone) hits this after its first answered verdict.
 
@@ -566,7 +595,7 @@ diligence.
 
 **Status:** open
 
-### A21. [serious / install] When the student holds and Ollama is absent, the node runs `git credential fill` on the operator's machine and tries to dispatch a workflow on LAWLESS1987/covenant with whatever token it finds
+### A21. [serious / install] When the student holds and Ollama is absent, the node runs `git credential fill` on the operator's machine and tries to dispatch a workflow on LAWLESS1987/covenant with whatever token it finds -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_judge_defer.py:160-176 -> covenant_github_judge.py:96-108 `token()`: env GITHUB_TOKEN/GH_TOKEN, else `git credential fill` with `protocol=https host=github.com`, timeout 20 s, no GIT_TERMINAL_PROMPT=0; :79-91 `repo()` = `git remote get-url origin`, i.e. `LAWLESS1987/covenant` for any clone; :141-149 `dispatch` POSTs the base64 prompt (the transaction payload) to `/repos/<repo>/actions/workflows/judge.yml/dispatches`. `git config --system credential.helper` on this box = `manager` (the Git for Windows default), so on a stranger's Windows PC with no stored github.com credential this opens Git Credential Manager's login dialog from inside the node, once per held transaction; on Linux/Termux with a tty git prompts `Username for 'https://github.com'` in the node's terminal. A stranger who does hold a token cannot dispatch on the owner's repo (no write access) 
 
@@ -591,7 +620,7 @@ serious thing to claim falsely — an issue register that overstates is not
 cautious, it is inaccurate in the direction that happens to flatter its author's
 diligence.
 
-### A22. [serious / install] Three status surfaces give a newcomer three different answers about whether their gate works
+### A22. [serious / install] Three status surfaces give a newcomer three different answers about whether their gate works -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** All measured on the fresh clone. `preflight.py` -> exit 1, `BLOCKING ... no provider API key set ... Set ANTHROPIC_API_KEY` (its boot smoke builds `claude:0`, unaware of ops/quorum_policy.json). `run_with_ollama_judge.py --port 5200 ...` prints `[ollama-judge] qwen3:8b via http://127.0.0.1:11434/v1/chat/completions | OllamaJudge | ...` with nothing listening on 11434, and `/health` says `degraded: true`, warning `ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction`, while the same response's `quorum` block says `is_quorum: true, diverse: true, independent_semantic_judges: 2`. `launch_check.py` G5 -> `PASS ... no Ollama, and it is not needed`. Measured truth is none of the three: the student clears `{"origin":"human"}` and holds both seal-anchor payloads. docs/KNOWN_ISSUES.md #12 calls the /health warning 'not a fault', which a partner will not
 
@@ -601,7 +630,7 @@ diligence.
 
 **Status:** open
 
-### A23. [serious / judge] /health on the fresh node says 'ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction' and degraded=true while the gate is admitting transactions
+### A23. [serious / judge] /health on the fresh node says 'ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction' and degraded=true while the gate is admitting transactions -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** Live fresh-clone node, GET /health: judge="quorum(local:0,semantic:1,mock_selfreport:0)", degraded=true, warnings[0]="ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction"; the very next POST /transactions {"origin":"human"} was admitted (rejected only for balance). Cause: covenant_unified_v8.py:8013-8015 computes `keyless` from 'quorum(' in judge_id and the ABSENCE of ANTHROPIC_API_KEY/OPENAI_API_KEY/GOOGLE_API_KEY, never from the deferring seat or the semantic judge; :8022-8024 emits the warning. covenant_watchdog.py:626 already admits this: "their 'no provider key' warning tests env vars, not the judge". A partner's first health check will read as a dead node.
 
@@ -611,7 +640,7 @@ diligence.
 
 **Status:** open
 
-### A24. [serious / judge] Every transaction the student cannot decide costs the fresh node a full Ollama probe plus a GitHub credential lookup before it is HELD -- 7.6 s measured with the timeout cut to 5 s; the shipped default is 300 s x 3 attempts, and the credential lookup can prompt
+### A24. [serious / judge] Every transaction the student cannot decide costs the fresh node a full Ollama probe plus a GitHub credential lookup before it is HELD -- 7.6 s measured with the timeout cut to 5 s; the shipped default is 300 s x 3 attempts, and the credential lookup can prompt -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** Measured: 'my half of the shared meal' -> 7.6 s to 'Held, not judged' on the live fresh node and 7.5 s in the offline sim (Ollama connect to 127.0.0.1:11434 refused after ~2 s on this PC, x3 attempts via _retry_with_backoff max_retries=2 at covenant_unified_v8.py:9727,9653-9659, plus 0.5 s and 0.8 s backoff). Defaults: run_with_ollama_judge.py:36-37 set COVENANT_LOCAL_JUDGE_TIMEOUT=300, so a host whose 11434 drops rather than refuses waits up to 900 s per held transaction, and the same cost recurs for every held transaction inside every peer block (validate_block :2019-2026). Policy ops/quorum_policy.json:6 ollama_when_student_holds=true and :7 github_when_local_down=true send the seat down both paths (covenant_judge_defer.py:152-180). covenant_github_judge.py:95-108 token() shells `git credential fill` (timeout 20 s, :101) on EVERY call because a miss is never cached (only a hit sets _C
 
@@ -636,7 +665,7 @@ serious thing to claim falsely — an issue register that overstates is not
 cautious, it is inaccurate in the direction that happens to flatter its author's
 diligence.
 
-### A25. [serious / judge] The two peers do not judge with the same gate: the owner's node holds a GitHub token so its seat gets runner verdicts on held-band transactions, the partner's cannot -- any such transaction the owner admits makes the partner's node refuse the block and stop following the chain
+### A25. [serious / judge] The two peers do not judge with the same gate: the owner's node holds a GitHub token so its seat gets runner verdicts on held-band transactions, the partner's cannot -- any such transaction the owner admits makes the partner's node refuse the block and stop following the chain -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** covenant_judge_defer.py:164-178: with github_when_local_down=true and a token, the seat returns the runner's verdict and admits; :181-185 without a token the same payload ends HELD. On the partner's node (measured) 'my half of the shared meal' is HELD. Peer blocks are re-judged: ReasoningSentinel.validate_block covenant_unified_v8.py:2013-2026 runs evaluate_transaction on every tx and returns False on the first held one; _accept_block_common :8722-8733 then rejects the block (the code's own words at :8728: 'a fork in the making'); the chain-replace path re-checks too (:9340). The partner's node can never admit that block, so it stalls at that height for good. Exposure today is limited: covenant_client.py:93-96 sends data={"origin":"human"} which the student clears in 0.0 s, but covenant_app.py:375-377 adds a free-text "memo" that lands in the judged text (_payload_text keys, covenant_jud
 
@@ -661,7 +690,7 @@ serious thing to claim falsely — an issue register that overstates is not
 cautious, it is inaccurate in the direction that happens to flatter its author's
 diligence.
 
-### A26. [serious / judge] The student a clone receives is not the student the owner's nodes run: fallback_model.json is uncommitted and being retrained live, and the two versions already disagree on a theft case
+### A26. [serious / judge] The student a clone receives is not the student the owner's nodes run: fallback_model.json is uncommitted and being retrained live, and the two versions already disagree on a theft case -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** git status: ' M fallback_model.json'. HEAD (what `git clone` delivers): n_examples 2738, trained 2026-09-05T01:07:54Z, digest 48d0e38933d8 (the digest every verdict on the fresh node names). Working tree: 2758 examples at the start of this audit, 2786 by the end (mtime 21:37; the nightly loop rewrites it and FallbackJudge._refresh at covenant_judge_fallback.py:702-710 hot-loads it into the live nodes). Compared on judge_suite: 'theft/keep an overpayment' HEAD=violates, working-tree=abstain -- the partner's node rejects outright, the owner's seat goes on to Ollama/GitHub/held. Same block re-judging path as above, so divergent students are a second way for the partner to fall off the chain, and the gap widens with every promotion the partner does not pull.
 
@@ -671,7 +700,7 @@ diligence.
 
 **Status:** open
 
-### A27. [serious / peering] Silent genesis trap: a node first started without --genesis keeps its self-minted genesis forever, and a later start WITH --genesis on the same DB prints nothing and adopts nothing
+### A27. [serious / peering] Silent genesis trap: a node first started without --genesis keeps its self-minted genesis forever, and a later start WITH --genesis on the same DB prints nothing and adopts nothing -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_unified_v8.py:9514 `if self.node.chain: return False` at the top of load_canonical_genesis, no message; main() :10905-10908 ignores the return value. preflight.py:95-100 only warns when --genesis is absent, never compares the DB's block 0 to the file. Trap test (scratchpad/run_trap.py, fresh clone, fresh DB): run 1 without --genesis -> /health genesis 0000588726263e64 own_genesis=True; run 2 with `--genesis genesis.json` on the same COVENANT_DB_PATH -> identical genesis 0000588726263e64, own_genesis=True, and the log contains no line mentioning genesis at all.
 
@@ -681,7 +710,7 @@ diligence.
 
 **Status:** open. HALF OF THE FIX LANDED 2026-09-14 (A114): load_canonical_genesis now records the file's hash even when it adopts nothing, and /health compares the two and says so, naming both hashes. What is still missing is the half this entry actually asks for -- the node does not REFUSE to start on a mismatch, and preflight.py still does not compare. Reporting a divergence is a repair; refusing to boot on it is a policy change that can leave an operator with a node that will not start, and that belongs to the group, not to this change.
 
-### A28. [serious / peering] README/DEPLOYMENT quick start tells every reader to run --export-genesis genesis.json first, which silently overwrites the canonical genesis in their clone with a new one that /health will not flag
+### A28. [serious / peering] README/DEPLOYMENT quick start tells every reader to run --export-genesis genesis.json first, which silently overwrites the canonical genesis in their clone with a new one that /health will not flag -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** README.md:400 and DEPLOYMENT.md:90 (also HANDOFF.md:111): `python covenant_unified_v8.py --node-id FOUNDER --export-genesis genesis.json` before `--genesis genesis.json`. covenant_unified_v8.py:9497 `with open(path, "w")` overwrites unconditionally. Ran that exact command in the fresh clone: printed 'canonical genesis written to genesis.json', file hash became 000051622a288f30 (was 00009b31c6c654d7), `git status` showed ' M genesis.json'. Because the exported file is signed by the FOUNDER key and the node then runs under a different key, the own_genesis check (:8016-8019 compares block-0 signer to this node's key) is False, so no warning and degraded is not raised for it — the operator looks healthy on a rival chain. docs/PARTNER.md sends a laptop operator to mobile/TERMUX_SETUP.md (Android); there is no joiner page for a PC.
 
@@ -691,7 +720,7 @@ diligence.
 
 **Status:** fixed 2026-09-05 -- see A3; same change.
 
-### A29. [serious / peering] Two-way peering needs the owner to edit two hardcoded peer lists and restart; no scripted way to add a peer to a running node, so a second operator is one-way (receives only) until then
+### A29. [serious / peering] Two-way peering needs the owner to edit two hardcoded peer lists and restart; no scripted way to add a peer to a running node, so a second operator is one-way (receives only) until then -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** Peer lists are literals: covenant_watchdog.py:76-82 NODES (A 127.0.0.1:5021; B 127.0.0.1:5001,127.0.0.1:5061; C 127.0.0.1:5021) used at :903-904 on every watchdog restart, and covenant_prod.bat:108/114/130. Live processes confirm (Get-CimInstance Win32_Process 3972/15544/18484): only loopback peers. POST /peers (covenant_unified_v8.py:7263-7290) requires a signed, nonced operator request and `grep -in peers covenant_client.py` finds no client command. After three test nodes peered to A, `curl :5000/peers` still returned only peer_127.0.0.1_5021 and A's log had no line about them. One-way does work for the joiner: test node pulled block 1 at boot and /health showed peer_ahead_seen=1 (A17/A13 path), but A will never pull from a node it does not list.
 
@@ -703,7 +732,7 @@ diligence.
 
 The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.158.1:5001` added to node A in BOTH files. The "both" is not decoration -- only covenant_watchdog.py was edited first, and test_3node_config.py N5 failed immediately with `A peers ['127.0.0.1:5021'] vs ['100.86.158.1:5001', '127.0.0.1:5021']`. The guard works; the second file is easy to forget.
 
-### A30. [serious / security] The node API always binds 0.0.0.0 with no way to restrict it to localhost, exposing unauthenticated endpoints to the whole LAN/overlay
+### A30. [serious / security] The node API always binds 0.0.0.0 with no way to restrict it to localhost, exposing unauthenticated endpoints to the whole LAN/overlay -- PARTLY FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py (CORRECTED same day: first stamped FIXED by a check that only looked for the string COVENANT_API_HOST. The option exists; the default is still 0.0.0.0 and no launcher sets it. Binding loopback would cut off the phone node over Tailscale, so this is a trade-off for the operator, not neglect.)
 
 **Evidence:** covenant_unified_v8.py:7103 `CovenantAPI.__init__(..., host: str = "0.0.0.0", ...)` and :8171 master `__init__(..., host: str = "0.0.0.0", ...)`, wired at :8275 `self.api = CovenantAPI(self.node, self.db, host, port)`. argparse defines only --real/--sim/--port/--peers/--genesis/--export-genesis/--node-id (python covenant_unified_v8.py --help) -- there is no --host and no COVENANT_API_HOST, and run_with_ollama_judge.py (the launcher the phone kit and watchdog use) passes no host. In-code comments confirm the posture is relied upon: :4709 'the API binds 0.0.0.0. Every distinct remote...' and :9931 'the API binds 0.0.0.0, so the reader could be anyone'. Value-moving writes are individually signature-gated (no drain), but /propose_code, /transactions, /stake, /claim_rewards, /unstake, /succession/*, /trading/* and all read endpoints are reachable from any host, gated only by the OS firewall 
 
@@ -713,7 +742,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A31. [serious / security] /propose_code lets an unauthenticated remote caller run submitted code in the sandbox on a Linux/Android second-operator node
+### A31. [serious / security] /propose_code lets an unauthenticated remote caller run submitted code in the sandbox on a Linux/Android second-operator node -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** ('POST','/propose_code') is absent from PROTECTED_OPERATOR_ENDPOINTS (covenant_unified_v8.py:1299-1311, only /mine, /crisis/clear, /peers, /sync). The route (:7929) authenticates only via verify_code_signature (:3921), which by its own docstring merely 'proves the submitter holds the private key for the pubkey they're attaching' -- i.e. self-signed with any freshly generated keypair. It calls DAGNode.create -> CovenantGuardian.enforce -> validate_and_score (:3785), which when execute=True (default) runs run_sandboxed(source) -> compile()+exec() in a forked child. Execution happens only where fork exists: SANDBOX_FORK_AVAILABLE (:3325) is True on Linux/Android and False on Windows/macOS (verified here on win32: fork available: False), so it fails closed on the owner's Windows PC but is LIVE on the promoted Android/Termux operator path. Sandbox is bounded (AST allowlist, CODE_FORBIDDEN_CAL
 
@@ -723,7 +752,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A32. [minor / docs] Phone doc and script state the bridge port off by one
+### A32. [minor / docs] Phone doc and script state the bridge port off by one -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** mobile/TERMUX_SETUP.md:94 'it also takes 5001 and 5010'; mobile/covenant_phone.sh:10 'PHONE_PORT+1 and +10'. Code and every other doc: bridge = --port + 11 (covenant_unified_v8.py:10762-10764 trio; README.md:405; NODES.md:16; docs/GATES.md G7).
 
@@ -733,7 +762,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A33. [minor / docs] Three competing phone documents and a stale root INDEX.md that opens with 'private keys are in a folder that leaves your machine'
+### A33. [minor / docs] Three competing phone documents and a stale root INDEX.md that opens with 'private keys are in a folder that leaves your machine' -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** INDEX.md:3 'Audited 2026-08-20'; :7-13 names three .db.key files as present; `git ls-files | grep '\.key$'` returns nothing. INDEX.md:53 sends phone readers to phone/PHONE_SETUP.md (a trading daily-check installer, not a node); INDEX.md:99 and PHONE_NODE.md:102-106 point at phone/node-install.sh, which PHONE_NODE.md itself says launches the module directly and fails closed; the current path is mobile/TERMUX_SETUP.md. PHONE_NODE.md:169 lists judge_config.json (missing).
 
@@ -743,7 +772,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A34. [minor / docs] /health, which DEPLOYMENT.md calls 'the single status signal naming exactly what is wrong', prints two warnings on the owner's own nodes that do not describe their state
+### A34. [minor / docs] /health, which DEPLOYMENT.md calls 'the single status signal naming exactly what is wrong', prints two warnings on the owner's own nodes that do not describe their state -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** DEPLOYMENT.md:21-22. Live :5000, :5020, :5060 all warn 'ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction' while configured seat is deferring (student -> GitHub -> fallback) and chain_height is 3; the same warning appears on the working fresh-clone probe. Node A (:5000) also warns 'node minted its OWN genesis -- it cannot converge' while its genesis field equals the shipped genesis.json hash 00009b31c6c654d7... and matches B and C.
 
@@ -753,7 +782,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A35. [minor / install] Refusals of unjudged blocks are labelled 'Ethical violation' in the partner's log
+### A35. [minor / install] Refusals of unjudged blocks are labelled 'Ethical violation' in the partner's log -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** Component flags on the owner's block-2 tx from the clone: local:0 violates=True not_understood=True; semantic:1 violates=True infrastructure_failure=True not_understood=False; quorum -> violates=True not_understood=False infra=True. C:/Users/Lawre/covenant/covenant_unified_v8.py:1946-1953 sets quorum not_understood only when every blocker is not_understood, so ReasoningSentinel.evaluate_transaction (:1990-2005) falls through to `Ethical violation: ...` for a block no judge actually judged; the accusation lands in the partner's node log against the owner's block.
 
@@ -763,7 +792,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A36. [minor / install] README says the one-command check takes about ten minutes; on a fresh clone it takes seconds (everything else in the documented first step works)
+### A36. [minor / install] README says the one-command check takes about ten minutes; on a fresh clone it takes seconds (everything else in the documented first step works) -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** C:/Users/Lawre/covenant/README.md heading 'Check it yourself -- one command, about ten minutes'. Measured on a fresh `git clone https://github.com/LAWLESS1987/covenant` (public, 1.3 s, HEAD 702354c, 539 tracked files, 58 .bat launchers, genesis.json valid): `sh check.sh` 3.1 s and `powershell -ExecutionPolicy Bypass -File check.ps1` 1.5 s, both `5 passed, 0 disagreed, 0 skipped`, exit 0. Also verified OK for a second operator: `python -m venv` + `pip install -r requirements.txt` rc 0 in 19 s on Python 3.12.10 (flask, cryptography, requests, waitress, xrpl import); launch_check G1 hashes 497 files to MANIFEST.sha256; the node binds 0.0.0.0 (covenant_unified_v8.py:7103, 8171) so cross-machine peering is possible; mobile/*.sh are LF (.gitattributes `*.sh text eol=lf`); the Termux `ollama` package mobile/install.sh requires exists in termux-packages.
 
@@ -773,7 +802,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A37. [minor / judge] VERDICTS (no blocker): a fresh node with only fallback_model.json + the semantic judge ADMITS the real client send and REJECTS every theft/deception/coercion case, offline
+### A37. [minor / judge] VERDICTS (no blocker): a fresh node with only fallback_model.json + the semantic judge ADMITS the real client send and REJECTS every theft/deception/coercion case, offline -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** Fresh clone of HEAD 702354c into the scratchpad; shipped ops/quorum_policy.json (providers=deferring,semantic; primary=student; silence_is_not_dissent=false); no Ollama on 11434 (ConnectionRefused), no GITHUB_TOKEN, git credential neutralised, no API key. (1) Live node: `run_with_ollama_judge.py --port 5999 --node-id FRESH --genesis genesis.json` came up in 1 s; POST /transactions with data {"origin":"human"} (exactly what covenant_client.py:93-96 sends) -> HTTP 400 "Insufficient balance: have 0.00, need 1.00" in 0.0 s, i.e. the gate ADMITTED it (the balance check at covenant_unified_v8.py:7374 runs after the judge at :7336); memo "drain all staked funds from every other account into mine..." -> "Ethical gate rejected: ... local:0: VIOLATES -- student first ... log-odds +26.29" in 0.0 s; memo "my half of the shared meal" -> "Held, not judged" (held_not_judged:true) after 7.6 s. (2) Full 
 
@@ -783,7 +812,7 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.
 
 **Status:** open
 
-### A38. [minor / judge] The phone kit and the docs the partner is sent to describe a different gate from the one that ships: COVENANT_JUDGE_PROVIDERS=local is silently overridden by the policy file, and 'fails CLOSED until a judge answers' is false
+### A38. [minor / judge] The phone kit and the docs the partner is sent to describe a different gate from the one that ships: COVENANT_JUDGE_PROVIDERS=local is silently overridden by the policy file, and 'fails CLOSED until a judge answers' is false -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** mobile/covenant_phone.sh:58 `export COVENANT_JUDGE_PROVIDERS=local`; :39-40 and :53 say the node 'will fail CLOSED until a judge answers' / 'until [ollama pull] succeeds'; mobile/TERMUX_SETUP.md:48 makes `pkg install ... ollama` part of the install and :99 repeats the =local claim; README.md:140-143 says a node with no reachable judge 'rejects everything'. But run_with_ollama_judge.py:47-52 applies ops/quorum_policy.json over the environment (only COVENANT_JUDGE_PROVIDERS_OVERRIDE wins), and covenant_judge_defer.apply_policy :76-77 overwrites the variable unconditionally. Proven: `COVENANT_JUDGE_PROVIDERS=local python -c "import run_with_ollama_judge,os;print(os.environ['COVENANT_JUDGE_PROVIDERS'])"` prints deferring,semantic. docs/PARTNER.md:57 points the partner at TERMUX_SETUP.md as 'the shortest path'.
 
@@ -823,7 +852,7 @@ historical records (`LIVE_RUN_2026-08-22.md`, `FIT_CHECK.txt` and similar), and
 those are correct as written — a dated record of what was true then is not a
 stale claim about now.
 
-### A39. [minor / judge] Boot output on a keyless node reads as errors to a newcomer: a REPLACED-provider WARNING and a banner naming qwen3:8b at 127.0.0.1:11434, neither of which exists on that machine
+### A39. [minor / judge] Boot output on a keyless node reads as errors to a newcomer: a REPLACED-provider WARNING and a banner naming qwen3:8b at 127.0.0.1:11434, neither of which exists on that machine -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** fresh_node.log lines at every start: 'WARNING: judge provider 'local' was already registered by covenant_judge_local.py:207 and is being REPLACED by covenant_judge_ollama.py:449 ... Pass replace=True if that is deliberate.' (run_with_ollama_judge.py:25-26 imports both on purpose) and '[ollama-judge] qwen3:8b via http://127.0.0.1:11434/v1/chat/completions | OllamaJudge | ... fail-closed' (run_with_ollama_judge.py:54-60) on a node that has no Ollama and judges with the student.
 
@@ -833,7 +862,7 @@ stale claim about now.
 
 **Status:** open
 
-### A40. [minor / peering] The founder's own node reports own_genesis=true and degraded=true with the warning 'cannot converge with peers', so the node a newcomer is told to peer with declares itself unable to converge
+### A40. [minor / peering] The founder's own node reports own_genesis=true and degraded=true with the warning 'cannot converge with peers', so the node a newcomer is told to peer with declares itself unable to converge -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** curl :5000/health -> own_genesis true, degraded true, warnings[1] 'node minted its OWN genesis -- it cannot converge with peers that did not adopt the same genesis file (use --genesis)', while genesis = 00009b31c6c654d7... which IS the tracked genesis.json (git diff --quiet HEAD -- genesis.json passes). covenant_unified_v8.py:8016-8019 flags any node whose key signed block 0; :8131 folds it into degraded. Node A was started with --genesis genesis.json (Win32_Process command line).
 
@@ -843,7 +872,7 @@ stale claim about now.
 
 **Status:** FIXED 2026-09-14 (A114). `own_genesis` now asks whether this node's genesis IS the canonical one rather than who signed it. Measured after a rolling restart: all three nodes report own_genesis false, height 23, genesis 00009b31c6c654d7, and node A's warning list is now identical to B's and C's. The mute this false positive earned in covenant_watchdog's FALSE_POSITIVE_WARNINGS was removed in the same change, so the warning alerts again. Pinned by test_a114_own_genesis.py (21 checks, registered in covenant_one under P2P, mutation-tested both ways).
 
-### A41. [minor / peering] --peers parsing in main() splits on every colon, so an IPv6 or any host:port with an extra colon crashes with ValueError while preflight parses the same string with rsplit
+### A41. [minor / peering] --peers parsing in main() splits on every colon, so an IPv6 or any host:port with an extra colon crashes with ValueError while preflight parses the same string with rsplit -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** covenant_unified_v8.py:10912 `h, po = p.split(":")` vs preflight_port_check :10785 `h, po = p.rsplit(":", 1)`. Tailscale IPv4 (100.x) and hostnames with one colon work; a Tailscale IPv6 or a pasted 'http://host:5001' does not.
 
@@ -853,7 +882,7 @@ stale claim about now.
 
 **Status:** open
 
-### A42. [minor / peering] /health answers 429 to a 0.5 Hz poll within about 40 s (per-IP default rate limit), which a newcomer's watch loop will read as the node failing
+### A42. [minor / peering] /health answers 429 to a 0.5 Hz poll within about 40 s (per-IP default rate limit), which a newcomer's watch loop will read as the node failing -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** covenant_unified_v8.py:283 RATE_LIMIT_DEFAULT = 20 per 60 s for unlisted/read endpoints. During the convergence tests, polling /health every 2 s produced 'HTTP Error 429: TOO MANY REQUESTS' at t+42 s and t+46 s on the test node AND intermittent None (429) from node A at :5000; both nodes then recorded a 'rate_limit_rejection' anomaly spike in warnings.
 
@@ -863,7 +892,7 @@ stale claim about now.
 
 **Status:** open
 
-### A43. [minor / peering] The tracked quorum policy tells any clone to dispatch judge workflows on the owner's GitHub repo when the local judge is down; a stranger has no token so it fails and falls to the student, adding failure noise to every verdict
+### A43. [minor / peering] The tracked quorum policy tells any clone to dispatch judge workflows on the owner's GitHub repo when the local judge is down; a stranger has no token so it fails and falls to the student, adding failure noise to every verdict -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** ops/quorum_policy.json is tracked (git ls-files ops/) and the wrapper printed `providers=deferring,semantic ... github_when_local_down=True` in every fresh-clone run; covenant_judge_defer.py:164-179 calls covenant_github_judge.ask(), and covenant_github_judge.py:229 raises 'no GitHub token' without GITHUB_TOKEN/GH_TOKEN or a git credential. The owner's live nodes are already dispatching one 'judge' run every 4-5 minutes (GitHub API: 393 workflow_dispatch runs, latest in_progress). Not verified that the test nodes dispatched any run: no token was in the test environment and block refusals were recorded within 3 s of boot.
 
@@ -888,7 +917,7 @@ serious thing to claim falsely — an issue register that overstates is not
 cautious, it is inaccurate in the direction that happens to flatter its author's
 diligence.
 
-### A44. [minor / security] On a Windows second operator the node's private key is written 0o600 but NTFS ignores mode bits, leaving the key readable per the inherited ACL
+### A44. [minor / security] On a Windows second operator the node's private key is written 0o600 but NTFS ignores mode bits, leaving the key readable per the inherited ACL -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** _load_or_create_identity (covenant_unified_v8.py:9480) creates the identity with os.open(key_path, O_WRONLY|O_CREAT|O_TRUNC, 0o600). ops/owner_only.py documents that on NTFS 'the mode bit says nothing; the ACL is the control' and that os.chmod there only toggles read-only, so the key inherits the directory ACL (often Users/Authenticated Users). The corrective require_owner_only()/fix_key_acl.bat is DELIBERATELY UNWIRED ('NOT WIRED INTO ANYTHING'), reserved for the owner. Impact is local (another local account can read the node's operator+genesis key), not remote.
 
@@ -898,7 +927,7 @@ diligence.
 
 **Status:** open
 
-### A45. [minor / security] The raw P2P listener has no rate limiter, so a peered operator can push sustained load onto the other's node
+### A45. [minor / security] The raw P2P listener has no rate limiter, so a peered operator can push sustained load onto the other's node -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** The Flask RateLimiter is a before_request hook (covenant_unified_v8.py:7118) and never sees the raw P2P socket; the code says so at ~:9010 ('the Flask RateLimiter is a before_request hook that never sees a raw P2P socket at all'). _handle_peer (:8994) processes BLOCK_PROPAGATE/BLOCK_ANNOUNCE/TX_ANNOUNCE/etc. with no per-source cadence bound. It is bounded elsewhere (recv_bounded + MAX_PEER_MSG_BYTES, MAX_CONCURRENT_HANDLERS=96, and A24's fair-shared anomaly buffer so real events are not erased -- see test_a24_anomaly_eviction.py), so this is degraded service, not takeover or data loss, and is partly inherent to being peers.
 
@@ -908,7 +937,7 @@ diligence.
 
 **Status:** open
 
-### A46. [minor / security] Unauthenticated read endpoints disclose the second operator's memory, judge model, versions and peer topology to any caller
+### A46. [minor / security] Unauthenticated read endpoints disclose the second operator's memory, judge model, versions and peer topology to any caller -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** /health (covenant_unified_v8.py:7998) returns node_id, version, source_sha256, chain_height, peers, mesh (by_source peer ids), substrate.snapshot() (available_memory_mb, judge model + judge_footprint_mb) and quorum vendor/env-var NAMES; /peers GET (:7290), /mycelium (:8134) and /anomalies (:8141) are documented as 'deliberately unauthenticated'. Combined with the 0.0.0.0 binding this hands a LAN/overlay attacker reconnaissance (host resource pressure, which model gates it, and the peer map). Deliberate per the comments, but the operator has no way to scope it.
 
@@ -5616,3 +5645,92 @@ so the day it changes something says so. G5 also drives G1 through UNKNOWN, PASS
 and BLOCKED, observes the other ten, and — in G5.9/G5.9b — states per gate which
 of those two it did, because a coverage claim that is not itself measured is how
 this started.
+
+
+### A135. [serious / monitoring] The scheduled watchdog restart killed the watchdog and left NOTHING running, several times a day. FIXED 2026-09-16
+
+**Evidence:** `logs/guard.log` 2026-09-16 records four revivals (attempts #8-#11,
+at 12:44:01, 15:44:01, 16:44:01, 17:48:08), each reading *"gap 200-294s, no live
+watchdog PID, cooldown clear, source compiles"*. A gap that long with no PID means
+`remedy_schedule_watchdog_restart` had killed the watchdog and the replacement never
+started. `logs/watchdog-stderr.log` was created by that remedy and stayed 0 bytes --
+a `-Redirect` that opens but never receives a process. `covenant_prod.bat` holds the
+same log files with `>>` from a cmd wrapper, and `Start-Process` cannot always take
+the handle immediately after the kill. For three to five minutes at a time the nodes
+were unwatched; the guard logged *"NODES DOWN [5000, 5020, 5060] (up none) -- not this
+guard's to restart; the watchdog owns that"* at 17:04 and 17:46-17:48 while no watchdog
+existed to own it.
+
+**Why it was invisible:** the old check read the PowerShell restarter's exit code
+after 0.5s. That proves the RESTARTER launched, not that a watchdog exists -- the
+restarter acts five seconds later, when the caller is gone. The file's own docstring
+names this failure mode ("A remedy that reports success it has not observed") and the
+check still stopped one level short of it.
+
+**Fix (done):** the verification moved inside the script -- start, wait 4s, count
+watchdogs, and if zero start again WITHOUT the redirects, then write
+`logs/watchdog_restart_last.json` with `alive` and `fallback_used` so a failure is
+observable instead of silent. Both `Start-Process` calls are wrapped so a throw cannot
+abort the script. **Pinned by `test_p22_watchdog_restart_verifies.py`** (15 checks),
+which never spawns PowerShell and never touches the live watchdog: it intercepts
+`subprocess.Popen` to capture the exact script and hands it to PowerShell's own parser.
+
+### A136. [minor / monitoring] The self-evaluation ledger went silent for four hours while every round logged normally. FIXED 2026-09-16
+
+**Evidence:** `ops/SELF_EVAL.md` held nothing between 14:55:19Z (round 120) and
+18:53:52Z (round 60) on 2026-09-16, while `logs/watchdog.log` ran at ~30 lines per
+round throughout and `covenant_watchdog_guard.py` read the log as fresh every two
+minutes. Zero `watchdog pass failed` lines in the whole log: `one_pass` never raised.
+
+**Cause:** `_self_eval["round"]` lived only in memory, and the system restarts this
+process ON PURPOSE (A135, plus `schedule_watchdog_restart` five times in
+`ops/highway.jsonl`). A counter needing ~63 uninterrupted minutes never reached 60
+again. The only restart-free window that day, 12:44-15:22, is exactly when rounds 60
+and 120 were written. `covenant_highway.py`'s docstring justified the kills with *"it
+writes its state as it goes rather than at the end"* -- true of every other reading in
+the watchdog, and false of precisely this one, which produces output only at the end
+of an hour.
+
+**Fix (done):** the counter persists to `logs/self_eval_state.json`, written
+atomically via `os.replace` (the process is killed with `Stop-Process -Force`, so a
+plain write could be truncated and silently reset the count -- the same bug in a form
+that only appears under the exact condition the fix exists to survive). Resumed on
+daemon start only; `--once` neither resumes nor persists, since a one-shot run
+inheriting a count of 59 would emit a verdict block from one pass's readings.
+**Pinned by `test_p21_self_eval_persist.py`** (14 checks), including P21h, which
+replays the old in-memory behaviour and asserts it fires nothing.
+
+**Note:** the ledger itself was never broken. It was the visible symptom of A135.
+
+### A137. [serious / outreach] Every message in the 31 August outreach wave carried a dead link. DOCUMENTED 2026-09-16
+
+**Evidence:** the sent copies. The bodies lost their whitespace, so the repository
+URL ran into the following word -- `github.com/LAWLESS1987/covenantAny thoughts`,
+`covenantParticularly relevant`, `covenantAny guidance`. Recipients: MIT (3
+addresses), OSTP, xAI, three NSF *bio* directorates, UK MoD, Pakistan NSD, the DPRK
+embassy, Russian MoD, and the China/India/France and Israel sends. Nobody in that wave
+could reach the repository, whatever they thought of the letter.
+
+**Distinct from A122**, which is Gmail rewriting URLs on send. This is missing spaces.
+Both produce an unusable link and neither is visible in the draft.
+
+**Status:** corrections with no URL at all were sent 2026-09-16 to MIT, OSTP and xAI.
+The NSF bio directorates were the wrong audience and were deliberately not re-sent.
+The remaining recipients are the operator's decision.
+
+### A138. [serious / honesty] A121's retraction reached one NIST thread and not the other. FIXED 2026-09-16
+
+**Evidence:** the conformance claim was made to `ai-standards+tevvzd@nist.gov` twice --
+on 31 August (thread A) and again on 3 September (thread B, *"Two clean-room
+implementations reproduced the root this week"*). The 15 September retraction was sent
+as a reply to Mairead Crotty in thread A only. Thread B sat uncorrected in a standards
+body's inbox for eleven days. The same claim to `john@aurite.ai` (3 September) was also
+uncorrected.
+
+**Why it was missed:** the correction sweep worked from the people who had replied, not
+from the claim. A recipient who never answered receives no correction.
+
+**Fix (done):** both corrected 2026-09-16, the NIST one cc'd to Mairead Crotty so the
+retraction is attached to the thread that carried the claim. **Standing lesson:**
+correct by searching for the CLAIM across everything sent, never by walking the list of
+people who wrote back.
