@@ -10,6 +10,38 @@ inside the correction for the previous one.
 
 ---
 
+## The two passes: first for counting, end for formatting
+
+The operator's design, 2026-09-17. The nine rules below hang on it.
+
+**FIRST PASS — COUNT.** Before reasoning begins, establish the denominators by
+discovery, and write down the UNIT of each. This is where the token saving is:
+one `grep -rn "\.token()"` costs ~200 tokens and would have prevented two
+commits and a dozen turns of unwinding on 2026-09-16. Rework is the dominant
+cost of a session, and this is the cheapest insurance against it. You cannot
+conflate 26 with 90 if you counted both, with their units, before you started.
+
+**END PASS — CHECK THE FORMATTING AGAINST THE MEASUREMENT.** Not "run the regex
+again". The question is narrower and sharper: *does the report faithfully
+represent what was measured?* Three things are machine-checkable and are checked
+by `.claude/hooks/verify_citations.py` on every reply:
+
+- a cited `file:line` exists and has that many lines;
+- a quotation attributed to a cited file **appears in that file**;
+- a number in the reply that appears in **no tool result** is flagged as
+  derived — because that is where units errors live. `64` was `90 − 26` done in
+  prose, with operands counting different things, presented as a finding.
+
+**What the end pass cannot do.** Regex is an existence oracle: it answers "does
+this string appear?" Every error it catches is an existence error; every error
+it misses is a semantics error, where both numbers are real and the mistake is
+that they do not mean the same thing. A30 was *caused* by using regex as a
+measurement. So every pass must name the population it read and what it
+structurally cannot see — a check that hides its blind spot manufactures
+confidence about the part it never looked at.
+
+---
+
 ## 1. Find the data. Prose about data is not data.
 
 Before counting, measuring or verifying anything, ask **which artifact is the
