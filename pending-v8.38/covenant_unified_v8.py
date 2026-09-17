@@ -1438,6 +1438,45 @@ PROTECTED_OPERATOR_ENDPOINTS = {
     # peers a burst of block serving. It is a maintenance action, so it belongs
     # with the other maintenance actions.
     ("POST", "/sync"),
+    # A31 (second-operator audit, fixed 2026-09-16). /propose_code accepts
+    # submitted code and runs it in the sandbox. Unauthenticated, that is
+    # remote code execution for anyone who can reach the port -- and the API
+    # binds beyond loopback on a second operator's Linux/Android node, so
+    # "anyone" is the LAN or the overlay, not just this machine. A sandbox is
+    # a limit on what submitted code can do, never a licence for a stranger to
+    # submit it.
+    ("POST", "/propose_code"),
+    # CRITICAL, found 2026-09-16 by a back-door audit. /trading/report_profit
+    # CREDITS SPENDABLE BALANCE -- it is a mint. Its only authentication was a
+    # signature checked against `pool_pubkey`, WHICH THE CALLER SUPPLIES IN THE
+    # REQUEST BODY. Signing with a key you generated proves you hold the key
+    # you generated and nothing else, so anyone who could reach the port could
+    # mint an arbitrary amount to themselves and spend it through
+    # /transactions, whose only balance source is the same ledger. The node
+    # binds 0.0.0.0, so "anyone who could reach the port" meant the LAN and the
+    # tailnet, and the bridge was live (probed: 400, not 503).
+    #
+    # A signature verified against a key the request carries is not
+    # authentication. It is a checksum with extra steps.
+    #
+    # SCOPE, CORRECTED 2026-09-17 by the full sweep. This first protected all
+    # three /trading POST routes on the strength of a grep for
+    # "trading/report_profit" that found only PRE-v8.* archives -- a result
+    # proven for ONE member and asserted for the SET. test_e2e_gift.py failed
+    # eight checks and test_security_audit.py reported "recent gift
+    # authorization still works" as broken. Both were right.
+    #
+    # Only report_profit needs this, and the difference is the whole point:
+    # it MINTS spendable balance, so a signature verified against a key the
+    # caller supplies proves only that they generated a key. gift_node MOVES
+    # balance from pool_pubkey to a recipient and report_loss writes no balance
+    # at all; for those, signing with your own key proves ownership of the
+    # source, which is what a signed transfer is supposed to prove. They are
+    # self-authenticating by design and were never the hole.
+    #
+    # Protecting them anyway was not harmless caution -- it silently changed
+    # who may gift, and only the sweep said so.
+    ("POST", "/trading/report_profit"),
 }
 
 
@@ -10376,7 +10415,70 @@ class CovenantUnifiedMaster:
         operator credentials and its genesis mint are bound to, so losing it
         across a restart silently changes who the node IS.
         """
+        # A44 (second-operator audit, fixed 2026-09-16). The key was written
+        # 0o600 and that is meaningless on NTFS, where the ACL is the control:
+        # on a Windows second operator the file inherits access from its parent
+        # and is readable by principals the operator never chose. The mode bit
+        # said "owner only" and the filesystem disagreed.
+        #
+        # Fail-closed on LOAD, repair-then-verify on CREATE. Doing only the
+        # former would turn this into a new blocker -- a fresh install writes a
+        # key with an inherited ACL and would refuse to boot on its second
+        # start, which is worse than the finding. And if the checker itself
+        # cannot be imported the key is used anyway with a warning: a missing
+        # audit module must not be able to stop a node that is otherwise fine.
+        def _owner_only(path, just_created):
+            try:
+                _ops = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops")
+                if _ops not in sys.path:
+                    sys.path.insert(0, _ops)
+                import owner_only as _oo
+            except Exception as _e:                              # noqa: BLE001
+                print(f"WARNING: cannot check the ACL on {path} ({_e}). "
+                      f"On Windows the mode bits say nothing -- verify with "
+                      f"ops\\fix_key_acl.bat if this is a shared machine.")
+                return
+            try:
+                _oo.require_owner_only(path)
+                return
+            except Exception as _e:                              # noqa: BLE001
+                if not just_created:
+                    raise RuntimeError(
+                        f"node identity at {path} is not owner-only: {_e} "
+                        f"Refusing to load it. Anything that can read this key "
+                        f"can sign as this node and spend its balance.")
+            # Just created: try to lock it down, then insist.
+            try:
+                if os.name == "nt":
+                    # Neither subprocess nor covenant_quiet is imported at
+                    # module level in this file, so both are local. Prefer
+                    # covenant_quiet (no console window under a windowless
+                    # parent); fall back to subprocess if it is absent.
+                    import subprocess as _sp
+                    try:
+                        import covenant_quiet as _q
+                        _run = _q.run
+                    except Exception:                            # noqa: BLE001
+                        _run = _sp.run
+                    _me = os.environ.get("USERNAME") or ""
+                    _run(["icacls", path, "/inheritance:r",
+                          "/grant:r", f"{_me}:F"],
+                         capture_output=True, text=True, timeout=30)
+                else:
+                    os.chmod(path, 0o600)
+            except Exception as _e:                              # noqa: BLE001
+                # NOT `pass`. test_security_audit.py forbids a silent handler in
+                # the core and caught this one on 2026-09-17, the day it was
+                # written -- correctly: a repair that fails quietly leaves the
+                # operator believing the ACL was fixed. The verify below still
+                # decides the outcome; this only makes the attempt's failure
+                # visible, since it is the likeliest reason the verify refuses.
+                print(f"WARNING: could not tighten the ACL on {path} "
+                      f"({type(_e).__name__}: {_e}); verifying anyway")
+            _oo.require_owner_only(path)      # raises if the repair did not take
+
         if os.path.exists(key_path):
+            _owner_only(key_path, just_created=False)
             try:
                 with open(key_path, "rb") as fh:
                     return serialization.load_pem_private_key(fh.read(), password=None,
@@ -10397,8 +10499,10 @@ class CovenantUnifiedMaster:
         fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "wb") as fh:
             fh.write(pem)
-        print(f"node identity created at {key_path} (owner-only). Back this up: "
-              f"it is this node's operator credential and genesis mint key.")
+        _owner_only(key_path, just_created=True)
+        print(f"node identity created at {key_path} (owner-only, ACL verified). "
+              f"Back this up: it is this node's operator credential and "
+              f"genesis mint key.")
         return key
 
     def export_genesis(self, path: str, overwrite: bool = False):

@@ -34,6 +34,18 @@ def main():
     import covenant_unified_v8 as C
     eps = C.PROTECTED_OPERATOR_ENDPOINTS
     check("/propose_code is protected", ("POST", "/propose_code") in eps)
+    # SCOPE, and it is a real distinction rather than caution. report_profit
+    # MINTS spendable balance, so a signature checked against a caller-supplied
+    # key proves only that they generated a key. gift_node MOVES balance from
+    # that key and report_loss writes no balance, so signing with your own key
+    # proves ownership of the source -- which is what a signed transfer is for.
+    # Protecting all three on 2026-09-17 broke test_e2e_gift (8 checks) and
+    # test_security_audit's "recent gift authorization still works". Over-wide
+    # protection is not free caution: it silently changed who may gift.
+    check("gift_node is NOT operator-gated -- it moves, it does not mint",
+          ("POST", "/trading/gift_node") not in eps)
+    check("report_loss is NOT operator-gated -- it writes no balance",
+          ("POST", "/trading/report_loss") not in eps)
     check("the other maintenance endpoints are still protected",
           all(e in eps for e in [("POST", "/mine"), ("POST", "/peers"),
                                  ("POST", "/sync"), ("POST", "/crisis/clear")]))

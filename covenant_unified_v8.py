@@ -1459,12 +1459,24 @@ PROTECTED_OPERATOR_ENDPOINTS = {
     # A signature verified against a key the request carries is not
     # authentication. It is a checksum with extra steps.
     #
-    # Nothing calls these over HTTP -- the only references are in the
-    # PRE-v8.29/30/31 archives -- so requiring an operator signature costs
-    # nothing and closes it. /trading/net_pnl is a GET and is left open.
+    # SCOPE, CORRECTED 2026-09-17 by the full sweep. This first protected all
+    # three /trading POST routes on the strength of a grep for
+    # "trading/report_profit" that found only PRE-v8.* archives -- a result
+    # proven for ONE member and asserted for the SET. test_e2e_gift.py failed
+    # eight checks and test_security_audit.py reported "recent gift
+    # authorization still works" as broken. Both were right.
+    #
+    # Only report_profit needs this, and the difference is the whole point:
+    # it MINTS spendable balance, so a signature verified against a key the
+    # caller supplies proves only that they generated a key. gift_node MOVES
+    # balance from pool_pubkey to a recipient and report_loss writes no balance
+    # at all; for those, signing with your own key proves ownership of the
+    # source, which is what a signed transfer is supposed to prove. They are
+    # self-authenticating by design and were never the hole.
+    #
+    # Protecting them anyway was not harmless caution -- it silently changed
+    # who may gift, and only the sweep said so.
     ("POST", "/trading/report_profit"),
-    ("POST", "/trading/report_loss"),
-    ("POST", "/trading/gift_node"),
 }
 
 
@@ -10454,8 +10466,15 @@ class CovenantUnifiedMaster:
                          capture_output=True, text=True, timeout=30)
                 else:
                     os.chmod(path, 0o600)
-            except Exception:                                    # noqa: BLE001
-                pass
+            except Exception as _e:                              # noqa: BLE001
+                # NOT `pass`. test_security_audit.py forbids a silent handler in
+                # the core and caught this one on 2026-09-17, the day it was
+                # written -- correctly: a repair that fails quietly leaves the
+                # operator believing the ACL was fixed. The verify below still
+                # decides the outcome; this only makes the attempt's failure
+                # visible, since it is the likeliest reason the verify refuses.
+                print(f"WARNING: could not tighten the ACL on {path} "
+                      f"({type(_e).__name__}: {_e}); verifying anyway")
             _oo.require_owner_only(path)      # raises if the repair did not take
 
         if os.path.exists(key_path):
