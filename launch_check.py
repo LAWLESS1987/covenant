@@ -93,6 +93,42 @@ def node_health(port, timeout=4.0):
     return http_json("http://127.0.0.1:%d/health" % port, timeout=timeout)[0]
 
 
+def node_answer(port, timeout=2.0, attempts=3, delay=1.5):
+    """("ours", obj) | ("rate_limited", None) | ("silent", None).
+
+    A RATE LIMIT IS AN ANSWER, AND THIS IS THE LESSON THIS FILE HAD NOT
+    LEARNED. test_a115_rate_limited_is_not_down.py exists because the watchdog
+    once read an all-429 mesh as "the chain is not running" and restarted
+    healthy nodes over it. covenant_highway.detect_node_down learned it too --
+    it separates `down` (no answer) from `answered_with_error` and returns
+    UNKNOWN for the second, because unknown is not a finding.
+
+    G7 never learned it. http_json turns a 429 into None, node_health passes
+    the None through, and G7 concluded the port was "held by something that is
+    NOT a covenant node" -- printing DO NOT LAUNCH over a healthy mesh that was
+    merely protecting itself from the sweep that had just hammered it.
+    Measured 2026-09-17: node A on :5000 answering {"message":"Rate limit
+    exceeded"} while holding 5000/5001/5011, its own correct triple.
+
+    So: RETRY first, because a rate limit is transient and a gate that probes
+    once and gives up has chosen a guess over a measurement. Only if it still
+    will not answer is the result reported as what it is -- something is
+    serving HTTP here and would not confirm itself, which is UNKNOWN and not
+    an accusation.
+    """
+    last = None
+    for i in range(max(1, attempts)):
+        obj, why = http_json("http://127.0.0.1:%d/health" % port, timeout=timeout)
+        if obj is not None:
+            return "ours", obj
+        last = why or ""
+        if "HTTPError" not in last:
+            return "silent", None        # nothing is serving HTTP at all
+        if i + 1 < attempts:
+            time.sleep(delay)
+    return "rate_limited", None
+
+
 def port_busy(port):
     s = socket.socket()
     s.settimeout(0.6)
@@ -369,8 +405,23 @@ def g7():
     # node answers /health and a port is taken, something ELSE has it, and the
     # node that wants it will fail preflight and exit -- visibly, since v8.15,
     # but only in a console log nobody is reading.
-    ours = {nid for nid, port in NODES if node_health(port, 2.0) is not None}
-    foreign = {nid: b for nid, b in live.items() if nid not in ours}
+    answers = {nid: node_answer(port)[0] for nid, port in NODES}
+    ours = {nid for nid, s in answers.items() if s == "ours"}
+    # A port that answered HTTP but would not confirm itself is UNKNOWN, never
+    # foreign. Accusing it is how a gate turns a node defending itself into
+    # DO NOT LAUNCH (A115's lesson, arriving here late).
+    unsure = {nid: b for nid, b in live.items()
+              if nid not in ours and answers.get(nid) == "rate_limited"}
+    foreign = {nid: b for nid, b in live.items()
+               if nid not in ours and answers.get(nid) != "rate_limited"}
+    if not foreign and unsure:
+        return R("G7", g7._title, UNKNOWN,
+                 "port(s) held by something that ANSWERS HTTP but would not "
+                 "confirm itself after %d tries: %s. A rate limit looks exactly "
+                 "like this, and a rate-limited node is not a foreign one."
+                 % (3, "; ".join("%s %s" % (k, v) for k, v in sorted(unsure.items()))),
+                 "Re-run when the node is idle; if it still will not answer, "
+                 "AD_DIAG_PORTS.bat shows what holds the ports.")
     if foreign:
         return R("G7", g7._title, BLOCKED,
                  "port(s) held by something that is NOT a covenant node: " +
@@ -467,7 +518,15 @@ def g9():
             break
     rows, unknown, mismatch = [], [], []
     for nid, port in NODES:
+        # RETRY THROUGH A RATE LIMIT before calling a node unreachable. The
+        # UNKNOWN verdict below is right and stays -- a node that cannot be
+        # reached is never OK. But one probe against a node the sweep has just
+        # hammered measures the rate limiter, not the node. 2026-09-17: all
+        # three read UNREACHABLE while all three were alive and answering 429.
+        # Measuring properly is not the same as lowering the bar.
         h = node_health(port)
+        if h is None and node_answer(port)[0] == "ours":
+            h = node_health(port)
         if h is None:
             unknown.append(nid)
             rows.append("%s UNREACHABLE" % nid)

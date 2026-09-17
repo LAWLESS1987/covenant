@@ -326,6 +326,45 @@ def main():
         srvR.shutdown()
         srvS.shutdown()
 
+    # ---- A115.13: the launch gate had never learned this suite's lesson ----
+    #
+    # Found 2026-09-17 by a full sweep. G7 ("port arithmetic") asked
+    # node_health(), which routes through http_json(), which turns a 429 into
+    # None -- and G7 read None as "port held by something that is NOT a
+    # covenant node", printing DO NOT LAUNCH over a healthy mesh. Measured:
+    # node A answering {"message":"Rate limit exceeded"} while holding
+    # 5000/5001/5011, its own correct triple, right after the sweep hammered
+    # it. The watchdog learned this in A115 and covenant_highway learned it in
+    # detect_node_down; the launch gate never did.
+    #
+    # Driven all three ways, because a gate that has only ever passed has never
+    # been observed. The gate is NOT weakened: a genuinely silent holder still
+    # BLOCKS. Only the accusation against a node defending itself is gone.
+    try:
+        import launch_check as LC
+        real_answer = LC.node_answer
+        seen = {}
+        for forced, want in (("rate_limited", LC.UNKNOWN),
+                             ("silent", LC.BLOCKED),
+                             ("ours", LC.PASS)):
+            LC.node_answer = lambda _p, _f=forced, **_k: (_f, None)
+            LC.results.clear()
+            LC.g7()
+            seen[forced] = LC.results[0]["state"] if LC.results else None
+        LC.node_answer = real_answer
+        LC.results.clear()
+        check("A115.13a a RATE-LIMITED node is UNKNOWN to G7, never foreign -- "
+              "the launch gate no longer says DO NOT LAUNCH over a node that "
+              "is merely protecting itself",
+              seen.get("rate_limited") == LC.UNKNOWN, str(seen))
+        check("A115.13b a SILENT port still BLOCKS -- the gate keeps the "
+              "purpose it was written for, and this fix took nothing from it",
+              seen.get("silent") == LC.BLOCKED, str(seen))
+        check("A115.13c and a node that answers is PASS",
+              seen.get("ours") == LC.PASS, str(seen))
+    except ImportError as _e:                                     # noqa: BLE001
+        check("A115.13 launch_check importable", False, str(_e))
+
     passed = sum(1 for _, o, _ in RESULTS if o)
     failed = sum(1 for _, o, _ in RESULTS if not o)
     print("")
