@@ -105,6 +105,35 @@ def repo():
         return "LAWLESS1987/covenant"
 
 
+_CREDENTIAL_STORE_OK = {"allowed": False, "why": ""}
+
+
+def allow_credential_store(why):
+    """Opt IN to reading this machine's git credential store, for this process
+    only, with a reason that gets logged.
+
+    WHY THIS EXISTS, and why it is not just the env var. A21 is about a NODE --
+    a long-running gate on a stranger's machine -- reaching into their
+    credential store unasked and spending their token. That must stay shut.
+
+    But the same token() serves a second, different use: the TEACHER.
+    ops/quorum_policy.json says it plainly -- the runner generates 1583 of the
+    3487 rows the students learn from, and "cutting the second as well would
+    stop the students learning at all, since Ollama is gone". The first version
+    of the A21 fix (2026-09-16, same day) gated BOTH, and nothing in the tree
+    sets COVENANT_GITHUB_JUDGE, so it silently killed corpus generation. Caught
+    by asking what the teacher actually depends on, after the fix was pushed.
+
+    A distiller run is an operator starting a tool by hand or by their own
+    scheduled task. That IS the consent the node path lacks. And repo() derives
+    the target from `git remote get-url origin`, so a second operator who runs
+    the distiller dispatches on THEIR fork with THEIR token -- their machine,
+    their repository, their corpus. That is a different act from a node quietly
+    spending their credentials on somebody else's repo."""
+    _CREDENTIAL_STORE_OK["allowed"] = True
+    _CREDENTIAL_STORE_OK["why"] = str(why)
+
+
 def token():
     t = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if t:
@@ -118,7 +147,8 @@ def token():
     # held, and dispatched a workflow on LAWLESS1987/covenant with it. A node
     # someone cloned must never spend their credentials on the owner's repo
     # without being told to. Opt in with COVENANT_GITHUB_JUDGE=1.
-    if os.environ.get("COVENANT_GITHUB_JUDGE", "").strip() not in ("1", "true", "yes"):
+    if (os.environ.get("COVENANT_GITHUB_JUDGE", "").strip()
+            not in ("1", "true", "yes")) and not _CREDENTIAL_STORE_OK["allowed"]:
         return ""
     try:
         env = dict(os.environ)

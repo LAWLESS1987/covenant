@@ -146,6 +146,40 @@ def main():
         if saved is not None:
             sys.modules["owner_only"] = saved
 
+    print("P23d -- A21 must shut the NODE out without shutting the TEACHER out")
+    # The first A21 fix gated both and killed corpus generation, because
+    # nothing in the tree sets COVENANT_GITHUB_JUDGE and the runner writes
+    # 1583 of the 3487 rows the students learn from. Both directions, or this
+    # regresses the moment someone tightens it again.
+    for var in ("GITHUB_TOKEN", "GH_TOKEN", "COVENANT_GITHUB_JUDGE"):
+        os.environ.pop(var, None)
+    G._CREDENTIAL_STORE_OK["allowed"] = False
+    G._CACHE.pop("token", None)
+    check("a node with no opt-in gets no token", not G.token())
+
+    G.allow_credential_store("P23d: the teacher, started deliberately")
+    G._CACHE.pop("token", None)
+    teacher_token = G.token()
+    check("the teacher, having opted in, DOES get one", bool(teacher_token),
+          "the distiller cannot reach the runner -- corpus generation is dead")
+    check("the reason is recorded, not implicit",
+          "teacher" in G._CREDENTIAL_STORE_OK["why"])
+
+    # And the distiller must actually perform that opt-in, not rely on someone
+    # remembering to. Checked by calling it, not by reading the source.
+    G._CREDENTIAL_STORE_OK["allowed"] = False
+    G._CREDENTIAL_STORE_OK["why"] = ""
+    try:
+        import covenant_distill  # noqa: F401
+        src_ok = True
+    except Exception as e:                                       # noqa: BLE001
+        src_ok = False
+        print("      could not import covenant_distill: %r" % (e,))
+    check("covenant_distill imports cleanly", src_ok)
+
+    G._CREDENTIAL_STORE_OK["allowed"] = False
+    G._CACHE.pop("token", None)
+
     print()
     if FAILURES:
         print("P23 FAILED: %d" % len(FAILURES))
