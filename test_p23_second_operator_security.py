@@ -63,7 +63,11 @@ def main():
     real_run = Q.run
 
     def spy(cmd, **kw):
-        calls.append(cmd)
+        # Record the KWARGS too, not just the command. The env handed to the
+        # credential helper is the thing under test, and reading it here is a
+        # behavioural check; grepping the source for "GIT_TERMINAL_PROMPT" is
+        # not (A74, and G3 counted it).
+        calls.append((cmd, kw))
         raise RuntimeError("test: the credential helper must not be reached")
 
     Q.run = spy
@@ -90,17 +94,23 @@ def main():
         G.token()
         check("with opt-in -> the credential helper IS reached", bool(calls),
               "calls=%r" % (calls,))
-        check("the helper is told not to prompt",
-              True)      # env is set inside token(); asserted by inspection below
+        # BEHAVIOURAL, replacing two fake guards on this same property
+        # (2026-09-17). It used to read `check(..., True)` -- a check that
+        # cannot fail -- with a comment deferring to a second check that
+        # grepped the source for the string. G3 counted that source-text
+        # assertion and turned the 15-minute green check RED; it was right on
+        # both. What matters is the env actually handed to the subprocess, so
+        # read it from the intercepted call.
+        env = (calls[0][1].get("env") or {}) if calls else {}
+        check("the helper is told not to prompt (env passed to the call)",
+              env.get("GIT_TERMINAL_PROMPT") == "0",
+              "GIT_TERMINAL_PROMPT=%r" % (env.get("GIT_TERMINAL_PROMPT"),))
+        check("the call still inherits a real environment, not a bare dict",
+              len(env) > 5, "env had %d keys" % len(env))
     finally:
         Q.run = real_run
         os.environ.pop("COVENANT_GITHUB_JUDGE", None)
         G._CACHE.pop("token", None)
-
-    src = open(os.path.join(HERE, "covenant_github_judge.py"),
-               encoding="utf-8").read()
-    check("GIT_TERMINAL_PROMPT=0 is set on the helper call",
-          'GIT_TERMINAL_PROMPT' in src and '"0"' in src)
 
     print("P23c -- A44: the key is refused when the ACL is wrong")
     load = C.CovenantUnifiedMaster._load_or_create_identity
