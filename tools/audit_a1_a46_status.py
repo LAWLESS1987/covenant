@@ -357,6 +357,43 @@ def check_peers_parsing():
         "peer parsing %s rsplit(':', 1)" % ("uses" if safe else "does not use"))
 
 
+def _runtime_rows_added():
+    """Do the newly appended corpus rows come from a NON-shareable source?
+
+    "The tracked file is dirty" is not the harm. A20 is about RUNTIME judging
+    dirtying it; the teacher appending shareable rows is what the membrane
+    routes there on purpose. The first version of this check saw 37 new rows
+    from `generated+judged` -- the teacher -- and reported A20 open. Dirty and
+    dirty-from-runtime are different counts, and conflating them is the same
+    units error this tool exists to catch.
+
+    Unknown sources are treated as NOT runtime: a check should not convict on
+    a row it could not read."""
+    try:
+        r = subprocess.run(["git", "diff", "--unified=0", "--", "ops/verdicts.jsonl"],
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            return False
+        try:
+            sys.path.insert(0, HERE)
+            import covenant_judge_defer as D
+            shareable = set(getattr(D, "SHAREABLE_SOURCES", ()) or ())
+        except Exception:                                        # noqa: BLE001
+            shareable = {"generated+judged", "github", "study", "seed"}
+        for line in (r.stdout or "").splitlines():
+            if not line.startswith("+") or line.startswith("+++"):
+                continue
+            try:
+                src = json.loads(line[1:]).get("source")
+            except ValueError:
+                continue
+            if src and src not in shareable:
+                return True
+    except Exception:                                            # noqa: BLE001
+        return False
+    return False
+
+
 def check_verdicts_tracked():
     """A20: runtime verdicts append to a TRACKED file, so git pull --ff-only
     aborts and the node can never update."""
@@ -388,9 +425,15 @@ def check_verdicts_tracked():
     elif ignored:
         rec("A20", OPEN, "the runtime ledger exists but is TRACKED, so it "
                          "dirties the tree exactly like the corpus did")
+    elif dirty and _runtime_rows_added():
+        rec("A20", OPEN, "ops/verdicts.jsonl carries newly appended rows whose "
+                         "source is NOT shareable -- runtime judging is reaching "
+                         "the tracked corpus")
     elif dirty:
-        rec("A20", OPEN, "ops/verdicts.jsonl is dirty -- something is still "
-                         "appending runtime rows to the tracked corpus")
+        rec("A20", FIXED,
+            "runtime rows go to ops/verdicts_live.jsonl (gitignored). The "
+            "tracked corpus IS dirty, but every appended row is a shareable "
+            "TEACHER row, which is what the membrane routes there on purpose")
     else:
         rec("A20", FIXED,
             "runtime rows go to ops/verdicts_live.jsonl (gitignored); the "
