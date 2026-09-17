@@ -21,15 +21,21 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 TOOL = os.path.join(HERE, "tools", "corpus_reconcile.py")
 FAILURES = []
+PASSED = [0]
 
 
 def check(label, ok, detail=""):
     print("  %-58s %s%s" % (label, "OK" if ok else "*** FAIL ***",
                             ("  " + detail) if detail and not ok else ""))
-    if not ok:
+    if ok:
+        PASSED[0] += 1
+    else:
         FAILURES.append(label)
 
 
+# The final line must not read "<digits> PASSED": covenant_one parses a
+# tally out of it, and "P21 PASSED" was recorded as 21 checks when the
+# suite runs 16. P21-P24 inflated the sweep by ~38 checks that way.
 def main():
     if not os.path.isfile(TOOL):
         print("P24 FAILED: tools/corpus_reconcile.py is missing")
@@ -50,7 +56,12 @@ def main():
         check("absent private/ is reported as a skip, not an error",
               "NOT AVAILABLE HERE" in text or out.returncode == 0)
         print()
-        print("P24 PASSED (reduced)" if not FAILURES else "P24 FAILED")
+        # An explicit tally, in the shape the runner parses, on BOTH paths.
+        # Without it the staged run reported "NO RESULT (no tally line)", which
+        # is indistinguishable from a suite that crashed.
+        print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
+        print("P24 result: PASSED (reduced: private/ absent)" if not FAILURES
+              else "P24 result: FAILED")
         return 1 if FAILURES else 0
 
     print("\nP24b -- catalogues are DISCOVERED, not listed from memory")
@@ -98,12 +109,13 @@ def main():
           "120 on X" in text)
 
     print()
+    print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
-        print("P24 FAILED: %d" % len(FAILURES))
+        print("P24 result: FAILED (%d)" % len(FAILURES))
         for f in FAILURES:
             print("  - %s" % f)
         return 1
-    print("P24 PASSED")
+    print("P24 result: PASSED")
     return 0
 
 

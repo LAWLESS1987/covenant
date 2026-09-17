@@ -28,12 +28,15 @@ sys.path.insert(0, HERE)
 import covenant_highway as H  # noqa: E402
 
 FAILURES = []
+PASSED = [0]
 
 
 def check(label, ok, detail=""):
     print("  %-62s %s%s" % (label, "OK" if ok else "*** FAIL ***",
                             ("  " + detail) if detail and not ok else ""))
-    if not ok:
+    if ok:
+        PASSED[0] += 1
+    else:
         FAILURES.append(label)
 
 
@@ -50,6 +53,9 @@ class FakePopen(object):
         return None                       # still running -> remedy reports OK
 
 
+# The final line must not read "<digits> PASSED": covenant_one parses a
+# tally out of it, and "P21 PASSED" was recorded as 21 checks when the
+# suite runs 16. P21-P24 inflated the sweep by ~38 checks that way.
 def main():
     print("P22a -- dry run promises, and spawns nothing")
     FakePopen.captured = None
@@ -119,12 +125,13 @@ def main():
         check("parses with 0 syntax errors", False, "could not run parser: %r" % (e,))
 
     print()
+    print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
-        print("P22 FAILED: %d" % len(FAILURES))
+        print("P22 result: FAILED (%d)" % len(FAILURES))
         for f in FAILURES:
             print("  - %s" % f)
         return 1
-    print("P22 PASSED")
+    print("P22 result: PASSED")
     return 0
 
 

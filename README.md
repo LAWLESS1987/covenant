@@ -372,7 +372,7 @@ a reader deciding whether to trust this deserves both halves.
 **This paragraph deliberately quotes no counts.** It used to, and every one of
 them rotted: it said "86 suites, 2,524 checks" while the header said 96 and <!--HISTORICAL-->
 2,742, and "95 test files on disk" while there were 133. `readme_totals.py`
-updates the two lines marked `<!--TOTALS-->` from a real transcript, and it
+updates the two marked total lines from a real transcript, and it
 cannot update prose that restates the same numbers without the marker. A figure
 maintained in one place and copied into another is not documentation, it is a
 second source that drifts — and on 2026-09-17 this README was misquoting its own

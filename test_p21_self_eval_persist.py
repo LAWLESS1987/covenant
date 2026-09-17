@@ -24,12 +24,15 @@ sys.path.insert(0, HERE)
 import covenant_watchdog as W  # noqa: E402
 
 FAILURES = []
+PASSED = [0]
 
 
 def check(label, ok, detail=""):
     print("  %-58s %s%s" % (label, "OK" if ok else "*** FAIL ***",
                             ("  " + detail) if detail and not ok else ""))
-    if not ok:
+    if ok:
+        PASSED[0] += 1
+    else:
         FAILURES.append(label)
 
 
@@ -39,6 +42,9 @@ def with_state(path):
     W._self_eval["persist"] = True
 
 
+# The final line must not read "<digits> PASSED": covenant_one parses a
+# tally out of it, and "P21 PASSED" was recorded as 21 checks when the
+# suite runs 16. P21-P24 inflated the sweep by ~38 checks that way.
 def main():
     tmp = tempfile.mkdtemp()
     state = os.path.join(tmp, "logs", "self_eval_state.json")
@@ -122,12 +128,13 @@ def main():
           fired_old == [])
 
     print()
+    print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
-        print("P21 FAILED: %d" % len(FAILURES))
+        print("P21 result: FAILED (%d)" % len(FAILURES))
         for f in FAILURES:
             print("  - %s" % f)
         return 1
-    print("P21 PASSED")
+    print("P21 result: PASSED")
     return 0
 
 

@@ -20,15 +20,21 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "ops"))
 
 FAILURES = []
+PASSED = [0]
 
 
 def check(label, ok, detail=""):
     print("  %-58s %s%s" % (label, "OK" if ok else "*** FAIL ***",
                             ("  " + detail) if detail and not ok else ""))
-    if not ok:
+    if ok:
+        PASSED[0] += 1
+    else:
         FAILURES.append(label)
 
 
+# The final line must not read "<digits> PASSED": covenant_one parses a
+# tally out of it, and "P21 PASSED" was recorded as 21 checks when the
+# suite runs 16. P21-P24 inflated the sweep by ~38 checks that way.
 def main():
     print("P23a -- A31: /propose_code needs an operator signature")
     import covenant_unified_v8 as C
@@ -193,12 +199,13 @@ def main():
     G._CACHE.pop("token", None)
 
     print()
+    print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
-        print("P23 FAILED: %d" % len(FAILURES))
+        print("P23 result: FAILED (%d)" % len(FAILURES))
         for f in FAILURES:
             print("  - %s" % f)
         return 1
-    print("P23 PASSED")
+    print("P23 result: PASSED")
     return 0
 
 

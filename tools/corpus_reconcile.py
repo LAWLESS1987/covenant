@@ -142,6 +142,18 @@ def load(path):
 def main():
     print("CORPUS RECONCILIATION -- counts from catalogues, claims from prose")
     print("=" * 74)
+    # The hypotheses print BEFORE anything can return early. They used to print
+    # only on the path where catalogues exist, so in covenant_one's staged copy
+    # -- which has no private/ -- this tool skipped out silently and P24's
+    # "prints its hypotheses" failed. A tool that states its method only when
+    # it has data is stating it exactly when it is least needed.
+    print("H1 prose counts are derivable from the catalogues")
+    print("H2 FILES and POSTS are different units")
+    print("H3 an X status_id is a snowflake, so each row carries its own date")
+    print("H4 Facebook ids are NOT snowflakes")
+    print("H5 enumeration by discovery finds what a hardcoded list misses")
+    print("H6 transcripts on disk and catalogue rows are independent counts")
+    print("=" * 74)
 
     present, absent = [], []
     for label, path, kind in CATALOGUES:
