@@ -106,6 +106,14 @@ A grep hit is a pointer, never a citation. `grep -o` strips the filename, so
 text that looks like `path:N:` inside a match is content, not provenance. A
 truncated match is not a fact — open the file rather than completing it.
 
+**After editing a file, its old text is no longer what the file says.** Three
+times on 2026-09-17 I replaced a passage and then, in the same breath, quoted
+the passage I had just deleted and attributed it to the file. The hook caught
+all three, because the quotation was no longer in it. Describing a change means
+saying what it *said* — in a sentence that does not cite the file as its source,
+or not in quotation marks at all. The most recent version of a file you edited
+is the one you have least recently read.
+
 A `Stop` hook (`.claude/hooks/verify_citations.py`) enforces this on `file:line`
 claims. It cannot enforce the rest; that is what this file is for.
 
