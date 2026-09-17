@@ -455,9 +455,14 @@ def check_fallback_model_committed():
 def check_github_rung():
     """A21 / A43: the node runs `git credential fill` and dispatches on the
     owner's repo when the local judge is down."""
-    pol = read("ops/quorum_policy.json")
+    # A43 is about what a CLONE receives. ops/quorum_policy.json is gitignored
+    # (.gitignore:264), so reading it answered a question about this machine and
+    # reported it as "the tracked policy" -- which no second operator ever gets.
+    # The shipped file is ops/quorum_policy.example.json. Found 2026-09-17 when
+    # git refused to add the local one; the refusal was the measurement.
+    pol = read("ops/quorum_policy.example.json")
     if pol is None:
-        rec("A43", UNDET, "ops/quorum_policy.json not readable")
+        rec("A43", UNDET, "ops/quorum_policy.example.json not readable")
     else:
         try:
             data = json.loads(pol)
