@@ -22,9 +22,11 @@ sys.path.insert(0, HERE)
 import covenant_watchdog as W          # noqa: E402
 
 FAILS = []
+RAN = []
 
 
 def check(cond, label):
+    RAN.append(bool(cond))
     print(("ok    " if cond else "FAIL  ") + label)
     if not cond:
         FAILS.append(label)
@@ -106,4 +108,4 @@ if FAILS:
     for f in FAILS:
         print("  -", f)
     sys.exit(1)
-print("WATCHDOG OUTAGE: all passed (offline; no node contacted, none started)")
+print(f"WATCHDOG OUTAGE: {len(RAN)}/{len(RAN)} passed (offline; no node contacted, none started)")

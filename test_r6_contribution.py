@@ -22,9 +22,11 @@ import guards as G                 # noqa: E402
 import covenant_trader as T        # noqa: E402
 
 FAILS = []
+RAN = []
 
 
 def check(cond, label):
+    RAN.append(bool(cond))
     print(("ok    " if cond else "FAIL  ") + label)
     if not cond:
         FAILS.append(label)
@@ -156,4 +158,4 @@ if FAILS:
     for f in FAILS:
         print("  -", f)
     sys.exit(1)
-print("R6 CONTRIBUTION: all passed")
+print(f"R6 CONTRIBUTION: {len(RAN)}/{len(RAN)} passed")

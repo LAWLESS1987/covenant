@@ -20,9 +20,11 @@ sys.path.insert(0, HERE)
 import venues as V          # noqa: E402
 
 FAILS = []
+RAN = []
 
 
 def check(cond, label):
+    RAN.append(bool(cond))
     print(("ok    " if cond else "FAIL  ") + label)
     if not cond:
         FAILS.append(label)
@@ -116,4 +118,4 @@ if FAILS:
     for f in FAILS:
         print("  -", f)
     sys.exit(1)
-print("MAKER ORDERS: all passed")
+print(f"MAKER ORDERS: {len(RAN)}/{len(RAN)} passed")

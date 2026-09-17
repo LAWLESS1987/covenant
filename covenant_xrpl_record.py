@@ -334,8 +334,10 @@ def verify(commitment: Optional[str] = None, snapshot: Optional[str] = None,
 # ------------------------------------------------------------------ self-test
 def _self_test() -> int:
     fails = []
+    ran = []
 
     def check(cond, label):
+        ran.append(bool(cond))
         print(("ok    " if cond else "FAIL  ") + label)
         if not cond:
             fails.append(label)
@@ -411,7 +413,7 @@ def _self_test() -> int:
     if fails:
         print(f"{len(fails)} FAILED")
         return 1
-    print("XRPL RECORD: all passed (offline; no key was created, nothing was submitted)")
+    print(f"XRPL RECORD: {len(ran)}/{len(ran)} passed (offline; no key was created, nothing was submitted)")
     return 0
 
 

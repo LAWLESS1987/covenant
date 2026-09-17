@@ -398,8 +398,10 @@ def main() -> int:
 def _self_test() -> int:
     import tempfile
     fails = []
+    ran = []
 
     def check(cond, label):
+        ran.append(bool(cond))
         print(("ok    " if cond else "FAIL  ") + label)
         if not cond:
             fails.append(label)
@@ -590,7 +592,7 @@ def _self_test() -> int:
     if fails:
         print(f"{len(fails)} FAILED")
         return 1
-    print("SENTINELS: all passed (offline; no anchor written, nothing repaired)")
+    print(f"SENTINELS: {len(ran)}/{len(ran)} passed (offline; no anchor written, nothing repaired)")
     return 0
 
 

@@ -1389,6 +1389,30 @@ def main():
             ("  -> " + ", ".join(r[0] for r in bad)) if bad else ""))
         say("  suites unmeasured   %d%s" % (len(unmeasured),
             ("  -> " + ", ".join(r[0] for r in unmeasured)) if unmeasured else ""))
+        # A SUITE THAT PASSED AND COUNTED NOTHING, NAMED.
+        #
+        # The operator, 2026-09-17: "should be auto repairing i don't
+        # understand." He was right that nothing was watching this. The TALLY
+        # regex accepts `ALL PASS`, which carries no number, so a suite ending
+        # "all passed" is logged ok and adds 0 to `checks passed`. Six did, and
+        # 119 real checks never reached the published total -- found only
+        # because seven checks were added to one of them and the headline did
+        # not move.
+        #
+        # It is NAMED, not blocked and not repaired. Not blocked, because the
+        # count being short is a reporting gap and not a failure: those suites
+        # exit non-zero when they fail, so nothing hides. Not repaired, because
+        # repairing it means editing test files, and the line this project
+        # holds is that the loop may restart the world and never edit a check.
+        # A loop that edits suites until the numbers look right is the failure
+        # it was built to catch.
+        zero = [r for r in results
+                if r[1] == "ok" and not r[3] and r[0] not in INFORMATIONAL]
+        say("  passed, counted 0   %d%s" % (len(zero),
+            ("  -> " + ", ".join(r[0] for r in zero)
+             + "  (their checks are real and absent from the total above; "
+               "INFORMATIONAL suites are excluded and are not a defect)")
+            if zero else ""))
         say("  runner list absent  %d%s" % (len(absent),
             ("  -> " + ", ".join(absent)) if absent else ""))
         say("  orphaned on disk    %d%s" % (len(orphans),
