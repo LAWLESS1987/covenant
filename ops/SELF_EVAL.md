@@ -2568,3 +2568,157 @@ judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
 
+## 2026-09-16T09:07:57Z  overall WARN  (round 1260)
+nodes     PASS  3/3 up, height 27 (spread 0), source 2f5e4e914bb5
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 2f5e4e914bb5, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T10:11:25Z  overall FAIL  (round 1320)
+nodes     PASS  3/3 up, height 27 (spread 0), source 3fb031657a8c
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded f6091f387f79 but covenant_watchdog.py on disk is 79925e8d8e0f -- the c
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 3fb031657a8c, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T13:49:14Z  overall WARN  (round 60)
+nodes     PASS  3/3 up, height 28 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: node A: mesh is running more than one source: we are ddfaaa9f704f, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T14:55:19Z  overall WARN  (round 120)
+nodes     PASS  3/3 up, height 28 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: node A: mesh is running more than one source: we are ddfaaa9f704f, peers report ['27a9bf2b01ad'] -- peers on a
+
+## 2026-09-16T18:53:52Z  overall PASS  (round 60)
+nodes     PASS  3/3 up, height 29 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-16T19:59:54Z  overall PASS  (round 120)
+nodes     PASS  3/3 up, height 29 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-16T21:06:03Z  overall PASS  (round 180)
+nodes     PASS  3/3 up, height 29 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-16T22:36:49Z  overall PASS  (round 60)
+nodes     PASS  3/3 up, height 29 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-16T23:42:59Z  overall PASS  (round 120)
+nodes     PASS  3/3 up, height 29 (spread 0), source ddfaaa9f704f
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+
+## 2026-09-17T00:48:34Z  overall WARN  (round 180)
+nodes     PASS  3/3 up, height 29 (spread 0), source 31b6e8131bd0
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@c4854e5da08, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 31b6e8131bd0, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T01:54:17Z  overall WARN  (round 240)
+nodes     PASS  3/3 up, height 30 (spread 0), source 4737e38aa7da
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@e0578647fec, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 4737e38aa7da, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T02:59:32Z  overall WARN  (round 300)
+nodes     PASS  3/3 up, height 30 (spread 0), source 4737e38aa7da
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@e0578647fec, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 4737e38aa7da, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T04:06:18Z  overall WARN  (round 360)
+nodes     PASS  3/3 up, height 30 (spread 0), source 4737e38aa7da
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@e0578647fec, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 4737e38aa7da, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T05:13:01Z  overall WARN  (round 420)
+nodes     PASS  3/3 up, height 30 (spread 0), source 4737e38aa7da
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@e0578647fec, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 4737e38aa7da, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T06:19:41Z  overall WARN  (round 480)
+nodes     PASS  3/3 up, height 30 (spread 0), source 4737e38aa7da
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@e0578647fec, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 4737e38aa7da, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T07:30:22Z  overall WARN  (round 540)
+nodes     PASS  3/3 up, height 30 (spread 0), source 4737e38aa7da
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@e0578647fec, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 4737e38aa7da, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T08:35:56Z  overall WARN  (round 600)
+nodes     PASS  3/3 up, height 31 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T09:42:09Z  overall WARN  (round 660)
+nodes     PASS  3/3 up, height 31 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T10:50:35Z  overall WARN  (round 720)
+nodes     PASS  3/3 up, height 31 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T11:59:25Z  overall WARN  (round 780)
+nodes     PASS  3/3 up, height 31 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T13:05:40Z  overall WARN  (round 840)
+nodes     PASS  3/3 up, height 32 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T14:12:08Z  overall WARN  (round 900)
+nodes     PASS  3/3 up, height 33 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+

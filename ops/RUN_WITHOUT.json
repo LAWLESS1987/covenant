@@ -1,8 +1,8 @@
 {
- "when": "2026-09-16T07:48:59Z",
+ "when": "2026-09-17T14:20:44Z",
  "digests": {
-  "ora": "c4854e5da087",
-  "sena": "f24290ca82b2"
+  "ora": "b5c91027271e",
+  "sena": "fd7f59e1037f"
  },
  "conditions": {
   "exam_met_streak": {
@@ -16,12 +16,12 @@
    "met": true
   },
   "holdout_decided_min": {
-   "measured": 0.7358,
+   "measured": 0.717,
    "bar": 0.75,
    "met": false
   },
   "panel_coverage_min": {
-   "measured": 0.051,
+   "measured": 0.0852,
    "bar": 0.9,
    "met": false
   },
@@ -53,6 +53,21 @@
   },
   {
    "when": "2026-09-16T07:48:59Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-17T00:54:01Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-17T07:39:24Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-17T14:20:44Z",
    "met_count": 2,
    "streak": 0
   }
