@@ -1,5 +1,43 @@
 # Ledger Trading Dashboard
 
+> **CORRECTED 2026-09-17, before the Sentinel work begins. Read this first.**
+>
+> **This README names 17 files. Twelve of them are not in this folder**, and it
+> reports *test results* for several of them — `secureStorage.js | Yes | Full
+> encrypt/decrypt round trip`, `gridMath.js | Yes | capital-safety invariant`,
+> `exchanges/kraken.js` signing `| Yes |`. A passing test cannot be reported for
+> code that is not here. Measured by walking the directory, not by reading the
+> table:
+>
+> ```
+> named in README : 17
+> present         :  5   automatedLimits.js  AutomatedSetupModal.jsx
+>                       Dashboard.jsx  tierNavigation.js  tradeGate.js
+> absent          : 12   App.jsx  gridMath.js  ledger.js  secureStorage.js
+>                       vite.config.js  src/lib/strategyGuide.js
+>                       exchanges/coinbase.js  exchanges/kraken.js
+>                       cryptocom.js  recursive_strategy_optimizer.py
+>                       src/lib/__tests__/automatedLimits.test.js
+>                       src/lib/__tests__/tierNavigation.test.js
+> ```
+>
+> The whole folder is **eight files**, one of which is this README and one a
+> `__pycache__` artifact. There is also `seal_service.py`, which the table below
+> does not mention at all.
+>
+> **What this means for the table below.** Its structure is honest — it separates
+> "tested" from "cannot be tested without your device", which is the right shape
+> and better than most. But a row claiming a green test for an absent file is not
+> a weaker claim than an overstatement; it is a claim about nothing. Read every
+> `Yes` in it as unverified until the file is in front of you.
+>
+> Nothing here is armed, and nothing here places an order. That part of the table
+> is true and is the part that matters most.
+>
+> The table is left unedited. This project does not quietly rewrite a document to
+> match what it wishes it had said.
+
+
 Phone-first PWA: Ledger hardware wallet + Coinbase/Kraken/Crypto.com, staged
 dashboard → manual-approval → automated execution, driven by walk-forward-
 validated grid/bracket strategy parameters (see the companion `strategy/`

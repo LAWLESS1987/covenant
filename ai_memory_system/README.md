@@ -1,5 +1,39 @@
 # AI Memory System
 
+> **CORRECTED 2026-09-17. Read this before the claims below.**
+>
+> This README's central promise — *nothing is destroyed, contradictions are
+> surfaced rather than resolved* — is **PARTLY TRUE**, and the project's own
+> field test says so in detail:
+> [`docs/FIELD_TEST_2026-08-29_memory_provenance.md`](docs/FIELD_TEST_2026-08-29_memory_provenance.md)
+> §4. Three carve-outs the text below does not state:
+>
+> 1. **`put()` does no overlap detection at all.** That coupling lives only in
+>    the HTTP PUT handler (`server.py:398-405`). A direct library call to
+>    `MemoryStore.put()` with an overlapping name marks nothing, silently. It is
+>    a property of the server, not of the store.
+> 2. **A same-name write overwrites irrecoverably.** `_atomic_write`
+>    (`memory_store.py:348`) overwrites unconditionally — no trash copy, and the
+>    ledger records only a `sha256`, never the text. Measured: after overwriting,
+>    the original body is unrecoverable. *This is the same failure this project
+>    diagnosed in other systems, present here, on this path.*
+> 3. **`superseded_by` is write-only.** Nothing in `score_explain`, `rank` or
+>    `context_window` reads it. A superseded memory and its correction score
+>    identically, `context_window` emits **both** bodies, and because
+>    `supersede()` carries the old use count forward a superseded memory can
+>    **outrank its own correction (10.82 vs 7.23)** and push it out of the
+>    8000-character core budget. The flag is a durable record with **no
+>    consequence for what an agent is handed back.**
+>
+> So "SUPERSEDE, both survive" describes a real state change that is written,
+> ledgered, and then not consulted. The honest summary is: the store does not
+> delete on the supersede path, one other path does delete irrecoverably, and
+> the surviving link does not change what recall returns.
+>
+> The claims below are left unedited. A README that quietly fixed its own
+> wording would be doing the thing this project exists to argue against.
+
+
 Shared, persistent, **auditable** memory for AI agents. Plain markdown files,
 a hash-chained ledger, and an HTTP API small enough that an agent can learn it
 from `/openapi.json` without being told.
