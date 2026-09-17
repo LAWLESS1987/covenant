@@ -198,6 +198,22 @@ def fetch(say=print):
     """The newest green build's APK from the private repository, kept under ops/app/.
     Returns the latest.json dict, or None with the reason said."""
     import covenant_github_judge as gh
+    # A141 (2026-09-16): the A21 gate closed the credential store for the node,
+    # correctly, and for this path too, which was not intended. The log shows
+    # the moment -- "already have build c0de384" at 19:31, "no GitHub
+    # credential on this PC" at 20:32 -- and the phone silently stopped being
+    # able to receive a build. Fetching the operator's own phone build on the
+    # operator's own PC is maintenance they set running, not a node reaching
+    # into a stranger's keychain.
+    #
+    # RESIDUAL, recorded rather than hidden: REPO is a hardcoded
+    # LAWLESS1987/covenant-phone (unlike covenant_github_judge.repo(), which
+    # derives from `git remote get-url origin`), so on a SECOND OPERATOR's
+    # machine this would spend their token against the owner's repository.
+    # Deriving REPO from origin is the real fix and is a structure change --
+    # see docs/KNOWN_ISSUES.md A142.
+    gh.allow_credential_store("covenant_app_update.fetch -- the operator's own "
+                              "phone build, on the operator's own PC")
     tok = gh.token()
     if not tok:
         say("app update: no GitHub credential on this PC"); return None

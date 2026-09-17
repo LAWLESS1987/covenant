@@ -5804,3 +5804,28 @@ have proved only that somebody typed it.
 callers of the CAPABILITY, not of the fix. The dangerous shape is a tightening that
 returns empty rather than raising, because callers were written to read that as "not
 available today" and carry on.
+
+
+### A142. [serious / privacy] The phone-build paths hardcode the owner's repository, so a clone spends a stranger's token on it. OPEN, found 2026-09-16
+
+**Evidence:** `covenant_app_update.py:37` -- `REPO = os.environ.get("COVENANT_PHONE_REPO",
+"LAWLESS1987/covenant-phone")` -- and `covenant_highway.py:545` dispatches `android.yml`
+on the same `AU.REPO`. Both send `Authorization: Bearer <token>` to
+`api.github.com/repos/LAWLESS1987/covenant-phone/...`. Contrast
+`covenant_github_judge.repo()` (:93-105), which derives the target from
+`git remote get-url origin`. These never fall back to the clone's own origin.
+
+**Why it matters:** a second operator running the highway or the app updater has their
+GitHub credential spent against the owner's repository, not their own fork. The env var
+exists, nothing sets it, and nobody cloning this would think to.
+
+**Interaction with A141:** those two call sites now call `allow_credential_store()` so the
+owner's own phone updates keep working. That opt-in is correct for the owner and makes the
+hardcoded target worse for everybody else, which is precisely why it is written down here
+rather than left implicit in the code.
+
+**Fix:** derive `REPO` from `git remote get-url origin` the way `covenant_github_judge`
+already does, falling back to the literal only when there is no origin. A structure change,
+deferred per the operator's 2026-09-09 rule.
+
+**Repro:** `grep -n "LAWLESS1987/covenant-phone" covenant_app_update.py covenant_highway.py`
