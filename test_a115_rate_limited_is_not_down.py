@@ -346,6 +346,8 @@ def main():
         seen = {}
         for forced, want in (("rate_limited", LC.UNKNOWN),
                              ("silent", LC.BLOCKED),
+                             ("foreign_http", LC.BLOCKED),
+                             ("ours_limited", LC.PASS),
                              ("ours", LC.PASS)):
             LC.node_answer = lambda _p, _f=forced, **_k: (_f, None)
             LC.results.clear()
@@ -362,6 +364,18 @@ def main():
               seen.get("silent") == LC.BLOCKED, str(seen))
         check("A115.13c and a node that answers is PASS",
               seen.get("ours") == LC.PASS, str(seen))
+        # RATE_LIMIT_DEFAULT is 20 per 60s, so after a 13-minute sweep the
+        # window has not rolled and no gate should sit waiting it out. The
+        # refusal itself is the evidence: a covenant node says so in covenant's
+        # own shape, and reading that body is a measurement where retrying
+        # harder would only have been a longer guess.
+        check("A115.13d a node that answers 429 IN COVENANT'S OWN SHAPE has "
+              "identified itself -- which is the only question G7 asks",
+              seen.get("ours_limited") == LC.PASS, str(seen))
+        check("A115.13e ...and an HTTP service that is NOT ours still BLOCKS, "
+              "so the gate got sharper here, not softer: it now tells our own "
+              "refusal apart from a stranger's",
+              seen.get("foreign_http") == LC.BLOCKED, str(seen))
     except ImportError as _e:                                     # noqa: BLE001
         check("A115.13 launch_check importable", False, str(_e))
 

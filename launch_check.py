@@ -116,14 +116,35 @@ def node_answer(port, timeout=2.0, attempts=3, delay=1.5):
     serving HTTP here and would not confirm itself, which is UNKNOWN and not
     an accusation.
     """
-    last = None
     for i in range(max(1, attempts)):
         obj, why = http_json("http://127.0.0.1:%d/health" % port, timeout=timeout)
         if obj is not None:
             return "ours", obj
-        last = why or ""
-        if "HTTPError" not in last:
+        if "HTTPError" not in (why or ""):
             return "silent", None        # nothing is serving HTTP at all
+
+        # THE REFUSAL ITSELF IDENTIFIES THE NODE. RATE_LIMIT_DEFAULT is 20 per
+        # 60s, so a sweep that has just spent 13 minutes on these nodes leaves
+        # a window no gate should sit and wait out -- retrying harder is the
+        # wrong answer to a rolling minute. But a covenant node refusing a
+        # caller says so in covenant's own shape, and that body is evidence,
+        # not noise. Reading it is a measurement; waiting and guessing is not.
+        try:
+            req = urllib.request.Request(
+                "http://127.0.0.1:%d/health" % port,
+                headers={"User-Agent": "launch-check/1.0"})
+            urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            try:
+                body = json.loads(e.read().decode())
+            except Exception:                                # noqa: BLE001
+                body = {}
+            if (str(body.get("status", "")).lower() == "error"
+                    and "rate limit" in str(body.get("message", "")).lower()):
+                return "ours_limited", None
+            return "foreign_http", None      # serving HTTP, but not ours
+        except Exception:                                    # noqa: BLE001
+            return "silent", None
         if i + 1 < attempts:
             time.sleep(delay)
     return "rate_limited", None
@@ -406,7 +427,10 @@ def g7():
     # node that wants it will fail preflight and exit -- visibly, since v8.15,
     # but only in a console log nobody is reading.
     answers = {nid: node_answer(port)[0] for nid, port in NODES}
-    ours = {nid for nid, s in answers.items() if s == "ours"}
+    # "ours_limited" IS ours: the node answered, in covenant's own shape, that
+    # it is rate-limiting. That identifies the holder, which is the only
+    # question G7 asks. It is not enough for G9, which needs a version.
+    ours = {nid for nid, s in answers.items() if s in ("ours", "ours_limited")}
     # A port that answered HTTP but would not confirm itself is UNKNOWN, never
     # foreign. Accusing it is how a gate turns a node defending itself into
     # DO NOT LAUNCH (A115's lesson, arriving here late).
@@ -525,8 +549,16 @@ def g9():
         # three read UNREACHABLE while all three were alive and answering 429.
         # Measuring properly is not the same as lowering the bar.
         h = node_health(port)
-        if h is None and node_answer(port)[0] == "ours":
-            h = node_health(port)
+        if h is None and node_answer(port)[0] in ("ours", "ours_limited"):
+            # It IS our node and it is rate-limiting. G7 can stop there; G9
+            # cannot, because a 429 carries no version and this gate compares
+            # versions. So retry for a short while -- and if the window has not
+            # rolled, the UNKNOWN below is the correct answer and stands.
+            for _ in range(3):
+                time.sleep(1.5)
+                h = node_health(port)
+                if h is not None:
+                    break
         if h is None:
             unknown.append(nid)
             rows.append("%s UNREACHABLE" % nid)
