@@ -297,6 +297,7 @@ SUITES = [
     # document against itself and reported it as accuracy. SKIPS rather than
     # fails when private/ is absent, which is always in a staged run.
     ("test_p24_corpus_counts.py",         180,  "IDENTITY"),
+    ("test_p25_sweep_red.py",             120,  "IDENTITY"),
     # C3 (2026-08-29): the guard that heals the watchdog -- pure
     # decide(), report-only by AST, no process started. 21/21.
     ("test_c3_guard.py",                 120,  "IDENTITY"),
@@ -363,7 +364,16 @@ SUITES = [
     # refused connection, and three of those restart a node -- with the
     # threshold dropping to one when every node trips at once. Real HTTP
     # servers over real sockets, the real one_pass; mutation-tested three ways.
-    ("test_a115_rate_limited_is_not_down.py", 120, "SECURITY"),
+    # 240, not 120. MEASURED 2026-09-17: this suite takes 119s on this machine
+    # against a 120s budget -- a one-second margin, so it flapped between clean
+    # and TIMEOUT depending on load, and a TIMEOUT prints no tally, which the
+    # runner scores as NO RESULT: 0 added to passed AND 0 to failed. It passes
+    # 24/24 when allowed to finish. The budget is a resource limit, not a
+    # check: no assertion here is weakened by giving a correct suite room to
+    # finish, and a limit that kills a passing suite is a false negative, not
+    # coverage. Doubling the measured time is the headroom; if it ever needs
+    # more than 240s something has genuinely changed and should be looked at.
+    ("test_a115_rate_limited_is_not_down.py", 240, "SECURITY"),
     ("test_sentinels.py",                 60,  "SECURITY"),
     ("test_selfaudit.py",                 90,  "SECURITY"),
     ("test_g12_inflight.py",              60,  "SECURITY"),

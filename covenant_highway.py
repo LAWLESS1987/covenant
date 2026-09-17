@@ -390,8 +390,75 @@ def detect_watchdog_stale(health=None):
                          "watched_files": len(files), "stale_by_s": round(newest - started, 1)}}
 
 
+def detect_sweep_red(health=None):
+    """The newest full sweep says FAIL.
+
+    WHY THIS DETECTOR EXISTS. Every other detector here watches a piece of
+    INFRASTRUCTURE -- a node, a log, a hash, the watchdog. None of them watches
+    the one signal that actually defines "green": the sweep's own verdict. So
+    on 2026-09-17 the sweep read FAIL at 11:48 and FAIL again at 12:38 with two
+    suites measuring nothing, and nothing in this file noticed, because every
+    remedy it owns was correctly reporting healthy. The loop could heal the
+    machine and not the thing the machine is for.
+
+    The cause that day was a node that died at boot on an ACL check, which THIS
+    FILE ALREADY HAD A REMEDY FOR. It was never told.
+
+    DISCOVERY, NOT A FILENAME LIST (rule 2). The sweep has been written to
+    ONE_RUN.txt, ONE_SWEEP.txt and SWEEP_*.txt at different times, and a
+    hardcoded list cannot find the artifact added after the list was written --
+    which is exactly the artifact a freshness check exists to catch. So every
+    *.txt at the top level is filtered by CONTENT: does it carry a verdict line
+    and a suite count? That is what makes it a sweep.
+    """
+    import glob
+    import re
+    newest = None
+    for p in glob.glob(os.path.join(HERE, "*.txt")):
+        try:
+            with io.open(p, encoding="utf-8", errors="replace") as fh:
+                txt = fh.read()
+        except OSError:
+            continue
+        if "RESULT:" not in txt or "suites run" not in txt:
+            continue                       # a description, not the measurement
+        mt = os.path.getmtime(p)
+        if newest is None or mt > newest[0]:
+            newest = (mt, p, txt)
+
+    if newest is None:
+        return {"state": UNKNOWN,
+                "measured": {"why": "no sweep artifact on disk to read"}}
+
+    mt, path, txt = newest
+    verdict = "UNKNOWN"
+    m = re.search(r"^\s*RESULT:\s*(PASS|FAIL)", txt, re.M)
+    if m:
+        verdict = m.group(1)
+    unclean = []
+    m = re.search(r"^\s*suites not clean\s+\d+\s*->\s*(.+)$", txt, re.M)
+    if m:
+        unclean = [s.strip() for s in m.group(1).split(",") if s.strip()]
+    failed = None
+    m = re.search(r"^\s*checks failed\s+(\d+)", txt, re.M)
+    if m:
+        failed = int(m.group(1))
+
+    measured = {"verdict": verdict, "artifact": os.path.basename(path),
+                "age_d": round((time.time() - mt) / 86400.0, 2),
+                "unclean": unclean, "checks_failed": failed}
+
+    if verdict == "FAIL":
+        return {"state": PRESENT, "measured": measured}
+    if verdict == "PASS":
+        return {"state": ABSENT, "measured": measured}
+    # A sweep whose verdict could not be parsed is not a pass. Rule 9: say so.
+    return {"state": UNKNOWN, "measured": measured}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
+    "sweep_red": detect_sweep_red,
     "source_drift": detect_source_drift,
     "height_lag": detect_height_lag,
     "app_build_gap": detect_app_build_gap,
@@ -687,7 +754,78 @@ def remedy_install_on_phone(measured, dry_run=True):
 # would only sound objective. The proposal a PROPOSE_ONLY remedy raises carries
 # this block verbatim, so the person deciding reads the cost in the same breath
 # as the benefit.
+MAX_TARGETED_RERUN = 5     # more than this is a broken tree, not a gap
+
+
+def remedy_rerun_unclean(measured, dry_run=True):
+    """Re-run ONLY the suites that measured nothing. Never the whole sweep.
+
+    THE LINE THIS MUST NOT CROSS, and the operator was asked to hold me to it:
+    this remedy may restart the WORLD; it may never edit a CHECK. It runs
+    processes. It does not open a test, does not move a threshold, does not
+    mark a suite deliberately-off. Restarting a downed node fixes reality;
+    editing a suite fixes the scoreboard, and only one of those is repair.
+
+    WHY TARGETED. The full sweep is ~14 minutes; the suites that produced no
+    tally are seconds. A loop that repays the whole bill to close a small gap
+    is the token waste the operator named on 2026-09-17. It heals the gap.
+
+    WHY IT MAY REPORT FAILURE AND THAT IS CORRECT. If the suites are still
+    unclean afterwards the cause is not transient, and this says so rather than
+    retrying. A self-healing loop that cannot fail honestly is a loop that
+    launders red into green by repetition.
+
+    NEVER writes to ONE_RUN.txt or ONE_SWEEP.txt. Those are G12's evidence of
+    when the suites last ran, and a targeted re-run of two suites is not that.
+    Overwriting them with a partial run destroyed G12's evidence once already.
+    """
+    unclean = [s for s in (measured.get("unclean") or []) if s.endswith(".py")]
+    if not unclean:
+        return False, ("the sweep is red but named no unclean suite -- the "
+                       "cause is checks that FAILED, and a re-run is not the "
+                       "answer to a real failure")
+    if len(unclean) > MAX_TARGETED_RERUN:
+        return False, ("%d unclean suites is a broken tree, not a gap -- "
+                       "refusing to paper over it: %s"
+                       % (len(unclean), ", ".join(unclean[:MAX_TARGETED_RERUN])))
+    if dry_run:
+        return True, "would re-run only: %s" % ", ".join(unclean)
+
+    import subprocess
+    out = os.path.join(HERE, "ops", "sweep_heal_last.txt")
+    try:
+        p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_one.py"),
+                            "--only"] + unclean + ["--out", out],
+                           cwd=HERE, capture_output=True, text=True, timeout=1800)
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the re-run could not be started: %s: %s" % (type(e).__name__, e)
+
+    import re
+    txt = (p.stdout or "") + (p.stderr or "")
+    still = []
+    m = re.search(r"^\s*suites not clean\s+\d+\s*->\s*(.+)$", txt, re.M)
+    if m:
+        still = [s.strip() for s in m.group(1).split(",") if s.strip()]
+    # BOTH readings, always. The red is recorded beside the green, so the loop
+    # can never make itself look good by forgetting what it found.
+    was = ", ".join(unclean)
+    if still:
+        return False, ("was unclean: %s | still unclean after a targeted "
+                       "re-run: %s -- not transient, and not mine to fix"
+                       % (was, ", ".join(still)))
+    return True, ("was unclean: %s | clean on a targeted re-run -- the sweep's "
+                  "reading was transient. Full verdict still needs a full "
+                  "sweep; this only closes the gap." % was)
+
+
 REMEDIES = {
+    "rerun_unclean": {"fn": remedy_rerun_unclean, "klass": AUTO_REVERSIBLE,
+                      "for": ["sweep_red"], "kind": "stateless",
+                      "touches": ["ops/sweep_heal_last.txt"],
+                      "benefit": {"gains": ["a suite that measured NOTHING is made to measure",
+                                            "red that is transient clears; red that is real is named"],
+                                  "cost": ["the seconds those suites take, never the full ~14 min sweep"],
+                                  "irreversible": []}},
     "restart_nodes": {"fn": remedy_restart_nodes, "klass": AUTO_REVERSIBLE,
                       "for": ["source_drift", "node_down"], "kind": "stateless",
                       "touches": ["nodes"],

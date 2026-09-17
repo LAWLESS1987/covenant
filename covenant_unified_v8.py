@@ -10461,9 +10461,22 @@ class CovenantUnifiedMaster:
                     except Exception:                            # noqa: BLE001
                         _run = _sp.run
                     _me = os.environ.get("USERNAME") or ""
-                    _run(["icacls", path, "/inheritance:r",
-                          "/grant:r", f"{_me}:F"],
-                         capture_output=True, text=True, timeout=30)
+                    # ABSPATH, for the same reason ops/owner_only.py does it:
+                    # icacls is a Windows program and reads a leading "/" as a
+                    # switch, so a POSIX-style path -- which Python opens
+                    # perfectly well on Windows -- is rejected outright.
+                    # AND THE RETURN CODE IS CHECKED. It was not, so when
+                    # icacls refused the path this repair failed in silence and
+                    # only the verify below spoke, blaming the ACL rather than
+                    # the call that never reached it. That is the exact defect
+                    # the comment beneath this block warns about, present in
+                    # the code the comment is attached to (2026-09-17).
+                    _p = _run(["icacls", os.path.abspath(path), "/inheritance:r",
+                               "/grant:r", f"{_me}:F"],
+                              capture_output=True, text=True, timeout=30)
+                    if getattr(_p, "returncode", 0) != 0:
+                        print(f"WARNING: icacls could not tighten {path}: "
+                              f"{(getattr(_p, 'stderr', '') or '').strip()[:200]}")
                 else:
                     os.chmod(path, 0o600)
             except Exception as _e:                              # noqa: BLE001

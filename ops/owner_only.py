@@ -77,6 +77,23 @@ _DENIED_HINT = re.compile(
 
 def acl_principals(path):
     """Every principal named in the file's DACL. Raises if it cannot be read."""
+    # icacls IS A WINDOWS PROGRAM AND TAKES A WINDOWS PATH. Python opens
+    # "/tmp/x/A.key" happily on Windows -- it is drive-relative, and
+    # os.path.samefile confirms it names the same file as C:\tmp\x\A.key --
+    # but icacls rejects a leading "/" outright as a switch: "First parameter
+    # must be a file name pattern". The caller is not wrong to use a POSIX
+    # path; this function is the one that shells out, so this is the layer
+    # that has to speak the shell's dialect.
+    #
+    # WHAT THIS COST, 2026-09-17. _owner_only() was wired into the node's
+    # identity load in a8ac0b0 and made fail-closed, which is right. But
+    # test_a1a_a2.py starts its nodes under TMP = "/tmp/covtest_a1a", so
+    # every node it launched died at boot on this error, wait_api sat out its
+    # full 30s against an already-dead process, and the suite then crashed
+    # before printing a tally -- which the runner scores as NO RESULT, adding
+    # 0 to passed AND 0 to failed. A real regression read as absence for as
+    # long as it took someone to run the suite by hand.
+    path = os.path.abspath(path)
     try:
         out = subprocess.run(["icacls", path], capture_output=True, text=True,
                              timeout=20)

@@ -91,6 +91,26 @@ def check(name, ok, detail=""):
     results.append((name, ok, detail))
     print(f"{'PASS' if ok else 'FAIL'}  {name}  {detail}")
 
+
+def tally():
+    """Print the count and exit. REACHABLE FROM THE FAILURE PATH, which is the
+    whole point.
+
+    2026-09-17: node A died at boot (icacls could not read an ACL under the
+    POSIX-style TMP this suite uses). The suite noticed -- it recorded "node A
+    API up" as FAIL -- and then walked straight into post(), which threw
+    URLError and killed the process before this line was ever reached. No
+    tally means covenant_one.py reads NO RESULT and adds 0 to passed AND 0 to
+    failed, so a real regression scored as absence rather than as red. That is
+    this project's own named failure mode (M30, P14): a check that stopped
+    checking still reads as coverage.
+
+    A suite may fail. It may not vanish.
+    """
+    fails = [r for r in results if not r[1]]
+    print(f"\n{len(results) - len(fails)}/{len(results)} passed")
+    sys.exit(1 if fails else 0)
+
 def post(port, path, body):
     req = urllib.request.Request(f"http://127.0.0.1:{port}{path}",
                                  data=json.dumps(body).encode(),
@@ -140,7 +160,15 @@ def main():
     # ---- node A up on 5001 ----
     a = start_node(BASE, "A")
     try:
-        check("node A API up", wait_api(BASE))
+        # A HARD GATE, not an observation. Every later check posts to this
+        # node; if it is not up, they do not measure anything, and the first
+        # of them raises before the tally prints. Stop here and REPORT.
+        if not wait_api(BASE):
+            check("node A API up", False,
+                  "node A never answered -- its own output is above; nothing "
+                  "after this point was measured")
+            tally()
+        check("node A API up", True)
 
         # founder key = node A's own identity key
         keyfile = os.path.join(TMP, "A.db.key")
@@ -231,9 +259,7 @@ def main():
     finally:
         stop(a)
 
-    fails = [r for r in results if not r[1]]
-    print(f"\n{len(results) - len(fails)}/{len(results)} passed")
-    sys.exit(1 if fails else 0)
+    tally()
 
 if __name__ == "__main__":
     main()
