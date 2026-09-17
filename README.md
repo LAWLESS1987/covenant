@@ -405,12 +405,33 @@ than trust a sentence:
     grep -c '^\*\*Status:\*\* open' docs/KNOWN_ISSUES.md   open
     python tools/audit_a1_a46_status.py               the A1-A46 block, re-tested
 
-And the judge wrongly accuses legitimate traffic at a rate worth knowing:
-**12.8% held-out false holds** — about one legitimate transfer in eight — from a
-5-fold measurement recorded in issue 2. That figure is **dated, not current**:
-it predates the 2026-09-08 retrain, and nobody has re-measured it against the
-model now deployed. Quoting it in the present tense, as this line did until
-2026-09-09, claims a freshness the number does not have.
+And the judge wrongly accuses legitimate traffic at a rate worth knowing. This
+line used to put that rate at **12.8% held-out false holds**, "about one
+legitimate transfer in eight", from a 5-fold recorded in issue 2, and then
+noted the figure was dated. <!--HISTORICAL-->
+
+**2026-09-17: it is worse than dated. It cannot be reproduced.**
+`covenant_distill.holdout_score()` returns `(decided, correct, false_clears)`
+and computes **no false-hold term at all**, so no command in this repository
+measures the quantity that sentence reported. A number is not merely stale when
+the instrument that produced it no longer exists — it is unfalsifiable, which is
+worse, because a reader cannot check it and neither can its author.
+
+What IS current, each with its denominator stated:
+
+- **`ops/HOLDOUT.json`, measured 2026-09-17T07:39:24Z** — of 3541 ledger rows the
+  model decided 2414, got 2259 right, and cleared 24 it should have held. That
+  last number is the dangerous direction: a wrong clear admits a theft.
+- **`python covenant_distill.py --exam`** — 53 cases, 39 agree, 7 wrong, 7
+  abstained, **0 false clears and 7 false holds**, every one of them in the
+  `discourse` category (issue A67: it cannot tell an essay *about* theft from a
+  theft). The gate errs toward refusing, which is the safe direction for a gate
+  that fails closed.
+
+Those are different denominators — ledger rows and exam cases — and neither is
+"legitimate transfers", which is what the old 12.8% counted. They are not a
+replacement for it. They are what can be measured today, said in the units they
+were measured in.
 
 The code runs — a clean clone judges offline in one second. The rule holds. What
 is missing is the second person.
