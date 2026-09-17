@@ -130,5 +130,84 @@ def main():
     print("docs already match the transcript"); return 0
 
 
+def check_prose():
+    """--check: does UNMARKED prose restate the marked totals, and disagree?
+
+    WHY (2026-09-17). This tool updates the two lines carrying <!--TOTALS-->
+    and says so honestly: "prose that quotes totals elsewhere is NOT touched".
+    That honesty did not stop the rot. README.md's own body said "the header
+    line says 86 suites, 2,524 checks" while the header seven lines above said
+    96 and 2,742, and "95 test files on disk" while there were 133. A number
+    maintained in one place and copied into another is a second source, and the
+    second source drifts silently because nothing points at it.
+
+    So: any line that states "<n> suites" or "<n> checks" and does NOT carry the
+    marker must agree with the marked line, or say no number at all. Prose that
+    quotes a count it does not own is the defect, whichever way it disagrees."""
+    marked_suites = marked_checks = None
+    offenders = []
+    for p in DOCS:
+        try:
+            lines = io.open(p, encoding="utf-8").read().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            if MARK in line:
+                m = re.search(r"\*\*(\d[\d,]*) suites?, (\d[\d,]*) checks?", line) \
+                    or re.search(r"\*\*(\d[\d,]*) suites? . (\d[\d,]*) checks?", line)
+                if m:
+                    marked_suites = m.group(1).replace(",", "")
+                    marked_checks = m.group(2).replace(",", "")
+    if marked_suites is None:
+        print("no marked TOTALS line found; nothing to check against")
+        return 0
+    for p in DOCS:
+        try:
+            lines = io.open(p, encoding="utf-8").read().splitlines()
+        except OSError:
+            continue
+        for n, line in enumerate(lines, 1):
+            if MARK in line:
+                continue
+            # A NUMBER IS NOT A CLAIM IF THE SENTENCE IS ABOUT THE PAST.
+            # The first version of this check flagged seven lines and every one
+            # was a deliberate record of what the README USED to say -- this
+            # repository's whole habit is keeping corrections visible rather
+            # than editing them away. It even convicted the paragraph written
+            # minutes earlier to explain the rot. A guard that criminalises the
+            # honest practice is a guard somebody switches off, which is the
+            # argument docs/RETRACTED.json makes about its own patterns.
+            #
+            # So: a line narrating history is exempt, and <!--HISTORICAL--> is
+            # the explicit escape for anything the heuristic misses. What is
+            # still caught is the real defect -- prose asserting a CURRENT count
+            # in the present tense, which is how "the runner registers 93
+            # suites" outlived 93 by thirty-three.
+            if "<!--HISTORICAL-->" in line or re.search(
+                    r"\b(said|says|once|used to|until|was|were|reported|"
+                    r"earlier|previously|rotted|opened with|had)\b", line, re.I):
+                continue
+            for m in re.finditer(r"(\d[\d,]*)\s+(suites?|checks?)\b", line):
+                val = m.group(1).replace(",", "")
+                want = marked_suites if m.group(2).startswith("suite") else marked_checks
+                if val != want:
+                    offenders.append((p, n, m.group(0), want, line.strip()[:90]))
+    print("marked totals: %s suites, %s checks" % (marked_suites, marked_checks))
+    if not offenders:
+        print("no unmarked prose restates them. Clean.")
+        return 0
+    print("%d place(s) state a count that disagrees with the marked line:"
+          % len(offenders))
+    for p, n, got, want, ctx in offenders:
+        print("  %s:%d  says %r, marked line says %s" % (p, n, got, want))
+        print("        %s" % ctx)
+    print("\nFIX: delete the number and point at the command, or move the marker.")
+    print("Do not hand-edit it to agree -- it will drift again the next sweep.")
+    return 1
+
+
 if __name__ == "__main__":
+    import sys as _sys
+    if "--check" in _sys.argv:
+        raise SystemExit(check_prose())
     raise SystemExit(main())

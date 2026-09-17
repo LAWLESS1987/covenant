@@ -365,20 +365,33 @@ count, each already half-broken:
 
 ### The state of it, since "it passes" is a claim too
 
-The header line says **86 suites, 2,524 checks, 0 failed**, and that is true of
-the sweep. It is not the whole picture, and the difference is worth a paragraph
-because a reader deciding whether to trust this deserves both halves.
+The header line above states the sweep's totals, and they are true of the sweep.
+They are not the whole picture, and the difference is worth a paragraph because
+a reader deciding whether to trust this deserves both halves.
 
-The runner registers **93** suites — 86 it runs in a scratch copy and 7 it runs
-in place — and prints both figures on every run. There are 95 test files on
-disk; the extras are `.PRE-*` snapshots kept deliberately *because* they fail —
-they are the "before" halves of fixes already landed, and running them outside
-the sweep produces failures that mean nothing. (This paragraph said "88
-registered" until 2026-09-09, which was neither number.) And the sweep's own final
-verdict on 2026-09-09 was **`RESULT: FAIL`** even with zero check failures,
-because it also counts in-place gates and one of them, bundle integrity, is
-blocked pending an owner decision. Reading "0 failed" without that is how the
-number flatters.
+**This paragraph deliberately quotes no counts.** It used to, and every one of
+them rotted: it said "86 suites, 2,524 checks" while the header said 96 and
+2,742, and "95 test files on disk" while there were 133. `readme_totals.py`
+updates the two lines marked `<!--TOTALS-->` from a real transcript, and it
+cannot update prose that restates the same numbers without the marker. A figure
+maintained in one place and copied into another is not documentation, it is a
+second source that drifts — and on 2026-09-17 this README was misquoting its own
+header seven lines below it. Run the numbers rather than read them here:
+
+    python covenant_one.py --all      the sweep, and the transcript it writes
+    python readme_totals.py           what the marked lines would become
+    python readme_totals.py --check   fails if unmarked prose disagrees with them
+
+The runner registers more suites than it runs in the scratch copy, because some
+must run in place, and it prints both figures every run. There are more test
+files on disk than either number, and the extras are `.PRE-*` snapshots kept
+deliberately *because* they fail — they are the "before" halves of fixes already
+landed, and running them outside the sweep produces failures that mean nothing.
+
+And a green check count is not a green run: the sweep's verdict has read
+**`RESULT: FAIL`** with zero check failures, because it also counts in-place
+gates, and one of those — bundle integrity — blocks pending an owner decision.
+Reading "0 failed" without that is how the number flatters.
 
 The rest of what is not green: [KNOWN_ISSUES](docs/KNOWN_ISSUES.md) carries 85
 entries, **43** of them marked `**Status:** open` — that is the counting rule,
