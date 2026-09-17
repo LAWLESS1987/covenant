@@ -585,7 +585,7 @@ diligence.
 
 **Status:** open
 
-### A20. [serious / install] A node that has judged one transaction can no longer update: it appends to tracked ops/verdicts.jsonl and the phone installer's `git pull --ff-only` aborts -- STILL OPEN, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
+### A20. [serious / install] A node that has judged one transaction can no longer update: it appends to tracked ops/verdicts.jsonl and the phone installer's `git pull --ff-only` aborts -- FIXED (the MEMBRANE, 2026-09-11), verified 2026-09-17 by tools/audit_a1_a46_status.py. CORRECTED same day: the check asked "is ops/verdicts.jsonl tracked?", which is a PROXY and the wrong one -- it is tracked on purpose, being the teacher's corpus. The harm is runtime judging DIRTYING it. covenant_judge_defer.py routes live rows to ops/verdicts_live.jsonl (.gitignore:255). Measured with three nodes judging: tracked corpus CLEAN, live ledger 164 rows, so `git pull --ff-only` survives.
 
 **Evidence:** C:/Users/Lawre/covenant/covenant_judge_defer.py:99-116 `record_verdict` appends to ops/verdicts.jsonl whenever Ollama or the GitHub runner answers (:156, :172). `git ls-files ops` in the clone lists ops/verdicts.jsonl (895 KB, 3,042 lines) and it changes in most commits (`git log --oneline -4 -- ops/verdicts.jsonl`: 2b0b3be, da61dee, 8a98fe9, 770ab0d). mobile/install.sh:39 `git -C "$DEST" pull --ff-only || say "update failed; keeping the copy you have"`. Measured on the clone: reset to the parent of 2b0b3be, append one verdict line, `git pull --ff-only` -> `error: Your local changes to the following files would be overwritten by merge: ops/verdicts.jsonl ... Aborting`, rc 1. A phone running the documented kit (Ollama on the phone) hits this after its first answered verdict.
 

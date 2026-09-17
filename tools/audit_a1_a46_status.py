@@ -360,13 +360,42 @@ def check_peers_parsing():
 def check_verdicts_tracked():
     """A20: runtime verdicts append to a TRACKED file, so git pull --ff-only
     aborts and the node can never update."""
-    t = tracked("ops/verdicts.jsonl")
-    if t is None:
-        rec("A20", UNDET, "git could not answer")
-    elif t:
-        rec("A20", OPEN, "ops/verdicts.jsonl is still tracked by git")
+    # This used to ask "is ops/verdicts.jsonl tracked?" and report OPEN if so.
+    # That is a PROXY, and the wrong one: the file is tracked ON PURPOSE -- it
+    # is the teacher's corpus and part of the delivery. The finding's actual
+    # harm is that RUNTIME judging appends to it, dirtying a tracked file so a
+    # node can never `git pull --ff-only` again. Test the harm.
+    #
+    # covenant_judge_defer.py's MEMBRANE (2026-09-11) routes by source:
+    # shareable corpus rows to the tracked ledger, everything a live node
+    # decides to ops/verdicts_live.jsonl, which .gitignore covers. Measured
+    # 2026-09-17 with three nodes judging: tracked file CLEAN, live file 164
+    # rows. The check reported OPEN for six days against a fix that worked.
+    defer = read("covenant_judge_defer.py") or ""
+    has_membrane = "verdicts_live.jsonl" in defer
+    ignored = tracked("ops/verdicts_live.jsonl")
+    dirty = None
+    try:
+        r = subprocess.run(["git", "status", "--porcelain", "ops/verdicts.jsonl"],
+                           cwd=HERE, capture_output=True, text=True, timeout=30)
+        dirty = bool((r.stdout or "").strip()) if r.returncode == 0 else None
+    except Exception:                                          # noqa: BLE001
+        dirty = None
+
+    if not has_membrane:
+        rec("A20", OPEN, "no separate runtime ledger: covenant_judge_defer.py "
+                         "does not mention verdicts_live.jsonl")
+    elif ignored:
+        rec("A20", OPEN, "the runtime ledger exists but is TRACKED, so it "
+                         "dirties the tree exactly like the corpus did")
+    elif dirty:
+        rec("A20", OPEN, "ops/verdicts.jsonl is dirty -- something is still "
+                         "appending runtime rows to the tracked corpus")
     else:
-        rec("A20", FIXED, "ops/verdicts.jsonl is no longer tracked")
+        rec("A20", FIXED,
+            "runtime rows go to ops/verdicts_live.jsonl (gitignored); the "
+            "tracked corpus is %s, so `git pull --ff-only` survives judging"
+            % ("clean" if dirty is False else "not reported dirty"))
 
 
 def check_fallback_model_committed():
