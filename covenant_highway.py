@@ -1237,6 +1237,64 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     return alerts, infos
 
 
+def standing(ledger=None):
+    """What each remedy CLAIMED, set against what actually happened when it ran.
+
+    THE OPERATOR, 2026-09-17: "Students surpass teachers children parents is
+    ideal. But respect remains."
+
+    The commit before this one marked every benefit claim `claimed_by "claude,
+    not ratified"`, which was honest and stopped one step short. A claim handed
+    over with no way to check it is not deference; it asks the operator to take
+    my word, which is the same asymmetry in a humbler voice. So the claims are
+    made AUDITABLE against the ledger's own record of outcomes.
+
+    THE SHAPE THIS GROWS ON is already in A126: a seat may hold, may differ by
+    temperament, may be right where the trunk is wrong -- and false clears stay
+    at zero. It may surpass. It may never clear itself. Standing here works the
+    same way: a remedy earns it by being MEASURABLY RIGHT, never by being
+    trusted more as time passes.
+
+    WHAT THIS DELIBERATELY IS NOT. Nothing in this file reads standing() to
+    decide anything, and test_p25 pins that a perfect record cannot change one
+    decision apply_remedy makes. A record that bought its own authority would
+    be a student grading its own theft. This is evidence FOR the operator's
+    ratification, and the ratification stays his.
+
+      EARNED    it ran, and every graded run fixed the condition
+      MIXED     it ran, and sometimes it did not fix it
+      FAILING   it ran, and never fixed it
+      UNPROVEN  never graded -- the honest answer, not a bad one (rule 9)
+    """
+    rows = read_ledger(ledger)
+    out = {}
+    for name, r in sorted(REMEDIES.items()):
+        mine = [x for x in rows if x.get("remedy") == name]
+        graded = [x for x in mine if not x.get("dry_run")
+                  and x.get("outcome") in ("fixed", "did not fix")]
+        fixed = sum(1 for x in graded if x.get("outcome") == "fixed")
+        missed = len(graded) - fixed
+        if not graded:
+            verdict = "UNPROVEN"
+        elif missed == 0:
+            verdict = "EARNED"
+        elif fixed == 0:
+            verdict = "FAILING"
+        else:
+            verdict = "MIXED"
+        b = r.get("benefit") or {}
+        out[name] = {"verdict": verdict, "graded": len(graded), "fixed": fixed,
+                     "did_not_fix": missed,
+                     "started_ungraded": sum(1 for x in mine
+                                             if x.get("outcome") == "started"),
+                     "refused": sum(1 for x in mine
+                                    if x.get("outcome") == "refused"),
+                     "claimed": list(b.get("gains") or []),
+                     "claimed_cost": list(b.get("cost") or []),
+                     "ratified": False}
+    return out
+
+
 def report(node_id=None, health=None, ledger=None):
     """What this node offers the mesh: what it senses, and what has worked here.
 
@@ -1301,8 +1359,25 @@ def main(argv=None):
     ap.add_argument("--repair", action="store_true", help="apply AUTO_REVERSIBLE remedies (default is dry run)")
     ap.add_argument("--report", action="store_true", help="print the signed-shape offer this node would share")
     ap.add_argument("--ledger", action="store_true", help="print what has been tried here")
+    ap.add_argument("--standing", action="store_true",
+                    help="what each remedy CLAIMED, against what happened when it ran")
     a = ap.parse_args(argv)
 
+    if a.standing:
+        st = standing()
+        print("What this system claimed for itself, and what the record says.")
+        print("Evidence for the operator's ratification. It is not authority,")
+        print("and nothing here changes a single decision the loop makes.\n")
+        print("%-26s %-9s %6s %7s  %s"
+              % ("remedy", "verdict", "fixed", "missed", "claimed gain"))
+        for k, v in st.items():
+            print("%-26s %-9s %6d %7d  %s"
+                  % (k, v["verdict"], v["fixed"], v["did_not_fix"],
+                     (v["claimed"][0][:44] if v["claimed"] else "-")))
+        print("\nUNPROVEN is not a failing grade. It means never graded, which")
+        print("is the honest answer and the one a tool that resolves everything")
+        print("would hide.")
+        return 0
     if a.ledger:
         for row in read_ledger()[-40:]:
             print("%s  %-14s %-14s %s" % (row.get("t", "?"), row.get("remedy", "?"),

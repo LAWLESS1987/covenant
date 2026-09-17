@@ -245,6 +245,44 @@ def main():
               isinstance(b, dict) and all(str(c).strip() for c in b.get("cost", [])),
               b)
 
+        # ---- T: a student may surpass; it may never clear itself -----------
+        # "Students surpass teachers children parents is ideal. But respect
+        # remains." (operator, 2026-09-17). standing() makes my benefit claims
+        # auditable against what actually happened, so ratification can be
+        # informed instead of blind. The line it must not cross is the same one
+        # A126.Z1 draws for a judge seat: a seat may hold, may differ, may be
+        # right where the trunk is wrong -- and false clears stay at zero.
+        st = H.standing(ledger=led)
+        check("P25.T1 standing grades every registered remedy against the "
+              "ledger, and UNPROVEN is a real answer rather than a bad one",
+              set(st) == set(H.REMEDIES) and all(
+                  v["verdict"] in ("EARNED", "MIXED", "FAILING", "UNPROVEN")
+                  for v in st.values()), sorted(st))
+        check("P25.T2 nothing ratifies ITSELF -- every entry reports "
+              "ratified False, because ratification is the operator's act",
+              all(v["ratified"] is False for v in st.values()))
+
+        # THE LINE, driven: give every remedy a spotless record and show that
+        # not one decision changes. A record that bought authority would be a
+        # student grading its own theft.
+        real_standing = H.standing
+        H.standing = lambda ledger=None: {
+            k: {"verdict": "EARNED", "graded": 99, "fixed": 99,
+                "did_not_fix": 0, "started_ungraded": 0, "refused": 0,
+                "claimed": [], "claimed_cost": [], "ratified": True}
+            for k in H.REMEDIES}
+        try:
+            ok_a, why_a = H.remedy_rerun_unclean({"unclean": []}, dry_run=True)
+            many2 = ["t%d.py" % i for i in range(H.MAX_TARGETED_RERUN + 1)]
+            ok_b, why_b = H.remedy_rerun_unclean({"unclean": many2}, dry_run=True)
+        finally:
+            H.standing = real_standing
+        check("P25.T3 a PERFECT record buys nothing: the same refusals stand, "
+              "word for word. Standing is evidence for the operator, never "
+              "authority the system grants itself",
+              ok_a is False and "not the answer" in why_a
+              and ok_b is False and "broken tree" in why_b, (why_a, why_b))
+
         # ---- registration: wired in, not merely written --------------------
         check("P25.W1 the detector is registered, so sense() actually runs it",
               H.DETECTORS.get("sweep_red") is H.detect_sweep_red)
