@@ -472,6 +472,15 @@ SUITES = [
     # poisoned copy so their green is earned. N1 fetches the derived URL and
     # reports NOT RUN offline rather than red.
     ("test_i1_invite.py", 90, "DAILY + GUARDS"),
+    # X1 (2026-09-18): the only suite that attacks the JUDGE rather than a
+    # parser. It found that seal_service.py was stuffing the judge on its own
+    # behalf -- its benign record prefix moved a plainly worded theft from HELD
+    # to CLEAR, 1 of 6 thefts cleared with the wrapper and 0 without. It
+    # asserts only what this repository controls (the judged text is the app's
+    # note verbatim) and MEASURES the judge's susceptibility without asserting
+    # it, because pinning a model's accuracy invites retraining to clear it
+    # (A118). Hermetic: no node, no network; NOT RUN when no judge can be built.
+    ("test_x1_judge_adversarial.py", 180, "DAILY + GUARDS"),
     # G4 (2026-09-16): all eleven reasons guards.preconditions() can refuse an
     # order, each driven ON and OFF. Hermetic -- every seam is a parameter, the
     # halt file is a temp path via guards.HALT, and it writes nothing. The two

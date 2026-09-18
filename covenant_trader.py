@@ -341,9 +341,26 @@ def seal_decision_result(cfg, record):
         # operator reads -- but no caller has to parse it any more.
         adm = resp.get("admission") if isinstance(resp, dict) else None
         txid = resp.get("tx_id") if isinstance(resp, dict) else None
+        # THE JUDGE'S ABSTENTION, FORWARDED (2026-09-18). The node already
+        # distinguishes "the gate convicted this" from "the gate could not read
+        # it": /transactions answers `held_not_judged` and `not_proven` beside
+        # the rejection (covenant_unified_v8, the ethics-gate branch). Those two
+        # fields were in `resp` here and dropped on the floor, so every caller
+        # saw a hold and a conviction as one refusal -- the same conflation the
+        # guards had, one layer deeper, with the information already present.
+        #
+        # ADDITIVE ON PURPOSE. Two callers read this dict, both by named key
+        # (seal_decision's adapter below, and sentinel_witness), so new keys
+        # cannot change what either already reads. The alternative -- recovering
+        # a hold by string-matching `detail` -- is what the docstring above
+        # exists to condemn, and `detail` is truncated at 160 characters anyway.
+        held = resp.get("held_not_judged") if isinstance(resp, dict) else None
+        unsure = resp.get("not_proven") if isinstance(resp, dict) else None
         return {"ok": (st == 200), "status": st,
                 "admission": (str(adm) if adm is not None else None),
                 "tx_id": (str(txid) if txid is not None else None),
+                "held_not_judged": bool(held),
+                "not_proven": bool(unsure),
                 "detail": f"HTTP {st}: {json.dumps(resp)[:160]}{mined}",
                 "mined": mined}
     except SystemExit as e:

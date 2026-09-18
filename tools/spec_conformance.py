@@ -52,7 +52,18 @@ import sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPEC = os.path.join(HERE, "docs", "SENTINEL_WITNESS_SPEC.md")
-SUITE = os.path.join(HERE, "test_sentinel_gate.py")
+
+#: EVERY suite the spec may cite, not just the first one (2026-09-18). The spec
+#: gained X1-X5 citing JA1-JA5 in test_x1_judge_adversarial.py, and with only
+#: the gate suite listed here all five would have read as ghost citations --
+#: this tool reporting the spec as dishonest when it was the tool that was
+#: narrow. A list, so adding a suite is one line and forgetting to is visible:
+#: the per-suite tally is printed, and a suite whose output cannot be parsed
+#: counts as blindness rather than as zero checks.
+SUITES = [
+    (os.path.join(HERE, "test_sentinel_gate.py"), r"SENTINEL-GATE:\s*(\d+)/(\d+)"),
+    (os.path.join(HERE, "test_x1_judge_adversarial.py"), r"JUDGE-ATTACK:\s*(\d+)/(\d+)"),
+]
 
 #: A check id: one to three uppercase letters, one or two digits, an optional
 #: lowercase suffix. S19, J3c, AB7, WS1 are all ids. Requirement ids in the spec
@@ -79,12 +90,35 @@ def _key(s):
 
 
 def suite_ids(timeout=300):
-    """(ids the suite PRINTED, its own tally) -- or (ids, None) if no tally."""
-    r = subprocess.run([sys.executable, SUITE], capture_output=True, text=True,
-                       timeout=timeout, cwd=HERE)
-    out = r.stdout + r.stderr
-    m = TALLY.search(out)
-    return set(LINE.findall(out)), ((int(m.group(1)), int(m.group(2))) if m else None)
+    """(ids every suite PRINTED, (passed, total) summed, [per-suite rows]).
+
+    Each suite is RUN and its printed ids collected; the tally is read from its
+    own summary line. A suite that prints no parseable tally yields None for it,
+    which `check` treats as blindness -- the same rule as an id the pattern
+    cannot see, for the same reason.
+    """
+    ids, rows, passed, total = set(), [], 0, 0
+    seen_all = True
+    for path, tally_re in SUITES:
+        name = os.path.basename(path)
+        if not os.path.exists(path):
+            rows.append((name, None, 0, "absent"))
+            seen_all = False
+            continue
+        r = subprocess.run([sys.executable, path], capture_output=True, text=True,
+                           timeout=timeout, cwd=HERE)
+        out = r.stdout + r.stderr
+        found = set(LINE.findall(out))
+        m = re.search(tally_re, out)
+        t = (int(m.group(1)), int(m.group(2))) if m else None
+        if t is None:
+            seen_all = False
+        else:
+            passed += t[0]
+            total += t[1]
+        ids |= found
+        rows.append((name, t, len(found), "ok" if t else "no tally line"))
+    return ids, ((passed, total) if seen_all else None), rows
 
 
 def spec_ids():
@@ -103,22 +137,36 @@ def spec_ids():
 
 
 def check(say=print, timeout=300):
-    real, tally = suite_ids(timeout)
+    real, tally, rows = suite_ids(timeout)
     cited, mentioned = spec_ids()
     ghosts = sorted(cited - real, key=_key)
     uncited = sorted(real - cited, key=_key)
-    blind = bool(tally) and len(real) != tally[1]
+    # AN UNREADABLE TALLY IS BLINDNESS, not a missing nicety. This read
+    # `bool(tally) and ...`, so a suite whose summary line could not be parsed
+    # set tally to None, blind to False, and the tool exited 0 while printing
+    # "TALLY UNREADABLE" -- a pass with the cross-check switched off, which is
+    # the third time in this file that a guard has been absent exactly where its
+    # subject was unmeasurable. No tally, no verdict.
+    blind = (tally is None) or len(real) != tally[1]
 
     say("Sentinel-Witness spec conformance")
-    say("  suite emits            %3d check id(s)%s"
-        % (len(real), "  (tally %d/%d)" % tally if tally else ""))
+    for name, t2, n, note in rows:
+        say("    %-34s %-9s %3d id(s)  %s"
+            % (name, ("%d/%d" % t2) if t2 else "-", n, note))
+    say("  suites emit            %3d check id(s)%s"
+        % (len(real), "  (tally %d/%d)" % tally if tally else "  (TALLY UNREADABLE)"))
     say("  spec CITES             %3d  (inside a [VERIFIED by ...] tag)" % len(cited))
     say("  spec mentions in prose %3d" % len(mentioned))
     say("")
     if blind:
-        say("  BLIND: found %d id(s), the suite counted %d check(s) -- %d unseen."
-            % (len(real), tally[1], tally[1] - len(real)))
-        say("  Every number above is void while this is true. Widen ID.")
+        if tally is None:
+            say("  BLIND: at least one suite printed no tally this tool could read,")
+            say("  so there is nothing to cross-check the id count against. Fix the")
+            say("  suite's summary line or this tool's pattern for it.")
+        else:
+            say("  BLIND: found %d id(s), the suites counted %d check(s) -- %d unseen."
+                % (len(real), tally[1], tally[1] - len(real)))
+            say("  Every number above is void while this is true. Widen ID.")
         say("")
     if ghosts:
         say("  GHOST CITATIONS -- the spec claims a check that does not exist:")
@@ -147,7 +195,7 @@ def main(argv=None):
     ap.add_argument("--list", action="store_true", help="print the id sets and exit")
     a = ap.parse_args(argv)
     if a.list:
-        real, tally = suite_ids()
+        real, tally, _rows = suite_ids()
         cited, mentioned = spec_ids()
         print("suite (%d):" % len(real), ", ".join(sorted(real, key=_key)))
         print("cited (%d):" % len(cited), ", ".join(sorted(cited, key=_key)))

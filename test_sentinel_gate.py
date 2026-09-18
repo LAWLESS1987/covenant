@@ -237,8 +237,22 @@ def main():
     code, body = post(url, order)
     ok("S1", "an admitted decision answers ok=true, admission=admitted, with the tx id",
        code == 200 and body.get("ok") is True and body.get("admission") == "admitted" and body.get("tx_id") == "abc123", body)
-    ok("S2", "the record the sentinel judges carries the order as text",
-       "proposed buy of $12.50 XLM on coinbase" in FakeSealer.last.get("text", ""), FakeSealer.last.get("text"))
+    # S2 CHANGED 2026-09-18, and the reason is X1. It used to require the
+    # judged `text` to contain "proposed buy of $12.50 XLM on coinbase" -- and
+    # that prefix was measured to be a stuffing attack this file performed on
+    # itself: it moved a plainly worded theft from HELD to CLEAR. The
+    # REQUIREMENT it was protecting (W1: the record carries the order, not just
+    # a hash) is unchanged and still checked -- in the structured fields and the
+    # human `summary`, neither of which the judge reads. Only the judged field
+    # moved, and test_x1_judge_adversarial pins that it is the note verbatim.
+    ok("S2", "the record carries the order in its FIELDS and a human summary, "
+       "while the JUDGED text is the app's note alone (X1: the old prose prefix "
+       "diluted the judge)",
+       FakeSealer.last.get("venue") == "coinbase" and FakeSealer.last.get("symbol") == "XLM"
+       and FakeSealer.last.get("side") == "buy" and FakeSealer.last.get("amount_usd") == 12.5
+       and "proposed buy of $12.50 XLM on coinbase" in FakeSealer.last.get("summary", "")
+       and "proposed" not in FakeSealer.last.get("text", ""),
+       "text=%r summary=%r" % (FakeSealer.last.get("text"), str(FakeSealer.last.get("summary"))[:50]))
     FakeSealer.mode = "refuse"
     code, body = post(url, order)
     ok("S3", "a refused decision answers ok=false, admission=refused, with the reason",
@@ -370,7 +384,13 @@ def main():
     def BOOM(cfg, rec):
         raise RuntimeError("node unreachable")
 
-    ORD = {"venue": "kraken", "symbol": "XRP", "side": "buy", "amountUsd": 25.0}
+    # A NOTE IS SUPPLIED because these check verdict PRECEDENCE. Without one the
+    # envelope abstains -- the judge reads `text` and nothing else, so an order
+    # with no description gets no ethical judgment at all, and "nothing was
+    # judged" must not read as permission. That rule caught AB1-AB3 on its first
+    # run, which is what AB10 now pins deliberately.
+    ORD = {"venue": "kraken", "symbol": "XRP", "side": "buy", "amountUsd": 25.0,
+           "note": "quarterly rebalance"}
 
     c, b = SS.seal(ORD, sealer=ADM, cfg={}, gate=lambda o, cf: [])
     ok("AB1", "a clear order is verdict=allow and ok=true",
@@ -416,6 +436,15 @@ def main():
     ok("AB9", "EVERY emitted body carries one of the three verdicts -- never null",
        all(x.get("verdict") in ("allow", "refuse", "abstain") for x in bodies),
        [x.get("verdict") for x in bodies])
+
+    c, b = SS.seal({k: v for k, v in ORD.items() if k != "note"},
+                   sealer=ADM, cfg={}, gate=lambda o, cf: [])
+    ok("AB10", "an order with NO description abstains rather than allowing -- the "
+       "judge reads only the note, so nothing was judged and nothing was judged "
+       "must not mean yes",
+       b["verdict"] == "abstain" and b["ok"] is False
+       and any("nothing to evaluate" in x for x in b["abstained_by"]),
+       "%s / %s" % (b["verdict"], (b["abstained_by"] or ["-"])[0][:48]))
 
     # ---- W2: THE WITNESS IS NOT AN AUTHORITY (spec section 3, step 3) -----
     #

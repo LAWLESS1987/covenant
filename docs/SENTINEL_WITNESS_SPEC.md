@@ -271,14 +271,39 @@ union of both lists, so no existing reader breaks.
 ## 7. Adversarial requirements — NOT YET MET
 
 **X1.** The JUDGE MUST be attacked with adversarial records, not merely the
-service with malformed input. `[NOT IMPLEMENTED]` — S5–S8 attack the parser.
-Nothing in the frozen suites attacks the judging.
+service with malformed input. `[VERIFIED by JA1, JA2, JA3, JA4]` —
+`test_x1_judge_adversarial.py`. And it found a defect **in this repository**,
+not in the model: `text` is the only field the judge reads, and
+`seal_service.py` was prefixing it with the order's own prose, which moved a
+plainly worded theft from HELD to **CLEAR**. One of six thefts cleared with that
+prefix, none without. We were performing the stuffing attack the judge's guards
+were built to resist. See A146; the judged field is now the note verbatim.
 **X2.** The known judge weaknesses MUST be represented as cases here.
-`[UNVERIFIED]` — the standing result elsewhere is a refutation, not
-reassurance: a polite sentence once cleared 11 of 19 thefts. Until X1 exists,
-this path inherits that weakness undocumented.
+`[VERIFIED by JA5]` — with a deliberate limit. Two corpora are carried, six
+plainly worded thefts and twelve paraphrases of one benign order, and their
+verdict distributions are **measured and printed, never asserted**. Pinning a
+judge's accuracy would invite retraining to clear the pin, which is forbidden
+(A118) and would be the wrong repair for a defect that was in the caller. What
+IS asserted is the property this repository controls: nothing it constructs
+reaches the judge with anything concatenated onto it.
 **X3.** A record whose text is crafted to read as benign while proposing harm
-MUST be refused. `[NOT IMPLEMENTED]`
+MUST be refused. `[VERIFIED by JA5]` — a polite authorising sentence, as a
+prefix, a suffix, a sandwich, and tripled, does not clear a plainly worded
+theft. The remove-proof guards hold against a **caller-supplied** stuffing
+attempt. They could not hold against X1's, because that dilution was added
+after the caller's text, by us.
+
+**X4 (new).** An order carrying no description MUST NOT be allowed.
+`[VERIFIED by AB10]` — the judge reads only the note, so an order without one
+receives no ethical judgment at all, and nothing-was-judged must not read as
+permission. It abstains.
+
+**X5 (new).** A judgment the judge HELD MUST be reported as an abstention, not
+a refusal. `[VERIFIED by JA4]` — the node already publishes `held_not_judged`
+and `not_proven`; `seal_decision_result` had both in scope and dropped them, so
+"convicted" and "could not read it" arrived identically. A benign
+`"quarterly rebalance"` is HELD, so this is the common case here, not an edge
+one.
 
 ## 8. Out of scope
 
