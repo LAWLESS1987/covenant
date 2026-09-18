@@ -1348,7 +1348,15 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
                 alerts.append("highway: %s is present; %s could fix it but this caller "
                               "excluded it" % (name, ", ".join(held_back)))
             else:
-                alerts.append("highway: %s is present and nothing here repairs it" % name)
+                # CARRY THE MEASUREMENT (2026-09-18). A detector with no remedy
+                # is the honest shape for a condition somebody else has to fix
+                # -- and this line used to name only the condition, so the one
+                # alert a person can actually act on arrived with none of the
+                # numbers needed to act. mesh_source_split says which peer is
+                # on which source and when it was last heard; "nothing here
+                # repairs it" without that is a nudge, not a finding.
+                alerts.append("highway: %s is present and nothing here repairs it -- %s"
+                              % (name, json.dumps(c["measured"])[:400]))
     return alerts, infos
 
 

@@ -7866,12 +7866,21 @@ class CovenantAPI:
         # Android's installer, which asks the person holding the phone.
         def _note_app_request(route, signer, offered="", outcome="served", detail=""):
             """Witness one ask at the update door, without letting the witness
-            break the door: a ledger write must never turn a 403 into a 500."""
+            break the door: a ledger write must never turn a 403 into a 500.
+
+            The failure is RECORDED rather than passed. test_security_audit
+            forbids `except: pass` in the core and was right to fail my first
+            draft of this: a witness that can go blind in silence is the exact
+            fault this function exists to fix, one level up. If the ledger
+            cannot be written, that is itself the thing somebody needs to know.
+            """
             try:
                 importlib.import_module("covenant_app_update").note_request(
                     route, signer, offered, outcome, detail)
-            except Exception:                                     # noqa: BLE001
-                pass
+            except Exception as e:                                # noqa: BLE001
+                self.node.anomaly_monitor.record(
+                    "app_update_witness_failed",
+                    "%s: %s: %s" % (route, type(e).__name__, e))
 
         @self.app.route("/app/latest", methods=["GET"])
         def app_latest():

@@ -465,6 +465,13 @@ SUITES = [
     # are the regression that matters -- a drifted PEER must leave source_drift
     # ABSENT. Hermetic except L1-L2, which report NOT RUN with no mesh up.
     ("test_h2_update_witness.py", 120, "DAILY + GUARDS"),
+    # I1 (2026-09-18): the greeter's link is DERIVED from the real remote, and
+    # the line it must not cross -- no tailnet or LAN address, no credential, a
+    # named PC_PEER with no value. Asserted over the rendered message, because
+    # that is what a stranger receives, and I8 drives the leak checks on a
+    # poisoned copy so their green is earned. N1 fetches the derived URL and
+    # reports NOT RUN offline rather than red.
+    ("test_i1_invite.py", 90, "DAILY + GUARDS"),
     # G4 (2026-09-16): all eleven reasons guards.preconditions() can refuse an
     # order, each driven ON and OFF. Hermetic -- every seam is a parameter, the
     # halt file is a temp path via guards.HALT, and it writes nothing. The two
