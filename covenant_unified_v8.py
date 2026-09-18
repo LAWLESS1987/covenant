@@ -7936,10 +7936,52 @@ class CovenantAPI:
             d = _au.latest()
             if not d:
                 return jsonify({"status": "error", "message": "no build fetched yet"}), 404
-            from flask import send_file
-            _au.note_request("/app/apk", who, d.get("sha7", ""), "sending",
-                             "%d bytes" % int(d.get("size") or 0))
-            return send_file(d["path"], mimetype="application/vnd.android.package-archive", as_attachment=True, download_name="covenant-node.apk")
+            # RECORD WHAT ACTUALLY LEFT, not what we intended to send
+            # (2026-09-18, second pass). The first version of this witness
+            # logged "sending" before send_file and stopped there -- so when the
+            # phone began downloading this build every ten minutes and never
+            # installing it, the PC still could not distinguish a TRUNCATED
+            # transfer from an installer that refused a complete one. Those are
+            # again opposite fixes, and a witness with the same blind spot as
+            # the thing it witnesses is the exact fault it was built to remove.
+            #
+            # So the file is streamed through a counting generator instead. A
+            # client that disconnects part way closes the generator, GeneratorExit
+            # fires, and the PARTIAL count is what gets recorded -- which is the
+            # measurement that matters. `sent` is a one-element list because the
+            # closures below have to mutate it.
+            _path, _size = d["path"], int(d.get("size") or 0)
+            _sha7 = d.get("sha7", "")
+            _au.note_request("/app/apk", who, _sha7, "started", "%d bytes to send" % _size)
+            _sent = [0]
+
+            def _stream():
+                try:
+                    with open(_path, "rb") as fh:
+                        while True:
+                            chunk = fh.read(1 << 16)
+                            if not chunk:
+                                break
+                            _sent[0] += len(chunk)
+                            yield chunk
+                except GeneratorExit:
+                    # The client went away. Re-raised so WSGI still unwinds
+                    # normally; the finally below is what records it.
+                    raise
+                finally:
+                    done = _sent[0] >= _size > 0
+                    _note_app_request(
+                        "/app/apk", who, _sha7,
+                        "sent-complete" if done else "sent-PARTIAL",
+                        "%d of %d bytes" % (_sent[0], _size))
+
+            from flask import Response
+            return Response(
+                _stream(), mimetype="application/vnd.android.package-archive",
+                headers={"Content-Length": str(_size),
+                         "Content-Disposition": "attachment; filename=covenant-node.apk",
+                         "Cache-Control": "no-cache",
+                         "Accept-Ranges": "none"})
 
         # ------------------------------------------------------------------
         # THE PHONE'S PLAIN-BROWSER DOOR (2026-09-16).

@@ -315,6 +315,82 @@ def live_checks():
           isinstance(mesh.get("heard_s_ago"), dict),
           json.dumps(mesh.get("heard_s_ago"))[:200])
 
+    # ---- L3-L4: WHAT ACTUALLY LEFT, not what we meant to send -----------
+    #
+    # The first witness logged "sending" BEFORE send_file and stopped there, so
+    # when the phone began downloading a build every ten minutes and never
+    # installing it, this PC still could not tell a TRUNCATED transfer from an
+    # installer refusing a complete one -- a witness carrying the same blind
+    # spot as the thing it witnesses. Both outcomes are driven here against the
+    # REAL route, signed as `pc` (this machine's own registered identity, never
+    # the phone's key), because a generator's early-close behaviour is not
+    # something a fixture can honestly stand in for.
+    import covenant_daily_plan as DP
+    import covenant_app_update as AU
+    try:
+        key = DP.load_key()
+        d = AU.latest()
+    except Exception as e:                                       # noqa: BLE001
+        not_run("L3-L4 the /app/apk transfer records what actually left",
+                f"no signing key or no fetched build here ({type(e).__name__})")
+        return
+    if not d or not key:
+        not_run("L3-L4 the /app/apk transfer records what actually left",
+                "no signing key or no fetched build on this machine")
+        return
+
+    def _get(stop_after=None):
+        hdr = DP.sign_headers(key, "GET", "/app/apk", b"")
+        req = urllib.request.Request("http://127.0.0.1:5000/app/apk", headers=hdr)
+        r = urllib.request.urlopen(req, timeout=180)
+        got = 0
+        try:
+            while True:
+                c = r.read(1 << 16)
+                if not c:
+                    break
+                got += len(c)
+                if stop_after and got >= stop_after:
+                    break
+        finally:
+            r.close()
+        return got
+
+    def _await_outcome(timeout=20.0):
+        """The last /app/apk row once it is no longer `started`.
+
+        The generator's `finally` runs when the WSGI server finishes unwinding
+        the response, which is AFTER the client's last read() returns -- so
+        reading the ledger straight away is a race, and it caught this test
+        before it caught anything else. Polled rather than slept past, because
+        a fixed sleep is a guess that passes on a fast machine and lies on a
+        slow one."""
+        end = time.time() + timeout
+        row = {}
+        while time.time() < end:
+            rows = AU.requests_tail(1, route="/app/apk")
+            row = rows[-1] if rows else {}
+            if row.get("outcome") in ("sent-complete", "sent-PARTIAL"):
+                return row
+            time.sleep(0.25)
+        return row
+
+    got = _get()
+    row = _await_outcome()
+    check("L3 a COMPLETE transfer is recorded as complete, with the byte count",
+          got == d["size"] and row.get("outcome") == "sent-complete"
+          and str(d["size"]) in row.get("detail", ""),
+          f"got={got} row={row.get('outcome')} {row.get('detail')}")
+
+    # BROKEN ON PURPOSE: walk away after 2 MB of ~45.
+    _get(stop_after=2 << 20)
+    row = _await_outcome()
+    check("L4 ...and a client that disconnects part way is recorded as PARTIAL "
+          "-- the distinction the first witness could not make",
+          row.get("outcome") == "sent-PARTIAL"
+          and "of %d bytes" % d["size"] in row.get("detail", ""),
+          f"row={row.get('outcome')} {row.get('detail')}")
+
 
 def main():
     print("H2 -- the update door's witness, and a peer's drift made visible\n")
