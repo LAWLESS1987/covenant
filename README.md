@@ -140,6 +140,17 @@ claims of the author's that did **not** survive checking are recorded alongside 
 
 No names, no personal data, nothing that requires trusting the author.
 
+**→ [Principles spoken before they were built](docs/PRINCIPLES_SPOKEN_BEFORE_BUILT_2026-09-18.md)**
+
+A discovery pass through the author's own reflections found the project's method
+stated in plain language before it was ever written in code — hold a question
+instead of reacting (the two-pass method), refuse finality (why `UNDETERMINED`
+is a real answer), and, load-bearing, the author asking on the record whether
+**repeated claims manufacture shared delusion rather than truth.** That last one
+is self-skepticism aimed inward, before any tool named the confound — and it is
+the reason to trust the smaller, checkable claims. It is continuity of thought,
+not anticipation of any outside result; the write-up says so in those words.
+
 **→ [Succession](docs/SUCCESSION.md)** — how this outlives whoever built it, and
 why publishing a state root lets someone verify a record they cannot read.
 
