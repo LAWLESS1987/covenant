@@ -136,6 +136,43 @@ def main():
               "outvote a fresh red",
               r["state"] == H.PRESENT, r["measured"])
 
+        # P25.D8 -- A REAL REGRESSION, 2026-09-18. The content filter asked only
+        # whether "RESULT:" and "suites run" appeared. A
+        # `covenant_one.py --check` transcript carries both and ends
+        # `RESULT: INCOMPLETE` -- gates only, no sweep, no tally. Running the
+        # gates for convenience therefore wrote the NEWEST matching file, D7's
+        # rule preferred it, the verdict regex could not read it, and the one
+        # detector that watches whether the sweep is green went UNKNOWN with a
+        # perfectly good ONE_SWEEP.txt sitting beside it. The blinding lasted
+        # about an hour and was found by asking why the system was failing.
+        for n in ("ONE_SWEEP.txt", "SWEEP_INVENTED_TOMORROW.txt", "OLD_SWEEP.txt",
+                  "notes.txt"):
+            try:
+                os.remove(os.path.join(tmp, n))
+            except OSError:
+                pass
+        write_sweep(tmp, "ONE_SWEEP.txt", "FAIL", unclean=["test_a126.py"], failed=2)
+        with open(os.path.join(tmp, "ONE_CHECK.txt"), "w", encoding="utf-8") as fh:
+            fh.write("  suites run          0\n"
+                     "  RESULT: INCOMPLETE. Nothing failed; something was not measured.\n")
+        os.utime(os.path.join(tmp, "ONE_CHECK.txt"), None)   # the NEWEST file
+        r = H.detect_sweep_red()
+        check("P25.D8 a --check transcript (RESULT: INCOMPLETE) is NOT a sweep "
+              "verdict, even though it is newest and contains both trigger "
+              "phrases -- the real red is still read",
+              r["state"] == H.PRESENT
+              and r["measured"].get("artifact") == "ONE_SWEEP.txt"
+              and r["measured"].get("unclean") == ["test_a126.py"],
+              r["measured"])
+
+        os.remove(os.path.join(tmp, "ONE_SWEEP.txt"))
+        r = H.detect_sweep_red()
+        check("P25.D8b ...and with ONLY a verdictless transcript the answer is "
+              "UNKNOWN that NAMES what it skipped, never ABSENT",
+              r["state"] == H.UNKNOWN
+              and "ONE_CHECK.txt" in (r["measured"].get("skipped_no_verdict") or []),
+              r["measured"])
+
         # ---- R: the remedy is targeted and honest --------------------------
         ok, why = H.remedy_rerun_unclean({"unclean": []}, dry_run=True)
         check("P25.R1 red with NO unclean suite is refused -- real failing "

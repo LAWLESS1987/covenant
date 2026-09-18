@@ -527,22 +527,40 @@ def detect_sweep_red(health=None):
     """
     import glob
     import re
-    newest = None
+    # A VERDICT, NOT THE WORD "RESULT" (2026-09-18). The content filter asked
+    # only whether the words `RESULT:` and `suites run` appeared, and took the
+    # newest match by mtime. A `covenant_one.py --check` transcript carries both
+    # and ends `RESULT: INCOMPLETE` -- no sweep, no tally -- so running the gates
+    # for convenience wrote a newer file that this detector then PREFERRED and
+    # could not read, and the one detector that watches whether the sweep is
+    # green went UNKNOWN while a real ONE_SWEEP.txt sat beside it. Measured the
+    # same afternoon, on a file I had just created.
+    #
+    # So the filter is the verdict regex itself. An artifact that does not state
+    # PASS or FAIL is not a sweep result, whatever words it contains, and it is
+    # named in `skipped` rather than silently passed over -- a filter that
+    # discards without saying so is how this went unnoticed for an hour.
+    verdict_re = re.compile(r"^\s*RESULT:\s*(PASS|FAIL)", re.M)
+    newest, skipped = None, []
     for p in glob.glob(os.path.join(HERE, "*.txt")):
         try:
             with io.open(p, encoding="utf-8", errors="replace") as fh:
                 txt = fh.read()
         except OSError:
             continue
-        if "RESULT:" not in txt or "suites run" not in txt:
+        if "suites run" not in txt:
             continue                       # a description, not the measurement
+        if not verdict_re.search(txt):
+            skipped.append(os.path.basename(p))
+            continue                       # e.g. a --check run: INCOMPLETE
         mt = os.path.getmtime(p)
         if newest is None or mt > newest[0]:
             newest = (mt, p, txt)
 
     if newest is None:
         return {"state": UNKNOWN,
-                "measured": {"why": "no sweep artifact on disk to read"}}
+                "measured": {"why": "no sweep artifact on disk states PASS or FAIL",
+                             "skipped_no_verdict": sorted(skipped)}}
 
     mt, path, txt = newest
     verdict = "UNKNOWN"
