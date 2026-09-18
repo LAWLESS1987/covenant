@@ -455,6 +455,16 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # H2 (2026-09-18): the update door's WITNESS, and a peer's drift made
+    # visible to the self-heal without handing restart_nodes a condition it
+    # cannot clear. All three faults it covers were live and invisible on the
+    # day it was written: the phone two days behind on core ddfaaa9f704f, no
+    # record anywhere of whether it had ever asked /app/latest (the node keeps
+    # no access log), and mesh.tracked reading 4 for 2 peers because the
+    # outbound and inbound paths keyed peer rows in different namespaces. R1-R3
+    # are the regression that matters -- a drifted PEER must leave source_drift
+    # ABSENT. Hermetic except L1-L2, which report NOT RUN with no mesh up.
+    ("test_h2_update_witness.py", 120, "DAILY + GUARDS"),
     # G4 (2026-09-16): all eleven reasons guards.preconditions() can refuse an
     # order, each driven ON and OFF. Hermetic -- every seam is a parameter, the
     # halt file is a temp path via guards.HALT, and it writes nothing. The two

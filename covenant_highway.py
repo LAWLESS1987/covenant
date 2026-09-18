@@ -156,7 +156,23 @@ def detect_node_down(health=None):
 
 
 def detect_source_drift(health=None):
-    """Nodes running bytes other than the ones on disk."""
+    """LOCAL nodes running bytes other than the ones on disk.
+
+    DELIBERATELY LOCAL, and the boundary is load-bearing. `restart_nodes` is
+    paired to this detector, and restarting the three processes on this PC is
+    the remedy for exactly this condition and no other. On 2026-09-18 the mesh
+    had two sources in it -- the phone on core ddfaaa9f704f, disk and all three
+    local nodes on 7b12fe509061 -- and the tempting fix was to widen this
+    detector's population until it saw the phone. That would have handed
+    restart_nodes a condition it cannot clear: it would restart three healthy
+    nodes, measure the split still PRESENT, be graded "did not fix" twice, and
+    QUARANTINE ITSELF -- the same way fetch_build did when it was paired with
+    app_build_gap (see detect_build_stale_on_pc). A remedy must be graded
+    against the condition it can actually clear.
+
+    The mesh-wide split is a real finding and gets its own detector with no
+    remedy attached: detect_mesh_source_split.
+    """
     import covenant_watchdog as W
     disk = W.disk_source_sha12()
     h = _health() if health is None else health
@@ -167,6 +183,78 @@ def detect_source_drift(health=None):
     off = sorted([k for k, s in live.items() if s and s != disk])
     return {"state": PRESENT if off else ABSENT,
             "measured": {"disk": disk, "live": live, "drifted": off}}
+
+
+def detect_mesh_source_split(health=None):
+    """A PEER in the mesh reporting bytes other than the ones on disk.
+
+    THE GAP THIS CLOSES (2026-09-18). Node A had been saying "mesh is running
+    more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f']"
+    on every self-eval round since at least 05:20, and the highway's own
+    source-drift detector answered `drifted: []` the whole time -- correctly,
+    because it looks at the three nodes it can restart. So the one organ built
+    to notice what is wrong across devices was blind to the only cross-device
+    fault present, and the finding sat in a WARN line for two days. Measured,
+    not inferred: the phone answered its own P2P port with
+    {'v': 'v8.40', 'src': 'ddfaaa9f704f'}, and `git show 13b946a` -- the core
+    commit its build names -- hashes to ddfaaa9f704f at 668,276 bytes.
+
+    NO REMEDY IS ATTACHED, on purpose. Nothing on this PC can clear it: the
+    fix is a new APK installed on a phone, and Android asks the person holding
+    it (free will, rule 5). A detector with no remedy is not a gap -- it is the
+    honest shape for a condition whose repair belongs to somebody else. What it
+    buys is that the condition is now a NUMBER in sense(), not prose in a
+    warning nobody re-reads.
+
+    THE REFERENCE IS THE RUNNING MESH, NOT DISK, and getting that wrong would
+    have made this useless. The first draft compared each peer against
+    `disk_source_sha12()` -- but a phone can only ever run a RELEASED BUILD,
+    and disk moves ahead of every build the moment anyone edits the core. That
+    detector would have read PRESENT for ever, including the instant after the
+    phone updated perfectly, and an alert whose condition cannot become false
+    is one nobody reads (M34). What CAN converge is the mesh agreeing with
+    itself, so the reference is the source the local nodes are actually
+    running -- the same denominator node A's own A20 warning uses. Disk versus
+    the local nodes is a different condition and already has its own detector
+    (source_drift) and its own remedy.
+
+    WHAT IT CANNOT SEE: `mesh.by_source` (A20) carries the last source each
+    peer reported; the age lives beside it in `heard_s_ago` and is reported
+    here, but a peer that has gone silent keeps its last reading for ever, so
+    PRESENT means "a peer has reported a different source", never "two sources
+    are live right now". It is also blind to any peer that has never answered a
+    local node, and to a disagreement between two peers neither of which has
+    spoken to this PC.
+    """
+    h = _health() if health is None else health
+    running, peers, ages = {}, {}, {}
+    for k, v in h.items():
+        if not isinstance(v, dict) or "http" in v:
+            continue
+        if v.get("source_sha256"):
+            running[k] = str(v["source_sha256"])[:12]
+        mesh = v.get("mesh") or {}
+        for src, whos in (mesh.get("by_source") or {}).items():
+            for who in (whos if isinstance(whos, list) else [whos]):
+                peers[str(who)[:64]] = str(src)[:12]
+        for who, age in (mesh.get("heard_s_ago") or {}).items():
+            if isinstance(age, (int, float)):
+                who = str(who)[:64]
+                ages[who] = min(ages.get(who, age), age)
+    ours = sorted(set(running.values()))
+    if not ours:
+        return {"state": UNKNOWN,
+                "measured": {"running": running, "peers": peers,
+                             "why": "no local node reported its own source"}}
+    if not peers:
+        return {"state": UNKNOWN,
+                "measured": {"running": running, "peers": peers,
+                             "why": "no peer has reported a source to any local node"}}
+    off = sorted([w for w, s in peers.items() if s and s not in ours])
+    return {"state": PRESENT if off else ABSENT,
+            "measured": {"running": ours, "peers": peers, "drifted": off,
+                         "heard_s_ago": {w: ages[w] for w in off if w in ages},
+                         "note": "no remedy: a peer's bytes are changed on the peer, by its owner"}}
 
 
 def detect_height_lag(health=None):
@@ -181,13 +269,39 @@ def detect_height_lag(health=None):
 
 
 def detect_app_build_gap(health=None):
-    """A phone holding a build older than the one this PC has fetched."""
+    """A phone holding a build older than the one this PC has fetched.
+
+    NOW CARRIES WHETHER THE PHONE ASKED (2026-09-18). The gap alone cannot say
+    which end is stuck, and for 46.6 h it did not: build 0.1.552 was fetched
+    here at 07:41, the manifest signed cleanly, the phone's signed /checkin
+    arrived every ten minutes -- and the PC had no record of a single ask at
+    /app/latest, because the node keeps no access log at all (grep across
+    logs/ finds 0 for /app/latest AND 0 for `checkin`, while
+    ops/phone_checkins.jsonl holds 615 rows). So `last_ask` comes from the
+    witness ledger covenant_app_update.note_request writes.
+
+    Read it exactly this way: `never` means NOTHING HAS ASKED SINCE THE LEDGER
+    BEGAN (2026-09-18), not that nothing ever asked. An ask recorded `refused`
+    means the fault is this PC's signature; no ask at all, with check-ins
+    arriving, means the fault is on the phone. Those need opposite fixes, which
+    is the whole reason the field is here.
+    """
     try:
         import covenant_daily_plan as dp
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
     alerts, _infos = dp.build_report()
-    return {"state": PRESENT if alerts else ABSENT, "measured": {"alerts": alerts}}
+    ask = {"last_ask": "never (since the witness ledger began)"}
+    try:
+        import covenant_app_update as AU
+        rows = AU.requests_tail(1, route="/app/latest")
+        if rows:
+            ask = {"last_ask": rows[-1].get("t"), "outcome": rows[-1].get("outcome"),
+                   "signer": rows[-1].get("signer"), "detail": rows[-1].get("detail")}
+    except Exception as e:                                       # noqa: BLE001
+        ask = {"last_ask": "unreadable: %s" % type(e).__name__}
+    return {"state": PRESENT if alerts else ABSENT,
+            "measured": dict(ask, alerts=alerts)}
 
 
 def detect_log_bloat(health=None, limit_mb=512):
@@ -460,6 +574,7 @@ DETECTORS = {
     "node_down": detect_node_down,
     "sweep_red": detect_sweep_red,
     "source_drift": detect_source_drift,
+    "mesh_source_split": detect_mesh_source_split,
     "height_lag": detect_height_lag,
     "app_build_gap": detect_app_build_gap,
     "build_stale_on_pc": detect_build_stale_on_pc,

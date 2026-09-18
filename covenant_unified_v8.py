@@ -824,14 +824,33 @@ class PeerStateTable:
             return {k: dict(v) for k, v in self._rows.items()}
 
     def summary(self):
-        """Small enough for /health: who is on what, and anyone disagreeing."""
+        """Small enough for /health: who is on what, when we last heard it, and
+        anyone disagreeing.
+
+        `heard_s_ago` ADDED 2026-09-18, and it is the fact whose absence let a
+        real finding sit for two days. `observe` has always stamped every row
+        with `seen`; this summary dropped it, so a split-source warning built
+        from `by_source` could not say whether the differing peer answered a
+        second ago or last week -- and the operator reading `peers report
+        ['ddfaaa9f704f']` on round after round had no way to tell a live
+        disagreement from a fossil. It was live, as it happens. It could
+        equally not have been, and nothing here could have said so.
+
+        `tracked` and `by_source` keep their exact shape: test_a20's C4b and H1
+        read them, and a summary that changes shape to add a fact breaks the
+        readers that were already right.
+        """
         snap = self.snapshot()
-        srcs = {}
+        now = time.time()
+        srcs, ages = {}, {}
         for k, row in snap.items():
             if row.get("src"):
                 srcs.setdefault(row["src"], []).append(k)
-        return {"tracked": len(snap), "by_source": {k: sorted(v)
-                                                    for k, v in srcs.items()}}
+            if row.get("seen"):
+                ages[k] = round(now - row["seen"], 1)
+        return {"tracked": len(snap),
+                "by_source": {k: sorted(v) for k, v in srcs.items()},
+                "heard_s_ago": ages}
 
 
 class SubstrateSensor:
@@ -7421,8 +7440,26 @@ class P2PNode:
                             # ALL replies land, so the table fills from ordinary
                             # traffic instead of a new poll.
                             try:
+                                # ONE NAMESPACE (2026-09-18). This keyed rows
+                                # by f"{host}:{port}" while the inbound handler
+                                # keys them by resolve_peer_id, so every peer
+                                # this node both sent to and heard from occupied
+                                # TWO rows under two spellings. Measured on node
+                                # A: mesh.tracked read 4 for 2 peers, each
+                                # listed twice in by_source. Cost, beyond the
+                                # doubled count: the 512-row bound the v8.34
+                                # eviction defends filled at twice the rate, and
+                                # observe's change-detection -- the thing that
+                                # makes A7 transmit change instead of state --
+                                # compared each direction only against itself,
+                                # so one source change could record twice and a
+                                # change seen outbound was invisible inbound.
+                                # resolve_peer_id's own docstring is about this
+                                # exact mistake in the conductance table; it
+                                # recurred one layer down.
                                 self.peer_state.observe(
-                                    f"{host}:{port}", verdict,
+                                    self.resolve_peer_id(host, port) or f"{host}:{port}",
+                                    verdict,
                                     monitor=self.anomaly_monitor,
                                     own_src=CORE_SOURCE_SHA12)
                             except Exception as e:
@@ -7827,10 +7864,24 @@ class CovenantAPI:
         # (covenant_app_update.py), served only to a signed GET from a
         # registered signer. The phone verifies the sha256 and hands the file to
         # Android's installer, which asks the person holding the phone.
+        def _note_app_request(route, signer, offered="", outcome="served", detail=""):
+            """Witness one ask at the update door, without letting the witness
+            break the door: a ledger write must never turn a 403 into a 500."""
+            try:
+                importlib.import_module("covenant_app_update").note_request(
+                    route, signer, offered, outcome, detail)
+            except Exception:                                     # noqa: BLE001
+                pass
+
         @self.app.route("/app/latest", methods=["GET"])
         def app_latest():
             ok, who, _pem = _daily_plan_auth(request, b"")
             if not ok:
+                # A REFUSAL IS THE MOST INFORMATIVE EVENT ON THIS ROUTE and was
+                # the one nothing recorded: a phone asking faithfully and being
+                # turned away at the signature looks, from this PC, exactly like
+                # a phone that never asked.
+                _note_app_request("/app/latest", "", "", "refused", who)
                 return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
             try:
                 _au = importlib.import_module("covenant_app_update")
@@ -7854,12 +7905,20 @@ class CovenantAPI:
                 out["doc"], out["sig"], out["spk"] = signed["doc"], signed["sig"], signed["spk"]
             elif isinstance(signed, dict):
                 out["unsigned_because"] = signed.get("message", "the manifest could not be signed")
+            # WITNESS (2026-09-18): this node keeps no access log, so until now
+            # nothing here could tell "the phone never asked" from "the phone
+            # asked and refused the manifest" -- two faults with opposite
+            # fixes. See covenant_app_update.note_request.
+            _au.note_request("/app/latest", who, d.get("sha7", ""),
+                             "served-signed" if "doc" in out else "served-unsigned",
+                             out.get("unsigned_because", ""))
             return jsonify(out)
 
         @self.app.route("/app/apk", methods=["GET"])
         def app_apk():
             ok, who, _pem = _daily_plan_auth(request, b"")
             if not ok:
+                _note_app_request("/app/apk", "", "", "refused", who)
                 return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
             try:
                 _au = importlib.import_module("covenant_app_update")
@@ -7869,6 +7928,8 @@ class CovenantAPI:
             if not d:
                 return jsonify({"status": "error", "message": "no build fetched yet"}), 404
             from flask import send_file
+            _au.note_request("/app/apk", who, d.get("sha7", ""), "sending",
+                             "%d bytes" % int(d.get("size") or 0))
             return send_file(d["path"], mimetype="application/vnd.android.package-archive", as_attachment=True, download_name="covenant-node.apk")
 
         # ------------------------------------------------------------------
@@ -8832,14 +8893,27 @@ class CovenantAPI:
             # disagree about what is a valid block (A7). Said out loud; nothing
             # is refused on account of it -- this node does not get to decide a
             # peer is too old to talk to.
-            _by_src = self.node.peer_state.summary().get("by_source", {})
+            _mesh_sum = self.node.peer_state.summary()
+            _by_src = _mesh_sum.get("by_source", {})
+            _ages = _mesh_sum.get("heard_s_ago", {})
             _others = [k for k in _by_src if k != CORE_SOURCE_SHA12]
             if _others and CORE_SOURCE_SHA12 in _by_src:
+                # 2026-09-18: the freshness is part of the finding, not colour.
+                # This warning stood on every round for two days saying peers
+                # report another source, and a reader could not tell from it
+                # whether that peer was answering right now (it was) or had
+                # gone months ago leaving a row behind. The youngest reading
+                # among the differing peers is the honest summary: if THAT is
+                # old, none of them is current.
+                _diff_ages = [_ages[w] for k in _others for w in _by_src[k]
+                              if w in _ages]
+                _fresh = ("last heard %.0fs ago" % min(_diff_ages)
+                          if _diff_ages else "last heard: unknown")
                 warnings.append(
                     f"mesh is running more than one source: we are "
-                    f"{CORE_SOURCE_SHA12}, peers report {sorted(_others)} -- "
-                    "peers on a different source may disagree about which "
-                    "blocks are valid (A7)")
+                    f"{CORE_SOURCE_SHA12}, peers report {sorted(_others)} "
+                    f"({_fresh}) -- peers on a different source may disagree "
+                    "about which blocks are valid (A7)")
             if CORE_SOURCE_UNREADABLE:                                 # P11 (v8.31)
                 warnings.append(
                     "cannot fingerprint own source "

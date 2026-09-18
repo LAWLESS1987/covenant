@@ -117,6 +117,73 @@ def latest_signed(nonce, key=None):
         return {"status": "error", "message": "cannot sign the update manifest: %s" % type(e).__name__}
 
 
+# ---------------------------------------------------------------- witness --
+REQUESTS = os.path.join(DIR, "requests.jsonl")
+REQUESTS_KEEP = 2000
+
+
+def note_request(route, signer="", offered="", outcome="served", detail=""):
+    """Record that somebody asked the update door for something. Returns nothing.
+
+    WHY THIS EXISTS (2026-09-18). The delivery pipeline was complete and the
+    phone still sat 46.6 h behind: build 0.1.552 fetched to this PC at 07:41,
+    manifest signing verified working, the phone's signed /checkin arriving
+    every ten minutes -- and no way on this machine to answer the one question
+    that matters, "has the phone asked?". The node keeps NO access log: grep
+    for /app/latest across logs/ returns 0 for every file, and grep for
+    `checkin` returns 0 as well while ops/phone_checkins.jsonl holds 615 rows.
+    The check-in route is visible only because it writes its own ledger. So an
+    absence in the logs was never evidence of anything, and a source comment
+    written on 2026-09-16 reasoning from "zero in any log" was resting on a
+    measurement that cannot see the event either way.
+
+    Two failures are indistinguishable without this: an updater that never
+    asks, and one that asks and refuses the answer. They need opposite fixes --
+    the first is on the phone, the second is the signature on this PC -- so a
+    detector that cannot tell them apart cannot point at either.
+
+    Bounded by construction: the file is trimmed to the last REQUESTS_KEEP
+    lines, and every field is coerced and length-capped here rather than
+    trusted, because `signer` arrives from a request header.
+    """
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1),
+           "route": str(route)[:40], "signer": str(signer or "")[:64],
+           "offered": str(offered or "")[:40], "outcome": str(outcome)[:40],
+           "detail": str(detail or "")[:200]}
+    try:
+        os.makedirs(DIR, exist_ok=True)
+        with open(REQUESTS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, sort_keys=True) + "\n")
+        with open(REQUESTS, encoding="utf-8") as fh:
+            lines = fh.readlines()
+        if len(lines) > REQUESTS_KEEP:
+            with open(REQUESTS, "w", encoding="utf-8") as fh:
+                fh.writelines(lines[-REQUESTS_KEEP:])
+    except Exception:                                             # noqa: BLE001
+        # A witness that can break the thing it witnesses is worse than none,
+        # and `except OSError` was not that promise: H2's W6 pointed this at a
+        # path containing a NUL and got a ValueError straight through to the
+        # caller -- which, at the route, is a 500 on the update door in place
+        # of the answer the phone was waiting for. The bare except is the
+        # point here, not laziness: there is no failure of a LEDGER WRITE that
+        # should ever be allowed to change what the door returns.
+        pass
+
+
+def requests_tail(n=20, route=None):
+    """The last `n` recorded asks, oldest first; [] when nothing has asked yet.
+
+    An empty list means NOBODY HAS ASKED SINCE THIS LEDGER EXISTED -- which is
+    not the same as "nobody has ever asked", and any caller reporting on it has
+    to say so out loud (see detect_app_build_gap)."""
+    try:
+        with open(REQUESTS, encoding="utf-8") as fh:
+            rows = [json.loads(l) for l in fh if l.strip()]
+    except (OSError, ValueError):
+        return []
+    if route:
+        rows = [r for r in rows if r.get("route") == route]
+    return rows[-int(n):] if n else rows
 
 
 VERSION_RE = None
