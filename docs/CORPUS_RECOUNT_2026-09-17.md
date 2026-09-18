@@ -16,6 +16,18 @@ On 2026-09-16 I cross-checked `NJEST1987_MEDIA_INDEX_2026-08-29.md` against
 itself, found it internally consistent, and reported that as accuracy. Internal
 consistency is not accuracy. Three faults, and they are one fault:
 
+> **THE READER CANNOT CHECK THIS, and that is stated here rather than left to
+> be discovered.** The data this rests on is in `private/`, which
+> `docs/CONSTITUTION.md` II.4 never publishes -- it names people who did not
+> consent to being recorded. Only its fingerprint is published, in
+> `docs/SUCCESSION_ANCHORS.md`, so an outside reader can verify the data has not
+> been ALTERED but cannot read it and cannot re-run this.
+>
+> Under II.6 ("what is not checked is not claimed") the status of every number
+> below is therefore **observed by the operator, not independently verifiable**.
+> It is not a refutation of the result; it is the honest ceiling on it, and it
+> only lifts when the same test runs on data a reader can open.
+
 - I checked a **document**, not the **data**. `private/*/catalog.csv` existed
   the whole time.
 - The document was **superseded** eight days earlier by `CORPUS_2026-09-09.md`,

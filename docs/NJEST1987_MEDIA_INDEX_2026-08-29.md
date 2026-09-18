@@ -248,6 +248,15 @@ count and the model's own quotation of it. Nothing was ever withheld.
 > 2. **The files-vs-posts finding was not new.** CORPUS_2026-09-09 had already
 >    caught it: *"114 of 114 read compared 114 video FILES against a Media-tab
 >    count of 114 video POSTS."* I presented a known correction as a discovery.
+> **AND THE READER CANNOT COUNT IT EITHER.** `private/` is never published
+> (`docs/CONSTITUTION.md` II.4); only its fingerprint is, in
+> `docs/SUCCESSION_ANCHORS.md`. So the corrected figures below are **observed by
+> the operator and not independently verifiable** (II.6). A reader can check
+> that the catalogues have not been ALTERED, and can check the arithmetic if the
+> operator prints it -- but cannot recount the corpus. Said here because the
+> paragraph it corrects was itself a lesson about trusting a record instead of
+> the data, and the same caution applies to this one.
+>
 > 3. **Neither document is data.** `private/*/catalog.csv` is. Counted there,
 >    the X corpus is **133 files across 124 posts, running to 2026-09-15** --
 >    not the 117/108 below, and not stale at all. The PROSE was 26 days out of

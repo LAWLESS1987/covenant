@@ -42,6 +42,18 @@ more than k% past the line. That is decidable at entry, so it can be tested.
 
 ## What was tested
 
+> **THE READER CANNOT CHECK THIS, and that is stated here rather than left to
+> be discovered.** The data this rests on is in `private/`, which
+> `docs/CONSTITUTION.md` II.4 never publishes -- it names people who did not
+> consent to being recorded. Only its fingerprint is published, in
+> `docs/SUCCESSION_ANCHORS.md`, so an outside reader can verify the data has not
+> been ALTERED but cannot read it and cannot re-run this.
+>
+> Under II.6 ("what is not checked is not claimed") the status of every number
+> below is therefore **observed by the operator, not independently verifiable**.
+> It is not a refutation of the result; it is the honest ceiling on it, and it
+> only lifts when the same test runs on data a reader can open.
+
 Settle-on-flip with a hysteresis band of k, on all 19 daily series in
 `private/data/`, 130 bps round trip — the same cost figure the ledger uses.
 

@@ -481,6 +481,16 @@ SUITES = [
     # it, because pinning a model's accuracy invites retraining to clear it
     # (A118). Hermetic: no node, no network; NOT RUN when no judge can be built.
     ("test_x1_judge_adversarial.py", 180, "DAILY + GUARDS"),
+    # C4 (2026-09-18): a public claim resting on evidence a reader cannot open
+    # must SAY so (CONSTITUTION II.6). Written when the operator objected that
+    # "hiding stuff in a system based off honesty seems wrong" -- and the
+    # objection found something real: 5 published documents cite private/, and
+    # three of them said nothing about the reader being unable to follow the
+    # citation. Not the non-publication; the silence about it at the point of
+    # the claim. Illustrative mentions are exempt BY DECLARATION, one line each
+    # with a reason, because a checker that guessed which brackets were
+    # rhetorical could be talked out of a finding.
+    ("test_c4_uncheckable_claims.py", 60, "DAILY + GUARDS"),
     # G4 (2026-09-16): all eleven reasons guards.preconditions() can refuse an
     # order, each driven ON and OFF. Hermetic -- every seam is a parameter, the
     # halt file is a temp path via guards.HALT, and it writes nothing. The two
