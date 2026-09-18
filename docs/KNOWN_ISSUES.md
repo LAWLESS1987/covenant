@@ -5898,6 +5898,122 @@ deferred per the operator's 2026-09-09 rule.
 
 ---
 
+### A143. [serious / delivery] A dismissed install prompt stopped the phone updating for ever, and the second cause is still not ruled out. PARTLY FIXED 2026-09-18
+
+**Evidence:** the phone sat 46.6 h on app `0.1.475+13b946a`, whose core commit
+`13b946a` hashes to `ddfaaa9f704f` at 668,276 bytes, while the PC and all three
+local nodes ran `7b12fe509061` and the replacing APK had been on this PC since
+07:41. Node A's `/health` named the split on every self-eval round for two days.
+The peer was not a fossil: it answered its own P2P port with
+`{'v': 'v8.40', 'src': 'ddfaaa9f704f'}` when asked directly.
+
+Everything on the PC side was then proved good, which is what narrowed it:
+the phone asks `/app/latest` every ten minutes (`ops/app/requests.jsonl`, 10:35:44
+and 10:45:44, signer `phone`), it is served a signed manifest, and that manifest
+verifies under the phone's own `verify_doc` with the right nonce while being
+refused for a tampered byte, a wrong nonce and another key. **No `/app/apk`
+request was ever recorded**, so the phone stopped before the download. Only two
+statements in `checkForUpdate` can do that.
+
+**Cause 1, FIXED** (covenant-phone `15f4d48`): `offered` was a permanent
+suppression. The first heartbeat that opened an installer session recorded the
+build's sha and every later heartbeat returned at that guard. Android's install
+prompt can be dismissed, missed, or lost behind an activity restart, and a
+dismissed prompt then pinned the app to its old build for the life of the
+service, silently. Now retried at most 6 times per build per service lifetime,
+with the bound announced in the log rather than returning in silence.
+
+**Cause 2, NOT RULED OUT:** if the phone has pinned a PC key that is not the one
+this PC signs with, `checkForUpdate` logs `update REFUSED` and returns — and from
+the PC that is indistinguishable from cause 1, because both produce exactly what
+was observed: a served manifest and no download. `ops/pc.pem` is unchanged since
+2026-09-13 09:41, before the phone's build, which makes it unlikely but does not
+settle it. **It is only settleable on the phone**, in the app's own log. If the
+new build installs, cause 1 was it.
+
+**Why the fix is not verified:** a fix to the updater cannot be tested by the
+updater it fixes. Build `0.1.554+95feec1` carries it and is on this PC; the
+currently-running old app will offer it anyway, because a NEW sha always passed
+the old guard — it was only re-offering the same build that was blocked.
+
+**Repro:** `python -c "import covenant_app_update as A,json;print(json.dumps(A.requests_tail(6),indent=1))"`
+— asks with no `/app/apk` beside them are this bug.
+
+---
+
+### A144. [moderate / delivery] The phone's browser door cannot serve an APK to Chrome, and HTTPS is an account setting. OPEN, found 2026-09-16, measured 2026-09-18
+
+**Evidence:** `/m` and `/m/apk` are served over plain HTTP on port 5000 and
+Chrome on Android refuses to download a `.apk` from a non-HTTPS origin. The
+transport is the whole problem — the file is fine, and `curl` pulls it at
+45,162,040 bytes with the right `Content-Disposition`. `AR_SERVE_HTTPS.bat` was
+written for this on 2026-09-16 and had never been run; measured today it was
+wrong twice over:
+
+* `tailscale serve --bg https / http://127.0.0.1:5000` is refused outright on
+  client 1.102.4 — "the CLI for serve and funnel has changed";
+* and the cert it needs cannot be issued at all. `tailscale cert
+  covenant-pc.tail51e137.ts.net` answers *"your Tailscale account does not
+  support getting TLS certs"* and exits 1; `tailscale status --json` reports
+  `CertDomains: None`.
+
+**Why it matters:** the plain door is the fallback for exactly the case where the
+app's own updater is broken (A143) — and it is unusable from the phone's default
+browser, so the fallback is not one.
+
+**Fix:** enable HTTPS Certificates for the tailnet (admin console → DNS → HTTPS
+Certificates), then run `AR_SERVE_HTTPS.bat`, which now probes for the cert
+first and refuses to pretend. That is an **account-owner decision** and is why
+this is written down rather than done. Two routes need no cert: the app's own
+updater, and Firefox or Samsung Internet at `http://100.112.171.24:5000/m`.
+
+**Repro:** `tailscale cert covenant-pc.tail51e137.ts.net; echo $?`
+
+---
+
+### A145. [moderate / judging] The nightly retrain made the 3.0 margin a no-op, and A126 broke exactly as it was written to. OPEN, found 2026-09-18 — NOT FIXED ON PURPOSE
+
+**Evidence:** `test_a126_seat_dispositions.py` was 12/12 in the 2026-09-17 12:36
+sweep and is 10/12 now. `fallback_model.json` was rewritten by the nightly at
+2026-09-18 03:44, seven hours before the session that found this, and no judge
+code changed in between. The two failing checks:
+
+    A126.M1a margin 3.0 still removes NO false convictions and costs a correct
+             one -- strictly worse on both counts  -- ((38, 7, 0, 8), (38, 7, 0, 8))
+    A126.M2  ...and it costs correct convictions, so it is worse on both counts  -- (38, 38)
+
+Base and margin-3.0 now measure **identically**: `(38, 7, 0, 8)` both. So 3.0
+removes nothing and costs nothing — it is a no-op on this model, which is
+neither the old claim ("worse on both counts") nor the failure mode the suite
+warned about ("remove convictions for free").
+
+**The suite predicted this in writing.** Its comment above M1a says both halves
+stay falsifiable and that M1a breaks if a future model made margin 3.0 remove
+convictions for free. The guard worked. What it is reporting is a real change in
+the judge's behaviour, not a stale expectation.
+
+**Why it is left red:** restating the claim to match the new numbers is moving a
+check to make it pass, and this check is about the judge that **block validity
+rides on**. The finding it carries survives either restatement — raising the
+margin still buys no false convictions cheaply — so there is nothing to gain by
+editing it and a precedent to lose. Whether the claim should be restated at the
+strength the new data supports is the operator's call, not a repair.
+
+**The consequential question IS answered.** `test_a124_chain_syncable.py` is 3/3
+run in the working tree beside the real node database: no transaction already in
+the chain is convicted by the deployed elder, the closest payload is block 12 at
+`+1.8418` — margin `0.5582` to the 2.4 hold threshold — against the 0.18 drift
+this model has shown in six days. **The chain is still joinable.** A124 is a
+NO-OP inside the sweep (it needs a node DB the sweep wipes), so a green sweep
+never covers it and this had to be run by hand.
+
+**Repro:** `python test_a126_seat_dispositions.py` then
+`python test_a124_chain_syncable.py` in the working tree. Do NOT retrain to
+clear either (A118).
+
+
+---
+
 ## Green, 2026-09-17 — what it means and what it does not
 
     RESULT: PASS. Everything this runner names was measured and correct.

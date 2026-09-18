@@ -597,6 +597,41 @@ def main():
     check("H1w ...and a dry run says what it WOULD do without doing it",
           ok_rr2 is True and "would re-run" in why_rr2, why_rr2)
 
+    # mesh_source_split arrived 2026-09-18 and H1v caught it with no coverage
+    # here, which is again exactly what H1v is for. Its behaviour is pinned in
+    # test_h2_update_witness.py (S1-S6, R1-R3); what is driven HERE is the one
+    # property this file is about -- the class boundary. It is the first
+    # registered detector with NO remedy on purpose, because the condition is a
+    # peer's bytes and nothing on this PC may change those (rule 5: the phone is
+    # asked, never pushed). If a remedy is ever pointed at it, that is a remedy
+    # graded against a condition it cannot clear, and the fetch_build quarantine
+    # is what that costs.
+    def _mesh_health(local, peer_src):
+        return {"A": {"source_sha256": local, "mesh": {
+            "tracked": 1, "by_source": {peer_src: ["phone:5001"]},
+            "heard_s_ago": {"phone:5001": 9.0}}}}
+
+    r_ms = H.detect_mesh_source_split(health=_mesh_health("aaaaaaaaaaaa", "ffffffffffff"))
+    check("H1w mesh_source_split is PRESENT for a peer off the running mesh, "
+          "and carries the peer, its bytes and the age of the reading",
+          r_ms["state"] == H.PRESENT
+          and r_ms["measured"]["drifted"] == ["phone:5001"]
+          and r_ms["measured"]["heard_s_ago"] == {"phone:5001": 9.0}, r_ms["measured"])
+    r_ms2 = H.detect_mesh_source_split(health=_mesh_health("aaaaaaaaaaaa", "aaaaaaaaaaaa"))
+    check("H1w ...and ABSENT when the peer matches, so the condition can clear",
+          r_ms2["state"] == H.ABSENT and r_ms2["measured"]["drifted"] == [],
+          r_ms2["measured"])
+    check("H1w mesh_source_split has NO remedy pointed at it -- a condition "
+          "this machine cannot clear must not grade one",
+          [n for n, r in H.REMEDIES.items()
+           if "mesh_source_split" in (r.get("for") or [])] == [],
+          str({n: r.get("for") for n, r in H.REMEDIES.items()}))
+    a_ms, _i_ms = H.run_once(dry_run=True, health=_mesh_health("aaaaaaaaaaaa", "ffffffffffff"))
+    check("H1w ...and run_once still ALERTS on it, with the numbers -- a finding "
+          "with no remedy is not a finding nobody is told about",
+          any("mesh_source_split" in a and "phone:5001" in a for a in a_ms),
+          str([a[:120] for a in a_ms if "mesh_source_split" in a]))
+
     # ---- H1v: nothing registered may go undriven, and every detector must
     # be able to say UNKNOWN
     #
