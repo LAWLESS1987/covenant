@@ -356,6 +356,32 @@ def live_checks():
             r.close()
         return got
 
+    # THE SIGNED DOOR IS NOT OPEN EVERYWHERE, and finding that out by traceback
+    # cost this suite its whole tally (2026-09-18). Run inside covenant_one the
+    # first version raised `HTTPError: 403 FORBIDDEN` here -- the runner stages
+    # to a temp directory, so ops/daily_plan_signers.json is not the one this
+    # key is registered in -- and an unhandled exception meant the suite printed
+    # NO tally line at all: 27 checks that HAD passed were scored NO RESULT.
+    # A section that cannot run is neither a pass nor a failure; it has to be
+    # named and the rest has to survive it (the rule test_a20's not_run was
+    # written for, which I had read).
+    try:
+        _probe = DP.sign_headers(key, "GET", "/app/apk", b"")
+        urllib.request.urlopen(
+            urllib.request.Request("http://127.0.0.1:5000/app/apk", headers=_probe),
+            timeout=30).close()
+    except urllib.error.HTTPError as e:
+        not_run("L3-L4 the /app/apk transfer records what actually left",
+                f"this environment's key is not a registered signer for the live "
+                f"node (HTTP {e.code}) -- the runner stages to a temp dir with its "
+                f"own ops/, so the signed door is closed there. Run this suite in "
+                f"the working tree to measure L3-L4.")
+        return
+    except (urllib.error.URLError, OSError, TimeoutError) as e:
+        not_run("L3-L4 the /app/apk transfer records what actually left",
+                f"the signed door did not answer ({type(e).__name__})")
+        return
+
     def _await_outcome(timeout=20.0):
         """The last /app/apk row once it is no longer `started`.
 
@@ -394,11 +420,22 @@ def live_checks():
 
 def main():
     print("H2 -- the update door's witness, and a peer's drift made visible\n")
-    witness_checks()
-    split_checks()
-    namespace_checks()
-    age_checks()
-    live_checks()
+    # NO SECTION MAY TAKE THE TALLY DOWN WITH IT (2026-09-18). One unhandled
+    # HTTPError in live_checks cost this suite its tally line inside
+    # covenant_one, and the runner scored 27 passing checks as NO RESULT --
+    # strictly worse than a FAIL, because a failure is at least a number. A
+    # section that dies is recorded as a failed check naming the exception, and
+    # every other section still runs and still counts.
+    for name, fn in (("witness", witness_checks), ("split", split_checks),
+                     ("namespace", namespace_checks), ("age", age_checks),
+                     ("live", live_checks)):
+        try:
+            fn()
+        except Exception as e:                                   # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            check("X1 the %s section ran without raising" % name, False,
+                  "%s: %s" % (type(e).__name__, e))
     ok = sum(1 for _, o, _ in results if o)
     print(f"\n{ok}/{len(results)} passed")
     if UNRUN:
