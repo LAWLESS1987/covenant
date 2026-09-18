@@ -85,4 +85,11 @@ print(f"[node] providers={os.environ['COVENANT_JUDGE_PROVIDERS']} | student {_st
       f"fail-closed, insecure mock OFF", flush=True)
 
 if __name__ == "__main__":
+    # `--invite` prints the front-door bootstrap link and exits before the node
+    # boots. It is a greeter, not a spreader: a link to the public repo that a
+    # consenting human reads and runs. See covenant_invite.py for why it embeds
+    # no live peer address and no token.
+    if "--invite" in sys.argv[1:]:
+        import covenant_invite
+        raise SystemExit(covenant_invite.main())
     cov.main()
