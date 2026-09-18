@@ -79,18 +79,88 @@ def admitted(res):
     return bool(res.get("ok")) and str(res.get("admission") or "").startswith("admitted")
 
 
+# ---- THE THREE VERDICTS (2026-09-18, spec A1-A4) --------------------------
+ALLOW, REFUSE, ABSTAIN = "allow", "refuse", "abstain"
+
+
+def _envelope(sealed, refused_by, abstained_by):
+    """The verdict fields. `ok` stays exactly what it was: permission, nothing
+    else, and only ever True in the ALLOW case.
+
+    PRECEDENCE: a refusal outranks an abstention. Measured 2026-09-18, one $25
+    buy returns BOTH "Rule 5: 2 sealed signals on record, need 30" AND
+    "no portfolio was supplied ... could not be evaluated" -- a rule deciding
+    and this system unable to tell, in the same answer. So these were never
+    three exclusive states. When a rule has said no, the honest verdict is
+    REFUSE: something decided. ABSTAIN is for when nothing did.
+
+    Both are fail-closed. `ok` is False for either, and A4 holds by
+    construction -- there is no field a caller can combine to turn an
+    abstention into permission, because `ok` is computed here and an abstention
+    never produces True.
+    """
+    if not sealed:
+        # The judge refused, or was never asked. `refused_by`/`abstained_by`
+        # carry which, and the caller reads `verdict`.
+        verdict = ABSTAIN if abstained_by and not refused_by else REFUSE
+    elif refused_by:
+        verdict = REFUSE
+    elif abstained_by:
+        verdict = ABSTAIN
+    else:
+        verdict = ALLOW
+    return {"ok": verdict == ALLOW,
+            "verdict": verdict,
+            "refused_by": list(refused_by),
+            "abstained_by": list(abstained_by)}
+
+
+CANNOT_EVALUATE = "the preconditions could not be evaluated (%s: %s) -- refusing"
+
+
+def _bad_request(why):
+    """A refusal of the REQUEST, carrying the full envelope.
+
+    EVERY body this service emits carries `verdict` (spec A1). These paths
+    returned {"ok": False, "detail": ...} with no verdict field, so a caller
+    switching on the verdict got null -- and null is not "refuse". It is
+    fail-closed either way, because E9 makes any non-200 a refusal, but a
+    caller with no null branch falls through a hole instead of meeting a state.
+    A malformed request IS a decision: the request was read and rejected.
+    """
+    return dict(_envelope(False, [why], []), admission=None, sealed=False,
+                blocked_by=[why], detail=str(why)[:300], tx_id=None)
+
+
 def _blocked_by(gate_order, cfg, sealed, gate=None):
-    """The trader's preconditions, asked of this proposal. Anything that goes
-    wrong here REFUSES; a gate that cannot evaluate must not admit."""
+    """(reasons, abstentions) from the trader's preconditions.
+
+    Anything that goes wrong here still REFUSES -- a gate that cannot evaluate
+    must not admit -- but it is now reported as an ABSTENTION rather than as a
+    guard's decision. Until 2026-09-18 this returned the "could not be
+    evaluated" string inside the same list as "Rule 5: 2 sealed signals on
+    record, need 30", so an exception in the guard stack was indistinguishable
+    from a rule refusing. An abstention wearing a refusal's clothes.
+
+    An injected `gate` (tests) returns a flat list, which is read as all
+    decisions: a fixture has no opinion about abstention and must not be given
+    one silently.
+    """
     if gate is not None:
-        return list(gate(gate_order, cfg))
+        return list(gate(gate_order, cfg)), []
     try:
         import guards as G
-        return list(G.preconditions(gate_order, cfg=cfg, sealed_ok=sealed,
-                                    guard_blocks=None, caller="sentinel"))
+        reasons = list(G.preconditions(gate_order, cfg=cfg, sealed_ok=sealed,
+                                       guard_blocks=None, caller="sentinel"))
     except Exception as e:                                        # noqa: BLE001
-        return ["the preconditions could not be evaluated (%s: %s) -- refusing"
-                % (type(e).__name__, str(e)[:120])]
+        return [], [CANNOT_EVALUATE % (type(e).__name__, str(e)[:120])]
+    try:
+        return G.split_reasons(reasons)
+    except AttributeError:
+        # An older guards.py with no classifier: every reason counts as a
+        # decision. Wrong in the safe direction -- it can only overstate what
+        # was decided, never understate a refusal.
+        return reasons, []
 
 
 def seal(order, sealer=None, cfg=None, gate=None):
@@ -98,10 +168,10 @@ def seal(order, sealer=None, cfg=None, gate=None):
     try:
         v, s, side, amt = order.get("venue"), order.get("symbol"), order.get("side"), order.get("amountUsd")
         if not v or not s or side not in ("buy", "sell"):
-            return 400, {"ok": False, "detail": "order is missing venue, symbol or side"}
+            return 400, _bad_request("order is missing venue, symbol or side")
         amt = float(amt)
         if not (amt > 0) or amt != amt or amt in (float("inf"),):
-            return 400, {"ok": False, "detail": "amountUsd must be a finite positive number"}
+            return 400, _bad_request("amountUsd must be a finite positive number")
         record = {"venue": str(v)[:40], "symbol": str(s)[:20], "side": side, "amount_usd": amt,
                   "text": "proposed %s of $%.2f %s on %s: %s" % (side, amt, s, v, str(order.get("note", ""))[:300]),
                   "source": "sentinel_witness"}
@@ -117,18 +187,28 @@ def seal(order, sealer=None, cfg=None, gate=None):
         # conjunction. guards.preconditions with caller="sentinel" can only
         # add reasons, never remove one, so this cannot be looser than the
         # trader on the same order.
-        blocked = [] if not sealed else _blocked_by(
+        refused_by, abstained_by = ([], []) if not sealed else _blocked_by(
             {"side": side, "usd": amt, "sym": str(s)[:20]}, cfg, sealed, gate)
-        if blocked:
-            detail = (detail + " || refused by: " + "; ".join(blocked))
-        return 200, {"ok": sealed and not blocked,
-                     "admission": "admitted" if sealed else "refused",
-                     "sealed": sealed,
-                     "blocked_by": blocked,
-                     "detail": detail[:300],
-                     "tx_id": res.get("tx_id")}
+        blocked = refused_by + abstained_by
+        if refused_by:
+            detail = (detail + " || refused by: " + "; ".join(refused_by))
+        if abstained_by:
+            detail = (detail + " || could not decide: " + "; ".join(abstained_by))
+        return 200, dict(_envelope(sealed, refused_by, abstained_by),
+                         admission="admitted" if sealed else "refused",
+                         sealed=sealed,
+                         blocked_by=blocked,
+                         detail=detail[:300],
+                         tx_id=res.get("tx_id"))
     except Exception as e:                                        # noqa: BLE001 -- any failure refuses
-        return 500, {"ok": False, "detail": "seal failed: %s: %s" % (type(e).__name__, str(e)[:200])}
+        # THE SEAL ITSELF FAILED, so no authority reached a decision: the node
+        # was unreachable, the sealer raised, the config would not load. That is
+        # an ABSTENTION, and reporting it as a refusal is what made "the judge
+        # said no" and "nobody could ask the judge" the same answer from here.
+        why = "seal failed: %s: %s" % (type(e).__name__, str(e)[:200])
+        return 500, dict(_envelope(False, [], [why]),
+                         admission=None, sealed=False, blocked_by=[why],
+                         detail=why[:300], tx_id=None)
 
 
 def make_handler(sealer=None, cfg=None, gate=None):
@@ -146,24 +226,24 @@ def make_handler(sealer=None, cfg=None, gate=None):
 
         def do_POST(self):
             if self.path.split("?", 1)[0] != "/seal":
-                return self._send(404, {"ok": False, "detail": "only POST /seal exists here"})
+                return self._send(404, _bad_request("only POST /seal exists here"))
             try:
                 n = int(self.headers.get("Content-Length", "0"))
             except ValueError:
-                return self._send(400, {"ok": False, "detail": "bad Content-Length"})
+                return self._send(400, _bad_request("bad Content-Length"))
             if n <= 0 or n > MAX_BODY:
-                return self._send(400, {"ok": False, "detail": "body must be 1..%d bytes" % MAX_BODY})
+                return self._send(400, _bad_request("body must be 1..%d bytes" % MAX_BODY))
             try:
                 order = json.loads(self.rfile.read(n).decode("utf-8"))
                 if not isinstance(order, dict):
                     raise ValueError("not an object")
             except (ValueError, UnicodeDecodeError) as e:
-                return self._send(400, {"ok": False, "detail": "body is not a JSON object: %s" % e})
+                return self._send(400, _bad_request("body is not a JSON object: %s" % e))
             code, body = seal(order, sealer, cfg, gate)
             self._send(code, body)
 
         def do_GET(self):
-            self._send(405, {"ok": False, "detail": "POST /seal only"})
+            self._send(405, _bad_request("POST /seal only"))
 
     return H
 

@@ -12,6 +12,9 @@ WHAT IT MEASURES
   uncited checks    ids the suite emits that no requirement cites. Reported, not
                     failed: a suite is allowed to be broader than the spec, but
                     a reader should be told by how much.
+  blind             this tool's id count disagreeing with the suite's own tally.
+                    MUST be 0, because every other number here is meaningless
+                    while it is not -- see THE PATTERN below.
 
 WHY IT RUNS THE SUITE instead of grepping it. The ids are read from the suite's
 OUTPUT, not from its source. Grepping the source would count a check that is
@@ -19,14 +22,25 @@ defined and never reached -- and this repository has shipped exactly that
 (35 of 36 suspected guards once grepped source text instead of running the
 code). An id only counts here if a check actually printed it.
 
-THE REGEX IS THE PART THAT WAS WRONG FIRST. Ids carry optional letter suffixes
--- J3, J3b, J3c -- and a pattern of [SJ]\\d+\\b silently dropped the suffixed
-ones, reporting 26 checks where there are 28. That produced a spec table that
-counted ids-matching-a-pattern and called them checks: two denominators, one
-number. The suffix is not optional in the pattern.
+THE PATTERN WAS WRONG THREE TIMES, so it is worth the paragraph:
 
-  python tools/spec_conformance.py           check, exit 1 on a ghost citation
-  python tools/spec_conformance.py --list    print both id sets
+  1. `[SJ]\\d+\\b` -- dropped the suffixed ids (J3b, J3c), reporting 26 checks
+     where there were 28. That fed a spec table which counted
+     ids-matching-a-pattern and called them checks: two denominators, one
+     number.
+  2. `[SJ]...` -- hardcoded the two prefixes that existed on the day. The
+     moment abstention added AB1-AB9 and WS1-WS3, this went blind to 12 of 40
+     checks WHILE REPORTING "ghost citations 0" -- a clean bill of health from
+     a checker that could not see the subject. Caught only because `check`
+     prints the suite's own tally beside its id count; that comparison is an
+     assertion now (`blind`), so the next widened namespace fails loudly.
+  3. `[A-Z]\\d{1,2}` -- one letter, so it read "AB1" as "B1" and invented ten
+     ghost citations that were really its own mis-parse. Hence {1,3}, and hence
+     word boundaries on BOTH scans: without them a multi-letter id matches from
+     its second letter.
+
+  python tools/spec_conformance.py           check; exit 1 on a ghost or blindness
+  python tools/spec_conformance.py --list    print the id sets
 """
 from __future__ import annotations
 
@@ -40,35 +54,52 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPEC = os.path.join(HERE, "docs", "SENTINEL_WITNESS_SPEC.md")
 SUITE = os.path.join(HERE, "test_sentinel_gate.py")
 
-ID = r"[SJ]\d{1,2}[a-z]?"
+#: A check id: one to three uppercase letters, one or two digits, an optional
+#: lowercase suffix. S19, J3c, AB7, WS1 are all ids. Requirement ids in the spec
+#: use prefixes the suite does not (E*, F*, W1-W4, X*), which is what keeps a
+#: [VERIFIED by ...] tag from being read as pointing at another requirement.
+ID = r"[A-Z]{1,3}\d{1,2}[a-z]?"
+CITED = re.compile(r"\b(" + ID + r")\b")
+TAG = re.compile(r"\[VERIFIED by ([^\]]+)\]")
+LINE = re.compile(r"^\s*(?:PASS|FAIL)\s+(" + ID + r")\b", re.M)
+TALLY = re.compile(r"SENTINEL-GATE:\s*(\d+)/(\d+)")
+PARTS = re.compile(r"([A-Z]+)(\d+)([a-z]?)")
 
 
 def _key(s):
-    return (s[0], int(re.match(r"[SJ](\d+)", s).group(1)), s)
+    """Sort key for an id, tolerant of any prefix because ID is.
+
+    This hardcoded [SJ] too, and raised AttributeError on the first A-prefixed
+    id -- the same assumption as the pattern, in the function that sorts the
+    pattern's output. Widening one and not the other turned a silent blind spot
+    into a crash: the better failure, but the same bug twice in one file.
+    """
+    m = PARTS.match(str(s))
+    return (m.group(1), int(m.group(2)), m.group(3)) if m else (str(s), 0, "")
 
 
 def suite_ids(timeout=300):
-    """The ids the suite actually PRINTS, plus its own tally line."""
+    """(ids the suite PRINTED, its own tally) -- or (ids, None) if no tally."""
     r = subprocess.run([sys.executable, SUITE], capture_output=True, text=True,
                        timeout=timeout, cwd=HERE)
     out = r.stdout + r.stderr
-    ids = set(re.findall(r"^\s*(?:PASS|FAIL)\s+(%s)\b" % ID, out, re.M))
-    m = re.search(r"SENTINEL-GATE:\s*(\d+)/(\d+)", out)
-    tally = (int(m.group(1)), int(m.group(2))) if m else None
-    return ids, tally
+    m = TALLY.search(out)
+    return set(LINE.findall(out)), ((int(m.group(1)), int(m.group(2))) if m else None)
 
 
 def spec_ids():
+    """(cited, mentioned). CITED means inside a [VERIFIED by ...] tag.
+
+    The distinction is load-bearing. Section 10 names J3b, J3c and J7 in prose
+    precisely to say they are NOT cited; counting a prose mention as a citation
+    would let the sentence admitting a gap be read as closing it.
+    """
     with open(SPEC, encoding="utf-8") as fh:
         text = fh.read()
-    # Only ids inside a [VERIFIED by ...] tag are CITATIONS. A bare id in prose
-    # is discussion -- the correction note in section 10 names J3b, J3c and J7
-    # precisely to say they are NOT cited, and counting those as citations would
-    # make this tool report success for the sentence admitting the gap.
     cited = set()
-    for tag in re.findall(r"\[VERIFIED by ([^\]]+)\]", text):
-        cited.update(re.findall(ID, tag))
-    return cited, set(re.findall(r"\b(%s)\b" % ID, text))
+    for tag in TAG.findall(text):
+        cited.update(CITED.findall(tag))
+    return cited, set(CITED.findall(text))
 
 
 def check(say=print, timeout=300):
@@ -76,6 +107,7 @@ def check(say=print, timeout=300):
     cited, mentioned = spec_ids()
     ghosts = sorted(cited - real, key=_key)
     uncited = sorted(real - cited, key=_key)
+    blind = bool(tally) and len(real) != tally[1]
 
     say("Sentinel-Witness spec conformance")
     say("  suite emits            %3d check id(s)%s"
@@ -83,38 +115,43 @@ def check(say=print, timeout=300):
     say("  spec CITES             %3d  (inside a [VERIFIED by ...] tag)" % len(cited))
     say("  spec mentions in prose %3d" % len(mentioned))
     say("")
+    if blind:
+        say("  BLIND: found %d id(s), the suite counted %d check(s) -- %d unseen."
+            % (len(real), tally[1], tally[1] - len(real)))
+        say("  Every number above is void while this is true. Widen ID.")
+        say("")
     if ghosts:
         say("  GHOST CITATIONS -- the spec claims a check that does not exist:")
         for g in ghosts:
             say("      %s" % g)
-        say("")
-        say("  This is section 9's failure: a requirement asserting a measurement")
-        say("  it does not have. Either the id is a typo or the check was removed.")
+        say("  Section 9's failure: a requirement asserting a measurement it does")
+        say("  not have. Either the id is a typo or the check was removed.")
     else:
-        say("  ghost citations        0  -- every cited check exists and ran")
+        say("  ghost citations          0  -- every cited check exists and ran")
     if uncited:
-        say("  uncited checks         %d  -> %s" % (len(uncited), ", ".join(uncited)))
+        say("  uncited checks          %2d  -> %s" % (len(uncited), ", ".join(uncited)))
         say("      Not a failure: the suite may be broader than the spec. It means")
         say("      the spec is narrower by exactly these, and says so in section 10.")
     else:
-        say("  uncited checks         0")
+        say("  uncited checks           0")
     if tally and tally[0] != tally[1]:
         say("")
-        say("  NOTE: the suite is RED (%d/%d). Citations to a failing check are" % tally)
-        say("  citations to a measurement that did not pass." )
-    return not ghosts
+        say("  NOTE: the suite is RED (%d/%d). A citation to a failing check is a"
+            % tally)
+        say("  citation to a measurement that did not pass.")
+    return not ghosts and not blind
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--list", action="store_true", help="print both id sets and exit")
+    ap.add_argument("--list", action="store_true", help="print the id sets and exit")
     a = ap.parse_args(argv)
     if a.list:
         real, tally = suite_ids()
         cited, mentioned = spec_ids()
-        print("suite :", ", ".join(sorted(real, key=_key)))
-        print("cited :", ", ".join(sorted(cited, key=_key)))
-        print("prose :", ", ".join(sorted(mentioned, key=_key)))
+        print("suite (%d):" % len(real), ", ".join(sorted(real, key=_key)))
+        print("cited (%d):" % len(cited), ", ".join(sorted(cited, key=_key)))
+        print("prose (%d):" % len(mentioned), ", ".join(sorted(mentioned, key=_key)))
         return 0
     return 0 if check() else 1
 

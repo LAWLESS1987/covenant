@@ -8,9 +8,13 @@ one is a matter of opinion afterwards.
 
 **Status: v0.1, and DESCRIPTIVE WHERE IT SAYS SO.** Every requirement below is
 marked with what actually verifies it today. A requirement with no check is
-marked `UNVERIFIED` and is a claim about intent, not about the system. Three
-requirements are marked `NOT IMPLEMENTED` — they are holes this document exists
-to name, not features it is announcing.
+marked `UNVERIFIED` and is a claim about intent, not about the system; one marked
+`NOT IMPLEMENTED` is a hole this document names rather than a feature it
+announces.
+
+**Requirement ids** (`W*`, `E*`, `F*`, `A*`, `X*`) and **check ids**
+(`S*`, `J*`, `AB*`, `WS*`) are separate namespaces on purpose, so a
+`[VERIFIED by …]` tag can never be read as pointing at another requirement.
 
 Frozen baseline this describes: `docs/SENTINEL_BASELINE.md`, commit `fa13845`.
 
@@ -30,8 +34,8 @@ It is **not**:
   order, and this document is not a step toward adding one.
 * an intelligence — see §3. The witness records; it must not decide.
 * a source of truth about market state — it evaluates a proposal against rules
-  and holdings supplied to it, and when those are absent it must abstain (§6),
-  which today it does not (§6.3).
+  and holdings supplied to it, and when those are absent it **abstains** (§6),
+  which as of 2026-09-18 it does, and says so in the answer.
 
 ## 2. Normative language
 
@@ -41,7 +45,8 @@ It is **not**:
 
 Each requirement carries a tag: `[VERIFIED by <check>]`, `[UNVERIFIED]`, or
 `[NOT IMPLEMENTED]`. Check ids are from `test_sentinel_gate.py`, measured at
-28/28 on 2026-09-18.
+**40/40** on 2026-09-18 (28 at the freeze, plus `AB1`–`AB9` for abstention and
+`WS1`–`WS3` for the witness separation). Counted, never hand-tallied — see §10.
 
 ## 3. The witness and the judge are different things
 
@@ -62,13 +67,35 @@ authority on its own correctness. Four roles, and they MUST stay distinct:
 before the guards run and happens either way.
 
 **W2.** The witness MUST NOT be consulted as an authority on whether to allow.
-`[UNVERIFIED]` — true by construction today (nothing reads the chain back to
-decide), but nothing checks that it stays true. **This is the gap step 3 should
-close, and it is a check, not a refactor.**
+`[VERIFIED by WS1, WS2, WS3]` — and it was a check, not a refactor, exactly as
+this section predicted. **WS1:** `_envelope`'s parameters are *only* `sealed`,
+`refused_by`, `abstained_by` — the record, its `tx_id` and its prose are not
+arguments to the verdict at all, asserted by introspecting the function rather
+than by reading its text. **WS2:** a proposal the guards refuse was still sealed
+(the sealer's calls are counted), so this is an audit trail and not a list of
+permissions. **WS3:** two records differing only in `tx_id` and `detail` produce
+an identical verdict — the record cannot vote.
+
+Two things worth recording about writing these. An earlier draft of WS1/WS2
+grepped `seal_service.py` for the absence of the string `tx_id` — the fake-guard
+shape this repository has already paid for — and both were rewritten to drive
+the running objects. And they were first *named* `W2a`–`W2c`, colliding with
+this requirement's own id — a tag reading *"VERIFIED by A1"* could not be read
+as pointing at a requirement or at a check. Check ids now take prefixes no
+requirement uses (`AB*`, `WS*`).
+
+**A note for anyone editing this file:** `tools/spec_conformance.py` cannot tell
+an *example* of a tag from a real one, and should not try — so an illustration
+must never be written in the tag's own syntax. The sentence above originally
+was, and the tool correctly reported a ghost citation to a check named `A1`.
+That is the right failure: a checker that guessed which brackets were rhetorical
+would be a checker that could be talked out of a finding.
 
 **W3.** The JUDGE's verdict and the GUARD's verdict MUST be separately legible
-in the answer. `[VERIFIED by S14, S15]` — `sealed` carries the judge, and
-`blocked_by` is a list carrying the guards' reasons; `detail` names them.
+in the answer. `[VERIFIED by S14, S15, AB2, AB3]` — `sealed` and `admission`
+carry the judge; `refused_by` carries the guards' decisions and `abstained_by`
+what nothing could decide. `blocked_by` remains the union of the two, so no
+reader written against the older envelope breaks.
 
 **W4.** The GUARD MUST be the same implementation the trader uses, and the
 sentinel path MUST NOT be able to loosen it.
@@ -104,10 +131,13 @@ non-finite or non-positive `amountUsd`. `[VERIFIED by S5, S6]`
 
 | field | type | meaning |
 |---|---|---|
-| `ok` | bool | **the only field a caller may act on.** `sealed AND NOT blocked_by` |
-| `admission` | string | the judge's verdict, normalised: `"admitted"` \| `"refused"` |
+| `ok` | bool | **the only field a caller may act on.** True only when `verdict == "allow"` |
+| `verdict` | string | `"allow"` \| `"refuse"` \| `"abstain"` — see §6 |
+| `refused_by` | string[] | reasons a rule DECIDED against the order |
+| `abstained_by` | string[] | reasons NOTHING could decide |
+| `admission` | string \| null | the judge's answer: `"admitted"` \| `"refused"`, or null when the judge was never reached |
 | `sealed` | bool | the judge admitted the record to the chain |
-| `blocked_by` | string[] | the guards' reasons; `[]` means the guards refused nothing |
+| `blocked_by` | string[] | `refused_by + abstained_by`, kept for readers of the pre-2026-09-18 envelope |
 | `detail` | string | human text, ≤300 chars. **Not machine-readable.** |
 | `tx_id` | string \| null | the witness's handle on the record |
 
@@ -152,9 +182,8 @@ malformed, and when `fetch` itself is unavailable. `[VERIFIED by J4]`
 `[VERIFIED by J1, J3]` — `executeIfAllowed` is the only path that calls one.
 **F5.** The automated tier MUST NOT be able to express an unlimited limit.
 `[VERIFIED by J2]` — a limit must be a finite positive number.
-**F6.** Guards that cannot be evaluated MUST refuse. `[VERIFIED by S15]`
-— but see §6.3: today this refusal is indistinguishable from a judged refusal,
-which is the defect.
+**F6.** Guards that cannot be evaluated MUST refuse. `[VERIFIED by S15, AB4, AB5]`
+— and MUST be distinguishable from a judged refusal, which is what §6 added.
 
 ## 6. Abstention — REQUIRED, AND ABSENT
 
@@ -172,35 +201,72 @@ that reports them identically is safe — refusing is the right default — but 
 is **not honest**, and it cannot be acted on: an operator seeing a refusal
 cannot tell whether a rule stopped the order or whether the system was blind.
 
-### 6.2 What is required
+### 6.2 What is required — IMPLEMENTED 2026-09-18
 
 **A1.** The envelope MUST carry a third verdict state, distinct from admitted
-and refused, meaning *no decision was reached*. `[NOT IMPLEMENTED]`
+and refused, meaning *no decision was reached*. `[VERIFIED by AB1, AB4, AB9]` —
+`verdict` ∈ `allow` \| `refuse` \| `abstain`, and A9 pins that **every** body
+the service emits carries one of the three. It never carries null: the 400
+paths returned `{"ok": false, "detail": …}` with no verdict at all, and a caller
+switching on the verdict fell through a hole rather than meeting a state.
+
 **A2.** An abstention MUST be fail-closed: it MUST NOT permit.
-`[NOT IMPLEMENTED]` — currently satisfied only because everything refuses.
+`[VERIFIED by AB5]` — `ok` is False in every non-allow verdict, driven across
+the judge-refused, seal-failed and guard-refused paths.
+
 **A3.** An abstention MUST name which authority abstained and why.
-`[NOT IMPLEMENTED]`
+`[VERIFIED by AB2, AB4]` — `refused_by` carries the decisions, `abstained_by` the
+non-decisions, and `detail` appends `could not decide: …` separately from
+`refused by: …`.
+
 **A4.** A caller MUST NOT be able to convert an abstention into permission.
-`[NOT IMPLEMENTED]`
+`[VERIFIED by AB5, J5]` — `ok` is computed inside `_envelope` as
+`verdict == "allow"`, so there is no combination of fields a caller can read to
+manufacture permission, and `tradeGate.js` still tests `ok === true` and
+nothing else.
 
-### 6.3 The current state, measured
+**A5 (new).** The classification of a reason as a decision or a non-decision
+MUST be by construction, not by pattern-matching prose.
+`[VERIFIED by AB7]` — `guards.ABSTENTION_REASONS` holds the exact strings that
+`guards._caller_reasons` builds the reasons *from*, and `is_abstention` is exact
+membership. A prefix or substring test would let a reworded refusal drift into
+the abstention set and quietly stop counting as a refusal. The asymmetry is the
+argument: an abstention mistaken for a refusal is imprecise; a refusal mistaken
+for an abstention is a rule going unenforced.
 
-`seal_service.py`'s own docstring records it: *it refuses everything today*,
-because a buy needs a portfolio to evaluate the cash floor and the budgets, a
-sell needs holdings and a baseline to clamp against the reserve, and the app
-supplies neither.
+**A6 (new).** Adding the third state MUST NOT change what
+`guards.preconditions()` returns to its other callers. `[VERIFIED by AB8]` — it
+still returns the flat list of strings, and the partition is lossless
+(`sorted(refusals + abstentions) == sorted(reasons)`). `covenant_trader`
+delegates to that function and three suites drive it; measured unchanged
+afterwards at G4 17/17, F7 70/70, DP1 26/26.
 
-**So every refusal this path produces today is semantically an abstention
-reported as a refusal.** That is the safe direction, and it is why nothing is
-armed. But it means the gate's 100% refusal rate is currently evidence of
-*nothing at all* about the rules — and a later change that made the rules
-evaluable would flip a large number of answers with no test able to tell the
-difference between "now correctly allowed" and "now wrongly allowed".
+### 6.3 What is still true, measured
 
-Additionally, `_blocked_by`'s exception path returns the string *"the
-preconditions could not be evaluated … refusing"* **inside `blocked_by`** — an
-abstention wearing a guard refusal's clothes. `[NOT IMPLEMENTED]` A1 would move
-it out.
+The states are now distinct, and the live answer has not become more permissive
+— it has become more *legible*. Measured on the real guards, one $25 buy:
+
+    refused_by  : ["Rule 5: 2 sealed signals on record, need 30"]
+    abstained_by: ["sentinel: no portfolio was supplied, so the buy-side guards
+                    (cash floor, concentration, budgets) could not be evaluated"]
+    verdict     : refuse        ok: false
+
+**A single order produces a decision AND a non-decision at the same time.**
+`[VERIFIED by AB6]` That is why these were never three exclusive states, and it
+is the fact that shaped the design: `verdict` reports the *precedence* — a rule
+that said no has decided, so `refuse` outranks `abstain` — while both lists are
+always published.
+
+So `seal_service.py` still refuses every real order, and the reason is still
+that the app supplies no portfolio and no holdings. What changed is that an
+operator can now see which half of the answer is a rule and which half is
+blindness. **The 100% refusal rate is still not evidence about the rules** —
+`abstained_by` being non-empty on every live order is the measurement that says
+so, and it is now readable rather than inferred.
+
+`_blocked_by`'s exception path no longer puts *"the preconditions could not be
+evaluated … refusing"* inside the refusals. `blocked_by` is retained as the
+union of both lists, so no existing reader breaks.
 
 ## 7. Adversarial requirements — NOT YET MET
 
@@ -257,22 +323,25 @@ twice in a row, the second time inside the correction of the first.
 
 | | count |
 |---|---|
-| checks the frozen suite emits | **28** (tally 28/28) |
-| cited by a requirement, inside a `[VERIFIED by …]` tag | **23** |
-| not cited by any requirement | **5** — `J3b`, `J3c`, `J7`, `S1`, `S3` |
+| checks the suite emits | **40** (tally 40/40) |
+| this tool's id count agrees with that tally | **yes** -- see `blind` below |
+| cited by a requirement, inside a `[VERIFIED by ...]` tag | **35** |
+| not cited by any requirement | **5** -- `J3b`, `J3c`, `J7`, `S1`, `S3` |
 | **ghost citations** (cited here, absent from the suite) | **0** |
-| requirements marked `[UNVERIFIED]` | 2 — W2, X2 |
-| requirements marked `[NOT IMPLEMENTED]` | 6 — A1–A4, X1, X3 |
+| requirements marked `[UNVERIFIED]` | 1 -- X2 |
+| requirements marked `[NOT IMPLEMENTED]` | 2 -- X1, X3 |
 
 The five uncited checks are all real and worth having: `J3b`/`J3c` refine J3
 (the executor is unreachable without an allowing verdict, and *is* reached with
 one, so the gate is not a blanket refusal); `J7` pins that `tierNavigation.js`'s
 import of `TIERS` resolves; `S1` and `S3` pin the whole-response shape on the
 admitted and refused paths. **The spec is narrower than its suite by exactly
-these five.** When §3–§5 are next revised they should each get a requirement, or
-that gap should be stated as deliberate.
+these five.**
 
-**A ghost-citation count of 0 is the load-bearing number in this document.** It
-is the only thing standing between §3–§5 and §9's warning that prose about a
-system is not the system. The count of *citations* can drift harmlessly; a
-single ghost means a requirement is claiming a measurement it does not have.
+**Two numbers are load-bearing, and `blind` is the first of them.** If this
+tool's id count disagrees with the suite's own tally, every other figure here is
+void -- it happened, at 28 found against a tally of 40, while the ghost count
+read 0. A checker that cannot see the subject reporting a clean bill of health
+is worse than no checker. `ghost citations` is the second: the count of
+citations may drift harmlessly, but one ghost means a requirement is claiming a
+measurement it does not have.

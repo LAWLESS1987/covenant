@@ -8,6 +8,23 @@ progress can be checked rather than believed.
 
 Re-runnable: `python tools/sentinel_baseline.py --check`
 
+> **RE-FROZEN 2026-09-18, later the same day. Everything below describes the
+> ORIGINAL freeze and is kept as written**, because a baseline that is edited
+> to match the present is not a baseline. What changed, and why:
+>
+> Steps 6 and 3 of the order of work (abstention, and the witness/judge
+> separation) deliberately altered three of the twelve files:
+> `seal_service.py` 8,305 -> 12,261 bytes, `tradeGate.js` 5,053 -> 6,228,
+> `test_sentinel_gate.py` 16,829 -> 24,867. The gate suite went 28/28 -> 40/40.
+> Total 100,369 -> 113,538 bytes. `tools/sentinel_baseline.py` flagged all
+> three as UNACCOUNTED FOR -- doing its job -- and carries the new digests;
+> the accounting is the commit that moved them.
+>
+> **The one claim below that is now FALSE is called out in place:** §"What
+> those 28 cover" said there is no abstention state anywhere in this path.
+> There is, as of today. Everything else here still holds, including the part
+> that matters most -- nothing in this path attacks the judge.
+
 ---
 
 ## The bytes
@@ -60,9 +77,13 @@ have. S1–S19 drive the Python seal service; J1–J7 drive the JS gate:
 work:** none of these attack the JUDGE. S5–S8 attack the service's parser.
 Adversarial pressure on the judging itself lives in other suites entirely, and
 the known results there are refutations, not reassurance — a polite sentence
-once cleared 11 of 19 thefts. There is also **no abstention state anywhere in
-this path**: every answer is admitted or refused, so "the judge could not tell"
-currently resolves to a refusal by accident of structure rather than by design.
+once cleared 11 of 19 thefts. There was also **no abstention state anywhere in this path** when this was
+written: every answer was admitted or refused, so "the judge could not tell"
+resolved to a refusal by accident of structure rather than by design.
+**CORRECTED the same day** -- `verdict` now carries `allow`/`refuse`/`abstain`,
+pinned by AB1-AB9, and the measured live answer separates "Rule 5 refused" from
+"no portfolio was supplied, so this could not be evaluated". The sentence is
+left standing because it is what made the work necessary.
 
 ## What is absent
 

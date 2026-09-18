@@ -1115,8 +1115,7 @@ def preconditions(order, cfg=None, st=None, sealed_ok=None, guard_blocks=None,
     if st is None:
         st = load_trader_state(state_path)
     if st is None:
-        bad.append("trader state exists but will not parse -- the day's order "
-                   "count and Rule 5 cannot be read, so nothing may go live")
+        bad.append(STATE_UNREADABLE)
         st = {}
 
     if not cfg.get("armed"):
@@ -1191,6 +1190,65 @@ def preconditions(order, cfg=None, st=None, sealed_ok=None, guard_blocks=None,
     return bad + _caller_reasons(caller, order, guard_blocks)
 
 
+# ---- WHICH REASONS ARE A DECISION, AND WHICH ARE THE ABSENCE OF ONE --------
+#
+# Added 2026-09-18 for the Sentinel-Witness specification's A1-A3. Some reasons
+# in this file are a RULE DECIDING against an order -- Rule 5's signal count, a
+# per-trade cap, a halt file. Others are this module saying it COULD NOT TELL:
+# no portfolio was supplied, no holdings to clamp against, a state file that
+# will not parse. Both refuse, and refusing is right in both cases -- but they
+# are not the same fact, and until now the envelope reported them identically.
+#
+# THE CLASSIFICATION IS BY CONSTRUCTION, NOT BY GREPPING PROSE. Each of these
+# strings is now built from the constant below and matched against the same
+# constant, so a reason cannot drift out of its own category by being reworded.
+# A classifier that pattern-matched the sentences would be the antipattern this
+# repository keeps finding: text inspection standing in for the thing itself.
+#
+# `preconditions()` KEEPS ITS EXACT CONTRACT -- a flat list of strings, same
+# strings, same order. covenant_trader.preconditions() delegates to it, and
+# test_g4_money_gates drives all eleven refusal reasons through it; this change
+# adds a second view of the same answer and alters neither.
+NO_PORTFOLIO = ("sentinel: no portfolio was supplied, so the buy-side guards "
+                "(cash floor, concentration, budgets) could not be evaluated")
+NO_HOLDINGS = ("sentinel: a sell cannot be admitted here -- the reserve floor "
+               "is enforced on the QUANTITY by covenant_trader.plan(), and "
+               "this path has no holdings or baseline to clamp against")
+STATE_UNREADABLE = ("trader state exists but will not parse -- the day's order "
+                    "count and Rule 5 cannot be read, so nothing may go live")
+
+#: Reasons that mean NO DECISION WAS REACHED. Everything else is a decision.
+ABSTENTION_REASONS = frozenset((NO_PORTFOLIO, NO_HOLDINGS, STATE_UNREADABLE))
+
+
+def is_abstention(reason):
+    """True when this reason is the absence of a decision, not a decision.
+
+    Exact membership, deliberately. A prefix or substring test would let a
+    reworded refusal drift into the abstention set and quietly stop counting as
+    a refusal -- and an abstention that is mistaken for a refusal is merely
+    imprecise, while a refusal mistaken for an abstention is a rule going
+    unenforced. The asymmetry is why this is `in`, not `startswith`.
+    """
+    return str(reason) in ABSTENTION_REASONS
+
+
+def split_reasons(reasons):
+    """(refusals, abstentions) -- the same strings, partitioned.
+
+    A single order can produce BOTH: measured 2026-09-18, a $25 buy on the
+    sentinel path returns "Rule 5: 2 sealed signals on record, need 30" (a rule
+    deciding) AND NO_PORTFOLIO (this module unable to tell). So these are not
+    three exclusive states; they are two lists, and the caller decides the
+    precedence. seal_service does: a refusal outranks an abstention, because a
+    rule that said no HAS decided, while both remain fail-closed.
+    """
+    rs, ab = [], []
+    for r in reasons or ():
+        (ab if is_abstention(r) else rs).append(r)
+    return rs, ab
+
+
 def _caller_reasons(caller, order, guard_blocks):
     """APPEND ONLY. A caller may add a reason to refuse; it can never remove
     one. That is what makes the sentinel provably no looser than the trader."""
@@ -1203,10 +1261,7 @@ def _caller_reasons(caller, order, guard_blocks):
     # CLOSED rather than being skipped -- skipping them is precisely what this
     # consolidation exists to stop.
     if side == "buy" and guard_blocks is None:
-        out.append("sentinel: no portfolio was supplied, so the buy-side guards "
-                   "(cash floor, concentration, budgets) could not be evaluated")
+        out.append(NO_PORTFOLIO)
     if side == "sell":
-        out.append("sentinel: a sell cannot be admitted here -- the reserve floor "
-                   "is enforced on the QUANTITY by covenant_trader.plan(), and "
-                   "this path has no holdings or baseline to clamp against")
+        out.append(NO_HOLDINGS)
     return out

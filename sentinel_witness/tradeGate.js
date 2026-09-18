@@ -81,9 +81,29 @@ export async function gateTrade(order, { sealUrl = SEAL_URL, fetchImpl = globalT
   }
   if (!response.ok) return refusal("seal service answered HTTP " + response.status, body && body.detail);
   if (body && body.ok === true && body.admission === "admitted") {
-    return Object.freeze({ allowed: true, reason: "admitted", detail: String(body.detail || "").slice(0, 300), txId: body.tx_id || null });
+    return Object.freeze({ allowed: true, reason: "admitted", verdict: "allow", detail: String(body.detail || "").slice(0, 300), txId: body.tx_id || null });
   }
-  return refusal("not admitted", body && (body.detail || body.reason));
+  // ABSTENTION IS SURFACED, NEVER PROMOTED (2026-09-18, spec A1-A4).
+  //
+  // `ok` remains the ONLY field permission is read from -- the test above is
+  // unchanged, so an abstention cannot become an allowance no matter what else
+  // the body says. What changes is the REASON handed back: until now "not
+  // admitted" covered three different situations, and an operator reading it
+  // could not tell a rule refusing from the system being unable to tell. The
+  // seal service distinguishes them now, so this stops discarding it.
+  //
+  // A body with no `verdict` is an older service. That reads as a plain
+  // refusal, which is what it was.
+  const verdict = body && typeof body.verdict === "string" ? body.verdict : null;
+  const why = verdict === "abstain"
+    ? "no decision was reached -- the gate could not evaluate this order"
+    : "not admitted";
+  return Object.freeze({
+    ...refusal(why, body && (body.detail || body.reason)),
+    verdict: verdict || "refuse",
+    abstainedBy: Object.freeze(Array.isArray(body && body.abstained_by) ? body.abstained_by.slice(0, 10).map(String) : []),
+    refusedBy: Object.freeze(Array.isArray(body && body.refused_by) ? body.refused_by.slice(0, 10).map(String) : []),
+  });
 }
 
 // The only path to an executor. If the gate does not allow, the executor is
