@@ -43,12 +43,27 @@ sys.path.insert(0, HERE)
 
 import durable                                                   # noqa: E402
 
-results = []
+results, UNRUN = [], []
 
 
 def check(label, ok, detail=""):
     results.append((label, bool(ok)))
     print(f"  [{'PASS' if ok else 'FAIL'}] {label}" + (f"  -- {detail}" if detail else ""))
+
+
+def not_run(label, why):
+    """A section that CANNOT be measured here is neither a pass nor a failure.
+
+    DU3 reads the node databases, which are gitignored and which covenant_one's
+    staged copy does not contain -- so the first sweep after this suite landed
+    reported it FAIL 9/10 on a machine where nothing was wrong. A check that is
+    red by construction in the place a person actually reads it is A60, which
+    is the defect I spent today removing from three other files; manufacturing
+    a fourth would be worse than the gap it was covering. Marking it NOT RUN
+    keeps the sweep honest AND keeps the measurement real where it can be
+    taken: run this suite in the working tree, beside the databases."""
+    UNRUN.append((label, why))
+    print(f"  [NOT RUN] {label}  -- {why}")
 
 
 class ReplaceSpy:
@@ -199,8 +214,10 @@ def chain_checks():
     dbs = sorted(glob.glob(os.path.join(HERE, "node*_prod.db")) +
                  glob.glob(os.path.join(HERE, "node*_run.db")))
     if not dbs:
-        check("DU3.a every node database is WAL with synchronous=FULL",
-              False, "NOT MEASURED: no node*.db on this machine. Not a pass.")
+        not_run("DU3 the node databases are WAL with synchronous=FULL",
+                "no node*.db here -- they are gitignored and covenant_one "
+                "stages to a temp copy without them. NOT a pass and not a "
+                "failure: run this suite in the working tree to measure it.")
         return
     bad = []
     for p in dbs:
@@ -234,6 +251,10 @@ def main():
                   "%s: %s" % (type(e).__name__, e))
     ok = sum(1 for _, o in results if o)
     print(f"\nDU1: {ok}/{len(results)} passed")
+    if UNRUN:
+        print(f"{len(UNRUN)} section(s) NOT RUN -- do not read this as covered:")
+        for n, why in UNRUN:
+            print(f"  - {n}: {why}")
     print("\nNOT CLAIMED: a drive that lies about fsync cannot be made honest "
           "from here. What is checked is that THIS process flushes and renames "
           "atomically.")
