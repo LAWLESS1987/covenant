@@ -9676,9 +9676,56 @@ class CovenantUnifiedMaster:
             # completely empty. A peer feeding structurally incompatible blocks
             # -- the signature of a fork, a misconfiguration, or an attack --
             # was invisible to the operator of either node.
-            self.node.anomaly_monitor.record(
-                "block_rejected_index",
-                f"block index {block.index} != local height {len(self.node.chain)}")
+            #
+            # SPLIT INTO THREE (2026-09-19, A150). One anomaly kind was
+            # reporting three conditions that want opposite responses, and
+            # measured in-process with a fixture chain [idx0, idx1] all three
+            # produced the SAME kind and the same shape of detail:
+            #
+            #   echo    index 1 we already hold, SAME hash -> block_rejected_index
+            #   fork    index 1 we already hold, OTHER hash -> block_rejected_index
+            #   behind  index 5, our height is 2            -> block_rejected_index
+            #
+            # The first is this design's OWN dedup mechanism firing correctly.
+            # The relay comment further down says so in as many words: "each
+            # node accepts a given height at most once and therefore relays it
+            # at most once", which is what makes the gossip flood die out with
+            # no dedup machinery -- so an echo is not a fault, it is the
+            # mechanism working, and the Hebbian rule below already treats it
+            # as one by ATTENUATING the link that delivered it. The second is
+            # a fork, a misconfiguration or an attack, and is the only one this
+            # kind's own comment above is describing. The third is a node
+            # simply missing ancestors, which the BLOCK_PROPAGATE caller
+            # self-heals from by pulling the gap.
+            #
+            # Found by A9's S1 going red once in eight sweeps on 2026-09-19
+            # (A150) and passing 3/3 standalone: under contention C's catch-up
+            # overlapped B's relay, C got a second copy of a block it already
+            # had, and the operator was shown the anomaly reserved for hostile
+            # peers. An alert that cannot separate a healthy mesh from an
+            # attacked one is the failure this project keeps rediscovering.
+            #
+            # THE DECISION IS UNCHANGED. Every branch still returns False and
+            # nothing is admitted that was not admitted before; only the name
+            # written to the ledger differs. This narrows what
+            # block_rejected_index MEANS, so it does not widen what is
+            # accepted.
+            local = (self.node.chain[block.index]
+                     if 0 <= block.index < len(self.node.chain) else None)
+            if local is not None and getattr(local, "hash", None) == block.hash:
+                self.node.anomaly_monitor.record(
+                    "block_duplicate",
+                    f"block {block.index} already held with the same hash "
+                    f"{str(block.hash)[:16]} -- an echo, the flood dying out")
+            elif block.index > len(self.node.chain):
+                self.node.anomaly_monitor.record(
+                    "block_behind",
+                    f"block index {block.index} is beyond local height "
+                    f"{len(self.node.chain)} -- ancestors missing, not a fork")
+            else:
+                self.node.anomaly_monitor.record(
+                    "block_rejected_index",
+                    f"block index {block.index} != local height {len(self.node.chain)}")
             return False
         # NEW (merge, security audit) -- item U on the P2P path. The HTTP
         # before_request guard cannot cover this: blocks arriving over the raw
