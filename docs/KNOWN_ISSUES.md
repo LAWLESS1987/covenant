@@ -6441,6 +6441,30 @@ measured. Whether the earlier three-times-downloaded-never-installed on
 `0.1.568` had the same cause is still not known: only the newest line is
 carried, and the older ones are in the phone's `actions.log`.
 
+**THE CAUSE, 2026-09-19 13:07 — from the first heartbeat able to say it.**
+
+    update: the bytes arrived and verified, but the INSTALLER refused (attempt 2 of 6):
+    IllegalStateException: Too many active sessions for UID 10512
+
+Every failed attempt since the 13th — the SecurityException era, the refusals,
+the ones left waiting for a tap — called `PackageInstaller.createSession` and
+never abandoned it. Sessions belong to the UID and outlive the process **and
+the app update**, so the count only grew until Android refused to open one
+more. The hint the app appended to every failure, *"check Install unknown
+apps"*, was a guess pointing at the wrong setting; the cause was the app's own
+leak. So the earlier three-times-downloaded-never-installed on `0.1.568` almost
+certainly had the same cause, and `0.1.599` — installed by hand — inherited the
+same pile of open sessions and failed the same way on its first attempt.
+
+**Fixed in covenant-phone** (this hour): every session the app owns is
+abandoned before a new one is created, with the count logged to the heartbeat;
+a failing session is abandoned in the catch; the "Install unknown apps" hint
+is appended only for a `SecurityException`. **The running build cannot install
+the fix — it hits the same refusal. One more manual `/m` install carries it
+over**, after which the app clears its own leak and self-update has no known
+reason left not to work. That is a prediction; the next auto-update is its
+test, and the heartbeat will report it either way.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
