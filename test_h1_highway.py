@@ -632,6 +632,53 @@ def main():
           any("mesh_source_split" in a and "phone:5001" in a for a in a_ms),
           str([a[:120] for a in a_ms if "mesh_source_split" in a]))
 
+    # app_install_futile arrived 2026-09-18 (A147) and H1v caught it with no
+    # coverage here, third in a row, which is the whole argument for that
+    # guard. Its behaviour is pinned in test_h2_update_witness.py (F1-F12,
+    # driven both ways and mutation-tested); what is driven HERE is this
+    # file's own subject -- the class boundary, and the one property that
+    # matters about this condition: the ONLY remedy pointed at it is the one
+    # that needs a person. The fix for a phone whose installer throws is on
+    # the phone, so anything automatic graded against this would be graded
+    # against a condition it cannot clear, which is what quarantined
+    # fetch_build in this file's first live hour.
+    _paired = [n for n, r in H.REMEDIES.items()
+               if "app_install_futile" in (r.get("for") or [])]
+    check("H1w app_install_futile is paired ONLY with the PROPOSE_ONLY remedy "
+          "-- nothing on this PC can clear a phone's installer",
+          _paired == ["install_on_phone"]
+          and H.REMEDIES["install_on_phone"]["klass"] == H.PROPOSE_ONLY,
+          str(_paired))
+
+    import covenant_app_update as _AU
+    _real_if = _AU.install_futility
+    try:
+        _AU.install_futility = lambda *a, **k: {
+            "futile": True, "complete": 3, "proved": 3, "bytes": 135490068,
+            "want": "0.1.568+2e61e52", "have": "0.1.475+13b946a",
+            "why": "delivered whole 3 times and still on 0.1.475+13b946a"}
+        r_fu = H.detect_app_install_futile()
+        _AU.install_futility = lambda *a, **k: {
+            "futile": False, "complete": 0, "proved": 0, "bytes": 0,
+            "want": "0.1.568+2e61e52", "have": "0.1.568+2e61e52",
+            "why": "phone is on 0.1.568+2e61e52 -- installed"}
+        r_fu0 = H.detect_app_install_futile()
+        _AU.install_futility = lambda *a, **k: {
+            "futile": False, "why": "could not be measured: OSError: nope"}
+        r_fuU = H.detect_app_install_futile()
+    finally:
+        _AU.install_futility = _real_if
+    check("H1w app_install_futile is PRESENT on a proved-futile delivery and "
+          "carries the count, the bytes and both versions",
+          r_fu["state"] == H.PRESENT and r_fu["measured"]["proved"] == 3
+          and r_fu["measured"]["bytes"] == 135490068
+          and r_fu["measured"]["have"] == "0.1.475+13b946a", r_fu["measured"])
+    check("H1w ...ABSENT once the phone reports the build, so it can clear",
+          r_fu0["state"] == H.ABSENT, r_fu0["measured"])
+    check("H1w ...and UNKNOWN when the measurement could not be taken -- an "
+          "unreadable ledger is not evidence that the phone is fine",
+          r_fuU["state"] == H.UNKNOWN, r_fuU["measured"])
+
     # ---- H1v: nothing registered may go undriven, and every detector must
     # be able to say UNKNOWN
     #

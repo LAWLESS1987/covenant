@@ -6154,6 +6154,17 @@ the bound for the current build (default 2 h), and a newer build clears it by
 itself. A door that can refuse for ever with nothing a person can do about it
 is the A21 shape again.
 
+**Residual, measured and NOT fixed.** `install_futility` reads
+`ops/phone_checkins.jsonl` whole on every `/app/apk`, and that ledger is
+**unbounded** — `covenant_daily_plan.record_checkin` appends and never trims,
+unlike `note_request` beside it, which caps at 2,000 rows with the comment
+*"it cannot eat the disk"*. Measured 2026-09-18: 129,783 bytes, 678 rows since
+2026-09-13, one phone at ~144 rows/day ≈ 25 KB/day. The read costs nothing at
+this size and at most once per ten minutes, so this is growth, not a
+bottleneck. Whether check-in history should be kept for ever, capped, or
+rotated is a retention decision and therefore his (CLAUDE.md rule 5), not a
+repair to make at the end of a session.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
