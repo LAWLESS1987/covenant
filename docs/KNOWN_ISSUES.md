@@ -6115,6 +6115,41 @@ AB10.
 payloads the old wrapper moved to CLEAR, and which.
 ---
 
+### A151. [moderate / judging] Both seats now judge every payload, and the flip cost four false holds and bought no false clears. FLIPPED 2026-09-19, cost measured first; one silence left OPEN
+
+**What changed.** `both_seats: true` in `ops/quorum_policy.json`, at his
+instruction after the four conditions in `docs/JUDGE_RESOLUTION.md` were met.
+Ora and Sena now both judge every payload and `judge_resolve.resolve()` settles
+it over (senior, junior). Sena was previously a fallback reached only when Ora
+held. The seat list is unchanged; deleting the key reverts exactly.
+
+**Measured before flipping** (`tools/judge_stress.py`, all 3,760 labelled rows,
+both rules on the same rows):
+
+    correct 2649 -> 2645 (-4)   false_clear 21 -> 21   false_hold 147 -> 151 (+4)   held 943 -> 943
+
+The two rules differ on **exactly 4 rows**, all `ora=clean, sena=violates,
+label=clean` — the junior wrongly convicting benign text and R1 letting that
+override the senior's clean. **No safety bought, four false holds paid.** Four
+rows is 0.1% and too small a sample to redesign a rule on (the `asymmetric_hold`
+precedent), so R1 stands and the number is here. Deadlock — 842 both-hold,
+22.4% — is identical under either rule; the flip did not create it. Real seat vs
+pure rule: 0 mismatches on 200 rows. After the flip in the working tree: A124
+3/3 (block 12 at +1.8354, margin 0.5646 — the chain is still joinable), and F1,
+F3, X1, F6, A93, B1, G3, gate_proxy, A126, teacher_panel, JR1 all green.
+
+**OPEN, and deliberately not fixed here.** If `fallback_model_2.json` is
+missing, `covenant_judge_defer` sets `_second = None` and the chain becomes
+single-judge **in silence** — no error, no anomaly. Under `both_seats` the
+reasoning now says `sena=ABSENT` and `deadlock_kind` reports `one-seat`, so a
+reader of the verdict can see it; but nothing *alerts*. A guard that makes an
+absent seat loud is a small change to the ethics gate, and changes to that gate
+are not made at the end of a session on the same day the gate was rewired.
+
+**Repro:** `python tools/judge_stress.py`; `python judge_check.py`
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**

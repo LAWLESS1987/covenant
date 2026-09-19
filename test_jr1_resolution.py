@@ -30,9 +30,12 @@ WHAT IS PINNED
          RUN with the number of payloads tried -- never a pass, because "no
          conflict found" and "conflict handled correctly" are different
          claims and only one of them is worth anything.
-  JR6.*  THE FLIP IS STILL OFF. Sena must still be a deferral fallback and
-         not a co-equal seat, because this suite is the precondition for
-         flipping her on, not the flip.
+  JR6.*  THE FLIP IS A POLICY KEY, NOT A REWIRE. Flipped on 2026-09-19 at his
+         instruction after the four conditions were met: `both_seats` in
+         ops/quorum_policy.json. `providers` is unchanged, so deleting the key
+         reverts to the deferral exactly, and asymmetric_hold stays on so the
+         deferral path -- if anyone reverts to it -- still resolves the one
+         shape it can see the way R3 specifies.
 
     python test_jr1_resolution.py
 """
@@ -230,21 +233,25 @@ def live_model_checks():
 
 
 def flip_still_off_checks():
-    """This suite is the PRECONDITION for flipping Sena on, not the flip."""
+    """The flip is a KEY. Flipped 2026-09-19 after this suite existed, which
+    was the order he asked for; what is pinned now is that it stays a key."""
     try:
         import covenant_judge_defer as D
         pol = D.load_policy()
     except Exception as e:                                       # noqa: BLE001
-        not_run("JR6 Sena is still a deferral fallback, not a co-equal seat",
+        not_run("JR6 the flip is a policy key, not a rewire",
                 "could not read the policy (%s)" % type(e).__name__)
         return
     providers = str(pol.get("providers", ""))
-    check("JR6.a Sena is still reached only when Ora holds -- the seat list "
-          "names the deferring seat, not two judges",
+    check("JR6.a the seat list is unchanged by the flip -- both_seats is a key "
+          "inside the deferring seat, so deleting it reverts exactly",
           "deferring" in providers and "second" not in providers, providers)
-    check("JR6.b asymmetric_hold is ON, so the one disagreement shape that "
-          "CAN occur today is already resolved the way R3 specifies",
+    check("JR6.b asymmetric_hold is still ON, so a revert to the deferral path "
+          "still resolves hold+clean the way R3 specifies",
           bool(pol.get("asymmetric_hold", False)), str(pol.get("asymmetric_hold")))
+    check("JR6.c both_seats is on -- the flip he asked for, after the four "
+          "conditions, measured first by tools/judge_stress.py",
+          pol.get("both_seats") is True, str(pol.get("both_seats")))
 
 
 def main():

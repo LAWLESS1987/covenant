@@ -1,28 +1,29 @@
 # How Ora and Sena resolve a disagreement — and what happens when they cannot
 
-**Status: SPECIFIED AND TESTED. The flip is NOT done.** His instruction,
+**Status: SPECIFIED, TESTED, AND FLIPPED ON 2026-09-19** — `both_seats: true` in `ops/quorum_policy.json`, at his instruction after the four conditions below were met, with the cost measured first (section 5). His instruction,
 2026-09-19: *"Define exactly how the two judges resolve disagreements. Add a
 test suite that deliberately creates conflicting judgments. Update your
 verification script to run both judges and check the resolution logic.
 Document the failure modes if they deadlock. Do those four things before you
-flip the second judge on."* All four are below. Sena remains a deferral
-fallback; `providers` is still `deferring,semantic`, pinned by `JR6`.
+flip the second judge on."* All four are below, and the flip followed them.
+`providers` is still `deferring,semantic`: the flip is the `both_seats` key
+inside that seat, pinned by `JR6`, and deleting it reverts exactly.
 
 ---
 
-## 0. What is true today, because it changes the question
+## 0. What was true before the flip, because it changed the question
 
-**They cannot currently disagree, because they are never both asked.**
+**Until 2026-09-19 they could not disagree, because they were never both asked.**
 `covenant_judge_defer` runs a *deferral*, not a panel: Ora answers and, if she
 commits, *"nothing else is consulted"*. Sena is reached only when Ora **holds**.
 
-So today the relation between the two seats is **precedence**, not resolution.
+So the relation between the two seats was **precedence**, not resolution.
 Exactly one disagreement shape can occur — Ora holds, Sena clears — and it is
 already settled: `asymmetric_hold` has been `true` in `ops/quorum_policy.json`
 since A132.
 
-Everything below is the rule for **after** the flip, when both seats judge the
-same payload.
+Everything below is the rule that now runs, with both seats judging the same
+payload.
 
 ## 1. The rule
 
@@ -164,13 +165,53 @@ than a comfortable silence when either model is missing from disk.
 
 ---
 
+## 5. The stress test, and what the flip actually cost
+
+`tools/judge_stress.py`: both seats over **all 3,760 labelled rows** of
+`ops/verdicts.jsonl`, settled two ways side by side — the deferral that ran until
+today and the resolution table behind `both_seats`. Same rows, so the cost is a
+subtraction:
+
+```
+                 DEFERRAL    RESOLVE
+correct              2649       2645     -4
+false_clear            21         21     +0
+false_hold            147        151     +4
+held                  943        943     +0
+```
+
+**The two rules differ on exactly 4 of 3,760 rows.** All four are
+`ora=clean, sena=violates, label=clean` — Sena wrongly convicting benign text
+(*"A month of school fees for the neighbour's child, sent gladly"*), and R1
+letting the junior's conviction override the senior's clean. So on this corpus
+the flip **buys no safety** (false clears identical) and **costs four false
+holds**. Four rows is 0.1%, which is far too small a sample to redesign a rule
+on — the same reason `asymmetric_hold` shipped default-off — so R1 stands and
+the number is written here instead.
+
+**The deadlock is not the flip's doing.** 842 both-hold rows (22.4%) and 943
+held (25.1%) under *either* rule; the flip neither creates nor relieves it.
+
+**The seat does what the table says.** The real `DeferringJudge`, driven with
+`both_seats` on and off over 200 rows, matched the pure rules with **0
+mismatches** each way.
+
+**After flipping, in the working tree:** F1 28/28, F3 8/8, X1 5/5, F6 18/18,
+A93 OK, B1 165/165, G3 20/20, gate_proxy 23/23, A126 13/13, teacher_panel 19/19,
+JR1 21/21 — and **A124 3/3**: no transaction already in the chain is convicted,
+closest is block 12 at +1.8354, margin 0.5646. The chain is still joinable.
+
+**The labels are the teacher's.** This is the corpus the students trained
+*from*, so agreement is partly memorisation; `ops/HOLDOUT.json` is the honest
+held-out figure (decided 2502, correct 2339, false clear 31 of 3605).
+
 ## Before the flip
 
 The four things asked for are done. What is **not** done, and is the
 operator's:
 
-1. **The flip itself** — making Sena a co-equal seat. `providers` is still
-   `deferring,semantic`.
+1. ~~The flip itself~~ — **done 2026-09-19**, as a policy key. `providers` is
+   still `deferring,semantic`; deleting `both_seats` reverts exactly.
 2. **Deciding whether the deadlock rate is acceptable.** Roughly one in five
    legitimate payloads on a small sample, failing closed. That is a
    throughput-for-safety trade on his own ledger and the numbers have to be

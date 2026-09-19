@@ -333,6 +333,59 @@ try:
             # earned it.
             if str(self.policy.get("primary", "student")) == "student":
                 rs = self._fallback.evaluate(data, principles)
+                # THE FLIP (2026-09-19, his instruction after the four conditions
+                # were met: "flip the second judge on and stress test").
+                #
+                # With both_seats TRUE, Sena is no longer a fallback reached
+                # only when Ora holds -- BOTH seats judge every payload and
+                # judge_resolve.resolve() settles it over (senior, junior).
+                # Everything below this block is the older deferral path and
+                # is untouched, so deleting the key from quorum_policy.json
+                # reverts to it exactly; that is how every other switch in this
+                # file is built and it is the whole reason this is a key and
+                # not an edit.
+                #
+                # The verdict shape follows the rule's own table. HELD is
+                # violates=True + not_understood=True, the same fail-closed
+                # default the deferral path already produces, so the gate and
+                # every reader of the flag see nothing new. deadlock_kind is
+                # written into the reasoning because (hold, hold) from two
+                # honest unknowns and from an empty bench arrive identically
+                # and need opposite responses -- and Sena's absence would
+                # otherwise turn this back into a single-judge chain in
+                # silence, which JUDGE_RESOLUTION.md 4c names as open.
+                if self.policy.get("both_seats", False):
+                    import judge_resolve as JR
+                    junior_live = self._second is not None
+                    r2s = self._second.evaluate(data, principles) if junior_live else None
+                    v, rule, why = JR.resolve(rs, r2s)
+                    dk = JR.deadlock_kind(rs, r2s, senior_live=True, junior_live=junior_live)
+                    ora_tag = "%s/%s" % (getattr(self._fallback, "name", None) or "student",
+                                         getattr(self._fallback, "model_digest", "?"))
+                    record_verdict(data, rs, ora_tag, "student-audit", AUDIT_PATH)
+                    if r2s is not None:
+                        record_verdict(data, r2s,
+                                       "%s/%s" % (getattr(self._second, "name", None) or "student2",
+                                                  getattr(self._second, "model_digest", "?")),
+                                       "student-audit", AUDIT_PATH)
+                    reason = "both seats (%s): ora=%s sena=%s -> %s; %s" % (
+                        rule, JR.as_verdict(rs),
+                        JR.as_verdict(r2s) if junior_live else "ABSENT", v, why)
+                    if dk:
+                        reason += " [deadlock: %s -- %s]" % dk
+                    if v == JR.CLEAN:
+                        src = rs if not getattr(rs, "not_understood", False) else r2s
+                        return cov.JudgmentResult(False, reason, judge_id=self.judge_id,
+                                                  uncertain=getattr(src, "uncertain", False),
+                                                  benefit_estimate=student_benefit(src))
+                    if v == JR.VIOLATES:
+                        src = rs if (not getattr(rs, "not_understood", False) and rs.violates) else r2s
+                        return cov.JudgmentResult(True, reason,
+                                                  principle_violated=getattr(src, "principle_violated", None),
+                                                  judge_id=self.judge_id,
+                                                  uncertain=getattr(src, "uncertain", False),
+                                                  benefit_estimate=student_benefit(src))
+                    return cov.JudgmentResult(True, reason, judge_id=self.judge_id, not_understood=True)
                 if not getattr(rs, "not_understood", False):
                     # AUDIT, NOT TRAINING. A student verdict is deliberately not
                     # written to ops/verdicts.jsonl: that file is the teacher
