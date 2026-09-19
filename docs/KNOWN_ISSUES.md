@@ -6512,6 +6512,18 @@ reach the phone with no tap, the heartbeat saying `abandoned N stale installer
 session(s)` once on the way. Not yet observed; the daily 07:32 rebuild is the
 test.
 
+**A FOURTH CAUSE, PREDICTED AND THEN MEASURED (2026-09-19 17:46).** The PC's
+daily dispatch rebuilds the *same* app commit against a newer public core; the
+phone decided "is this build mine" by app-repo sha alone. A core-only rebuild
+(`0.1.610+48ad177`, commit `925f553`, dispatched on his instruction at 17:30)
+was served to the phone at 17:46:30 — **served-signed, no request for the
+bytes, phone stayed on `0.1.607`**. So core-only rebuilds have never reached
+the phone by auto-update; every earlier build today also changed the app repo,
+which masked it. Fixed both sides: the phone compares (sha, versionName), the
+PC signs `version` inside the manifest and its guard says installed only when
+build **and** versionName match (F15). The fix ships as a new app commit, so
+the phone will take it — the first auto-update observed end to end.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
