@@ -462,6 +462,16 @@ SUITES = [
     # forbids every rule that can say no. Hermetic -- temp trees, no node, no
     # network; the real ops/ is read once and only to assert an absence.
     ("test_mfn.py", 120, "DAILY + GUARDS"),
+    # DU1 (2026-09-19, "Must survive power loss"): the writes beside the chain.
+    # The chain itself was already safe -- every node DB is WAL with
+    # synchronous=FULL, measured, and DU3 pins that so it cannot be quietly
+    # downgraded. What was not safe was every flat file next to it, because
+    # open(path,"w") truncates FIRST: the update door's whole audit ledger, the
+    # build manifest the phone is offered, and the trader state the daily caps
+    # are computed from. DU2 drives the real call sites, not just the helper,
+    # because a correct atomic write already existed in ai_memory_system and
+    # stayed private to it while three live ledgers went on truncating.
+    ("test_du1_durable.py", 120, "DAILY + GUARDS"),
     # H2 (2026-09-18): the update door's WITNESS, and a peer's drift made
     # visible to the self-heal without handing restart_nodes a condition it
     # cannot clear. All three faults it covers were live and invisible on the

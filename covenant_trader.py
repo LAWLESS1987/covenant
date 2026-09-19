@@ -135,8 +135,21 @@ def load_state():
 
 
 def save_state(st):
+    """DURABLE (2026-09-19, "Must survive power loss").
+
+    This was `json.dump(st, open(STATE, "w"))`, and the truncate-then-write
+    window mattered here more than anywhere else on the machine: `orders_today`
+    and `sealed_signals` live in this file and the daily caps are computed FROM
+    them. A power cut mid-write does not leave a missing state -- it leaves a
+    file that still exists and will not parse, and load_state above catches
+    Exception and returns DEFAULTS, so the count of orders placed today
+    silently resets to zero. guards.preconditions refuses an unparseable state
+    (G4.3) and would have caught it at the gate; this removes the cause rather
+    than relying on the last check in the chain.
+    """
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
-    json.dump(st, open(STATE, "w", encoding="utf-8"), indent=2)
+    import durable
+    durable.write_json(STATE, st, indent=2)
 
 
 def roll_day(st):

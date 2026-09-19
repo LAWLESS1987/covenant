@@ -73,7 +73,11 @@ def load_state():
 
 
 def save_state(s):
-    json.dump(s, open(STATE, "w"), indent=2)
+    # DURABLE (2026-09-19): this state carries the open signals Rule 5 counts,
+    # and load_state above returns {} on any failure -- so a truncated file
+    # does not raise, it silently forgets every signal in flight.
+    import durable
+    durable.write_json(STATE, s, indent=2)
 
 
 def append_record(row):

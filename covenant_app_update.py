@@ -152,13 +152,20 @@ def note_request(route, signer="", offered="", outcome="served", detail=""):
            "detail": str(detail or "")[:200]}
     try:
         os.makedirs(DIR, exist_ok=True)
-        with open(REQUESTS, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(row, sort_keys=True) + "\n")
+        # DURABLE (2026-09-19, his requirement: "Must survive power loss").
+        # The append was fine -- the worst a cut can do to an append is a short
+        # last line, which every reader here already skips. THE TRIM WAS NOT:
+        # it opened this file with "w", which TRUNCATES FIRST, so a power cut
+        # in that window did not lose one row of the update door's audit trail,
+        # it lost all two thousand. Rewritten through a temp file and an atomic
+        # rename, so a reader sees the old ledger or the new one and never an
+        # empty one.
+        import durable
+        durable.append_line(REQUESTS, json.dumps(row, sort_keys=True))
         with open(REQUESTS, encoding="utf-8") as fh:
             lines = fh.readlines()
         if len(lines) > REQUESTS_KEEP:
-            with open(REQUESTS, "w", encoding="utf-8") as fh:
-                fh.writelines(lines[-REQUESTS_KEEP:])
+            durable.rewrite_lines(REQUESTS, lines[-REQUESTS_KEEP:])
     except Exception:                                             # noqa: BLE001
         # A witness that can break the thing it witnesses is worse than none,
         # and `except OSError` was not that promise: H2's W6 pointed this at a
@@ -409,8 +416,8 @@ def serve_anyway(hours=2.0, d=None):
     mark = {"sha7": str(d.get("sha7") or ""), "until": time.time() + float(hours) * 3600.0,
             "set": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     os.makedirs(DIR, exist_ok=True)
-    with open(ALLOW_AGAIN, "w", encoding="utf-8") as fh:
-        json.dump(mark, fh, indent=1)
+    import durable
+    durable.write_json(ALLOW_AGAIN, mark, indent=1)
     return mark
 
 
@@ -465,8 +472,12 @@ def latest_version(d=None):
                 cur.pop("path", None)
                 cur["version"] = v
                 cur["core"] = v.split("+", 1)[1]
-                with open(LATEST, "w", encoding="utf-8") as fh:
-                    json.dump(cur, fh, indent=1)
+                # Atomic: truncated, latest.json makes latest() return None
+                # and the door answer "no build fetched yet" -- the phone then
+                # cannot update at all, from a file the PC rewrote for its own
+                # bookkeeping.
+                import durable
+                durable.write_json(LATEST, cur, indent=1)
             except OSError:
                 pass
     return v, (v.split("+", 1)[1] if v and "+" in v else None)
