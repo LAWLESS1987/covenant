@@ -6382,6 +6382,31 @@ bottleneck. Whether check-in history should be kept for ever, capped, or
 rotated is a retention decision and therefore his (CLAUDE.md rule 5), not a
 repair to make at the end of a session.
 
+**MEASURED AGAIN 2026-09-19 09:25–09:55, on the build whose updater was fixed.**
+The phone was hand-installed onto `0.1.568+2e61e52` at 00:15 — the first build
+carrying all four installer fixes, `autoInstall` defaulting to true — and a new
+build `0.1.597+7ffa73b` was pushed to the door at 09:18. The phone took it
+**whole three times** (09:25:41, 09:35:44, 09:45:55; 45,165,840 bytes each)
+and checked in on `0.1.568` after each one. The bound tripped at 09:55 and the
+next three asks were `refused-futile`. **So the fixed updater does not install
+either, and this bound is now proven on a second build.**
+
+**Why the cause is UNDETERMINED from this machine, precisely.** `NodeService`
+logs seven distinct update outcomes — REFUSED at the signature, sha256
+mismatch, INSTALLER refused, offered N of 6, and so on — through
+`CovenantActuator.log(this, "pc", …)`, and every one of them stays on the
+phone. The heartbeat body is `app`, `battery`, `when`, plus height and peers.
+Nothing about the outcome ever leaves the device. This is A143's cause-2 shape
+exactly: *"It is only settleable on the phone."* Whether Android refused the
+no-tap session, the session threw, or a prompt is sitting unanswered cannot be
+told apart from here, and they need three different fixes.
+
+**What closes the blind spot** — the same move the door's witness ledger made
+for the PC side: carry the last update outcome in the check-in. One string
+field on the phone, one whitelisted key with its own length cap in
+`covenant_daily_plan.record_checkin`. Small on both sides; it rides the next
+manual install, since the phone cannot ship itself the build that would report.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---

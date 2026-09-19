@@ -313,6 +313,15 @@ def record_checkin(body_bytes, who, path=None):
     for k in ("node_id", "chain_height", "peers", "app", "battery", "when"):
         if k in data:
             row[k] = data[k] if isinstance(data[k], (int, float, bool)) else str(data[k])[:80]
+    # `update` (2026-09-19): the updater's last word about itself, carried from
+    # the phone's actions.log. Its own cap, because 80 characters cuts the one
+    # line whose whole value is the reason at the end of it -- and it was the
+    # missing field when a build with a working updater was downloaded whole
+    # three times and never installed, with nothing here able to say why
+    # (A147). Still whitelisted, still capped, still a string: a phone cannot
+    # write anything into this ledger that is not one of these keys.
+    if "update" in data:
+        row["update"] = str(data["update"])[:240]
     path = path or CHECKINS
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:
