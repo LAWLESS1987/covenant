@@ -374,9 +374,22 @@ def main():
         tmp = tempfile.mkdtemp(prefix="v1_mut_")
         try:
             os.makedirs(os.path.join(tmp, "docs"), exist_ok=True)
-            for rel in ("check.sh", "verify.sh", "constitution.py",
-                        "CONTRIBUTING.md", "docs/CONSTITUTION_ANCHOR.json",
-                        "docs/SUCCESSION.md"):
+            # THE FILE LIST IS DERIVED, NOT REMEMBERED (2026-09-19). It was
+            # a literal tuple naming CONTRIBUTING.md and docs/SUCCESSION.md,
+            # and the day a fourth protected block was added
+            # (docs/FEDERATION_RULES.md) the copy silently lacked it: the
+            # block came out MISSING, the hash differed, and C3 reported the
+            # checker failing on a CLEAN tree. Which is the confident false
+            # alarm this suite's own header calls worse than a silence -- and
+            # a hardcoded list cannot find the file added after the list was
+            # written, which is precisely the file a check like this exists to
+            # catch (CLAUDE.md rule 2). So the protected files come from
+            # constitution.PROTECTED, the primary source, and a fifth block
+            # will be copied without anyone editing this line.
+            import constitution as _C
+            _protected = sorted({b["file"] for b in _C.PROTECTED})
+            for rel in ["check.sh", "verify.sh", "constitution.py",
+                        "docs/CONSTITUTION_ANCHOR.json"] + _protected:
                 src = os.path.join(HERE, rel.replace("/", os.sep))
                 if os.path.exists(src):
                     shutil.copy2(src, os.path.join(tmp, rel.replace("/", os.sep)))

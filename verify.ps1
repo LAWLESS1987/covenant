@@ -44,7 +44,8 @@ $Anchor = Join-Path $Here "docs/CONSTITUTION_ANCHOR.json"
 $Protected = @(
   @{ File = "CONTRIBUTING.md";    Opens = "## Why it exists, and the one condition" },
   @{ File = "CONTRIBUTING.md";    Opens = "## What never changes" },
-  @{ File = "docs/SUCCESSION.md"; Opens = "## Layer 4 - Continuation, not just preservation" }
+  @{ File = "docs/SUCCESSION.md"; Opens = "## Layer 4 - Continuation, not just preservation" },
+  @{ File = "docs/FEDERATION_RULES.md"; Opens = "## What is owed to every peer" }
 )
 
 function Get-Sha256Hex([byte[]]$Bytes) {

@@ -117,6 +117,7 @@ BLOCKS=$(cat <<'EOF'
 CONTRIBUTING.md	## Why it exists, and the one condition
 CONTRIBUTING.md	## What never changes
 docs/SUCCESSION.md	## Layer 4 - Continuation, not just preservation
+docs/FEDERATION_RULES.md	## What is owed to every peer
 EOF
 )
 
