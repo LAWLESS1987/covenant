@@ -5898,7 +5898,7 @@ deferred per the operator's 2026-09-09 rule.
 
 ---
 
-### A143. [serious / delivery] A dismissed install prompt stopped the phone updating for ever, and the second cause is still not ruled out. PARTLY FIXED 2026-09-18 — cause 2 RULED OUT and a third cause measured, 2026-09-18 evening
+### A143. [serious / delivery] A dismissed install prompt stopped the phone updating for ever, and the second cause is still not ruled out. CLOSED 2026-09-19 — the real cause was the app's own leaked installer sessions (A147), the PC key is now pinned and VERIFIED on the phone
 
 **Settled since this was written (2026-09-18, 20:45).** Cause 2 is **ruled
 out**: a phone refusing the manifest does not download what the manifest
@@ -6464,6 +6464,17 @@ the fix — it hits the same refusal. One more manual `/m` install carries it
 over**, after which the app clears its own leak and self-update has no known
 reason left not to work. That is a prediction; the next auto-update is its
 test, and the heartbeat will report it either way.
+
+**CLOSED 2026-09-19 13:46.** He installed `925f553` (`0.1.607+b02b076`) by hand
+at 13:36 and pinned the PC key from a sealed block generated here (`--seal-plan
+--to phone`, fingerprint `a60bb20f15afe5d8`). The new build's first own line,
+carried by the 13:46:29 heartbeat: *`update: manifest VERIFIED against the
+pinned PC key -- signed by the pinned PC key, this phone's nonce echoed`*.
+Every phone-side highway condition is ABSENT and the phone runs the same core
+as the PC nodes. What remains is a prediction: the next core change should
+reach the phone with no tap, the heartbeat saying `abandoned N stale installer
+session(s)` once on the way. Not yet observed; the daily 07:32 rebuild is the
+test.
 
 **Repro:** `python covenant_app_update.py --futility`
 
