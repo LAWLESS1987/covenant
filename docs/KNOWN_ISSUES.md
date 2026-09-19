@@ -6115,7 +6115,7 @@ AB10.
 payloads the old wrapper moved to CLEAR, and which.
 ---
 
-### A150. [minor / p2p] A9's relay race is real and intermittent: node C rejected a relayed block once in eight sweeps. OPEN, found 2026-09-19 — NOT FIXED, on purpose
+### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
 `block_rejected*` anomaly when it receives a block relayed by B. Across eight
@@ -6155,8 +6155,53 @@ no-op. Both are measurements nobody has taken.
 run after a red one is the observation that hides this class of defect; the
 table above is eight runs precisely so the rate is visible.
 
-**Repro:** `python test_a9_relay_race.py` — and expect it to pass. It fails
-under sweep contention, not standalone.
+**THE CAUSE, measured rather than argued (2026-09-19).** `_accept_block_common`
+refuses any block whose `index != len(chain)` and recorded one anomaly kind for
+it. Three quite different things reach that line, and a fixture chain
+`[idx0, idx1]` driven in-process showed all three producing the **same** kind
+and the same shape of detail:
+
+    ECHO    index 1 we already hold, SAME hash    -> block_rejected_index
+    FORK    index 1 we already hold, OTHER hash   -> block_rejected_index
+    BEHIND  index 5, our height is 2              -> block_rejected_index
+
+The first is **this design's own dedup mechanism working**. The relay code says
+so in as many words — *"each node accepts a given height at most once and
+therefore relays it at most once"* — which is what makes the gossip flood die
+out with no dedup machinery, and the Hebbian rule beside it already treats an
+echo as an echo by *attenuating* the link that carried it. The third is a node
+missing ancestors, which the caller self-heals by pulling the gap. Only the
+second is what that anomaly's own comment describes: *"a fork, a
+misconfiguration, or an attack"*.
+
+So under contention C received a second copy of a block it already had, and the
+operator was shown the alert reserved for hostile peers. All three nodes agreed
+on the tip throughout — nothing was ever wrong with the chain.
+
+**The fix is to the signal, not the behaviour.** Every branch still returns
+`False`; nothing is accepted that was not accepted before. Only the name written
+to the ledger differs, so this **narrows** what `block_rejected_index` means and
+widens nothing:
+
+    echo    -> block_duplicate        "an echo, the flood dying out"
+    behind  -> block_behind           "ancestors missing, not a fork"
+    fork    -> block_rejected_index   unchanged
+
+**Driven all three ways** in `test_a4_block_injection.py` A4.1b, which is where
+this project maps block conditions to anomaly kinds — 64/64 — and
+mutation-tested: collapsing the echo branch back takes A4 to 63/64 with the
+echo reported as `block_rejected_index` again. A9 18/18, A11 23/23, A13 25/25,
+A24 70/70.
+
+**What this does NOT claim.** The race itself was never reproduced on demand:
+ten rounds of S1 under six busy CPU workers did not fire it, so the trigger is
+contention this machine only sees during a full sweep. What was proven is the
+CONFLATION, which is provable without the race and is the thing that made the
+red unreadable. If S1 goes red again it now means a genuine fork, which is
+worth stopping for.
+
+**Repro:** `python test_a4_block_injection.py` (A4.1b), and
+`python test_a9_relay_race.py`
 
 ---
 

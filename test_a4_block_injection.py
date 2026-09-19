@@ -13,6 +13,10 @@ Cases (each against the live node):
   A4.0  control: a correctly mined block is accepted (height 1 -> 2)
   A4.1  the same message replayed (same nonce) is ignored; same block with a
         fresh nonce is "duplicate", not re-applied
+  A4.1b an index mismatch is THREE conditions, not one (A150, 2026-09-19):
+        an echo we already hold      -> block_duplicate
+        a rival block at that index  -> block_rejected_index
+        a block beyond our height    -> block_behind
   A4.2  rival genesis / wrong previous_hash   -> block_rejected_prev_hash
   A4.3  forged signature (tampered sig bytes)  -> block_rejected_signature
   A4.4  contents changed after signing         -> block_rejected_signature
@@ -183,6 +187,42 @@ def main():
     r = propagate(P2P, asdict(good))                      # same block, new nonce
     check("same block under a fresh nonce is 'duplicate', not re-applied",
           len(m.node.chain) == h0 and r and r.get("outcome") == "duplicate", f"reply={r}")
+
+    # A4.1b -- AN INDEX MISMATCH IS THREE CONDITIONS (A150, 2026-09-19).
+    #
+    # One anomaly kind used to report all three, and measured in-process with
+    # a fixture chain every one of them produced `block_rejected_index` with
+    # the same shape of detail. So an operator could not tell the gossip flood
+    # dying out -- which this design RELIES on, "each node accepts a given
+    # height at most once and therefore relays it at most once" -- from a peer
+    # feeding rival blocks. A9's S1 went red once in eight sweeps on exactly
+    # that confusion, while all three nodes agreed on the tip throughout.
+    #
+    # The DECISION is identical in all three: nothing here is accepted that
+    # was not accepted before. Only the name in the ledger differs, so this
+    # narrows what block_rejected_index MEANS and widens nothing.
+    print("\n== A4.1b an index mismatch is three conditions, not one ==")
+    h0 = len(m.node.chain); a0 = anomalies(m)
+    propagate(P2P, asdict(good))                          # the block we already hold
+    a1 = anomalies(m)
+    check("A4.1b an ECHO of a block we hold records block_duplicate, NOT a "
+          "rejection -- it is the flood dying out, not a hostile peer",
+          delta(a0, a1, "block_duplicate") >= 1
+          and delta(a0, a1, "block_rejected_index") == 0
+          and len(m.node.chain) == h0,
+          f"+={[kk for kk in a1 if delta(a0, a1, kk) > 0]}")
+
+    rd = asdict(mined_block(m, [signed_tx(k, pem)]))
+    rd["index"] = len(m.node.chain) - 1                   # an index we already hold
+    expect_reject(m, P2P, "A4.1b a DIFFERENT block at an index we hold is still "
+                          "block_rejected_index -- the fork signal survives",
+                  rd, "block_rejected_index")
+
+    ahead = asdict(mined_block(m, [signed_tx(k, pem)]))
+    ahead["index"] = len(m.node.chain) + 7                # ancestors missing
+    expect_reject(m, P2P, "A4.1b a block BEYOND our height is block_behind -- "
+                          "missing ancestors, which self-heals, not a fork",
+                  ahead, "block_behind")
 
     print("\n== A4.2 rival genesis / wrong previous_hash ==")
     b = mined_block(m, [signed_tx(k, pem)], prev="f" * 64)
