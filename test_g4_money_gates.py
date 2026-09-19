@@ -136,19 +136,66 @@ def main():
     #
     # MY FIRST VERSION OF THIS TEST WAS WRONG, and the way it was wrong is
     # worth keeping. It turned the gate on and asserted it would complain --
-    # and it did not, because today's plan IS approved ("approved by phone at
-    # 2026-09-16T11:14:16-0400"). Silence was the correct answer and I had
-    # written the test as though the gate always speaks. So it is driven by a
-    # DAY instead: a day with no approval must be refused, today must not.
+    # and it did not, because that day's plan was approved. Silence was the
+    # correct answer and I had written the test as though the gate always
+    # speaks. So it is driven by a DAY instead: a day with no approval must be
+    # refused, an approved day must not.
+    #
+    # RETRACTED AND RESTATED 2026-09-19 -- retraction G4b, the second half of
+    # that fix. It read "...today, which the operator approved from the phone,
+    # is not", and asserted the gate stays silent on TODAY. That is not a
+    # property of the gate. It is a property of whether the operator has
+    # tapped approve yet this morning, and he approves between roughly 07:00
+    # and 11:20. Measured: 17/17 in three sweeps on 2026-09-18 after the 07:10
+    # approval, 16/17 in the 2026-09-19 sweep before it, with ops/daily_approvals.jsonl
+    # holding approvals for the 15th through the 18th and none yet for the 19th.
+    #
+    # So the suite reported the operator's to-do list as a test failure, every
+    # morning, on the money path -- which is A60's defect in its worst place: a
+    # line that is red by routine is a line nobody reads on the day it means
+    # something. The invariant the original author wanted is the one directly
+    # above, and it is kept; what is restated is this half, which now drives an
+    # APPROVED day from the ledger rather than hoping today is one.
+    #
+    # The claim as written is preserved on branch
+    # `g4-daily-plan-check-as-written-2026-09-19` and in docs/RETRACTED.json.
     import time as _t
+    import covenant_daily_plan as _dp
     no_plan_day = _t.time() - 86400 * 400          # long before any plan exists
     on = reasons(cfg=clear_cfg(daily_plan_required=True), now=no_plan_day)
-    off_today = reasons(cfg=clear_cfg(daily_plan_required=True))
     off_switch = reasons(cfg=clear_cfg(daily_plan_required=False), now=no_plan_day)
     check("G4.4 a day with no approved plan is refused",
           any("daily plan" in r.lower() for r in on), str(on)[:100])
-    check("G4.4b ...today, which the operator approved from the phone, is not",
-          not any("daily plan" in r.lower() for r in off_today), str(off_today)[:80])
+
+    # An approved day, taken from the ledger rather than assumed. If nothing
+    # has ever been approved on this machine there is nothing to measure and
+    # the check says so instead of passing: a green that means "no data" is
+    # the fake-guard shape this project has paid for twice (A65, A74).
+    approved_days = []
+    try:
+        with open(_dp.APPROVALS, encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                r = json.loads(line)
+                if r.get("decision") == "approve" and r.get("date"):
+                    approved_days.append(r["date"])
+    except (OSError, ValueError):
+        approved_days = []
+    if approved_days:
+        day = sorted(set(approved_days))[-1]
+        ok_appr, why_appr = _dp.approved(day)
+        stamp = _t.mktime(_t.strptime(day, "%Y-%m-%d")) + 43200
+        off_appr = reasons(cfg=clear_cfg(daily_plan_required=True), now=stamp)
+        check("G4.4b ...and a day the operator DID approve is not -- the gate "
+              "reads the decision, it does not assume one",
+              ok_appr and not any("daily plan" in r.lower() for r in off_appr),
+              "%s: %s | %s" % (day, why_appr[:60], str(off_appr)[:50]))
+    else:
+        check("G4.4b ...and a day the operator DID approve is not",
+              False, "NOT MEASURED: no approval has ever been recorded in %s, so "
+                     "there is no approved day to drive this with. This is not a "
+                     "pass." % _dp.APPROVALS)
     check("G4.4c ...and the switch turns the gate off entirely",
           not any("daily plan" in r.lower() for r in off_switch), str(off_switch)[:80])
 

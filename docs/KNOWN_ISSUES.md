@@ -6115,6 +6115,53 @@ AB10.
 payloads the old wrapper moved to CLEAR, and which.
 ---
 
+### A149. [moderate / money] The money-gate suite reported the operator's morning to-do list as a test failure. RETRACTED AND RESTATED 2026-09-19 — retraction G4b
+
+**Evidence.** `test_g4_money_gates.py` G4.4b read *"...today, which the
+operator approved from the phone, is not"*, and asserted the daily-plan gate
+stays silent on **today**. That is not a property of the gate. It is a
+property of whether he has tapped approve yet this morning.
+
+    2026-09-18, three sweeps after his 07:10:50 approval    G4 17/17
+    2026-09-19, one sweep at 09:20, before his approval     G4 16/17
+      -> "no approved daily plan for 2026-09-19"
+
+`ops/daily_approvals.jsonl` holds approvals for the 15th, 16th, 17th and 18th
+and none yet for the 19th. **The gate refused correctly and the check called
+that refusal a failure.**
+
+**Why it mattered more than the one red line.** Left as written it goes red
+every morning until he taps and green after — a suite reporting a to-do item
+as a defect, on the money path. That is A60 in the worst place it can land: a
+line red by routine is a line nobody reads on the day it means something. It
+is the same fault as A145, found the same morning, in a check that guards
+orders rather than opinions.
+
+**What replaced it, and why it measures more.** The invariant the original
+author wanted is that the gate **reads** the decision instead of assuming one.
+G4.4 drives a day with no approval; G4.4b now drives the most recent day
+`ops/daily_approvals.jsonl` says **was** approved. The old form could pass on a
+day the gate was broken but he happened to have approved; this one cannot.
+The no-data branch is explicit and **fails**: pointed at an empty approvals
+ledger it reports `NOT MEASURED` and takes G4 to 16/17 rather than passing on
+absence — driven, not asserted, because a green meaning "no data" is the
+fake-guard shape this project has already paid for twice (A65, A74).
+
+**The gate itself is untouched.** No guard was moved, loosened or switched off,
+and nothing here approves a plan — that decision is his and is not a repair.
+
+- **Branch** `g4-daily-plan-check-as-written-2026-09-19`, at `f6ae5d6`, pushed.
+  Run it before his morning approval and it fails; run it after and it passes,
+  which is the behaviour being retracted, reproducible on demand.
+- **Tombstone** retraction `G4b` in `docs/RETRACTED.json`. `test_r1_retracted.py`
+  is 18/18 and fails the build if the sentence returns without citing G4b
+  within ten lines — driven both ways: a probe file carrying it took R1 to
+  17/18, removing it restored 18/18.
+
+**Repro:** `python test_g4_money_gates.py`
+
+---
+
 ### A147. [serious / delivery] The update door re-sent 2.75 GB it had already proved would not install. FIXED 2026-09-18
 
 **Evidence.** `ops/app/requests.jsonl`, between 11:16:16 and 20:45:49 on

@@ -123,6 +123,33 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "The three added files are SWEEP TRANSCRIPTS: a verbatim record of what the suite printed on a given day, which is the one kind of file whose whole purpose is to hold the old wording unedited. Editing a transcript to satisfy a guard would be falsifying the record the guard exists to protect. Same reasoning as A121's docs/RUN_LOG_ARCHIVE.md. ONE_RUN.txt is overwritten by the next sweep and will carry the restated wording by itself; the other two are archives and will not."
+  },
+  {
+   "id": "G4b",
+   "claim": "That today's daily trading plan is approved by the operator -- asserted as a property of the money gate, in test_g4_money_gates.py G4.4b.",
+   "refuted_by": "the sweep of 2026-09-19 at 09:20, run before the operator had approved that morning: G4 16/17, 'no approved daily plan for 2026-09-19'. The same check was 17/17 in all three sweeps of 2026-09-18, taken after his 07:10:50 approval.",
+   "truth": "Whether today is approved is a fact about the operator's morning, not about the gate. ops/daily_approvals.jsonl records an approval for 2026-09-15, -16, -17 and -18 and none for the 19th at the time of the sweep; the gate refused correctly, and the check called that refusal a failure. Left as written it would go red every morning until he taps and green after -- a suite reporting his to-do list as a test failure, on the money path, which is A60's defect in the worst place for it: a line red by routine is a line nobody reads on the day it means something. The gate itself was never wrong and is not changed by this.",
+   "why_restated_rather_than_left_red": "The invariant the original author wanted is that the gate READS the decision rather than assuming one, and that is now driven both ways: G4.4 against a day with no approval, G4.4b against the most recent day the ledger says was approved. It is strictly more than the old form measured -- the old one could pass on a day the gate was broken but the operator happened to have approved. The no-data branch is explicit and fails: pointed at an empty approvals ledger the check reports NOT MEASURED and takes G4 to 16/17 rather than passing on absence, which is the fake-guard shape this project has already paid for twice (A65, A74).",
+   "the_other_perspective": "Branch `g4-daily-plan-check-as-written-2026-09-19` holds the tree at f6ae5d6 with the check exactly as written, pushed to origin. Run it before the operator's morning approval and it fails; run it after and it passes -- which is the behaviour being retracted, reproducible on demand.",
+   "verbatim": [
+    "G4.4b ...today, which the operator approved from the phone, is not"
+   ],
+   "patterns": [
+    "which\\s+the\\s+operator\\s+approved\\s+from\\s+the\\s+phone"
+   ],
+   "note_on_patterns": "One pattern, narrow. A pattern over 'daily plan' or 'approved' matches the gate's own refusal strings, the plan store, the route and every transcript, none of which assert anything about today. This phrase is the assertion.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_SWEEP.txt",
+    "ops/_sweep2.txt",
+    "ops/_sweep3.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The four added files are sweep transcripts -- a verbatim record of what the suite printed on a given day, the one kind of file whose purpose is to hold the old wording unedited. test_g4_money_gates.py is deliberately NOT allowed: it quotes the retracted sentence in the comment explaining the retraction, and cites G4b two lines above it, so containment covers it. That is the rule working as intended rather than being waived."
   }
  ]
 }
