@@ -317,9 +317,26 @@ def futility_checks():
                                  "node_id": "phone", "app": "0.1.597+7ffa73b",
                                  "build": "a0fd2a1deadbeef"}) + "\n")
         f_same = AU.install_futility()
-        check("F14 a matching `build` IS installed, whatever versionName says",
+        check("F14 a matching `build` with a matching versionName IS installed",
               f_same["futile"] is False and "installed" in f_same["why"],
               f_same["why"][:60])
+
+        # A BUILD IS (COMMIT, CORE) -- third pass at this identity (2026-09-19).
+        # The PC's daily dispatch rebuilds the SAME app commit against a newer
+        # core; the sha is unchanged and the versionName moves. "Same commit"
+        # alone read that as installed, and the door would have stopped
+        # offering exactly the build the phone lacked.
+        AU.latest = lambda: dict(BUILD, sha7="a0fd2a1", version="0.1.640+9999999")
+        deliver(3, sha7="a0fd2a1")
+        with open(AU.CHECKINS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": "fixture", "at": _tick(), "signer": "phone",
+                                 "node_id": "phone", "app": "0.1.597+7ffa73b",
+                                 "build": "a0fd2a1deadbeef"}) + "\n")
+        f_core = AU.install_futility()
+        check("F15 the SAME commit against a NEWER core is NOT installed -- the "
+              "versionName moved and the phone does not have that build",
+              "installed" not in f_core["why"] and f_core.get("proved", 0) >= 1,
+              "proved=%s why=%s" % (f_core.get("proved"), f_core["why"][:50]))
         AU.latest = lambda: dict(BUILD)
 
         # A measurement that cannot be taken has no opinion, and must never

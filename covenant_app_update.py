@@ -107,7 +107,13 @@ def latest_signed(nonce, key=None):
     doc = {"v": 1, "issued": int(time.time()), "nonce": str(nonce or "")[:64],
            "sha": str(d.get("sha", "")), "sha7": str(d.get("sha7", "")),
            "sha256": str(d.get("sha256", "")), "size": int(d.get("size") or 0),
-           "built": str(d.get("built", ""))}
+           "built": str(d.get("built", "")),
+           # `version` under the signature too (2026-09-19): the phone now
+           # decides "is this build mine" by (sha, version), because a rebuild
+           # of its own commit against a newer core carries the same sha and a
+           # new versionName, and it used to read that as "already mine". A
+           # field the phone acts on must be one the PC signed.
+           "version": str(d.get("version", "") or "")}
     try:
         import covenant_actuator_guide as _ag
         return _ag.sign_doc(doc, _ag._key(key))
@@ -359,8 +365,13 @@ def install_futility(signer="phone", d=None, after=None):
         have_build = str(ck.get("build") or "").strip().lower()
         if have_build:
             out["have_build"] = have_build[:7]
-            if have_build[:7] == sha7[:7].lower():
-                out["why"] = "%s is on build %s -- installed" % (signer, have_build[:7])
+            # INSTALLED MEANS SAME COMMIT *AND* SAME VERSIONNAME (2026-09-19,
+            # third pass at this identity). Same commit alone is not enough: a
+            # rebuild of that commit against a newer core keeps the sha and
+            # changes the versionName, and calling that "installed" would let
+            # the door stop offering exactly the build the phone lacks.
+            if have_build[:7] == sha7[:7].lower() and have == want:
+                out["why"] = "%s is on build %s (%s) -- installed" % (signer, have_build[:7], have)
                 return out
             # A build is reported and it is NOT this one: that is the answer,
             # whatever the versionName says. Fall through to the round-trip
@@ -406,7 +417,9 @@ def install_futility(signer="phone", d=None, after=None):
             the commit tells them apart (F13)."""
             b = str(c.get("build") or "").strip().lower()
             if b:
-                return b[:7] != sha7[:7].lower()
+                # Other commit, OR same commit against another core (the
+                # versionName moves exactly when the core does).
+                return b[:7] != sha7[:7].lower() or str(c.get("app") or "") != want
             return str(c.get("app") or "") != want
 
         for r in rows:
