@@ -332,6 +332,129 @@ def main():
         wd._self_eval.clear()
         wd._self_eval.update(_saved_se[5])
 
+    # E12 -- THE OFFLINE LAYERS (2026-09-19) ------------------------------
+    # Added because on 2026-09-19 both of the day's real failures were in
+    # layers this block could not see. Every guard below is driven BOTH ways:
+    # a check that has only ever passed has never been observed.
+    _, base = parse(ev()[0])
+    check("E12a with offline=None the block is unchanged -- five layers, no "
+          "row invented for something nobody measured",
+          set(base) == {"nodes", "mycelium", "judge", "self", "alerts"},
+          str(sorted(base)))
+
+    _, four = parse(ev(offline={"trader": ("PASS", "t"), "repo": ("PASS", "r"),
+                                "git": ("PASS", "g"), "disk": ("PASS", "d")})[0])
+    check("E12b supplied layers appear, in the fixed order",
+          [k for k in four] [-4:] == ["trader", "repo", "git", "disk"],
+          str(list(four)))
+
+    _, partial = parse(ev(offline={"disk": ("PASS", "d")})[0])
+    check("E12c a layer that could not be read is OMITTED, not guessed PASS",
+          "disk" in partial and "trader" not in partial, str(sorted(partial)))
+
+    blk, ov = ev(offline={"trader": ("FAIL", "seal failed")})
+    check("E12d a FAIL in an offline layer drives the OVERALL verdict -- the "
+          "whole point, since 09-19 read WARN while the trader could not seal",
+          ov == "FAIL" and "seal failed" in blk, ov)
+    check("E12e ...and the same block without it is PASS, so E12d measures "
+          "the offline row and not a block that always fails", ev()[1] == "PASS",
+          ev()[1])
+
+    # The readings themselves, against real files in a temp tree.
+    import hashlib
+    import time
+    _saved_paths = (wd.TRADER_LOG, wd.CORE_FILE, wd.MANIFEST_FILE)
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            core = os.path.join(td, "covenant_unified_v8.py")
+            man = os.path.join(td, "MANIFEST.sha256")
+            with open(core, "wb") as fh:
+                fh.write(b"print('core')\n")
+
+            good = hashlib.sha256(b"print('core')\n").hexdigest()
+            wd.CORE_FILE, wd.MANIFEST_FILE = core, man
+            with open(man, "w", encoding="utf-8") as fh:
+                fh.write(good + "  covenant_unified_v8.py\n")
+            check("E12f _repo_reading PASSes when the core matches the manifest",
+                  wd._repo_reading()[0] == "PASS", str(wd._repo_reading()))
+            with open(man, "w", encoding="utf-8") as fh:
+                fh.write("0" * 64 + "  covenant_unified_v8.py\n")
+            check("E12g ...and FAILs on a one-byte-different pin, so E12f is "
+                  "measuring the hash and not the file's existence",
+                  wd._repo_reading()[0] == "FAIL", str(wd._repo_reading()))
+            with open(man, "w", encoding="utf-8") as fh:
+                fh.write(good + "  something_else.py\n")
+            check("E12h ...and WARNs when the manifest carries no row for the "
+                  "core at all (unpinned is not the same as matching)",
+                  wd._repo_reading()[0] == "WARN", str(wd._repo_reading()))
+
+            tl = os.path.join(td, "trader_log.txt")
+            wd.TRADER_LOG = tl
+            check("E12i no trader log at all -> no row, rather than a verdict",
+                  wd._trader_reading() is None, str(wd._trader_reading()))
+            t = time.localtime()
+            today = "%02d/%02d/%04d" % (t.tm_mon, t.tm_mday, t.tm_year)
+            clean = ("---- CYCLE COMPLETE %s ----\n  SEAL  ok -- HTTP 200\n"
+                     "---- CYCLE COMPLETE %s ----\n  exit 0\n" % (today, today))
+            with open(tl, "w", encoding="utf-8") as fh:
+                fh.write(clean)
+            check("E12j a cycle dated today that sealed -> PASS",
+                  wd._trader_reading()[0] == "PASS", str(wd._trader_reading()))
+            with open(tl, "w", encoding="utf-8") as fh:
+                fh.write(clean.replace("SEAL  ok -- HTTP 200",
+                                       "SEAL  FAILED -- refusing to seal"))
+            r = wd._trader_reading()
+            check("E12k ...and the SAME cycle with a failed seal -> FAIL. This "
+                  "is the 2026-09-19 case: freshness said RAN, nothing sealed",
+                  r[0] == "FAIL" and "FAILED" in r[1], str(r))
+            with open(tl, "w", encoding="utf-8") as fh:
+                fh.write(clean.replace("exit 0", "exit 3: a required seal failed"))
+            check("E12l ...and a non-zero exit is caught even when the seal "
+                  "line reads ok", wd._trader_reading()[0] == "FAIL",
+                  str(wd._trader_reading()))
+    finally:
+        wd.TRADER_LOG, wd.CORE_FILE, wd.MANIFEST_FILE = _saved_paths
+
+    o = wd.offline_readings()
+    check("E12m offline_readings() runs against the REAL tree and returns "
+          "only layers it could take", isinstance(o, dict)
+          and set(o) <= {"trader", "repo", "git", "disk"}, str(sorted(o)))
+    check("E12n every returned layer carries a real verdict word",
+          all(v[0] in ("PASS", "WARN", "FAIL") and v[1] for v in o.values()),
+          str(o))
+
+    _boom = wd._disk_reading
+    try:
+        wd._disk_reading = lambda: (_ for _ in ()).throw(RuntimeError("x"))
+        o2 = wd.offline_readings()
+        check("E12o a reading that RAISES becomes a WARN row, never a crash -- "
+              "the evaluation must not be able to kill the evaluator",
+              o2.get("disk", ("", ""))[0] == "WARN", str(o2.get("disk")))
+    finally:
+        wd._disk_reading = _boom
+
+    # E12p -- NO NETWORK, pinned by RUNNING it, not by grepping the source.
+    # A source grep would fail on the word "fetch" in FETCH_HEAD, which is a
+    # local file read; and it would pass a watchdog that reached the network
+    # by some other spelling. So every git argv is recorded and urlopen is
+    # replaced by something that fails the test if it is ever called.
+    _git_calls, _net = [], []
+    _s_git, _s_url = wd._git, urllib.request.urlopen
+    try:
+        def _rec(*a, **k):
+            _git_calls.append(a)
+            return _s_git(*a, **k)
+        wd._git = _rec
+        urllib.request.urlopen = lambda *a, **k: _net.append(a)
+        wd.offline_readings()
+        check("E12p the offline pass RAN without reaching the network: no "
+              "fetch/pull/push in any git argv, no urlopen at all",
+              _git_calls and not _net and not any(
+                  set(a) & {"fetch", "pull", "push", "clone", "remote"}
+                  for a in _git_calls), f"{_git_calls} {_net}")
+    finally:
+        wd._git, urllib.request.urlopen = _s_git, _s_url
+
     p = sum(results)
     print(f"\nP20: {p}/{len(results)} passed")
     return 0 if p == len(results) else 1

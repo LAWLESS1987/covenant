@@ -60,6 +60,7 @@ import hashlib
 import http.client            # HTTPException: not an OSError, not a URLError (A115b)
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -664,9 +665,211 @@ SELF_EVAL_HEADER = (
 
 _RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
 
+# ---------------------------------------------------------------------------
+# OFFLINE READINGS (2026-09-19, at the operator's instruction: "this should be
+# greenlit or a local pc function constantly").
+#
+# WHY THIS EXISTS. Until today the hourly block carried five layers -- nodes,
+# mycelium, judge, self, alerts -- all of them readings of the RUNNING chain.
+# The scheduled Claude session carried four more: the trader, the deploy pins,
+# git drift and disk. On 2026-09-19 both of the day's failures were in those
+# four (a trader cycle that could not seal at 09:00, and a deploy verifier
+# pinning a build deleted nine days ago), and the hourly block said WARN
+# through all of it, because it was structurally unable to look. A ledger that
+# can only see the layers that were green is not an evaluation of the system.
+#
+# WHAT IT STRUCTURALLY CANNOT SEE. These are local file and git reads only.
+# No network: git drift is measured against the last fetch this PC did, and
+# the row says how old that is rather than pretending it is live. It does not
+# run the trader, read a key, or touch funds. It compares the core against
+# MANIFEST.sha256, which is the record that has been telling the truth, and
+# NOT against verify_deploy.py's in-source pins, which have been stale since
+# 2026-09-12 -- so this row can miss a substitution that also rewrote the
+# manifest, and it says so in its own detail line.
+#
+# It is separate from self_evaluation(), which stays pure (everything arrives
+# as arguments), and every reading fails to None rather than raising: the
+# evaluation must not be able to kill the evaluator.
+# ---------------------------------------------------------------------------
+TRADER_LOG = os.path.join(HERE, "trader_log.txt")
+CORE_FILE = os.path.join(HERE, "covenant_unified_v8.py")
+MANIFEST_FILE = os.path.join(HERE, "MANIFEST.sha256")
+
+
+def _read_text(path, tail_bytes=0):
+    try:
+        with open(path, "rb") as fh:
+            if tail_bytes:
+                try:
+                    fh.seek(max(0, os.path.getsize(path) - tail_bytes))
+                except OSError:
+                    pass
+            return fh.read().decode("utf-8", "replace")
+    except OSError:
+        return None
+
+
+def _git(*args, timeout=20):
+    try:
+        p = covenant_quiet.run(("git",) + args, cwd=HERE, timeout=timeout,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if p.returncode != 0:
+        return None
+    return p.stdout.decode("utf-8", "replace").strip()
+
+
+def _trader_reading(now=None):
+    """(verdict, detail) for the trader, or None when there is no log.
+
+    Freshness is trader_freshness.verdict() -- the existing measurement, not a
+    second one that could disagree with it. On top of that: a cycle that RAN
+    and then failed its seal produced no audit record, which the freshness
+    code does not and should not know about, so it is asked separately."""
+    text = _read_text(TRADER_LOG, tail_bytes=200_000)
+    if text is None:
+        return None
+    try:
+        import trader_freshness
+    except Exception:
+        return "WARN", ("trader_log.txt is here but trader_freshness.py did "
+                        "not import -- freshness UNMEASURED this pass")
+    t = time.localtime(now if now is not None else time.time())
+    try:
+        code, line = trader_freshness.verdict(
+            text, (t.tm_year, t.tm_mon, t.tm_mday), (t.tm_hour, t.tm_min))
+    except Exception as e:                                   # never fatal
+        return "WARN", f"trader_freshness.verdict raised {type(e).__name__}"
+    try:
+        age_h = (time.time() - os.path.getmtime(TRADER_LOG)) / 3600.0
+    except OSError:
+        age_h = float("nan")
+    # The last cycle only: everything after the second-to-last COMPLETE line.
+    parts = text.split("---- CYCLE COMPLETE")
+    last = ("---- CYCLE COMPLETE" + parts[-2] + "---- CYCLE COMPLETE"
+            + parts[-1]) if len(parts) >= 2 else text
+    seal_lines = [l.strip() for l in last.splitlines() if " SEAL " in l]
+    seal_failed = bool(seal_lines) and "FAILED" in seal_lines[-1].upper()
+    exit_bad = [l.strip() for l in last.splitlines()
+                if l.strip().startswith("exit ")
+                and not l.strip().startswith("exit 0")]
+    detail = f"log {age_h:.1f}h old; freshness exit {code}: {line[:150]}"
+    if seal_failed or exit_bad:
+        why = (seal_lines[-1][:120] if seal_failed else exit_bad[-1][:120])
+        return "FAIL", (detail + f" -- BUT the last cycle did not finish "
+                                 f"clean: {why}")
+    if code == 1:
+        return "FAIL", detail
+    if code == 2:
+        return "WARN", detail
+    return "PASS", detail
+
+
+def _repo_reading():
+    """(verdict, detail) comparing the core on disk to MANIFEST.sha256."""
+    blob = _read_text(MANIFEST_FILE)
+    if blob is None or not os.path.exists(CORE_FILE):
+        return None
+    try:
+        with open(CORE_FILE, "rb") as fh:
+            disk = hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+    want = None
+    for row in blob.splitlines():
+        bits = row.split(None, 1)
+        if len(bits) == 2 and bits[1].strip().replace("\\", "/").endswith(
+                "covenant_unified_v8.py"):
+            want = bits[0].strip()
+            break
+    if want is None:
+        return "WARN", ("MANIFEST.sha256 carries no row for "
+                        "covenant_unified_v8.py -- the core is unpinned")
+    if want != disk:
+        return "FAIL", (f"core on disk {disk[:12]} but MANIFEST.sha256 pins "
+                        f"{want[:12]} -- an old copy, a partial copy or a "
+                        f"hand edit. Re-pin in the SAME change as the file")
+    return "PASS", (f"core {disk[:12]} matches MANIFEST.sha256. This compares "
+                    f"the manifest only; a substitution that also rewrote the "
+                    f"manifest would read clean here")
+
+
+def _git_reading():
+    """(verdict, detail) for drift against the LAST FETCH -- no network."""
+    head = _git("rev-parse", "--short", "HEAD")
+    if head is None:
+        return None
+    counts = _git("rev-list", "--left-right", "--count", "origin/main...HEAD")
+    dirty = _git("status", "--short")
+    n_dirty = len([l for l in (dirty or "").splitlines() if l.strip()])
+    port = [l for l in (dirty or "").splitlines()
+            if "holdings" in l.lower() or "portfolio" in l.lower()]
+    fetch_age = ""
+    fh_path = os.path.join(HERE, ".git", "FETCH_HEAD")
+    try:
+        fetch_age = " last fetch %.1fh ago;" % (
+            (time.time() - os.path.getmtime(fh_path)) / 3600.0)
+    except OSError:
+        fetch_age = " no FETCH_HEAD (origin never fetched here);"
+    if counts is None:
+        return "WARN", (f"HEAD {head};{fetch_age} origin/main not resolvable "
+                        f"-- drift UNMEASURED")
+    behind, ahead = (counts.split() + ["?", "?"])[:2]
+    detail = (f"HEAD {head}, {ahead} ahead / {behind} behind origin/main as "
+              f"of the last fetch;{fetch_age} {n_dirty} file(s) not committed")
+    if port:
+        return "FAIL", (detail + " -- INCLUDING what looks like a portfolio "
+                        f"file: {port[0].strip()[:80]}. Never git add -A here")
+    if behind not in ("0", "?") or ahead not in ("0", "?"):
+        return "WARN", detail
+    return "PASS", detail
+
+
+def _disk_reading():
+    try:
+        du = shutil.disk_usage(HERE)
+    except OSError:
+        return None
+    free_g = du.free / (1024.0 ** 3)
+    logs = 0
+    for root, _dirs, files in os.walk(os.path.join(HERE, "logs")):
+        for f in files:
+            try:
+                logs += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    detail = (f"{free_g:.0f}G free of {du.total / (1024.0 ** 3):.0f}G "
+              f"({du.used * 100 // du.total}% used); logs/ "
+              f"{logs / (1024.0 ** 2):.0f}M")
+    if free_g < 5:
+        return "FAIL", detail + " -- under 5G free"
+    if free_g < 20:
+        return "WARN", detail + " -- under 20G free"
+    return "PASS", detail
+
+
+def offline_readings(now=None):
+    """{layer: (verdict, detail)} for everything this PC can check without the
+    chain. Any reading that cannot be taken is ABSENT from the dict rather
+    than guessed, so self_evaluation() omits the row instead of asserting."""
+    out = {}
+    for name, fn in (("trader", lambda: _trader_reading(now)),
+                     ("repo", _repo_reading),
+                     ("git", _git_reading),
+                     ("disk", _disk_reading)):
+        try:
+            r = fn()
+        except Exception as e:                               # never fatal
+            r = ("WARN", f"{name} reading raised {type(e).__name__}: {e}"[:160])
+        if r:
+            out[name] = r
+    return out
+
 
 def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
-                    round_no=0, rate_limited=()):
+                    round_no=0, rate_limited=(), offline=None):
     """(block, overall) -- every layer, judged from what this pass sensed.
 
     Pure, the same shape as topology_report and judge_identity_report:
@@ -676,6 +879,10 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
       judge      -- the judge-identity baseline state      (metadata)
       self_drift -- P14's alert list for THIS file          (metadata)
       alerts     -- every alert this pass raised
+      offline    -- {layer: (verdict, detail)} from offline_readings(), or
+                    None. A layer that is absent is OMITTED, never guessed:
+                    the block must not be able to report PASS on something
+                    nobody measured.
     """
     layers = []
 
@@ -741,6 +948,13 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
         layer("alerts", v, f"{len(alerts)} live -- first: {alerts[0][:110]}")
     else:
         layer("alerts", "PASS", "none this pass")
+
+    # The offline layers, in a fixed order so the ledger is greppable. Only
+    # what was actually read appears.
+    for name in ("trader", "repo", "git", "disk"):
+        r = (offline or {}).get(name)
+        if r:
+            layer(name, r[0], r[1])
 
     overall = max((v for _, v, _ in layers), key=lambda v: _RANK[v])
     block = [f"## {now_iso}  overall {overall}  (round {round_no})"]
@@ -1233,7 +1447,8 @@ def one_pass(strict=False):
             states, dict(_topo_prev), _student_state(),
             list(s_alerts), list(alerts),
             time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            round_no=_self_eval["round"], rate_limited=rate_limited)
+            round_no=_self_eval["round"], rate_limited=rate_limited,
+            offline=offline_readings())
         if _self_eval_write(block):
             log("INFO", f"self-evaluation: {overall} "
                         f"(round {_self_eval['round']}) -> {SELF_EVAL_PATH}")
