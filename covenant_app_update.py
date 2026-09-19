@@ -188,18 +188,26 @@ def requests_tail(n=20, route=None):
 
 # ------------------------------------------------------- futile delivery --
 #
-# WHAT WAS MEASURED (2026-09-18, 20:45). The door had been working perfectly
-# and achieving nothing. In ops/app/requests.jsonl, between 11:08:52 and
-# 20:45:49 -- 9.6 hours -- there are 61 COMPLETE DELIVERIES at /app/apk (unit:
-# HTTP responses whose last byte was streamed, counted by the generator in the
-# route, not by intent), totalling 2,754,957,352 bytes. Over the same window
+# WHAT WAS MEASURED (2026-09-18, 20:45; figures corrected 21:45, see below).
+# The door had been working perfectly and achieving nothing. In
+# ops/app/requests.jsonl, between 11:16:16 and 20:45:49 -- 9.5 hours -- there
+# are 57 COMPLETE DELIVERIES TO SIGNER `phone` at /app/apk (unit: HTTP
+# responses whose last byte was streamed, counted by the generator in the
+# route, not by intent), totalling 2,574,307,896 bytes. Over the same window
 # the phone's own /checkin reported `0.1.475+13b946a` on all 200 of its rows.
 # Not one changed. A second, independent route agrees: `tailscale status` shows
-# tx 2,873,815,540 bytes to lawrences-s25, the extra being partials, check-ins
-# and headers.
+# tx 2,873,815,540 bytes to lawrences-s25, the extra being partials, check-ins,
+# headers and the four transfers below.
 #
-# And it is not one bad build. The 61 deliveries were of THREE different
-# builds -- ab5ea5a x42, ef44d63 x14, 15f4d48 x5 -- so nothing about the bytes
+# CORRECTED, and the correction belongs here. This first read "61 deliveries,
+# 2,754,957,352 bytes" -- every complete delivery in the ledger, four of which
+# went to signer `pc` from an earlier session's own test, reported as the
+# phone's. That is CLAUDE.md rule 4 inside the comment explaining a rule-4
+# fix: a right number of the wrong thing. All signers is 60 / 2,709,794,008;
+# the phone is 57 / 2,574,307,896.
+#
+# And it is not one bad build. The 57 deliveries were of THREE different
+# builds -- ab5ea5a x42, ef44d63 x13, 15f4d48 x2 -- so nothing about the bytes
 # being served explains it. The installed app is 0.1.475, built before
 # 3df2173 ("The install threw SecurityException every time: commit() ran with
 # the write stream open"), so its installer throws on every attempt, and the

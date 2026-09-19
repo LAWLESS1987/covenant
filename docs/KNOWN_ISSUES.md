@@ -6080,21 +6080,29 @@ payloads the old wrapper moved to CLEAR, and which.
 
 ### A147. [serious / delivery] The update door re-sent 2.75 GB it had already proved would not install. FIXED 2026-09-18
 
-**Evidence.** `ops/app/requests.jsonl`, between 11:08:52 and 20:45:49 on
-2026-09-18 — 9.6 hours — records **61 complete deliveries** at `/app/apk`
-(unit: HTTP responses whose last byte was streamed, counted by the route's own
-generator, not by intent), totalling **2,754,957,352 bytes**. Over the same
-window `ops/phone_checkins.jsonl` holds the phone's heartbeat every ten
-minutes, and all 200 of those rows report the same app: `0.1.475+13b946a`.
-Not one changed.
+**Evidence.** `ops/app/requests.jsonl`, between 11:16:16 and 20:45:49 on
+2026-09-18 — 9.5 hours — records **57 complete deliveries to signer `phone`**
+at `/app/apk` (unit: HTTP responses whose last byte was streamed, counted by
+the route's own generator, not by intent), totalling **2,574,307,896 bytes**.
+Over the same window `ops/phone_checkins.jsonl` holds the phone's heartbeat
+every ten minutes, and all 200 of those rows report the same app:
+`0.1.475+13b946a`. Not one changed.
+
+*(Corrected the same evening. This first said **61 deliveries, 2,754,957,352
+bytes**, which is every complete delivery the ledger held — including four
+served to signer `pc` by an earlier session's own test — presented as the
+phone's. Rule 4, in the entry describing a rule-4 fix: right number, wrong
+denominator. All signers is 60 and 2,709,794,008 bytes over the same window;
+the phone is 57 and 2,574,307,896. The finding is unchanged either way, and
+the wrong figure is kept here rather than quietly swapped.)*
 
 A second, independent route agrees: `tailscale status` showed
 `tx 2873815540` to `lawrences-s25`. 2.87 GB against 2.75 GB ledgered — the
 difference is partials, check-ins and headers. Two measurements that could
 have disagreed, and did not.
 
-**It is not one bad build.** The 61 deliveries were of **three** different
-builds — `ab5ea5a` ×42, `ef44d63` ×14, `15f4d48` ×5 — so nothing about the
+**It is not one bad build.** The 57 deliveries were of **three** different
+builds — `ab5ea5a` ×42, `ef44d63` ×13, `15f4d48` ×2 — so nothing about the
 bytes being served explains it. The installed app is `0.1.475`, built before
 covenant-phone `3df2173` (*"The install threw SecurityException every time:
 commit() ran with the write stream open"*). Its installer throws on every
