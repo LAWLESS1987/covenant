@@ -6524,6 +6524,25 @@ PC signs `version` inside the manifest and its guard says installed only when
 build **and** versionName match (F15). The fix ships as a new app commit, so
 the phone will take it — the first auto-update observed end to end.
 
+**THE LEAK IS CLEARED, AND THE LAST STEP IS ANDROID'S (2026-09-19 17:56).**
+On `925f553` (the build that abandons its own stale sessions) the phone was
+offered `65bc28b`, downloaded it whole at 17:56:31, and at 17:56:32 logged
+*"Android is asking you to confirm build 65bc28b"* — `createSession` and
+`commit` both succeeded where three attempts at 13:07–13:27 had died on *Too
+many active sessions*. So every cause found today is closed except one that is
+not a defect: Android waives the confirmation only when an installer is
+**updating itself**, and a build installed by hand from the browser has the
+system installer as its installer of record. The first self-update after a
+hand install must therefore ask; the one after it should not. **Prediction,
+made before the field that can test it exists:** the heartbeat will carry
+`installer` (`getInstallSourceInfo`), and after this tap it should read this
+package's own name, and the next update should land with no prompt.
+
+Also: a watcher script of mine printed "AUTO-UPDATED WITHOUT A TAP" on this
+event. It matched the substring `build 65bc28b` in the *update line* rather
+than in the `build` field; the phone was still on `925f553`. Recorded here so
+the phrase is not quoted from that log as a result.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
