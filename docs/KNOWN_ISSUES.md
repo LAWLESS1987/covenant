@@ -6115,6 +6115,51 @@ AB10.
 payloads the old wrapper moved to CLEAR, and which.
 ---
 
+### A150. [minor / p2p] A9's relay race is real and intermittent: node C rejected a relayed block once in eight sweeps. OPEN, found 2026-09-19 — NOT FIXED, on purpose
+
+**Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
+`block_rejected*` anomaly when it receives a block relayed by B. Across eight
+full sweeps on 2026-09-19 it failed exactly once:
+
+    one_baseline  one_after  one_final  one_green  one_g4  one_mfn   18/18
+    one_final2                                              17/18  <- FAIL
+    one_final3                                              18/18
+
+and three standalone runs immediately after the failure were 18/18, 18/18,
+18/18. The failing detail:
+
+    block_rejected_index  baseline 1, expected_recent 0.1, recent 1
+    catchup_failed        baseline 1, expected_recent 0.1, recent 1
+
+**It is not flakiness in the test; it is the race the test is named for.** C
+boots knowing only B, B is down, C's bootstrap round fails and stops. B then
+comes up peered to A and C, pulls the block from A, and relays it. Under sweep
+contention C's catch-up and B's relay overlap, the block arrives at an index C
+has already asked about, and C rejects it. The suite caught a real transient
+in the P2P path — which is what it exists for.
+
+**Why it is left open.** It is intermittent at roughly one sweep in eight, the
+three nodes reconcile (S1's tip check passed in the failing run: all three
+agreed), and `test_a9_relay_race.py`'s own header rule applies — *"IT DOES NOT
+CHANGE A GUARD. If a reason here cannot be driven both ways, that is a finding
+to report, not a thing to fix in the money path at the end of a long
+session."* The same restraint applies to the P2P path. Fixing a race needs it
+reproduced deliberately, not re-run until green.
+
+**What would settle it:** run S1 in a loop under artificial load and see
+whether the rejection correlates with catch-up latency, then decide whether C
+should treat a duplicate relay at a known index as a rejection at all or as a
+no-op. Both are measurements nobody has taken.
+
+**Do NOT re-run the sweep until it passes and call that closed.** One green
+run after a red one is the observation that hides this class of defect; the
+table above is eight runs precisely so the rate is visible.
+
+**Repro:** `python test_a9_relay_race.py` — and expect it to pass. It fails
+under sweep contention, not standalone.
+
+---
+
 ### A149. [moderate / money] The money-gate suite reported the operator's morning to-do list as a test failure. RETRACTED AND RESTATED 2026-09-19 — retraction G4b
 
 **Evidence.** `test_g4_money_gates.py` G4.4b read *"...today, which the
