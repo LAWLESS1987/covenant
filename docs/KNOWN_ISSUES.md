@@ -6422,6 +6422,25 @@ field on the phone, one whitelisted key with its own length cap in
 `covenant_daily_plan.record_checkin`. Small on both sides; it rides the next
 manual install, since the phone cannot ship itself the build that would report.
 
+**CLOSED ON THE PHONE SIDE, 2026-09-19 12:17.** He installed `0.1.599+85d82f6`
+(build `6a177d7`) by hand at ~12:07. From the first heartbeat after it the
+check-in carries `build 6a177d7` and `update <last line>`; the guard reads
+*"phone is on build 6a177d7 -- installed"* by the commit, not the versionName;
+the door served `/app/latest` three times and downloaded nothing. The blind
+spot named above no longer exists: the next time an update does not take, the
+reason arrives every ten minutes.
+
+**And the first line it sent is a finding of its own:** `update: trusting an
+UNAUTHENTICATED manifest -- no PC key is pinned`. This phone has never pinned
+the PC's daily-plan key, so every manifest it accepted since 2026-09-14 was
+accepted on trust and the signed path built for A143 was inert on this device
+throughout. Not a fault in the signing — a step nobody took on the phone. One
+tap on the Today screen pins it; until then the update door is exactly as safe
+as Android's own signature check and no safer, which is what A143 first
+measured. Whether the earlier three-times-downloaded-never-installed on
+`0.1.568` had the same cause is still not known: only the newest line is
+carried, and the older ones are in the phone's `actions.log`.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
