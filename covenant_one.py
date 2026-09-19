@@ -472,6 +472,15 @@ SUITES = [
     # because a correct atomic write already existed in ai_memory_system and
     # stayed private to it while three live ledgers went on truncating.
     ("test_du1_durable.py", 120, "DAILY + GUARDS"),
+    # JR1 (2026-09-19): how Ora and Sena resolve a disagreement, written down
+    # and driven BEFORE the second judge is flipped on -- his four conditions.
+    # All nine cells of the table asserted independently of the module, the
+    # three directions that must not invert given their own checks, and the
+    # real models run until they genuinely conflict (3 of 10 probes on the day
+    # it landed, including A132 live). Deadlock is separated from an empty
+    # bench, because (hold, hold) arrives identically for both and they need
+    # opposite responses.
+    ("test_jr1_resolution.py", 120, "JUDGE"),
     # H2 (2026-09-18): the update door's WITNESS, and a peer's drift made
     # visible to the self-heal without handing restart_nodes a condition it
     # cannot clear. All three faults it covers were live and invisible on the
