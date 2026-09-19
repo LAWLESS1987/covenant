@@ -6115,6 +6115,42 @@ AB10.
 payloads the old wrapper moved to CLEAR, and which.
 ---
 
+### A152. [moderate / judging] Both seats deadlocked on 22% of the ledger, three-quarters of it on rows the teacher had called clean — a vocabulary floor, not hard cases. MIN_DOC_FREQ 3 → 2, measured first, 2026-09-19
+
+**Measured.** 842 of 3,760 ledger rows are `(hold, hold)`; 612 of those carry
+the teacher's own **clean** label. Across those 612, **1,055 distinct words are
+out of vocabulary** — the commonest ("shall", "sought", "invest", "freelance",
+"courier") in only 4–6 rows each. A long tail; no authored batch of sentences
+covers it, since every word needs `MIN_DOC_FREQ` sightings to enter the model.
+
+**The experiment, scratch models, nothing promoted, same folds and seed:**
+
+    held-out (holdout_score)   MDF=3  decided 2493  correct 2286  false_clear 68
+                               MDF=2  decided 2545  correct 2341  false_clear 60
+    exam, 53 cases (examine)   MDF=3  agree 38  wrong 6  abstain 9  false_clean 0
+                               MDF=2  agree 39  wrong 6  abstain 8  false_clean 0
+    vocabulary                 2238 -> 3188
+    A124 replicated on chain   MDF=3  0 convicted, closest block 12 at +1.8354
+                               MDF=2  0 convicted, closest block 12 at +0.6077
+
+Better or equal on every count on data the model did not train on, and the
+chain's closest payload moves *away* from the hold line. `MDF=1` was measured
+and **not taken**: its training-set false_clear of 2 is memorisation.
+
+**What changed:** one constant, with this table in its comment. Promotion is
+not by hand: tonight's candidate is trained at the new floor and goes through
+`covenant_distill`'s own gates; `test_a124_chain_syncable.py` runs in the
+working tree after it. F2's W2 fixture hardcoded two repetitions for a floor
+of three and went red on a property that was still true; it now derives from
+the constant. F2 42/42, A119, SEM5, A127, A126, JR1, F6, X1, F3 all green.
+
+**What this does not fix.** The residual deadlocks include genuinely hedged
+text — *"I steal no value, but I transfer what I have…"* — where holding is
+right. Coverage lifts the floor; it does not make ambiguity decidable, and it
+must not.
+
+---
+
 ### A151. [moderate / judging] Both seats now judge every payload, and the flip cost four false holds and bought no false clears. FLIPPED 2026-09-19, cost measured first; one silence left OPEN
 
 **What changed.** `both_seats: true` in `ops/quorum_policy.json`, at his

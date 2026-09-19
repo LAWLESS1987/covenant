@@ -99,7 +99,23 @@ MODEL_PATH = os.path.join(HERE, "fallback_model.json")
 
 # Thresholds. Every one of these is a refusal to speak, not a licence to.
 MIN_EXAMPLES = 40        # below this the model has no business having a view
-MIN_DOC_FREQ = 3         # a token seen once or twice is a coincidence, not evidence
+# 3 -> 2 on 2026-09-19, measured first, at his instruction to get the deadlock
+# rate down by coverage. Both students held on 842 of 3,760 ledger rows and
+# 612 of those were rows the TEACHER had labelled clean: the words were below
+# this floor, not the cases hard -- 1,055 distinct out-of-vocabulary words
+# across them, a long tail no authored batch covers. On scratch models, nothing
+# promoted, same folds and seed:
+#   held-out (covenant_distill.holdout_score)  MDF=3  decided 2493 correct 2286 false_clear 68
+#                                              MDF=2  decided 2545 correct 2341 false_clear 60
+#   exam, 53 cases (covenant_distill.examine)  MDF=3  agree 38 wrong 6 abstain 9 false_clean 0
+#                                              MDF=2  agree 39 wrong 6 abstain 8 false_clean 0
+#   vocabulary                                 2238 -> 3188
+# Better or equal on every count, on data the model did not train on. MDF=1
+# was also measured and NOT taken: its training-set numbers (false_clear 2)
+# are memorisation, and one sighting is still a coincidence. This changes what
+# tonight's candidate is; promotion still goes through covenant_distill's own
+# gates, and A124 (chain joinability) is run after it, never retrained past.
+MIN_DOC_FREQ = 2         # a token seen once is a coincidence, not evidence
 MIN_COVERAGE = 0.35      # fraction of payload tokens the model has ever seen
 # MIN_EVIDENCE, replacing a cut on the stored weight, 2026-09-11.
 #

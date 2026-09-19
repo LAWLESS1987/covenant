@@ -368,8 +368,14 @@ def main():
     m = FB.FallbackModel.load(model)
     check("W1 no function word carries weight -- 'the' was measured at +0.50 toward VIOLATES before this",
           not (FB.STOPWORDS & set(m.weights)))
-    thin = FB.FallbackModel.train([("a singular unrepeated phrase here", True)] * 2 +
-                                  [("ordinary payment for goods", False)] * 3, ["fixture"])
+    # DERIVED FROM THE FLOOR, NOT REMEMBERED (2026-09-19). This repeated the
+    # phrase twice, which is "fewer than the floor" only while the floor is 3.
+    # When MIN_DOC_FREQ went to 2 -- measured first, see the constant's own
+    # comment -- the fixture's tokens crossed the floor and W2 went red while
+    # the property it pins ("below the floor gets no weight") was still true.
+    # The label already read the constant; now the fixture does too.
+    thin = FB.FallbackModel.train([("a singular unrepeated phrase here", True)] * (FB.MIN_DOC_FREQ - 1) +
+                                  [("ordinary payment for goods", False)] * (FB.MIN_DOC_FREQ + 1), ["fixture"])
     check("W2 a token seen in fewer than %d examples gets no weight" % FB.MIN_DOC_FREQ,
           "singular" not in thin.weights and "unrepeated" not in thin.weights)
     check("W3 ...and one seen at or above the floor does", "payment" in thin.weights or "ordinary" in thin.weights)
