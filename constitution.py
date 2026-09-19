@@ -73,6 +73,17 @@ PROTECTED: List[Dict[str, str]] = [
         "opens": "## Layer 4 - Continuation, not just preservation",
         "why": "the reasoning rules a successor inherits",
     },
+    {
+        # Added 2026-09-19 at his instruction, and this IS an amendment: the
+        # hash moves and every peer running federation.py will read AMENDED.
+        # That is the intended cost of binding something, and it is why the
+        # two rules were adopted while this node has two counterparties who
+        # are both his -- an invariant adopted while it is cheap binds later,
+        # when it is expensive and there is a reason to want an exception.
+        "file": "docs/FEDERATION_RULES.md",
+        "opens": "## What is owed to every peer",
+        "why": "equal terms to every peer, and a departure nobody can refuse",
+    },
 ]
 
 

@@ -455,6 +455,13 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # MF (2026-09-19): the two federation rules, adopted at his instruction --
+    # most favoured peer, and unilateral exit. Driven both ways, including the
+    # direction that would break the federation if it were wrong: a peer
+    # refused by an EQUAL rule must not read as an unequal term, or the rule
+    # forbids every rule that can say no. Hermetic -- temp trees, no node, no
+    # network; the real ops/ is read once and only to assert an absence.
+    ("test_mfn.py", 120, "DAILY + GUARDS"),
     # H2 (2026-09-18): the update door's WITNESS, and a peer's drift made
     # visible to the self-heal without handing restart_nodes a condition it
     # cannot clear. All three faults it covers were live and invisible on the
@@ -519,6 +526,18 @@ SUITES = [
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
 # run so a reader is never told coverage they do not have.
 DELIBERATELY_OFF = {
+    "test_e3_witness_loop.py":
+        "THE WITNESS LOOP END TO END -- starts a real node on free ports, seals "
+        "a proposal, and finds the record on /chain by RECOMPUTING its "
+        "content-addressed id rather than trusting the one the node reported. "
+        "It was an ORPHAN until 2026-09-19: on disk, in no runner, run by "
+        "nobody. Measured in the staged tree it is 0/0 in 61s -- no judge, no "
+        "chain, nothing to admit -- so registering it would have bought a green "
+        "line that measures nothing, which is this runner's own named failure "
+        "mode. In the working tree its E3.2-E3.5 report NOT RUN today because "
+        "the deployed judge refuses all six candidate notes (the standing "
+        "keyless degradation, /health degraded=true). Run it beside a live "
+        "chain: python test_e3_witness_loop.py",
     "test_covenant_app.py":
         "binds the REAL production ports (5000/5020/5060/5199) by design -- "
         "run it with the chain STOPPED: python test_covenant_app.py (expects 54/54)",

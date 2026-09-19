@@ -1,8 +1,16 @@
 {
-  "hash": "0f0b316270f5acff8ead6842bbc3fcea10e2dba2c6d597730ab97f7cb5dfa55f",
-  "blocks": 3,
-  "at": "2026-08-30",
+  "hash": "464b1975bc05988e26bf4044fc1d99f4f6479788c418fad867dbe3e4795101f5",
+  "blocks": 4,
+  "at": "2026-09-19",
   "note": "Hash over the rules that bind the operator. A change here is an amendment. See docs/CONSTITUTION.md section III.",
+  "amended_from": {
+    "hash": "0f0b316270f5acff8ead6842bbc3fcea10e2dba2c6d597730ab97f7cb5dfa55f",
+    "at": "2026-08-30",
+    "blocks": 3,
+    "what_changed": "ADDED one block: docs/FEDERATION_RULES.md '## What is owed to every peer' -- most favoured peer, and unilateral exit. The three blocks anchored on 2026-08-30 are byte-identical and their digests are unchanged; this amendment only widens what is bound, it alters nothing already bound.",
+    "why": "Adopted 2026-09-19 on the operator's instruction, while this node has two counterparties and both are his. An invariant adopted while it is cheap binds later, when it is expensive and there is a reason to want an exception.",
+    "measured_by": "python constitution.py verify; python mfn.py; python test_mfn.py"
+  },
   "detail": [
     {
       "file": "CONTRIBUTING.md",
@@ -21,6 +29,12 @@
       "opens": "## Layer 4 - Continuation, not just preservation",
       "chars": 2632,
       "digest": "672107a4c4ef00b5c8692f93e82da3e28ae4631cfb17a9fd5e56719d7ecd97c5"
+    },
+    {
+      "file": "docs/FEDERATION_RULES.md",
+      "opens": "## What is owed to every peer",
+      "chars": 2134,
+      "digest": "57634b8b4b7d015c090f608b94752677c7655263edca3a9a1ba968b671a35874"
     }
   ]
 }
