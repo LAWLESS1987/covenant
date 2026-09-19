@@ -24,6 +24,9 @@ CHECKS
   W1-W6   the witness ledger: it records, it is bounded, it coerces what a
           header hands it, it survives an unwritable directory, and an EMPTY
           ledger is reported as "nobody asked SINCE IT BEGAN", never as proof
+  F1-F12  the bound on futile sending: a build delivered whole and answered
+          by a heartbeat still on another version, three times over, is not
+          sent again -- and every direction that must NOT trip it is driven
   S1-S5   detect_mesh_source_split: PRESENT on a drifted peer, ABSENT when the
           mesh agrees, UNKNOWN when no peer has reported -- and it names what
           it cannot see
@@ -140,6 +143,164 @@ def _health_fixture(local_src, peer_map, ages=None):
     return {"A": {"source_sha256": local_src, "chain_height": 35,
                   "mesh": {"tracked": len(peer_map), "by_source": by_source,
                            "heard_s_ago": ages or {}}}}
+
+
+# --------------------------------------------- the bound on futile sending --
+def futility_checks():
+    """F1-F12: the door stops sending a build it has PROVED does not install.
+
+    Driven both ways on purpose (CLAUDE.md rule 8). The dangerous failure here
+    is not a bound that fires too eagerly -- it is one that can never fire, or
+    one that fires on the wrong caller and closes the door on a path that still
+    works. So the false direction gets more checks than the true one: below the
+    budget, no check-in at all, a check-in that agrees, another signer, a newer
+    build, partials, an unreadable ledger.
+    """
+    import covenant_app_update as AU
+
+    tmp = tempfile.mkdtemp(prefix="h2_futile_")
+    saved = (AU.DIR, AU.REQUESTS, AU.CHECKINS, AU.ALLOW_AGAIN, AU.latest)
+    AU.DIR = tmp
+    AU.REQUESTS = os.path.join(tmp, "requests.jsonl")
+    AU.CHECKINS = os.path.join(tmp, "phone_checkins.jsonl")
+    AU.ALLOW_AGAIN = os.path.join(tmp, "serve_anyway.json")
+    # `fetched` matters: install_futility counts only deliveries recorded
+    # AFTER the build landed on disk, because two runs of one app commit carry
+    # the same sha7 and the ledger cannot tell them apart. Set below the
+    # fixture clock so every row written here belongs to this build.
+    BUILD = {"sha7": "ab5ea5a", "version": "0.1.560+fa13845", "size": 45163344,
+             "fetched": "2023-11-14T00:00:00+0000",
+             "file": "x.apk", "path": os.path.join(tmp, "x.apk")}
+    AU.latest = lambda: dict(BUILD)
+
+    # AN EXPLICIT CLOCK, because the real one is not precise enough here.
+    # note_request stores `at` ROUNDED TO A TENTH OF A SECOND -- which is
+    # invisible in production, where a delivery and the heartbeat that answers
+    # it are ten minutes apart, and decisive in a fixture that writes both
+    # inside a millisecond: the rounding walked deliveries forward past the
+    # check-ins meant to follow them and every round trip read as ungraded. A
+    # test whose result depends on how fast the machine ran it is not a
+    # measurement, so the ordering is stated rather than raced for.
+    CLOCK = [1_700_000_000.0]
+
+    def _tick(minutes=10):
+        CLOCK[0] += minutes * 60.0
+        return CLOCK[0]
+
+    def deliver(n, sha7="ab5ea5a", signer="phone", outcome="sent-complete"):
+        for _ in range(n):
+            with open(AU.REQUESTS, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"t": "fixture", "at": _tick(), "route": "/app/apk",
+                                     "signer": signer, "offered": sha7, "outcome": outcome,
+                                     "detail": "45163344 of 45163344 bytes"}) + "\n")
+
+    def checkin(app, signer="phone"):
+        with open(AU.CHECKINS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": "fixture", "at": _tick(), "signer": signer,
+                                 "node_id": signer, "app": app}) + "\n")
+
+    try:
+        f = AU.install_futility()
+        check("F1 nothing delivered yet is not futile",
+              f["futile"] is False and f["complete"] == 0, f["why"][:80])
+
+        # Two whole copies, each followed by a heartbeat still on the old
+        # build: two graded round trips, one short of the bound.
+        deliver(1); checkin("0.1.475+13b946a")
+        deliver(1); checkin("0.1.475+13b946a")
+        f = AU.install_futility()
+        check("F2 below the budget is not futile, and says how far along it is",
+              f["futile"] is False and f["complete"] == 2 and f["proved"] == 2
+              and "budget" in f["why"], f["why"][:90])
+
+        deliver(1)                       # a third copy, not yet answered
+        f = AU.install_futility()
+        check("F3 a delivery with no check-in after it YET is not graded "
+              "-- silence is not evidence of a failed install",
+              f["futile"] is False and f["complete"] == 3
+              and f["proved"] == 2 and f["ungraded"] == 1, f["why"][:95])
+
+        checkin("0.1.560+fa13845")       # it installed after all
+        f = AU.install_futility()
+        check("F4 a check-in naming the build's OWN version is not futile",
+              f["futile"] is False and "installed" in f["why"]
+              and f["have"] == "0.1.560+fa13845", f["why"][:80])
+
+        # Back on the old build, and one more whole copy comes back unchanged:
+        # the third graded round trip.
+        checkin("0.1.475+13b946a")
+        deliver(1); checkin("0.1.475+13b946a")
+        f = AU.install_futility()
+        check("F5 THE TRUE DIRECTION: three whole copies, each answered by a "
+              "heartbeat still on another version, is futile",
+              f["futile"] is True and f["complete"] == 4 and f["proved"] == 3
+              and f["want"] == "0.1.560+fa13845" and f["have"] == "0.1.475+13b946a"
+              and f["bytes"] == 4 * 45163344, f["why"][:120])
+
+        check("F6 ...and the refusal names the door that still works",
+              "/m" in f["why"] and "hand" in f["why"], f["why"][-90:])
+
+        # THE REGRESSION THAT MATTERS. test_h2's own L3-L4 downloads the APK
+        # signed as `pc`. If the phone's failure bounded every caller, this
+        # suite would close the door on itself -- and so would any other
+        # consumer of the capability (CLAUDE.md rule 6).
+        f_pc = AU.install_futility(signer="pc")
+        check("F7 another signer is NOT bounded by the phone's failure",
+              f_pc["futile"] is False and f_pc["complete"] == 0, f_pc["why"][:80])
+
+        # A newer build clears it by itself: the count is per build.
+        BUILD2 = dict(BUILD, sha7="9999999", version="0.1.561+2e61e52")
+        AU.latest = lambda: dict(BUILD2)
+        f_new = AU.install_futility()
+        check("F8 a NEWER build starts the count again",
+              f_new["futile"] is False and f_new["complete"] == 0, f_new["why"][:80])
+        AU.latest = lambda: dict(BUILD)
+
+        # Partials are not deliveries.
+        deliver(5, outcome="sent-PARTIAL")
+        f_part = AU.install_futility()
+        check("F9 a PARTIAL transfer does not count toward the budget",
+              f_part["complete"] == 4 and f_part["proved"] == 3,
+              "complete=%d proved=%d after 5 partials" % (f_part["complete"], f_part["proved"]))
+
+        m = AU.serve_anyway(hours=1.0)
+        f_allow = AU.install_futility()
+        check("F10a serve-anyway clears it for this build",
+              f_allow["futile"] is False and "serve-anyway" in f_allow["why"],
+              str(m)[:70])
+        with open(AU.ALLOW_AGAIN, "w", encoding="utf-8") as fh:
+            json.dump({"sha7": "ab5ea5a", "until": time.time() - 1}, fh)
+        check("F10b ...and an EXPIRED serve-anyway does not",
+              AU.install_futility()["futile"] is True, "expired marker ignored")
+        os.remove(AU.ALLOW_AGAIN)
+
+        # A SECOND BUILD OF THE SAME COMMIT IS A SECOND BUILD (2026-09-18).
+        # The workflow builds one app commit against whatever the public core
+        # is at the time, so run 35370202625 and run 35410624880 are BOTH
+        # `ab5ea5a` -- and the first draft of the counter keyed on sha7 alone,
+        # which would have handed a brand new build its predecessor's 43
+        # failures and refused it on the first ask. The floor is the fetch
+        # time, and this drives it: same commit, same ledger, later fetch.
+        BUILD3 = dict(BUILD, version="0.1.568+2e61e52",
+                      fetched=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
+        AU.latest = lambda: dict(BUILD3)
+        f_run = AU.install_futility()
+        check("F12 a NEW RUN of the SAME commit does not inherit the old "
+              "build's failures",
+              f_run["futile"] is False and f_run["complete"] == 0
+              and f_run["want"] == "0.1.568+2e61e52", f_run["why"][:85])
+        AU.latest = lambda: dict(BUILD)
+
+        # A measurement that cannot be taken has no opinion, and must never
+        # become a refusal by accident.
+        AU.latest = lambda: (_ for _ in ()).throw(RuntimeError("ledger on fire"))
+        f_err = AU.install_futility()
+        check("F11 an unreadable measurement says so and refuses nothing",
+              f_err["futile"] is False and "could not be measured" in f_err["why"],
+              f_err["why"][:70])
+    finally:
+        AU.DIR, AU.REQUESTS, AU.CHECKINS, AU.ALLOW_AGAIN, AU.latest = saved
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def split_checks():
@@ -426,7 +587,8 @@ def main():
     # strictly worse than a FAIL, because a failure is at least a number. A
     # section that dies is recorded as a failed check naming the exception, and
     # every other section still runs and still counts.
-    for name, fn in (("witness", witness_checks), ("split", split_checks),
+    for name, fn in (("witness", witness_checks), ("futility", futility_checks),
+                     ("split", split_checks),
                      ("namespace", namespace_checks), ("age", age_checks),
                      ("live", live_checks)):
         try:

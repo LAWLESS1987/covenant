@@ -186,6 +186,226 @@ def requests_tail(n=20, route=None):
     return rows[-int(n):] if n else rows
 
 
+# ------------------------------------------------------- futile delivery --
+#
+# WHAT WAS MEASURED (2026-09-18, 20:45). The door had been working perfectly
+# and achieving nothing. In ops/app/requests.jsonl, between 11:08:52 and
+# 20:45:49 -- 9.6 hours -- there are 61 COMPLETE DELIVERIES at /app/apk (unit:
+# HTTP responses whose last byte was streamed, counted by the generator in the
+# route, not by intent), totalling 2,754,957,352 bytes. Over the same window
+# the phone's own /checkin reported `0.1.475+13b946a` on all 200 of its rows.
+# Not one changed. A second, independent route agrees: `tailscale status` shows
+# tx 2,873,815,540 bytes to lawrences-s25, the extra being partials, check-ins
+# and headers.
+#
+# And it is not one bad build. The 61 deliveries were of THREE different
+# builds -- ab5ea5a x42, ef44d63 x14, 15f4d48 x5 -- so nothing about the bytes
+# being served explains it. The installed app is 0.1.475, built before
+# 3df2173 ("The install threw SecurityException every time: commit() ran with
+# the write stream open"), so its installer throws on every attempt, and the
+# counter that was meant to bound the retries sat after the throw. That build
+# cannot install ANY update; no newer APK reaches a phone through it.
+#
+# WHAT THIS DOES ABOUT IT. The PC cannot fix the installer on a running phone,
+# and it has no business pretending the next 45 MB will land when the last
+# three did not. So the door stops sending the bytes and says why, where a
+# person can read it. This is a bound on a MEASURED futility, not a guess: it
+# needs complete deliveries of THIS build to THIS signer, and a check-in from
+# that same signer, TAKEN AFTER the last of them, still naming another version.
+#
+# WHAT IT STRUCTURALLY CANNOT SEE. It reads the door's ledger and the
+# check-in ledger, and neither exists on the phone: an install that succeeded
+# and then crashed back to the old version looks identical to one that never
+# started. It also cannot see anything before the witness ledger began
+# (2026-09-18), so a count of 0 means "none recorded here", never "none ever".
+#
+# WHAT IT DELIBERATELY DOES NOT TOUCH. /m/apk -- the plain-browser bootstrap
+# door -- is a different route and is never gated by this. That path is the
+# one remaining way a build gets onto the phone, and narrowing the capability
+# without checking every consumer of it is this repository's named A21 error.
+FUTILE_AFTER = 3
+ALLOW_AGAIN = os.path.join(DIR, "serve_anyway.json")
+CHECKINS = os.path.join(HERE, "ops", "phone_checkins.jsonl")
+
+
+def _checkins(signer):
+    """Every /checkin row from `signer`, oldest first; [] when unreadable."""
+    try:
+        with open(CHECKINS, encoding="utf-8") as fh:
+            rows = [json.loads(l) for l in fh if l.strip()]
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if str(r.get("signer") or r.get("node_id") or "") == str(signer)]
+
+
+def _last_checkin(signer):
+    """The newest /checkin row from `signer`, or {}. Never raises."""
+    rows = _checkins(signer)
+    return rows[-1] if rows else {}
+
+
+def install_futility(signer="phone", d=None, after=None):
+    """Has this build been delivered whole to `signer` and demonstrably not installed?
+
+    Returns a dict, always, and never raises -- a door that 500s because its
+    own bookkeeping tripped is worse than a door that oversends.
+
+      futile          the bound is met AND the phone proved it is still on
+                      another version after the last complete delivery
+      complete        complete deliveries of THIS build to THIS signer
+      bytes           what those deliveries actually cost
+      want / have     the build's versionName and the signer's reported one,
+                      COMPARED IN ONE NAMESPACE (both are versionNames; `sha7`
+                      is a commit in the private app repo and is never
+                      compared against a core sha -- that conflation is what
+                      made "is the phone current?" unanswerable on 2026-09-16)
+      why             the sentence a person reads
+
+    `after=0` disables the bound, which is what the reset lever writes.
+    """
+    out = {"futile": False, "signer": str(signer), "complete": 0, "bytes": 0,
+           "want": None, "have": None, "why": "", "proved": 0, "ungraded": 0, "since": 0}
+    try:
+        d = latest() if d is None else d
+        if not d:
+            out["why"] = "no build fetched yet"
+            return out
+        want, _core = latest_version(d)
+        out["want"] = want
+        sha7 = str(d.get("sha7") or "")
+        bound = FUTILE_AFTER if after is None else int(after)
+
+        # The reset lever, so this can never become a door that refuses for
+        # ever with nothing a person can do about it.
+        try:
+            with open(ALLOW_AGAIN, encoding="utf-8") as fh:
+                allow = json.load(fh)
+            if str(allow.get("sha7", "")) == sha7 and float(allow.get("until", 0)) > time.time():
+                out["why"] = "serve-anyway is set for %s until %s" % (
+                    sha7, time.strftime("%H:%M:%S", time.localtime(float(allow["until"]))))
+                return out
+        except (OSError, ValueError, TypeError):
+            pass
+
+        # A BUILD IS A RUN, NOT A COMMIT -- and this counter keyed on the
+        # commit, which is the same conflation is_new_build was written to end
+        # (2026-09-16) reappearing one function away. Caught on 2026-09-18 at
+        # 20:57 by the build that landed while this was being written: run
+        # 35370202625 and run 35410624880 are BOTH `ab5ea5a`, because the
+        # workflow builds one app commit against whatever the public core is at
+        # the time. So 43 deliveries recorded against `ab5ea5a` would have
+        # transferred wholesale onto 0.1.568 -- a brand new build refused on the
+        # evidence of its predecessor, which is the one outcome this guard must
+        # never produce.
+        #
+        # The ledger cannot be asked to tell them apart: `offered` holds sha7
+        # and always has. The fetch time can. A delivery recorded BEFORE this
+        # build was written to disk was necessarily a delivery of some other
+        # build, whatever commit it names, so the floor does the separating and
+        # needs no change to what the door writes.
+        since = 0.0
+        try:
+            import datetime
+            since = datetime.datetime.strptime(
+                str(d.get("fetched", "")), "%Y-%m-%dT%H:%M:%S%z").timestamp()
+        except (ValueError, TypeError):
+            # No usable stamp: count nothing rather than count another build's
+            # deliveries against this one. Erring toward SENDING is the safe
+            # direction here -- the cost of a wrong send is 45 MB, the cost of a
+            # wrong refusal is a phone that can never be updated again.
+            since = time.time()
+        out["since"] = since
+        rows = [r for r in requests_tail(0, route="/app/apk")
+                if r.get("outcome") == "sent-complete"
+                and str(r.get("offered") or "") == sha7
+                and str(r.get("signer") or "") == str(signer)
+                and float(r.get("at") or 0) >= since]
+        out["complete"] = len(rows)
+        for r in rows:
+            try:
+                out["bytes"] += int(str(r.get("detail", "")).split(" of ")[0])
+            except (ValueError, IndexError):
+                pass
+        if not rows or not want:
+            out["why"] = ("nothing delivered whole to %s for build %s yet" % (signer, sha7)
+                          if not rows else "the build on disk declares no versionName")
+            return out
+        ck = _last_checkin(signer)
+        have = str(ck.get("app") or "")
+        out["have"] = have or None
+        if not ck or not have:
+            # NOT futile: absence of a check-in is not evidence of a failed
+            # install, and treating it as such would refuse a phone we simply
+            # cannot hear from.
+            out["why"] = "no check-in from %s to compare against -- not calling it futile" % signer
+            return out
+        if have == want:
+            out["why"] = "%s is on %s -- installed" % (signer, have)
+            return out
+
+        # WHAT COUNTS IS A DELIVERY THAT CAME BACK, and the first draft of this
+        # counted the wrong thing twice before it counted this.
+        #
+        # The order inside one heartbeat is the whole subtlety. The phone does
+        # /checkin, then /app/latest, then /app/apk, all inside a second -- so
+        # the newest check-in is ALWAYS a moment older than the newest
+        # delivery, and a rule of "checked in after the last delivery" can
+        # never be satisfied by a phone behaving normally. That draft made the
+        # bound permanently inert, which is the quiet way a guard becomes
+        # decoration. The second draft moved the marker to the start of the
+        # window, which fired -- but claimed more than it had measured: it
+        # proved the FIRST copy had not landed and said it about the third.
+        #
+        # So each complete delivery is graded on its own, against the first
+        # check-in that arrives AFTER it: that is the next heartbeat, ten
+        # minutes later, and it is the only evidence there is that a
+        # particular copy did not take. A delivery with no check-in after it
+        # yet is not graded at all -- it has not had its chance. `proved` is
+        # therefore a count of ROUND TRIPS, not of bytes sent, and the bound
+        # reads: three whole copies arrived, and after each of them the phone
+        # came back still on another version.
+        cks = _checkins(signer)
+        proved, ungraded = 0, 0
+        for r in rows:
+            at = float(r.get("at") or 0)
+            nxt = next((c for c in cks if float(c.get("at") or 0) > at), None)
+            if nxt is None:
+                ungraded += 1
+            elif str(nxt.get("app") or "") != want:
+                proved += 1
+        out["proved"], out["ungraded"] = proved, ungraded
+        if proved < bound:
+            out["why"] = ("%d of %d complete deliveries came back still on %s (%d not yet "
+                          "graded) -- within the budget" % (proved, bound, have, ungraded))
+            return out
+        out["futile"] = True
+        out["why"] = ("%s has had build %s (%s) delivered whole %d times, %.2f GB in all, and "
+                      "after %d of them it checked in still on %s. The bytes arrive and the "
+                      "install does not happen, so this door stops sending them. Install it by "
+                      "hand: open /m on the phone's browser and tap Install -- /m/apk is not "
+                      "gated by this. A newer build clears the count by itself."
+                      % (signer, sha7, want, len(rows), out["bytes"] / 1e9, proved, have))
+        return out
+    except Exception as e:                                        # noqa: BLE001
+        # The measurement failed, so it has no opinion. It must not become a
+        # refusal by accident: an unreadable ledger is not evidence of futility.
+        out["why"] = "could not be measured: %s: %s" % (type(e).__name__, e)
+        return out
+
+
+def serve_anyway(hours=2.0, d=None):
+    """Clear the futility bound for the current build for `hours`. Returns the marker."""
+    d = latest() if d is None else d
+    if not d:
+        return None
+    mark = {"sha7": str(d.get("sha7") or ""), "until": time.time() + float(hours) * 3600.0,
+            "set": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    os.makedirs(DIR, exist_ok=True)
+    with open(ALLOW_AGAIN, "w", encoding="utf-8") as fh:
+        json.dump(mark, fh, indent=1)
+    return mark
+
+
 VERSION_RE = None
 
 
@@ -331,9 +551,21 @@ def main():
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--fetch", action="store_true")
     g.add_argument("--show", action="store_true")
+    g.add_argument("--futility", action="store_true",
+                   help="has the current build been delivered whole and not installed?")
+    g.add_argument("--serve-anyway", type=float, metavar="HOURS", nargs="?", const=2.0,
+                   help="clear the futility bound for this build for HOURS (default 2)")
     a = ap.parse_args()
     if a.fetch:
         return 0 if fetch() else 2
+    if a.futility:
+        f = install_futility()
+        print(json.dumps(f, indent=1))
+        return 1 if f.get("futile") else 0
+    if a.serve_anyway is not None:
+        m = serve_anyway(a.serve_anyway)
+        print(json.dumps(m, indent=1) if m else "no build fetched yet")
+        return 0 if m else 2
     d = latest()
     print(json.dumps({k: v for k, v in d.items()} if d else {"latest": None, "hint": "python covenant_app_update.py --fetch"}, indent=1))
     return 0

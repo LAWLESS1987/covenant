@@ -304,6 +304,37 @@ def detect_app_build_gap(health=None):
             "measured": dict(ask, alerts=alerts)}
 
 
+def detect_app_install_futile(health=None):
+    """The phone takes the whole build and stays on the old one.
+
+    SEPARATE FROM app_build_gap ON PURPOSE, and the separation is the finding.
+    "The phone is behind" was true for 46.6 h while the cause changed
+    underneath it twice -- first the phone never asked, then it asked and was
+    refused at the signature, then (2026-09-18) it asked, was served, and
+    downloaded 45 MB every ten minutes without ever installing. One condition
+    covering three faults with three different fixes is a condition nobody can
+    act on, which is the same lesson detect_build_stale_on_pc was split out for.
+
+    This one is narrow enough to act on: the bytes arrive whole and the version
+    does not move. The fix is not on this PC at all -- the installed build
+    predates the SecurityException fix, so its installer throws on every
+    attempt -- which is exactly why the only remedy paired here is the one that
+    needs a person.
+
+    WHAT IT CANNOT SEE: everything the phone does not report. An install that
+    succeeded and rolled back looks identical from here to one that never ran,
+    and nothing before the witness ledger began (2026-09-18) is visible at all.
+    """
+    try:
+        import covenant_app_update as AU
+        f = AU.install_futility()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if "could not be measured" in str(f.get("why", "")):
+        return {"state": UNKNOWN, "measured": f}
+    return {"state": PRESENT if f.get("futile") else ABSENT, "measured": f}
+
+
 def detect_log_bloat(health=None, limit_mb=512):
     """A log file eating the disk. Measured in bytes, not guessed at."""
     big = {}
@@ -595,6 +626,7 @@ DETECTORS = {
     "mesh_source_split": detect_mesh_source_split,
     "height_lag": detect_height_lag,
     "app_build_gap": detect_app_build_gap,
+    "app_install_futile": detect_app_install_futile,
     "build_stale_on_pc": detect_build_stale_on_pc,
     "phone_build_behind_core": detect_phone_build_behind_core,
     "log_bloat": detect_log_bloat,
@@ -1018,7 +1050,7 @@ REMEDIES = {
                                               "cost": ["a few seconds with nothing watching the nodes"],
                                               "irreversible": []}},
     "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
-                         "for": ["app_build_gap"], "kind": "needs a person",
+                         "for": ["app_build_gap", "app_install_futile"], "kind": "needs a person",
                          "touches": ["the phone"],
                          "benefit": {"gains": ["the phone stops running a build that cannot update itself",
                                                "the mesh stops running two sources (A20)"],
@@ -1544,6 +1576,30 @@ def main(argv=None):
                 # and the hourly suppressor exists for the scheduled pass, not for them.
                 row = apply_remedy(rname, conditions[name], name, dry_run=not a.repair,
                                    cooldown_s=0)
+                # A REPEATED ROW IS NOT A THING THAT JUST HAPPENED, and this
+                # printer said it was. run_once was fixed for exactly this on
+                # 2026-09-18 -- "an accurate ledger under a report that misreads
+                # it is still a system that lies to its operator" -- and the
+                # same misreading was left standing here, in the reader a person
+                # actually types.
+                #
+                # It is not cosmetic and it is not hypothetical: `cooldown_s=0`
+                # waives the hour but NOT a remedy's own declared budget
+                # (eff = max(0, 86400) for dispatch_phone_build, deliberately,
+                # because that budget is his Actions minutes). So a plain
+                # `python covenant_highway.py` printed
+                #     dispatch_phone_build  started  dispatch accepted (HTTP 204)
+                # for a dispatch made THIRTEEN HOURS EARLIER at 07:32, with no
+                # new row in ops/highway.jsonl -- and a reader who trusted the
+                # line would believe a build had just been asked for when none
+                # had. Measured here on 2026-09-18 at 20:47, by me, before I
+                # noticed the ledger disagreed with the screen.
+                if row.get("repeat"):
+                    print("  %-16s %-14s %-10s %s" % (
+                        name, rname, "held",
+                        "within its budget -- nothing done this pass; last %s at %s"
+                        % (row.get("outcome", "?"), row.get("t", "?"))))
+                    continue
                 print("  %-16s %-14s %-10s %s" % (name, rname, row["outcome"],
                                                   row.get("why", row.get("detail", ""))[:80]))
     return 0

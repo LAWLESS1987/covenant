@@ -5898,7 +5898,17 @@ deferred per the operator's 2026-09-09 rule.
 
 ---
 
-### A143. [serious / delivery] A dismissed install prompt stopped the phone updating for ever, and the second cause is still not ruled out. PARTLY FIXED 2026-09-18
+### A143. [serious / delivery] A dismissed install prompt stopped the phone updating for ever, and the second cause is still not ruled out. PARTLY FIXED 2026-09-18 — cause 2 RULED OUT and a third cause measured, 2026-09-18 evening
+
+**Settled since this was written (2026-09-18, 20:45).** Cause 2 is **ruled
+out**: a phone refusing the manifest does not download what the manifest
+names, and this one downloaded 45 MB **61 times in 9.6 hours**. Cause 1's fix
+is in `ab5ea5a` and cannot be confirmed from here, because a third cause sits
+in front of it — the running `0.1.475` predates covenant-phone `3df2173`, so
+its installer throws on every attempt and **no APK served down the signed path
+can replace it**. One manual install is required; see **A147**, which also
+stops the PC re-sending bytes it has proved will not land. The paragraph below
+is kept as written.
 
 **Evidence:** the phone sat 46.6 h on app `0.1.475+13b946a`, whose core commit
 `13b946a` hashes to `ddfaaa9f704f` at 668,276 bytes, while the PC and all three
@@ -6066,6 +6076,123 @@ AB10.
 
 **Repro:** `python test_x1_judge_adversarial.py` — the census prints how many
 payloads the old wrapper moved to CLEAR, and which.
+---
+
+### A147. [serious / delivery] The update door re-sent 2.75 GB it had already proved would not install. FIXED 2026-09-18
+
+**Evidence.** `ops/app/requests.jsonl`, between 11:08:52 and 20:45:49 on
+2026-09-18 — 9.6 hours — records **61 complete deliveries** at `/app/apk`
+(unit: HTTP responses whose last byte was streamed, counted by the route's own
+generator, not by intent), totalling **2,754,957,352 bytes**. Over the same
+window `ops/phone_checkins.jsonl` holds the phone's heartbeat every ten
+minutes, and all 200 of those rows report the same app: `0.1.475+13b946a`.
+Not one changed.
+
+A second, independent route agrees: `tailscale status` showed
+`tx 2873815540` to `lawrences-s25`. 2.87 GB against 2.75 GB ledgered — the
+difference is partials, check-ins and headers. Two measurements that could
+have disagreed, and did not.
+
+**It is not one bad build.** The 61 deliveries were of **three** different
+builds — `ab5ea5a` ×42, `ef44d63` ×14, `15f4d48` ×5 — so nothing about the
+bytes being served explains it. The installed app is `0.1.475`, built before
+covenant-phone `3df2173` (*"The install threw SecurityException every time:
+commit() ran with the write stream open"*). Its installer throws on every
+attempt, and the retry counter that was meant to bound it sat **after** the
+throw. **That build cannot install any update**; no APK served down the signed
+path can ever replace it.
+
+So this is the third distinct cause under A143, and it also settles A143's
+second: the phone is plainly not refusing the manifest, because it downloads
+what the manifest names.
+
+**The fix, and what it deliberately does not touch.** `/app/apk` now consults
+`covenant_app_update.install_futility()` before streaming, and refuses with
+`409` — recorded as `refused-futile` and raised as an `app_install_futile`
+anomaly — once a build has been delivered **whole** to a signer three times and
+the signer's own check-in has come back still naming another version after each
+of them. `/app/latest` still answers, so the phone keeps learning what exists,
+and **`/m/apk` — the plain-browser bootstrap, the one path that can still
+install — is a different route and is not gated by this.** Every consumer of
+the APK capability was grepped before it landed, which is the step whose
+absence broke the teacher when A21 closed (CLAUDE.md rule 6): the two are the
+app's signed door and `test_h2_update_witness.py`'s live probe, which signs as
+`pc` and is bounded per-signer, so it is unaffected.
+
+**Three drafts, and the first two were wrong in ways worth recording.**
+
+1. *Inert.* The first rule asked for a check-in **after the last delivery**.
+   The phone's heartbeat does `/checkin`, then `/app/latest`, then `/app/apk`
+   inside one second, so the newest check-in is always a moment older than the
+   newest delivery, and the bound could never fire. A guard that cannot fire
+   is decoration.
+2. *Overclaiming.* The second moved the marker to the start of the window,
+   which fired — on evidence about the **first** copy, stated about the third.
+   It now grades each complete delivery against the first check-in that
+   arrives after **it**, so `proved` counts round trips, not bytes, and a
+   delivery with no answer yet is `ungraded` rather than counted.
+3. *A build is a run, not a commit* — the same conflation `is_new_build`'s
+   docstring was written to end (2026-09-16), reappearing one function away.
+   The counter keyed on `sha7`, and runs `35370202625` and `35410624880` are
+   **both** `ab5ea5a`, because the workflow builds one app commit against
+   whatever the public core is at the time. Caught at 20:57 by the second of
+   those landing mid-edit: 43 recorded failures would have transferred
+   wholesale onto `0.1.568+2e61e52` and refused a brand new build on its
+   predecessor's record. The ledger cannot tell them apart — `offered` holds
+   `sha7` and always has — so the floor is the build's **fetch time**.
+
+**Every direction that must not trip it is driven** (`F1`-`F12` in
+`test_h2_update_witness.py`, 42/42): nothing delivered, below the budget, a
+delivery not yet answered, a check-in that agrees, another signer, a newer
+build, partials that do not count, an expired override, an unreadable
+measurement that refuses nothing, and a new run of the same commit. `F12` was
+mutation-tested: with the fetch-time floor removed it fails exactly as
+predicted, and 41/42 becomes 42/42 when it is restored.
+
+**The lever.** `python covenant_app_update.py --serve-anyway [HOURS]` clears
+the bound for the current build (default 2 h), and a newer build clears it by
+itself. A door that can refuse for ever with nothing a person can do about it
+is the A21 shape again.
+
+**Repro:** `python covenant_app_update.py --futility`
+
+---
+
+### A148. [moderate / honesty] The self-heal's own CLI reprinted a 13-hour-old row as though it had just happened. FIXED 2026-09-18
+
+**Evidence.** A plain `python covenant_highway.py` — a **dry run** — printed:
+
+    phone_build_behind_core dispatch_phone_build started  dispatch accepted (HTTP 204); the build takes ~10 min
+
+while `ops/highway.jsonl` recorded **no** `dispatch_phone_build` row for that
+pass at all; the four rows either side of it were written and that one was
+not. The most recent real dispatch was `2026-09-18T07:32:18-0400`, thirteen
+hours earlier.
+
+**Cause.** `apply_remedy`'s cooldown returns the **previous** row with
+`repeat=True` and writes nothing. `run_once` handles that and says *"nothing
+done this pass"*; the CLI's own printer did not, and printed the returned row's
+`outcome` and `detail` straight out. The CLI passes `cooldown_s=0`, which
+waives the hour but correctly **not** a remedy's declared budget
+(`eff = max(0, 86400)` for `dispatch_phone_build`, deliberately, because that
+budget is his Actions minutes) — so the suppressed case is the normal one here,
+not an edge.
+
+**Why it is worth an entry.** The same misreading was found and fixed in
+`run_once` on 2026-09-16, with the comment *"an accurate ledger under a report
+that misreads it is still a system that lies to its operator"*, and was left
+standing in the reader a person actually types. It is not hypothetical: it
+cost this session several minutes, during which I believed a CI build had been
+dispatched that had not been, and only the ledger disagreeing with the screen
+caught it. **A fix applied to one reader of a record is not applied to the
+record's other readers.**
+
+Now printed as `held — within its budget; nothing done this pass; last started
+at <t>`.
+
+**Repro:** `python covenant_highway.py` with a remedy inside its cooldown —
+compare the printed line against `python covenant_highway.py --ledger`.
+
 
 
 ---

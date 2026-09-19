@@ -7936,6 +7936,30 @@ class CovenantAPI:
             d = _au.latest()
             if not d:
                 return jsonify({"status": "error", "message": "no build fetched yet"}), 404
+            # A DELIVERY THAT HAS BEEN PROVED NOT TO LAND IS NOT MADE AGAIN
+            # (2026-09-18). Measured, in this node's own two ledgers: 61
+            # complete 45 MB transfers in 9.6 hours, of three different builds,
+            # while all 200 of the phone's check-ins over the same window
+            # reported the same 0.1.475+13b946a. The installed build predates
+            # the SecurityException fix, so its installer throws on every
+            # attempt and no APK served here can ever reach it. Sending the
+            # next copy costs his data and his battery and buys a line
+            # identical to the one above it.
+            #
+            # This refuses the BYTES and nothing else: /app/latest still
+            # answers, so the phone keeps learning what build exists, and
+            # /m/apk -- the browser bootstrap, the one path that can still
+            # install -- is a different route and is not gated here. Every
+            # consumer of the APK capability was grepped before this landed,
+            # which is the step whose absence broke the teacher when A21 closed
+            # (CLAUDE.md rule 6). `--serve-anyway` clears it, and a newer build
+            # clears it by itself.
+            _f = _au.install_futility(signer=who, d=d)
+            if _f.get("futile"):
+                _au.note_request("/app/apk", who, d.get("sha7", ""), "refused-futile", _f.get("why", ""))
+                self.node.anomaly_monitor.record("app_install_futile", _f.get("why", "")[:400])
+                return jsonify({"status": "error", "futile": True, "measured": _f,
+                                "message": _f.get("why", "this build has been delivered and not installed")}), 409
             # RECORD WHAT ACTUALLY LEFT, not what we intended to send
             # (2026-09-18, second pass). The first version of this witness
             # logged "sending" before send_file and stopped there -- so when the
@@ -7989,12 +8013,25 @@ class CovenantAPI:
         # Everything above this line is for the APP: signed GETs, verified
         # manifests, an installer session. That is the right shape once a build
         # carrying the updater is installed -- and exactly the wrong shape for
-        # the case that actually happened. The phone is running 0.1.421+70c6200,
-        # a build from BEFORE the updater existed, so it has never once asked
-        # /app/latest (zero in any log) and cannot: auto-update cannot bootstrap
-        # itself. Nothing signed can reach a phone whose app does not know how to
-        # sign. The only client left on that phone is its browser, and a browser
-        # has no key.
+        # the case that actually happened. WHEN THIS WAS WRITTEN (2026-09-16)
+        # the phone ran 0.1.421+70c6200, a build from BEFORE the updater
+        # existed, so it had never once asked /app/latest and could not:
+        # auto-update cannot bootstrap itself. Nothing signed can reach a phone
+        # whose app does not know how to sign. The only client left on that
+        # phone is its browser, and a browser has no key.
+        #
+        # THAT PARAGRAPH IS NOW HISTORY, AND ITS CONCLUSION IS UNCHANGED, which
+        # is the only reason this door still exists. Kept in the past tense
+        # because both of its clauses have since been falsified and a comment
+        # that states a falsified fact in the present tense is how a file
+        # teaches its next reader something untrue: the phone is on
+        # 0.1.475+13b946a, it DOES ask /app/latest -- every ten minutes, all
+        # day, witnessed in ops/app/requests.jsonl -- and "zero in any log" was
+        # never evidence of anything, because the node keeps no access log.
+        # What is still true is the part that matters here. The installed build
+        # predates the fix for an installer that threw on every attempt, so
+        # nothing served through the signed path can replace it, and this
+        # browser door remains the one way in.
         #
         # So these two routes are deliberately unsigned, and pay for it with the
         # network instead: they answer ONLY a caller whose source address is
