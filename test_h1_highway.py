@@ -679,6 +679,31 @@ def main():
           "unreadable ledger is not evidence that the phone is fine",
           r_fuU["state"] == H.UNKNOWN, r_fuU["measured"])
 
+    # judge_seat_missing arrived 2026-09-19 (A151) -- the fourth detector H1v
+    # has met without coverage, and the fourth time it earned its keep. Driven
+    # HERE both ways, because the point of this one is that an absent seat is
+    # LOUD: a policy naming a file that is not there must read PRESENT, and the
+    # real tree -- both models on disk -- must read ABSENT.
+    import covenant_judge_defer as _D
+    _real_lp = _D.load_policy
+    try:
+        _D.load_policy = lambda *a, **k: {"second_student": "no_such_model_here.json", "both_seats": True}
+        r_js = H.detect_judge_seat_missing()
+        _D.load_policy = lambda *a, **k: {"second_student": "fallback_model_2.json", "both_seats": True}
+        r_js0 = H.detect_judge_seat_missing()
+    finally:
+        _D.load_policy = _real_lp
+    check("H1w judge_seat_missing is PRESENT when the policy seats a judge whose "
+          "model file is not on disk -- the silence A151 named",
+          r_js["state"] == H.PRESENT and "second_student" in r_js["measured"]["missing"],
+          str(r_js["measured"])[:90])
+    check("H1w ...and ABSENT when every seated judge has its model on disk",
+          r_js0["state"] == H.ABSENT, str(r_js0["measured"])[:60])
+    check("H1w judge_seat_missing has NO remedy -- a missing model is a person's "
+          "or the nightly distill's to restore, never this engine's",
+          [n for n, r in H.REMEDIES.items()
+           if "judge_seat_missing" in (r.get("for") or [])] == [])
+
     # ---- H1v: nothing registered may go undriven, and every detector must
     # be able to say UNKNOWN
     #

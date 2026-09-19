@@ -335,6 +335,46 @@ def detect_app_install_futile(health=None):
     return {"state": PRESENT if f.get("futile") else ABSENT, "measured": f}
 
 
+def detect_judge_seat_missing(health=None):
+    """The policy seats a judge whose model file is not on disk.
+
+    A151 (2026-09-19). covenant_judge_defer sets `_second = None` when the
+    file quorum_policy.json names is absent, and the chain becomes
+    single-judge in SILENCE -- no error, no anomaly. Under both_seats the
+    verdict reasoning says `sena=ABSENT`, which a reader can see; nothing
+    alerts. This is the alert, and it is a detector rather than a change to
+    the gate, because the gate was rewired the day this was written and a
+    second change to it in one day is one too many. No remedy is paired: a
+    missing model is restored by a person or by the nightly distill, never by
+    this engine.
+
+    It reads the policy and the filesystem -- the two things that decide
+    whether the seat exists -- and nothing else. What it cannot see: a file
+    that is present but will not load. That is a different fault with a
+    different signature (the seat raises), and pretending to cover it here
+    would be the fake-guard shape.
+    """
+    try:
+        import covenant_judge_defer as D
+        pol = D.load_policy()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    missing = {}
+    p1 = os.path.join(HERE, "fallback_model.json")
+    if not os.path.isfile(p1):
+        missing["first_student"] = p1
+    p2 = pol.get("second_student")
+    if p2:
+        p2 = p2 if os.path.isabs(p2) else os.path.join(HERE, p2)
+        if not os.path.isfile(p2):
+            missing["second_student"] = p2
+    return {"state": PRESENT if missing else ABSENT,
+            "measured": {"missing": missing, "both_seats": bool(pol.get("both_seats")),
+                         "note": ("a seated judge with no model file is a chain judged by "
+                                  "fewer seats than the policy says, in silence" if missing
+                                  else "every seated judge has its model on disk")}}
+
+
 def detect_log_bloat(health=None, limit_mb=512):
     """A log file eating the disk. Measured in bytes, not guessed at."""
     big = {}
@@ -627,6 +667,7 @@ DETECTORS = {
     "height_lag": detect_height_lag,
     "app_build_gap": detect_app_build_gap,
     "app_install_futile": detect_app_install_futile,
+    "judge_seat_missing": detect_judge_seat_missing,
     "build_stale_on_pc": detect_build_stale_on_pc,
     "phone_build_behind_core": detect_phone_build_behind_core,
     "log_bloat": detect_log_bloat,

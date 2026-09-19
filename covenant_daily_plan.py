@@ -321,7 +321,11 @@ def record_checkin(body_bytes, who, path=None):
     # (A147). Still whitelisted, still capped, still a string: a phone cannot
     # write anything into this ledger that is not one of these keys.
     if "update" in data:
-        row["update"] = str(data["update"])[:240]
+        # 600 since 2026-09-19: the phone sends its last FIVE pc-channel lines
+        # joined with " || ", because the one line that found the cause of
+        # every failed auto-update was also the only line, and the history
+        # that would have explained the earlier failures was overwritten.
+        row["update"] = str(data["update"])[:600]
     # `build` (2026-09-19): the app repository's commit, BuildConfig.GIT_SHA.
     # versionName is 0.1.<count of public-core commits>+<core sha7>, so two
     # builds of the app against one core share a versionName -- measured the
