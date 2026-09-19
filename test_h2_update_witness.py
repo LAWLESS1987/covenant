@@ -291,6 +291,37 @@ def futility_checks():
               and f_run["want"] == "0.1.568+2e61e52", f_run["why"][:85])
         AU.latest = lambda: dict(BUILD)
 
+        # VERSIONNAME IS NOT A BUILD (2026-09-19, the second time this bit).
+        # versionName is 0.1.<count of public-core commits>+<core sha7>, so two
+        # app builds against one core share it: 2068c8f and a0fd2a1 are BOTH
+        # "0.1.597+7ffa73b". A guard comparing versionName reads a phone on the
+        # first as "installed" for the second. When the heartbeat carries
+        # `build` (the app-repo commit), that wins; without it, versionName is
+        # all there is and the fallback stays exactly as it was.
+        AU.latest = lambda: dict(BUILD, sha7="a0fd2a1", version="0.1.597+7ffa73b")
+        deliver(3, sha7="a0fd2a1")
+        with open(AU.CHECKINS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": "fixture", "at": _tick(), "signer": "phone",
+                                 "node_id": "phone", "app": "0.1.597+7ffa73b",
+                                 "build": "2068c8fbfc24ed93c63e683c1350b60378578823"}) + "\n")
+        f_twin = AU.install_futility()
+        check("F13 the same versionName on a DIFFERENT build is NOT installed -- "
+              "the heartbeat's `build` decides, not the version string",
+              f_twin["futile"] is False or f_twin["why"].find("installed") < 0,
+              "have_build=%s why=%s" % (f_twin.get("have_build"), f_twin["why"][:60]))
+        check("F13b ...and it is counted as a round trip, so the bound can still "
+              "trip on a phone that reports the wrong build",
+              f_twin.get("proved", 0) >= 1, "proved=%s" % f_twin.get("proved"))
+        with open(AU.CHECKINS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": "fixture", "at": _tick(), "signer": "phone",
+                                 "node_id": "phone", "app": "0.1.597+7ffa73b",
+                                 "build": "a0fd2a1deadbeef"}) + "\n")
+        f_same = AU.install_futility()
+        check("F14 a matching `build` IS installed, whatever versionName says",
+              f_same["futile"] is False and "installed" in f_same["why"],
+              f_same["why"][:60])
+        AU.latest = lambda: dict(BUILD)
+
         # A measurement that cannot be taken has no opinion, and must never
         # become a refusal by accident.
         AU.latest = lambda: (_ for _ in ()).throw(RuntimeError("ledger on fire"))

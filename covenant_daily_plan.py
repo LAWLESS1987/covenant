@@ -322,6 +322,13 @@ def record_checkin(body_bytes, who, path=None):
     # write anything into this ledger that is not one of these keys.
     if "update" in data:
         row["update"] = str(data["update"])[:240]
+    # `build` (2026-09-19): the app repository's commit, BuildConfig.GIT_SHA.
+    # versionName is 0.1.<count of public-core commits>+<core sha7>, so two
+    # builds of the app against one core share a versionName -- measured the
+    # same day: 2068c8f and a0fd2a1 both report "0.1.597+7ffa73b". A guard
+    # comparing that string cannot tell them apart; this can.
+    if "build" in data:
+        row["build"] = str(data["build"])[:40]
     path = path or CHECKINS
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:

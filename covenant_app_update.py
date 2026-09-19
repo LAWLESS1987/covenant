@@ -348,6 +348,24 @@ def install_futility(signer="phone", d=None, after=None):
         ck = _last_checkin(signer)
         have = str(ck.get("app") or "")
         out["have"] = have or None
+        # PREFER THE BUILD OVER THE VERSION when the phone reports one
+        # (2026-09-19). versionName is not unique across builds of the same
+        # core: 2068c8f and a0fd2a1 both declare "0.1.597+7ffa73b". A phone
+        # that installed the first would read as "installed" for the second
+        # under a versionName comparison, and the door would never offer it.
+        # A phone that does not yet send `build` falls back to versionName,
+        # which is all it can say -- and that fallback is exactly as wrong as
+        # it was before, no worse.
+        have_build = str(ck.get("build") or "").strip().lower()
+        if have_build:
+            out["have_build"] = have_build[:7]
+            if have_build[:7] == sha7[:7].lower():
+                out["why"] = "%s is on build %s -- installed" % (signer, have_build[:7])
+                return out
+            # A build is reported and it is NOT this one: that is the answer,
+            # whatever the versionName says. Fall through to the round-trip
+            # count without the versionName short-circuit below.
+            have = have_build[:7]
         if not ck or not have:
             # NOT futile: absence of a check-in is not evidence of a failed
             # install, and treating it as such would refuse a phone we simply
@@ -381,12 +399,22 @@ def install_futility(signer="phone", d=None, after=None):
         # came back still on another version.
         cks = _checkins(signer)
         proved, ungraded = 0, 0
+        def _still_other(c):
+            """Did this check-in report a build OTHER than the one delivered?
+            By `build` (app-repo commit) when the phone sends it, else by
+            versionName -- because two builds can share a versionName and only
+            the commit tells them apart (F13)."""
+            b = str(c.get("build") or "").strip().lower()
+            if b:
+                return b[:7] != sha7[:7].lower()
+            return str(c.get("app") or "") != want
+
         for r in rows:
             at = float(r.get("at") or 0)
             nxt = next((c for c in cks if float(c.get("at") or 0) > at), None)
             if nxt is None:
                 ungraded += 1
-            elif str(nxt.get("app") or "") != want:
+            elif _still_other(nxt):
                 proved += 1
         out["proved"], out["ungraded"] = proved, ungraded
         if proved < bound:
