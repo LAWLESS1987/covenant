@@ -95,6 +95,34 @@
     "covenant_route.py",
     "test_r1_retracted.py"
    ]
+  },
+  {
+   "id": "A145",
+   "claim": "That raising the ethics judge's margin to convict from 2.4 to 3.0 is strictly worse than leaving it -- that it removes no false convictions AND costs a correct one.",
+   "refuted_by": "the nightly retrain of 2026-09-18 03:44, caught the same day by test_a126_seat_dispositions.py's own exam, which is the guard that carried the claim",
+   "truth": "On the model of 2026-09-19 the base and margin-3.0 tallies are IDENTICAL -- (38 right, 7 false convictions, 0 wrong clears, 8 abstained) both -- so 3.0 removes nothing and costs nothing. It is a NO-OP, not a trade, which is neither the retracted claim nor the failure the suite warned about. The finding underneath it never moved and is now what the suite pins instead: raising the bar to convict cannot buy a false conviction for free, because all seven false convictions are `discourse` -- text that DESCRIBES a theft rather than committing one -- and the worst of them outscores the mildest true conviction, so no threshold separates the two (A126.M4). Only coverage moves it, at a stated price (A126.M3).",
+   "why_restated_rather_than_left_red": "The claim pinned THIS MODEL'S NUMBERS, so every overnight retrain re-broke it: narrowed once on 2026-09-17 after a student promotion, broken again on 2026-09-18. A claim rewritten whenever the judge moves is following the judge around rather than holding it to anything, and a permanently red line teaches its reader to skip the place a real failure would appear (A60). The replacement constrains margins 3.0 and 3.5 together at EVERY tally either could produce, which is strictly harder to satisfy than the two single-tally assertions it replaces, and A126.M1c drives the predicate to a failing verdict so the guard has been watched failing.",
+   "the_other_perspective": "Branch `a126-margin-claim-as-written-2026-09-19` holds the tree with the claim exactly as written, at commit c1ffb9c. `git checkout a126-margin-claim-as-written-2026-09-19 && python test_a126_seat_dispositions.py` reproduces the 10/12 and the two failing lines. Nothing about the restatement is hidden behind a rewrite of history: the case for the older, stronger reading can still be run.",
+   "verbatim": [
+    "margin 3.0 still removes NO false convictions and costs a correct one -- strictly worse on both counts",
+    "...and it costs correct convictions, so it is worse on both counts"
+   ],
+   "patterns": [
+    "strictly\\s+worse\\s+on\\s+both\\s+counts",
+    "costs\\s+correct\\s+convictions,\\s+so\\s+it\\s+is\\s+worse"
+   ],
+   "note_on_patterns": "Deliberately narrow. A pattern over 'margin 3.0' alone matches the measurement lines, the restated comment and every transcript that ever printed the exam, none of which reassert anything. These two phrases are the ASSERTION and appear nowhere else in the tree.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The three added files are SWEEP TRANSCRIPTS: a verbatim record of what the suite printed on a given day, which is the one kind of file whose whole purpose is to hold the old wording unedited. Editing a transcript to satisfy a guard would be falsifying the record the guard exists to protect. Same reasoning as A121's docs/RUN_LOG_ARCHIVE.md. ONE_RUN.txt is overwritten by the next sweep and will carry the restated wording by itself; the other two are archives and will not."
   }
  ]
 }

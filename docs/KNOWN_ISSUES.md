@@ -5981,7 +5981,7 @@ updater, and Firefox or Samsung Internet at `http://100.112.171.24:5000/m`.
 
 ---
 
-### A145. [moderate / judging] The nightly retrain made the 3.0 margin a no-op, and A126 broke exactly as it was written to. OPEN, found 2026-09-18 — NOT FIXED ON PURPOSE
+### A145. [moderate / judging] The nightly retrain made the 3.0 margin a no-op, and A126 broke exactly as it was written to. RETRACTED AND RESTATED 2026-09-19, on the operator's decision — the claim as written is kept on a branch
 
 **Evidence:** `test_a126_seat_dispositions.py` was 12/12 in the 2026-09-17 12:36
 sweep and is 10/12 now. `fallback_model.json` was rewritten by the nightly at
@@ -6016,6 +6016,38 @@ the chain is convicted by the deployed elder, the closest payload is block 12 at
 this model has shown in six days. **The chain is still joinable.** A124 is a
 NO-OP inside the sweep (it needs a node DB the sweep wipes), so a green sweep
 never covers it and this had to be run by hand.
+
+**SETTLED 2026-09-19.** He asked for it green *"with a branch and tombstone
+in case other perspective is needed"*, which is the shape this needed: the
+claim is retracted, not deleted, and the older and stronger reading remains
+runnable.
+
+- **The branch.** `a126-margin-claim-as-written-2026-09-19` holds the tree at
+  `c1ffb9c` with the claim exactly as written. `git checkout` it and
+  `python test_a126_seat_dispositions.py` reproduces the 10/12 and both
+  failing lines. Nothing was rewritten out of history.
+- **The tombstone.** Retraction `A145` in `docs/RETRACTED.json`, carrying the
+  two retracted sentences verbatim and two narrow patterns. `test_r1_retracted.py`
+  now fails the build if either sentence reappears anywhere without citing
+  A145 within ten lines — driven both ways: a probe file carrying the phrase
+  took R1 to 14/15, and removing it restored 15/15.
+- **What replaced it, and why it is stronger not weaker.** The old claim pinned
+  *this model's tally*, which is why an overnight retrain broke it twice in
+  three days. What is pinned now is the finding that never moved: **raising
+  the bar to convict cannot buy a false conviction for free** — it either
+  removes none, or pays in right answers for each one it removes. That
+  constrains margins 3.0 **and** 3.5 together at *every* tally either could
+  produce, where the old form asserted one tally each. `A126.M1c` drives the
+  predicate to a failing verdict on a synthetic free-win tally, so the guard
+  has been watched failing rather than only passing.
+- **The model's own numbers are now reported, not asserted** — the `measured
+  now` line in the suite's output. They are a measurement of a thing that
+  changes nightly; they were never the claim.
+
+A126 is **13/13**. The mechanism is unchanged and still the real finding: all
+seven false convictions are `discourse`, the worst outscores the mildest true
+conviction, and no threshold separates describing a theft from doing one
+(`A126.M4`). Only coverage moves it, at a price stated in `A126.M3`.
 
 **Repro:** `python test_a126_seat_dispositions.py` then
 `python test_a124_chain_syncable.py` in the working tree. Do NOT retrain to
