@@ -6401,6 +6401,21 @@ exactly: *"It is only settleable on the phone."* Whether Android refused the
 no-tap session, the session threw, or a prompt is sitting unanswered cannot be
 told apart from here, and they need three different fixes.
 
+**AND versionName IS NOT A BUILD — measured 2026-09-19 10:31.** Builds `2068c8f`
+and `a0fd2a1` both declare `0.1.597+7ffa73b`, because `build.sh` derives it as
+`0.1.<git rev-list --count>+<short HEAD>` of the merged tree, which is rooted at
+the **public core** — so two app builds against one core share a versionName.
+The futility guard compared that string to decide "installed" and could not
+tell them apart: a phone on the first would have read as installed for the
+second, and the door would never have offered it. `apk_version`'s own docstring
+had already recorded that versionName and `sha7` are different namespaces; this
+is the second half of that lesson — versionName is not even unique within its
+own. Fixed the same hour (`e005150`): the heartbeat carries `build` =
+`BuildConfig.GIT_SHA`, `record_checkin` whitelists it (cap 40), and
+`install_futility` prefers it — installed iff `build[:7] == sha7`, each delivery
+graded by `build` when present. `F13` drives the twin case; `F13b` caught that
+the per-delivery grading still used versionName; `F14` drives the match. 45/45.
+
 **What closes the blind spot** — the same move the door's witness ledger made
 for the PC side: carry the last update outcome in the check-in. One string
 field on the phone, one whitelisted key with its own length cap in
