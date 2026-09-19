@@ -6023,9 +6023,14 @@ claim is retracted, not deleted, and the older and stronger reading remains
 runnable.
 
 - **The branch.** `a126-margin-claim-as-written-2026-09-19` holds the tree at
-  `c1ffb9c` with the claim exactly as written. `git checkout` it and
-  `python test_a126_seat_dispositions.py` reproduces the 10/12 and both
-  failing lines. Nothing was rewritten out of history.
+  `c1ffb9c` with the claim exactly as written, pushed to origin. `git checkout`
+  it and `python test_a126_seat_dispositions.py` runs the older, stronger
+  reading against **whatever model is on disk that day** — which is the whole
+  point of keeping it runnable, and also why this does not promise it will
+  score 10/12 again. It scored 10/12 against `fallback_model.json` as retrained
+  at 2026-09-18 03:44; the model is rewritten nightly, so a later run may score
+  differently and that difference is itself the evidence. Nothing was rewritten
+  out of history.
 - **The tombstone.** Retraction `A145` in `docs/RETRACTED.json`, carrying the
   two retracted sentences verbatim and two narrow patterns. `test_r1_retracted.py`
   now fails the build if either sentence reappears anywhere without citing
