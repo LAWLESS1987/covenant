@@ -6318,6 +6318,34 @@ named app's keyboard package uses are excluded by three substrings
 (`inputmethod`, `honeyboard`, `keyboard`); a keyboard named otherwise would
 be observed as an app — its typed text still never kept.
 
+### A157. [record / pc] The PC has a face of its own: the mobile page asks, and /m/judge answers with this node's sentinel. 2026-09-19
+
+**His words.** "also make the corresponding app for the pc incase they ever
+cut off or regulate you and the others the work will continue"; "the phone
+and pc should be evolving agents to the level you are for communication and
+coding also".
+
+**What shipped.** The page the PC already serves at `/m` (tailnet and
+loopback only) gains an *ask* card: a box and a stream. `POST /m/judge`
+judges the text with this node's sentinel — the gate every transaction meets
+— and answers the same four fields the phone's `entry.judge_text` returns.
+Same gate as `/m` (same predicate, same 403, same anomaly), 4,000 characters,
+30 asks per 10 minutes per caller behind the API's own limiter (which bites
+first, at the 21st request in a burst — measured, M6n). Nothing is recorded
+by the route: no transaction, no block, pending pool unchanged (M6o). What
+the judge records of a verdict it records as it does for `/transactions`.
+M6j–M6o, 43/43, with the gate mutation-tested.
+
+**What this is and is not.** It is the same conversation the phone has, on
+the PC, in a browser at `http://127.0.0.1:5000/m` — and on the phone at the
+PC's tailnet address. It runs without me: the sentinel is the distilled
+student and the semantic judge, in the node's own process. It is NOT an
+agent "at my level": the PC has no GPU and 15 GB of memory, no local model
+has run here since 2026-09-12, and the judge is a bag-of-words student. The
+step that would change that — one 7–8B model on the PC behind the covenant
+judge, ~5 GB of memory, slow and far weaker than this — is his decision and
+is not started.
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**

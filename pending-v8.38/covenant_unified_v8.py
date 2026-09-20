@@ -546,6 +546,10 @@ MOBILE_PAGE_HTML = """<!doctype html>
 <h1>covenant &middot; node __NODE__</h1>
 <div class="sub">__VERSION__ &middot; source __SOURCE__ &middot; <span id="age" class="pill ok">live</span></div>
 
+<div class="card"><h2>ask</h2><div id="talk"></div>
+ <textarea id="say" rows="3" placeholder="Ask, paste, or judge a text" style="width:100%;box-sizing:border-box;background:#0b0f14;color:#e6edf3;border:1px solid #30363d;border-radius:10px;padding:10px;font:inherit;margin-top:6px"></textarea>
+ <a class="btn" href="#" id="send">Send</a></div>
+
 <div class="card"><h2>this node</h2><div id="health">reading /health &hellip;</div>
  <ul id="warns"></ul></div>
 
@@ -628,6 +632,23 @@ function tick(){
   if (s > 120) { e.className = 'pill bad'; e.textContent = ago(s); }
   else if (s > 45) { e.className = 'pill warn'; e.textContent = ago(s); }
 }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function say(){
+  var box = document.getElementById('say'), t = box.value.trim(), talk = document.getElementById('talk');
+  if (!t) return false;
+  talk.innerHTML += '<div class="row"><span>you</span><span>' + esc(t.slice(0, 600)) + '</span></div>';
+  box.value = '';
+  fetch('/m/judge', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text: t})})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var v = j.status !== 'success' ? j.message
+            : ((j.admitted ? 'ADMITTED' : (j.alleges_nothing ? 'HELD (nothing alleged)' : 'REFUSED')) + ' -- ' + j.message + ' [' + j.judge + ']');
+      talk.innerHTML += '<div class="row"><span>covenant</span><span class="' + (j.admitted ? 'ok' : 'warn') + '">' + esc(v) + '</span></div>';
+    })
+    .catch(function(e){ talk.innerHTML += '<div class="row"><span>covenant</span><span class="bad">' + esc(String(e)) + '</span></div>'; });
+  return false;
+}
+document.getElementById('send').onclick = say;
 phoneCard(); paint();
 setInterval(paint, 20000); setInterval(tick, 5000);
 </script>
@@ -8093,6 +8114,53 @@ class CovenantAPI:
             page = page.replace("__PHONE__", json.dumps(phone))
             return (page, 200, {"Content-Type": "text/html; charset=utf-8",
                                 "Cache-Control": "no-store"})
+
+        # ASK (2026-09-19). The PC's own face, the same box the phone got:
+        # "make the corresponding app for the pc in case they ever cut off or
+        # regulate you and the others the work will continue". A text is
+        # judged by this node's sentinel -- the gate every transaction meets --
+        # and nothing is recorded here: no transaction, no block. What the
+        # judge itself records of a verdict (ops/verdicts.jsonl, the ledger
+        # the nightly distill learns from) it records exactly as it does for
+        # /transactions; an ask trains the student the way a transaction
+        # would, and that is the mutual benefit. Tailnet-gated like /m (the
+        # same predicate, the same refusal, the same anomaly), bounded at 4000
+        # characters and 30 asks per 10 minutes per caller, answered in the
+        # JSON the phone's entry.judge_text returns. M6j-M6o.
+        _ask_log = {}
+
+        @self.app.route("/m/judge", methods=["POST"])
+        def mobile_judge():
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("mobile_page_refused", addr or "unknown")
+                return (jsonify({"status": "error", "message": "this door answers the tailnet only -- you are %s" % (addr or "unknown")}), 403)
+            now_ = time.time()
+            recent = [t for t in _ask_log.get(addr, []) if now_ - t < 600]
+            if len(recent) >= 30:
+                _ask_log[addr] = recent
+                return (jsonify({"status": "error", "message": "30 asks in 10 minutes -- wait"}), 429)
+            body = request.get_json(silent=True)
+            text = str(body.get("text", "") if isinstance(body, dict) else "")[:4000]
+            if not text.strip():
+                return (jsonify({"status": "error", "message": "nothing to judge"}), 400)
+            recent.append(now_)
+            _ask_log[addr] = recent
+            sentinel = getattr(self.node, "sentinel", None)
+            if sentinel is None:
+                return (jsonify({"status": "error", "message": "no sentinel on this node"}), 503)
+            tx = Transaction(sender_pubkey="shared", receiver="collective",
+                             data={"origin": "human", "kind": "shared", "message": text},
+                             amount=0.0, benefit_score=0.5)
+            try:
+                ok2, message, _benefit, result = sentinel.evaluate_transaction(tx)
+            except Exception as e:                                # noqa: BLE001
+                return (jsonify({"status": "error", "message": "could not judge: %s: %s" % (type(e).__name__, e)}), 500)
+            alleges_nothing = bool(result is not None and not ok2 and (
+                getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
+            return jsonify({"status": "success", "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
+                            "message": str(message)[:2000],
+                            "judge": getattr(result, "judge_id", "") if result is not None else ""})
 
         @self.app.route("/m/apk", methods=["GET"])
         def mobile_apk():

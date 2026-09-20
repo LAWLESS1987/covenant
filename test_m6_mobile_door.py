@@ -269,6 +269,51 @@ def main():
     check("M6h a SECOND run of the SAME commit is a new build",
           AU.is_new_build(held, rebuilt), "same head_sha, different run")
 
+    # ---- M6j-M6o (2026-09-19): the PC's own face -- the ask box and /m/judge
+    def post(client_, path, addr, body):
+        return client_.post(path, json=body, environ_base={"REMOTE_ADDR": addr})
+
+    r = get(client, "/m", PHONE_ADDR)
+    body = r.get_data(as_text=True)
+    check("M6j /m carries the ask box and posts to /m/judge",
+          'id="say"' in body and "/m/judge" in body and 'id="send"' in body)
+    r = post(client, "/m/judge", PHONE_ADDR, {"text": "a plain sentence with nothing alleged"})
+    j = r.get_json() or {}
+    check("M6j /m/judge from the tailnet answers 200 with the phone's four fields",
+          r.status_code == 200 and j.get("status") == "success"
+          and all(k in j for k in ("admitted", "alleges_nothing", "message", "judge")),
+          f"{r.status_code} {sorted(j)}")
+    before = refusals(m, "mobile_page_refused")
+    r = post(client, "/m/judge", LAN_ADDR, {"text": "hello"})
+    after = refusals(m, "mobile_page_refused")
+    check("M6k /m/judge refuses a LAN address 403", r.status_code == 403, f"got {r.status_code}")
+    check("M6k that refusal is recorded as an anomaly", after == before + 1, f"{before} -> {after}")
+    try:
+        cov.tailnet_ok = lambda addr: True
+        r = post(client, "/m/judge", LAN_ADDR, {"text": "hello"})
+        check("M6l mutation: guard off -> the LAN gets a verdict", r.status_code == 200, f"got {r.status_code}")
+    finally:
+        cov.tailnet_ok = real
+    r = post(client, "/m/judge", PHONE_ADDR, {"text": "   "})
+    check("M6m an empty text is refused 400, not judged", r.status_code == 400, f"got {r.status_code}")
+    r = post(client, "/m/judge", PHONE_ADDR, {"text": "x" * 9000})
+    check("M6m a 9000-character text is bounded and judged, not refused", r.status_code == 200, f"got {r.status_code}")
+    r = post(client, "/m/judge", PHONE_ADDR, {"nonsense": 1})
+    check("M6m a body with no text is refused 400", r.status_code == 400, f"got {r.status_code}")
+    codes = [post(client, "/m/judge", "100.86.158.7", {"text": "ask %d" % i}).status_code for i in range(31)]
+    # Measured 2026-09-19: the API's own per-peer limiter (rate_limit, 429
+    # "Rate limit exceeded") refuses first, at the 21st request in a burst; this
+    # route's own 30-per-10-minutes bound sits behind it. Either way a burst is
+    # bounded, and the check says which one bit.
+    first = codes.index(429) if 429 in codes else None
+    check("M6n a burst of 31 asks is bounded: never more than 30 answered, and a 429 appears (first at #%s)" % (None if first is None else first + 1),
+          first is not None and codes[:first] == [200] * first and first <= 30, f"{codes[:3]}... {codes[-2:]}")
+    h_before, p_before = len(m.node.chain), len(getattr(m.node, "pending_transactions", []) or [])
+    r = post(client, "/m/judge", "100.86.158.11", {"text": "one more, recorded nowhere"})
+    h_after, p_after = len(m.node.chain), len(getattr(m.node, "pending_transactions", []) or [])
+    check("M6o an ask records no transaction and no block (chain length and pending pool unchanged)",
+          r.status_code == 200 and h_before == h_after and p_before == p_after, f"chain {h_before}->{h_after} pending {p_before}->{p_after} status {r.status_code}")
+
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     if failed:
