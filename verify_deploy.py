@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 11214
+EXPECTED_LINES = 12525   # 2026-09-20: moved with the core pin below (was 11214 at the 09-11 re-pin)
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -69,8 +69,17 @@ MANIFEST = {
     # P19 23/23, A3s 51/51, P15 33/33 -- which is the order the b969
     # lesson below teaches: a pin proves WHICH bytes arrived, never that
     # the bytes are right.
+    # 2026-09-20: re-pinned, late. Four commits of 2026-09-19 moved the core
+    # (291fc13, e293153, ddc7775, 2d74712 -- A158, the agent door, the image
+    # door, A160) without moving this pin: the M53 failure once more, found
+    # when AM_VERIFY_AND_RESTART refused to restart node C over it. Stale
+    # pins, not a bad delivery: the file is clean against HEAD, and the live
+    # sweep of 2026-09-19 23:48 staged THIS digest (39341fb726a9, "core ...
+    # sha256 39341fb726a9a77b" on its line 14) and finished 0 failed, with
+    # K1 20/20, K2 25/25, P19 23/23 and A3s 51/51 against these bytes before
+    # the pin moved -- the order the b969 lesson below requires.
     "covenant_unified_v8.py":
-        "57d877e3f7a65593bf28fa635341fcbcc77404a17dc36e154f40aeeb79ff552f",
+        "39341fb726a9a77b34591713b1ebd2a2db7414472b2f650097c224c590ea2280",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
@@ -97,7 +106,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "f238ff9b25fe91cc3299e41ab047ff6f827a6728b7b8f37302b60556c3517f04",   # 2026-09-03: F2 (test_f2_distill_loop) joined the runner; pin moved in the same change (M53)
+        "7bde90e1effa0f37dc544cbb61b838f969ff88f546f24f46c4b725a799c3f22f",   # 2026-09-20: re-pinned late; moved by c64a33c, bf77dd2, 1fca761, 7eac94c (09-15/16) without the pin (M53); clean against HEAD; K1/K2 ran against it 09-19
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -120,13 +129,15 @@ MANIFEST = {
     # since 00:40Z, and the first v8.40 deployed sweep went red on all four
     # semantic suites from that asymmetry. P19 23/23 after each move.
     "run_local_sweep.py":
-        "d0197dc3c0d64d0088b0dff2b46635b4ba0cccf48ed08b094d2b5c199ea1764b",
+        "cfe07f71da4a303d8efbd1e6d13893278afe25a414447351914e48d7e804e81b",   # 2026-09-20: re-pinned late; moved by eb892c0 (Ollama removal, 09-12) without the pin (M53); clean against HEAD; P19 23/23 ran against it 09-19
     "test_p19_overlay_guard.py":
         "ed76c4497594d56b48ea7724a4aeed24bf1e9a38959fa705d9071812e07d4ed7",
-    # pinned ~10:30Z 08-29 when both runners gained it -- a suite both
-    # runners name is part of the delivery (M53).
-    "test_p15_judge_identity.py":
-        "a0f2702f2fe56cfa39dc5c769e2e9fd8f378cc638ced12af418c49582a687370",   # 2026-09-03: R4d/R5c pin the deferring-policy wording (F2); moved with the file (M53)
+    # test_p15_judge_identity.py was pinned here ~10:30Z 08-29 when both
+    # runners gained it. It left the project in eb892c0 (Ollama removal,
+    # 2026-09-12: the judge seat it identified is gone) and the pin stayed,
+    # so this verifier reported it MISSING for eight days. Removed
+    # 2026-09-20; a pin for a file the project no longer ships is a stale
+    # claim about the delivery, not a check.
 }
 # file -> module it imports that must sit in the same directory
 COMPANIONS = {
@@ -139,7 +150,6 @@ COMPANIONS = {
     # at all, so its presence is a delivery claim like any other.
     "covenant_watchdog.py": "covenant_quiet.py",
     "test_p19_overlay_guard.py": "run_local_sweep.py",
-    "test_p15_judge_identity.py": "covenant_watchdog.py",
     # v8.40: the judge is code plus a MODEL, and a judge whose model is
     # absent fails closed at install() -- so the model's presence is a
     # delivery claim, checked here before anything restarts.

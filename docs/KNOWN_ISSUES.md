@@ -6707,6 +6707,44 @@ or more memory.
 
 ---
 
+### A164. [ops / two trees on one machine] For part of 2026-09-20 the production nodes ran a core that exists only in the artifact tree. FOUND by G9 and verify_deploy; the mesh was returned to the disk core at 15:42 local; the launcher of the 15:09-15:24 restarts is UNDETERMINED
+
+**Measured.** All three nodes reported `source_sha256 7bc352118448`, 12,556
+lines, against the disk core `39341fb726a9`, 12,525 lines. The only files on
+this machine with that digest are `covenant-satc/covenant_unified_v8.py` and
+its held copy; no commit of this repository has a 12,556-line core (checked
+at 1e36600, ba8ea76, 5e91246, 2d74712, ddc7775, e293153, 291fc13). Node C
+carried it from 09:47Z (the sweep's live-state line, "node C restarted"), A
+and B from restarts at 15:09, 15:10 and 15:24 local. A node did run from the
+artifact's root once: `covenant-satc/nodeC_prod.db` and
+`covenant-satc/logs/nodeC.log` exist, both written 05:47 local. The
+artifact's own sweep transcripts show its restart action OFF ("verify_deploy
+... runs under --restart"), so its action phase did not do this. The
+watchdog recorded the condition for 17 rounds ("A runs 7bc352118448, B ...,
+C ...") and its clearing at 19:43:55Z, after `AM_VERIFY_AND_RESTART.bat` was
+run at 15:38 local by the operator's assistant; `/health` on 5000, 5020 and
+5060 then reads `39341fb726a9`, 12,525 lines, and G9 passes.
+
+**Established, and not.** Established: the artifact tree on this machine
+carries the same node-launch scripts, watchdog, highway and fixed ports
+(5000/5020/5060) as the production tree, and at least once a node ran from
+it on a production port. Not established: which process launched the
+15:09-15:24 nodes with the artifact's core while the production logs were
+the ones being written. Recorded as UNDETERMINED rather than guessed
+(rule 9); a launcher named without evidence would be the A30 shape.
+
+**Fixed, narrowly.** The mesh runs the disk core, verified on all three
+ports. The deploy verifier's pins were moved to the committed files -- they
+had been stale since the Ollama removal of 2026-09-12 and the 09-19 core
+commits, the M53 failure, which is why the restart script had refused with
+"hash mismatch" and "test_p15 missing" before any restart could happen. Not
+fixed: nothing stops a second tree on this machine from launching nodes on
+the production ports. Proposed, not done: the launch scripts should refuse
+to start a node whose port is held by a process outside their own tree. A
+reviewer's machine has no mesh and is not affected.
+
+---
+
 ### A163. [learning / the promotion gate] A promotion regressed two pinned disposition claims and the nightly said PROMOTED over a red it never ran. FOUND 2026-09-20 in the SaTC artifact's sweep; the suite now runs in the nightly's green check
 
 **Measured.** `test_a126_seat_dispositions.py` pins two empirical claims about
@@ -6729,12 +6767,29 @@ check is not moved.
 **Also on the way, and worth stating.** The judge evaluation written for the
 artifact (`tools/judge_eval.py` there) adds the control the earlier numbers
 lacked: a naive Bayes over the same bag of words, trained on the same folds,
-that must decide. Measured: it clears 22.9% of labelled violations (95% CI
-20.9–24.8) and convicts 19.2% of clean memos; the student, with abstention,
-clears 3.2% (2.4–4.1) and convicts 14.0% of the clean memos it decides while
-abstaining on 31.4%. Abstention buys a seven-fold cut in false clears and
-fewer false convictions, and costs the 31.4% it declines to decide. That is
-the number to quote for what the hold is worth.
+that must decide. Measured, after the fold split there was corrected on
+2026-09-20 to keep exact-duplicate memos on one side of train/test (36% of
+the rows it reads had a twin): it wrongly admits 23.9% of labelled
+violations (95% CI 21.8–26.0) and convicts 20.5% of clean memos; the
+student, with abstention, wrongly admits 3.4% (2.6–4.3) and convicts 15.7%
+of the clean memos it decides while abstaining on 34.8%. Abstention buys a
+seven-fold cut in false clears and fewer false convictions, and costs the
+34.8% it declines to decide; the comparison is not at matched coverage, and
+the artifact's evaluation says so beside its table. That is the number to
+quote for what the hold is worth.
+
+**Rolled back, 2026-09-20, here too.** "Left red" was not a finished state;
+the operator's standing rule is that a green sweep beside an honest ledger
+is finished and a red one is not, and he said so ("unacceptable"). The
+deployed student is the previous one again (`fallback_model.json` from
+`ddc7775`, digest `9a2bbf97a69c`), which is what the promotion gate would
+have kept had its green check run A126 that night. Re-measured after the
+swap on this tree: A126 13/13. The promoted student is not deleted; it sits
+in history at `2d3c821`. The running nodes reload the student by file
+mtime, so no restart was needed for this. The check was not moved and the
+claims were not re-stated. Tonight's nightly refines from the rolled-back
+student and its green check now runs A126, so a candidate that regresses
+these claims is refused rather than promoted.
 
 ---
 

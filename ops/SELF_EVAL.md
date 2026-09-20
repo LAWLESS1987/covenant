@@ -3198,3 +3198,190 @@ repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the man
 git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 9.2h ago; 31 file(s) not committed
 disk      PASS  324G free of 476G (31% used); logs/ 22M
 
+## 2026-09-20T01:41:15Z  overall FAIL  (round 4020)
+nodes     PASS  3/3 up, height 36 (spread 0), source 12062a780c57
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 12062a780c57, peers report ['0f388bd9eeaa'] (last heard 5
+trader    FAIL  log 12.7h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 12062a780c57 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD a520d94, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 10.3h ago; 17 file(s) not committed
+disk      PASS  325G free of 476G (31% used); logs/ 22M
+
+## 2026-09-20T01:41:15Z  overall FAIL  (round 4020)
+nodes     PASS  3/3 up, height 36 (spread 0), source 12062a780c57
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 12062a780c57, peers report ['0f388bd9eeaa'] (last heard 5
+trader    FAIL  log 12.7h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 12062a780c57 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD a520d94, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 10.3h ago; 18 file(s) not committed
+disk      PASS  325G free of 476G (31% used); logs/ 22M
+
+## 2026-09-20T03:01:59Z  overall FAIL  (round 4080)
+nodes     PASS  3/3 up, height 36 (spread 0), source 5162ad34d6de
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 5162ad34d6de, peers report ['24fc72076de9'] (last heard 1
+trader    FAIL  log 14.0h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 5162ad34d6de matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ddc7775, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 11.6h ago; 18 file(s) not committed
+disk      PASS  314G free of 476G (34% used); logs/ 22M
+
+## 2026-09-20T04:11:42Z  overall FAIL  (round 4140)
+nodes     PASS  3/3 up, height 36 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 1
+trader    FAIL  log 15.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 2d74712, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 12.8h ago; 18 file(s) not committed
+disk      PASS  313G free of 476G (34% used); logs/ 22M
+
+## 2026-09-20T05:18:47Z  overall FAIL  (round 4200)
+nodes     PASS  3/3 up, height 36 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 3
+trader    FAIL  log 16.3h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 2d74712, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 13.9h ago; 18 file(s) not committed
+disk      PASS  313G free of 476G (34% used); logs/ 23M
+
+## 2026-09-20T06:25:41Z  overall FAIL  (round 4260)
+nodes     PASS  3/3 up, height 36 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 1
+trader    FAIL  log 17.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 2d74712, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 15.0h ago; 18 file(s) not committed
+disk      PASS  313G free of 476G (34% used); logs/ 23M
+
+## 2026-09-20T07:32:38Z  overall FAIL  (round 4320)
+nodes     PASS  3/3 up, height 36 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 7
+trader    FAIL  log 18.5h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 2d74712, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 16.1h ago; 24 file(s) not committed
+disk      PASS  313G free of 476G (34% used); logs/ 23M
+
+## 2026-09-20T08:41:32Z  overall FAIL  (round 4380)
+nodes     PASS  3/3 up, height 37 (spread 1), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 8
+trader    FAIL  log 19.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 5e91246, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 17.3h ago; 19 file(s) not committed
+disk      PASS  314G free of 476G (34% used); logs/ 23M
+
+## 2026-09-20T09:50:37Z  overall FAIL  (round 4440)
+nodes     PASS  3/3 up, height 37 (spread 1), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 7
+trader    FAIL  log 20.8h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ba8ea76, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 18.4h ago; 19 file(s) not committed
+disk      PASS  313G free of 476G (34% used); logs/ 23M
+
+## 2026-09-20T10:58:09Z  overall FAIL  (round 4500)
+nodes     PASS  3/3 up, height 37 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 4
+trader    FAIL  log 22.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ba8ea76, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 19.5h ago; 19 file(s) not committed
+disk      PASS  316G free of 476G (33% used); logs/ 24M
+
+## 2026-09-20T12:04:44Z  overall FAIL  (round 4560)
+nodes     PASS  3/3 up, height 37 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 1
+trader    FAIL  log 23.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ba8ea76, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 20.7h ago; 19 file(s) not committed
+disk      PASS  317G free of 476G (33% used); logs/ 24M
+
+## 2026-09-20T13:11:49Z  overall FAIL  (round 4620)
+nodes     WARN  3/3 up, height 38 (spread 1), source 39341fb726a9/7bc352118448
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  6 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 2
+trader    FAIL  log 0.2h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 1e36600, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 21.8h ago; 19 file(s) not committed
+disk      PASS  317G free of 476G (33% used); logs/ 24M
+
+## 2026-09-20T14:19:29Z  overall FAIL  (round 4680)
+nodes     PASS  3/3 up, height 38 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 6
+trader    FAIL  log 1.3h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 1e36600, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 22.9h ago; 19 file(s) not committed
+disk      PASS  321G free of 476G (32% used); logs/ 24M
+
+## 2026-09-20T15:26:40Z  overall FAIL  (round 4740)
+nodes     WARN  3/3 up, height 38 (spread 0), source 39341fb726a9/7bc352118448
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: node B: mesh is running more than one source: we are 7bc352118448, peers report ['39341fb726a9'] (last heard 7
+trader    FAIL  log 2.4h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 1e36600, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 24.0h ago; 19 file(s) not committed
+disk      PASS  321G free of 476G (32% used); logs/ 25M
+
+## 2026-09-20T16:34:27Z  overall FAIL  (round 4800)
+nodes     WARN  3/3 up, height 38 (spread 0), source 39341fb726a9/7bc352118448
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: node B: mesh is running more than one source: we are 7bc352118448, peers report ['39341fb726a9'] (last heard 1
+trader    FAIL  log 3.6h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 1e36600, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 25.1h ago; 19 file(s) not committed
+disk      PASS  321G free of 476G (32% used); logs/ 25M
+
+## 2026-09-20T17:44:18Z  overall FAIL  (round 4860)
+nodes     PASS  3/3 up, height 38 (spread 0), source 7bc352118448
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: phone phone: running 0.1.633+8af8709, and build 0.1.645+ba8ea76 is here and newer by 7.4 h -- open http://100.
+trader    FAIL  log 4.7h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 1e36600, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 26.3h ago; 19 file(s) not committed
+disk      PASS  320G free of 476G (32% used); logs/ 25M
+
+## 2026-09-20T18:54:34Z  overall FAIL  (round 4920)
+nodes     PASS  3/3 up, height 38 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@f461925a808, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 1
+trader    FAIL  log 5.9h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 1e36600, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 27.5h ago; 19 file(s) not committed
+disk      PASS  320G free of 476G (32% used); logs/ 25M
+
