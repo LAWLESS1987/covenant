@@ -115,11 +115,21 @@ def health(port, timeout=4):
     return detail if state == "up" else None
 
 
-def pids_for(node_id):
-    """Every python process whose command line names this node. The command line is the
-    only thing that identifies one of these; see the module docstring."""
+def pids_for(node_id, port=None):
+    """Every python process whose command line names this node -- and, when the
+    port is given, THIS node on THIS port. The command line is the only thing
+    that identifies one of these; see the module docstring.
+
+    Scoped by port on 2026-09-20 (A164). Two trees on one machine both run
+    nodes named A, B and C: by id alone this stopped the OTHER tree's node,
+    which is how the research artifact's copy of this file killed the
+    production mesh and relaunched it from the artifact tree. start_node
+    writes "--port N --node-id X" adjacent, so the pattern below matches only
+    a node that holds this tree's port. With no port given it behaves as
+    before, for callers that have only an id."""
+    like = ("*--port " + str(port) + " --node-id " + node_id + "*") if port else ("*--node-id " + node_id + "*")
     ps = ("Get-CimInstance Win32_Process -Filter \"Name LIKE 'python%'\" | "
-          "Where-Object { $_.CommandLine -like '*--node-id " + node_id + "*' } | "
+          "Where-Object { $_.CommandLine -like '" + like + "' } | "
           "Select-Object -ExpandProperty ProcessId")
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
@@ -129,10 +139,10 @@ def pids_for(node_id):
     return [int(x) for x in out.split() if x.strip().isdigit()]
 
 
-def stop(node_id, say):
-    pids = pids_for(node_id)
+def stop(node_id, say, port=None):
+    pids = pids_for(node_id, port)
     if not pids:
-        say("    nothing is running as node %s" % node_id)
+        say("    nothing is running as node %s%s" % (node_id, (" on port %s" % port) if port else ""))
         return True
     say("    stopping pid(s) %s" % ", ".join(str(p) for p in pids))
     subprocess.run(["powershell", "-NoProfile", "-Command",
@@ -224,7 +234,7 @@ def restart_one(node, want_sha, say):
     before_height = before.get("chain_height") if before else None
     say("    before: %s" % ("height %s, source %s" % (before_height, str(before.get("source_sha256", ""))[:12])
                             if before else "not answering"))
-    stop(node["id"], say)
+    stop(node["id"], say, node.get("port"))
     if not port_free(node["port"], time.time() + PORT_FREE_TIMEOUT_S, say):
         return False
     if W.start_node(node) is False:

@@ -6707,7 +6707,7 @@ or more memory.
 
 ---
 
-### A164. [ops / two trees on one machine] For part of 2026-09-20 the production nodes ran a core that exists only in the artifact tree. FOUND by G9 and verify_deploy; the mesh was returned to the disk core at 15:42 local; the launcher of the 15:09-15:24 restarts is UNDETERMINED
+### A164. [ops / two trees on one machine] For part of 2026-09-20 the production nodes ran a core that exists only in the artifact tree. FOUND by G9 and verify_deploy; the mesh was returned to the disk core at 15:42 local; the launcher was the artifact's copy of test_a115 driving the real watchdog pass, whose highway ran rolling_restart from the artifact tree -- established the same evening
 
 **Measured.** All three nodes reported `source_sha256 7bc352118448`, 12,556
 lines, against the disk core `39341fb726a9`, 12,525 lines. The only files on
@@ -6725,13 +6725,26 @@ C ...") and its clearing at 19:43:55Z, after `AM_VERIFY_AND_RESTART.bat` was
 run at 15:38 local by the operator's assistant; `/health` on 5000, 5020 and
 5060 then reads `39341fb726a9`, 12,525 lines, and G9 passes.
 
-**Established, and not.** Established: the artifact tree on this machine
-carries the same node-launch scripts, watchdog, highway and fixed ports
-(5000/5020/5060) as the production tree, and at least once a node ran from
-it on a production port. Not established: which process launched the
-15:09-15:24 nodes with the artifact's core while the production logs were
-the ones being written. Recorded as UNDETERMINED rather than guessed
-(rule 9); a launcher named without evidence would be the A30 shape.
+**Established, later the same evening (the earlier text here said
+UNDETERMINED).** The artifact's `test_a115_rate_limited_is_not_down.py`
+drives the real `covenant_watchdog.one_pass`, which ends by running
+`covenant_highway.run_once(dry_run=False)`. Run from the artifact tree, that
+highway read this mesh as `source_drift` (this tree's core against the
+artifact's own), and its `restart_nodes` remedy ran the artifact's
+`rolling_restart.py`, whose `pids_for` matched processes by `--node-id`
+alone and so stopped THIS tree's A, B and C, then relaunched them through
+the artifact's `start_node` -- from the artifact tree, with the artifact's
+core. Evidence: the artifact's `logs/nodeC.log` carries a start banner for
+source 7bc352118448 at 16:37:54 local, seconds before this watchdog logged
+node C refused at 16:38:28, while that suite was running by hand; the same
+suite sits about eleven minutes into every artifact sweep, which is where
+the 15:09, 15:10 and 15:24 rolling restarts fall; and this morning's
+05:47 banner in the same file (source 3bd0625e5286 on port 5060) is the
+first occurrence. Fixed both ways: that suite fences the highway; and
+`rolling_restart.pids_for` in BOTH trees now matches `--port N --node-id X`,
+so a stop from either tree can only reach a node on its own port (measured:
+the artifact's `pids_for('C', 6060)` is empty while `pids_for('C', 5060)`
+here is this node).
 
 **Fixed, narrowly.** The mesh runs the disk core, verified on all three
 ports. The deploy verifier's pins were moved to the committed files -- they

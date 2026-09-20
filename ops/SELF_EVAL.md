@@ -3407,3 +3407,14 @@ repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the man
 git       PASS  HEAD 3d6801b, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 29.7h ago; 19 file(s) not committed
 disk      PASS  319G free of 476G (32% used); logs/ 26M
 
+## 2026-09-20T22:16:20Z  overall FAIL  (round 5100)
+nodes     PASS  3/3 up, height 38 (spread 0), source 39341fb726a9
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 39341fb726a9, peers report ['24fc72076de9'] (last heard 8
+trader    FAIL  log 9.3h old; freshness exit 0: RAN: a cycle dated 2026-09-20 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 39341fb726a9 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 741f488, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 30.8h ago; 18 file(s) not committed
+disk      PASS  319G free of 476G (32% used); logs/ 26M
+
