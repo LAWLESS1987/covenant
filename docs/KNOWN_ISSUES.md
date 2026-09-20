@@ -6635,6 +6635,78 @@ beside "meal" cannot be promised to decide it after one night.
 
 ---
 
+### A162. [diagnostics, 2026-09-20] "run diagnostics": the students' live-traffic bar was reading a selftest, and the doubled writer batch got nothing from a 3B writer. Both FIXED; the disk is two-thirds free and the clutter is named
+
+**What the diagnostics said.** `covenant_one.py --quick`: 0 checks failed,
+0 suites unmeasured, G1 BLOCKED only because the nightly's own outputs
+(`ops/RUN_WITHOUT.json` and the rest) were newer than the manifest --
+committed as the nightly's record and cleared. `covenant_watchdog.py --once`:
+one live alert, the phone peer on an older core (its build, not this PC's).
+`tools/corpus_reconcile.py` and `tools/audit_a1_a46_status.py`: unchanged
+from their last recorded state (23 FIXED, 23 UNDETERMINED, 1 partly).
+`trader_freshness.py`: not yet due. The first nightly under A161 (31 min):
+study kept 6 whole-pair cases from 24 precepts, the first study yield since
+09-15; back-audit 48 rows, 1 contested; panel coverage 0.098 -> 0.145; exam
+39/53 decided (was 38), 7 abstain (was 8); second student REFUSED on one
+false clean, correctly.
+
+**Two defects the diagnostics surfaced, both fixed and pinned:**
+
+1. **`own_traffic_hold_max` read 0.99 against 0.05, and it was not traffic.**
+   `ops/judged_by_student.jsonl` held 0% holds every day to 09-18, then 72%
+   on 09-19 and 85% on 09-20. Since 09-19 its rows were five outward-message
+   drafts ("Here is our work: https://github.com/...", "Ordinary technical
+   prose about gates") 156 times each -- `covenant_ambassador.py --selftest`,
+   run every fifteen minutes by `CovenantRefineCheck`, judged its fixture
+   drafts through the REAL deferring seat with dry-run emits, and the seat
+   recorded every verdict. All correctly HELD (not transactions), and the
+   run-without bar took them as the students holding on live traffic. The
+   selftest now rebinds the seat's audit path to a temp file for its duration,
+   exactly as `covenant_judge_defer._selftest` has since 09-11, and AM31
+   measures the real file's size before and after (48/48). Mutation run: with
+   the rebinding removed the real trail grew 8,263 bytes in one selftest and
+   AM31 failed. The 1,806 rows already written stay in the trail (it is an
+   audit, not a corpus; `covenant_distill` never trains on it), so the bar will
+   read high until 200 genuine decisions push them out of its window.
+2. **The doubled cycle was one 56-case prompt, and the day's writer
+   (llama3.2:3b) returned nothing in 342 s.** The single-prompt design was
+   measured at 24 cases on 2026-09-04. `gh_write_all` now asks in calls of at
+   most `WRITER_MAX_CASES` (24), whole categories per call: 3 calls at the
+   doubled volume, 2 at the old one with edge added, never the twelve of the
+   original design. `test_f2` T4 pins the call count and that every category
+   still reaches the writer (50/50).
+
+**The disk, measured (`C:` 476 GB, 313 GB free before, 318 after).** The
+covenant tree is 11.7 GB, of which 11.2 GB is `models/` (sd-turbo 4.9,
+coder-7B 4.4, 3B 2.0) -- the bots themselves, kept. Everything else in the
+tree is under 0.2 GB. Cleared: 4.65 GB of the sweep's own staging leftovers
+in Temp (20 directories older than two hours; one held open by the running
+nightly). NOT cleared, because they are not this session's to remove: other
+Claude sessions' scratch (6.3 GB, the auto-mode classifier refused it) and
+everything below, which is the operator's to decide:
+
+| item | size | what it is |
+|---|---|---|
+| `Downloads\sha256-*` (3 GGUF blobs + 8 manifests) | 18.9 GB | Ollama model layers; Ollama was removed 2026-09-12 |
+| `Downloads\*.exe` installers | 1.0 GB | GitHub Desktop, VS Code, VSCodium, Termius, XAMPP, Git, Ledger Live -- re-downloadable |
+| `$Recycle.Bin` | 2.6 GB, 168 items | already deleted once |
+| WSL Ubuntu (stopped) | 3.0 GB | nothing in covenant uses it |
+| `AppData\Roaming\ollama app.exe` | 68 MB | remnant |
+| `Downloads\Photos*.zip` | 0.8 GB | his photographs -- never touched by this side |
+
+"Transfer to GitHub": the repository already is; `models/` cannot go (size,
+third-party weights) and `private/` must not (his data, public repository).
+Nothing else local is worth a byte of the remote.
+
+**Said plainly about "space to train bots".** Disk is not what limits
+training here. The PC has 15.3 GB of memory with 12.5 GB in use while the
+browser and the desktop app are open; covenant's own processes take 215 MB,
+and the 3B model needs ~2.5 GB to answer, the 7B ~5 GB. Deleting downloads
+changes none of that. What would: fewer open applications while a model runs,
+or more memory.
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**

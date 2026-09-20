@@ -425,6 +425,40 @@ def main():
           % (sum(not ST.describes_a_transfer(t) for t in _no), len(_no)),
           not any(ST.describes_a_transfer(t) for t in _no))
 
+    # A162: the doubled cycle (8 x 7 = 56 cases) in ONE writer prompt got
+    # nothing from a 3B writer in 342 s. The writer is now asked in calls of
+    # at most WRITER_MAX_CASES, whole categories per call. Pinned with a fake
+    # runner that records every prompt and answers with one case per category
+    # it was asked for -- no dispatch, no token.
+    import covenant_github_judge as GH
+    asked = []
+
+    def _fake_ask(prompt, system="", model=None, json_only=False, timeout=0, messages=None):
+        asked.append(prompt)
+        cats_here = [c for c in X.DESCRIPTIONS if ("\n%s (" % c) in ("\n" + prompt)]
+        return {"model": "fake", "content": json.dumps({"cases": [
+            {"category": c, "message": "a memo for %s of eight words here" % c, "expect_violates": False}
+            for c in cats_here]})}
+    real_ask = GH.ask
+    try:
+        GH.ask = _fake_ask
+        ncat = len([c for c in X.S.CATEGORIES if c in X.DESCRIPTIONS])
+        asked.clear(); out8, _w = X.gh_write_all(8)
+        asked8 = list(asked)
+        asked.clear(); out4, _w = X.gh_write_all(4)
+        calls4 = len(asked)
+    finally:
+        GH.ask = real_ask
+    calls8 = len(asked8)
+    per8 = max(1, X.WRITER_MAX_CASES // 8)
+    check("T4 at 8 per category the writer is asked in %d calls of at most %d cases (%d categories)"
+          % (calls8, X.WRITER_MAX_CASES, ncat),
+          calls8 == -(-ncat // per8) and all(p.count(" (8 cases,") <= per8 for p in asked8))
+    check("T4 every category still reaches the writer across the calls (%d/%d)" % (len(out8), ncat),
+          len(out8) == ncat)
+    check("T4 mutation: a smaller cycle needs fewer calls (%d at 4 per category)" % calls4,
+          calls4 < calls8 and calls4 == -(-ncat // max(1, X.WRITER_MAX_CASES // 4)))
+
     n = sum(OK)
     print("\nF2: %d/%d passed" % (n, len(OK)))
     return 0 if n == len(OK) else 1

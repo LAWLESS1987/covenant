@@ -1235,6 +1235,32 @@ def selftest(say=print):
         say("%s  %s%s" % ("ok  " if cond else "FAIL", label,
                           ("  " + str(detail)[:160]) if (detail and not cond) else ""))
 
+    # A162 (2026-09-20): THIS SELFTEST WAS WRITING TO THE STUDENTS' REAL AUDIT
+    # TRAIL. Every dry-run emit below judges its fixture draft through the real
+    # deferring seat, and the seat records each verdict in
+    # ops/judged_by_student.jsonl. CovenantRefineCheck runs this file every
+    # fifteen minutes, so from 2026-09-19 the trail carried the same five
+    # drafts 156 times each, every one correctly HELD as not a transaction --
+    # and covenant_distill's own_traffic_hold_max bar, which reads that trail
+    # as the students' live traffic, went from 0.00 to 0.99 overnight and
+    # failed. The judge's own selftest (covenant_judge_defer._selftest) has
+    # rebound these paths to a temp dir since 2026-09-11; this one now does the
+    # same, and AM31 at the end checks the real file did not grow.
+    # Only the audit trail is rebound: a dry-run emit records as "student-audit"
+    # and nowhere else, and this file names no training corpus (AM10).
+    import tempfile as _tmp
+    import covenant_judge_defer as _D
+    _real_audit = _D.AUDIT_PATH
+    _real_audit_size = os.path.getsize(_real_audit) if os.path.exists(_real_audit) else -1
+    _D.AUDIT_PATH = os.path.join(_tmp.mkdtemp(), "selftest_audit.jsonl")
+    try:
+        return _selftest_body(say, ok, check, _real_audit, _real_audit_size)
+    finally:
+        _D.AUDIT_PATH = _real_audit
+
+
+def _selftest_body(say, ok, check, _real_audit, _real_audit_size):
+
     # --- the link precondition
     good, why = repo_link_ok(live=False)
     check("AM1 the repo precondition FAILS CLOSED when it cannot look -- an "
@@ -1550,6 +1576,12 @@ def selftest(say=print):
           "the way -- the rate limit is visible before the key exists",
           isinstance(dr.get("rate"), dict) and "ok" in dr["rate"]
           and dr.get("crypto_risk") is not None, dr.get("rate"))
+
+    # A162: every dry run above judged a draft; none of it may reach the
+    # students' real audit trail. Measured, not assumed.
+    _now = os.path.getsize(_real_audit) if os.path.exists(_real_audit) else -1
+    check("AM31 the selftest left ops/judged_by_student.jsonl untouched (%d -> %d bytes)"
+          % (_real_audit_size, _now), _now == _real_audit_size, _real_audit)
 
     n = sum(ok)
     say("\nAMBASSADOR: %d/%d passed" % (n, len(ok)))
