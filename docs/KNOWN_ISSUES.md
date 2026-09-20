@@ -6610,6 +6610,36 @@ first new-build heartbeat showed, both measured, neither a phone defect:
   should read this package's own name, and the build after *it* should land
   with no prompt.
 
+**THE PREDICTION FAILED, AND THE WAY IT FAILED IS THE FINDING (2026-09-19
+21:00:12).** The next build (`7119105`, the one carrying the `installer`
+field) was downloaded whole at 21:00:08 and committed with the no-tap flag,
+this app now being its own installer of record. Android did not ask. It
+refused: `installer answered 3 -- INSTALL_FAILED_VERIFICATION_FAILURE:
+Install not allowed for file:///data/app/vmdl1934402817.tmp`. The two
+tap-path installs earlier the same day went through (17:56 asked, 20:38
+installed). So on this phone a verifier permits a confirmed sideload and
+refuses a silent one; the no-tap flag was inert until the installer of record
+became this app, and the moment it took effect it was refused. Which
+verifier — the platform's, Samsung's, or Play Protect's — is NOT measured; the
+string is the only evidence, and it is one signal.
+
+**Fixed on the phone side (app commits `a507d2a`, `ebc33ea`).** A session
+that asked for no tap and was refused is re-staged for the tap from the same
+verified bytes in the cache, once, without the flag — one tap, no new
+download. And a build already staged for a tap is recorded
+(`pending_install.json`) and not downloaded again: `65bc28b` was delivered
+whole three times today, each copy abandoning the session Android was still
+asking about; only the door's bound let a prompt survive. M5.7j/M5.7j2 pin
+both, driven both ways.
+
+**What it takes to get there.** The phone runs `65bc28b`, whose updater
+still asks for the silent install and has no fallback, so every build it is
+offered will be refused the same way while the *Auto install* switch is on.
+One action on the phone: switch *Auto install* off on the main screen and
+Save. The next poll then commits without the flag, Android asks, one tap,
+and the build with the fallback is in. After that the switch can go back on:
+silent where Android permits it, one tap where it does not.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
