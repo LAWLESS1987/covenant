@@ -6389,6 +6389,56 @@ memory can read ("as we use other models we improve").
 **NOT measured.** The runner is the compiler; the screens are his eyes.
 MediaStore on One UI: the card path is standard API 29+ and untested here.
 
+**On the phone (22:50:34).** `d834d64` downloaded at 22:50:21 and installed
+silently on the first attempt; the 22:52:05 check-in reports `app
+0.1.633+8af8709 build d834d64`. Tetsu's engine voice is in the phone's log
+the first time he speaks; not yet read here.
+
+### A159. [record / agent] An open-source model runs on this PC behind the door and the gate; the students' learning loop from its answers is NOT closed. 2026-09-19
+
+**His words.** "there has to be a image creation open source we can take and
+improve on same as the other asks including our students growing to agents";
+"optimize the pc towards these tasks and this purpose"; "need a browser and a
+security layer other than that optimize"; "green light". Core commit
+`e293153`, `docs/AGENT.md`.
+
+**Measured.** This PC: Ryzen 5 5625U, 12 threads, 15.3 GB, 324 GB free;
+12.5 GB in use with his browser and the desktop app open (covenant's own
+processes: 215 MB in all). llama.cpp b11057 (CPU) under `tools/llama/`,
+Qwen2.5-3B-Instruct Q4_K_M and Qwen2.5-Coder-7B-Instruct Q4_K_M under
+`models/`, both untracked. The 3B loads in ~8 s, answers at ~10 tokens/s,
+holds 2.8 GB, leaves 0.5 GB free; the 7B needs ~6 GB free and waits for
+memory he frees. Two live asks through `/m/agent` on node A:
+
+| ask | model | judge | result |
+|---|---|---|---|
+| "what is a hash chain?" | 3B, 10.7 s incl. load | R1: both seats VIOLATES | **withheld** — a false conviction on plain technical prose |
+| "say hello" | 3B, 1.1 s | R2: senior clean, junior hold | admitted |
+
+**The loop is not closed, and this says so.** The students' verdicts on the
+model's answers land in `ops/chat/ask_log.jsonl` (memory) and nowhere the
+nightly distill reads: `ops/verdicts_live.jsonl` was last written
+2026-09-12, and the teacher's ledger `ops/verdicts.jsonl` is written by the
+teacher panel, not by this path. Feeding the students' OWN verdicts back as
+labels would train them on their own false convictions. The honest next
+step is a queue the TEACHER labels (the runner panel) — the model's answers
+as texts, the teacher's verdicts as labels — and that is a design pass, not
+done tonight.
+
+**Security layer, as built (docs/AGENT.md).** Loopback-only server; tailnet
+door; 30 asks / 10 min behind the API limiter; one leashed HTTPS fetch per
+answer to an allow-listed host, 8 KB, handed back as data; the sentinel
+judges every answer before it is returned; every exchange logged; put away
+after ten idle minutes. The model cannot act. M6q drives the door and the
+leash both ways with a stub model.
+
+**Next vectors, in order.** (1) The teacher-labelled queue above. (2) Give
+the model covenant's own facts: the system prompt is generic, so its first
+answer about the judge was wrong in substance — retrieval over docs/ before
+it answers. (3) Memory: the 7B fits once ~3.5 GB is freed; the browser is
+the biggest holder. (4) Images: stable-diffusion.cpp with sd-turbo, behind
+the same door, the LLM put away first — measured before built.
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
