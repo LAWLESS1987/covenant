@@ -110,7 +110,7 @@ research artifact must not depend on them.
 All 643 commits are by one author. The Constitution says it itself:
 *"A single-operator network is not governed, it is owned. Quorum among
 machines one party controls is theatre."* The NSF summary already corrects an
-earlier overstatement: no person outside the project has reproduced the root;
+earlier overstatement: no person outside the project has reproduced the root (A121);
 the two clean-room reimplementations were written by AI agents the author ran.
 
 For a proposal whose second objective is *"let two independent parties confirm
