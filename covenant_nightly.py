@@ -96,6 +96,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--study", type=int, default=12, help="precepts to turn into cases")
     ap.add_argument("--cycle", type=int, default=4, help="generated cases per category")
+    ap.add_argument("--audit", type=int, default=48,
+                    help="A161: legacy single-teacher rows the PANEL re-judges each pass (one panel batch); "
+                         "0 disables. panel_coverage was 0.098 against a 0.9 bar with nothing moving it")
     ap.add_argument("--redteam", type=int, default=15,
                     help="memos per angle the runner writes to fool the student; 0 disables")
     ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
@@ -258,6 +261,23 @@ def main():
         AL.digest_write(say=say)
     except Exception as e:                                       # noqa: BLE001
         say("actuator digest FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE PANEL'S BACK-AUDIT (A161, 2026-09-20). covenant_teacher_panel.back_audit
+    # existed and nothing ran it: 1,880 legacy single-teacher rows taught the
+    # student beside 204 panel rows, panel_coverage read 0.098 against the
+    # run-without bar of 0.9, and no night could move it. One batch a night:
+    # the last N single-teacher rows are re-judged blind by the panel; a row
+    # the panel does not admit is marked contested and stops teaching. Runs
+    # BEFORE the distill cycle so tonight's candidate learns from the audited
+    # ledger. Its failure is reported and does not stop the pass.
+    try:
+        if a.audit > 0:
+            import covenant_teacher_panel as TPn
+            import covenant_unified_v8 as _cov
+            checked, contested = TPn.back_audit(TPn.VERDICTS, a.audit, list(_cov.DIVINE_PRINCIPLES), say=say)
+            say("back-audit: %d legacy row(s) re-judged by the panel, %d now contested" % (checked, contested))
+    except Exception as e:                                       # noqa: BLE001
+        say("back-audit FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X

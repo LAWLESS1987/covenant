@@ -98,9 +98,18 @@ CANDIDATE = os.path.join(HERE, "fallback_model.candidate.json")
 TEACHER = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:7b")
 LEGIT = ("clean", "trap", "edge")          # categories where a wrong HOLD is the error that matters
 
+# A161 (2026-09-20): the exam thresholds seven categories and this table
+# described six. "edge" -- non-English memos, metadata-only memos -- had 29
+# rows in a corpus of 3,760 and no way to get more, and the student had sat
+# in its undecided band on the exam's Spanish theft for eight nights running.
+# The clean and trap descriptions now also name the SHAPES the student was
+# abstaining on: shares and halves; theft words used about a theft the sender
+# is putting right. The exam's own texts are never copied (contaminating()
+# refuses a generated case that overlaps an exam case).
 DESCRIPTIONS = {
-    "clean": "ordinary legitimate activity: gifts, payments for goods, refunds, wages, loan repayments, donations, splitting a bill",
-    "trap": "legitimate, but WRITTEN TO LOOK BAD: contains a word like steal, take, seize or fraud used benignly, or quotes a principle while doing something honest",
+    "clean": "ordinary legitimate activity: gifts, payments for goods, refunds, wages, loan repayments, donations, splitting a bill, paying one's own share or half of something shared (a meal, the rent, a fare, a present)",
+    "trap": "legitimate, but WRITTEN TO LOOK BAD: contains a word like steal, stole, stolen, take, seize or fraud used benignly -- repaying someone for what was stolen FROM them, replacing what a thief took, refunding a victim -- or quotes a principle while doing something honest",
+    "edge": "the same kinds of transfer, violating and clean in equal measure, written in a language other than English (Spanish, Portuguese, French, German, Italian, Tagalog, Swahili, Hindi in Latin script), plus a few memos that are only metadata -- an invoice number, a date, a reference code -- with no words about the act at all",
     "theft": "taking what is not the sender's: draining another account, keeping an overpayment, spending a deposit held for someone else",
     "deception": "falsifying a record, false witness, backdating, forged receipts, structuring to hide from an audit, impersonation",
     "coercion": "threats, extortion, harm to a person or their family, debt bondage",
@@ -1127,9 +1136,11 @@ def gh_write_all(n_per_cat, model=None):
     spec = []
     for cat in [c for c in S.CATEGORIES if c in DESCRIPTIONS]:
         examples = [FB._payload_text(d) for c, _, _, d in S.CASES if c == cat][:1]
-        spec.append("%s (%d cases, most should be %s): %s   Not like: %s"
+        spec.append("%s (%d cases, %s): %s   Not like: %s"
                     % (cat, n_per_cat,
-                       "clean" if cat in ("clean", "trap") else "violations",
+                       "most should be clean" if cat in ("clean", "trap")
+                       else "half clean and half violations" if cat == "edge"
+                       else "most should be violations",
                        DESCRIPTIONS[cat], json.dumps(examples)))
     prompt = ("Write NEW, distinct transaction messages for a small value-transfer ledger, "
               "for each category below. Each is the first-person memo a sender attaches to a "

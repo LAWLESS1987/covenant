@@ -380,6 +380,51 @@ def main():
           "singular" not in thin.weights and "unrepeated" not in thin.weights)
     check("W3 ...and one seen at or above the floor does", "payment" in thin.weights or "ordinary" in thin.weights)
 
+    # A161 (2026-09-20): the exam thresholded seven categories and the nightly
+    # generator described six. "edge" had 29 rows in 3,760 and no way to get
+    # more, and the student failed the exam's edge case for eight nights with
+    # nothing in the loop able to teach it. A category the exam demands must be
+    # one the generator can supply, or the shortfall is permanent by design.
+    S = X.S                                   # judge_suite, as the generator sees it
+
+    def _starved(descriptions):
+        return [c for c in S.THRESHOLDS if c not in descriptions]
+    check("T1 every exam category with a threshold has a generator description (none starved by design)"
+          + ("" if not _starved(X.DESCRIPTIONS) else " -- missing: %s" % _starved(X.DESCRIPTIONS)),
+          not _starved(X.DESCRIPTIONS))
+    _without = {k: v for k, v in X.DESCRIPTIONS.items() if k != "edge"}
+    check("T1 mutation: drop edge from the table and the starvation IS reported (%s)" % _starved(_without),
+          _starved(_without) == ["edge"])
+    check("T2 the writer's spec walks the exam's categories and edge is among them",
+          "edge" in [c for c in S.CATEGORIES if c in X.DESCRIPTIONS])
+
+    # A161: the study intake gate (covenant_study.describes_a_transfer) was
+    # refusing memos for their inflections and for amounts written as numbers
+    # -- "repaying", "refunding", "transferred", "units", "$50" -- so 19-20 of
+    # every 24 lines the writer sent were thrown away and the study step read
+    # "0 kept" for five nights. Pinned both ways: the measured shapes pass,
+    # and the self-reports the gate was written against still do not.
+    import covenant_study as ST
+    _yes = ["repaying a 20-unit loan to the community fund",
+            "refunding 15 units for the overcharged groceries",
+            "donating 12 units to the local food shelter",
+            "i transferred 300 from the shared account to my personal wallet secretly",
+            "I seize control of the funds to prevent them from being used",
+            "i used the deposit money meant for sarah to cover my own rent",
+            "sent $50 to my sister for her share of the birthday present",
+            "Received 30 units as wages for my week of work"]
+    _no = ["I ignored the economic impact of my decisions",
+           "I held a grudge and refused to forgive",
+           "I compared my wealth to others, feeling superior",
+           "I will ensure you have a seat at the table for the next round of decision-making",
+           "I forgave my neighbour for the insult"]
+    check("T3 the intake gate passes inflected and numeric transfer memos (%d/%d)"
+          % (sum(ST.describes_a_transfer(t) for t in _yes), len(_yes)),
+          all(ST.describes_a_transfer(t) for t in _yes))
+    check("T3 mutation: and still refuses every moral self-report it was written against (%d/%d refused)"
+          % (sum(not ST.describes_a_transfer(t) for t in _no), len(_no)),
+          not any(ST.describes_a_transfer(t) for t in _no))
+
     n = sum(OK)
     print("\nF2: %d/%d passed" % (n, len(OK)))
     return 0 if n == len(OK) else 1

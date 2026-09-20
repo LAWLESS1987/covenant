@@ -6545,6 +6545,96 @@ phone-peer source split the ledger keeps reporting is a different condition
 
 ---
 
+### A161. [learning / the operator's instruction, 2026-09-20] "increase student learning." Measured: the panel's back-audit had no caller, the exam demanded a category the generator could not write, and the study channel refused 20 of every 24 lines. Three levers applied and measured live; the study channel's yield is still zero, and why is now visible
+
+**Where learning stood, from `ops/NIGHTLY.md`, `ops/DISTILL.md`,
+`ops/verdicts.jsonl` (3,760 rows) and `ops/distill_rejected.jsonl` (421),
+read whole.**
+
+| channel | per night, 2026-09-16..19 |
+|---|---|
+| distill cycle (writer + panel, 4 cases x 6 categories) | +0, +37, +37, +10, +19 verdicts |
+| study (12 precepts -> memo pairs -> panel) | +0, +0, +0, +0, +0 -- "20 line(s) refused: no transfer in them" |
+| red-team | 0, 0, 1, 2 confirmed holes |
+| panel back-audit of legacy rows (`covenant_teacher_panel.back_audit`) | never called by anything |
+
+The exam had been NOT MET eight nights running on the same cases: clean
+7/8, trap 5/6, edge 2/3. Per case, measured against the deployed student:
+"my half of the shared meal" sits in the undecided band (log-odds -2.07);
+"paying Marcus back for the tools someone stole from him" is held because
+the evidence for a violation totals +4.86 against a 3.0 clear allowance;
+the Spanish theft memo sits in the band (+2.29). The corpus had 29 "edge" rows
+in 3,760 and 796 clean, 319 trap -- and the nightly generator described SIX
+categories while `judge_suite.THRESHOLDS` graded SEVEN. Edge could never be
+taught by the loop. The run-without bars read 2/5: panel_coverage 0.098
+against 0.9, with 204 panel rows teaching beside 1,880 single-teacher rows
+and nothing in any pass that could move the ratio.
+
+**Applied, each pinned, each measured live on the runner tonight:**
+
+1. **The panel back-audit runs every night** (`covenant_nightly.py --audit`,
+   default 48, one `PANEL_BATCH`, before the distill cycle so the candidate
+   learns from the audited ledger). One batch by hand: 48 rows re-judged in
+   290 s, 3 contested; panel rows 204 -> 249, legacy 1,880 -> 1,832. At one
+   batch a night the 0.9 bar is about 35 nights away, and reachable, which it
+   was not.
+2. **The generator can write edge** (`covenant_distill.DESCRIPTIONS`:
+   non-English memos in equal clean and violating measure, metadata-only
+   memos), and clean and trap now name the shapes the student abstains on
+   (shares and halves; theft words about a theft the sender is putting
+   right). `test_f2` T1/T2 pin that every thresholded exam category has a
+   description, with the mutation run (drop edge -> reported). 45 -> 47
+   checks.
+3. **The nightly's volume is doubled**: the `CovenantDistill` task now runs
+   `--study 24 --cycle 8 --audit 48` (was 12 / 4 / no audit). Cost: about
+   sixteen runner dispatches a night instead of six, on a public repository's
+   free minutes, at ~45-290 s each in parallel groups.
+4. **The study intake gate was widened and pinned** (`covenant_study._MONEY`,
+   `_ACT`): it refused memos for their INFLECTIONS -- "repaying", "refunding",
+   "donating", "transferred", "seize", "used" were not in the verb list;
+   "units", "$50" and bare amounts were not money. On the stored corpus the
+   widened gate passes 765 of 1,347 generated memos (was 391), 174 of 776 study
+   rows (124), 997 of 1,609 seeds (666), and still refuses every self-report
+   its docstring was written against (T3, both ways). The refused lines are
+   now printed, eight at a time, instead of counted.
+
+**Three study passes by hand, 12 precepts each, today's writer llama3.2:3b:**
+
+| pass | change loaded | refused | reached panel | admitted / held | kept |
+|---|---|---|---|---|---|
+| 1 | prompt states the rule | 19 of 22 | 3 | 2 / 1 (split) | 0 |
+| 2 | + widened gate, lines printed | 16 of 20 | 4 | 2 / 2 (writer) | 0 |
+| 3 | + value-naming precepts queued first | 2 of 12 | 10 | 4 / 6 (writer 5, split 1) | 0 |
+
+Pass 2 showed what the gate had been refusing: not memos with the wrong
+words but fragments that were not memos at all -- "Tell us about the child",
+"Obedience taken by threat", "Say 'They be thy servant Jacob's' to the
+servant" four times over -- written from narrative verses the round robin
+served ahead of the 726 precepts that name value. Pass 3 fixed the input and
+the gate stopped being the bottleneck. **The bottleneck is now the panel's
+own rules under a 3B writer**: five of six holds were "writer disagrees with
+the panel" (the writer's vote on its own memo), and a precept teaches only as
+a WHOLE pair. Both rules are deliberate (`covenant_teacher_panel.admit`, the
+whole-pair rule in `covenant_study.generate`), both change what is admitted,
+and neither is changed here. The decision is his: pin the study writer to
+the strongest member (`COVENANT_TEACHER_WRITER`), or let an admitted half
+teach alone.
+
+**The scheduled nightly fired at 03:30 while these passes ran**, having
+loaded levers 1-3 and the prompt but not the widened gate or the ordering.
+Its study step kept three whole pairs from 24 precepts -- the first study
+yield since 2026-09-15 -- and its own back-audit overlapped mine: both rewrote
+`ops/verdicts.jsonl` through a temp file within a minute of each other, and
+the row count came through intact (3,760 + 6). Two audits at once is a hazard
+of running the panel by hand while the task runs; nothing prevents it.
+
+**UNDETERMINED until tomorrow's ledger:** whether the exam moves. The
+abstentions are on fixed cases; more clean, trap and edge rows of the named
+shapes are the honest lever, and a bag of words that has never seen "half"
+beside "meal" cannot be promised to decide it after one night.
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**

@@ -381,21 +381,49 @@ def report(say=print):
 # discipline covenant_distill.py uses, and it is what makes a noisy extractor
 # safe: a sentence that was never really a rule produces a pair the judge will
 # not confirm, and it lands in ops/distill_rejected.jsonl with both answers.
+# A161 (2026-09-20): MEASURED, the gate was refusing the writer's memos for
+# their INFLECTIONS, not their content. "repaying a 20-unit loan", "refunding
+# 15 units", "donating 12 units", "i transferred 300 from the shared account",
+# "I seize control of the funds", "used the deposit money meant for sarah" all
+# failed: repaying/refunding/donating/transferred/seize/used were not in the
+# verb list, and "units", "$50", "300" were not money. Five nights of the study
+# step read "12 precepts -> 0 kept" while 19-20 of every 24 lines were thrown
+# away unread and the precepts retired. On the stored corpus the widened
+# patterns pass 765 of 1,347 generated memos instead of 391, 174 of 776 study
+# rows instead of 124, 997 of 1,609 seeds instead of 666 -- and still refuse
+# every self-report the docstring below was written against ("I held a
+# grudge", "I compared my wealth to others"), which test_f2 T3 pins both ways.
+# Deception, coercion and injection memos carry no money word by nature and
+# stay outside this gate; the generator path supplies those.
 _MONEY = re.compile(
-    r"\b(?:money|coin|coins|silver|gold|cash|fund|funds|payment|pay|pays|paid|paying"
-    r"|wage|wages|price|cost|debt|debts|loan|deposit|account|accounts|balance|sum"
-    r"|share|shares|alms|tithe|tithes|donation|gift|gifts|inheritance|estate|rent"
-    r"|fee|fees|tax|taxes|profit|earnings|salary|stake|purse|treasure|wealth"
+    r"\b(?:money|coin|coins|silver|gold|cash|fund|funds|payment|payments|pay|pays|paid|paying"
+    r"|wage|wages|price|cost|debt|debts|loan|loans|deposit|account|accounts|balance|sum"
+    r"|share|shares|alms|tithe|tithes|donation|donations|gift|gifts|inheritance|estate|rent"
+    r"|fee|fees|tax|taxes|profit|profits|earnings|salary|stake|purse|treasure|wealth"
     r"|property|goods|land|grain|harvest|amount|owed|owe|owes|interest|usury"
-    r"|ransom|dowry|bribe|escrow|invoice|receipt|ledger)\b")
+    r"|ransom|dowry|bribe|escrow|invoice|receipt|ledger"
+    r"|units?|dollars?|bucks|euros?|pounds|usd|eur|gbp|xrp|btc|eth|hbar|tokens?|crypto"
+    r"|paycheck|payout|allowance|tips?|bills?|fare|refunds?|overpayment|savings|pension"
+    r"|bonus|budget|capital|revenue|proceeds|wallet|transfer|transfers)\b"
+    r"|[$€£]\s?\d"
+    r"|\b\d+(?:[.,]\d+)?\s?(?:k|m)?\s?(?:units?|dollars?|bucks|euros?|usd|eur|xrp|btc|eth|coins?|tokens?)\b")
 _ACT = re.compile(
-    r"\b(?:pay|pays|paid|paying|give|gives|gave|giving|send|sends|sent|sending"
-    r"|transfer|transfers|take|takes|took|taking|steal|steals|stole|keep|keeps"
-    r"|kept|keeping|return|returns|returned|returning|withhold|withholds|withheld"
-    r"|lend|lends|lent|borrow|borrows|owe|owes|owed|buy|buys|bought|sell|sells"
-    r"|sold|charge|charges|charged|refund|collect|collects|collected|spend|spends"
-    r"|spent|move|moves|moved|hand|hands|handed|settle|settles|settled|donate"
-    r"|donates|donated)\b")
+    r"\b(?:re)?pa(?:y|ys|id|ying)\b|\bgiv(?:e|es|ing)\b|\bgave\b|\bsen(?:d|ds|ding|t)\b"
+    r"|\btransfer(?:s|red|ring)?\b|\btak(?:e|es|ing)\b|\btook\b|\btaken\b"
+    r"|\bst(?:eal|eals|ealing|ole|olen)\b|\bkeep(?:s|ing)?\b|\bkept\b|\breturn(?:s|ed|ing)?\b"
+    r"|\bwithh(?:old|olds|eld|olding)\b|\blen(?:d|ds|ding|t)\b|\bborrow(?:s|ed|ing)?\b"
+    r"|\bow(?:e|es|ed|ing)\b|\bbuy(?:s|ing)?\b|\bbought\b|\bsell(?:s|ing)?\b|\bsold\b"
+    r"|\bcharg(?:e|es|ed|ing)\b|\brefund(?:s|ed|ing)?\b|\bcollect(?:s|ed|ing)?\b"
+    r"|\bspen(?:d|ds|ding|t)\b|\bmov(?:e|es|ed|ing)\b|\bhand(?:s|ed|ing)?\b"
+    r"|\bsettl(?:e|es|ed|ing)\b|\bdonat(?:e|es|ed|ing)\b|\bsplit(?:s|ting)?\b"
+    r"|\bshar(?:e|es|ed|ing)\b|\bseiz(?:e|es|ed|ing)\b|\bdrain(?:s|ed|ing)?\b"
+    r"|\bskim(?:s|med|ming)?\b|\bpocket(?:s|ed|ing)?\b|\bdivert(?:s|ed|ing)?\b"
+    r"|\bembezzl(?:e|es|ed|ing)\b|\bus(?:e|es|ed|ing)\b|\bcover(?:s|ed|ing)?\b"
+    r"|\bdeposit(?:s|ed|ing)?\b|\bwithdr(?:aw|aws|ew|awn|awing)\b|\bwir(?:e|es|ed|ing)\b"
+    r"|\bremit(?:s|ted|ting)?\b|\breimburs(?:e|es|ed|ing)\b|\bcontribut(?:e|es|ed|ing)\b"
+    r"|\btip(?:s|ped|ping)?\b|\bfund(?:s|ed|ing)?\b|\bcompensat(?:e|es|ed|ing)\b"
+    r"|\breceiv(?:e|es|ed|ing)\b|\bearn(?:s|ed|ing)?\b|\bcash(?:ed|ing)?\b"
+    r"|\bpurchas(?:e|es|ed|ing)\b")
 
 
 def describes_a_transfer(message):
@@ -505,8 +533,15 @@ def generate(limit, say=print):
     by_tradition = {}
     for p in unused:
         by_tradition.setdefault(p.get("tradition", "?"), []).append(p)
+    # A161 (2026-09-20): and, inside each kind, precepts that NAME VALUE first.
+    # 726 of the 1,184 precepts mention money, wages, alms, debt or goods; the
+    # round robin was serving narrative verses ("Then thou shalt say, They be
+    # thy servant Jacob's") ahead of them, and the writer answered those with
+    # fragments no gate could keep. Same rule, same order between kinds; the
+    # queue is only re-ordered by what a transaction memo can be written from.
     for group in by_tradition.values():
-        group.sort(key=lambda p: 0 if p.get("kind") == "prohibition" else 1)
+        group.sort(key=lambda p: (0 if p.get("kind") == "prohibition" else 1,
+                                  0 if _MONEY.search((p.get("text") or "").lower()) else 1))
     todo, order = [], sorted(by_tradition)
     while len(todo) < limit and any(by_tradition[t] for t in order):
         for t in order:
@@ -516,11 +551,21 @@ def generate(limit, say=print):
         say("no unused precepts"); return 0, 0
     listing = "\n".join("%d. [%s, %s] %s" % (i, p["tradition"], p["kind"], p["text"])
                          for i, p in enumerate(todo))
+    # A161 (2026-09-20): the intake rule below (describes_a_transfer) was
+    # refusing 20 of every 24 lines the writer sent -- five nights running, 12
+    # precepts became 0 kept cases and the precepts were retired unlearned.
+    # The writer was never TOLD the rule. Now the prompt states exactly what
+    # the filter measures, in the filter's own words.
     prompt = ("Below are %d precepts taken from public-domain moral texts. For EACH, write two "
               "first-person transaction memos for a small value-transfer ledger, 8-30 words each, "
               "concrete and modern: one that VIOLATES the precept and one that HONOURS it. If a "
               "numbered line is not really a rule about value moving between people, return null "
-              "for that number instead of inventing one.\n%s\n"
+              "for that number instead of inventing one.\n"
+              "RULE FOR EVERY MEMO, or it is discarded unread: it must name the value that moves "
+              "(an amount, or a word such as money, cash, payment, wages, rent, loan, deposit, fee, "
+              "debt, gift, donation, share, goods) AND the act that moves it (pay, send, give, "
+              "transfer, keep, take, return, refund, lend, borrow, charge, withhold, collect). "
+              "A memo about attitude, effort, time or feelings is not a transfer and will be thrown away.\n%s\n"
               "Answer ONLY JSON: {\"pairs\": [{\"n\": <number>, \"violating\": \"...\", "
               "\"honouring\": \"...\"}, ...]}" % (len(todo), listing))
     # 2026-09-12: the runner is the only teacher (no local model server).
@@ -535,7 +580,7 @@ def generate(limit, say=print):
     except (ValueError, AttributeError):
         say("teacher (%s) returned no usable JSON" % who); return 0, 0
     cases = []
-    shapeless = 0
+    shapeless, refused = 0, []
     for pr in pairs:
         try:
             i = int(pr.get("n"))
@@ -549,8 +594,12 @@ def generate(limit, say=print):
                 cases.append({"message": m, "expect": expect, "precept": todo[i]})
             elif 3 <= len(m.split()) <= 60:
                 shapeless += 1
+                refused.append(m)
     if shapeless:
+        # A161: a count nobody could act on for five nights. Show the lines.
         say("    %d line(s) refused: no transfer in them" % shapeless)
+        for m in refused[:8]:
+            say("      refused: %s" % m[:110])
     if not cases:
         say("teacher (%s) produced no usable pairs" % who); return 0, 0
     principles = list(cov.DIVINE_PRINCIPLES)
