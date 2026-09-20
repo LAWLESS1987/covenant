@@ -6785,6 +6785,21 @@ after one refusal (`7119105`), one clean silent install (`ebc33ea`). The
 fallback shipped in that last build has not yet been exercised by a real
 refusal; M5.7j holds its shape until one comes.
 
+**FOURTH BUILD, AND A PATTERN (22:10:05).** `56185dc` (chat-first, learn from
+use) was downloaded whole at 21:58:34 and committed silently — and the
+receiver logged NOTHING: no installed, no answered, no prompt. The 22:08 poll
+downloaded it again (attempt 2 of 6) and it installed at 22:08:34; the
+22:10:05 check-in reads `build 56185dc app 0.1.630+a520d94 installer
+org.covenant.node`. So of four silent commits tonight, two completed on the
+first attempt (`ebc33ea`, and `7119105`'s second) and two did not (`7119105`
+first: refused with a verification failure; `56185dc` first: no result at
+all). The retry loop and the door's bound carry it, at one extra 45 MB
+download each time. What happens to the first commit is NOT measured — the
+receiver's silence is the only evidence, and it is silence. A first-attempt
+failure that returns NO status is not the case the fallback in `a507d2a`
+covers (that needs a refusal to fall back from); it is the case the
+re-download covers. Left as is, recorded, watched on the next build.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
