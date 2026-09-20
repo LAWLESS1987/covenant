@@ -6739,9 +6739,18 @@ had been stale since the Ollama removal of 2026-09-12 and the 09-19 core
 commits, the M53 failure, which is why the restart script had refused with
 "hash mismatch" and "test_p15 missing" before any restart could happen. Not
 fixed: nothing stops a second tree on this machine from launching nodes on
-the production ports. Proposed, not done: the launch scripts should refuse
-to start a node whose port is held by a process outside their own tree. A
-reviewer's machine has no mesh and is not affected.
+the production ports. Done instead, the same evening, on the operator's word ("separate nodes
+for each"): the artifact tree now runs its own mesh block, 6000/6020/6060
+(P2P +1, bridge +11), every node table, launch script, gate, guard and
+exposure check moved together and proven to agree by its
+`test_3node_config.py` (11/11); this tree keeps 5000/5020/5060, so the two
+cannot collide on one machine. The move exposed two artifact suites whose
+"offline" checks had been answered by THIS mesh on the old ports -- one of
+them, `test_watchdog_outage.py`, had been mining this system's pending pool
+on every artifact sweep through the watchdog's un-stubbed pool tender.
+Both are offline in fact now; the artifact's final sweep reads RESULT PASS,
+124 suites, 3,406 checks, 0 failed. A reviewer's machine has no mesh and
+was never affected.
 
 ---
 
