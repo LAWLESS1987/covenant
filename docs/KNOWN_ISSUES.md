@@ -6282,6 +6282,42 @@ tracked; both change what "tracked" means here.
 **Repro:** `python test_h1_highway.py` (H1x); `git log --oneline -3` after
 any full commit shows no separate "Manifest:" commit.
 
+### A156. [record / phone] The app learns from use and talks in a stream: what shipped 2026-09-19, what it keeps, what it never sends, and what is NOT measured
+
+**His decisions, in his words.** "The recipes should be learned when I use
+the apps and phone, just don't expose any personal stuff that could be
+leveraged against me"; asked for a bound: "no bound but mutual benefit";
+"refine the app for an interface closer to the claude apps for ease of use".
+App commit `56185dc`.
+
+**Learn from use.** `CovenantActuator.observe()`: in any app (not only the
+green-lit ones), the same capture Record uses — view id, label, description,
+class, ordinal. Never typed text (a slot, as Record already did); never a
+password field (`isPassword`, skipped outright); no OCR of the screen while
+observing. A draft with source `observed` under `files/recipes`, at most 20
+(oldest forgotten), closed when he leaves the app, after two minutes idle,
+or at 60 steps; drafts with fewer than two actions are not kept. Recipes
+shows them under their own heading with **Keep** (source becomes `phone`)
+and **Forget all**. The brain never runs one: it starts nothing without a
+charter, and a draft has none. `entry.learn_payload` skips every observed
+draft — M5.37, driven both ways — so nothing about them leaves the phone
+until he keeps one. Switch in Settings, default on. Cost: one tree read per
+tap while he uses the phone; up to 20 small files.
+
+**Chat-first.** One stream and one box; what he types is judged by the
+node's own gate (`entry.judge_text`) and the answer lands in the stream under
+a status line and the last lines the node and the PC exchanged. Start/Stop
+is one header button. The old form is a Settings screen. M5.7i now reads
+every Activity. 280/280.
+
+**NOT measured.** No Android toolchain here: the runner is the compiler, and
+`java_syntax_check.py` is a heuristic. Whether the new screens render as
+intended is his eyes on the phone. Whether observation costs battery is not
+measured; the heartbeat's battery field is where it would show. Modules a
+named app's keyboard package uses are excluded by three substrings
+(`inputmethod`, `honeyboard`, `keyboard`); a keyboard named otherwise would
+be observed as an app — its typed text still never kept.
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
