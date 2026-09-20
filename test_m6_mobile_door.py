@@ -91,6 +91,11 @@ def main():
     m = fresh_master()
     client = m.api.app.test_client()
     PHONE_ADDR, LAN_ADDR = "100.86.158.1", "192.168.1.50"
+    # The ask log is chat MEMORY (ops/chat/ask_log.jsonl); this suite wrote 24
+    # sample asks into the real one on 2026-09-19. Redirected for the run, and
+    # the model is a stub: no weights are needed to drive the door.
+    os.environ["COVENANT_ASK_LOG"] = tempfile.mktemp(suffix="_m6_asklog.jsonl")
+    os.environ["COVENANT_MODEL_STUB"] = "1"
 
     # ---- M6b: the page a tailnet browser gets ---------------------------
     r = get(client, "/m", PHONE_ADDR)
@@ -324,6 +329,30 @@ def main():
     r = get(client, "/m/students", LAN_ADDR)
     check("M6p /m/students refuses a LAN address 403 and records it",
           r.status_code == 403 and refusals(m, "mobile_page_refused") == before + 1, f"got {r.status_code}")
+
+    # ---- M6q (2026-09-19): the agent door, its leash and its gate (stub model)
+    r = post(client, "/m/agent", PHONE_ADDR, {"text": "what is two plus two"})
+    j = r.get_json() or {}
+    check("M6q /m/agent from the tailnet answers 200 with the answer, the verdict and the model's cost",
+          r.status_code == 200 and j.get("status") == "success" and "answer" in j and "admitted" in j
+          and "withheld" in j and "ms" in j and j.get("model") == "stub", f"{r.status_code} {sorted(j)}")
+    r = post(client, "/m/agent", LAN_ADDR, {"text": "hello"})
+    check("M6q /m/agent refuses a LAN address 403", r.status_code == 403, f"got {r.status_code}")
+    check("M6q the leash: an https URL on a listed host passes, a subdomain of one passes",
+          cov._agent_fetch_ok("https://github.com/LAWLESS1987/covenant") and cov._agent_fetch_ok("https://api.github.com/x"))
+    check("M6q the leash: http, an unlisted host, a look-alike host and junk are refused",
+          not cov._agent_fetch_ok("http://github.com/x") and not cov._agent_fetch_ok("https://example.com/")
+          and not cov._agent_fetch_ok("https://github.com.evil.io/x") and not cov._agent_fetch_ok("not a url"))
+    txt, note = cov._agent_fetch("https://example.com/")
+    check("M6q an off-list fetch is refused before any network, with no text", txt == "" and note.startswith("refused"), note)
+    log_rows = []
+    try:
+        with open(os.environ["COVENANT_ASK_LOG"], "r", encoding="utf-8") as fh:
+            log_rows = [json.loads(l) for l in fh if l.strip()]
+    except OSError:
+        pass
+    check("M6q every ask and agent exchange went to the redirected memory log, none to the real one",
+          any(x.get("kind") == "agent" for x in log_rows) and any(x.get("kind") == "ask" for x in log_rows), len(log_rows))
 
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")

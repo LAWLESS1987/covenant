@@ -337,3 +337,10 @@ tools/platform-tools/
 # sitting untracked next to the real records, which is how something that
 # should never have been committed eventually is (the A85 lesson).
 ops/_*
+
+# local open-source model runtime and weights (2026-09-19): never tracked, never shipped
+tools/llama/
+models/
+*.gguf
+ops/model_server.json
+logs/model_server.log
