@@ -1,8 +1,8 @@
 {
- "when": "2026-09-19T07:51:59Z",
+ "when": "2026-09-20T07:54:33Z",
  "digests": {
-  "ora": "bbdc4590aeae",
-  "sena": "3e9fcfda3eb2"
+  "ora": "f461925a808c",
+  "sena": "d3d138616229"
  },
  "conditions": {
   "exam_met_streak": {
@@ -16,22 +16,22 @@
    "met": true
   },
   "holdout_decided_min": {
-   "measured": 0.717,
+   "measured": 0.7358,
    "bar": 0.75,
    "met": false
   },
   "panel_coverage_min": {
-   "measured": 0.0979,
+   "measured": 0.1448,
    "bar": 0.9,
    "met": false
   },
   "own_traffic_hold_max": {
-   "measured": 0.0,
+   "measured": 0.99,
    "bar": 0.05,
-   "met": true
+   "met": false
   }
  },
- "met_count": 2,
+ "met_count": 1,
  "of": 5,
  "exam_streak": 0,
  "streak": 0,
@@ -79,6 +79,11 @@
   {
    "when": "2026-09-19T07:51:59Z",
    "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-20T07:54:33Z",
+   "met_count": 1,
    "streak": 0
   }
  ]
