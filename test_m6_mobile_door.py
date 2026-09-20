@@ -96,6 +96,7 @@ def main():
     # the model is a stub: no weights are needed to drive the door.
     os.environ["COVENANT_ASK_LOG"] = tempfile.mktemp(suffix="_m6_asklog.jsonl")
     os.environ["COVENANT_MODEL_STUB"] = "1"
+    os.environ["COVENANT_IMAGE_STUB"] = "1"
 
     # ---- M6b: the page a tailnet browser gets ---------------------------
     r = get(client, "/m", PHONE_ADDR)
@@ -353,6 +354,18 @@ def main():
         pass
     check("M6q every ask and agent exchange went to the redirected memory log, none to the real one",
           any(x.get("kind") == "agent" for x in log_rows) and any(x.get("kind") == "ask" for x in log_rows), len(log_rows))
+
+    # ---- M6r (2026-09-19): the image door -- the prompt is judged, the PNG comes back (stub model)
+    r = post(client, "/m/image", PHONE_ADDR, {"prompt": "a small mountain station at dusk, one lamp"})
+    check("M6r /m/image from the tailnet answers a PNG for a clean prompt",
+          r.status_code == 200 and r.headers.get("Content-Type") == "image/png" and r.get_data()[:8] == b"\x89PNG\r\n\x1a\n",
+          f"{r.status_code} {r.headers.get('Content-Type')}")
+    r = post(client, "/m/image", LAN_ADDR, {"prompt": "x"})
+    check("M6r /m/image refuses a LAN address 403", r.status_code == 403, f"got {r.status_code}")
+    r = post(client, "/m/image", PHONE_ADDR, {"prompt": "   "})
+    check("M6r an empty prompt is refused 400", r.status_code == 400, f"got {r.status_code}")
+    check("M6r the page carries the Draw control and posts to /m/image",
+          'id="draw"' in get(client, "/m", PHONE_ADDR).get_data(as_text=True) and "/m/image" in get(client, "/m", PHONE_ADDR).get_data(as_text=True))
 
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")

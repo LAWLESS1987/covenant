@@ -598,7 +598,9 @@ MOBILE_PAGE_HTML = """<!doctype html>
 <div class="card"><h2>ask</h2><div id="talk"></div>
  <label style="display:block;color:#7d8896;font-size:12px;margin-bottom:4px"><input type="checkbox" id="agent"> ask the model on this PC (its answer is judged first; one leashed page fetch)</label>
  <textarea id="say" rows="3" placeholder="Ask, paste, or judge a text" style="width:100%;box-sizing:border-box;background:#0b0f14;color:#e6edf3;border:1px solid #30363d;border-radius:10px;padding:10px;font:inherit;margin-top:6px"></textarea>
- <a class="btn" href="#" id="send">Send</a></div>
+ <a class="btn" href="#" id="send">Send</a>
+ <a class="btn ghost" href="#" id="draw">Draw it (the prompt is judged first; tens of seconds on this CPU)</a>
+ <div id="pic"></div></div>
 
 <div class="card"><h2>this node</h2><div id="health">reading /health &hellip;</div>
  <ul id="warns"></ul></div>
@@ -701,6 +703,23 @@ function say(){
   return false;
 }
 document.getElementById('send').onclick = say;
+function draw(){
+  var box = document.getElementById('say'), t = box.value.trim(), pic = document.getElementById('pic');
+  if (!t) return false;
+  pic.innerHTML = '<div class="row"><span>drawing</span><span>' + esc(t.slice(0, 120)) + ' ...</span></div>';
+  fetch('/m/image', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prompt: t})})
+    .then(function(r){
+      if (r.headers.get('Content-Type') === 'image/png') return r.blob().then(function(b){ return {png: b, ms: r.headers.get('X-Covenant-Ms')}; });
+      return r.json();
+    })
+    .then(function(j){
+      if (j.png) { pic.innerHTML = '<img src="' + URL.createObjectURL(j.png) + '" style="width:100%;border-radius:10px;margin-top:8px">' + row('made in', j.ms + ' ms'); }
+      else { pic.innerHTML = '<div class="row"><span>' + esc(j.status || 'error') + '</span><span class="warn">' + esc(j.message || '') + '</span></div>'; }
+    })
+    .catch(function(e){ pic.innerHTML = '<div class="row"><span>error</span><span class="bad">' + esc(String(e)) + '</span></div>'; });
+  return false;
+}
+document.getElementById('draw').onclick = draw;
 phoneCard(); paint();
 setInterval(paint, 20000); setInterval(tick, 5000);
 </script>
@@ -8299,6 +8318,63 @@ class CovenantAPI:
                             "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
                             "judge": getattr(result, "judge_id", "") if result is not None else "",
                             "model": meta.get("model"), "tokens": meta.get("tokens"), "ms": meta.get("ms"), "fetches": fetches})
+
+        # THE IMAGE (2026-09-19, "there has to be a image creation open
+        # source we can take and improve on"). The PROMPT is judged by the
+        # sentinel first -- a refused prompt never reaches the model -- then
+        # covenant_image makes one 512x512 PNG on this CPU and the bytes are
+        # returned. The image itself is not judged, and this says so. Same
+        # door, same limiter. Slow by nature: tens of seconds, and the
+        # language model is put away first when memory is short.
+        @self.app.route("/m/image", methods=["POST"])
+        def mobile_image():
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("mobile_page_refused", addr or "unknown")
+                return (jsonify({"status": "error", "message": "this door answers the tailnet only -- you are %s" % (addr or "unknown")}), 403)
+            now_ = time.time()
+            recent = [t for t in _ask_log.get(addr, []) if now_ - t < 600]
+            if len(recent) >= 30:
+                _ask_log[addr] = recent
+                return (jsonify({"status": "error", "message": "30 asks in 10 minutes -- wait"}), 429)
+            body = request.get_json(silent=True)
+            prompt = str(body.get("prompt", "") if isinstance(body, dict) else "")[:500]
+            if not prompt.strip():
+                return (jsonify({"status": "error", "message": "nothing to draw"}), 400)
+            recent.append(now_)
+            _ask_log[addr] = recent
+            sentinel = getattr(self.node, "sentinel", None)
+            if sentinel is None:
+                return (jsonify({"status": "error", "message": "no sentinel on this node"}), 503)
+            tx = Transaction(sender_pubkey="shared", receiver="collective",
+                             data={"origin": "human", "kind": "image_prompt", "message": prompt}, amount=0.0, benefit_score=0.5)
+            try:
+                ok2, message, _benefit, result = sentinel.evaluate_transaction(tx)
+            except Exception as e:                                # noqa: BLE001
+                return (jsonify({"status": "error", "message": "could not judge the prompt: %s: %s" % (type(e).__name__, e)}), 500)
+            alleges_nothing = bool(result is not None and not ok2 and (
+                getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
+            if not ok2 and not alleges_nothing:
+                try:
+                    _ask_log_row({"kind": "image", "from": addr, "text": prompt, "refused": True, "message": str(message)[:2000]})
+                except Exception:                                 # noqa: BLE001
+                    pass
+                return (jsonify({"status": "refused", "message": str(message)[:2000],
+                                 "judge": getattr(result, "judge_id", "") if result is not None else ""}), 403)
+            try:
+                _im = importlib.import_module("covenant_image")
+                path, meta = _im.generate(prompt)
+            except Exception as e:                                # noqa: BLE001
+                return (jsonify({"status": "error", "message": "no image: %s: %s" % (type(e).__name__, str(e)[:300])}), 503)
+            try:
+                _ask_log_row({"kind": "image", "from": addr, "text": prompt, "refused": False, "held": alleges_nothing,
+                              "file": os.path.basename(path), "model": meta.get("model"), "ms": meta.get("ms")})
+            except Exception:                                     # noqa: BLE001
+                pass
+            with open(path, "rb") as fh:
+                png = fh.read()
+            return (png, 200, {"Content-Type": "image/png", "X-Covenant-Ms": str(meta.get("ms", 0)),
+                               "X-Covenant-Model": str(meta.get("model", "")), "Cache-Control": "no-store"})
 
         # THE STUDENTS' PAST WORK (2026-09-19, "cross reference with ... our
         # students past work"). Text, tailnet-gated like /m: the tail of each

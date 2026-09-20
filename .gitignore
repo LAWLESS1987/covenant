@@ -344,3 +344,6 @@ models/
 *.gguf
 ops/model_server.json
 logs/model_server.log
+tools/sd/
+*.safetensors
+ops/images/
