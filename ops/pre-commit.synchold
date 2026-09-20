@@ -19,28 +19,43 @@
 # live version, or a copy this repository does not track, is REPORTED at length
 # and left alone -- never silently flattened. Every path below ends `exit 0`.
 #
-# It regenerates MANIFEST.sha256 ONLY when it actually changed a file, because a
-# file it changed would otherwise fail launch_check G1 in the very commit this
-# hook was trying to help. It deliberately does NOT rewrite the manifest on every
-# commit: verify_bundle hashes the WORKING TREE, so on a partial commit
-# (`git add -p`) that would record a manifest describing content the commit does
-# not contain, which is a worse bug than the one this fixes.
+# ORDER MATTERS (2026-09-19). Three steps, in this order, because each one
+# changes what the next one hashes:
+#   1. sync the held core copy (only when the core is in this commit);
+#   2. stage any held copy that differs from the index -- twice now a copy was
+#      synced into the working tree and never staged (7ffa73b, 171fb86),
+#      because the sync tool says "in sync" about a file the INDEX has never
+#      seen;
+#   3. regenerate MANIFEST.sha256 on every FULL commit -- one where no staged
+#      file also has unstaged changes -- under the rule this hook always had:
+#      never describe content the commit does not contain. On a partial
+#      commit (`git add -p`) the manifest is left alone and the hook says so.
+#      Before this, every ordinary commit left the manifest one step behind,
+#      the highway's manifest_stale fired after each, and a person ran
+#      `verify_bundle.py --write` by hand and committed "Manifest: ..." after
+#      every change (A155).
+#   Not measured here and said so: tracked files the running system rewrites
+#   (fallback_model.json, ops/verdicts.jsonl ...) are hashed as they are on
+#   disk, exactly as the hand-run did.
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root" 2>/dev/null || exit 0
 
-# THE MANIFEST, ON EVERY FULL COMMIT (2026-09-19, "should stay green during
-# updates"). The rule above -- never describe content the commit does not
-# contain -- is kept exactly, and applied where it bites: a PARTIAL commit is
-# one where some staged file also has unstaged changes. When no staged file
-# does, the working tree IS the commit for every file this commit touches, and
-# the manifest written now describes them truthfully. Every other commit today
-# left MANIFEST.sha256 one step behind, the highway's manifest_stale fired
-# after each one, and its rehash remedy was quarantined -- so the fix was a
-# person running `verify_bundle.py --write` by hand and committing "Manifest:
-# ..." after every change. Not measured here and said so: tracked files the
-# running system rewrites (fallback_model.json, ops/verdicts.jsonl ...) are
-# hashed as they are on disk, exactly as the hand-run did.
+rc=0
+if git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"; then
+  # ---- 1. the held copy follows the core, in the same commit
+  out=$(python covenant_sync_held_core.py 2>&1)
+  rc=$?
+  echo "$out" | sed 's/^/pre-commit: /'
+  # ---- 2. a held copy the index has not seen is staged, whatever the tool said
+  for f in $(git ls-files 'pending-*/covenant_unified_v8.py' 2>/dev/null); do
+    if ! git diff --quiet -- "$f" 2>/dev/null; then
+      git add -- "$f" 2>/dev/null && echo "pre-commit: staged $f into this commit"
+    fi
+  done
+fi
+
+# ---- 3. the manifest, on every full commit
 staged=$(git diff --cached --name-only 2>/dev/null)
 if [ -n "$staged" ]; then
   partial=""
@@ -55,29 +70,6 @@ if [ -n "$staged" ]; then
     if ! git diff --quiet -- MANIFEST.sha256 2>/dev/null; then
       git add -- MANIFEST.sha256 2>/dev/null && echo "pre-commit: MANIFEST.sha256 regenerated and staged (full commit)"
     fi
-  else
-    echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write' yourself" >&2
-  fi
-fi
-
-# Only when the core itself is part of this commit. A commit that does not touch
-# the core cannot have broken the rule, and a hook that runs a scan on every
-# commit for nothing is a hook that gets deleted too.
-if ! git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"; then
-  exit 0
-fi
-
-out=$(python covenant_sync_held_core.py 2>&1)
-rc=$?
-echo "$out" | sed 's/^/pre-commit: /'
-
-if echo "$out" | grep -q "^  re-synced"; then
-  echo "$out" | grep "^  re-synced" | awk '{print $2}' | while read -r f; do
-    git add -- "$f" 2>/dev/null && echo "pre-commit: staged $f into this commit"
-  done
-  if python verify_bundle.py --write >/dev/null 2>&1; then
-    git add -- MANIFEST.sha256 2>/dev/null
-    echo "pre-commit: MANIFEST.sha256 regenerated and staged (a file changed, so G1 would have blocked)"
   else
     echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write' yourself" >&2
   fi
