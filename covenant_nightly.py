@@ -56,6 +56,11 @@ REPORT = os.path.join(HERE, "ops", "NIGHTLY.md")
 GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_f3_gate_end_to_end.py", "test_f4_capability.py",
                 "test_f5_reserve.py", "test_f6_stuffing.py", "test_f7_caps.py", "test_g12_inflight.py", "test_purge_tool.py", "test_gate_proxy.py", "test_sentinel_gate.py",
+                # A163 (2026-09-20): a promotion regressed A126's two disposition
+                # claims (previous student 13/13, promoted student 11/13) and the
+                # green check never ran the suite, so the nightly said PROMOTED
+                # over a red it could not see. It runs here now, after the cycle.
+                "test_a126_seat_dispositions.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",

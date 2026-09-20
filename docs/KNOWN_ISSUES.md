@@ -6707,6 +6707,37 @@ or more memory.
 
 ---
 
+### A163. [learning / the promotion gate] A promotion regressed two pinned disposition claims and the nightly said PROMOTED over a red it never ran. FOUND 2026-09-20 in the SaTC artifact's sweep; the suite now runs in the nightly's green check
+
+**Measured.** `test_a126_seat_dispositions.py` pins two empirical claims about
+the deployed student: a margin of 3.5 buys nothing for free, and coverage 0.80
+reduces false convictions at a stated price. Hypothesis: the student promoted
+by the 2026-09-20 nightly flipped them. Test, same day, same tree: the suite
+against the previous `fallback_model.json` (commit `ddc7775`) and against the
+promoted one. Result: previous 13/13, promoted 11/13 (a margin of 3.5 now
+costs one right answer; coverage 0.80 costs two). The promotion gate checks
+the exam (no false clean, holds no clean case) and the held-out record; it
+did not run A126, and `verify_green` did not list it, so the pass reported
+green on the checks it ran and never saw this one.
+
+**Fixed, narrowly.** A126 is now in `covenant_nightly.GREEN_SUITES`, so a
+promotion that regresses it turns the pass NOT GREEN the same night. The
+claims themselves are left as they are and the suite is left red until the
+student meets them again or the claims are re-measured and re-stated; the
+check is not moved.
+
+**Also on the way, and worth stating.** The judge evaluation written for the
+artifact (`tools/judge_eval.py` there) adds the control the earlier numbers
+lacked: a naive Bayes over the same bag of words, trained on the same folds,
+that must decide. Measured: it clears 22.9% of labelled violations (95% CI
+20.9–24.8) and convicts 19.2% of clean memos; the student, with abstention,
+clears 3.2% (2.4–4.1) and convicts 14.0% of the clean memos it decides while
+abstaining on 31.4%. Abstention buys a seven-fold cut in false clears and
+fewer false convictions, and costs the 31.4% it declines to decide. That is
+the number to quote for what the hold is worth.
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
