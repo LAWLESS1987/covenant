@@ -481,6 +481,19 @@ CORE_SOURCE_SHA256, CORE_SOURCE_LINES, CORE_SOURCE_UNREADABLE = \
     _core_source_fingerprint()
 CORE_SOURCE_SHA12 = CORE_SOURCE_SHA256[:12]
 
+
+def _imports_fingerprint():
+    """The PC-only import-set fingerprint (A153), or "" where the watchdog is
+    not shipped (the phone). Additive: CORE_SOURCE_* keep their meaning."""
+    try:
+        import importlib
+        return str(importlib.import_module("covenant_watchdog").disk_imports_sha12() or "")
+    except Exception:                      # noqa: BLE001 -- absent module, unreadable tree
+        return ""
+
+
+IMPORTS_SHA12 = _imports_fingerprint()
+
 # THE PHONE'S PAGE (2026-09-16). Served by /m to a tailnet caller. It is one
 # self-contained file with no external asset: dashboard.html needs a 670 KB
 # WebGL library from disk, which is why it was never a thing a phone could
@@ -9030,6 +9043,7 @@ class CovenantAPI:
                 "wsgi": self.wsgi_backend,                            # W1 (v8.29)
                 "version": COVENANT_VERSION,                          # P11 (v8.31)
                 "source_sha256": CORE_SOURCE_SHA12,                   # P11 (v8.31)
+                "imports_sha12": IMPORTS_SHA12,                       # A153: the modules it imported at start
                 "source_lines": CORE_SOURCE_LINES,                    # P11 (v8.31)
                 "substrate": self.node.substrate.snapshot(),          # P12 (v8.32)
                 "mesh": self.node.peer_state.summary(),               # A20 (v8.33)

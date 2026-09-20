@@ -242,8 +242,9 @@ def restart_one(node, want_sha, say):
 
 def status(say=print):
     want = disk_sha()
-    say("disk source: %s" % want)
     import covenant_watchdog as W
+    wimp = W.disk_imports_sha12()
+    say("disk source: %s   imports: %s (%d modules)" % (want, wimp, len(W.runtime_import_set())))
     for node in W.NODES:
         state, h = probe(node["port"])
         if state == "rate_limited":
@@ -264,7 +265,7 @@ def status(say=print):
         src = str(h.get("source_sha256", ""))[:12]
         say("  node %-2s port %-5d height %-4s peers %-2s source %s  %s" % (
             node["id"], node["port"], h.get("chain_height"), h.get("peers"), src,
-            "on the disk source" if src == want else "STALE -- restart would pick up %s" % want))
+            W.source_verdict(h, want, wimp)))
     return 0
 
 
@@ -287,7 +288,9 @@ def main(argv=None):
             return 2
 
     print("rolling restart -- one at a time, each proved back before the next")
-    print("disk source: %s" % want)
+    import covenant_watchdog as _W
+    wimp = _W.disk_imports_sha12()
+    print("disk source: %s   imports: %s" % (want, wimp))
     print("order: %s" % " then ".join(ids))
     print("")
 
@@ -307,8 +310,8 @@ def main(argv=None):
             print("     Not restarting it on an unread answer. Wait and run again.")
             skipped.append(i)
             continue
-        if state == "up" and not a.all and not a.only and str(h.get("source_sha256", ""))[:12] == want:
-            print("  node %s is already on the disk source; leaving it alone" % i)
+        if state == "up" and not a.all and not a.only and str(h.get("source_sha256", ""))[:12] == want and (wimp is None or str(h.get("imports_sha12") or "")[:12] == wimp):
+            print("  node %s is already on the disk source, imports current; leaving it alone" % i)
             skipped.append(i)
             continue
         if not restart_one(node, want, print):

@@ -6212,8 +6212,23 @@ That is a refinement of a check, not a new capability, but it changes what
 in passing here. Until then: after committing a change to a module the node
 imports, restart; do not read `--status` as proof it is running.
 
+**FIXED 2026-09-19 21:30 — additively.** `disk_source_sha12` keeps its
+meaning (thirty-odd consumers, and the phone ships a subset of the tree, so
+a wider hash there would fake a mesh split). Beside it,
+`covenant_watchdog.runtime_import_set()` names the modules the node file and
+launcher import — by discovery over their text, `import covenant_x` and
+`import_module("covenant_x")`, fifteen on this tree — and
+`disk_imports_sha12()` hashes them as (name, bytes). The node computes the
+same at start and reports it in `/health` as `imports_sha12` (empty on the
+phone, where the watchdog is not shipped). `rolling_restart.py --status`
+prints both and says *IMPORTS STALE ... (A153)* when a named module changed;
+its leave-alone decision reads the field too, and a node that reports no
+field is stale, not silently current. One level deep by design and by
+docstring. `test_a153_import_drift.py` (14 checks, both ways) is in the
+sweep.
+
 **Repro:** `python rolling_restart.py --status` after editing a comment in
-`covenant_daily_plan.py` — it will still say *on the disk source*.
+`covenant_daily_plan.py` — it now says *IMPORTS STALE*.
 
 ### A154. [minor / phone] The app's Dashboard button opened a path the core does not serve. FIXED 2026-09-19 (ships in the next app build)
 
@@ -6229,8 +6244,43 @@ measured from the PC; the PC node runs the same core.
 
 **Fix.** The button opens `/m`. M5.7i (text check) holds every loopback path
 the main screen opens in a browser to a route the core registers; it failed
-against the old button and passes against the new one. Ships as the app
-commit after `7119105`.
+against the old button and passes against the new one. Shipped in
+`ebc33ea`, on the phone at 21:27:00.
+
+### A155. [serious / self-heal] Every update-time remedy was quarantined by its own correct refusals, so the self-heal sat inert on the conditions it exists for. FIXED 2026-09-19
+
+**Measured.** Today's highway ledger: `manifest_stale` fired 9 times,
+`sweep_red` 9, `source_drift` 2 — every one *refused: quarantined: measured
+not fixing it 2 times*. The rows that earned each quarantine: `rehash_bundle`
+twice said *the tree has uncommitted tracked changes* and did nothing
+(2026-09-16); `restart_nodes` said *already on the disk source; leaving it
+alone* and did nothing (2026-09-17); `rerun_unclean` re-ran one genuinely
+red suite, written twice in the same second. The grader asked one question —
+is the condition still PRESENT afterwards? — and a remedy that had
+*declined* was scored exactly like one that had *run and failed*. Two such
+rows and the remedy was refused for good. A153's stale import and every
+stale manifest today were conditions the highway saw and would not touch.
+
+**Fix.** `apply_remedy` grades a remedy that returned `ran=False` as
+**held** — condition and reason on the record — and `quarantined()` does not
+count it; *did not fix* is reserved for a remedy that ran and left the
+condition standing. H1x pins it both ways, and breaking the branch fails H1x
+(measured). The three quarantines were cleared with `recalibrate()` rows that
+say why, on the ledger; nothing was deleted.
+
+**The manifest, at the source.** The pre-commit hook now regenerates
+`MANIFEST.sha256` on every *full* commit — one where no staged file also has
+unstaged changes — under the same rule it always had (never describe content
+the commit does not contain), applied where it bites. Partial commits are
+left alone and say so. Not fixed, and his decision: tracked files the
+running system rewrites (`fallback_model.json`, `ops/verdicts.jsonl`,
+`ops/NIGHTLY.md`, `dashboard.html` ...) are dirty every day, so the manifest
+describes the disk rather than any commit for those, exactly as the hand-run
+did all day. Either they get a nightly state commit or they stop being
+tracked; both change what "tracked" means here.
+
+**Repro:** `python test_h1_highway.py` (H1x); `git log --oneline -3` after
+any full commit shows no separate "Manifest:" commit.
 
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
@@ -6661,6 +6711,15 @@ the staged-build guard stops the triple download seen with `65bc28b`. The
 phone got there on its own. Next: the build carrying the fallback and the
 Dashboard fix (`ebc33ea`) is the first that should arrive with no prompt AND
 no refusal. Its heartbeat decides.
+
+**CLOSED END TO END (21:28:31).** Build `ebc33ea` — the fallback and the
+Dashboard fix — was downloaded at 21:25:27 (attempt 1 of 6) and installed
+silently at 21:27:00: no prompt, no refusal, no second download. The 21:28:31
+check-in reads `build ebc33ea installer org.covenant.node`. Three builds
+today, three different routes: one hand tap (`65bc28b`), one silent install
+after one refusal (`7119105`), one clean silent install (`ebc33ea`). The
+fallback shipped in that last build has not yet been exercised by a real
+refusal; M5.7j holds its shape until one comes.
 
 **Repro:** `python covenant_app_update.py --futility`
 

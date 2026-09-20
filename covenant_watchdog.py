@@ -458,6 +458,73 @@ def disk_source_sha12(path=None):
         return None
 
 
+# THE MODULES THE NODE FILE NAMES (2026-09-19, A153). disk_source_sha12 above
+# hashes covenant_unified_v8.py alone, and that is what every consumer of
+# "source" means -- the phone ships a subset of this tree, so a wider hash
+# there would fake a mesh split. But the node imports PC-only modules at
+# start (covenant_daily_plan, covenant_app_update, covenant_highway ...) and
+# runs the bytes it imported until restarted: on 2026-09-19 all three nodes
+# ran a 240-character cap that no file on disk contained for three hours
+# while rolling_restart --status said "on the disk source". This is a SECOND
+# fingerprint, additive, over the modules the node file and the launcher name
+# by discovery -- an `import covenant_x` or `import_module("covenant_x")`
+# in their text -- hashed as (name, bytes) for each that exists on disk. It
+# is one level deep on purpose: what those modules import in turn is not
+# read, and the docstring says so rather than pretending.
+_IMPORT_PAT = None
+
+
+def runtime_import_set(root=None):
+    """Sorted module names the node file and launcher name, by discovery."""
+    global _IMPORT_PAT
+    import re
+    if _IMPORT_PAT is None:
+        _IMPORT_PAT = re.compile(r'(?:^|\s)(?:import|from)\s+(covenant_[a-z0-9_]+)|import_module\("(covenant_[a-z0-9_]+)"\)', re.M)
+    root = root or HERE
+    names = set()
+    for fn in ("covenant_unified_v8.py", "run_node.py"):
+        try:
+            with open(os.path.join(root, fn), "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        for a, b in _IMPORT_PAT.findall(text):
+            n = a or b
+            if n and n != "covenant_unified_v8":
+                names.add(n)
+    return sorted(names)
+
+
+def disk_imports_sha12(root=None):
+    """First 12 hex of sha256 over (name, bytes) of each named module on disk, or None."""
+    root = root or HERE
+    h = hashlib.sha256()
+    seen = 0
+    for n in runtime_import_set(root):
+        p = os.path.join(root, n + ".py")
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        h.update(n.encode("utf-8") + b"\0" + raw + b"\0")
+        seen += 1
+    return h.hexdigest()[:12] if seen else None
+
+
+def source_verdict(h, want, wimp):
+    """One line for a live node's health against the disk: source, then imports."""
+    src = str(h.get("source_sha256", ""))[:12]
+    if src != want:
+        return "STALE -- restart would pick up %s" % want
+    if wimp is None:
+        return "on the disk source"
+    imp = str(h.get("imports_sha12") or "")[:12]
+    if imp == wimp:
+        return "on the disk source, imports current"
+    return "on the disk source but IMPORTS STALE (%s on disk) -- a module it imports changed; restart (A153)" % wimp
+
+
 def source_drift_report(states, on_disk):
     """(alerts, infos) for the deployed-vs-running comparison.
 

@@ -302,6 +302,30 @@ def main():
         check("H1o mutation: graded on the spot, two runs quarantine it",
               H.quarantined("_fixture_async", led))
 
+        # ---- H1x (2026-09-19): a remedy that DECLINES is graded "held", never
+        # "did not fix". Every quarantine in the live ledger that day was a
+        # correct refusal graded as a failure (rehash_bundle: "uncommitted
+        # tracked changes"; restart_nodes: "already on the disk source").
+        H.REMEDIES["_fixture_decline"] = {"fn": lambda m, dry_run=False: (False, "declined: the tree is dirty"),
+                                          "klass": H.AUTO_REVERSIBLE, "for": ["log_bloat"], "kind": "stateless",
+                                          "touches": ["nothing"],
+                                          "benefit": {"gains": ["x"], "cost": ["y"], "irreversible": []}}
+        led2 = tmp_ledger()
+        d1 = H.apply_remedy("_fixture_decline", present(), "log_bloat", dry_run=False, ledger=led2, choices={}, cooldown_s=0)
+        d2 = H.apply_remedy("_fixture_decline", present(), "log_bloat", dry_run=False, ledger=led2, choices={}, cooldown_s=0)
+        check("H1x a remedy that returns ran=False is graded 'held', with the condition still on the record",
+              d1["outcome"] == "held" and d2["outcome"] == "held" and d1.get("after") == H.PRESENT and d1.get("ran") is False,
+              (d1.get("outcome"), d1.get("after"), d1.get("ran")))
+        check("H1x ...and two declines do not quarantine it", not H.quarantined("_fixture_decline", led2))
+        # MUTATION: the same remedy claiming it RAN (True) with the condition still
+        # PRESENT is the real failure, graded as before, and two of them quarantine.
+        H.REMEDIES["_fixture_decline"]["fn"] = lambda m, dry_run=False: (True, "ran, changed nothing")
+        m1 = H.apply_remedy("_fixture_decline", present(), "log_bloat", dry_run=False, ledger=led2, choices={}, cooldown_s=0)
+        H.apply_remedy("_fixture_decline", present(), "log_bloat", dry_run=False, ledger=led2, choices={}, cooldown_s=0)
+        check("H1x mutation: ran=True with the condition still PRESENT is 'did not fix', and two of them quarantine",
+              m1["outcome"] == "did not fix" and H.quarantined("_fixture_decline", led2), m1.get("outcome"))
+        H.REMEDIES.pop("_fixture_decline", None)
+
         # The same function, graded differently per condition: synchronous for
         # one, asynchronous for the other. fetch_build is both -- it clears
         # build_stale_on_pc at once, and phone_build_behind_core only after the

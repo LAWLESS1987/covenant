@@ -29,6 +29,37 @@
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root" 2>/dev/null || exit 0
 
+# THE MANIFEST, ON EVERY FULL COMMIT (2026-09-19, "should stay green during
+# updates"). The rule above -- never describe content the commit does not
+# contain -- is kept exactly, and applied where it bites: a PARTIAL commit is
+# one where some staged file also has unstaged changes. When no staged file
+# does, the working tree IS the commit for every file this commit touches, and
+# the manifest written now describes them truthfully. Every other commit today
+# left MANIFEST.sha256 one step behind, the highway's manifest_stale fired
+# after each one, and its rehash remedy was quarantined -- so the fix was a
+# person running `verify_bundle.py --write` by hand and committing "Manifest:
+# ..." after every change. Not measured here and said so: tracked files the
+# running system rewrites (fallback_model.json, ops/verdicts.jsonl ...) are
+# hashed as they are on disk, exactly as the hand-run did.
+staged=$(git diff --cached --name-only 2>/dev/null)
+if [ -n "$staged" ]; then
+  partial=""
+  for f in $(git diff --name-only 2>/dev/null); do
+    for g in $staged; do
+      [ "$f" = "$g" ] && partial="$partial $f"
+    done
+  done
+  if [ -n "$partial" ]; then
+    echo "pre-commit: manifest left alone -- partially staged:$partial (run 'python verify_bundle.py --write' after the commit)"
+  elif python verify_bundle.py --write >/dev/null 2>&1; then
+    if ! git diff --quiet -- MANIFEST.sha256 2>/dev/null; then
+      git add -- MANIFEST.sha256 2>/dev/null && echo "pre-commit: MANIFEST.sha256 regenerated and staged (full commit)"
+    fi
+  else
+    echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write' yourself" >&2
+  fi
+fi
+
 # Only when the core itself is part of this commit. A commit that does not touch
 # the core cannot have broken the rule, and a hook that runs a scan on every
 # commit for nothing is a hook that gets deleted too.

@@ -1341,6 +1341,21 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
                    note="asynchronous -- the condition is re-measured next pass")
         return write_ledger(row, ledger)
     after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
+    # A REMEDY THAT DECLINED IS NOT A REMEDY THAT FAILED (2026-09-19). Every
+    # quarantine in the ledger on this date was earned by a correct refusal:
+    # rehash_bundle twice said "the tree has uncommitted tracked changes" and
+    # did nothing; restart_nodes said "already on the disk source; leaving it
+    # alone" and did nothing. Each was graded "did not fix" because the
+    # condition was still PRESENT afterwards -- which is true, and beside the
+    # point: nothing ran. Two such rows and the remedy was refused for good,
+    # so the self-heal sat inert on exactly the update-time conditions it
+    # exists for. A remedy that returned ran=False is graded "held" -- the
+    # condition and the reason both on the record -- and quarantined() does
+    # not count it. "did not fix" is reserved for a remedy that RAN and left
+    # the condition standing.
+    if not ok:
+        row.update(after=after, outcome="held")
+        return write_ledger(row, ledger)
     row.update(after=after,
                outcome="fixed" if (before == PRESENT and after == ABSENT) else "did not fix")
     return write_ledger(row, ledger)
