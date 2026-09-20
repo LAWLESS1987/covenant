@@ -8238,8 +8238,8 @@ class CovenantAPI:
             try:
                 _ask_log_row({"kind": "ask", "from": addr, "text": text, "admitted": bool(ok2),
                               "alleges_nothing": alleges_nothing, "message": str(message)[:2000]})
-            except Exception:                                     # noqa: BLE001 -- a memory row is never a gate
-                pass
+            except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate
+                print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
             return jsonify({"status": "success", "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
                             "message": str(message)[:2000],
                             "judge": getattr(result, "judge_id", "") if result is not None else ""})
@@ -8312,8 +8312,8 @@ class CovenantAPI:
                               "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
                               "message": str(message)[:2000], "model": meta.get("model"), "tokens": meta.get("tokens"),
                               "ms": meta.get("ms"), "fetches": fetches})
-            except Exception:                                     # noqa: BLE001 -- a memory row is never a gate
-                pass
+            except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate
+                print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
             return jsonify({"status": "success", "answer": "" if withheld else answer, "withheld": withheld,
                             "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
                             "judge": getattr(result, "judge_id", "") if result is not None else "",
@@ -8357,8 +8357,8 @@ class CovenantAPI:
             if not ok2 and not alleges_nothing:
                 try:
                     _ask_log_row({"kind": "image", "from": addr, "text": prompt, "refused": True, "message": str(message)[:2000]})
-                except Exception:                                 # noqa: BLE001
-                    pass
+                except Exception as _e:                           # noqa: BLE001 -- a memory row is never a gate
+                    print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
                 return (jsonify({"status": "refused", "message": str(message)[:2000],
                                  "judge": getattr(result, "judge_id", "") if result is not None else ""}), 403)
             try:
@@ -8369,8 +8369,8 @@ class CovenantAPI:
             try:
                 _ask_log_row({"kind": "image", "from": addr, "text": prompt, "refused": False, "held": alleges_nothing,
                               "file": os.path.basename(path), "model": meta.get("model"), "ms": meta.get("ms")})
-            except Exception:                                     # noqa: BLE001
-                pass
+            except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate
+                print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
             with open(path, "rb") as fh:
                 png = fh.read()
             return (png, 200, {"Content-Type": "image/png", "X-Covenant-Ms": str(meta.get("ms", 0)),

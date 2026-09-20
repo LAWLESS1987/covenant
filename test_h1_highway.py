@@ -232,11 +232,40 @@ def main():
         H.REMEDIES["install_on_phone"] = real
 
     # ---- H1j: the pass does not kill its own caller
-    calls = []
+    #
+    # A160 (2026-09-20): THIS CHECK WAS KILLING THE PRODUCTION WATCHDOG. Two
+    # remedies are registered for watchdog_stale and only one was a stub; the
+    # other, schedule_watchdog_restart, ran for real from the sweep's staged
+    # copy, and its detached restarter stopped every process whose command
+    # line carried the bare filename -- the production watchdog included --
+    # then started a replacement from the temporary directory the sweep was
+    # about to delete. Seven watchdog deaths sat in the last ninety seconds of
+    # a sweep before anyone looked. So now: EVERY remedy for the condition is
+    # a spy, subprocess is fenced so nothing can spawn even if a future remedy
+    # is added unstubbed, and the fence is checked, not assumed.
+    import subprocess as _sp
+    calls, sched, spawned = [], [], []
+
+    class _NoSpawn(object):
+        def __init__(self, args, **kw):
+            spawned.append(("Popen", args))
+            self.pid = 0
+
+        def poll(self):
+            return None
+
+    def _no_run(args, **kw):
+        spawned.append(("run", args))
+        return _sp.CompletedProcess(args, 0, "", "")
+
     real_rw = dict(H.REMEDIES["restart_watchdog"])
+    real_sw = dict(H.REMEDIES["schedule_watchdog_restart"])
     real_det = H.DETECTORS.get("watchdog_stale")
+    real_popen, real_run = _sp.Popen, _sp.run
     try:
         H.REMEDIES["restart_watchdog"] = dict(real_rw, fn=spy_remedy(calls))
+        H.REMEDIES["schedule_watchdog_restart"] = dict(real_sw, fn=spy_remedy(sched))
+        _sp.Popen, _sp.run = _NoSpawn, _no_run
         H.DETECTORS["watchdog_stale"] = lambda health=None: {"state": H.PRESENT, "measured": {"fixture": True}}
         led = tmp_ledger()
         only = {"watchdog_stale": H.DETECTORS["watchdog_stale"]}
@@ -244,12 +273,21 @@ def main():
         try:
             H.run_once(dry_run=False, ledger=led, cooldown_s=0)
             check("H1j run_once excludes the watchdog's own restart by default", not calls, str(calls))
+            check("H1j the scheduled (detached) restart is the one it may use on itself", bool(sched), str(len(sched)))
             H.run_once(dry_run=False, exclude=(), ledger=led, cooldown_s=0)
             check("H1j mutation: asked for explicitly, it runs", bool(calls), str(len(calls)))
+            unstubbed = [n for n, r in H.REMEDIES.items()
+                         if "watchdog_stale" in r["for"] and r["fn"].__name__ != "fn"]
+            check("H1j every remedy registered for watchdog_stale is a stub in this test",
+                  not unstubbed, str(unstubbed))
+            check("H1j nothing real was spawned by either pass -- the production watchdog "
+                  "is not this test's to stop", not spawned, str(spawned)[:200])
         finally:
             H.DETECTORS = saved
     finally:
+        _sp.Popen, _sp.run = real_popen, real_run
         H.REMEDIES["restart_watchdog"] = real_rw
+        H.REMEDIES["schedule_watchdog_restart"] = real_sw
         if real_det:
             H.DETECTORS["watchdog_stale"] = real_det
 

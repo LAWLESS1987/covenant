@@ -502,6 +502,34 @@ def detect_held_core_drift(health=None):
             "measured": {"rc": p.returncode, "said": (p.stdout or p.stderr or "").strip()[:200]}}
 
 
+def _watchdog_like():
+    """ONE TREE, ONE WATCHDOG (A160, 2026-09-20): the PowerShell -like pattern
+    that names THIS tree's watchdog by ABSOLUTE PATH.
+
+    Every process match in this file used to be the bare filename,
+    '*covenant_watchdog.py*'. The sweep stages a copy of this file in a
+    temporary directory and test_h1_highway.py's H1j drives the restart remedy
+    there with a fixture -- so the staged copy killed the PRODUCTION watchdog
+    and started a replacement from the temporary directory, which the sweep
+    then deleted. Measured over 2026-09-16..20: 13 of 35 silent watchdog deaths
+    fell inside a sweep window, 7 of them in the last ninety seconds of a
+    sweep, and the OS guard revived the watchdog 42 times with the nodes
+    unwatched for three to twenty minutes each time.
+
+    A staged copy has a different HERE, so with this pattern it can only ever
+    count, stop or restart a watchdog of its own tree. The pattern is a glob:
+    HERE carries none of PowerShell's wildcard characters on this machine, and
+    the assertion below says so out loud if that ever changes rather than
+    matching nothing in silence.
+    """
+    path = os.path.join(HERE, "covenant_watchdog.py")
+    bad = [ch for ch in "*?[]'`" if ch in path]
+    if bad:
+        raise ValueError("this tree's path %r carries %r and cannot be a -like pattern"
+                         % (path, "".join(bad)))
+    return "*%s*" % path
+
+
 def _watchdog_module_files():
     """covenant_watchdog.py and every covenant_* module it imports.
 
@@ -551,8 +579,12 @@ def detect_watchdog_stale(health=None):
         newest, newest_name = max((os.path.getmtime(f), os.path.basename(f)) for f in files)
     except (OSError, ValueError) as e:
         return {"state": UNKNOWN, "measured": {"error": str(e)}}
+    try:
+        like = _watchdog_like()
+    except ValueError as e:
+        return {"state": UNKNOWN, "measured": {"error": str(e)}}
     ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\" |"
-          " Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' } |"
+          " Where-Object { $_.CommandLine -like '" + like + "' } |"
           " ForEach-Object { $_.CreationDate.ToUniversalTime().ToString('o') }")
     try:
         p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
@@ -784,13 +816,14 @@ def remedy_restart_watchdog(measured, dry_run=True):
     # in the WMI filter blew up the first --repair run with "unsupported
     # format character 'p'".
     ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
-          " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
+          " | Where-Object { $_.CommandLine -like '%s' };"
           " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
           " Start-Sleep -Seconds 2;"
           " Start-Process -FilePath '%s' -ArgumentList '%s','--interval','60'"
           " -WorkingDirectory '%s' -WindowStyle Hidden"
           " -RedirectStandardOutput '%s' -RedirectStandardError '%s'"
-          % (sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
+          % (_watchdog_like(),
+             sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
              os.path.join(HERE, "logs", "watchdog-stdout.log"),
              os.path.join(HERE, "logs", "watchdog-stderr.log")))
     p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
@@ -895,11 +928,13 @@ def remedy_schedule_watchdog_restart(measured, dry_run=True):
     # then write what actually happened to logs/watchdog_restart_last.json so
     # a failure is observable instead of silent. Verify the effect, not the
     # invocation -- the rule this file states and this remedy was missing.
+    # $like (A160): THIS tree's watchdog by absolute path -- see _watchdog_like.
+    # A staged copy of this file must never be able to stop the production one.
     inner = (" $py='%s'; $wd='%s'; $here='%s'; $out='%s'; $err='%s';"
-             " $marker='%s'; $fb=0;"
+             " $marker='%s'; $like='%s'; $fb=0;"
              " Start-Sleep -Seconds 5;"
              " $w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
-             " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
+             " | Where-Object { $_.CommandLine -like $like };"
              " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
              " Start-Sleep -Seconds 2;"
              " try { Start-Process -FilePath $py -ArgumentList $wd,'--interval','60'"
@@ -908,13 +943,13 @@ def remedy_schedule_watchdog_restart(measured, dry_run=True):
              " catch { };"
              " Start-Sleep -Seconds 4;"
              " $a=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
-             " | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' };"
+             " | Where-Object { $_.CommandLine -like $like };"
              " if ($a.Count -eq 0) { $fb=1;"
              "   try { Start-Process -FilePath $py -ArgumentList $wd,'--interval','60'"
              "   -WorkingDirectory $here -WindowStyle Hidden } catch { };"
              "   Start-Sleep -Seconds 4;"
              "   $a=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
-             "   | Where-Object { $_.CommandLine -like '*covenant_watchdog.py*' } };"
+             "   | Where-Object { $_.CommandLine -like $like } };"
              " $o=[ordered]@{"
              " at=((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'));"
              " alive=$a.Count; fallback_used=$fb };"
@@ -923,7 +958,8 @@ def remedy_schedule_watchdog_restart(measured, dry_run=True):
              % (sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
                 os.path.join(HERE, "logs", "watchdog-stdout.log"),
                 os.path.join(HERE, "logs", "watchdog-stderr.log"),
-                os.path.join(HERE, "logs", "watchdog_restart_last.json")))
+                os.path.join(HERE, "logs", "watchdog_restart_last.json"),
+                _watchdog_like()))
     if dry_run:
         return True, "would schedule a detached restart in 5s"
     # CREATE_NO_WINDOW, not DETACHED_PROCESS, and the difference is not

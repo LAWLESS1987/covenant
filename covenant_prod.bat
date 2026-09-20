@@ -118,10 +118,14 @@ REM
 REM  Match on the COMMAND LINE, which is the only thing that actually
 REM  identifies this process. `.Where({...})` avoids a pipe, which would need
 REM  escaping inside a batch line. Exit 0 = a watchdog is already running.
-powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*covenant_watchdog.py*'}); exit [int]($w.Count -eq 0)"
+REM  A160 (2026-09-20): matched by ABSOLUTE PATH, and started by absolute
+REM  path, so the count, the highway's restarters and the watchdog's own
+REM  twin check all see the same process. A bare-filename match let a copy
+REM  of the highway in the sweep's staged directory stop THIS watchdog.
+powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*%~dp0covenant_watchdog.py*'}); exit [int]($w.Count -eq 0)"
 if %errorlevel% neq 0 (
   call :stamp "starting watchdog"
-  start "Covenant Watchdog" /min cmd /c "%CE%&& python covenant_watchdog.py --interval 60 >> logs\watchdog-stdout.log 2>&1"
+  start "Covenant Watchdog" /min cmd /c "%CE%&& python "%~dp0covenant_watchdog.py" --interval 60 >> logs\watchdog-stdout.log 2>&1"
 ) else ( call :stamp "watchdog already running" )
 
 timeout /t 5 /nobreak >nul

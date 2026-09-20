@@ -100,8 +100,8 @@ REM  NO TREE KILL, deliberately: sentinel_witness/seal_service.py is a
 REM  five-deep DESCENDANT of the stale watchdog and holds port 8433. Stop-Process
 REM  has no /T, so descendants are left running and the fresh watchdog re-adopts
 REM  the seal service on its next pass (covenant_watchdog.py tend_seal_service).
->> "%OUT%" echo --- stop every watchdog by command line, windowed or not, no tree kill ---
-powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*covenant_watchdog.py*'}); foreach($p in $w){ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue; Write-Output ('stopped watchdog ' + $p.ProcessId) }" >> "%OUT%" 2>&1
+>> "%OUT%" echo --- stop every watchdog OF THIS TREE by command line (absolute path, A160), windowed or not, no tree kill ---
+powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*%~dp0covenant_watchdog.py*'}); foreach($p in $w){ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue; Write-Output ('stopped watchdog ' + $p.ProcessId) }" >> "%OUT%" 2>&1
 timeout /t 4 /nobreak >nul
 
 >> "%OUT%" echo --- stop by port, whatever still holds 5000 or 5020 ---

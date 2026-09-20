@@ -6439,6 +6439,112 @@ it answers. (3) Memory: the 7B fits once ~3.5 GB is freed; the browser is
 the biggest holder. (4) Images: stable-diffusion.cpp with sd-turbo, behind
 the same door, the LLM put away first — measured before built.
 
+### A160. [efficiency / the supervisor layer] The sweep was killing the production watchdog, and two watchdogs ran at once: 160 restarts in five days, 35 silent deaths, ten doubled ledger blocks. FIXED 2026-09-20, the continuation of A120
+
+**His instruction.** "continue the work from system optimization and increase
+efficiency." A120 had measured the nodes (nothing to recover), the sweep
+(sleep-bound, the sleep load-bearing) and the judge (cached). This round
+measured the layer A120 said cost more than all three nodes together: the
+watchdog and what restarts it. The cost was not in the pass. It was in the
+churn.
+
+**Measured, from `logs/watchdog.log*`, `logs/guard.log`, `ops/SELF_EVAL.md`
+and `ops/highway.jsonl`, all read whole:**
+
+| what | before 2026-09-16 | 2026-09-16 .. 20 |
+|---|---|---|
+| `watchdog started` lines per day | 1 (7-8 on two days of hand restarts) | 30, 29, 13, 25, 17 |
+| starts within 3 s of another start (a PAIR) | -- | 26 of 160 |
+| guard `REVIVED` (found no live watchdog after a 180 s gap) | 1 per day at most | 4, 14, 3, 12, 2 |
+| unwatched gap at each revival | -- | 184 s to 1,217 s |
+| self-evaluation blocks written twice with the same timestamp and round | -- | 10 of 448 |
+| `schedule_watchdog_restart` rows written twice in the same second | -- | 2 pairs |
+
+**Two mechanisms, both found by reading the log around each death, not by
+reasoning about the code.**
+
+1. **The sweep killed the production watchdog.** 13 of the 35 silent deaths
+   fell inside a sweep transcript's window, and 7 of them in the last ninety
+   seconds of a sweep -- the moment `test_h1_highway.py` runs. Its H1j check
+   ("the pass does not kill its own caller") drove `run_once` with a fixture
+   saying the watchdog is stale, with ONE of the two remedies registered for
+   that condition replaced by a spy. `run_once` applies EVERY remedy registered
+   for a condition. The other one, `schedule_watchdog_restart`, ran for real
+   from the sweep's staged copy: its detached PowerShell stopped every python
+   process whose command line carried the bare filename
+   `covenant_watchdog.py` -- the production watchdog included -- and started a
+   replacement from the temporary directory the sweep was about to delete.
+   H1j ran `run_once` twice, so two restarters fired a second apart. Then the
+   OS guard, seeing no live PID after 180 s, revived the watchdog three to five
+   minutes later. Every sweep since the highway went live on 2026-09-16 did
+   this, and every sweep reported green.
+2. **Two restarters a second apart left two watchdogs alive.** The restarter
+   lists the watchdogs, stops them, starts one. When two run a second apart the
+   second's list was taken before the first's new watchdog existed, so that
+   one survived beside the second's. Both resumed the persisted round counter,
+   both reached round 4020 at 01:41:15Z, both wrote it to the ledger (17 and 18
+   uncommitted files, a second apart), both ran the highway (the doubled rows),
+   and their doubled probes pushed the nodes into rate-limit rejections that
+   the anomaly detector reported as spikes, so `node_down` and `source_drift`
+   "could not be measured" for minutes at a time. The trader's `SEAL FAILED --
+   /health did not answer` at 09:00 on 2026-09-19 sits one minute after the
+   12:59:16Z death in this series: the nodes were being restarted under it.
+
+**What was NOT the cause, checked.** No traceback in either watchdog stream.
+The guard revived only when no PID was alive, never beside a slow one. The
+highway's own restart rows were 20-50 minutes before each revival, not
+seconds. Rounds take 67-69 s against a 60 s interval: 7-9 s of work per pass,
+of which the three PowerShell process queries cost about 0.5 s each.
+
+**Fixed, four ways, each pinned:**
+
+* `covenant_highway.py`: every process match -- the stale detector, both
+  restarters and the count-after-start -- is now THIS tree's watchdog by
+  ABSOLUTE PATH (`_watchdog_like`). A staged copy has a different tree and can
+  no longer see, count or stop the production one. `test_p22` P22g pins the
+  restarter's script and the detector's query (5 checks; all 5 fail against
+  the previous file, run and recorded).
+* `covenant_watchdog.py`: at daemon start it lists the watchdogs of its own
+  tree and stops any that started strictly before it (`_twins_to_evict`, pure;
+  `_evict_twins`, the measurement). Ties are left alone, because two evicting
+  each other leaves nothing, and nothing is evicted when the measurement cannot
+  see the process doing the measuring. P22h drives it both ways.
+* `test_h1_highway.py` H1j: every remedy registered for the condition is a
+  stub, `subprocess.Popen` and `subprocess.run` are fenced for the duration,
+  and both facts are CHECKED (98 checks, up from 95). Mutation run and
+  recorded: with the stub for the restarter removed, three checks fail and the
+  fence captured the real PowerShell command instead of running it -- no
+  process was spawned, the production watchdog was untouched.
+* `covenant_prod.bat` and `AB_RESTART_NODES.bat`: count and stop by the same
+  absolute path, and the launcher now starts the watchdog by absolute path so
+  the four matchers see one process.
+
+Also, on the way: the core carried four `except Exception: pass` handlers
+around chat-memory rows (A158/A159, added after the last sweep), which turned
+`test_security_audit.py` red and with it the fifteen-minute
+`CovenantRefineCheck` task, RED on every run since. They now print the
+failure to the node log. 133/133.
+
+**Proof it holds.** A full sweep was run after the change (`ONE_SWEEP.txt`,
+2026-09-20 03:33-03:49Z, 15.8 min): 0 checks failed, 0 suites unmeasured, and
+the guard's revival count stayed at 42 through it. The one watchdog restart in
+the window (03:42:04Z) was the production highway's own hourly
+`schedule_watchdog_restart`, because this change had made the running
+watchdog's modules older than the files on disk -- the design working, with
+exactly one watchdog alive after it (`watchdog_restart_last.json`: alive=2,
+the venv stub and its child). The sweep's RESULT line read FAIL for the
+integrity phase only: the manifest and the held core copy were stale against
+the edited core, which the commit's pre-commit hook re-syncs.
+
+**UNDETERMINED, said plainly.** 22 of the 35 deaths fall in no transcript
+window in this tree; sweeps run from sessions into scratch directories would
+explain them and cannot be shown. The tie case (two watchdogs started in the
+same tick) is left alone by design and would still produce a pair. The
+phone-peer source split the ledger keeps reporting is a different condition
+(the phone runs the build it has) and is not touched here.
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**

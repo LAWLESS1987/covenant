@@ -106,6 +106,48 @@ def main():
     check("stops the existing watchdog", "Stop-Process -Id $_.ProcessId -Force"
           in script)
 
+    print("P22g -- A160: it stops THIS tree's watchdog by absolute path, never the bare filename")
+    wd_path = os.path.join(HERE, "covenant_watchdog.py")
+    check("the kill pattern carries this tree's absolute path",
+          "$like='*%s*'" % wd_path in script, script[:200])
+    check("the bare filename pattern is gone from the restarter",
+          "'*covenant_watchdog.py*'" not in script)
+    check("every match in the restarter uses the scoped pattern",
+          script.count("-like $like") == 3 and "-like '*" not in script,
+          "scoped=%d" % script.count("-like $like"))
+    # The stale DETECTOR counts by the same rule, or a staged copy would count
+    # the production watchdog as its own and declare it stale every pass.
+    seen = []
+
+    def _capture_run(args, **kwargs):
+        seen.append(args)
+        return subprocess.CompletedProcess(args, 0, "", "")
+    real_run = subprocess.run
+    subprocess.run = _capture_run
+    try:
+        H.detect_watchdog_stale()
+    finally:
+        subprocess.run = real_run
+    det = " ".join(a for cmd in seen for a in cmd if isinstance(a, str))
+    check("detect_watchdog_stale matches by this tree's absolute path",
+          "-like '*%s*'" % wd_path in det, det[:200])
+    check("detect_watchdog_stale no longer matches the bare filename",
+          "'*covenant_watchdog.py*'" not in det)
+
+    print("P22h -- A160: the watchdog evicts an OLDER twin of its own tree, and only that")
+    import covenant_watchdog as W  # noqa: E402
+    t0, t1, t2 = "2026-09-20T01:28:35Z", "2026-09-20T01:28:37Z", "2026-09-20T01:29:43Z"
+    rows = [(100, t0), (101, t0), (200, t1), (201, t1), (300, t2)]
+    check("stops the older pair (stub and child), keeps itself, its parent and the newer one",
+          W._twins_to_evict(rows, my_pid=201, my_ppid=200) == [100, 101],
+          str(W._twins_to_evict(rows, my_pid=201, my_ppid=200)))
+    check("a tie is left alone -- two evicting each other would leave nothing",
+          W._twins_to_evict([(100, t0), (201, t0)], my_pid=201, my_ppid=200) == [])
+    check("nothing is evicted when the measurement cannot see this process",
+          W._twins_to_evict([(100, t0), (101, t0)], my_pid=999, my_ppid=998) == [])
+    check("the newest process evicts every older watchdog of the tree",
+          W._twins_to_evict(rows, my_pid=300, my_ppid=1) == [100, 101, 200, 201])
+
     print("P22f -- PowerShell's own parser accepts it (parse only, no run)")
     tmp = os.path.join(tempfile.mkdtemp(), "inner.ps1")
     with open(tmp, "w", encoding="utf-8") as fh:

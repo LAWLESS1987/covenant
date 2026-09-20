@@ -1586,6 +1586,73 @@ def tend_pending(port=5000, http=None, signer=None):
         return "mine failed: %s: %s" % (type(e).__name__, str(e)[:80])
 
 
+def _twins_to_evict(rows, my_pid, my_ppid):
+    """ONE TREE, ONE WATCHDOG (A160). Pure: which of `rows` to stop.
+
+    `rows` are (pid, started_iso) for every python process whose command line
+    names THIS file by absolute path -- including this process and the venv
+    stub that launched it. Evict every row that started STRICTLY BEFORE this
+    process did, never this process or its parent, and nothing at all when this
+    process is not in the rows (a measurement that cannot see the measurer is
+    not trusted to act). A tie is left alone: two watchdogs started in the same
+    tick would otherwise each stop the other and leave NOTHING running, which
+    is the outage the guard then takes three to five minutes to notice.
+
+    Why the newer one wins: a watchdog is only ever started by a restarter that
+    has just stopped the old one, by the OS guard after finding none alive, or
+    by an operator's launcher that first counted none -- so a live older twin
+    is always the leftover of a race between two of those, and it is the one
+    running older code. Measured 2026-09-20: two restarters one second apart
+    left two watchdogs alive, both resumed at the same round, both wrote
+    round 4020 to ops/SELF_EVAL.md, and their probes pushed the nodes into
+    rate-limit rejections (429) that read as anomaly spikes."""
+    mine = [t for p, t in rows if p == my_pid]
+    if not mine:
+        return []
+    my_t = mine[0]
+    return sorted(p for p, t in rows
+                  if p not in (my_pid, my_ppid) and t < my_t)
+
+
+def _evict_twins():
+    """Daemon start only. Measures, decides with _twins_to_evict, stops. Never
+    raises: a failed check costs one possible duplicate, never the watchdog."""
+    import subprocess
+    me = os.path.join(HERE, "covenant_watchdog.py")
+    if any(ch in me for ch in "*?[]'`"):
+        log("INFO", "twin check skipped: %r cannot be a PowerShell -like pattern" % me)
+        return
+    ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\""
+          " | Where-Object { $_.CommandLine -like '*" + me + "*' }"
+          " | ForEach-Object { '' + $_.ProcessId + ' ' +"
+          " $_.CreationDate.ToUniversalTime().ToString('o') }")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], cwd=HERE,
+                           capture_output=True, text=True, timeout=60)
+        rows = []
+        for line in (p.stdout or "").splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[0].isdigit():
+                rows.append((int(parts[0]), parts[1]))
+    except Exception as e:                                       # noqa: BLE001
+        log("INFO", "twin check unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
+        return
+    victims = _twins_to_evict(rows, os.getpid(), os.getppid())
+    if not victims:
+        return
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-Command",
+                        "Stop-Process -Id %s -Force -ErrorAction SilentlyContinue"
+                        % ",".join(str(v) for v in victims)],
+                       cwd=HERE, capture_output=True, text=True, timeout=60)
+        log("WARN", "another watchdog of this tree was already running (pid %s) when "
+                    "this one started -- stopped it: one tree, one watchdog (A160)"
+                    % ", ".join(str(v) for v in victims))
+    except Exception as e:                                       # noqa: BLE001
+        log("INFO", "could not stop twin watchdog %s: %s: %s"
+                    % (victims, type(e).__name__, str(e)[:120]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true")
@@ -1627,6 +1694,7 @@ def main():
     # verifies the PID is a live python before believing it; what would not
     # be harmless is a guard with no pid to check spawning a second watchdog
     # beside a slow one, doubling every restart the first might still make.
+    _evict_twins()                                                # A160
     try:
         with open(os.path.join(LOGDIR, "watchdog.pid"), "w",
                   encoding="utf-8", newline="\n") as fh:
