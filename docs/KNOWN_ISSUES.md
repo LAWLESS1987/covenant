@@ -6215,6 +6215,23 @@ imports, restart; do not read `--status` as proof it is running.
 **Repro:** `python rolling_restart.py --status` after editing a comment in
 `covenant_daily_plan.py` — it will still say *on the disk source*.
 
+### A154. [minor / phone] The app's Dashboard button opened a path the core does not serve. FIXED 2026-09-19 (ships in the next app build)
+
+**Measured.** "The dashboard doesn't work when clicked" (the operator,
+2026-09-19 21:03). The button opened `http://127.0.0.1:<port>/`; the core
+registers no route for `/` (grep of every `@self.app.route`), so the browser
+showed the framework's 404 page. On the PC's own node, loopback: `GET /` →
+404, `GET /m` → 200 with a 6,718-byte page. `/m` — the phone-shaped page that
+reads the node's live routes — has existed since 2026-09-16, and the note
+beside it says it is the answer to this exact complaint; the button was never
+repointed to it. The phone's API binds loopback only, so this could not be
+measured from the PC; the PC node runs the same core.
+
+**Fix.** The button opens `/m`. M5.7i (text check) holds every loopback path
+the main screen opens in a browser to a route the core registers; it failed
+against the old button and passes against the new one. Ships as the app
+commit after `7119105`.
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
