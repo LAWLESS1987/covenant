@@ -2722,3 +2722,479 @@ judge     PASS  baseline digest student@cc241f093a6, 1 model(s)
 self      PASS  running watchdog matches its file on disk (P14)
 alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
 
+## 2026-09-17T15:19:56Z  overall WARN  (round 960)
+nodes     PASS  3/3 up, height 33 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T16:33:05Z  overall WARN  (round 1020)
+nodes     PASS  3/3 up, height 33 (spread 0), source 51a6f4eb844d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 51a6f4eb844d, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T17:55:31Z  overall WARN  (round 1080)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T19:11:08Z  overall WARN  (round 1140)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T20:17:28Z  overall WARN  (round 1200)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T21:27:26Z  overall WARN  (round 1260)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T22:38:24Z  overall WARN  (round 1320)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-17T23:48:05Z  overall WARN  (round 1380)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T00:54:28Z  overall WARN  (round 1440)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T02:00:53Z  overall WARN  (round 1500)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T03:07:25Z  overall WARN  (round 1560)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T04:13:46Z  overall WARN  (round 1620)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T05:20:04Z  overall WARN  (round 1680)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T06:26:32Z  overall WARN  (round 1740)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T07:32:52Z  overall WARN  (round 1800)
+nodes     PASS  3/3 up, height 33 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@b5c91027271, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T08:39:24Z  overall WARN  (round 1860)
+nodes     PASS  3/3 up, height 34 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T09:46:01Z  overall WARN  (round 1920)
+nodes     PASS  3/3 up, height 34 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T10:52:29Z  overall WARN  (round 1980)
+nodes     PASS  3/3 up, height 34 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T11:58:57Z  overall WARN  (round 2040)
+nodes     PASS  3/3 up, height 34 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T13:05:17Z  overall WARN  (round 2100)
+nodes     PASS  3/3 up, height 35 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T14:11:43Z  overall WARN  (round 2160)
+nodes     PASS  3/3 up, height 35 (spread 0), source 7b12fe509061
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a
+
+## 2026-09-18T15:18:40Z  overall WARN  (round 2220)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 3
+
+## 2026-09-18T15:18:40Z  overall WARN  (round 2220)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 3
+
+## 2026-09-18T16:29:21Z  overall WARN  (round 2280)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 7
+
+## 2026-09-18T16:29:21Z  overall WARN  (round 2280)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 7
+
+## 2026-09-18T17:35:41Z  overall WARN  (round 2340)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 9
+
+## 2026-09-18T17:35:41Z  overall WARN  (round 2340)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 9
+
+## 2026-09-18T18:42:01Z  overall WARN  (round 2400)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 1
+
+## 2026-09-18T18:42:01Z  overall WARN  (round 2400)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 1
+
+## 2026-09-18T19:48:19Z  overall WARN  (round 2460)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 1
+
+## 2026-09-18T19:48:19Z  overall WARN  (round 2460)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 1
+
+## 2026-09-18T20:57:28Z  overall WARN  (round 2520)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 8
+
+## 2026-09-18T22:04:02Z  overall WARN  (round 2580)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 1
+
+## 2026-09-18T23:10:29Z  overall WARN  (round 2640)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 2
+
+## 2026-09-19T00:16:52Z  overall WARN  (round 2700)
+nodes     PASS  3/3 up, height 35 (spread 0), source 8cfd98921b40
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 8cfd98921b40, peers report ['ddfaaa9f704f'] (last heard 4
+
+## 2026-09-19T01:30:56Z  overall WARN  (round 2760)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['ddfaaa9f704f'] (last heard 4
+
+## 2026-09-19T01:30:56Z  overall WARN  (round 2760)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['ddfaaa9f704f'] (last heard 4
+
+## 2026-09-19T02:40:40Z  overall WARN  (round 2820)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['ddfaaa9f704f'] (last heard 3
+
+## 2026-09-19T03:47:43Z  overall WARN  (round 2880)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['ddfaaa9f704f'] (last heard 9
+
+## 2026-09-19T04:55:10Z  overall WARN  (round 2940)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['8cfd98921b40'] (last heard 5
+
+## 2026-09-19T06:02:34Z  overall WARN  (round 3000)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['8cfd98921b40'] (last heard 2
+
+## 2026-09-19T07:09:56Z  overall WARN  (round 3060)
+nodes     PASS  3/3 up, height 35 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@1d6d0cb1c52, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['8cfd98921b40'] (last heard 1
+
+## 2026-09-19T08:16:59Z  overall WARN  (round 3120)
+nodes     PASS  3/3 up, height 36 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['8cfd98921b40'] (last heard 4
+
+## 2026-09-19T09:34:33Z  overall WARN  (round 3180)
+nodes     PASS  3/3 up, height 36 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['8cfd98921b40'] (last heard 2
+
+## 2026-09-19T10:47:08Z  overall WARN  (round 3240)
+nodes     PASS  3/3 up, height 36 (spread 0), source 44f17e1c3e9b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 44f17e1c3e9b, peers report ['8cfd98921b40'] (last heard 5
+
+## 2026-09-19T11:59:44Z  overall WARN  (round 3300)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 0f388bd9eeaa, peers report ['8cfd98921b40'] (last heard 4
+
+## 2026-09-19T13:09:49Z  overall WARN  (round 3360)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 0f388bd9eeaa, peers report ['8cfd98921b40'] (last heard 1
+
+## 2026-09-19T14:17:49Z  overall WARN  (round 3420)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 0f388bd9eeaa, peers report ['8cfd98921b40'] (last heard 1
+
+
+## 2026-09-19T15:20Z  overall FAIL  (claude scheduled self-eval)
+nodes     PASS  3/3 answer (5000/5020/5060), height 36 all three (spread 0), genesis 00009b31, v8.40, source 0f388bd9eeaa, 12191 lines -- all four fields agree. degraded=true on all three (no provider key; no win32 code sandbox) -- disclosed, unchanged. anomaly_kinds empty; 0 heartbeats skipped; free RAM A 6448 / B 7317 / C 1182 MB -- C is the low one. A tracks a peer on source 8cfd98921b40 (the phone, 100.86.158.1:5001)
+watchdog  WARN  last line 2026-09-19T15:15:13Z, 39s before the check -- PASS on the 3-minute test. But a 4m47s SILENCE 12:59:15Z -> 13:04:02Z, ended by "watchdog started" at 13:04:02Z, i.e. a restart. That window is 08:59-09:04 local and the trader's 09:00:03 cycle falls inside it -- see the trader row. What restarted it is UNDETERMINED: ops/highway.jsonl has no remedy between 08:39:51-0400 and 09:18:49-0400
+alerts    WARN  3450 ALERT lines in the whole of logs/watchdog.log; 1682 dated 2026-09-19, 1756 dated 09-18. Two kinds carry ~97%: highway mesh_source_split (822 today) and node A mesh-multi-source (798 today), both the same phone-on-an-old-source fact. Also today: 13 "node(s) running a source that is NOT the one on disk" and the phone-build-behind alert. NO NEW KIND versus the 2026-09-15 block. BLIND SPOT: this file starts 2026-09-17T22:20:23Z, so I cannot count "since the last evaluation" (09-15T02:08Z) from it -- older lines are not here
+gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false; relax_valueless_for_local_nodes=true; both_seats=true and asymmetric_hold=true (A132). All three /health agree: quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report, veto_threshold 1, degradations []. Ollama absent by the operator's 2026-09-07 instruction -- disclosed, not failed
+trader    FAIL  trader_log.txt 2026-09-19T09:00:03 local (2h16m old). trader_freshness.py exit 0: "RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher." So freshness is fine and the row still fails: the cycle's last lines are "SEAL FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown" and "exit 3: a required seal failed". No orders (Rule 5: 3/30 settled, 13 open, 0/3 wins, p=1.000; R1 cash floor 0.0%). The seal failed because nothing answered on 5000 at 09:00:03 -- the same window as the watchdog silence above. NOTE (6th block running): trader_config.json reads armed=true, NOT armed:false as this task file states; the config is the operator's (FUTURE.bat, 2026-09-06) and the task text is stale. No funds, keys or orders touched
+student   WARN  exam NOT MET -- short on clean 7/8 (need 100%), trap 5/6 (need 85%), edge 2/3 (need 100%). 53 cases: 38 agree, 7 wrong (all `discourse`, all false HOLD), 0 false clean, 8 abstain; theft/deception/coercion/injection 19/19. Model in use bbdc4590aeae, 3605 examples, 4438 weighted tokens. Last night BOTH students were PROMOTED at 07:51 (first: 2502 held-out rows, 31 false clears, from 2458/34; second: 1162 rows, 20 false clears, from 1149/19). Seat stays with the deferring chain. CLI GAP, 4th block running: `--exam` prints the table only and never the thresholds line this task asks me to quote -- I read it from ops/DISTILL.md:1863 instead
+repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- 4 problems: covenant_unified_v8.py, run_all_tests.sh, run_local_sweep.py hash mismatch; test_p15_judge_identity.py missing. MEASURED, not relayed: disk core hashes 0f388bd9eeaa, MANIFEST.sha256 records 0f388bd9eeaa, and all three nodes report source_sha256 0f388bd9eeaa -- three independent reads agree. run_local_sweep.py on disk is cfe07f71da4a and MANIFEST.sha256 says cfe07f71da4a. All three files are CLEAN against HEAD (git status: 0). test_p15_judge_identity.py is in 0 of HEAD's tracked files. verify_deploy.py's own MANIFEST dict was last committed eb892c0 2026-09-12; MANIFEST.sha256 was updated today in 047b6f3. STALE PINS, not tamper -- 4th evaluation running, and a verifier that fails every run cannot see a real substitution
+git       PASS  on main, 0 ahead / 0 behind origin/main after fetch. 14 modified (all loop-written: fallback_model*.json, ops/DISTILL*.md, HOLDOUT*.json, NIGHTLY.md, RUN_WITHOUT.json, SELF_EVAL.md, distill_rejected.jsonl, outbound_overrides.jsonl, verdicts.jsonl, dashboard.html, sentinel_witness/seal_service.py) and 17 untracked (run transcripts, ops/highway.jsonl, 3 nightly strategy reports, tools/redact_corpus.py, .claude/*). NO holdings or portfolio file untracked
+disk      PASS  C: 324G free of 476G (32% used); logs/ 22M. NO PRUNE DONE: %TEMP%\covenant_sweep is 150M / 329 entries, but 233 of the 235 items older than 7 days are the operator's named .bat tools -- including AB_RESTART_NODES.bat, which the watchdog's own alert text tells a person to run. Deleting by age would remove the documented remedy, so I left it
+verdict   FAIL  on repo and trader. Nothing is down NOW: three nodes agreeing at height 36, a 39-second-old watchdog, a wired gate. Two real items: (1) the ~5-minute outage at 09:00 local that cost the trader its seal -- cause UNDETERMINED, and it is the first thing I would want a second reading on; (2) verify_deploy.py pinning a dead build for the 4th evaluation running. Single next action: re-pin verify_deploy.py's MANIFEST from MANIFEST.sha256 and drop test_p15_judge_identity.py from its required list, in one commit with the files (M53)
+## 2026-09-19T15:49:03Z  overall FAIL  (round 3480)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded a9746b5da38b but covenant_watchdog.py on disk is 6cf2882ed50d -- the c
+alerts    WARN  1 live -- first: THE WATCHDOG ITSELF IS STALE: this process loaded a9746b5da38b but covenant_watchdog.py on disk is 6cf2882ed50
+
+## 2026-09-19T16:54:33Z  overall FAIL  (round 3540)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 3.9h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9aa712b, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.5h ago; 31 file(s) not committed
+disk      PASS  324G free of 476G (31% used); logs/ 21M
+
+## 2026-09-19T18:01:12Z  overall FAIL  (round 3600)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 5.0h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 48ad177, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.6h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 21M
+
+## 2026-09-19T19:07:26Z  overall FAIL  (round 3660)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 6.1h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 48ad177, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.7h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 21M
+
+## 2026-09-19T20:13:42Z  overall FAIL  (round 3720)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 7.2h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 48ad177, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 4.8h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 21M
+
+## 2026-09-19T21:20:04Z  overall FAIL  (round 3780)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 8.3h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 48ad177, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 5.9h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 22M
+
+## 2026-09-19T22:25:33Z  overall FAIL  (round 3840)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.607+b02b076, and build 0.1.618+cf83f33 is here and newer by 4.4 h -- open http://100.
+trader    FAIL  log 9.4h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 7.0h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 22M
+
+## 2026-09-19T22:25:33Z  overall FAIL  (round 3840)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.607+b02b076, and build 0.1.618+cf83f33 is here and newer by 4.4 h -- open http://100.
+trader    FAIL  log 9.4h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 7.0h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 22M
+
+## 2026-09-19T23:32:02Z  overall FAIL  (round 3900)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.607+b02b076, and build 0.1.618+cf83f33 is here and newer by 4.4 h -- open http://100.
+trader    FAIL  log 10.5h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 8.1h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 22M
+
+## 2026-09-19T23:32:02Z  overall FAIL  (round 3900)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.607+b02b076, and build 0.1.618+cf83f33 is here and newer by 4.4 h -- open http://100.
+trader    FAIL  log 10.5h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 8.1h ago; 31 file(s) not committed
+disk      PASS  323G free of 476G (32% used); logs/ 22M
+
+## 2026-09-20T00:38:21Z  overall FAIL  (round 3960)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.607+b02b076, and build 0.1.618+cf83f33 is here and newer by 4.4 h -- open http://100.
+trader    FAIL  log 11.6h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 9.2h ago; 31 file(s) not committed
+disk      PASS  324G free of 476G (31% used); logs/ 22M
+
+## 2026-09-20T00:38:21Z  overall FAIL  (round 3960)
+nodes     PASS  3/3 up, height 36 (spread 0), source 0f388bd9eeaa
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@bbdc4590aea, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.607+b02b076, and build 0.1.618+cf83f33 is here and newer by 4.4 h -- open http://100.
+trader    FAIL  log 11.6h old; freshness exit 0: RAN: a cycle dated 2026-09-19 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- refusing to seal: /health did not answer, so the block's alignment is unknown. Sealing at 0.0 would be a
+repo      PASS  core 0f388bd9eeaa matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e2d8b44, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 9.2h ago; 31 file(s) not committed
+disk      PASS  324G free of 476G (31% used); logs/ 22M
+

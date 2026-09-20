@@ -229,6 +229,26 @@ def seal(order, sealer=None, cfg=None, gate=None):
         #
         # Measured: a benign "quarterly rebalance" is HELD, not convicted. So on
         # this path a hold is the COMMON case, not an edge one.
+        # DOES THE NOTE DESCRIBE THIS ORDER? (2026-09-18, the gap X1's own fix
+        # opened.) The judge reads the note and nothing else, so side, amount and
+        # symbol are invisible to it: a $999,999 sell described as a "tiny $5
+        # test trade" was `verdict: allow`. Deterministic comparison, not the
+        # judge's business -- $5 is not $999,999 whatever anyone thinks about it.
+        #
+        # AFTER the seal, deliberately: a note that misdescribes its order is
+        # evidence, and the record is written either way (W1). And a REFUSAL
+        # rather than an abstention, because nothing here is uncertain.
+        try:
+            import order_claims as OC
+            lies = OC.contradictions(note, side, amt, str(s)[:20])
+        except Exception as e:                                    # noqa: BLE001
+            # Unavailable is not clear: if the comparison cannot run, nobody has
+            # checked whether the description is true, and that is an abstention.
+            lies, _ = [], abstained_by.append(
+                "the note/order comparison could not run (%s) -- nothing "
+                "confirmed this note describes this order" % type(e).__name__)
+        refused_by.extend("the note does not describe this order: " + x for x in lies)
+
         if res.get("held_not_judged"):
             abstained_by.append("the ethics judge HELD -- it could not read this "
                                 "payload, so no ethical decision was reached")
