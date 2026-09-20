@@ -6186,6 +6186,35 @@ are not made at the end of a session on the same day the gate was rewired.
 
 ---
 
+### A153. [minor / ops] "On the disk source" only reads the node file: a change to an imported module is invisible to the restart tool until the node is restarted anyway. Measured 2026-09-19 20:46
+
+**What was measured.** The phone's first heartbeat on build `65bc28b` carried a
+240-character `update` field. Both caps in the source say 600: the phone's
+(`NodeService.java`, in that commit) and the PC's (`covenant_daily_plan.py`,
+commit `c71063e`, 17:40:26). `grep -rn 240` across the PC's check-in path
+found no cap. The three node processes were created at 17:33:14, 17:33:19 and
+17:33:23 (Win32_Process), seven minutes before the PC cap changed, and
+`rolling_restart.py --status` reported all three *on the disk source* — its
+fingerprint is of `covenant_unified_v8.py`, and the daily-plan module the node
+imports at start is not in it. The nodes were running a 240 cap that no file
+on disk still contained.
+
+**What it means.** The tool that exists to catch source drift has a
+population it does not read: everything the node imports. A change to any of
+those modules is silently not running until the next restart, and the tool
+that would say so says the opposite. This is the A21 shape again — a check
+whose blind spot is the exact thing it was asked about.
+
+**Done.** `rolling_restart.py --all` at 20:48; all three back, height 36,
+peers 2/2/1. **Not done:** widening the fingerprint to the imported modules.
+That is a refinement of a check, not a new capability, but it changes what
+"on the disk source" *means* and is left for a measured pass rather than done
+in passing here. Until then: after committing a change to a module the node
+imports, restart; do not read `--status` as proof it is running.
+
+**Repro:** `python rolling_restart.py --status` after editing a comment in
+`covenant_daily_plan.py` — it will still say *on the disk source*.
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
@@ -6542,6 +6571,27 @@ Also: a watcher script of mine printed "AUTO-UPDATED WITHOUT A TAP" on this
 event. It matched the substring `build 65bc28b` in the *update line* rather
 than in the `build` field; the phone was still on `925f553`. Recorded here so
 the phrase is not quoted from that log as a result.
+
+**THE TAP LANDED (2026-09-19 20:40).** He confirmed the prompt; the 20:40:05
+check-in reports `app 0.1.618+cf83f33 build 65bc28b`, and the door's guard
+reads *installed* on both build and versionName (`--futility`: `futile
+false`, `have_build 65bc28b`). The door had stopped sending after its third
+whole delivery (refused-futile at 18:26 through 20:36), and the staged session
+from 18:16 was the one Android installed — no fourth download. Two things the
+first new-build heartbeat showed, both measured, neither a phone defect:
+
+* Its `update` field was 240 characters, not 600. The phone caps at 600
+  (NodeService.java, commit `65bc28b`); the PC whitelist caps at 600 since
+  commit `c71063e` at 17:40:26 — but all three nodes were started at
+  17:33:14–17:33:23 and import the daily-plan module once. `rolling_restart.py
+  --status` said every node was *on the disk source* because its fingerprint
+  reads the node file, not the modules it imports. Restarted one at a time at
+  20:48; the next check-in is the test. See **A153**.
+* `installer` is not in this build. The heartbeat field ships in the next app
+  commit, with a PC-side whitelist (cap 80, D21b, driven both ways). The
+  prediction stands and is now testable: after that build installs, the field
+  should read this package's own name, and the build after *it* should land
+  with no prompt.
 
 **Repro:** `python covenant_app_update.py --futility`
 

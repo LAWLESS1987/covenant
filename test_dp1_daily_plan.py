@@ -154,6 +154,20 @@ def main():
               "min ago" in i1[0], i1)
         code, out = DP.record_checkin(b"not json", "phone", led)
         check("D21 a body that is not JSON is refused (400) and nothing is written", code == 400 and len(open(led, encoding="utf-8").readlines()) == 1, code)
+        # D21b (2026-09-19). The heartbeat names its installer of record, and
+        # the ledger keeps it -- as a string, capped at 80 -- because Android's
+        # no-tap install rule turns on exactly this fact. Driven both ways:
+        # a dict where a string belongs is stringified and cut, never stored
+        # whole; and the field is absent when the phone did not send it.
+        with tempfile.TemporaryDirectory() as td2:
+            led2 = os.path.join(td2, "c.jsonl")
+            DP.record_checkin(json.dumps({"node_id": "phone", "installer": "org.covenant.node", "build": "65bc28b"}).encode(), "phone", led2)
+            DP.record_checkin(json.dumps({"node_id": "phone", "installer": {"x": "y" * 200}}).encode(), "phone", led2)
+            DP.record_checkin(json.dumps({"node_id": "phone"}).encode(), "phone", led2)
+            r2 = [json.loads(l) for l in open(led2, encoding="utf-8")]
+            check("D21b the check-in's `installer` is kept as a string capped at 80, and absent when not sent",
+                  r2[0].get("installer") == "org.covenant.node" and isinstance(r2[1]["installer"], str) and len(r2[1]["installer"]) == 80
+                  and "installer" not in r2[2], r2)
 
         # D22 (2026-09-14). An empty order list means one of two completely
         # different things and the plan used to say the same calm sentence for

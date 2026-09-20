@@ -333,6 +333,13 @@ def record_checkin(body_bytes, who, path=None):
     # comparing that string cannot tell them apart; this can.
     if "build" in data:
         row["build"] = str(data["build"])[:40]
+    # `installer` (2026-09-19): the package that installed this app, from
+    # PackageManager.getInstallSourceInfo. Android's no-tap rule applies only
+    # when the installer is updating ITSELF, so a build the browser put on
+    # must ask once and the build after it should not. This field is how that
+    # prediction gets checked against the phone instead of against a comment.
+    if "installer" in data:
+        row["installer"] = str(data["installer"])[:80]
     path = path or CHECKINS
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:
