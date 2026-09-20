@@ -6640,6 +6640,28 @@ Save. The next poll then commits without the flag, Android asks, one tap,
 and the build with the fallback is in. After that the switch can go back on:
 silent where Android permits it, one tap where it does not.
 
+**CORRECTED FOURTEEN MINUTES LATER (21:15:23).** The paragraph above
+overclaimed. On the identical code path, switch on, the phone re-downloaded
+`7119105` at 21:10:08 (attempt 2 of 6), committed it silently, and at
+21:13:52 logged *build 7119105 installed* — with no "asking you to confirm"
+line between, so no prompt and no tap. The 21:15:23 check-in reads `app
+0.1.621+cb1ea1f build 7119105 installer org.covenant.node`. So, measured:
+
+* the installer of record is now this app — the prediction made at 17:56
+  before the field existed is CONFIRMED by the field;
+* the silent install works on this phone — the FIRST attempt was refused and
+  the SECOND, identical, was permitted, 3 min 44 s after commit. Why the
+  first was refused is NOT measured; "a verifier refuses silent sideloads"
+  is withdrawn as a rule. One refusal is one signal.
+
+The fallback shipped in `a507d2a` stays, with its framing corrected: it turns
+a refusal into one tap on the same bytes instead of a 45 MB re-download, and
+the staged-build guard stops the triple download seen with `65bc28b`. The
+"What it takes" section above is superseded: no switch needs flipping; the
+phone got there on its own. Next: the build carrying the fallback and the
+Dashboard fix (`ebc33ea`) is the first that should arrive with no prompt AND
+no refusal. Its heartbeat decides.
+
 **Repro:** `python covenant_app_update.py --futility`
 
 ---
