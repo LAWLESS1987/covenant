@@ -314,6 +314,17 @@ def main():
     check("M6o an ask records no transaction and no block (chain length and pending pool unchanged)",
           r.status_code == 200 and h_before == h_after and p_before == p_after, f"chain {h_before}->{h_after} pending {p_before}->{p_after} status {r.status_code}")
 
+    # ---- M6p (2026-09-19): the students' past work, tailnet-gated text
+    r = get(client, "/m/students", PHONE_ADDR)
+    body = r.get_data(as_text=True)
+    check("M6p /m/students answers the tailnet 200 with text naming each record it has or lacks",
+          r.status_code == 200 and "text/plain" in r.headers.get("Content-Type", "")
+          and "ops/DISTILL.md" in body and "ops/verdicts.jsonl" in body, f"{r.status_code} {body[:80]!r}")
+    before = refusals(m, "mobile_page_refused")
+    r = get(client, "/m/students", LAN_ADDR)
+    check("M6p /m/students refuses a LAN address 403 and records it",
+          r.status_code == 403 and refusals(m, "mobile_page_refused") == before + 1, f"got {r.status_code}")
+
     failed = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     if failed:

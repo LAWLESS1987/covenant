@@ -8158,9 +8158,62 @@ class CovenantAPI:
                 return (jsonify({"status": "error", "message": "could not judge: %s: %s" % (type(e).__name__, e)}), 500)
             alleges_nothing = bool(result is not None and not ok2 and (
                 getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
+            # INTO THE MEMORY (2026-09-19, "as we use other models we improve
+            # also using the memory system in covenant"): every ask and its
+            # verdict is appended to ops/chat/ask_log.jsonl -- the same
+            # gitignored folder the recorded model conversations live in --
+            # so what is asked here is material the chat memory can read.
+            # Bounded, local, never tracked by git.
+            try:
+                _cd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "chat")
+                os.makedirs(_cd, exist_ok=True)
+                with open(os.path.join(_cd, "ask_log.jsonl"), "a", encoding="utf-8") as _fh:
+                    _fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "from": addr, "text": text,
+                                          "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
+                                          "message": str(message)[:2000]}, ensure_ascii=False) + "\n")
+            except Exception:                                     # noqa: BLE001 -- a memory row is never a gate
+                pass
             return jsonify({"status": "success", "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
                             "message": str(message)[:2000],
                             "judge": getattr(result, "judge_id", "") if result is not None else ""})
+
+        # THE STUDENTS' PAST WORK (2026-09-19, "cross reference with ... our
+        # students past work"). Text, tailnet-gated like /m: the tail of each
+        # distill record, the held-out results, and the verdict ledger's
+        # size. Files that are not here say so instead of 500. Read-only.
+        @self.app.route("/m/students", methods=["GET"])
+        def mobile_students():
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("mobile_page_refused", addr or "unknown")
+                return ("this door answers the tailnet only -- you are %s" % (addr or "unknown"), 403,
+                        {"Content-Type": "text/plain; charset=utf-8"})
+            here = os.path.dirname(os.path.abspath(__file__))
+            out = []
+            for name, n in (("ops/DISTILL.md", 40), ("ops/DISTILL_2.md", 30)):
+                p = os.path.join(here, *name.split("/"))
+                try:
+                    with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                        lines = fh.read().splitlines()
+                    out.append("== %s (last %d of %d lines)\n%s" % (name, min(n, len(lines)), len(lines), "\n".join(lines[-n:])))
+                except OSError:
+                    out.append("== %s: not on this node" % name)
+            for name in ("ops/HOLDOUT.json", "ops/HOLDOUT_2.json"):
+                p = os.path.join(here, *name.split("/"))
+                try:
+                    with open(p, "r", encoding="utf-8") as fh:
+                        h = json.load(fh)
+                    keep = {k: h[k] for k in sorted(h) if isinstance(h[k], (int, float, str, bool))}
+                    out.append("== %s\n%s" % (name, json.dumps(keep, ensure_ascii=False, indent=1)[:1500]))
+                except (OSError, ValueError):
+                    out.append("== %s: not on this node" % name)
+            try:
+                with open(os.path.join(here, "ops", "verdicts.jsonl"), "rb") as fh:
+                    rows = sum(1 for _ in fh)
+                out.append("== ops/verdicts.jsonl: %d rows (what the students learn from)" % rows)
+            except OSError:
+                out.append("== ops/verdicts.jsonl: not on this node")
+            return ("\n\n".join(out)[:12000], 200, {"Content-Type": "text/plain; charset=utf-8"})
 
         @self.app.route("/m/apk", methods=["GET"])
         def mobile_apk():

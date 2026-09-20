@@ -6346,6 +6346,49 @@ step that would change that — one 7–8B model on the PC behind the covenant
 judge, ~5 GB of memory, slow and far weaker than this — is his decision and
 is not started.
 
+### A158. [record / phone+pc] Buttons on top; Tetsu, our own voice; Image cards; Code, the reference panel; /m/students; the ask log feeds the chat memory. 2026-09-19
+
+**His asks, in his words.** "i want the buttons on the top also a coding
+option able to cross reference with git hub and all phone models and our
+students past work online resources etc to become more efficent also a voice
+preferably tien from dragon ball but up to the main agent and an image
+creation option also"; "as we use other models we improve also using the
+memory system in covenant"; "always looking for optimization vectors"; "Ok
+create our own Anime persona for a voice". App commit `d834d64`.
+
+**Voice.** A character's voice is a likeness not ours to copy; the persona
+is ours — **Tetsu**, `docs/PERSONA.md` in the app repo: the phone's own
+speech engine, its deepest English voice among those installed, pitch 0.8,
+rate 0.95, "Tetsu here." once per session, verdict first then the reason.
+The engine voice actually picked is logged by name the first time he
+speaks. Switch in Settings, default on. NOT measured: which voice the S25+
+has; the log line will say.
+
+**Image.** No model on either machine, no key asked for: the phone draws a
+1080×1080 card of the last answer (or the box's text) with a 6×6 mark from
+its sha256, saves it under Pictures/Covenant through MediaStore, and hands it
+to the share sheet, which also carries the text as a prompt to any image app
+on the phone. He has since said the real thing should be an open-source
+image model we take and improve on — that is the next pass, measured first
+(what this PC and the phone can run), not this one.
+
+**Code.** A reference panel, not a code writer: this device against the
+app's floor (Android 14+, minSdk 34), the repositories and this record, the
+students' past work as the PC serves it, and lookups that open GitHub code
+search or the Android reference in his own browser session (his rule:
+browser, not API; no keys). It opens only what it names (M5.38, text check).
+Writing code needs a model neither machine has — the same next pass.
+
+**PC side.** `GET /m/students` (tailnet, text): the tail of each distill
+record, the held-out results, the verdict ledger's row count; files absent
+say so (M6p, both ways). `POST /m/judge` now appends every ask and verdict
+to `ops/chat/ask_log.jsonl` — gitignored, beside the recorded model
+conversations — so what is asked on the PC's face is material the chat
+memory can read ("as we use other models we improve").
+
+**NOT measured.** The runner is the compiler; the screens are his eyes.
+MediaStore on One UI: the card path is standard API 29+ and untested here.
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
