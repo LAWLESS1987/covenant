@@ -150,20 +150,43 @@ def main():
     check("TM1d a rule that does not survive tells him nothing", len(CT._rows()) == n0 + 1)
 
     print("TM1e -- comfort, and what this module cannot do")
+    # A211 (2026-09-21, "We can make the crypto strategy unsettled"): these four
+    # checks used to pin COMFORT_SURVIVORS=3 AND Rule 5 as the VERDICT on comfort.
+    # That number was the assistant's, standing in for another's comfort, and his
+    # instruction was "build strategy till HE's comfortable". The checks now pin
+    # the stricter claim: the measurement is evidence and never a verdict, only
+    # Tetsu settles it, and settling it moves none of the operator's gates.
+    TM.COMFORT_DECLARATION = os.path.join(tempfile.mkdtemp(prefix="tm1e_"), "tetsu_comfort.json")
     st = TM.status(rule5_={"clears": False, "why": "4 settled signals, need 30"})
-    check("TM1e not comfortable: one survivor of three, Rule 5 not clearing, both named; live is never from here",
-          st["comfortable"] is False and len(st["survivors"]) == 1 and len(st["why"]) == 2 and "never from this module" in st["live"], st)
+    check("TM1e unsettled by default: comfort is None, not False and not True, and the module still cannot go live",
+          st["comfortable"] is None and st["settled"] is False and len(st["survivors"]) == 1
+          and "UNSETTLED" in st["why"][0] and "never from this module" in st["live"], st)
     # A187 ("comfortable generating a profit"): a survivor counts only with a positive paper return on a surviving asset
     TM._append({"kind": "hypothesis", "name": "stub-loss", "survives": True, "paper": True, "result": {"assets": {"X": {"survives": True, "return": -0.02}}}})
     st1b = TM.status(rule5_={"clears": True, "why": ""})
-    check("TM1e a survivor with a paper LOSS does not count toward comfort", st1b["comfortable"] is False and "stub-loss" in st1b["survivors"] and "stub-loss" not in st1b["profitable"], st1b)
+    check("TM1e a survivor with a paper LOSS is still kept out of the evidence (the measurement stayed honest)",
+          st1b["comfortable"] is None and "stub-loss" in st1b["survivors"] and "stub-loss" not in st1b["profitable"], st1b)
     for n in ("a", "b"):
         TM._append({"kind": "hypothesis", "name": "stub-" + n, "survives": True, "paper": True, "result": {"assets": {"X": {"survives": True, "return": 0.05}}}})
     st2 = TM.status(rule5_={"clears": False, "why": "4 settled signals, need 30"})
-    check("TM1e three distinct profitable survivors but Rule 5 not clearing: still not comfortable, one reason left",
-          st2["comfortable"] is False and len(st2["profitable"]) == 3 and st2["why"] == ["Rule 5 does not clear: 4 settled signals, need 30"], (st2["profitable"], st2["why"]))
+    check("TM1e three profitable survivors and Rule 5 failing: still unsettled, and Rule 5 is still named",
+          st2["comfortable"] is None and len(st2["profitable"]) == 3
+          and any("Rule 5 does not clear" in w for w in st2["why"]), (st2["profitable"], st2["why"]))
     st3 = TM.status(rule5_={"clears": True, "why": ""})
-    check("TM1e three survivors AND Rule 5 clearing: comfortable, and going live is still his go per order", st3["comfortable"] is True and "his go" in st3["why"][0] and "each order is his go" in st3["live"], st3)
+    check("TM1e the assistant's old bar fully met -- three survivors AND Rule 5 clearing -- STILL does not make it comfortable",
+          st3["comfortable"] is None and st3["settled"] is False and "UNSETTLED" in st3["why"][0]
+          and "assistant's number" in st3["needed_note"], st3)
+    TM.declare_comfortable("the paper rules have held for me and I am ready to watch it live")
+    st4 = TM.status(rule5_={"clears": True, "why": ""})
+    check("TM1e only Tetsu settles it: his own declaration makes it comfortable, and his reason is carried",
+          st4["comfortable"] is True and st4["settled"] is True and st4["declared_by_tetsu"]["by"] == "tetsu"
+          and "ready to watch it live" in st4["why"][0], st4)
+    TM.declare_comfortable("I have changed my mind", comfortable=False)
+    st5 = TM.status(rule5_={"clears": True, "why": ""})
+    check("TM1e a declaration is not a one-way door: he can take it back and it goes shut again",
+          st5["comfortable"] is False and st5["settled"] is True, st5)
+    check("TM1e settling it moves none of the operator's gates: live is still never from this module",
+          "never from this module" in st4["live"] and "each order is his go" in st4["live"])
     check("TM1e the real Rule 5 summary is read (measured, not assumed): it does not clear today and says why", TM.rule5()["clears"] is False and TM.rule5()["why"])
     src = open(TM.__file__, encoding="utf-8").read()
     check("TM1e the module imports no venue client, no trader and no order path (text check beside the run above)",

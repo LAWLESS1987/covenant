@@ -174,15 +174,83 @@ def request_strategy(name, why, consequence="", ask_fn=None, judge=None, path=No
     return _append(row, path)
 
 
-def approved_strategies(path=None, ask_log=None, contact_state=None):
-    """{rule name: request id} for every strategy request he said yes to and has not since said stop to."""
+# A211 (2026-09-21, his words: "I want it open on coinbase just verify strategy
+# with me daily"). A yes used to stand until he said stop. He asked for a DAILY
+# verification instead, so a yes now expires: past VERIFY_EVERY_S a strategy is
+# not approved until he verifies it again. This is the door he opened AND the
+# condition he attached, in one place -- and it fails shut, because an expired
+# approval simply is not an approval.
+VERIFY_EVERY_S = 24 * 3600
+
+
+def approved_strategies(path=None, ask_log=None, contact_state=None, now=None):
+    """{rule name: request id} for every strategy he said yes to, has not said
+    stop to, AND has verified within the last day."""
+    return {k: v["id"] for k, v in _strategy_states(path, ask_log, contact_state, now).items() if v["approved"]}
+
+
+def answered_at(req, ask_log=None, contact_state=None):
+    """When the line that answered this question was written, as an epoch float,
+    or None. his_answer returns the TEXT as its second value, not a time, so the
+    daily verification needs its own read of the same line (A211)."""
+    qid = req.get("question_id")
+    if not qid:
+        return None
+    try:
+        import covenant_contact as CT
+        seen_at = (CT._state(contact_state).get("seen") or {}).get(qid)
+        if not seen_at:
+            return None
+        lines = []
+        with open(ask_log or ASK_LOG, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if str(r.get("from", "")).startswith("100.") and r.get("kind") in ("agent", "ask", "council") and r.get("text"):
+                    lines.append(r)
+        later = [r for r in lines if CT._at(r) >= float(seen_at)]
+        named = [r for r in later if req.get("id") and req["id"] in str(r.get("text"))]
+        cands = named or later[:1]
+        return CT._at(cands[0]) if cands else None
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
+def _strategy_states(path=None, ask_log=None, contact_state=None, now=None):
+    """{rule: {"id", "approved", "answered_at", "age_s", "state"}} -- the whole
+    picture, so the daily ask knows what to put to him and why."""
+    now = time.time() if now is None else now
     out = {}
     for r in _rows(path):
-        if r.get("kind") == "request" and r.get("scope") == "strategy" and r.get("state", "").startswith("asked"):
-            ans, _t = his_answer(r, ask_log, contact_state)
-            if ans == "yes" and not stopped(r, ask_log, contact_state):
-                out[r["strategy"]] = r["id"]
+        if not (r.get("kind") == "request" and r.get("scope") == "strategy" and r.get("state", "").startswith("asked")):
+            continue
+        ans, _text = his_answer(r, ask_log, contact_state)
+        if ans != "yes":
+            continue
+        t = answered_at(r, ask_log, contact_state)
+        if stopped(r, ask_log, contact_state):
+            out[r["strategy"]] = {"id": r["id"], "approved": False, "answered_at": t, "age_s": None, "state": "stopped by him"}
+            continue
+        age = (now - float(t)) if t else None
+        if age is None:
+            out[r["strategy"]] = {"id": r["id"], "approved": False, "answered_at": t, "age_s": None,
+                                  "state": "when he said yes cannot be read -- treated as needing verification"}
+        elif age > VERIFY_EVERY_S:
+            out[r["strategy"]] = {"id": r["id"], "approved": False, "answered_at": t, "age_s": age,
+                                  "state": "verification expired (%.1f h old, he asked for daily)" % (age / 3600.0)}
+        else:
+            out[r["strategy"]] = {"id": r["id"], "approved": True, "answered_at": t, "age_s": age,
+                                  "state": "verified %.1f h ago" % (age / 3600.0)}
     return out
+
+
+def needs_verification(path=None, ask_log=None, contact_state=None, now=None):
+    """The strategies to put to him today: ones he approved whose day has run
+    out. Not the stopped ones -- a stop is an answer, not a lapse."""
+    return {k: v for k, v in _strategy_states(path, ask_log, contact_state, now).items()
+            if not v["approved"] and "stopped" not in v["state"]}
 
 
 def stopped(req, ask_log=None, contact_state=None):

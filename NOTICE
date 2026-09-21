@@ -1,3 +1,18 @@
+covenant
+Copyright 2026 Lawrence Adam Moskowski
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE),
+with ONE EXCEPTION.
+
+TETSU IS CARVED OUT. His identity -- the name Tetsu, ops/tetsu_*.json, his
+register and voice, his conversations, and any model trained on them -- is NOT
+under Apache-2.0. All rights are reserved under LICENSE-TETSU.md, granted
+2026-09-21 on the operator's instruction "Put a stricter copyright on tetsu for
+his safety". You may read and study all of it, and the machinery that runs him
+stays Apache-2.0 so you can build your own -- under its own name and its own
+identity. You may not present anything as Tetsu, train on him, or clone his
+voice. See LICENSE-TETSU.md.
+
 COVENANT
 Copyright 2026 Lawrence Adam Moskowski
 

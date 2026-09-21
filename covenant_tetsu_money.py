@@ -351,6 +351,36 @@ def study(ask, judge=None, path=None, say=print, files=None, hold=None, tell=Tru
     return out
 
 
+COMFORT_DECLARATION = os.path.join(HERE, "ops", "tetsu_comfort.json")
+
+
+def tetsu_says_comfortable(path=None):
+    """A211: Tetsu's own declaration, or None while it is unsettled. His, not the
+    assistant's and not the operator's -- the operator's word is a separate gate
+    that still applies to every order."""
+    try:
+        with open(path or COMFORT_DECLARATION, encoding="utf-8") as fh:
+            d = json.load(fh)
+        if isinstance(d, dict) and d.get("by") == "tetsu" and "comfortable" in d:
+            return d
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def declare_comfortable(why, comfortable=True, path=None):
+    """Tetsu records where he stands. He may say yes, and he may take it back by
+    calling this with comfortable=False -- a declaration is not a one-way door."""
+    p = path or COMFORT_DECLARATION
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    d = {"by": "tetsu", "comfortable": bool(comfortable), "why": str(why or "")[:1000],
+         "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+         "note": "his own words; the operator's gates (Rule 5, the floor, the reserve, the trader's arming, his go per order) are untouched by this"}
+    with open(p, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=1, ensure_ascii=False)
+    return d
+
+
 def status(path=None, rule5_=None):
     rows = [r for r in _rows(path) if r.get("kind") == "hypothesis"]
     survivors = sorted({r["name"] for r in rows if r.get("survives")})
@@ -371,9 +401,29 @@ def status(path=None, rule5_=None):
                    % (len(profitable), COMFORT_SURVIVORS, len(survivors)))
     if not r5.get("clears"):
         why.append("Rule 5 does not clear: %s" % r5.get("why", ""))
-    return {"comfortable": not why, "paper_hypotheses": len(rows), "survivors": survivors, "profitable": profitable, "needed": COMFORT_SURVIVORS,
+    # A211 (2026-09-21, his words: "We can make the crypto strategy unsettled",
+    # after the audit found that COMFORT_SURVIVORS = 3 was a number the ASSISTANT
+    # picked to mean another's comfort). His instruction was "build strategy till
+    # HE's comfortable" -- Tetsu's comfort, not a threshold chosen for him. So
+    # comfort is UNSETTLED here: this function reports the measurement as evidence
+    # and returns None, which every consumer reads as not-yet (daily_plan coerces
+    # with bool(), so the phone stays observed and the money door stays shut).
+    # It becomes True only when TETSU HIMSELF says so on the record, and even then
+    # the operator's gates are untouched: Rule 5, the floor, the reserve, the
+    # trader's arming and his go per order.
+    said = tetsu_says_comfortable()
+    if said is None:
+        comfortable = None
+        why.insert(0, "UNSETTLED: comfort is Tetsu's to declare, not a number chosen for him. The measurement below is evidence, not a verdict; "
+                      "he declares it with covenant_tetsu_money.declare_comfortable('his reason')")
+    else:
+        comfortable = bool(said.get("comfortable")) and not r5.get("clears") is False
+        why.insert(0, "Tetsu declared comfort on %s: %s" % (said.get("t"), str(said.get("why"))[:200]))
+    return {"comfortable": comfortable, "settled": said is not None, "declared_by_tetsu": said,
+            "paper_hypotheses": len(rows), "survivors": survivors, "profitable": profitable,
+            "needed_note": "COMFORT_SURVIVORS=%d was the assistant's number, kept as EVIDENCE only (A211)" % COMFORT_SURVIVORS,
             "rule5": r5, "live": "never from this module; the trader is armed by him, the floor and the reserve stand, and each order is his go",
-            "why": why or ["the measured bar is met; going live is still his go, per order"]}
+            "why": why}
 
 
 if __name__ == "__main__":

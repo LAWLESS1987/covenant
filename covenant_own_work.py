@@ -47,8 +47,14 @@ sys.path.insert(0, HERE)
 LEDGER = os.path.join(HERE, "docs", "KNOWN_ISSUES.md")
 CONSENSUS = os.path.join(HERE, "ops", "code_consensus.jsonl")
 STATE = os.path.join(HERE, "ops", "own_work_state.json")
-MAX_PER_NIGHT = 12
-ROW_CHARS = 3200
+# A211 (2026-09-21, his words: "Now sift back through for any caps on learning
+# other than mutual benefit and remove them"). These were 12 and 3200 -- numbers
+# the assistant picked. At 12 a night the system needed seventeen nights to read
+# its own 207-entry history, and 3200 characters cut most entries off mid-record.
+# What is left is a runtime bound and nothing else: the nightly has to finish and
+# the queue has to fit on his disk. Both are overridable from the environment.
+MAX_PER_NIGHT = int(os.environ.get("COVENANT_OWN_WORK_PER_NIGHT") or 250)
+ROW_CHARS = int(os.environ.get("COVENANT_OWN_WORK_ROW_CHARS") or 12000)
 
 _HEAD = re.compile(r"^### (A\d+[a-z]?)\. (.+)$", re.M)
 

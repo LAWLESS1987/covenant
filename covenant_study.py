@@ -554,7 +554,11 @@ def precepts_in(text, max_len=240, min_len=40):
     return out
 
 
-def extract(limit_per_book=400, say=print):
+def extract(limit_per_book=None, say=print):
+    # A211: was a fixed 400 per book per pass. Overridable, and far higher by
+    # default -- extraction is local, plain Python over text already on disk,
+    # so the only thing a cap here saves is time the nightly already has.
+    limit_per_book = int(os.environ.get("COVENANT_STUDY_PER_BOOK") or 4000) if limit_per_book is None else limit_per_book
     os.makedirs(OUT, exist_ok=True)
     _ok, bad = verify(say=lambda *_a, **_k: None)
     skip = {gid for gid, _t, _d in bad}

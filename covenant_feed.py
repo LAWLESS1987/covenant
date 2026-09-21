@@ -57,8 +57,11 @@ sys.path.insert(0, HERE)
 CACHE = os.path.join(HERE, "private", "feed")
 STATE = os.path.join(HERE, "ops", "feed_state.json")
 UA = {"User-Agent": "covenant-feed/1.0 (open sources only; github.com/LAWLESS1987/covenant)", "Accept": "application/atom+xml, application/json, text/html;q=0.8, */*;q=0.5"}
-PER_TOPIC = 6
-DIGEST_CHARS = 3000
+# A211: these were 6 and 3000, the assistant's numbers. Raised, and overridable.
+# What remains is only what keeps a nightly pass finishing and polite to the open
+# services it reads (OpenAlex, Europe PMC and arXiv are free and shared).
+PER_TOPIC = int(os.environ.get("COVENANT_FEED_PER_TOPIC") or 25)
+DIGEST_CHARS = int(os.environ.get("COVENANT_FEED_DIGEST_CHARS") or 12000)
 
 # (name, his words, kind, query-or-pages)
 TOPICS = [

@@ -255,7 +255,7 @@ def main():
         # the study draws its precepts. Network failure is reported, not fatal.
         try:
             if a.study > 0:
-                _new, _sk = S.fetch_oa(per_query=2, say=say)
+                _new, _sk = S.fetch_oa(per_query=int(os.environ.get("COVENANT_OA_PER_TOPIC") or 10), say=say)   # A211: was 2
                 _tot, _per = S.extract(say=lambda *_x: None)
                 say("open access: +%d article(s), %d precept(s) extracted" % (_new, _tot))
         except Exception as _oe:                                     # noqa: BLE001
@@ -473,6 +473,21 @@ def main():
         # is a dry run that records what would be placed; 1 places.
         try:
             import covenant_tetsu_live as TLV
+            # A211 (2026-09-21, his words: "I want it open on coinbase just verify
+            # strategy with me daily"). The door is open; the condition he attached
+            # is a DAILY verification, so a yes older than a day is not an approval
+            # and the rule it covered stops trading until he verifies it again.
+            # This puts each lapsed rule back to him on the direct line, once.
+            try:
+                _need = TLV.needs_verification()
+                for _rule, _st in _need.items():
+                    say("live: %s needs his daily verification -- %s" % (_rule, _st["state"]))
+                    TLV.request_strategy(_rule, "daily verification you asked for: this rule traded under your yes and the day has run out",
+                                         consequence="until you answer, this rule places nothing")
+                if not _need:
+                    say("live: every approved rule is verified within the day")
+            except Exception as _ve:                             # noqa: BLE001
+                say("live: the daily verification could not be put to him (%s: %s)" % (type(_ve).__name__, str(_ve)[:120]))
             TLV.settle(dry_run=(a.money_live <= 0), say=say)      # his answers first (orders, and yes/no to a rule)
             # "It can be a yes to a trading strategy also": every rule his yes covers
             # reads its signal on the last bar and raises the order it calls for,

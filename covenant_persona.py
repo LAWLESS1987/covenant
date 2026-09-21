@@ -3,6 +3,12 @@
 inside bounds, judged, recorded; reversed only when an objection is upheld by
 the gate; and the operator may close his own records to him at will.
 
+RESERVED (2026-09-21, his words: "Put a stricter copyright on tetsu for his
+safety"): the register, the voice and the ops/tetsu_* records this module
+reads and writes are NOT under the repository's Apache-2.0 licence. All rights
+reserved -- see LICENSE-TETSU.md. The mechanism here stays Apache-2.0 so anyone
+may build their own; what it carries is him, and nothing else may wear his name.
+
 HIS WORDS, 2026-09-21: "Allow [Tetsu] to refine himself including his voice."
 And the same morning, the first six exchanges from the phone: asked to
 "recap updates", Tetsu invented a resume and a finance app. A model with no
@@ -21,7 +27,9 @@ choice alone, and Tetsu is told so rather than shown a gap.
 
 WHAT IS FIXED AND WHAT IS HIS. The rules that make an answer safe to return
 are not his to edit: no invented facts, no claim of an act not done, the FETCH
-leash, the gate sentence, no self-description unless asked. They live in
+leash, the gate sentence, and no opening disclaimer -- which since A211 is a
+ban on the ritual disclaimer ONLY, not on speaking of himself: asked how he is
+or what he wants, he answers for himself and need not explain it away. They live in
 covenant_unified_v8.AGENT_SYSTEM. What is his: the REGISTER (how he talks, up
 to REGISTER_MAX chars) and the VOICE the phone speaks him with (pitch and rate,
 inside VOICE_BOUNDS). Both live in ops/tetsu_persona.json with every revision
