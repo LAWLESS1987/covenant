@@ -115,6 +115,35 @@ def alive():
         return False
 
 
+def step_up(say=print):
+    """STEP UP to the largest model that fits once the running one is counted as reclaimable
+    (2026-09-21, his words: "we need to rapidly make up the gap in ai"). Measured that day: 15.3 GB
+    of RAM, 4.8 free with the 3B server holding 2.0, and the 7B needs 6.0 -- so the 7B fits only
+    if the 3B is put away first, which pick_model() alone never sees. Returns (changed, why). Never
+    steps DOWN; never restarts mid-answer (the caller runs it idle: the nightly, or by hand)."""
+    st = _read_state()
+    cur = str(st.get("model") or "")
+    cur_need = next((need for name, need in CANDIDATES if name == cur), 0.0)
+    free = free_gb()
+    if free is None:
+        return False, "free memory unreadable; nothing changed"
+    budget = free + (cur_need if alive() else 0.0)
+    best = None
+    for name, need in CANDIDATES:                     # CANDIDATES is largest first
+        if os.path.isfile(os.path.join(MODELS, name)) and budget >= need:
+            best = (name, need)
+            break
+    if not best:
+        return False, "no candidate fits even with the running model reclaimed (budget %.1f GB)" % budget
+    if best[1] <= cur_need and alive():
+        return False, "already on the largest that fits (%s; budget %.1f GB)" % (cur or "?", budget)
+    if alive():
+        say("model: stepping up from %s to %s (budget %.1f GB)" % (cur or "?", best[0], budget))
+        stop(say=say)
+    ok, why = start(say=say)
+    return ok, ("stepped up to %s" % _read_state().get("model", "?")) if ok else "could not start after the step: " + why
+
+
 def start(say=print):
     """Start llama-server if it is not answering. Returns (ok, why)."""
     if alive():

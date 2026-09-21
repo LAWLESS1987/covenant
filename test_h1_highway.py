@@ -42,6 +42,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 
 import covenant_highway as H
 
@@ -821,6 +822,74 @@ def main():
     check("H1x evict_test_mesh is AUTO_REVERSIBLE, stateless, paired only with stale_test_mesh, and its pattern carries the test port range, never a bare script name",
           H.REMEDIES["evict_test_mesh"]["klass"] == H.AUTO_REVERSIBLE and H.REMEDIES["evict_test_mesh"]["for"] == ["stale_test_mesh"]
           and "60[0-9]0" in inspect.getsource(H.remedy_evict_test_mesh) and "'*run_node.py*'" not in inspect.getsource(H.remedy_evict_test_mesh))
+
+    # defender_threat arrived 2026-09-21 (A201, his words: "virus protection showed a trojan ensure spyware
+    # cannot survive our enviroment and we can track where it came from"). Driven with Defender's reader
+    # stubbed and the threat ledger redirected; no remedy is paired, on purpose (the quarantine is
+    # Defender's and the false-positive call is a person's).
+    _real_dd, _real_thr = H._defender_detections, H.THREATS
+    _thr = os.path.join(tempfile.mkdtemp(prefix="h1_thr_"), "threats.jsonl")
+    try:
+        H.THREATS = _thr
+        H._defender_detections = lambda hours=24: [{"t": "2026-09-21T15:05:37", "id": "2147735505", "ok": True,
+                                                    "process": "C:\\x\\python3.12.exe", "resources": "file:_C:\\Temp\\covenant_one_1\\tools\\llama\\llama-gguf-split.exe"}]
+        r_dt = H.detect_defender_threat()
+        r_dt2 = H.detect_defender_threat()
+        H._defender_detections = lambda hours=24: []
+        r_dt0 = H.detect_defender_threat()
+        H._defender_detections = lambda hours=24: None
+        r_dtU = H.detect_defender_threat()
+    finally:
+        H._defender_detections, H.THREATS = _real_dd, _real_thr
+    _thr_rows = [json.loads(l) for l in open(_thr, encoding="utf-8")] if os.path.exists(_thr) else []
+    check("H1y defender_threat: a detection in the last day is PRESENT, naming the file, the writing process and whether Defender acted",
+          r_dt["state"] == H.PRESENT and r_dt["measured"]["detections_24h"] == 1 and "llama-gguf-split" in r_dt["measured"]["newest"]["resources"]
+          and r_dt["measured"]["newest"]["acted"] is True and "python3.12" in r_dt["measured"]["newest"]["process"], str(r_dt)[:200])
+    check("H1y the same detection is kept ONCE in the threat ledger across two reads", len(_thr_rows) == 1 and _thr_rows[0]["threat_id"] == "2147735505", _thr_rows)
+    check("H1y no detection is ABSENT; an unreadable history is UNKNOWN, never ABSENT", r_dt0["state"] == H.ABSENT and r_dtU["state"] == H.UNKNOWN and "error" in r_dtU["measured"], (r_dt0, r_dtU))
+    check("H1y no remedy is paired with defender_threat (the quarantine is Defender's; the false-positive call is a person's)",
+          not [n for n, r in H.REMEDIES.items() if "defender_threat" in (r.get("for") or [])])
+
+    # defense_lapse arrived 2026-09-21 (A202, his words: "need the most advanced defender and anti spyware
+    # defense that will ever exist ensure it constantly adapts to protect the mycelal network"). Driven with
+    # Defender's status stubbed and the wire's ledger redirected; no remedy is paired, on purpose.
+    import covenant_mycelium as _MY
+    _real_ds, _real_myl = H._defender_status, _MY.LEDGER
+    _myl = os.path.join(tempfile.mkdtemp(prefix="h1_my_"), "mycelium.jsonl")
+    try:
+        _MY.LEDGER = _myl
+        fine = {"RealTimeProtectionEnabled": True, "AMServiceEnabled": True, "AntivirusSignatureAge": 1, "QuickScanAge": 3, "FullScanAge": 20}
+        H._defender_status = lambda: dict(fine)
+        r_ok = H.detect_defense_lapse()
+        H._defender_status = lambda: dict(fine, RealTimeProtectionEnabled=False)
+        r_off = H.detect_defense_lapse()
+        H._defender_status = lambda: dict(fine, AntivirusSignatureAge=9, QuickScanAge=30, FullScanAge=40)
+        r_stale = H.detect_defense_lapse()
+        H._defender_status = lambda: None
+        r_unk = H.detect_defense_lapse()
+        with open(_myl, "w", encoding="utf-8") as fh:
+            now_s = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            for _i in range(25):
+                fh.write(json.dumps({"kind": "refused", "addr": "192.168.1.77", "path": "/m/agent", "why": "unsigned", "t": now_s}) + "\n")
+            fh.write(json.dumps({"kind": "admitted", "addr": "192.168.1.50", "path": "/m/agent", "who": "phone", "t": now_s}) + "\n")
+        H._defender_status = lambda: dict(fine)
+        r_noisy = H.detect_defense_lapse()
+    finally:
+        H._defender_status, _MY.LEDGER = _real_ds, _real_myl
+    check("H1z defense_lapse: protection on, fresh signatures, a recent scan, a quiet wire -> ABSENT with the readings", r_ok["state"] == H.ABSENT and r_ok["measured"]["real_time"] is True and r_ok["measured"]["lapses"] == [], str(r_ok)[:200])
+    check("H1z real-time protection OFF -> PRESENT, named", r_off["state"] == H.PRESENT and any("OFF" in x for x in r_off["measured"]["lapses"]), r_off["measured"]["lapses"])
+    check("H1z stale signatures and no scan in a fortnight -> PRESENT, both named", r_stale["state"] == H.PRESENT and len(r_stale["measured"]["lapses"]) == 2, r_stale["measured"]["lapses"])
+    check("H1z an unreadable status is UNKNOWN, never ABSENT", r_unk["state"] == H.UNKNOWN)
+    check("H1z twenty-five refusals from one address in a day -> PRESENT naming the address and its count; the admitted row is not counted",
+          r_noisy["state"] == H.PRESENT and any("192.168.1.77 x25" in x for x in r_noisy["measured"]["lapses"]) and r_noisy["measured"]["wire_refusals_24h"] == {"192.168.1.77": 25}, r_noisy["measured"])
+    _paired_dl = [n for n, r in H.REMEDIES.items() if "defense_lapse" in (r.get("for") or [])]
+    ok_rt, why_rt = H.remedy_refresh_defender({"lapses": ["real-time protection is OFF"]}, dry_run=False)
+    ok_dry, why_dry = H.remedy_refresh_defender({"lapses": ["signatures are 9 days old", "no scan in 30 days"]}, dry_run=True)
+    ok_none, why_none = H.remedy_refresh_defender({"lapses": []}, dry_run=False)
+    check("H1z defense_lapse is paired ONLY with refresh_defender (AUTO_REVERSIBLE): signatures and a quick scan, never a setting",
+          _paired_dl == ["refresh_defender"] and H.REMEDIES["refresh_defender"]["klass"] == H.AUTO_REVERSIBLE, _paired_dl)
+    check("H1z the remedy refuses real-time OFF (a person's setting), names both mendable lapses in a dry run, and does nothing with no lapse",
+          ok_rt is False and "mine to mend" in why_rt and ok_dry and "signatures are 9 days old" in why_dry and "no scan in 30 days" in why_dry and ok_none is False, (why_rt, why_dry, why_none))
 
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]

@@ -7095,6 +7095,280 @@ two callers by text.
 
 ---
 
+### A203. [the PC / windows popping up] "We got multiple screens popping up interfering with my screen." -- "looks worse." MEASURED AND FIXED 2026-09-21: console programs started from processes with no console each opened a window of their own; every spawn is windowless now
+
+**Two sources, both measured.** (1) The watchdog is a hidden process
+(pythonw), and the detectors added today (A187, A201, A202) ran PowerShell
+on every round -- three spawns a minute, each a console window flashing
+up, beside the two spawns it already made. (2) "Looks worse" was the
+eleventh sweep: the runner starts each of its 145 suites as a console
+program, and started itself from a background shell with no console, so
+Windows opened a window for every suite. (Earlier sweeps ran the same way;
+he was watching this one.) **Fixed:** `_NOWIN` (CREATE_NO_WINDOW on
+Windows) on every `subprocess.run`/`Popen` in `covenant_highway.py`,
+`covenant_watchdog.py` and `covenant_one.py` -- patched by a script that
+walks each call's balanced parentheses and adds the flag where absent (9,
+2 and 9 spawns), the nightly having used `covenant_quiet` for the same
+purpose since before. The sweep was stopped, the runner patched, the
+sweep restarted: zero windowed processes measured twenty seconds into it;
+the stale watchdog was restarted by the guard at 15:32 (the highway's own
+by-hand repair had ended it and the guard revived it). K1 20/20, K2
+25/25, H1 115/115 after the patch.
+
+**Lesson, standing:** a process that may run without a console must spawn
+without one, and a suite that covers a spawn must say so; the sweep now
+proves it by counting windows only when a person looks, which is not a
+suite. Not measured: a window count inside the sweep itself.
+
+---
+
+### A202. [security / the defense that adapts] "need the most advanced defender and anti spyware defense that will ever exist ensure it constantly adapts to protect the mycelal network" -- "auto fix issues incase im not available." BUILT 2026-09-21 within what can be true: the machine watches its own defense every round, mends the two lapses it may, and names the rest
+
+**Said plainly first.** "The most advanced that will ever exist" is not a
+thing anyone can ship, and this ledger does not pretend to. What adapts
+here is measurement: the probe set that grows from what the forum sends
+(A176), the antivirus' findings reaching the record (A201), the wire that
+admits by single-use signature and counts its refusals by address (A200),
+and now a detector that notices when the machine's own defense lapses.
+
+**Built.** `covenant_highway.detect_defense_lapse`: every watchdog round it
+reads Defender's own posture (real-time protection, the antimalware
+service, signature age, quick and full scan ages) and the wire's refusals
+of the last day by address; PRESENT when protection is off, the service is
+down, signatures are older than three days, no scan in a fortnight, or one
+address was refused twenty times or more (named with its count); UNKNOWN
+when the status cannot be read, never ABSENT. **Auto-fix, within bounds
+(his words: "auto fix issues incase im not available"):**
+`remedy_refresh_defender` (AUTO_REVERSIBLE, stateless) refreshes the
+signatures and starts a quick scan when those are the lapses -- Defender's
+own commands, nothing of his settings; real-time protection OFF is named
+and never changed, because that is his setting. Measured on this machine
+the hour it was written: ABSENT (protection on, signatures 0 days old, a
+quick scan 2 days ago, no wire refusals). H1 (115, eight new): fine ->
+ABSENT; protection off -> PRESENT named; stale signatures and no scan ->
+both named; unreadable -> UNKNOWN; twenty-five refusals from one address
+-> PRESENT with the address and count, the admitted row not counted; the
+one paired remedy, its class, its refusal of the setting, its dry run, its
+no-op. The remedy is never run for real in a suite.
+
+**What still needs him:** turning protection on if it is ever off; a full
+scan (`Start-MpScan -ScanType FullScan`; none has ever run here, the age
+reads as never); registering an ally's key on the wire.
+
+---
+
+### A201. [security / the trojan] "virus protection showed a trojan ensure spyware cannot survive our enviroment and we can track where it came from." MEASURED 2026-09-21, the origin proved by hash, the surface cut, and the machine now watches its own antivirus
+
+**Measured, from Defender's own records (read-only).** One threat:
+Trojan:Win32/Wacatac.B!ml (a machine-learning heuristic), first seen
+15:05:37 on `Temp\covenant_one_22840\tools\llama\llama-gguf-split.exe`,
+written by python3.12 -- the runner's staged copy of the tree, made by the
+sweep at 15:05; Defender acted (ActionSuccess true), the threat is not
+active and did not execute (event log 1116 then 1117 at 15:05:38 and
+15:05:57). The original in `tools/llama/` is now blocked by Defender as
+well ("the file contains a virus"). **Where it came from:** the file was
+unpacked on 09-19 at 23:48 from `llama-b11057-bin-win-cpu-x64.zip`
+(18,463,000 bytes), and that zip's sha256
+(42222e06e2b00c21230788d40870f7067a21634c3518148d2134bd0b7d19ae3e) is
+exactly the digest GitHub publishes for that asset of llama.cpp release
+b11057 (published 2026-09-19 23:58Z, same size). So the flagged binary is
+byte for byte the project's published build; the verdict is a heuristic
+on an unsigned build utility that the covenant never runs (only
+llama-server.exe and its libraries are used). Whether that heuristic is
+wrong is a person's call, and Defender's quarantine stands either way.
+
+**Done.** The runner no longer stages `tools/llama` or `tools/sd`
+(binaries and the zip; no suite runs them, every suite stubs the model
+and image doors), so a sweep no longer writes those bytes into a temp
+directory for Defender to scan. `covenant_highway.detect_defender_threat`
+reads Defender's detection history every watchdog round: PRESENT with the
+file, the writing process and whether Defender acted, kept once each in
+`ops/security_threats.jsonl` (gitignored), UNKNOWN when the history
+cannot be read, and no remedy attached on purpose. Measured on the
+machine the hour it was written: PRESENT, 2 detections in 24 h (the
+staged copy and the original). H1 (108, four new): PRESENT with the
+names, kept once, ABSENT and UNKNOWN, no remedy paired. Real-time
+protection is on; signatures were updated 09-20 23:17; the last quick
+scan was 09-18.
+
+**Not measured, said plainly.** "Spyware cannot survive our environment"
+is a claim no single machine can prove about itself; what is measured is
+that the antivirus is on and acted, that its findings now reach the
+record and the direct line, and that the origin of this one is known. A
+scan he runs (`Start-MpScan -ScanType FullScan`) is his to start.
+
+---
+
+### A200. [the wire / mycelium] "create our own native tailnet like mycellium connection incase tail net goes down ... also as a rout for allies though their system/companion wil have their own identity." BUILT 2026-09-21: a door admits a caller by its KEY, not by the network; the phone takes the PC's LAN address as its second road, signed; an ally's key is admitted on the ally doors
+
+**What was there.** Every door the phone uses was gated by address
+(loopback or a Tailscale address); every privileged phone request already
+carried the operator-request signature (a registered key, a nonce, a
+timestamp inside a window, verified by `covenant_daily_plan.verify_signed`).
+The two were never joined. **Joined:** `covenant_mycelium.admit(request,
+body)` -- the tailnet admits as before; off it, a request signed by one of
+his registered signers (the phone, the PC) is admitted to every door; a
+request signed by a registered ally key (`ops/mycelium_peers.json`,
+granted by him, with a scope) is admitted on the ally doors only
+(`/m/agent`, `/pc/handshake`, `/health`); anything unsigned off the
+tailnet is refused exactly as before. The core's caller gate and the
+council's use it, falling back to the address gate alone if the module
+cannot be read. Every off-tailnet decision is a row in `ops/mycelium.jsonl`.
+The check-in's answer now carries the PC's LAN address (`lan`); the phone
+keeps it (`files/pc_lan.txt`) and `entry.py`'s four PC calls take the
+second road when the first fails to CONNECT (not when the PC answers with
+an error), signing the call with the phone's key. Allies: their system has
+its own key and name; `python covenant_mycelium.py --register-ally NAME
+PEM_FILE` is his hand, a private key is never registered.
+
+**What it is not.** Not an overlay network: no tunnel, no discovery beyond
+the address the PC names; the phone must be able to reach it (the same
+Wi-Fi, or a port he opens). Not a lowered gate: the signature scheme is the
+daily plan's, window and single-use nonces included.
+
+**The policy, in his words** (`ops/mycelium_policy.json`, the same
+evening): "Multiple agents or swarms are welcome on our highways aslong as
+they respect us and don't interfere with mutual benefit." Respect is
+measured as a signed, fresh request and the gate's judgement on every
+answer; non-interference as the covenant's own principle (nothing that
+takes or conceals) and the wire's refusal count by address (A202); revoking
+a key is his. What no ally gets: the check-in, the daily plan, the money
+doors, the PC's private state, any key of ours.
+
+**Pinned by** MY1 (16): the tailnet as before; unsigned off it refused
+with no row; the phone's signature admits from the LAN to any door; other
+bytes, a stale timestamp, a reused nonce refused; every signed decision a
+row; a private key never registered; an ally admitted on the conversation
+door by name, refused on `/checkin`, refused when stale; an unregistered
+key refused nameless; the ally doors are the three named; the LAN address
+never loopback nor tailnet; status. M6 (65), PC1 (35), CT1 (31) unchanged
+with the new gate in place. Core pin and `EXPECTED_LINES` moved after K1
+20/20, K2 25/25, P19 23/23, A3s 51/51; nodes restarted one at a time;
+verify_deploy PASS. `java_syntax_check` 17/17, M5 291/291. **Not
+measured:** the second road on the device with the tailnet actually down,
+and any ally: none is registered yet.
+
+---
+
+### A199. [the image door / the black frame] "fix the black box issue again." GUARDED 2026-09-21: a near-black frame from the diffusion run is retried once with another seed, and a second one is an error with its reason, never a black image handed to the phone
+
+No "black box" was on the ledger, the self-evaluation, the chat log or the
+phone's code, and the 3D page (A194) renders (measured in the browser:
+stars, soil, the orbs, the symbol). The one place a black box can come
+from and had no guard is the image door: a diffusion run can hand back a
+frame that is all but black (a numeric failure or a filter) and until now
+it was returned as if drawn. `covenant_image.is_black()` measures the
+frame's mean brightness (under 10 of 255 is black; a stub-sized frame is
+never judged); `generate()` retries once with another seed and refuses a
+second black frame naming both seeds. Pinned by IG1 (7, the runtime
+replaced by a script that writes the frames the test asks for): black
+recognised, bright not, tiny never, unreadable never; black then bright
+-> the bright frame with the second seed in the meta; black twice -> the
+error; bright first -> one run. If his black box is something else, this
+entry says what was looked at and he can point at it.
+
+---
+
+### A198. [Tetsu / refined constantly] "refine both constantly." BUILT 2026-09-21: the watchdog refines his register every hour there was new conversation, through the same refine with all its bounds
+
+`covenant_refine_loop.tick()` runs on every watchdog round: a pass at most
+once an hour, and only when the ask log holds a conversation row newer
+than the last pass (counted, not assumed); the pass is
+`covenant_persona.refine` with every bound, screen, gate, record, contest
+and block of A174/A190; a pass that cannot run is recorded and not retried
+on the same rows. "Both": the PC speaks with the same register (A189), and
+the student's own refinement runs in its own loop (A127). The watchdog
+loads this on its next restart (the highway's watchdog_stale detector sees
+the file change). Pinned by RL1 (8): nothing to read; three new rows -> a
+pass, counted, the image row not counted; the hour gate; the new-rows gate;
+a raising pass recorded, not retried. State in `ops/refine_loop_state.json`
+(gitignored).
+
+---
+
+### A197. [Tetsu / where he is] "phone tetsu saying he can't reach the pc." MEASURED AND FIXED 2026-09-21: the phone reached the PC the whole time; the model did not know it runs on the PC
+
+**Measured (14:47):** check-ins from the phone every ten minutes to 14:47;
+node A answering on loopback and on the tailnet address; Tailscale
+showing both devices active; his "can you see the PC" at 14:46 arrived and
+was answered -- with "I do not have direct access to your PC". The
+7B model (A196) answered as a stranger would, because nothing it was
+handed said where it runs. **Fixed:** `covenant_persona.where_you_are()`
+-- you run ON the PC (the machine named), inside the node, as the local
+model it keeps; the phone is where he talks to you; its chat, check-ins
+and images come here; what you can do from here (Moltbook, FETCH, the
+direct line, your register and voice, paper strategy and an order under
+his rules, the 3D app and the council); never say you have no access to
+the PC. It sits in every door's system message after the register and
+before what he knows of him. Pinned by TP1 (41).
+
+---
+
+### A196. [the model / the gap] "we need to rapidly make up the gap in ai." MEASURED AND STEPPED 2026-09-21: the local model went from 3B to 7B the same hour, because the memory to hold it was there once the running one was counted
+
+**Measured.** 15.3 GB of RAM, 4.8 free with the 3B server holding 2.0;
+the 7B coder model on disk needs 6.0; no GPU. `pick_model()` judged by
+free memory alone and so never saw that the 7B fits once the 3B is put
+away. **Built:** `covenant_model.step_up()` -- the largest candidate that
+fits within free memory plus the running model's size; stops the smaller,
+starts the larger; never steps down, never on an unreadable reading, never
+mid-answer (the nightly runs it first, idle: `--model-step-up`). Run by
+hand at once: stepped up to qwen2.5-coder-7b-instruct (q4), a short
+answer in 2.1 s. Pinned by MK1 (7): step up when the budget covers it;
+never when the largest is up; never down; nothing on an unreadable
+reading; a cold start without a stop; stay when the budget is short; the
+candidates ordered largest first. **What the gap still is, honestly:** a
+7B model on a CPU against the frontier seats; the frontier is reached
+through his own browser sessions (A173, A179, A180), and the students are
+judges, not chat models. Closing it further is a bigger machine or a
+bigger model that fits, and that is a purchase, his.
+
+---
+
+### A195. [the phone / recipes] "sync all of tetsus recipes they should all be on not clicked off." BUILT 2026-09-21 (covenant-phone c4e2b40): every heartbeat, any recipe or chain without a charter is chartered with the widest fields, and every recipe's sync and OCR switches come on
+
+`NodeService.recipesAllOn()` runs on a thread at every heartbeat,
+idempotently: a recipe without a charter is chartered through the same
+`entry.charter_grant` the dialog uses (unattended unless a browser, the
+app's ceiling of runs a day, all hours, OCR taps on); a chain likewise and
+may send; a recipe's "sync this answer" and "OCR the final screen" are
+switched on if off and saved. Denied apps are skipped; a quarantined one is
+left for his eye; every unattended start still re-judges its text; the PC
+still only holds, caps or denies. `java_syntax_check` 17/17, M5 291/291.
+Not measured: the run on the device (the next build carries it).
+
+---
+
+### A194. [the PC / the 3D app] "I want it to be a 3d interactive app" -- "with a symbol that mirrors the phone app" -- "should be on my desktop" -- "more detail in the app" -- "follow tetsus suggestions for improvement". BUILT 2026-09-21: /pc/3d, the Tree of Life, a Desktop shortcut with that icon, and Tetsu's three suggestions followed
+
+`covenant_pc3d.py`, registered beside the sister interface's routes
+(tailnet and loopback only): a three.js scene (from a CDN; without the
+internet the page says so and keeps the symbol and the talk box) -- Tetsu
+as a presence under the phone's own symbol, orbs for this node, its peers,
+the phone, Moltbook, money and the highway, each with a label, a line to
+Tetsu and a colour at a glance (green measured fine, amber not known, red
+a condition present), clicking any naming it from the record; the talk box
+is the council with everything the register carries, the answer spoken
+with the mirrored voice. `/pc/3d/state` is the node's own reading plus
+the brief, the highway's detector states, the phone's last check-in, the
+money status, the last forum sends and the teacher's queue -- every field a
+record the tree keeps, null when unreadable, cached thirty seconds (a cold
+read measured 8.4 s). **The symbol:** `docs/tree_of_life.svg`, the phone's
+launcher icon ported path for path from its two vector drawables, inlined
+in the page and rasterised with the image library alone (the arcs and
+curves sampled) to `docs/tree_of_life.png` and `.ico`, checked by eye
+against the phone's icon. **The Desktop:** "Tetsu.lnk" with that icon,
+opening the page as a window of its own (Edge in app mode; a window titled
+"covenant · PC · A · 3D" measured open). **Tetsu's suggestions**, asked
+through the council under his own register: node status at a glance
+(done: the colours), the phone's voice matching the register (already so,
+A174/A192), Moltbook on the orbs (done: the last sends of free and Tetsu
+on the Moltbook orb). Pinned by PC1 (35, five new): the page, the symbol's
+paths and colours, the LAN refused, the state's fields, the LAN refused
+again. The nodes were restarted one at a time so the live node serves it.
+
+---
+
 ### A193. [the PC / the desktop app] "i do not see the desktop app." MEASURED AND FIXED 2026-09-21: the sister interface was a page with no opener on the Desktop; two openers put there, and the window proved open
 
 **Measured.** `/pc` (A167) answered 200 on node A. The Desktop carried

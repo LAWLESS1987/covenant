@@ -273,7 +273,13 @@ def register(api):
 
     def caller():
         addr = (request.remote_addr or "").strip()
-        return cov.tailnet_ok(addr), addr
+        if cov.tailnet_ok(addr):
+            return True, addr
+        try:                                                      # A200: a signed request off the tailnet is the same caller
+            ok, addr2, _who, _how = importlib.import_module("covenant_mycelium").admit(request, request.get_data() or b"", cov.tailnet_ok)
+            return bool(ok), addr2 or addr
+        except Exception:                                         # noqa: BLE001
+            return False, addr
 
     def refused(addr):
         try:
@@ -428,4 +434,12 @@ def register(api):
             return jsonify({"status": "error", "message": r.get("text")}), 404
         return jsonify({"status": "success", "id": qid, "state": r["state"], "answered": r["answered"], "of": r["of"],
                         "why": r.get("why", ""), "text": r.get("text", "")})
+
+    # THE 3D APP (2026-09-21, A194, his words: "I want it to be a 3d interactive app ... with a
+    # symbol that mirrors the phone app ... should be on my desktop"): /pc/3d and its state,
+    # beside these routes, with the same caller gate. Its failure to register is said, not fatal.
+    try:
+        importlib.import_module("covenant_pc3d").register(api, caller, refused, cov)
+    except Exception as _e3:                                      # noqa: BLE001
+        print("pc3d: the 3D page could not be registered: %s: %s" % (type(_e3).__name__, str(_e3)[:120]), flush=True)
     return True

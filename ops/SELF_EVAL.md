@@ -3605,3 +3605,14 @@ repo      PASS  core 15896d5c757e matches MANIFEST.sha256. This compares the man
 git       PASS  HEAD ecc61f0, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 49.9h ago; 26 file(s) not committed
 disk      PASS  304G free of 476G (36% used); logs/ 26M
 
+## 2026-09-21T18:34:05Z  overall FAIL  (round 6180)
+nodes     PASS  3/3 up, height 39 (spread 0), source d32e18d931f0
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are d32e18d931f0, peers report ['15896d5c757e'] (last heard 4
+trader    FAIL  log 5.6h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- HTTP 500: {"error": "HTTP Error 500: INTERNAL SERVER ERROR"}
+repo      PASS  core d32e18d931f0 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 61caf20, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 51.1h ago; 28 file(s) not committed
+disk      PASS  303G free of 476G (36% used); logs/ 26M
+

@@ -71,7 +71,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 # 2026-09-21 (A174, A175): Tetsu refines himself and speaks on the
                 # forum; both suites pin the gate on each, so a pass that broke
                 # them is NOT GREEN.
-                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py", "test_im1_immunity.py",
+                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py", "test_im1_immunity.py", "test_mk1_model_keeper.py", "test_rl1_refine_loop.py", "test_ig1_image_guard.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
@@ -150,6 +150,9 @@ def main():
     ap.add_argument("--money-study", type=int, default=1,
                     help="2026-09-21 (A181): one PAPER hypothesis a night from Tetsu, on the three tests nothing has cleared, "
                          "priced at what he holds above the floor; nothing here places an order; 0 disables")
+    ap.add_argument("--model-step-up", type=int, default=1,
+                    help="2026-09-21 (A196, his words: 'we need to rapidly make up the gap in ai'): before the pass, step the local "
+                         "model up to the largest that fits once the running one is reclaimed (covenant_model.step_up); 0 disables")
     ap.add_argument("--money-live", type=int, default=0,
                     help="2026-09-21 (A182, his grant): settle Tetsu's live requests that carry HIS yes and clear the trader's gate "
                          "NOW; 0 = a dry run (the default: nothing is placed, the outcome is recorded), 1 = place through the venue")
@@ -160,6 +163,16 @@ def main():
                     help="1 = re-run strategy_validate.py on the latest data each pass (30 min cap); 0 = skip")
     ap.add_argument("--no-verify", action="store_true", help="skip the green check (not advised)")
     a = ap.parse_args()
+
+    # THE MODEL STEPS UP FIRST (A196): idle, before anything asks it, the largest model that
+    # fits once the running one is reclaimed. Its failure is said and does not stop the pass.
+    if a.model_step_up > 0:
+        try:
+            import covenant_model as _cmu
+            _ch, _why = _cmu.step_up(say=print)
+            print("model step-up: %s" % _why, flush=True)
+        except Exception as e:                                   # noqa: BLE001
+            print("model step-up FAILED: %s: %s" % (type(e).__name__, str(e)[:200]), flush=True)
 
     # GHOST CONTROL, found 2026-09-16 by a back-door audit and fixed here.
     # covenant_pause.ACTORS has advertised "nightly: the nightly learning pass

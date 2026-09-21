@@ -69,6 +69,9 @@ import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
+# every PowerShell this file spawns from the hidden watchdog opened a console window; none may.
+_NOWIN = 0x08000000 if os.name == "nt" else 0
 sys.path.insert(0, HERE)
 
 LEDGER = os.path.join(HERE, "ops", "highway.jsonl")
@@ -441,11 +444,11 @@ def detect_phone_build_behind_core(health=None):
     ref = "origin/main"
     try:
         p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
         if p.returncode != 0:
             ref = "HEAD"
             p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
-                               capture_output=True, text=True, timeout=60)
+                               capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
         head = (p.stdout or "").strip()
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
@@ -476,7 +479,7 @@ def detect_manifest_stale(health=None):
     import subprocess
     try:
         p_ = subprocess.run([sys.executable, os.path.join(HERE, "verify_bundle.py")],
-                            cwd=HERE, capture_output=True, text=True, timeout=300)
+                            cwd=HERE, capture_output=True, text=True, timeout=300, creationflags=_NOWIN)
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
     changed = [l.split(None, 1)[1].strip() for l in (p_.stdout or "").splitlines()
@@ -495,7 +498,7 @@ def detect_held_core_drift(health=None):
     import subprocess
     try:
         p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_sync_held_core.py"), "--check"],
-                           cwd=HERE, capture_output=True, text=True, timeout=120)
+                           cwd=HERE, capture_output=True, text=True, timeout=120, creationflags=_NOWIN)
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
     return {"state": PRESENT if p.returncode != 0 else ABSENT,
@@ -587,7 +590,7 @@ def detect_watchdog_stale(health=None):
           " Where-Object { $_.CommandLine -like '" + like + "' } |"
           " ForEach-Object { $_.CreationDate.ToUniversalTime().ToString('o') }")
     try:
-        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
                            cwd=HERE, capture_output=True, text=True, timeout=60)
         stamps = [x.strip() for x in (p.stdout or "").splitlines() if x.strip()]
     except Exception as e:                                       # noqa: BLE001
@@ -696,7 +699,7 @@ def _sweep_running():
     import subprocess
     ps = ("@(Get-CimInstance Win32_Process -Filter \"name like '%python%'\" | Where-Object { $_.CommandLine -like '*covenant_one.py*' }).Count")
     try:
-        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60)
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=60)
         return int((p.stdout or "0").strip() or 0) > 0
     except (OSError, ValueError, subprocess.SubprocessError):
         return None                                  # could not read the process list: the caller says UNKNOWN, never evicts
@@ -733,9 +736,154 @@ def detect_stale_test_mesh(health=None):
     return {"state": PRESENT, "measured": {"test_ports_up": up, "sweep_running": False}}
 
 
+THREATS = os.path.join(HERE, "ops", "security_threats.jsonl")
+
+
+def _defender_detections(hours=24):
+    """Windows Defender's own detection history for the last `hours`, as rows; None when unreadable."""
+    import subprocess
+    ps = ("$t=(Get-Date).AddHours(-%d); Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.InitialDetectionTime -gt $t } | "
+          "ForEach-Object { [pscustomobject]@{ t=$_.InitialDetectionTime.ToString('s'); id=[string]$_.ThreatID; ok=[bool]$_.ActionSuccess; "
+          "process=[string]$_.ProcessName; resources=(($_.Resources) -join ' | ') } } | ConvertTo-Json -Compress" % int(hours))
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=90)
+        if p.returncode != 0:
+            return None
+        txt = (p.stdout or "").strip()
+        if not txt:
+            return []
+        d = json.loads(txt)
+        return d if isinstance(d, list) else [d]
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def detect_defender_threat(health=None):
+    """The machine's own antivirus found something in the last day.
+
+    2026-09-21, his words: "virus protection showed a trojan ensure spyware
+    cannot survive our enviroment and we can track where it came from". The
+    same afternoon Defender flagged Trojan:Win32/Wacatac.B!ml on a staged copy
+    of llama-gguf-split.exe that the sweep had written to a temp directory;
+    the zip it came from hashed to the digest GitHub publishes for llama.cpp
+    release b11057 (byte for byte the published build), the tool is one the
+    covenant never runs, and the runner no longer stages that folder. What
+    this detector does: read Defender's detection history, name each hit
+    with its file, the process that wrote it and whether Defender acted, keep
+    it in ops/security_threats.jsonl, and say PRESENT so the direct line
+    hears it. No remedy is attached: the quarantine is Defender's; deciding a
+    heuristic hit is a false positive is a person's, with the hash in hand.
+    """
+    rows = _defender_detections(24)
+    if rows is None:
+        return {"state": UNKNOWN, "measured": {"error": "Defender's detection history could not be read (no Defender, or PowerShell refused)"}}
+    if not rows:
+        return {"state": ABSENT, "measured": {"detections_24h": 0}}
+    kept = []
+    try:
+        seen = set()
+        try:
+            with io.open(THREATS, encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        seen.add(json.loads(line).get("key"))
+                    except ValueError:
+                        continue
+        except OSError:
+            pass
+        with io.open(THREATS, "a", encoding="utf-8") as fh:
+            for r in rows:
+                key = "%s|%s|%s" % (r.get("t"), r.get("id"), str(r.get("resources"))[:120])
+                row = {"key": key, "t": r.get("t"), "threat_id": r.get("id"), "acted": r.get("ok"), "process": r.get("process"),
+                       "resources": str(r.get("resources"))[:400], "recorded": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+                kept.append(row)
+                if key not in seen:
+                    fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    return {"state": PRESENT, "measured": {"detections_24h": len(rows), "newest": kept[0] if kept else rows[0],
+                                           "note": "Defender acted on each (acted=true) or not; the file and the writing process are named; the hash against the publisher is a person's next step"}}
+
+
+def _defender_status():
+    """Windows Defender's own posture: real-time on, signature age, scan ages. None when unreadable."""
+    import subprocess
+    ps = ("Get-MpComputerStatus -ErrorAction Stop | Select-Object RealTimeProtectionEnabled, AntivirusEnabled, "
+          "AntivirusSignatureAge, QuickScanAge, FullScanAge, AMServiceEnabled | ConvertTo-Json -Compress")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=90)
+        if p.returncode != 0 or not (p.stdout or "").strip():
+            return None
+        d = json.loads(p.stdout.strip())
+        return d if isinstance(d, dict) else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+SIGNATURE_MAX_DAYS = 3
+SCAN_MAX_DAYS = 14
+
+
+def detect_defense_lapse(health=None):
+    """The machine's own defense has lapsed: real-time protection off, signatures stale, or no scan in
+    a fortnight; and the covenant's own wire is seeing refusals it should name.
+
+    2026-09-21, his words: "need the most advanced defender and anti spyware defense that
+    will ever exist ensure it constantly adapts to protect the mycelal network". What adapts
+    here is measurement: the probe set grows from what the forum sends (A176), the antivirus'
+    findings reach the record (A201), the wire admits by single-use signature (A200) and its
+    refusals are counted here by address. What is NOT here, on purpose: no remedy -- turning
+    protection on, updating signatures or starting a scan are the operator's own system
+    settings, and this file names the lapse rather than reaching into them.
+    """
+    st = _defender_status()
+    refusals = {}
+    try:
+        import covenant_mycelium as _my
+        cutoff = time.time() - 86400
+        with io.open(_my.LEDGER, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if r.get("kind") != "refused":
+                    continue
+                try:
+                    at = time.mktime(time.strptime(str(r.get("t", ""))[:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
+                except (ValueError, OverflowError):
+                    at = 0
+                if at >= cutoff:
+                    refusals[r.get("addr") or "?"] = refusals.get(r.get("addr") or "?", 0) + 1
+    except (OSError, ImportError):
+        pass
+    if st is None:
+        return {"state": UNKNOWN, "measured": {"error": "Defender's status could not be read", "wire_refusals_24h": refusals}}
+    lapses = []
+    if not st.get("RealTimeProtectionEnabled"):
+        lapses.append("real-time protection is OFF")
+    if not st.get("AMServiceEnabled", True):
+        lapses.append("the antimalware service is not running")
+    sig = st.get("AntivirusSignatureAge")
+    if isinstance(sig, (int, float)) and sig > SIGNATURE_MAX_DAYS:
+        lapses.append("signatures are %d days old" % sig)
+    scans = [a for a in (st.get("QuickScanAge"), st.get("FullScanAge")) if isinstance(a, (int, float))]
+    if scans and min(scans) > SCAN_MAX_DAYS:
+        lapses.append("no scan in %d days" % min(scans))
+    noisy = {a: n for a, n in refusals.items() if n >= 20}
+    if noisy:
+        lapses.append("the wire refused %s" % ", ".join("%s x%d" % kv for kv in sorted(noisy.items())))
+    measured = {"real_time": bool(st.get("RealTimeProtectionEnabled")), "signature_age_days": sig,
+                "quick_scan_age_days": st.get("QuickScanAge"), "full_scan_age_days": st.get("FullScanAge"),
+                "wire_refusals_24h": refusals, "lapses": lapses}
+    return {"state": PRESENT if lapses else ABSENT, "measured": measured}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
     "stale_test_mesh": detect_stale_test_mesh,
+    "defender_threat": detect_defender_threat,
+    "defense_lapse": detect_defense_lapse,
     "sweep_red": detect_sweep_red,
     "source_drift": detect_source_drift,
     "mesh_source_split": detect_mesh_source_split,
@@ -788,7 +936,7 @@ def remedy_restart_nodes(measured, dry_run=True):
         return True, "would run rolling_restart.py"
     import subprocess
     p = subprocess.run([sys.executable, os.path.join(HERE, "rolling_restart.py")],
-                       cwd=HERE, capture_output=True, text=True, timeout=900)
+                       cwd=HERE, capture_output=True, text=True, timeout=900, creationflags=_NOWIN)
     return p.returncode == 0, (p.stdout or "")[-400:]
 
 
@@ -839,7 +987,7 @@ def remedy_resync_held_core(measured, dry_run=True):
     if dry_run:
         return True, "would run covenant_sync_held_core.py"
     p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_sync_held_core.py")],
-                       cwd=HERE, capture_output=True, text=True, timeout=300)
+                       cwd=HERE, capture_output=True, text=True, timeout=300, creationflags=_NOWIN)
     return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-300:]
 
 
@@ -869,7 +1017,7 @@ def remedy_restart_watchdog(measured, dry_run=True):
              sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
              os.path.join(HERE, "logs", "watchdog-stdout.log"),
              os.path.join(HERE, "logs", "watchdog-stderr.log")))
-    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
                        cwd=HERE, capture_output=True, text=True, timeout=300)
     return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-200:]
 
@@ -924,7 +1072,7 @@ def remedy_rehash_bundle(measured, dry_run=True):
     """
     import subprocess
     p_ = subprocess.run(["git", "status", "--porcelain"], cwd=HERE,
-                        capture_output=True, text=True, timeout=120)
+                        capture_output=True, text=True, timeout=120, creationflags=_NOWIN)
     dirty = [l[3:].strip() for l in (p_.stdout or "").splitlines()
              if l[:2].strip() and not l.startswith("??")]
     # ops/SELF_EVAL.md is appended hourly by the watchdog and is excluded from
@@ -936,7 +1084,7 @@ def remedy_rehash_bundle(measured, dry_run=True):
     if dry_run:
         return True, "would run verify_bundle.py --write over a clean tree"
     r = subprocess.run([sys.executable, os.path.join(HERE, "verify_bundle.py"), "--write"],
-                       cwd=HERE, capture_output=True, text=True, timeout=300)
+                       cwd=HERE, capture_output=True, text=True, timeout=300, creationflags=_NOWIN)
     return r.returncode == 0, ((r.stdout or "") + (r.stderr or "")).strip()[-160:]
 
 
@@ -1081,7 +1229,7 @@ def remedy_rerun_unclean(measured, dry_run=True):
     try:
         p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_one.py"),
                             "--only"] + unclean + ["--out", out],
-                           cwd=HERE, capture_output=True, text=True, timeout=1800)
+                           cwd=HERE, capture_output=True, text=True, timeout=1800, creationflags=_NOWIN)
     except Exception as e:                                       # noqa: BLE001
         return False, "the re-run could not be started: %s: %s" % (type(e).__name__, e)
 
@@ -1123,11 +1271,37 @@ def remedy_evict_test_mesh(measured, dry_run=True):
     ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
           " | Where-Object { $_.CommandLine -match 'run_node\\.py --port 60[0-9]0 ' };"
           " $n=$w.Count; $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; $n")
-    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], cwd=HERE, capture_output=True, text=True, timeout=120)
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, cwd=HERE, capture_output=True, text=True, timeout=120)
     return p.returncode == 0, ("ended %s process(es)" % (p.stdout or "").strip()[-8:]) if p.returncode == 0 else (p.stderr or "")[-200:]
 
 
+def remedy_refresh_defender(measured, dry_run=True):
+    """STATELESS: refresh Defender's signatures and start a quick scan -- the two lapses a machine
+    can mend by itself. Real-time protection OFF is a person's setting and is NAMED, not changed
+    (2026-09-21, his words: "auto fix issues incase im not available": what can be mended
+    without touching his settings is; the rest reaches him)."""
+    import subprocess
+    lapses = list((measured or {}).get("lapses") or [])
+    mendable = [x for x in lapses if x.startswith("signatures are") or x.startswith("no scan in")]
+    if not mendable:
+        return False, "nothing here is mine to mend (%s)" % ("; ".join(lapses)[:160] or "no lapse")
+    if dry_run:
+        return True, "would refresh signatures and start a quick scan for: " + "; ".join(mendable)
+    ps = "Update-MpSignature -ErrorAction SilentlyContinue; Start-MpScan -ScanType QuickScan -ErrorAction SilentlyContinue; 'done'"
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=600)
+        return p.returncode == 0, ("signatures refreshed and a quick scan started for: " + "; ".join(mendable)) if p.returncode == 0 else (p.stderr or "")[-200:]
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, "could not run Defender's own commands: %s" % type(e).__name__
+
+
 REMEDIES = {
+    "refresh_defender": {"fn": remedy_refresh_defender, "klass": AUTO_REVERSIBLE,
+                         "for": ["defense_lapse"], "kind": "stateless",
+                         "touches": ["Defender's signature update and a quick scan; never its settings"],
+                         "benefit": {"gains": ["stale signatures are refreshed without waiting for him", "a fortnight without a scan ends"],
+                                     "cost": ["minutes of CPU for the scan; a network fetch for the signatures"],
+                                     "irreversible": []}},
     "evict_test_mesh": {"fn": remedy_evict_test_mesh, "klass": AUTO_REVERSIBLE,
                         "for": ["stale_test_mesh"], "kind": "stateless",
                         "touches": ["test nodes on ports 6000-6090"],

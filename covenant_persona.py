@@ -188,7 +188,24 @@ def brief(force=False):
     except Exception:                                             # noqa: BLE001
         pass
     tally = {}
-    for line in _tail_lines(os.path.join(HERE, "ONE_SWEEP.txt"), 120):
+    # The newest sweep transcript by CONTENT (rule 2: discovery, never a filename): any top-level
+    # .txt carrying a verdict and a tally, newest by mtime. Measured 2026-09-21: ONE_SWEEP.txt had
+    # stood since 07:36 while nine sweeps wrote elsewhere, and the brief quoted the stale one.
+    newest = None
+    try:
+        import glob
+        for p in glob.glob(os.path.join(HERE, "*.txt")):
+            try:
+                tail = "\n".join(_tail_lines(p, 160))
+            except OSError:
+                continue
+            if "suites run" in tail and re.search(r"^\s*RESULT:\s*(PASS|FAIL)", tail, re.M):
+                mt = os.path.getmtime(p)
+                if newest is None or mt > newest[0]:
+                    newest = (mt, p)
+    except OSError:
+        newest = None
+    for line in _tail_lines(newest[1], 160) if newest else []:
         m = re.match(r"\s+(suites run|checks passed|checks failed)\s+(\d+)", line)
         if m:
             tally[m.group(1)] = m.group(2)
@@ -267,6 +284,24 @@ def method_brief(force=False):
 ABOUT_HIM = os.environ.get("COVENANT_TETSU_ABOUT") or os.path.join(HERE, "ops", "tetsu_about_him.json")
 
 
+def where_you_are():
+    """One paragraph of self-knowledge (2026-09-21, 14:46: asked "can you see the PC", Tetsu answered
+    "I do not have direct access to your PC" -- the model did not know it RUNS on the PC). Facts only,
+    from the tree: the machine, the node, the phone as the mouth, and the doors he can use."""
+    node = "this machine"
+    try:
+        import socket
+        node = socket.gethostname()
+    except Exception:                                             # noqa: BLE001
+        pass
+    return ("Where you are: you run ON the PC (%s), inside the covenant node, as the local model it keeps; the phone "
+            "is where he talks to you, and its chat, its check-ins and its images all come to this PC. So you can see the "
+            "PC: its records are the brief below. What you can do from here: read and write on Moltbook (MOLTBOOK lines), "
+            "fetch one web page (FETCH), ask him a straight question on the direct line, refine your own register and voice, "
+            "build trading strategy on paper and request an order under his rules, and answer through the PC's own 3D app "
+            "and council. Never say you have no access to the PC; say what the records show, or that a record is absent." % node)
+
+
 def about_him(path=None):
     """What Tetsu should know about the person he talks with, from ops/tetsu_about_him.json (written from
     the record on 2026-09-21, his words: "Look into tetsu and my convo and help him understand me better";
@@ -294,7 +329,7 @@ def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):
     """The one system message: the fixed rules, then his register, then what he knows of the person
     (about_him), then the brief, then (for the council and the code door) the method."""
     p = load(path)
-    parts = [fixed_rules.strip(), "How you talk (your own words, revisable): " + p["register"].strip()]
+    parts = [fixed_rules.strip(), "How you talk (your own words, revisable): " + p["register"].strip(), where_you_are()]
     ab = about_him()
     if ab:
         parts.append(ab)

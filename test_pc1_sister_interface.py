@@ -68,6 +68,21 @@ def main():
     os.environ["COVENANT_MODEL_STUB"] = "1"
     m = fresh_master()
     client = m.api.app.test_client()
+    # ---- A194 (2026-09-21, his words: "I want it to be a 3d interactive app ... with a symbol that
+    # mirrors the phone app"): the 3D page and its state, tailnet only, the phone's icon inlined.
+    r3 = get(client, "/pc/3d", "100.86.158.1")
+    b3 = r3.get_data(as_text=True)
+    check("PC1z /pc/3d answers the tailnet 200 as HTML with the three.js scene, the council talk box and the spoken answer",
+          r3.status_code == 200 and "text/html" in r3.headers.get("Content-Type", "") and "three.module.js" in b3 and "/pc/council" in b3
+          and "SpeechSynthesisUtterance" in b3 and "/pc/3d/state" in b3, f"{r3.status_code} {b3[:80]!r}")
+    check("PC1z the page carries the phone app's symbol path for path (the Tree of Life's canopy colours) and names this node",
+          "#4FB08E" in b3 and "#175A48" in b3 and "M54,20 C68,20 78,28 80,38" in b3 and "__NODE__" not in b3 and "__SYMBOL__" not in b3)
+    check("PC1z /pc/3d refuses a LAN address 403", get(client, "/pc/3d", "192.168.1.50").status_code == 403)
+    rs = get(client, "/pc/3d/state", "100.86.158.1")
+    js = rs.get_json() or {}
+    check("PC1z /pc/3d/state answers the tailnet with this node, its peers, the voice and the immunity state",
+          rs.status_code == 200 and js.get("self", {}).get("node_id") and "chain_height" in js.get("self", {}) and "peers" in js and "voice" in js and "immunity" in js, js)
+    check("PC1z /pc/3d/state refuses a LAN address 403", get(client, "/pc/3d/state", "192.168.1.50").status_code == 403)
     LOOP, PHONE, LAN = "127.0.0.1", "100.86.158.1", "192.168.1.50"
 
     print("PC1a -- the page and its gate")

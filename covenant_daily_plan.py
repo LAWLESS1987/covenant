@@ -444,6 +444,15 @@ def record_checkin(body_bytes, who, path=None):
         out["money"] = {"comfortable": bool(_st.get("comfortable")), "why": "; ".join(_st.get("why") or [])[:200]}
     except Exception as e:                                        # noqa: BLE001
         out["money"] = {"comfortable": False, "why": "the money status could not be read: %s" % type(e).__name__}
+    # THE SECOND ROAD (2026-09-21, A200, his words: "create our own native tailnet like
+    # mycellium connection incase tail net goes down"): the PC's address on its local
+    # network rides the answer, so the phone knows where to sign its calls to when the
+    # tailnet is down. None when it cannot be read; never invented.
+    try:
+        import covenant_mycelium
+        out["lan"] = covenant_mycelium.lan_address(5000)
+    except Exception:                                             # noqa: BLE001
+        out["lan"] = None
     return 200, out
 
 

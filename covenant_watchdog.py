@@ -70,6 +70,9 @@ import covenant_quiet                                    # no console window on 
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
+# every PowerShell this file spawns from the hidden watchdog opened a console window; none may.
+_NOWIN = 0x08000000 if os.name == "nt" else 0
 LOGDIR = os.path.join(HERE, "logs")
 LOGFILE = os.path.join(LOGDIR, "watchdog.log")
 LOG_MAX_BYTES = 5 * 1024 * 1024
@@ -1405,6 +1408,17 @@ def one_pass(strict=False):
             c_alerts, c_infos = c_alerts + h_alerts, c_infos + h_infos
         except Exception as e:                                   # noqa: BLE001
             c_infos.append("highway pass unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
+        # TETSU REFINES HIMSELF CONSTANTLY (2026-09-21, A198, his words: "refine both
+        # constantly"): once an hour at most, only after new conversation, through
+        # covenant_persona.refine with every bound it already has. Most rounds are a
+        # no-op costing one file read; a pass that ran is one info line.
+        try:
+            import covenant_refine_loop as _rl
+            _r = _rl.tick(say=lambda *_a: None)
+            if _r.get("ran"):
+                c_infos.append("refine loop: %s -- %s" % (_r.get("why"), (_r.get("result") or {}).get("why", "")))
+        except Exception as e:                                   # noqa: BLE001
+            c_infos.append("refine loop unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
         # EVERY STANDING PAUSE, SAID ON EVERY ROUND (2026-09-16). A pause is a
         # decision and never an alert -- but a pause nobody is reminded of is
         # how a system runs half-off for a week and the operator finds out
@@ -1627,7 +1641,7 @@ def _evict_twins():
           " | ForEach-Object { '' + $_.ProcessId + ' ' +"
           " $_.CreationDate.ToUniversalTime().ToString('o') }")
     try:
-        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], cwd=HERE,
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, cwd=HERE,
                            capture_output=True, text=True, timeout=60)
         rows = []
         for line in (p.stdout or "").splitlines():
@@ -1641,10 +1655,10 @@ def _evict_twins():
     if not victims:
         return
     try:
-        subprocess.run(["powershell", "-NoProfile", "-Command",
+        subprocess.run(["powershell", "-NoProfile", "-Command",  # windowless (A203)
                         "Stop-Process -Id %s -Force -ErrorAction SilentlyContinue"
                         % ",".join(str(v) for v in victims)],
-                       cwd=HERE, capture_output=True, text=True, timeout=60)
+                       cwd=HERE, capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
         log("WARN", "another watchdog of this tree was already running (pid %s) when "
                     "this one started -- stopped it: one tree, one watchdog (A160)"
                     % ", ".join(str(v) for v in victims))

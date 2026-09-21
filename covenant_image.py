@@ -99,8 +99,39 @@ def generate(prompt, out=None, seed=-1, timeout=600):
     if r.returncode != 0 or not os.path.isfile(p):
         _log("FAIL rc=%s %d ms prompt=%r %s" % (r.returncode, ms, prompt[:80], tail.replace("\n", " | ")[-300:]))
         raise RuntimeError("sd exited %s after %d ms: %s" % (r.returncode, ms, tail.replace("\n", " | ")[-300:]))
+    # THE BLACK FRAME (2026-09-21, his words: "fix the black box issue again"): a diffusion run
+    # can hand back a frame that is all but black -- a numeric failure, or a filter -- and until
+    # now it was returned as if drawn. Measured here: the mean brightness of what came back; a
+    # frame under BLACK_MEAN is retried ONCE with another seed, and a second black frame is an
+    # error with the reason, never a black image handed to the phone.
+    if is_black(p):
+        _log("BLACK FRAME %d ms seed=%s prompt=%r -- retrying once with another seed" % (ms, seed, prompt[:80]))
+        seed2 = (int(seed) + 7919) if int(seed) >= 0 else 7919
+        args[args.index("-s") + 1] = str(seed2)
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout, creationflags=creation, cwd=os.path.dirname(BIN))
+        ms = int((time.time() - t0) * 1000)
+        if r.returncode != 0 or not os.path.isfile(p) or is_black(p):
+            _log("BLACK FRAME twice %d ms prompt=%r" % (ms, prompt[:80]))
+            raise RuntimeError("the model drew a black frame twice (seeds %s and %s) after %d ms; try other words" % (seed, seed2, ms))
+        room = room + "; second seed after a black frame"
     _log("ok %d ms %s prompt=%r (%s)" % (ms, os.path.basename(p), prompt[:80], room))
     return p, {"model": "sd-turbo q8_0 %dx%d %d steps" % (SIZE, SIZE, STEPS), "ms": ms, "room": room}
+
+
+BLACK_MEAN = 10.0        # mean brightness (0-255) under which a frame counts as black
+
+
+def is_black(path, threshold=BLACK_MEAN):
+    """True when the PNG's mean brightness is under the threshold. Unreadable -> False (never a guess of black)."""
+    try:
+        from PIL import Image, ImageStat
+        with Image.open(path) as im:
+            g = im.convert("L")
+            if g.size[0] * g.size[1] < 64:
+                return False                                     # a stub or a thumbnail is not a frame to judge
+            return ImageStat.Stat(g).mean[0] < threshold
+    except Exception:                                            # noqa: BLE001
+        return False
 
 
 def main(argv=None):

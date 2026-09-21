@@ -23,6 +23,7 @@ and a stub judge:
 """
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -89,6 +90,12 @@ def main():
     check("TP1a the tree's own about-him record (if present here) names him as the operator and the three things that went wrong, and is his to edit",
           real_about is None or (real_about.get("his_to_edit") is True and "operator" in real_about.get("who", "") and len(real_about.get("what_went_wrong_before", [])) == 3))
     check("TP1a the default voice mirrors the PC's (pitch +15%, the fastest rate the bounds allow)", P.DEFAULT_VOICE == {"pitch": 1.15, "rate": 1.3} and P.clamp_voice(P.DEFAULT_VOICE) == P.DEFAULT_VOICE)
+    # A197 (2026-09-21 14:46: "can you see the PC" -> "I do not have direct access to your PC"): every door's
+    # system message says where Tetsu runs and what he can do from there, before what he knows of him.
+    wy = P.where_you_are()
+    check("TP1a where_you_are names the PC and the node, the phone as the mouth, the doors, and forbids 'no access to the PC'",
+          "you run ON the PC" in wy and "the phone is where he talks to you" in wy and "MOLTBOOK" in wy and "direct line" in wy and "Never say you have no access" in wy, wy[:160])
+    check("TP1a the system message carries it after the register and before the record of him", "Where you are:" in sm_ab and sm_ab.index("How you talk") < sm_ab.index("Where you are:") < sm_ab.index("About the person"))
 
     # A184 (his words: "Tetsu and the pc model/agents/students should be learning to function in similar
     # or better fashion to you"): the council and the code door work under the tree's standing method.
@@ -253,7 +260,7 @@ def main():
     has_sweep = os.path.exists(os.path.join(HERE, "ONE_SWEEP.txt"))
     has_ledger = os.path.exists(os.path.join(HERE, "docs", "KNOWN_ISSUES.md"))
     check("TP1e the brief names the node%s%s, from the records" % (", the last sweep's tally" if has_sweep else "", " and the newest ledger entries" if has_ledger else ""),
-          "node v" in b and (not has_sweep or ("last sweep" in b and "checks passed" in b)) and (not has_ledger or "recent: A1" in b), b[:200])
+          "node v" in b and (not has_sweep or ("last sweep" in b and "checks passed" in b)) and (not has_ledger or re.search(r"recent: A\d+", b)), b[:200])   # any ledger number: the newest entries moved past A1xx on 2026-09-21
     cf = P.checkin_fields(pp)
     check("TP1e checkin_fields carries the clamped voice for the phone", cf["persona"]["voice"] == P.clamp_voice(P.load(pp)["voice"]) and cf["persona"]["voice"] == {"pitch": 0.7, "rate": 1.0} and "revised" in cf["persona"], cf)
     check("TP1e clamp_voice bounds both ways and survives junk",

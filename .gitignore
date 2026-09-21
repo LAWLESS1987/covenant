@@ -368,6 +368,9 @@ ops/tetsu_strategy.jsonl
 ops/tetsu_live.jsonl
 ops/tetsu_immunity.jsonl
 ops/tetsu_about_him.json
+ops/refine_loop_state.json
+ops/mycelium.jsonl
+ops/security_threats.jsonl
 ops/contact_state.json
 ops/ambassador_sends.jsonl
 coinbase_balance.prev.json

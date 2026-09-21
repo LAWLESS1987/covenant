@@ -8223,9 +8223,20 @@ class CovenantAPI:
         # so a stale page cannot pretend to be a calm system.
         # ------------------------------------------------------------------
         def _tailnet_caller():
-            """(ok, addr) for the calling request -- the gate is `tailnet_ok`."""
+            """(ok, addr) for the calling request. The gate is `tailnet_ok` first; off the tailnet, a
+            request SIGNED by a registered key is the same caller (2026-09-21, A200, his words:
+            "create our own native tailnet like mycellium connection incase tail net goes down"):
+            covenant_mycelium.admit joins the address gate to the operator-request signature the
+            phone already carries, and admits a registered ally on the ally doors only. If that
+            module cannot be read, the address gate alone stands, as before."""
             addr = (request.remote_addr or "").strip()
-            return tailnet_ok(addr), addr
+            if tailnet_ok(addr):
+                return True, addr
+            try:
+                ok, addr2, _who, _how = importlib.import_module("covenant_mycelium").admit(request, request.get_data() or b"", tailnet_ok)
+                return bool(ok), addr2 or addr
+            except Exception:                                     # noqa: BLE001 -- the address gate alone
+                return False, addr
 
         @self.app.route("/m", methods=["GET"])
         def mobile_page():

@@ -67,6 +67,10 @@ import urllib.request
 
 ONE_VERSION = "one-1.0"
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+# A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
+# every suite this runner starts is a console program; started from a shell with no console,
+# each one opened a window of its own. None may. covenant_quiet does the same for the nightly.
+_NOWIN = 0x08000000 if os.name == "nt" else 0
 WIN = sys.platform.startswith("win")
 NODES = [("A", 5000), ("B", 5020), ("C", 5060)]
 CONSOLE_PORT = int(os.environ.get("COVENANT_APP_PORT", "5199"))
@@ -431,6 +435,9 @@ SUITES = [
     ("test_tm1_tetsu_money.py",           180,  "JUDGE"),
     ("test_tl1_tetsu_live.py",            120,  "JUDGE"),
     ("test_im1_immunity.py",              120,  "JUDGE"),
+    ("test_mk1_model_keeper.py",          120,  "JUDGE"),
+    ("test_rl1_refine_loop.py",           120,  "JUDGE"),
+    ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_dp1_daily_plan.py",           120,  "TRADER"),
     ("test_sm1_sealed_mail.py",          120,  "TRADER"),
     ("test_ac1_ai_consult.py",           120,  "TRADER"),
@@ -691,7 +698,7 @@ def kill_tree(proc):
     grandchildren holding the handle; killing the child alone hangs."""
     if WIN:
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=_NOWIN)
     else:
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
@@ -718,7 +725,7 @@ def run_open(say, cmd, cwd=None, env=None, timeout=None, label=None):
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, text=True,
                              encoding="utf8", errors="replace", bufsize=1,
-                             start_new_session=not WIN)
+                             start_new_session=not WIN, creationflags=_NOWIN)
     except FileNotFoundError:
         say("   ABSENT -- %s is not on this machine" % cmd[0])
         return None
@@ -820,7 +827,11 @@ def stage(say):
     for d in ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness"):
         s = os.path.join(HERE, d)
         if os.path.isdir(s):
-            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True)
+            # A201 (2026-09-21): the untracked runtimes under tools/ (llama, sd -- binaries and an
+            # 18 MB zip) are never staged: a staged copy of one tripped Defender, and no suite
+            # runs them (the model and image doors are stubbed in every suite).
+            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools" else None)
     say("   staged into %s" % work)
     return work
 
@@ -868,7 +879,7 @@ def phase_identity(say):
         say("  core          ABSENT -- %s is not in this folder" % CORE)
     try:
         out = subprocess.run(["git", "log", "--oneline", "-1"], cwd=HERE,
-                             capture_output=True, text=True, timeout=10)
+                             capture_output=True, text=True, timeout=10, creationflags=_NOWIN)
         if out.returncode == 0 and out.stdout.strip():
             say("  git HEAD      %s" % out.stdout.strip())
         # --no-optional-locks, and it is load-bearing. Plain `git status`
@@ -882,7 +893,7 @@ def phase_identity(say):
         # read-only check has no business taking a write lock.
         dirty = subprocess.run(["git", "--no-optional-locks", "status",
                                 "--porcelain"], cwd=HERE,
-                               capture_output=True, text=True, timeout=15)
+                               capture_output=True, text=True, timeout=15, creationflags=_NOWIN)
         if dirty.returncode == 0:
             k = len([l for l in dirty.stdout.splitlines() if l.strip()])
             say("  git worktree  %s" % ("clean" if k == 0 else "%d file(s) modified" % k))
@@ -958,7 +969,7 @@ def phase_coverage(say):
     unshipped, ignored_by = [], {}
     if subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
                       cwd=HERE, capture_output=True,
-                      text=True).returncode != 0:
+                      text=True, creationflags=_NOWIN).returncode != 0:
         # A tarball delivery, a transported copy, a PRE-LAND snapshot. Without
         # this gate every listed suite reports UNSHIPPED and the run is
         # permanently INCOMPLETE for a reason that is true of the folder rather
@@ -971,7 +982,7 @@ def phase_coverage(say):
         # takes .git/index.lock, and once blocked a git rm for two hours.
         tracked = set()
         out = subprocess.run(["git", "ls-files"], cwd=HERE,
-                             capture_output=True, text=True)
+                             capture_output=True, text=True, creationflags=_NOWIN)
         if out.returncode == 0:
             tracked = {os.path.basename(l.strip()) for l in
                        out.stdout.splitlines() if l.strip()}
@@ -980,7 +991,7 @@ def phase_coverage(say):
                            and os.path.isfile(os.path.join(HERE, s)))
         for s in unshipped:
             ci = subprocess.run(["git", "check-ignore", "-v", s], cwd=HERE,
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, creationflags=_NOWIN)
             if ci.returncode == 0 and ci.stdout.strip():
                 ignored_by[s] = ci.stdout.strip().split("\t")[0]
         if not unshipped:
@@ -1185,7 +1196,7 @@ def phase_gates(say, again=False):
     rc = run_open(say, [sys.executable, "launch_check.py"], timeout=300, env=env)
     subprocess.run([sys.executable, "launch_check.py", "--json"], cwd=HERE, env=env,
                    stdout=open(os.path.join(HERE, "LAUNCH_CHECK.json"), "w"),
-                   stderr=subprocess.DEVNULL)
+                   stderr=subprocess.DEVNULL, creationflags=_NOWIN)
     if rc == 0:
         say("  GATES PASS -- every gate measured and correct.")
     elif rc == 1:
@@ -1235,7 +1246,7 @@ def phase_sweep(say, only=None, repeat=1, verbose=False):
             p = subprocess.Popen([sys.executable, suite], cwd=work, env=env,
                                  stdout=lf, stderr=subprocess.STDOUT,
                                  stdin=subprocess.DEVNULL,
-                                 start_new_session=not WIN)
+                                 start_new_session=not WIN, creationflags=_NOWIN)
             try:
                 rc = p.wait(timeout=tmo)
             except subprocess.TimeoutExpired:
