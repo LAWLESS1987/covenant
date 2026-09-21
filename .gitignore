@@ -350,3 +350,10 @@ ops/images/
 
 # context_pack.py output: a paste for a Claude with no tools; a record, never shipped
 ops/CONTEXT_PACK.txt
+
+# 2026-09-21 (A166/A168/A169): his conversations, the AI-app chat lines the phone carries, what the PC says to him, and what free sent -- records of a person, never shipped
+ops/teacher_queue.jsonl
+ops/teacher_queue.state.json
+ops/contact_outbox.jsonl
+ops/contact_state.json
+ops/ambassador_sends.jsonl

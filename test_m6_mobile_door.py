@@ -95,6 +95,10 @@ def main():
     # sample asks into the real one on 2026-09-19. Redirected for the run, and
     # the model is a stub: no weights are needed to drive the door.
     os.environ["COVENANT_ASK_LOG"] = tempfile.mktemp(suffix="_m6_asklog.jsonl")
+    # The teacher's queue too (2026-09-21): the agent door queues both sides of every
+    # exchange (A166), and this suite's stub exchanges went into the REAL queue -- sixty
+    # rows, six of which the 03:30 nightly carried to the panel before they were purged.
+    os.environ["COVENANT_TEACHER_QUEUE"] = tempfile.mktemp(suffix="_m6_queue.jsonl")
     os.environ["COVENANT_MODEL_STUB"] = "1"
     os.environ["COVENANT_IMAGE_STUB"] = "1"
 
