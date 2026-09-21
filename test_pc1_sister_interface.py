@@ -22,6 +22,7 @@ agent") by RUNNING the doors against a fresh master with the stub model:
 """
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -130,6 +131,25 @@ def main():
           len(crit) == 5 and crit[4]["met"] is None and g.get("graduated") is False and g.get("undetermined", 0) >= 1, g)
     check("PC1d every measured section names its source", all(isinstance(t[k], dict) and ("source" in t[k] or "error" in t[k]) for k in ("queue", "ledger", "exam", "nightly")), {k: t[k].get("source") for k in ("queue", "ledger", "exam", "nightly")})
     check("PC1d /pc/training refuses a LAN address 403", get(client, "/pc/training", LAN).status_code == 403)
+
+    print("PC1g -- the handshake")
+    r = get(client, "/pc/handshake", LOOP)
+    body = r.get_data(as_text=True)
+    check("PC1g /pc/handshake answers loopback 200 with HTML, the node named, Copy and Share buttons",
+          r.status_code == 200 and "text/html" in r.headers.get("Content-Type", "") and "__NODE__" not in body
+          and "__TEXT__" not in body and "Copy" in body and "Share" in body, r.status_code)
+    check("PC1g the text names the private door, what to send, what to open first, the run, and the public repository",
+          all(s in C.HANDSHAKE_TEXT for s in ("github.com/LAWLESS1987/covenant-satc", "GitHub username", "docs/SATC_RES_MAP.md",
+                                                "python covenant_one.py --offline", "github.com/LAWLESS1987/covenant ", "one line back")))
+    check("PC1g the text carries the disclosure and no key, code, token or private path",
+          "drafted with the help of the system" in C.HANDSHAKE_TEXT
+          and not re.search(r"\b(api key|token|password|sudo code|private/|moltbook_)\b", C.HANDSHAKE_TEXT, re.I))
+    r = get(client, "/pc/handshake?format=text", PHONE)
+    check("PC1g ?format=text returns the bare text for the tailnet, for a share sheet or a curl",
+          r.status_code == 200 and "text/plain" in r.headers.get("Content-Type", "") and r.get_data(as_text=True) == C.HANDSHAKE_TEXT)
+    before = refusals(m, "mobile_page_refused")
+    check("PC1g a LAN address is refused 403 and recorded", get(client, "/pc/handshake", LAN).status_code == 403
+          and refusals(m, "mobile_page_refused") == before + 1)
 
     print("PC1e -- the burst")
     codes = [post(client, "/pc/council", "100.86.158.7", {"text": "council %d" % i}).status_code for i in range(31)]

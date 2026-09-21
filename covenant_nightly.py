@@ -65,12 +65,31 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 # the panel) is part of what the cycle trains on; its rules are
                 # pinned here so a pass that broke them is NOT GREEN.
                 "test_tq1_teacher_queue.py",
+                # 2026-09-21 (A170): a candidate that regresses A126's claims is
+                # REFUSED by the promotion gate itself now; this suite pins the gate.
+                "test_a170_promotion_dispositions.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
                 "test_selfaudit.py", "test_teacher_panel.py", "test_sm1_sealed_mail.py", "test_ac1_ai_consult.py", "test_al1_actuator_learn.py",
                 "test_al2_actuator_brain.py",
                 "covenant_quiet.py"]
+
+
+def tell_him_not_green(lines, say=print):
+    """The direct line (2026-09-21, A169): a red pass is the first thing he
+    asked to be told about. One message with the first two red lines; the
+    record is the report. Returns the outbox row, or None if the line could
+    not be used (said, never raised: a message is not a gate on the pass)."""
+    try:
+        import covenant_contact
+        red = [l for l in lines if "FAIL" in l or "not clean" in l.lower()][:2]
+        return covenant_contact.say("The nightly pass was NOT GREEN. %s The full report is in ops/NIGHTLY.md."
+                                    % (" ".join(l.strip()[:160] for l in red) if red else "Read the gates and suites."),
+                                    "nightly: not green", "nightly")
+    except Exception as e:                                        # noqa: BLE001
+        say("contact: could not tell him: %s" % type(e).__name__)
+        return None
 
 
 def verify_green(say):
@@ -113,6 +132,10 @@ def main():
     ap.add_argument("--queue", type=int, default=24,
                     help="2026-09-21: rows from the teacher's queue (his conversations with Tetsu, his AI apps' "
                          "chat lines) the PANEL judges each pass; kept balanced, once each; 0 disables")
+    ap.add_argument("--ambassador", type=int, default=1,
+                    help="2026-09-21: free's round on Moltbook under his grant (ops/ambassador_grant.json): "
+                         "learn, rank allies, reply as an ally, one introduction a week; 0 disables; "
+                         "no grant on record means the round does nothing")
     ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
     ap.add_argument("--strategy", type=int, default=1,
                     help="1 = re-run strategy_validate.py on the latest data each pass (30 min cap); 0 = skip")
@@ -308,6 +331,21 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         say("queue FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    # FREE'S ROUND (2026-09-21, his words: "i give covenant on the main
+    # permission to interact with and post on moltbook and reply there i'd
+    # hope as an ally but freely searching out allies also"). Once a day,
+    # after the learning and before the cycle: learn the forum, rank allies,
+    # reply to the ones not yet written to, one introduction a week -- every
+    # message through the ambassador's one outbound path and the covenant's
+    # own judge. No grant on record, or the ambassador paused, and it says so
+    # and does nothing. Its failure is reported and does not stop the pass.
+    try:
+        if a.ambassador > 0:
+            import covenant_free_will as FW
+            FW.run_round(dry_run=False, say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("ambassador FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
     try:
         import covenant_distill as X
         X.cycle(a.cycle, say=say)
@@ -360,6 +398,7 @@ def main():
         if not green:
             rc = 1
             lines.insert(1, "**NOT GREEN after this pass -- read the gates and suites below.**")
+            tell_him_not_green(lines, say)
         say("green: %s" % ("yes" if green else "NO"))
     say("took %.0f minutes" % ((time.time() - t0) / 60.0))
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)

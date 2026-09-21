@@ -415,7 +415,18 @@ def record_checkin(body_bytes, who, path=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")
-    return 200, {"status": "success", "recorded": row}
+    out = {"status": "success", "recorded": row}
+    # THE DIRECT LINE (2026-09-21, his words: "add a way to contact me direct
+    # through the phone app"). The check-in's answer carries what the PC has
+    # for him, and the phone's `contact_seen` marks what it has shown. A line
+    # that cannot be read (module missing, state unreadable) is said and the
+    # check-in still answers: the heartbeat never fails over a message.
+    try:
+        import covenant_contact
+        out.update(covenant_contact.checkin_fields(data))
+    except Exception as e:                                        # noqa: BLE001
+        print("contact: the line could not be read on this check-in: %s: %s" % (type(e).__name__, str(e)[:120]), flush=True)
+    return 200, out
 
 
 def last_checkins(path=None):

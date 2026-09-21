@@ -50,6 +50,11 @@ ACTORS = {
     "watchdog-restarts": "the watchdog stops RESTARTING nodes; it still watches and alerts",
     "nightly": "the nightly learning pass stops; nothing else is affected",
     "trader": "the existing TRADER_HALT file -- reported here, owned by guards.py",
+    # 2026-09-21: free, the ambassador, may act on her own under his grant
+    # (ops/ambassador_grant.json). This is her isolation: covenant_free_will
+    # sets it when the judge refused every reply in two live rounds, and he
+    # lifts it. She still learns and ranks nothing while paused.
+    "ambassador": "free's round on Moltbook stops (no replies, no introduction); the grant stays on record",
 }
 
 

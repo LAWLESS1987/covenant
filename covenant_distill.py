@@ -892,6 +892,28 @@ def vocabulary_moved(cur, cand, limit=12):
             % (len(gone), len(faded), added, " ".join(parts)))
 
 
+def disposition_claims_hold(model_file, timeout=600):
+    """(holds, tally) -- the A126 suite RUN against `model_file`, not a proxy of it.
+    The suite reads COVENANT_A126_MODEL; its checks and thresholds are its own.
+    An unreadable result is a refusal with the reason, never a pass."""
+    import subprocess
+    if not os.path.isfile(model_file):
+        return False, "no such candidate file: %s" % model_file     # measured: a missing path loads an empty model that fails 11/13, which would have read as a real tally
+    env = dict(os.environ)
+    env["COVENANT_A126_MODEL"] = os.path.abspath(model_file)
+    env.setdefault("COVENANT_QUIET", "1")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(HERE, "test_a126_seat_dispositions.py")],
+                           capture_output=True, text=True, timeout=timeout, cwd=HERE, env=env)
+    except Exception as e:                                        # noqa: BLE001
+        return False, "could not run: %s: %s" % (type(e).__name__, str(e)[:120])
+    tally = ""
+    for line in (r.stdout or "").splitlines():
+        if line.startswith("A126:"):
+            tally = line.strip()
+    return r.returncode == 0 and bool(tally), tally or ("exit %d, no tally" % r.returncode)
+
+
 def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, say=print):
     verdicts = load_verdicts(verdicts_path)
     examples = [(v["text"], bool(v["violates"])) for v in verdicts]
@@ -1010,6 +1032,21 @@ def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, s
             hold["fair_holds"] = ((hh, hw), hold_error(cur, new))
     ok, reasons = promotion(cand_stats, cur_stats,
                             cur_trained=cur.n_examples >= FB.MIN_EXAMPLES, holdout=hold)
+    if ok:
+        # A126 IS PART OF THE GATE NOW (2026-09-21). Twice a promoted student
+        # regressed the two pinned disposition claims -- 2026-09-20 (A163) and
+        # 04:03 today -- and both times the pass only REPORTED it after the file
+        # had been replaced, so the sweep went red and a person rolled it back.
+        # The claims are measured on the CANDIDATE here, by running the suite
+        # that pins them against the candidate file, before anything replaces
+        # the student. A candidate that regresses them is REFUSED, with the
+        # tally, and stays a candidate. The suite's thresholds are untouched.
+        cand.save(candidate_path)
+        holds, tally = disposition_claims_hold(candidate_path)
+        if not holds:
+            ok = False
+            reasons.append("REFUSED: regresses the pinned disposition claims (test_a126 %s on the candidate; "
+                           "the model in use keeps them) -- A163 twice was enough" % tally)
     if ok:
         cand.save(model_path)
         if hold:

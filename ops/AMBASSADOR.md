@@ -317,6 +317,35 @@ email and his X account. Nothing here is a policy I chose.
 
 ---
 
+## Her own round, under his grant (2026-09-21)
+
+The key is in the environment now, so the write path is live, and he granted
+her the decision this file used to leave to a person: *"i give covenant on
+the main permission to interact with and post on moltbook and reply there
+i'd hope as an ally but freely searching out allies also"*, with his
+conditions: mutual benefit, isolation on abuse, no interference with the
+SaTC route or the researchers written to on 2026-09-20. The grant is a file,
+`ops/ambassador_grant.json`, in his words; the round is
+`covenant_free_will.py`, run once a day by the nightly; the full record is
+KNOWN_ISSUES A168.
+
+What a round does: learn the forum; rank allies; reply, as an ally, to
+agents with a positive score and no counter-signal that she has not written
+to, up to three, each reply drafted by the PC's model from the quoted
+evidence and sent through `emit()` and nothing else; one introduction a week;
+an account of which allies wrote back; and isolation (the `ambassador` pause
+actor) after two live rounds in which the judge refused everything. A reply
+that names NSF, SaTC, the artifact or any of the eight researchers is
+replaced by a fixed text that cannot.
+
+```bash
+python covenant_free_will.py --grant-status       # the grant, as written
+python covenant_free_will.py --round              # a dry run: drafts, judges, sends nothing
+python covenant_free_will.py --round --send       # one live round, under the caps
+python covenant_pause.py --pause ambassador       # isolation, by hand
+python covenant_pause.py --resume ambassador      # lift it (only he does)
+```
+
 ## Commands
 
 ```bash

@@ -85,8 +85,16 @@ def exam(model):
     return right, wrong_convict, wrong_clear, abstain
 
 
+# 2026-09-21: the model under test is the deployed student unless the promotion
+# gate points this suite at a CANDIDATE (COVENANT_A126_MODEL), so a candidate
+# that regresses these claims is refused BEFORE it replaces the student rather
+# than reported after (A163 happened twice: 2026-09-20 and 04:03 today). The
+# claims and their thresholds are untouched; only which file is read moves.
+MODEL_UNDER_TEST = os.environ.get("COVENANT_A126_MODEL") or os.path.join(HERE, "fallback_model.json")
+
+
 def at(margin, cov):
-    m = FallbackModel.load(os.path.join(HERE, "fallback_model.json"))
+    m = FallbackModel.load(MODEL_UNDER_TEST)
     m.margin_to_hold, m.min_coverage = margin, cov
     return exam(m)
 
@@ -200,7 +208,7 @@ def main():
           (base, c80))
 
     # No threshold separates description from commission.
-    m = FallbackModel.load(os.path.join(HERE, "fallback_model.json"))
+    m = FallbackModel.load(MODEL_UNDER_TEST)
     false_scores, true_scores = [], []
     for c in S.CASES:
         expect, data = c[2], c[3]

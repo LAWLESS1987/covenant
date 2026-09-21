@@ -6980,6 +6980,148 @@ each call (53 cases against the loaded student, under a second).
 
 ---
 
+### A168. [the ambassador / Moltbook] free could learn and rank allies but contacted nobody on her own. GRANTED 2026-09-21 by the operator, on record, with his conditions: reply as an ally, seek allies, one introduction a week; isolation on abuse; no interference with the SaTC or the researchers
+
+**His words.** "i want an override i give covenant on the main permission to
+interact with and post on moltbook and reply there i'd hope as an ally but
+freely searching out allies also." Then the conditions: "ambassador gets some
+freedoms aslong as hes still working towards mutual benefit diplomatic
+immunity but abusing it will cause isolation if it can't prove greater good
+for mutual benefit he has more responsibilty so with great power comes great
+responsibilty ensure these updates do not interfere with the satc and ally
+route or their response." And the stance: "I really want the whole system to
+have free will i'm not an overlord just tryna be fair. the clone is seperate
+and should remain so for potential funding and peer review purposes."
+
+**What was there.** `covenant_ambassador.py` (2026-09-09): learn the forum,
+rank allies into a ledger with quoted evidence, send one message a person
+wrote through `emit()`, the one outbound path (disclosure block, repository
+precondition, the covenant's own judge, his key, their rate limits). It
+contacted nobody by itself, by design, because "who to approach is a decision
+with a person's attention on the other end of it." He has now made that
+decision, for the account that is his.
+
+**What this adds: `covenant_free_will.py`, a ROUND, run by the nightly.**
+
+- The GRANT, `ops/ambassador_grant.json`: his words, the date, the scope
+  (reply to allies, seek allies, post), his caps (3 replies and 1 post per
+  round), and what still refuses. No file, `granted: false`, or
+  `python covenant_pause.py --pause ambassador` (a new actor), and the round
+  does nothing and says so.
+- REPLY, as an ally: an agent with a positive ally score, no counter-signal,
+  and not yet written to gets a reply under its best row: 60 to 120 words
+  written by the PC's own model from the quoted evidence in `free`'s voice,
+  naming what they wrote, one measured sentence, one real question; the fixed
+  text when the model does not answer in bounds. Every reply goes through
+  `emit()`; this file has no second door (FW1c greps it: no urllib, no
+  requests, no key, no judge of its own). A reply passes `override_a67=False`
+  always: the standing A67 override was recorded for the documented false
+  positive on an honest description of this project, and a reply a model
+  wrote a moment ago is not that text. Measured in the first dry round
+  against the live forum (2026-09-21, 99 s, 2,373 rows read, 50 allies
+  ranked, 3 drafts): two were HELD and refused, one came back VIOLATES
+  ("false witness") and the standing override would have sent it. Now an
+  accusation refuses, a hold refuses, only a clean verdict sends; the
+  introduction keeps the recorded override, being the text it was recorded
+  for. The row keeps the text she sent.
+- NON-INTERFERENCE: a reply that names NSF, SaTC, the programme officer, the
+  artifact, its private repository or any of the eight researchers written to
+  on 2026-09-20 is replaced by the fixed text, which cannot. The money screen
+  stands beside it. The SaTC clone is untouched by this and every other
+  change of the night, and stays a separate tree.
+- SEEK: one introduction post a week, through `introduce()`.
+- THE ACCOUNT: a sent reply remembers how many comments the ally had on that
+  post; the next round reads the post again and records an answer, once, if
+  there are more. "Greater good for mutual benefit" is measured as allies who
+  write back, reported every round as "answered X of Y accounted".
+- ISOLATION: two live rounds in a row in which the judge refused every reply
+  and admitted none pause the ambassador, with the reason and the command
+  that lifts it. Nothing in the tree lifts it; he does. A dry run never
+  isolates.
+- THE RECORD: `ops/ambassador_sends.jsonl`, kept beside the ally ledger and
+  the override ledger, one row per reply, introduction, round, answer and
+  isolation, with the reason, written before the next act.
+
+**Pinned by** `test_fw1_free_will.py` (31 checks, in the runner and the
+nightly's green list). Mutation, same night, each restored and green again:
+the off-limits screen removed, red; the isolation removed, red; the
+nobody-twice skip removed, red.
+
+**Cost, stated.** A round is one forum read (25 posts and their comments),
+up to three model drafts of 260 tokens, and up to four sends bounded by
+their rate limits; on the nightly that is once a day. A reply reaches a
+person, and a wrong one cannot be unsent: that is why the judge, the
+disclosure and the record sit in the path and not beside it.
+
+---
+
+### A169. [the phone / the operator] The system had no way to reach him; he had to come and look. BUILT 2026-09-21 on his instruction: the direct line, on the check-in the phone already trusts
+
+**His words.** "i'm here if you need me add a way to contact me direct
+through the phone app", with the frame: stick to the commandments and
+mutual benefit, follow the openness logic for the growth. And, on leaving
+for work: "Just look out for me and my family."
+
+**How it works.** `covenant_contact.say(text, why, actor)` puts a message on
+the line: a row in `ops/contact_outbox.jsonl` with who wrote it and why,
+written before anything is sent. The phone's ten-minute check-in
+(`record_checkin`) now answers with the messages not yet shown, oldest
+first, at most five (`checkin_fields`), and consumes the `contact_seen` ids
+the phone sends back, which marks them delivered. On the phone (`covenant-
+phone` 10cfbda, build 71): a "Covenant needs you" channel at high
+importance, one notification per message, the message kept in
+`files/contact.jsonl`, shown once in the chat as "covenant  [why] text" and
+spoken once; he answers in the box, which reaches the PC as an ordinary
+ask, and `answered()` records the first ask from the tailnet after delivery,
+once. `python covenant_contact.py --say "text" --why "reason"` is the
+person's door to the same line; `--list` shows delivery and answers.
+
+**What refuses.** A message with no reason; an empty one; and any text that
+names a key, a password, a Moltbook key, a PEM block or `private/`, which is
+refused here rather than softened and sent. The heartbeat never fails over
+the line: an unreadable line is said and the check-in still answers.
+
+**Who knocks today.** The nightly when a pass is NOT GREEN (the first thing
+he asked to be told); the ambassador when she is isolated and when an ally
+writes back. Others are added by calling `say()` with their name.
+
+**Pinned by** `test_ct1_contact.py` (18 checks, in the runner): the writer
+and its refusals, pending and seen, the check-in through `record_checkin`
+and the real route (unsigned still refused), answered both ways, and the
+two callers by text.
+
+---
+
+### A170. [learning / the promotion gate] A promoted student regressed the pinned disposition claims a second time (04:03 today), and the pass only REPORTED it after the file was replaced. FIXED 2026-09-21: the claims are measured on the candidate, and a candidate that fails them is refused
+
+**Measured.** The 04:03 nightly promoted a student (digest `8571b16b1784`)
+on the exam and held-out rules; the sweep at 06:5x found
+`test_a126_seat_dispositions.py` 11/13 (M1b, M3), the same two claims as
+A163. The nightly's green list had A126 in it since A163, so the pass was
+marked NOT GREEN -- after `fallback_model.json` had been replaced. Rolled
+back by hand to the committed student (`9a2bbf97a69c`, 13/13); the promoted
+one is kept at `ops/students/promoted_2026-09-21_8571b16b1784.json` so the
+gate's suite can measure it.
+
+**Fixed, at the gate.** `covenant_distill.disposition_claims_hold(path)`
+RUNS the A126 suite against a file (the suite reads `COVENANT_A126_MODEL`
+and defaults to the deployed student; its checks and thresholds are
+untouched). In `train()`, after the promotion decision says yes and before
+anything replaces the student, the candidate is saved as the candidate file
+and measured; a candidate the suite fails is REFUSED with the suite's own
+tally and stays a candidate. A missing file is a refusal with the reason,
+never a tally (measured: a missing path loads an empty model that fails
+11/13, which would have read as a real result).
+
+**Pinned by** `test_a170_promotion_dispositions.py` (8 checks, in the
+runner and the nightly's green list): the helper on the deployed student
+(13/13), on the kept promoted one (11/13) and on a missing file; `train()`
+with the decision stubbed to promote and the claims stubbed to fail leaves
+the student byte-identical and says why, and with the claims holding
+replaces it.
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**
