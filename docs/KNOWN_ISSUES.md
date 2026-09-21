@@ -7095,6 +7095,46 @@ two callers by text.
 
 ---
 
+### A173. [the consult / Chat Smith] His Chat Smith account joins the consult ledger as a set of seats: one packet, several models in turn, one recorded answer each. BUILT 2026-09-21 on his instruction, inside the existing judge and ledger
+
+**His words.** "I think we need to incorporate my chat smith account on the
+pc for help with generalized information and coding cycling models to find
+flaws and different views."
+
+**What was there.** `covenant_ai_consult.py` (2026-09-14): the judge and the
+ledger for consulting the other AI apps through his own signed-in browser
+session, never an API key; a plain Python process cannot drive a browser,
+and that absence is load-bearing (A67/A69/A79). Known apps: chatgpt,
+gemini. One question, one intent row before the send, one result row after.
+
+**What this adds, on the same rails.** `chatsmith` is a known app with a
+roster of seats (`CHATSMITH_MODELS`, the app's own labels as read on
+2026-09-20 when gpt-6-astra was driven for the artifact's fifth cross-check).
+`cycle_packet(question, excerpt, models)` builds ONE packet -- a fixed rubric
+(the first flaw and where; what you would refuse to believe until you had run
+it; the view another school would take; cite or say you cannot see), the
+question, an excerpt marked as data -- and puts it through the gate once per
+seat: the same secret scan, a length rule of its own (`MAX_PACKET_CHARS`,
+6,000, against a question's 2,000), one intent row and one linked seat row
+per model under one cycle id, before anything is pasted. `--answer INTENT
+--file` records each seat's answer; `--digest CYCLE` prints the seats side
+by side with the unanswered ones named. The browser step stays where it was:
+the assistant in a session, or him by hand, one seat at a time.
+
+**Pinned by** `test_ac1_ai_consult.py` (32 checks): a cycle writes N intents
+and N seats under one id with the same packet; an excerpt carrying a key
+refuses every seat and writes nothing; a packet over the cap has no cycle;
+a packet over a question's cap but under the packet's is admitted; the
+digest names answered and unanswered seats. Mutation, same day: the cycle's
+length rule dropped, red; the seat rows dropped, red; restored, 32/32.
+
+**Cost, stated.** Each seat is one exchange against the per-app daily limit
+(12); a six-seat cycle is half a day's allowance. The answers are other
+companies' models' opinions, recorded as such (`answer_sha256`, a bounded
+excerpt); nothing in the tree acts on them.
+
+---
+
 ### A172. [the phone / the PC] "Phone app not cleanly communicating with the pc": every chat and image call from the app was refused on the phone before it left, by the app's own network policy; the check-in never was. FIXED 2026-09-21 (covenant-phone acf068a): the chat and the image take the check-in's road
 
 **Measured on the PC.** Check-ins from the phone every ten minutes without
