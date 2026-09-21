@@ -43,6 +43,11 @@ import re
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
 
 ROLES = (
     ("proposer", "Your role in this council: answer the question as well as you can, in plain words. "

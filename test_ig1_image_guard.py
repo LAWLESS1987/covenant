@@ -30,8 +30,17 @@ def check(label, ok, detail=""):
 
 
 def png(path, value, size=64):
-    from PIL import Image
-    Image.new("RGB", (size, size), (value, value, value)).save(path)
+    """An 8-bit RGB PNG of one grey level, written with zlib alone -- the
+    Linux CI has no Pillow (A204c), and the guard must be checked there too."""
+    import struct
+    import zlib
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xffffffff)
+    row = b"\x00" + bytes((value, value, value)) * size
+    raw = zlib.compress(row * size)
+    with open(path, "wb") as fh:
+        fh.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
+                 + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
 
 
 def main():
@@ -43,17 +52,35 @@ def main():
     check("IG1a a bright frame is not", IMG.is_black(bright) is False)
     check("IG1a a stub-sized frame is never judged black", IMG.is_black(tiny) is False)
     check("IG1a an unreadable path is not black (never a guess)", IMG.is_black(os.path.join(tmp, "nope.png")) is False)
+    print("IG1c -- the guard without Pillow (A204c)")
+    m_black, why = IMG.mean_luma_pure(black)
+    m_bright, _ = IMG.mean_luma_pure(bright)
+    check("IG1c the pure reader measures the black frame near 3", m_black is not None and abs(m_black - 3) < 1.0, why)
+    check("IG1c the pure reader measures the bright frame near 140", m_bright is not None and abs(m_bright - 140) < 1.0)
+    check("IG1c the pure reader names what it cannot read", IMG.mean_luma_pure(os.path.join(tmp, "nope.png"))[0] is None)
+    import subprocess
+    probe = ("import sys; sys.modules['PIL'] = None; sys.path.insert(0, %r); import covenant_image as I; "
+             "print(I.is_black(%r), I.is_black(%r), I.is_black(%r))" % (HERE, black, bright, tiny))
+    r = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=120,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0)
+    check("IG1c with Pillow blocked, is_black still judges black / bright / stub the same way",
+          (r.stdout or "").strip() == "True False False", (r.stdout or "") + (r.stderr or "")[-200:])
 
     print("IG1b -- generate retries once, then refuses")
     # a fake diffusion binary: a Python script that writes the frame named by a side file, per call
     fake_bin = os.path.join(tmp, "sd.py")
     plan = os.path.join(tmp, "plan.txt")
     with open(fake_bin, "w", encoding="utf-8") as fh:
-        fh.write("import sys\nfrom PIL import Image\n"
+        # the stub writes its PNG with zlib alone, like png() above: the runner's
+        # interpreter and the Linux CI have no Pillow (A204c)
+        fh.write("import sys, struct, zlib\n"
+                 "def chunk(k, b): return struct.pack('>I', len(b)) + k + b + struct.pack('>I', zlib.crc32(k + b) & 0xffffffff)\n"
                  "args=sys.argv; out=args[args.index('-o')+1]; seed=args[args.index('-s')+1]\n"
                  "plan=open(%r).read().split()\n"
                  "v=int(plan.pop(0)); open(%r,'w').write(' '.join(plan))\n"
-                 "Image.new('RGB',(64,64),(v,v,v)).save(out); open(out+'.seed','w').write(seed)\n" % (plan, plan))
+                 "row=b'\\x00'+bytes((v,v,v))*64\n"
+                 "open(out,'wb').write(b'\\x89PNG\\r\\n\\x1a\\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',64,64,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(row*64))+chunk(b'IEND',b''))\n"
+                 "open(out+'.seed','w').write(seed)\n" % (plan, plan))
     real = {k: getattr(IMG, k) for k in ("BIN", "WEIGHTS", "OUT_DIR", "_make_room")}
     real_run = IMG.subprocess.run
     try:

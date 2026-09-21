@@ -45,6 +45,7 @@ import py_compile
 import re
 import subprocess
 import covenant_quiet                                    # no console window on Windows
+covenant_quiet.install()                                 # A204: and for every module this process imports
 import sys
 import time
 
@@ -189,19 +190,18 @@ def write_state(d):
         pass
 
 
-def revive():
-    """Spawn the watchdog exactly as covenant_prod does: detached, its own
-    process group, stdout to its own file. Never waits on it."""
+def revive(cmd=None):
+    """Spawn the watchdog as a survivor: its own process group, a HIDDEN
+    console (A204d: the venv shim's child inherits it -- a detached shim
+    gave it a window at 16:16:01 on 2026-09-21), out of this job when
+    allowed, stdout to its own file. Never waits on it. `cmd` is for the
+    suite only, so the flags can be checked without starting a watchdog."""
     py = os.path.join(HERE, ".venv", "Scripts", "python.exe")
     if not os.path.exists(py):
         py = sys.executable
     out = open(os.path.join(LOGDIR, "watchdog-stdout.log"), "a",
                encoding="utf-8", errors="replace")
-    flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    if os.name == "nt":
-        flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
-    p = subprocess.Popen([py, WD_SRC], cwd=HERE, stdout=out, stderr=out,
-                         creationflags=flags)
+    p = covenant_quiet.popen_survivor(cmd or [py, WD_SRC], cwd=HERE, stdout=out, stderr=out)
     return p.pid
 
 

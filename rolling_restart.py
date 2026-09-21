@@ -54,6 +54,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
 
 ORDER = ["C", "B", "A"]          # the hub in the middle; the phone's node last
 UP_TIMEOUT_S = 120               # a cold node adopts genesis and builds its judges

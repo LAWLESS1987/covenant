@@ -121,6 +121,64 @@ def generate(prompt, out=None, seed=-1, timeout=600):
 BLACK_MEAN = 10.0        # mean brightness (0-255) under which a frame counts as black
 
 
+def mean_luma_pure(path):
+    """Mean brightness (0-255) of an 8-bit greyscale/RGB/RGBA non-interlaced
+    PNG, decoded with zlib alone -- no Pillow. (None, why) when it cannot.
+    A204c (2026-09-21): the Linux CI has no Pillow, and a guard that is
+    blind without it would pass a black frame there; this reads what
+    sd-turbo writes without any wheel."""
+    import struct
+    import zlib
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError as e:
+        return None, "unreadable: %s" % e
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None, "not a PNG"
+    pos, width = 8, None
+    idat = []
+    while pos + 8 <= len(data):
+        ln, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + ln]
+        if kind == b"IHDR":
+            width, height, depth, ctype, _c, _f, interlace = struct.unpack(">IIBBBBB", body)
+            if depth != 8 or interlace != 0 or ctype not in (0, 2, 4, 6):
+                return None, "unsupported PNG (depth %d, type %d, interlace %d)" % (depth, ctype, interlace)
+            bpp = {0: 1, 2: 3, 4: 2, 6: 4}[ctype]
+        elif kind == b"IDAT":
+            idat.append(body)
+        elif kind == b"IEND":
+            break
+        pos += 12 + ln
+    if width is None or not idat:
+        return None, "no IHDR/IDAT"
+    raw = zlib.decompress(b"".join(idat))
+    stride = width * bpp
+    prev = bytearray(stride)
+    total, count, p = 0, 0, 0
+    for _y in range(height):
+        f = raw[p]; line = bytearray(raw[p + 1:p + 1 + stride]); p += 1 + stride
+        for i in range(stride):
+            a = line[i - bpp] if i >= bpp else 0
+            b = prev[i]
+            c = prev[i - bpp] if i >= bpp else 0
+            if f == 1: line[i] = (line[i] + a) & 255
+            elif f == 2: line[i] = (line[i] + b) & 255
+            elif f == 3: line[i] = (line[i] + ((a + b) >> 1)) & 255
+            elif f == 4:
+                q = a + b - c; pa, pb, pc = abs(q - a), abs(q - b), abs(q - c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else (b if pb <= pc else c))) & 255
+        for x in range(0, stride, bpp):
+            if bpp >= 3:
+                total += (299 * line[x] + 587 * line[x + 1] + 114 * line[x + 2]) // 1000
+            else:
+                total += line[x]
+            count += 1
+        prev = line
+    return (total / count if count else 0.0), "pure (%dx%d, %d channels)" % (width, height, bpp)
+
+
 def is_black(path, threshold=BLACK_MEAN):
     """True when the PNG's mean brightness is under the threshold. Unreadable -> False (never a guess of black)."""
     try:
@@ -130,6 +188,18 @@ def is_black(path, threshold=BLACK_MEAN):
             if g.size[0] * g.size[1] < 64:
                 return False                                     # a stub or a thumbnail is not a frame to judge
             return ImageStat.Stat(g).mean[0] < threshold
+    except ImportError:
+        pass                                                     # no Pillow: the pure reader below
+    except Exception:                                            # noqa: BLE001
+        return False
+    try:
+        mean, why = mean_luma_pure(path)
+        if mean is None:
+            return False
+        w_h = why[why.index("(") + 1:why.index(",")].split("x")
+        if int(w_h[0]) * int(w_h[1]) < 64:
+            return False
+        return mean < threshold
     except Exception:                                            # noqa: BLE001
         return False
 

@@ -42,6 +42,11 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
 LOG = os.path.join(HERE, "logs", "refine_check.log")
 LOCK = os.path.join(HERE, "logs", "refine_check.lock")
 # EIGHT BLACK WINDOWS EVERY FIFTEEN MINUTES, and the fix already existed.

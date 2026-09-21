@@ -67,6 +67,7 @@ import time
 import urllib.error
 import urllib.request
 import covenant_quiet                                    # no console window on Windows
+covenant_quiet.install()                                 # A204: and for every module this process imports
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1198,12 +1199,34 @@ def start_node(node):
     cmd = [sys.executable, "run_node.py",
            "--port", str(node["port"]), "--node-id", node["id"],
            "--genesis", "genesis.json", "--peers", node["peers"]]
-    flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    if os.name == "nt":
-        flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
-    subprocess.Popen(cmd, cwd=HERE, env=env, stdout=out, stderr=out,
-                     creationflags=flags)
+    launch_survivor(cmd, cwd=HERE, env=env, stdout=out, stderr=out)
     log("WARN", f"node {node['id']} restarted -> logs/node{node['id']}.log")
+
+
+# A204b (2026-09-21, "I closed node A, get this shit in order" / "ensure this
+# doesn't happen when you are gone"). The three nodes were restarted by
+# rolling_restart.py from a session's shell, and all three died the moment
+# that shell ended: Windows had put the shell in a job with kill-on-close,
+# and a DETACHED child is still a member of its parent's job. The watchdog
+# revived them 66 seconds later, which is the outage this flag removes. A
+# node is started with CREATE_BREAKAWAY_FROM_JOB when the job allows it
+# (the launcher's own tasks do); when the job forbids breakaway the call
+# fails with EACCES and the plain launch is used, so nothing that started
+# before this still starts.
+# A204d: not DETACHED -- a detached venv shim gives its child a window. The
+# flags live in covenant_quiet so the guard, which must not import this file,
+# starts the watchdog the same way.
+CREATE_BREAKAWAY_FROM_JOB = covenant_quiet.CREATE_BREAKAWAY_FROM_JOB
+
+
+def launch_flags(breakaway=True):
+    return covenant_quiet.survivor_flags(breakaway)
+
+
+def launch_survivor(cmd, **kw):
+    """Popen a long-lived child that outlives the shell (job) that started
+    its parent and shows no window. Falls back when the job forbids breakaway."""
+    return covenant_quiet.popen_survivor(cmd, **kw)
 
 
 # ------------------------------------------------------------------- pass --

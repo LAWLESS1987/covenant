@@ -42,6 +42,11 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
 sys.path.insert(0, HERE)
 REPORT = os.path.join(HERE, "ops", "NIGHTLY.md")
 
@@ -71,7 +76,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 # 2026-09-21 (A174, A175): Tetsu refines himself and speaks on the
                 # forum; both suites pin the gate on each, so a pass that broke
                 # them is NOT GREEN.
-                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py", "test_im1_immunity.py", "test_mk1_model_keeper.py", "test_rl1_refine_loop.py", "test_ig1_image_guard.py",
+                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py", "test_im1_immunity.py", "test_mk1_model_keeper.py", "test_rl1_refine_loop.py", "test_ig1_image_guard.py", "test_qw1_quiet_everywhere.py", "test_my1_mycelium.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",

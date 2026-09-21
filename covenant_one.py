@@ -67,6 +67,11 @@ import urllib.request
 
 ONE_VERSION = "one-1.0"
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
 # A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
 # every suite this runner starts is a console program; started from a shell with no console,
 # each one opened a window of its own. None may. covenant_quiet does the same for the nightly.
@@ -438,6 +443,8 @@ SUITES = [
     ("test_mk1_model_keeper.py",          120,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
+    ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
+    ("test_my1_mycelium.py",              120,  "JUDGE"),
     ("test_dp1_daily_plan.py",           120,  "TRADER"),
     ("test_sm1_sealed_mail.py",          120,  "TRADER"),
     ("test_ac1_ai_consult.py",           120,  "TRADER"),

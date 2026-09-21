@@ -76,47 +76,21 @@
 <script src="vendor/three.min.js"></script>
 <script>
 const DATA = {
- "generated_utc": "2026-09-21T11:35:32Z",
- "generated_local": "Mon 21 Sep 07:35:32",
- "generated_epoch": 1789990532,
+ "generated_utc": "2026-09-21T20:37:14Z",
+ "generated_local": "Mon 21 Sep 16:37:14",
+ "generated_epoch": 1790023034,
  "host": "SALES",
- "free_mb": 2155,
+ "free_mb": 3328,
  "total_mb": 15679,
- "judge_model": "Ora@8571b16b1784",
+ "judge_model": "Ora@9a2bbf97a69c",
  "nodes": [
   {
    "id": "A",
    "port": 5000,
-   "up": true,
-   "height": 39,
-   "peers": 2,
-   "pending": 0,
-   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
-   "insecure": false,
-   "keyless": true,
-   "wsgi": "waitress",
-   "genesis": "00009b31c6c6",
-   "own_genesis": false,
-   "degraded": true,
-   "crisis": false,
-   "alignment": 0.5,
-   "dead_peers": 0,
-   "heartbeats_skipped": 0,
-   "tip_gossip_seen": 47,
-   "peer_ahead_seen": 0,
-   "anomaly_kinds": [],
-   "anomalies": 36,
-   "spike": false,
-   "subsystems": {
-    "brainflow": false,
-    "code_sandbox": false,
-    "neural_bridge": true,
-    "trading_bridge": true
-   },
-   "warnings": [
-    "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
-    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
-   ]
+   "up": false,
+   "error": "HTTPError: HTTP Error 429: TOO MANY REQUESTS",
+   "warnings": [],
+   "anomaly_kinds": []
   },
   {
    "id": "B",
@@ -136,12 +110,10 @@ const DATA = {
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 48,
+   "tip_gossip_seen": 34,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [
-    "peer_message_error"
-   ],
-   "anomalies": 8,
+   "anomaly_kinds": [],
+   "anomalies": 0,
    "spike": false,
    "subsystems": {
     "brainflow": false,
@@ -172,12 +144,10 @@ const DATA = {
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 3,
+   "tip_gossip_seen": 17,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [
-    "sync_hold_waived"
-   ],
-   "anomalies": 2,
+   "anomaly_kinds": [],
+   "anomalies": 1,
    "spike": false,
    "subsystems": {
     "brainflow": false,
@@ -193,13 +163,15 @@ const DATA = {
  ],
  "links": [],
  "watchdog": {
-  "last": "2026-09-21T11:34:39Z",
-  "ok": true,
-  "ticks": 6,
+  "last": "2026-09-21T20:37:14Z",
+  "ok": false,
+  "ticks": 16,
   "founder": null,
   "nodeb": null,
   "agree": null,
-  "alerts": []
+  "alerts": [
+   "highway: mesh_source_split is present and nothing here repairs it -- {\"running\": [\"447ed5ecdffc\"], \"peers\": {\"peer_127.0.0.1_5021\": \"447ed5ecdffc\", \"p"
+  ]
  },
  "converged": true
 };

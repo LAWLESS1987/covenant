@@ -69,6 +69,11 @@ import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
 # A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
 # every PowerShell this file spawns from the hidden watchdog opened a console window; none may.
 _NOWIN = 0x08000000 if os.name == "nt" else 0

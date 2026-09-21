@@ -25,6 +25,7 @@ RUN (same args as the node):
 import os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
 import covenant_unified_v8 as cov
 import covenant_judge_local    # noqa: F401 -- registers local/deepseek/mistral
 import covenant_judge_fallback # noqa: F401 -- registers "fallback", the distilled floor (covenant_distill.py trains it)

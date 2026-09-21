@@ -7095,6 +7095,91 @@ two callers by text.
 
 ---
 
+### A204. [the PC / windows popping up, second measure] "still popping up." -- "I closed node A, get this shit in order." -- "ensure this doesn't happen when you are gone." MEASURED AND FIXED 2026-09-21: the flag was only where the call sites had been rewritten; it is now applied once per process, at every unattended entry point, and a node outlives the shell that started it
+
+**What A203 missed, measured.** Every process with a visible window was
+listed (four, none ours), then every console host: 355 alive, 350 of them
+created in the one hour, and 372 Windows Terminal tabs with a dead process
+in each. Process creation was then watched for 40 s: the spawner was node A
+(`run_node.py`, started 15:11:54, ten minutes BEFORE the flagged highway
+was saved at 15:21:44) running `git log`, `verify_bundle.py` and PowerShell
+through modules that still called subprocess directly -- the highway's own
+lines had the flag, `covenant_reconnect`, `covenant_daily_plan` and
+`covenant_selfaudit` did not, and the node itself has no console, so each
+child was given a new one and handed to Windows Terminal. The watchdog,
+started after the save, produced no handoff at all. A203 had fixed the
+call sites it could see; a flag that has to be remembered at each site is
+the defect.
+
+**Fix.** `covenant_quiet.install()` patches `subprocess.Popen` once, so
+every child of that process is windowless whatever module spawns it,
+unless the caller asked for a console (CREATE_NEW_CONSOLE) or a detached
+child (DETACHED_PROCESS, which does not combine). Called at the top of
+`run_node.py`, `covenant_watchdog.py`, `covenant_watchdog_guard.py`,
+`rolling_restart.py`, `covenant_one.py`, `covenant_highway.py`,
+`covenant_council.py`, `covenant_nightly.py` and `covenant_refine_check.py`
+-- the last found by DISCOVERY, from the scheduled tasks, not from memory.
+The dead tabs were closed (the terminal window the handoff had created,
+parent svchost, not one he opened), the nodes restarted one at a time, and
+creation watched again for 75 s with the mesh running: 43 processes, 0
+terminal handoffs, 0 new windows.
+
+**The second half (A204b).** The rolling restart ran from a session's
+shell, and all three nodes died the moment that shell ended: Windows puts a
+tool shell in a job with kill-on-close, and a DETACHED child is still a
+member of its parent's job. The watchdog revived them 66 s later
+(20:03:26Z down, 20:04:32Z restarted, "whole mesh down" drops the three
+strikes to one). `covenant_watchdog.launch_survivor` now starts a node with
+CREATE_BREAKAWAY_FROM_JOB and falls back to the plain launch when the job
+forbids it (ERROR_ACCESS_DENIED), so nothing that started before fails to
+start now.
+
+**Pinned by** `test_qw1_quiet_everywhere.py` (16 checks, in the runner and
+the nightly's green set): each of the 9 entry points -- 8 fixed, plus every
+`.py` a scheduled task runs, discovered with `schtasks` -- is IMPORTED in a
+child interpreter and subprocess is found patched afterwards; idempotent;
+output still returned; restored by uninstall; the launch flags both ways;
+and a real job object with kill-on-close: a grandchild started the old way
+is dead when the job closes, one started by `launch_survivor` is alive.
+Broken both ways before it was trusted: the council's install line removed
+-> QW1.1 red; breakaway removed from `launch_survivor` -> QW1.8 red;
+restored -> 16/16. `covenant_quiet.py` selftest 7 (three new: the plain
+call carries the flag after install, a detached child is left alone, and
+without the patch the same call carries none).
+
+**Not measured by the suite:** whether a window appears. That needs a
+desktop console; the harness that runs the suites has none (its console
+window handle reads 0 either way), so it is measured by hand and said so
+in the suite's own output. **What still needs him:** nothing for this;
+if a window ever appears again, the process that owns it is listed by
+`Get-Process | Where-Object { $_.MainWindowTitle -ne "" }` and its parent
+names the module.
+
+**A204c, the public CI read after the push (rule: read the remote run).**
+The Linux run on b0d23c0 was RED on two counts this PC could not show:
+`test_ig1_image_guard.py` wrote its frames with Pillow, which the runner
+does not have (a Traceback, NO RESULT), and `test_my1_mycelium.py` was on
+disk but in no runner list (ORPHAN). Both fixed: the suite writes its PNGs
+with zlib alone, and `covenant_image.mean_luma_pure` decodes an 8-bit PNG
+without Pillow so `is_black` judges the same frame the same way with the
+wheel or without (IG1 11 checks, four new, including a child with Pillow
+blocked: black / bright / stub -> True / False / False; the reader mutated
+to say 255 -> three red). MY1 is registered in the runner and the nightly.
+
+**A204d, the one window that came back.** At 16:16:01, the second the
+guard revived the watchdog, one Windows Terminal window opened and stayed
+(it held the live watchdog's console). Cause: the venv's `python.exe` on a
+Store Python is a shim that starts the real interpreter as a child, and a
+DETACHED shim has no console, so Windows gave its child a new one. Both
+survivor launches (the guard's revive, the watchdog's node start) now use
+`covenant_quiet.survivor_flags`: a hidden console (CREATE_NO_WINDOW) the
+shim's child inherits, its own process group, breakaway from the job when
+allowed; never DETACHED. QW1 17 (one new: the guard's revive measured
+through a probe with a command that is not a watchdog); DETACHED put back
+-> QW1.5 and QW1.9 red; restored -> 17/17.
+
+---
+
 ### A203. [the PC / windows popping up] "We got multiple screens popping up interfering with my screen." -- "looks worse." MEASURED AND FIXED 2026-09-21: console programs started from processes with no console each opened a window of their own; every spawn is windowless now
 
 **Two sources, both measured.** (1) The watchdog is a hidden process
