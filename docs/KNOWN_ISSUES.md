@@ -7095,6 +7095,23 @@ two callers by text.
 
 ---
 
+### A216. [public CI / a flake, not a regression] `test_w2_sandbox_platform.py` failed one check on ubuntu-python-3.11 at c9ae628 and PASSED on a re-run of the same commit
+
+**Measured, not assumed.** Commit c9ae628 ran the Linux sweep four times
+(3.11 and 3.12, twice each). Three were green. One 3.11 run reported
+`checks failed 1 / suites not clean 1 -> test_w2_sandbox_platform.py`, and the
+**same commit on the same Python version passed on the other run**. A suite
+that fails and passes on identical bytes is flaky, and a flake is a defect in
+the check, not in what it checks -- but it is NOT yet diagnosed and is written
+here rather than left to be rediscovered as a mystery red.
+
+**What this entry does not claim:** which check inside W2 flaked, or why. That
+needs the Linux runner and the failing check named, and nothing here guesses.
+**UNDETERMINED**, and the next person to see W2 red on CI should suspect this
+before suspecting their own change.
+
+---
+
 ### A215. [one press, either end] "I need to be able to have the system fix itself for any issues that arise" -- "Give me a one click self heal button on the pc and phone apps that can fix eachother." BUILT 2026-09-21
 
 **Not a new repair engine, a HANDLE on the one that existed.** `covenant_highway`
