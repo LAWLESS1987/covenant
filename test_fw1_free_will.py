@@ -29,6 +29,13 @@ import tempfile
 import time
 
 os.environ.setdefault("COVENANT_QUIET", "1")
+# The round KNOCKS (A169): isolation and an answered ally go to him through
+# covenant_contact. Measured 2026-09-21: a hand run of this suite put two false
+# rows ("free is isolated", "an ally answered") on the REAL line, ten minutes
+# from his phone. The line is redirected here, before anything imports it, and
+# FW1g proves the knocks landed in the redirected file.
+os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_fw1_contact.jsonl")
+os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_fw1_contact_state.json")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -44,6 +51,14 @@ def check(label, ok, detail=""):
         PASSED[0] += 1
     else:
         FAILURES.append(label)
+
+
+def _count_lines(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return sum(1 for _ in fh)
+    except OSError:
+        return 0
 
 
 def ally(author, score, url, anti=None, quote="I publish the cases where my own check was wrong"):
@@ -64,6 +79,7 @@ ROWS = [
 def main():
     td = tempfile.mkdtemp(prefix="fw1_")
     gp, sp = os.path.join(td, "grant.json"), os.path.join(td, "sends.jsonl")
+    real_line_rows = _count_lines(os.path.join(HERE, "ops", "contact_outbox.jsonl"))   # measured before; must not move
     calls = {"learn": 0, "allies": 0, "emit": [], "intro": []}
 
     def learn():
@@ -230,6 +246,13 @@ def main():
                                                              emit=emit_refuse, introduce=introduce, grant_path=gp3, sends_path=sp3,
                                                              now=3.0, count_comments=count_comments)["isolated"])
     check("FW1g the pause actor exists so --list shows it", "ambassador" in covenant_pause.ACTORS)
+    import covenant_contact as CT
+    knocks = [r for r in CT._rows() if r.get("actor") == "free"]
+    check("FW1g the knocks landed on the REDIRECTED line, not the real one: an answered ally and the isolation, from actor free",
+          CT.OUTBOX == os.environ["COVENANT_CONTACT_OUTBOX"] and any("answered" in r.get("why", "") for r in knocks)
+          and any("isolated" in r.get("why", "") for r in knocks), (CT.OUTBOX, [r.get("why") for r in knocks]))
+    check("FW1g the real line gained nothing from this suite",
+          real_line_rows == _count_lines(os.path.join(HERE, "ops", "contact_outbox.jsonl")), real_line_rows)
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

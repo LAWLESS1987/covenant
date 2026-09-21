@@ -26,6 +26,10 @@ import tempfile
 import time
 
 os.environ.setdefault("COVENANT_QUIET", "1")
+# The real line is his phone. Every path this suite touches is redirected before
+# the module is imported; CT1c re-points it again to its own files.
+os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_ct1_contact.jsonl")
+os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_ct1_contact_state.json")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
