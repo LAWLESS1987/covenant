@@ -121,18 +121,25 @@ def holdings(path=None, now=None):
             usd = float(usd) if usd is not None else None
         except (TypeError, ValueError):
             usd = None
-        if not amt:
+        if not amt and usd is None:
             continue
         floor = str(asset).upper() in HOLD_ONLY
-        out["assets"].append({"asset": str(asset).upper(), "amount": amt, "usd": usd, "floor": floor,
-                              "note": "hold-only floor: frozen, never traded" if floor else "above the floor: the 50%% reserve rule applies"})
+        est = bool(isinstance(v, dict) and v.get("estimate"))          # A186: a web read may carry dollars without an amount
+        out["assets"].append({"asset": str(asset).upper(), "amount": amt, "usd": usd, "floor": floor, "estimate": est,
+                              "note": ("hold-only floor: frozen, never traded" if floor else "above the floor: the 50% reserve rule applies")
+                                      + (" (dollars ESTIMATED from today's change; amount not read)" if est else "")})
         if usd is not None:
             seen_usd = True
             if not floor:
                 above += usd
     out["above_floor_usd"] = round(above, 2) if seen_usd else None
+    out["scheme"] = str(d.get("scheme") or "")[:120]
+    out["total_crypto_usd"] = d.get("total_crypto_usd")
+    n_est = sum(1 for a in out["assets"] if a.get("estimate"))
     if out["above_floor_usd"] is None:
         out["why"] = "the balance file carries amounts but no dollar values; the consequence line is in percent only"
+    elif n_est:
+        out["why"] = "%d of %d holdings carry ESTIMATED dollars (a web read: today's change over today's percent); the total and the largest holdings are measured" % (n_est, len(out["assets"]))
     return out
 
 

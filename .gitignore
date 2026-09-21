@@ -368,3 +368,4 @@ ops/tetsu_strategy.jsonl
 ops/tetsu_live.jsonl
 ops/contact_state.json
 ops/ambassador_sends.jsonl
+coinbase_balance.prev.json

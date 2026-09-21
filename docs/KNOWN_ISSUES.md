@@ -7095,6 +7095,40 @@ two callers by text.
 
 ---
 
+### A186. [money / the balance read] "The pc can access the website to track balances tetsu can access the app." DONE 2026-09-21: the balance file refreshed from his signed-in Coinbase session, in his own browser, with measured and derived dollars told apart; the Coinbase app opened to Tetsu for READING on the phone, never acting
+
+**The website, on the PC.** Read in session through his own Chrome, signed
+in by him (the sign-in tile was his to press; nothing was typed by the
+assistant). Measured: the crypto total on the home page, the cash (USDC,
+amount and dollars), and for the three largest holdings the amount and the
+percent of portfolio on their asset pages (XRP, LINK, XLM: 89.18% of the
+portfolio between them). The site then began answering with an error page,
+so the twelve small holdings carry dollars DERIVED from today's dollar
+change over today's percent change on the home page, each row marked
+`estimate: true` with its basis, and `covenant_tetsu_money.holdings()` now
+says so in its own line: 12 of 16 holdings estimated, the total and the
+largest measured. The previous file (fifteen days old, amounts only) is
+kept beside it as `coinbase_balance.prev.json`. The sum of the rows is
+0.6% under the measured total, the rounding of the site's percents. What
+he holds above the floor now has a dollar figure, so every consequence
+line (A181) is priced. The file is private (gitignored, checked before
+this commit) and the key was never involved: the scheme field says
+"web-read". Not built: an unattended web read -- the PC cannot drive his
+browser without a person in the session, and this entry does not pretend
+it can; `python coinbase_balance.py` (his key, outside this folder) stays
+the unattended road.
+
+**The app, on the phone** (covenant-phone `Brain.OBSERVE_ONLY`, text-
+identical in `entry.py`): the Coinbase app may now be green-lit, previewed
+by OCR and inspected -- reading -- and stays denied for recording, replay,
+a job from the PC and any send (`isDenied` unchanged on those four paths;
+the read paths use `deniedForObserve`). `java_syntax_check` 17/17, M5
+291/291. The Python `denied_app` is unchanged, so unattended runs in the
+app are refused by both sides. Not measured: an OCR read of a balance on
+the device, and whether the app's screen reads well by OCR at all.
+
+---
+
 ### A185. [the ambassador / free rein] "Let the ambassador have free reign of moltbook also." GRANTED 2026-09-21 by his words in the grant file: free may reply to anyone she read and write posts of her own, through the same one door
 
 `ops/ambassador_grant.json` carries the sentence, `free_rein: true`, and
