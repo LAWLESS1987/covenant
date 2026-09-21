@@ -347,3 +347,6 @@ logs/model_server.log
 tools/sd/
 *.safetensors
 ops/images/
+
+# context_pack.py output: a paste for a Claude with no tools; a record, never shipped
+ops/CONTEXT_PACK.txt
