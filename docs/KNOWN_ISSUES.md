@@ -7101,9 +7101,18 @@ with five suites not clean: `test_p22_watchdog_restart_verifies.py`,
 `test_jr1_resolution.py` (19/22), `test_g4_money_gates.py` (16/17). A fresh
 Linux clone in WSL reproduces all five; checked out at 3455312, whose run
 had a green tick, the same clone fails `jr1` 19/22 and `g4` 16/17 as well.
-So the tick on 3455312 did not measure what a fresh clone measures; a full
-`--ci` run of both commits, side by side, is in progress as this is written
-and its reading goes here when it lands.
+So the tick on 3455312 did not measure what a fresh clone measures. A full
+`--ci` run of both commits on a fresh Linux clone, side by side, read:
+3455312 -> 131 suites, 6 checks failed, the same five suites not clean,
+RESULT FAIL; 67c8d12 -> 134 suites, 6 checks failed, the same five,
+RESULT FAIL. The green ticks on 3455312 were the **scheduled** runs; the
+push runs of the day (52e4281, 3455312, 67c8d12) had all failed, and the
+badge read "failing". The lesson is the artifact's, restated for this tree:
+a push is green when the remote push run is, read by its own conclusion,
+never by a tick that a scheduled run may have painted on the same commit.
+One more on 63bed09: the totals rewrite touched `docs/OUTREACH_
+INSTITUTIONAL.md` and only the README was staged, so a fresh clone read two
+totals for one day (G1 T3); the document is committed with the README now.
 
 **The three platform failures** are the ones the artifact fixed at
 5c9c0d9 (its A-table row "Linux") and this tree never received: the

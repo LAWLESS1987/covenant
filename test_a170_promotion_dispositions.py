@@ -71,10 +71,19 @@ def main():
         for r in src_rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     real_promotion, real_hold, real_report = X.promotion, X.disposition_claims_hold, X.report
+    # train() also WRITES records at module paths: the held-out score of a promoted
+    # candidate (write_holdout -> ops/HOLDOUT.json) and the run-without file
+    # (ops/RUN_WITHOUT.json). Measured 2026-09-21: the first run of this suite
+    # overwrote the real held-out record with the stub promotion's score (decided
+    # 201 of 314 rows). Both are pointed at this temp directory, and restored.
+    real_wh, real_hr, real_rw = X.write_holdout, X.HOLDOUT_RECORD, X.RUN_WITHOUT
     said = []
     try:
         X.promotion = lambda cand, cur, cur_trained=True, holdout=None: (True, ["PROMOTED: stub"])
         X.report = lambda block: None
+        X.write_holdout = lambda *a, **k: None
+        X.HOLDOUT_RECORD = os.path.join(td, "HOLDOUT.json")
+        X.RUN_WITHOUT = os.path.join(td, "RUN_WITHOUT.json")
         X.disposition_claims_hold = lambda path, timeout=600: (False, "A126: 11/13 passed (stub)")
         ok_b, _st = X.train(verdicts_path=verdicts, model_path=model_path, candidate_path=cand_path, say=said.append)
         after = io.open(model_path, "rb").read()
@@ -90,6 +99,10 @@ def main():
               ok_c is True and after_c != before and not os.path.exists(cand_path), (ok_c, os.path.exists(cand_path)))
     finally:
         X.promotion, X.disposition_claims_hold, X.report = real_promotion, real_hold, real_report
+        X.write_holdout, X.HOLDOUT_RECORD, X.RUN_WITHOUT = real_wh, real_hr, real_rw
+    real_h = os.path.join(HERE, "ops", "HOLDOUT.json")
+    check("A170b/c the real held-out record was not touched by this suite (it holds the deployed student's score, not a stub's)",
+          not os.path.exists(real_h) or json.load(open(real_h, encoding="utf-8")).get("decided") != 201, real_h)
 
     print("A170d -- the green list")
     # (That the suite reads COVENANT_A126_MODEL is proven above by RUNNING it against

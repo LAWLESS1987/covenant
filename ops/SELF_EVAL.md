@@ -3539,3 +3539,14 @@ repo      PASS  core 35bff56c70dd matches MANIFEST.sha256. This compares the man
 git       PASS  HEAD 3455312, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 43.1h ago; 31 file(s) not committed
 disk      PASS  304G free of 476G (36% used); logs/ 26M
 
+## 2026-09-21T11:39:15Z  overall FAIL  (round 5820)
+nodes     PASS  3/3 up, height 39 (spread 0), source 35bff56c70dd
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: highway: phone_build_behind_core is present and fetch_build started -- app update: fetched build d406ef1 (4520
+trader    FAIL  log 22.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 35bff56c70dd matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 8d8edc3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 44.2h ago; 34 file(s) not committed
+disk      PASS  303G free of 476G (36% used); logs/ 25M
+
