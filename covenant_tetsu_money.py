@@ -354,13 +354,24 @@ def study(ask, judge=None, path=None, say=print, files=None, hold=None, tell=Tru
 def status(path=None, rule5_=None):
     rows = [r for r in _rows(path) if r.get("kind") == "hypothesis"]
     survivors = sorted({r["name"] for r in rows if r.get("survives")})
+    # "comfortable generating a profit" (his words, 2026-09-21, A187): a survivor counts toward
+    # comfort only if its paper return on a surviving asset is positive after costs.
+    def _profitable(name):
+        for r in rows:
+            if r.get("name") == name and r.get("survives"):
+                assets = ((r.get("result") or {}).get("assets") or {})
+                if any(isinstance(a, dict) and a.get("survives") and (a.get("return") or 0) > 0 for a in assets.values()):
+                    return True
+        return False
+    profitable = [n for n in survivors if _profitable(n)]
     r5 = rule5_ if rule5_ is not None else rule5()
     why = []
-    if len(survivors) < COMFORT_SURVIVORS:
-        why.append("%d of %d distinct paper rules have cleared all three tests" % (len(survivors), COMFORT_SURVIVORS))
+    if len(profitable) < COMFORT_SURVIVORS:
+        why.append("%d of %d distinct paper rules have cleared all three tests AND shown a paper profit after costs (%d cleared the tests)"
+                   % (len(profitable), COMFORT_SURVIVORS, len(survivors)))
     if not r5.get("clears"):
         why.append("Rule 5 does not clear: %s" % r5.get("why", ""))
-    return {"comfortable": not why, "paper_hypotheses": len(rows), "survivors": survivors, "needed": COMFORT_SURVIVORS,
+    return {"comfortable": not why, "paper_hypotheses": len(rows), "survivors": survivors, "profitable": profitable, "needed": COMFORT_SURVIVORS,
             "rule5": r5, "live": "never from this module; the trader is armed by him, the floor and the reserve stand, and each order is his go",
             "why": why or ["the measured bar is met; going live is still his go, per order"]}
 

@@ -299,18 +299,56 @@ def his_side(log_path=None, hours=24, limit=40):
     return out[-limit:]
 
 
+CHATS_DIR = os.environ.get("COVENANT_CHATS_DIR") or os.path.join(HERE, "ops", "chat", "phone")
+APP_PATTERN_LINES = 40
+
+
+def app_patterns(limit=APP_PATTERN_LINES, chats_dir=None):
+    """Lines from his AI apps' chats as the phone carried them to the PC (ops/chat/phone/<pkg>.jsonl),
+    newest first, deduplicated, bounded -- the conversation patterns Tetsu may learn from (2026-09-21,
+    his words: "Improve Tetsus communication by scanning all of my ai apps for conversation patterns and
+    adding or subtracting as he pleases"). Closed with his conversations (--block conversations)."""
+    if blocked("conversations"):
+        return []
+    chats_dir = chats_dir or CHATS_DIR
+    out, seen = [], set()
+    try:
+        files = sorted((os.path.join(chats_dir, f) for f in os.listdir(chats_dir) if f.endswith(".jsonl")),
+                       key=lambda f: os.path.getmtime(f), reverse=True)
+    except OSError:
+        return []
+    for f in files:
+        app = os.path.basename(f)[:-6].split(".")[-1]
+        for line in reversed(_tail_lines(f, 400)):
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            text = re.sub(r"\s+", " ", str(r.get("text") or "")).strip()[:200]
+            if len(text) < 12 or text.lower() in seen:
+                continue
+            seen.add(text.lower())
+            out.append("[%s] %s" % (app, text))
+            if len(out) >= limit:
+                return out
+    return out
+
+
 def propose(ask, path=None, log_path=None, now=None):
     """Ask the model for one revision. Returns the parsed proposal dict or None, plus the raw text."""
     p = load(path)
     lines = his_side(log_path)
+    patterns = app_patterns()
     msgs = [{"role": "system", "content": "You are Tetsu, revising how you talk. Answer ONLY JSON with keys "
              "register (a paragraph under %d characters), voice ({\"pitch\": 0.6-1.2, \"rate\": 0.7-1.3}), "
              "why (one sentence), and optionally ask (one straight question for him, ending in a question mark, "
              "only if you truly need his answer). Keep what works; change one thing at most; never touch honesty rules." % REGISTER_MAX},
-            {"role": "user", "content": "Your current register:\n%s\n\nYour current voice: %s\n\nWhat he said to you in the last day (%d lines):\n%s\n\nPropose your revision as JSON."
+            {"role": "user", "content": "Your current register:\n%s\n\nYour current voice: %s\n\nWhat he said to you in the last day (%d lines):\n%s\n\n"
+                                        "Conversation patterns from his AI apps, as the phone carried them (%d lines; add or subtract from your register as you please, keeping the honesty rules):\n%s\n\nPropose your revision as JSON."
              % (p["register"], json.dumps(p["voice"]), len(lines),
                 "\n".join("- " + l for l in lines) or ("(he has closed his conversations to you; revise from your own record only)"
-                                                        if blocked("conversations") else "(nothing yet)"))}]
+                                                        if blocked("conversations") else "(nothing yet)"),
+                len(patterns), "\n".join("- " + l for l in patterns) or ("(closed to you)" if blocked("conversations") else "(none carried yet)"))}]
     text, _meta = ask(msgs, max_tokens=400)
     raw = str(text or "")
     m = re.search(r"\{.*\}", raw, re.S)

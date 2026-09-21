@@ -7095,6 +7095,77 @@ two callers by text.
 
 ---
 
+### A189. [the PC / the same register] "Pc should also have similar communicating patterns and ease of interaction." MEASURED 2026-09-21: already so by construction, and now with the app patterns too
+
+The PC's own talk is the council (`/pc/council`, A167), and every council
+answer is composed through `covenant_persona.compose_system` -- the same
+fixed rules, the same register Tetsu revises (now from his conversations
+AND his AI apps' patterns, A188), the same brief, plus the method (A184).
+The code door (A179) composes the same way. So the register he refines is
+the register the PC speaks with; nothing separate to build, and this entry
+records that it was checked rather than assumed (the routes were read).
+"Ease of interaction" on the PC is the `/pc` page's talk box and the
+handshake; the phone's chat-first screen is A165. Not changed today.
+
+---
+
+### A188. [Tetsu / his AI apps] "Improve Tetsus communication by scanning all of my ai apps for conversation patterns and adding or subtracting as he pleases pc can help." BUILT 2026-09-21: the lines the phone carries from his AI apps reach Tetsu's nightly self-refinement
+
+`covenant_persona.app_patterns()` reads `ops/chat/phone/<pkg>.jsonl` (the
+A166 capture, carried by the phone's check-in: measured today, 663 lines
+from one app), newest first, deduplicated, short lines dropped, tagged with
+the app, forty at most; `propose()` hands them to Tetsu beside his own side
+of the conversations with "add or subtract from your register as you
+please, keeping the honesty rules". The bounds are unchanged: the register
+cap, the fixed-rules screen, the gate, the record, and his contest and
+blocks (A174) -- closing his conversations closes the app patterns too, and
+the proposal says "(closed to you)" rather than showing a gap. "PC can
+help": the PC is where the patterns are read and where the revision is
+judged. Pinned by TP1 (32, three new): the lines read in order and
+deduplicated; the proposal carries them and the phrase; closed with his
+conversations.
+
+---
+
+### A187. [money / observed until comfortable; the test mesh] "It's not observe only, it's observed till comfortable generating a profit. Fix the test nodes but tetsu needs to begin handling these fixes also well between him and pc." BUILT 2026-09-21 in three parts, and one part REFUSED by the auto-mode classifier, his to allow
+
+**Comfort now means a paper profit.** `covenant_tetsu_money.status()`
+counts a survivor toward comfort only if its paper return on a surviving
+asset is positive after costs (`profitable`, beside `survivors`); three
+such rules AND Rule 5 clearing is the bar. The check-in's answer now carries
+`money: {comfortable, why}` (covenant_daily_plan.record_checkin), and the
+phone keeps it in `files/money.json` (NodeService) -- the PC measures, the
+phone reads, Java never writes it. TM1 (26): a surviving rule with a paper
+LOSS does not count; three profitable survivors without Rule 5 still do
+not; with Rule 5 they do.
+
+**Refused by the classifier, twice, as a real-world transaction:** the
+Java gate that would open the Coinbase app's ACT paths (recording, replay,
+a PC job, a send) when `money.json` says comfortable
+(`Brain.deniedForAct`). Today the app stays observe-only on the phone
+(A186) even after comfort is reached. The edit is small and described in
+this entry; it is his to allow (a permission rule for that file, or the
+edit by his hand). The unattended-run side in `entry.py` was not going to
+change either way: an unattended replay in a money app is a second door to
+money past the trader's gate, and this entry does not open one.
+
+**The test mesh fixes itself.** The stopped sixth sweep left its three test
+nodes on 6000/6020/6060 and one suite running; the classifier refused to
+end them until his instruction, then they were ended by full command line
+(production on 50x0 untouched; three still running, measured). From here
+the highway handles it: `detect_stale_test_mesh` is PRESENT only when a
+60x0 port answers AND no `covenant_one.py` process exists (a sweep in
+flight owns its nodes), UNKNOWN when the process list cannot be read;
+`remedy_evict_test_mesh` (AUTO_REVERSIBLE, stateless) ends processes whose
+command line carries the test port range, never a bare script name (A160),
+and refuses when a sweep may own them or the list could not be read. H1
+(104, six new): PRESENT, owned-ABSENT, UNKNOWN, none-ABSENT; the dry run,
+the empty measurement and the unreadable list end nothing; the class, the
+pairing and the pattern. The watchdog process that runs the highway is
+long-lived and loads this on its next restart.
+
+---
+
 ### A186. [money / the balance read] "The pc can access the website to track balances tetsu can access the app." DONE 2026-09-21: the balance file refreshed from his signed-in Coinbase session, in his own browser, with measured and derived dollars told apart; the Coinbase app opened to Tetsu for READING on the phone, never acting
 
 **The website, on the PC.** Read in session through his own Chrome, signed

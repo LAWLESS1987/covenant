@@ -30,6 +30,7 @@ os.environ.setdefault("COVENANT_QUIET", "1")
 os.environ["COVENANT_PERSONA"] = tempfile.mktemp(suffix="_tp1_persona.json")
 os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_tp1_contact.jsonl")
 os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_tp1_contact_state.json")
+os.environ["COVENANT_CHATS_DIR"] = tempfile.mkdtemp(prefix="tp1_chats_")   # A188: his AI apps' chat lines, redirected
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -169,6 +170,24 @@ def main():
           seen_prompt and "closed his conversations" in seen_prompt[-1] and "recap updates" not in seen_prompt[-1], seen_prompt[-1:][0][-160:] if seen_prompt else "")
     P.set_block("conversations", False)
     check("TP1d reopened: his side is read again", P.his_side(log) == ["recap updates"] and not P.blocked("conversations"))
+    # A188 (his words: "Improve Tetsus communication by scanning all of my ai apps for conversation
+    # patterns and adding or subtracting as he pleases"): the app lines the phone carried reach the proposal
+    with open(os.path.join(os.environ["COVENANT_CHATS_DIR"], "com.anthropic.claude.jsonl"), "w", encoding="utf-8") as fh:
+        for t in ("Reviewing past philosophical discussions", "Solving world hunger without population limits", "Reviewing past philosophical discussions", "short"):
+            fh.write(json.dumps({"t": 1789992208, "signer": "phone", "pkg": "com.anthropic.claude", "text": t}) + "\n")
+    pats = P.app_patterns()
+    check("TP1d app_patterns reads the phone-carried AI-app lines, newest first, deduplicated, the short one dropped, tagged with the app",
+          pats == ["[claude] Reviewing past philosophical discussions", "[claude] Solving world hunger without population limits"], pats)   # the duplicate is the newest line, so it leads
+    seen_prompt.clear()
+    P.propose(ask_capture, pp, log)
+    check("TP1d the proposal carries the app patterns with 'add or subtract ... as you please'",
+          seen_prompt and "[claude] Solving world hunger" in seen_prompt[-1] and "add or subtract" in seen_prompt[-1] and "2 lines" in seen_prompt[-1], seen_prompt[-1:][0][-300:] if seen_prompt else "")
+    P.set_block("conversations", True)
+    seen_prompt.clear()
+    P.propose(ask_capture, pp, log)
+    check("TP1d with his conversations closed the app patterns are closed too and the proposal says so",
+          P.app_patterns() == [] and seen_prompt and "(closed to you)" in seen_prompt[-1] and "Solving world hunger" not in seen_prompt[-1])
+    P.set_block("conversations", False)
     P.set_block("contact", True)
     n_rows = len(CT._rows())
     out_b = P.refine(ask_with({"register": "Warm and brief, one thought at a time, a question back when it helps.", "voice": {"pitch": 0.7, "rate": 1.0}, "why": "b"}),

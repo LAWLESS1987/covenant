@@ -137,7 +137,7 @@ def main():
     check("TM1d a hypothesis outside bounds is refused and recorded as refused", "refused" in out_b["why"] and TM._rows()[-1]["kind"] == "refused", out_b)
     out_n = TM.study(ask_with("no json here"), judge=clean, say=said.append, files=files, hold=hold)
     check("TM1d no JSON changes nothing", not out_n["proposed"] and "no JSON" in out_n["why"])
-    surv = lambda h, **k: {"name": "stub", "survives": True, "assets": {"X": {"mdd": 0.1, "wf": {"worst_fold": -0.05}, "in_market": 0.5, "survives": True}}, "trials_counted": 1, "why": "survives on X", "consequence": "paper line"}   # noqa: E731
+    surv = lambda h, **k: {"name": "stub", "survives": True, "assets": {"X": {"mdd": 0.1, "wf": {"worst_fold": -0.05}, "in_market": 0.5, "survives": True, "return": 0.12}}, "trials_counted": 1, "why": "survives on X", "consequence": "paper line"}   # noqa: E731
     out_h = TM.study(ask_with({"family": "mean_revert", "params": {"lookback": 24, "z_enter": 1.5}, "why": "y"}), judge=lambda t: (False, "HOLD"), say=said.append, files=files, hold=hold, evaluate_=surv)
     last = [r for r in TM._rows() if r["kind"] == "hypothesis"][-1]
     check("TM1d a reason the gate holds is recorded and is NEVER a survivor even when the tests pass", not out_h["survives"] and last["survives"] is False and last["gate"]["ok"] is False and "held by the gate" in out_h["why"], (out_h, last["gate"]))
@@ -153,10 +153,15 @@ def main():
     st = TM.status(rule5_={"clears": False, "why": "4 settled signals, need 30"})
     check("TM1e not comfortable: one survivor of three, Rule 5 not clearing, both named; live is never from here",
           st["comfortable"] is False and len(st["survivors"]) == 1 and len(st["why"]) == 2 and "never from this module" in st["live"], st)
+    # A187 ("comfortable generating a profit"): a survivor counts only with a positive paper return on a surviving asset
+    TM._append({"kind": "hypothesis", "name": "stub-loss", "survives": True, "paper": True, "result": {"assets": {"X": {"survives": True, "return": -0.02}}}})
+    st1b = TM.status(rule5_={"clears": True, "why": ""})
+    check("TM1e a survivor with a paper LOSS does not count toward comfort", st1b["comfortable"] is False and "stub-loss" in st1b["survivors"] and "stub-loss" not in st1b["profitable"], st1b)
     for n in ("a", "b"):
-        TM._append({"kind": "hypothesis", "name": "stub-" + n, "survives": True, "paper": True})
+        TM._append({"kind": "hypothesis", "name": "stub-" + n, "survives": True, "paper": True, "result": {"assets": {"X": {"survives": True, "return": 0.05}}}})
     st2 = TM.status(rule5_={"clears": False, "why": "4 settled signals, need 30"})
-    check("TM1e three distinct survivors but Rule 5 not clearing: still not comfortable, one reason left", st2["comfortable"] is False and len(st2["survivors"]) == 3 and st2["why"] == ["Rule 5 does not clear: 4 settled signals, need 30"], st2["why"])
+    check("TM1e three distinct profitable survivors but Rule 5 not clearing: still not comfortable, one reason left",
+          st2["comfortable"] is False and len(st2["profitable"]) == 3 and st2["why"] == ["Rule 5 does not clear: 4 settled signals, need 30"], (st2["profitable"], st2["why"]))
     st3 = TM.status(rule5_={"clears": True, "why": ""})
     check("TM1e three survivors AND Rule 5 clearing: comfortable, and going live is still his go per order", st3["comfortable"] is True and "his go" in st3["why"][0] and "each order is his go" in st3["live"], st3)
     check("TM1e the real Rule 5 summary is read (measured, not assumed): it does not clear today and says why", TM.rule5()["clears"] is False and TM.rule5()["why"])

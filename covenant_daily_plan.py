@@ -434,6 +434,16 @@ def record_checkin(body_bytes, who, path=None):
         out.update(covenant_persona.checkin_fields())
     except Exception as e:                                        # noqa: BLE001
         print("persona: the voice could not be read on this check-in: %s" % type(e).__name__, flush=True)
+    # THE MONEY COMFORT (2026-09-21, A187, his words: "It's not observe only,
+    # it's observed till comfortable generating a profit"): whether Tetsu's
+    # paper rules have reached the measured bar rides the answer, so the phone
+    # can open the Coinbase app to acting only then. Unreadable: not comfortable.
+    try:
+        import covenant_tetsu_money
+        _st = covenant_tetsu_money.status()
+        out["money"] = {"comfortable": bool(_st.get("comfortable")), "why": "; ".join(_st.get("why") or [])[:200]}
+    except Exception as e:                                        # noqa: BLE001
+        out["money"] = {"comfortable": False, "why": "the money status could not be read: %s" % type(e).__name__}
     return 200, out
 
 

@@ -691,8 +691,51 @@ def detect_sweep_red(health=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
+def _sweep_running():
+    """Is a covenant_one.py sweep in flight on this machine? Read from the process list, never guessed."""
+    import subprocess
+    ps = ("@(Get-CimInstance Win32_Process -Filter \"name like '%python%'\" | Where-Object { $_.CommandLine -like '*covenant_one.py*' }).Count")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=60)
+        return int((p.stdout or "0").strip() or 0) > 0
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None                                  # could not read the process list: the caller says UNKNOWN, never evicts
+
+
+def detect_stale_test_mesh(health=None):
+    """Test nodes (run_node.py --port 60x0) answering while no sweep is running.
+
+    2026-09-21, his words: "Fix the test nodes but tetsu needs to begin handling
+    these fixes also well between him and pc." A sweep stopped mid-suite left
+    its three test nodes on 6000/6020/6060 running under a staging directory
+    that no longer existed; the next sweep would have failed on the ports and
+    a person had to end them by hand. The condition is two measurements that
+    must agree: a node answers /health on a 60x0 port AND no covenant_one.py
+    process exists. A sweep in flight owns its test nodes; this never touches
+    them then. Production is 50x0 and is never in the pattern.
+    """
+    import urllib.request
+    up = []
+    for port in (6000, 6020, 6060):
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:%d/health" % port, timeout=3) as r:
+                if r.status == 200:
+                    up.append(port)
+        except Exception:                                        # noqa: BLE001
+            continue
+    if not up:
+        return {"state": ABSENT, "measured": {"test_ports_up": []}}
+    running = _sweep_running()
+    if running is None:
+        return {"state": UNKNOWN, "measured": {"test_ports_up": up, "error": "the process list could not be read; whether a sweep owns them is not known"}}
+    if running:
+        return {"state": ABSENT, "measured": {"test_ports_up": up, "note": "a sweep is running and owns them"}}
+    return {"state": PRESENT, "measured": {"test_ports_up": up, "sweep_running": False}}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
+    "stale_test_mesh": detect_stale_test_mesh,
     "sweep_red": detect_sweep_red,
     "source_drift": detect_source_drift,
     "mesh_source_split": detect_mesh_source_split,
@@ -1060,7 +1103,37 @@ def remedy_rerun_unclean(measured, dry_run=True):
                   "sweep; this only closes the gap." % was)
 
 
+def remedy_evict_test_mesh(measured, dry_run=True):
+    """STATELESS: end the leftover TEST nodes (run_node.py --port 60x0) of a sweep that is not running.
+
+    The match is the port range the sweep uses for its test mesh (6000-6090)
+    plus the script name, and the detector has already proved no sweep owns
+    them; production nodes are 50x0 and cannot match. A160's lesson stands in
+    the other direction here: a glob on the bare script name would match
+    production, so the port is part of the pattern.
+    """
+    import subprocess
+    ports = [int(p) for p in (measured or {}).get("test_ports_up") or []]
+    if not ports:
+        return False, "nothing to evict: no test port is up"
+    if dry_run:
+        return True, "would end the test nodes on %s" % ", ".join(str(p) for p in ports)
+    if _sweep_running() is not False:            # True: a sweep owns them; None: not known -- either way, no eviction
+        return False, "a sweep may own them (started since the measurement, or the process list could not be read); nothing ended"
+    ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+          " | Where-Object { $_.CommandLine -match 'run_node\\.py --port 60[0-9]0 ' };"
+          " $n=$w.Count; $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; $n")
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], cwd=HERE, capture_output=True, text=True, timeout=120)
+    return p.returncode == 0, ("ended %s process(es)" % (p.stdout or "").strip()[-8:]) if p.returncode == 0 else (p.stderr or "")[-200:]
+
+
 REMEDIES = {
+    "evict_test_mesh": {"fn": remedy_evict_test_mesh, "klass": AUTO_REVERSIBLE,
+                        "for": ["stale_test_mesh"], "kind": "stateless",
+                        "touches": ["test nodes on ports 6000-6090"],
+                        "benefit": {"gains": ["the next sweep finds its ports free", "no person ends a stray process by hand"],
+                                    "cost": ["nothing kept: a test mesh holds no chain anyone keeps"],
+                                    "irreversible": []}},
     "rerun_unclean": {"fn": remedy_rerun_unclean, "klass": AUTO_REVERSIBLE,
                       "for": ["sweep_red"], "kind": "stateless",
                       "touches": ["ops/sweep_heal_last.txt"],

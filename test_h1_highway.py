@@ -37,6 +37,7 @@ AND TWO AUDITS OF THE REGISTRY ITSELF
 """
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import sys
@@ -776,6 +777,51 @@ def main():
     # names the gap instead of trusting that the suite grew with the registry.
     import io as _io
     src = _io.open(os.path.join(HERE, "test_h1_highway.py"), encoding="utf-8").read()
+    # stale_test_mesh / evict_test_mesh arrived 2026-09-21 (A187, his words: "Fix the test
+    # nodes but tetsu needs to begin handling these fixes also well between him and pc").
+    # Driven here with the two measurements stubbed: ports answering, and whether a
+    # covenant_one.py sweep is running. The remedy is never run for real in a suite.
+    _real_sr, _real_uo = H._sweep_running, None
+    import urllib.request as _ur
+    _real_uo = _ur.urlopen
+
+    class _Up:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    try:
+        _ur.urlopen = lambda url, timeout=3: _Up()          # every test port answers
+        H._sweep_running = lambda: False
+        r_tm = H.detect_stale_test_mesh()
+        H._sweep_running = lambda: True
+        r_tm_owned = H.detect_stale_test_mesh()
+        H._sweep_running = lambda: None
+        r_tm_unk = H.detect_stale_test_mesh()
+        _ur.urlopen = lambda url, timeout=3: (_ for _ in ()).throw(OSError("refused"))
+        H._sweep_running = lambda: False
+        r_tm_none = H.detect_stale_test_mesh()
+    finally:
+        _ur.urlopen, H._sweep_running = _real_uo, _real_sr
+    check("H1x stale_test_mesh: test ports answering with NO sweep running is PRESENT, naming the ports",
+          r_tm["state"] == H.PRESENT and r_tm["measured"]["test_ports_up"] == [6000, 6020, 6060], str(r_tm))
+    check("H1x stale_test_mesh: the same ports with a sweep running is ABSENT (a sweep owns its nodes)",
+          r_tm_owned["state"] == H.ABSENT and "owns them" in r_tm_owned["measured"].get("note", ""), str(r_tm_owned))
+    check("H1x stale_test_mesh: the process list unreadable is UNKNOWN, never ABSENT",
+          r_tm_unk["state"] == H.UNKNOWN and "error" in r_tm_unk["measured"], str(r_tm_unk))
+    check("H1x stale_test_mesh: no test port answering is ABSENT", r_tm_none["state"] == H.ABSENT, str(r_tm_none))
+    ok_dry, note_dry = H.remedy_evict_test_mesh({"test_ports_up": [6000, 6020]}, dry_run=True)
+    ok_no, note_no = H.remedy_evict_test_mesh({"test_ports_up": []}, dry_run=False)
+    try:
+        H._sweep_running = lambda: None
+        ok_unk, note_unk = H.remedy_evict_test_mesh({"test_ports_up": [6000]}, dry_run=False)
+    finally:
+        H._sweep_running = _real_sr
+    check("H1x evict_test_mesh: a dry run names the ports and ends nothing; nothing up ends nothing; an unreadable process list ends nothing",
+          ok_dry and "6000, 6020" in note_dry and not ok_no and not ok_unk and "nothing ended" in note_unk, (note_dry, note_no, note_unk))
+    check("H1x evict_test_mesh is AUTO_REVERSIBLE, stateless, paired only with stale_test_mesh, and its pattern carries the test port range, never a bare script name",
+          H.REMEDIES["evict_test_mesh"]["klass"] == H.AUTO_REVERSIBLE and H.REMEDIES["evict_test_mesh"]["for"] == ["stale_test_mesh"]
+          and "60[0-9]0" in inspect.getsource(H.remedy_evict_test_mesh) and "'*run_node.py*'" not in inspect.getsource(H.remedy_evict_test_mesh))
+
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]
     check("H1v every registered detector is named somewhere in this suite",
