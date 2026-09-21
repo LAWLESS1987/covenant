@@ -7095,6 +7095,88 @@ two callers by text.
 
 ---
 
+### A215. [one press, either end] "I need to be able to have the system fix itself for any issues that arise" -- "Give me a one click self heal button on the pc and phone apps that can fix eachother." BUILT 2026-09-21
+
+**Not a new repair engine, a HANDLE on the one that existed.** `covenant_highway`
+has sensed nineteen conditions and applied the remedies classed AUTO_REVERSIBLE
+since A100. What was missing was a button: the repairs ran only on the
+watchdog's schedule, so when he saw something wrong there was nothing to press.
+`covenant_heal.heal()` presses it, and `heal_peer()` presses the machine at the
+other end of the wire -- which repairs ITSELF and reports. Nothing reaches into
+the other end in either direction: the phone cannot be made to run the PC's
+remedies, nor the PC the phone's. That is the only shape safe both ways.
+
+**"Any issues" is not a promise anyone can keep, and this does not make it.**
+It repairs what has a remedy and hands back everything else with the condition,
+what was measured, and **why there is no fix** -- distinguishing "no automatic
+remedy exists for this one" from "the remedy ran and it is still here". A
+repair invented on the spot for a condition nobody has seen is how a monitor
+takes a chain down.
+
+**The first press repaired NOTHING, and that was the whole finding.** Measured:
+six conditions present, six reported as needing him -- and five of them had a
+remedy sitting inside its cooldown. The cooldown is right for an automatic
+loop and wrong for a button: when he presses fix, he means now. A press now
+passes `cooldown_s=0`, which is the highway's own word for "a person typed
+--repair", and it still respects a remedy's own declared budget (the build
+runner's day stays a day). After the fix the same press repaired
+`watchdog_stale`. **A button that does nothing and blames the person is worse
+than no button.**
+
+**Where it is.** `/m/heal` on the node, tailnet-gated like every `/m` door;
+the **Self-heal** button on `/pc/3d`, the page his Desktop shortcut opens;
+and **Heal** on the phone (entry.`pc_heal`, pushed at 735ebac, build running).
+
+**A real defect found while verifying the button was live.** The page kept
+serving without it after two rolling restarts that both reported
+`node A ... on the disk source`. Measured: port 5000 was held by a node started
+at 19:14:01, five seconds BEFORE the page edit, and `rolling_restart` had
+health-checked that stale process and called it a success. The new node could
+not bind and the restart never noticed. Stopped by pid after verifying its
+command line, the port freed, restarted, and the button is served (13,479 ->
+14,691 bytes). **`rolling_restart` proving a restart by asking the port, when
+the port may be answered by the process it failed to replace, is a hole and is
+written here rather than quietly fixed at four in the morning.**
+
+**Pinned by** `test_hl1_heal.py` (15 checks): fixed-versus-still-broken from two
+looks at the conditions, a condition never present blamed on nobody, the
+measurement carried, **the waived cooldown**, the summary line, the record, a
+dry run that never claims a remedy ran, an engine that raises reported and not
+thrown, the real registry's shape behind the reason text, and both directions
+of the wire including a peer that cannot be reached. Broken: the cooldown put
+back -> HL1.5 red; restored -> 15/15.
+
+---
+
+### A214. [optimize] "Optimize." -- "Replication doesn't matter to me as long as operation continues without breaking my phone or comp or slowing down; optimization is the goal." MEASURED 2026-09-21, and the guesses are recorded beside the gains
+
+**Measured first, and twice wrong.** The sweep is 18.5 minutes; the largest
+single suite is `test_a115` at 224.6 s. First guess: the watchdog's 8-second
+health timeout against fixtures on loopback. Made overridable
+(`COVENANT_HEALTH_TIMEOUT`, unchanged at 8 s for a real node, where a node
+mid-boot is slow rather than dead) and set to 0.6 s in that suite. **Gain: 34
+seconds. Guess mostly wrong.** Second guess: nine `covenant_client.py`
+subprocesses per watchdog pass. Measured properly: one `balance()` call is
+**0.4 s**, not the 4 s assumed, so the cross-ledger comparison is ~3.6 s of a
+15-second pass, not 12. It now runs every `BALANCE_EVERY` (15) rounds instead
+of every round, and always on a manual `--once`. **The cost, stated: detection
+latency for a ledger divergence goes from under a minute to under fifteen**;
+nothing auto-acts on that condition, it is logged for a person. **The remaining
+~11 s of the 15-second pass is NOT MEASURED and is not claimed as optimised.**
+
+**An optimisation that changes a verdict is not an optimisation.** Lowering the
+timeout turned A115.11c green-to-red: the check means "slower than the probe
+waits", and the fixture's delay had shrunk while a hardcoded `timeout=3` had
+not. The probe timeout now derives from the same constant, so the relationship
+is what is pinned, not the number. **A115: 32 checks, identical verdicts,
+230 s -> 196 s.**
+
+**His constraint, recorded as the bound on all of it:** *"without breaking my
+phone or comp or slowing down"*. Every change here gives time back to the
+machine or costs it nothing; none adds work to his phone.
+
+---
+
 ### A213. [no backdoors / audited, and the newest code brought up to the same standard] "There should be no backdoors." -- "So encode the newest stuff the same way for security." AUDITED AND HARDENED 2026-09-21
 
 **The audit, by discovery, not by recall.** Every shape a backdoor takes was

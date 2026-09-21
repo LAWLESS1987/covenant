@@ -42,6 +42,17 @@ import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# A214 (2026-09-21, his word: "Optimize"). Every fixture below answers on
+# loopback in milliseconds or is deliberately silent, so the watchdog's real
+# 8-second health timeout bought this suite nothing but wall clock: 180 s of
+# 230 s, measured, the largest single cost in the sweep. Set BEFORE the
+# watchdog is imported, because it reads this once at import.
+# It changes no verdict: a fixture that answers still answers well inside
+# 0.6 s, and SLOW_ANSWER_S below still overshoots the timeout by more than
+# 3x, which is the only thing the "slow, not down" checks depend on.
+os.environ.setdefault("COVENANT_HEALTH_TIMEOUT", "0.6")
+SLOW_ANSWER_S = float(os.environ.get("COVENANT_HEALTH_TIMEOUT", "0.6")) * 3.5
+
 RESULTS = []
 
 
@@ -98,7 +109,7 @@ class Slow(http.server.BaseHTTPRequestHandler):
     starts a second node on an occupied one."""
 
     def do_GET(self):                                             # noqa: N802
-        time.sleep(12)
+        time.sleep(SLOW_ANSWER_S)
         try:
             self.send_response(200)
             self.end_headers()
@@ -310,7 +321,13 @@ def main():
               st == "rate_limited", "got %r" % st)
         st2, _d2 = RR.probe(deadR, timeout=5)
         check("A115.11b and a refused connection 'down'", st2 == "down", "got %r" % st2)
-        st3, d3 = RR.probe(pS, timeout=3)
+        # A214: this probe's timeout shrinks WITH the slow fixture's delay, never
+        # apart from it. What the check means is "slower than the probe waits",
+        # and that relationship (SLOW_ANSWER_S is 3.5x this) is what is pinned --
+        # not the number 3. Leaving the number at 3 while the fixture dropped to
+        # 2.1 s is what turned this check green-to-red on the first try, and an
+        # optimisation that changes a verdict is not an optimisation.
+        st3, d3 = RR.probe(pS, timeout=float(os.environ["COVENANT_HEALTH_TIMEOUT"]))
         check("A115.11c and a listener too slow to answer 'slow', NOT 'down'",
               st3 == "slow", "got %r (%s)" % (st3, d3))
 

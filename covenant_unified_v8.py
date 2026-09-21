@@ -8465,6 +8465,31 @@ class CovenantAPI:
         # returned. The image itself is not judged, and this says so. Same
         # door, same limiter. Slow by nature: tens of seconds, and the
         # language model is put away first when memory is short.
+        # ONE PRESS, EITHER END (A215, 2026-09-21, his words: "I need to be able
+        # to have the system fix itself for any issues that arise" -- "Give me a
+        # one click self heal button on the pc and phone apps that can fix
+        # eachother"). The same door for both buttons: the PC page presses it on
+        # this node, the phone presses it across the wire, and each machine
+        # repairs ITSELF and reports. Nothing reaches into the other end -- a
+        # caller presses the peer's own button and the peer's own gate decides,
+        # which is the only shape that is safe in both directions.
+        # Tailnet-gated like every /m door. It runs covenant_highway's existing
+        # remedies and invents none: a repair improvised for a condition nobody
+        # has seen is how a monitor takes a chain down.
+        @self.app.route("/m/heal", methods=["POST"])
+        def mobile_heal():
+            ok, addr = _tailnet_caller()
+            if not ok:
+                self.node.anomaly_monitor.record("mobile_page_refused", addr or "unknown")
+                return (jsonify({"status": "error", "message": "this door answers the tailnet only -- you are %s" % (addr or "unknown")}), 403)
+            body = request.get_json(silent=True) or {}
+            dry = bool(body.get("dry_run"))
+            try:
+                out = importlib.import_module("covenant_heal").heal(dry_run=dry, who="press:%s" % addr)
+            except Exception as e:                                # noqa: BLE001
+                return (jsonify({"status": "error", "ok": False, "message": "the heal could not run: %s: %s" % (type(e).__name__, str(e)[:200])}), 503)
+            return jsonify(dict(out, status="success" if out.get("ok") else "error")), (200 if out.get("ok") else 503)
+
         @self.app.route("/m/image", methods=["POST"])
         def mobile_image():
             ok, addr = _tailnet_caller()

@@ -63,14 +63,35 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 <div id="hud">__SYMBOL__<div class="t"><b>Tetsu · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small></div></div>
 <div id="panel"><h3>What you clicked</h3><div id="info">click an orb: this node, its peers, or Tetsu</div></div>
 <div id="answer"></div>
-<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="send">Send</button></div>
+<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
 <script>
 const NODE='__NODE__';
-let state=null, voice={pitch:1.15,rate:1.3};
+let state=null, voice={pitch:0.8,rate:0.95};
 async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');}catch(e){document.getElementById('live').textContent='state unreadable';}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 async function send(){const q=document.getElementById('q');const t=q.value.trim();if(!t)return;const a=document.getElementById('answer');a.style.display='block';a.textContent='thinking…';try{const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});const j=await r.json();const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');a.textContent=txt;speak(txt);q.value='';}catch(e){a.textContent='no answer: '+e;}}
 document.getElementById('send').onclick=send;
+// A215 (his words: "Give me a one click self heal button on the pc and phone apps").
+// One press: the node runs covenant_heal, which runs the highway's own remedies
+// with the person's cooldown waived, and says what it fixed and what still needs him.
+async function heal(){const b=document.getElementById('heal');const a=document.getElementById('answer');
+ b.disabled=true;const was=b.textContent;b.textContent='healing…';a.style.display='block';a.textContent='looking at everything that can go wrong…';
+ try{const r=await fetch('/m/heal',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const j=await r.json();
+  let t=j.summary||'no answer';
+  if(j.fixed&&j.fixed.length)t+='
+
+FIXED:
+'+j.fixed.map(x=>'  '+x.condition).join('
+');
+  if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='
+
+STILL NEEDS YOU:
+'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('
+');
+  a.textContent=t;speak(j.summary||'');}
+ catch(e){a.textContent='the heal could not be reached: '+e;}
+ b.disabled=false;b.textContent=was;}
+document.getElementById('heal').onclick=heal;
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 getState();setInterval(getState,15000);
 </script>

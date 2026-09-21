@@ -667,6 +667,9 @@ def _seat_defers(pol=None):
 # For Misha, and all that were lost to injustice.
 # --------------------------------------------------------------------------
 SELF_EVAL_EVERY = int(os.environ.get("COVENANT_SELF_EVAL_ROUNDS", "60"))
+# A214: rounds between the cross-ledger balance comparison (nine subprocesses).
+# 1 restores the old every-round behaviour; a manual --once always runs it.
+BALANCE_EVERY = int(os.environ.get("COVENANT_BALANCE_EVERY", "15"))
 SELF_EVAL_PATH = os.environ.get(
     "COVENANT_SELF_EVAL_PATH", os.path.join(HERE, "ops", "SELF_EVAL.md"))
 SELF_EVAL_MAX_BYTES = 512 * 1024
@@ -1080,7 +1083,18 @@ def log(level, msg):
 
 
 # ------------------------------------------------------------------ probes --
-def health(port, timeout=8):
+# A214 (2026-09-21, his word: "Optimize"). Measured: test_a115 spent 180 s of
+# its 230 s waiting out THIS timeout against fixture servers on loopback -- the
+# single largest cost in an 18.5-minute sweep. The number is unchanged for a
+# real node (8 s: a node mid-boot building its judges is slow, not dead, and
+# A115 exists because calling it dead restarts a healthy node). A suite driving
+# fixtures that answer in milliseconds can set COVENANT_HEALTH_TIMEOUT low and
+# buy back the wall clock without changing a single verdict.
+HEALTH_TIMEOUT_S = float(os.environ.get("COVENANT_HEALTH_TIMEOUT", "8"))
+
+
+def health(port, timeout=None):
+    timeout = HEALTH_TIMEOUT_S if timeout is None else timeout
     try:
         with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/health", timeout=timeout) as r:
@@ -1474,7 +1488,19 @@ def one_pass(strict=False):
         log("INFO", line)
 
     # The check nothing else does: same identity, both databases, must agree.
-    if all(os.path.exists(os.path.join(HERE, n["db"])) for n in NODES) and \
+    # A214 (2026-09-21, his word: "Optimize"). MEASURED: one real pass took 15 s
+    # of every 60, and ~12 s of it was here -- three identities x three
+    # databases = NINE covenant_client.py subprocesses, every minute, for ever.
+    # What they check is whether an identity's balance AGREES across the three
+    # ledgers. A divergence does not heal itself and does not appear between one
+    # minute and the next: nothing auto-acts on it, it is logged for a person.
+    # So it runs every BALANCE_EVERY rounds instead of every round, and always
+    # on a manual `--once`, so a person checking by hand still gets the answer.
+    # THE COST, STATED: detection latency for a ledger divergence goes from
+    # under a minute to under fifteen. The gain is 20% of this machine's
+    # wall clock handed back to the node it is supposed to be watching.
+    _bal_due = strict or BALANCE_EVERY <= 1 or (_self_eval.get("round", 0) % BALANCE_EVERY == 0)
+    if _bal_due and all(os.path.exists(os.path.join(HERE, n["db"])) for n in NODES) and \
             os.path.exists(os.path.join(HERE, "nodeA_prod.db.key")):
         _identities = [("founder", "nodeA_prod.db.key")] + [
             (f"node{n['id']}", n["key"]) for n in NODES if n["id"] != "A"]
