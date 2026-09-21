@@ -7130,10 +7130,12 @@ and WSL2 forwards Windows loopback to them: a PC-side probe of the door hit
 a Linux node with no model runtime, and the watchdog read B and C at height
 2 for 48 rounds. The phone, reaching the Windows address over Tailscale,
 never saw them. Killed; after any WSL sweep the ports are checked empty.
-(2) Two watchdogs had run since the same second (the guard's venv one and a
-store-python one); the A160 twin rule leaves a tie alone. Stopped by hand;
-the guard restarts one within its threshold. Neither is fixed in code here;
-both are named so the next reader looks for them.
+(2) What looked like two watchdogs since the same second was one: the
+venv's `python.exe` is a launcher whose child is the real interpreter
+(`python3.12.exe`, parent pid = the launcher), so every watchdog is two
+processes on this PC. Measured after the guard revived it: pids 26308 and
+11100, the second the child of the first. Not a twin, not a defect; named
+so the next reader does not count two.
 
 ---
 
