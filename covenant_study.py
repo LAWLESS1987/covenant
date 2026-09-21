@@ -354,6 +354,16 @@ _SENT = re.compile(r"(?<=[.;:!?])\s+")
 # cited come first, a bounded few per topic per pass, each cached with its
 # title, licence and source URL so it can be checked like a Gutenberg file.
 OA_REGISTRY = os.path.join(OUT, "oa_sources.jsonl")
+# A213 (his words: "So encode the newest stuff the same way for security"):
+# every call below goes through covenant_web.api_get -- https, host pinned,
+# redirects checked hop by hop, recorded -- instead of raw urllib.
+OA_HOSTS = ("ebi.ac.uk",)
+_PMCID = re.compile(r"^PMC[0-9]{1,12}$")
+
+
+def _api(url, timeout=60):
+    import covenant_web
+    return covenant_web.api_get(url, OA_HOSTS, timeout=timeout)
 EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 UA = {"User-Agent": "covenant-study (public-domain study pipeline; contact via github.com/LAWLESS1987/covenant)"}
 
@@ -374,12 +384,16 @@ OA_QUERIES = [
 def oa_search(query, n):
     u = EPMC + "/search?" + urllib.parse.urlencode({"query": query, "format": "json", "pageSize": n,
                                                      "resultType": "core", "sort": "CITED desc"})
-    d = json.load(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60))
+    d = json.loads(_api(u))
     return d.get("hitCount", 0), d.get("resultList", {}).get("result", [])
 
 
 def oa_text(pmcid):
-    xml = urllib.request.urlopen(urllib.request.Request(EPMC + "/%s/fullTextXML" % pmcid, headers=UA), timeout=90).read().decode("utf-8", "replace")
+    # the id comes from a remote answer and is interpolated into a URL: it is
+    # checked against its own shape first, so nothing else can be smuggled in.
+    if not _PMCID.match(str(pmcid or "")):
+        raise ValueError("not a PMC id: %r" % (pmcid,))
+    xml = _api(EPMC + "/%s/fullTextXML" % pmcid, timeout=90)
     m = re.search(r"<article-title>(.*?)</article-title>", xml, re.S)
     title = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else ""
     parts = []

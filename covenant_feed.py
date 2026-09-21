@@ -57,6 +57,18 @@ sys.path.insert(0, HERE)
 CACHE = os.path.join(HERE, "private", "feed")
 STATE = os.path.join(HERE, "ops", "feed_state.json")
 UA = {"User-Agent": "covenant-feed/1.0 (open sources only; github.com/LAWLESS1987/covenant)", "Accept": "application/atom+xml, application/json, text/html;q=0.8, */*;q=0.5"}
+# A213 (2026-09-21, his words: "So encode the newest stuff the same way for
+# security"). This module used urllib directly, so none of the web door's checks
+# applied to it. Every fetch now goes through covenant_web.api_get: https only,
+# the host must be on this list, every redirect hop checked before it is
+# followed, and each call recorded in the same ledger as any other read.
+API_HOSTS = ("api.openalex.org", "export.arxiv.org", "ebi.ac.uk",
+             "ripple.com", "mirrornode.hedera.com")
+
+
+def _api(url, timeout=60):
+    import covenant_web
+    return covenant_web.api_get(url, API_HOSTS, timeout=timeout)
 # A211: these were 6 and 3000, the assistant's numbers. Raised, and overridable.
 # What remains is only what keeps a nightly pass finishing and polite to the open
 # services it reads (OpenAlex, Europe PMC and arXiv are free and shared).
@@ -65,17 +77,25 @@ DIGEST_CHARS = int(os.environ.get("COVENANT_FEED_DIGEST_CHARS") or 12000)
 
 # (name, his words, kind, query-or-pages)
 TOPICS = [
-    ("ai-research", "All ai news", "arxiv", "cat:cs.AI OR cat:cs.LG OR cat:cs.CL"),
-    ("space-discovery", "j space discovery", "arxiv", "cat:astro-ph.EP OR cat:astro-ph.GA OR cat:astro-ph.CO"),
-    ("quantum-computing", "quantum computing", "arxiv", "cat:quant-ph AND (all:\"quantum computing\" OR all:qubit OR all:\"quantum error correction\")"),
-    ("neuromorphic", "mishmahowalds work and all offspring of it", "arxiv", "all:neuromorphic OR all:\"silicon retina\" OR all:\"spiking neural\" OR all:\"event camera\""),
-    ("recursive-self-improvement", "All research on recursive self improvement", "arxiv", "all:\"recursive self-improvement\" OR all:\"self-improving\" OR all:\"self-improvement\" AND cat:cs.AI"),
-    ("mathematics", "every known math equation", "arxiv", "cat:math.HO OR cat:math.GM OR cat:math.NT OR cat:math.CO"),
-    ("extra-dimensions", "Imterdimensional studies", "arxiv", "all:\"extra dimensions\" OR all:\"higher-dimensional\" OR all:\"Kaluza-Klein\" OR all:\"braneworld\""),
-    ("collective-consciousness", "Layered understanding and collective consciousness research", "arxiv",
-     "all:\"collective intelligence\" OR all:\"global workspace\" OR all:\"integrated information\" OR all:\"hierarchical representation\" OR cat:q-bio.NC"),
+    ("ai-research", "All ai news", "papers",
+     "artificial intelligence large language model agents alignment"),
+    ("space-discovery", "j space discovery", "papers",
+     "exoplanet discovery galaxy cosmology observation"),
+    ("quantum-computing", "quantum computing", "papers",
+     "quantum computing qubit error correction"),
+    ("neuromorphic", "mishmahowalds work and all offspring of it", "papers",
+     "neuromorphic engineering silicon retina spiking neural event camera"),
+    ("recursive-self-improvement", "All research on recursive self improvement", "papers",
+     "recursive self-improvement self-improving artificial intelligence"),
+    ("mathematics", "every known math equation", "papers",
+     "mathematics theorem proof equation"),
+    ("extra-dimensions", "Imterdimensional studies", "papers",
+     "extra dimensions Kaluza-Klein braneworld higher-dimensional spacetime"),
+    ("collective-consciousness", "Layered understanding and collective consciousness research", "papers",
+     "collective intelligence consciousness global workspace integrated information"),
     ("crypto-ledgers", "Crypto ledgers and burn rates", "ledgers", None),
-    ("token-burn-research", "Crypto ledgers and burn rates", "arxiv", "all:\"token burn\" OR all:tokenomics OR all:\"transaction fee\" AND (cat:cs.CR OR cat:q-fin.GN OR cat:cs.DC)"),
+    ("token-burn-research", "Crypto ledgers and burn rates", "papers",
+     "token burn tokenomics blockchain transaction fee mechanism"),
     ("medicine", "Law, medical journals and research", "europepmc",
      '(PUB_TYPE:"systematic review" OR PUB_TYPE:review) AND (TITLE:treatment OR TITLE:therapy OR TITLE:prevention) AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
     ("law", "Law, medical journals and research", "pages", [
@@ -98,13 +118,52 @@ TOPICS = [
 
 
 # ------------------------------------------------------------------ sources --
+def _openalex_abstract(inv):
+    """OpenAlex stores an abstract as {word: [positions]}; put it back in order."""
+    if not inv:
+        return ""
+    return " ".join(w for _p, w in sorted((p, w) for w, ps in inv.items() for p in ps))
+
+
+def openalex_search(query, n, mailto="noreply@github.com"):
+    """Open-access works, newest first, from OpenAlex: open metadata (CC0), no
+    key, and the mailto puts the call in its polite pool."""
+    u = "https://api.openalex.org/works?" + urllib.parse.urlencode(
+        {"search": query, "filter": "open_access.is_oa:true", "sort": "publication_date:desc",
+         "per-page": n, "mailto": mailto})
+    out = []
+    for w in (json.loads(_api(u)).get("results") or []):
+        out.append({"id": (w.get("id") or "").rsplit("/", 1)[-1],
+                    "title": (w.get("title") or "")[:300],
+                    "summary": _openalex_abstract(w.get("abstract_inverted_index"))[:1500],
+                    "published": (w.get("publication_date") or "")[:10],
+                    "authors": [((a.get("author") or {}).get("display_name") or "") for a in (w.get("authorships") or [])][:6],
+                    "url": (w.get("open_access") or {}).get("oa_url") or w.get("id") or ""})
+    return out
+
+
 def arxiv_search(query, n):
-    """[{"id", "title", "summary", "published", "authors"}] newest first."""
-    u = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode(   # the API answered 406 once to a bare UA; Accept is explicit now
-        
+    """[{"id", "title", "summary", "published", "authors", "url"}] newest first."""
+    u = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode(
         {"search_query": query, "start": 0, "max_results": n, "sortBy": "submittedDate", "sortOrder": "descending"})
-    xml = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60).read().decode("utf-8", "replace")
-    return parse_arxiv(xml)
+    return parse_arxiv(_api(u))
+
+
+def papers_search(query, n):
+    """OpenAlex first, arXiv second. Measured 2026-09-21: the arXiv API answered
+    406 to every query asking for more than one result, so it is the fallback
+    and not the road. A failure of both carries both reasons."""
+    try:
+        got = openalex_search(query, n)
+        if got:
+            return got
+        note = "no results"
+    except Exception as e:                                        # noqa: BLE001
+        note = "%s: %s" % (type(e).__name__, str(e)[:60])
+    try:
+        return arxiv_search("all:" + " AND all:".join(query.split()[:3]), n)
+    except Exception as e:                                        # noqa: BLE001
+        raise RuntimeError("OpenAlex %s; arXiv %s: %s" % (note, type(e).__name__, str(e)[:60]))
 
 
 def parse_arxiv(xml):
@@ -116,7 +175,8 @@ def parse_arxiv(xml):
             return re.sub(r"\s+", " ", mm.group(1)).strip() if mm else ""
         aid = tag("id").rsplit("/", 1)[-1]
         out.append({"id": aid, "title": tag("title"), "summary": tag("summary")[:1500], "published": tag("published")[:10],
-                    "authors": [re.sub(r"\s+", " ", a).strip() for a in re.findall(r"<name>(.*?)</name>", e)][:6]})
+                    "authors": [re.sub(r"\s+", " ", a).strip() for a in re.findall(r"<name>(.*?)</name>", e)][:6],
+                    "url": "https://arxiv.org/abs/" + aid})
     return out
 
 
@@ -169,19 +229,19 @@ def _cache(topic, item_id, text, cache=None):
 
 # --------------------------------------------------------------------- pass --
 def run_topic(name, words, kind, spec, seen, per_topic=PER_TOPIC, cache=None, say=print,
-              arxiv=None, oa=None, web=None, ledgers=None):
+              papers=None, oa=None, web=None, ledgers=None):
     """New items for one topic -> cached; returns (items, note). Never raises."""
     seen_ids = set(seen.get(name, []))
     items = []
     try:
-        if kind == "arxiv":
-            for e in (arxiv or arxiv_search)(spec, per_topic * 3):
+        if kind == "papers":
+            for e in (papers or papers_search)(spec, per_topic * 3):
                 if e["id"] in seen_ids or len(items) >= per_topic:
                     continue
-                text = "Title: %s\nSource: https://arxiv.org/abs/%s\nPublished: %s\nAuthors: %s\n\n%s\n" % (
-                    e["title"], e["id"], e["published"], ", ".join(e["authors"]), e["summary"])
+                text = "Title: %s\nSource: %s\nPublished: %s\nAuthors: %s\n\n%s\n" % (
+                    e["title"], e.get("url", ""), e["published"], ", ".join(e["authors"]), e["summary"])
                 _cache(name, e["id"], text, cache)
-                items.append({"id": e["id"], "title": e["title"], "line": e["summary"][:300], "url": "https://arxiv.org/abs/%s" % e["id"]})
+                items.append({"id": e["id"], "title": e["title"], "line": e["summary"][:300], "url": e.get("url", "")})
         elif kind == "europepmc":
             if oa is None:
                 import covenant_study as S

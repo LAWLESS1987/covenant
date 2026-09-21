@@ -134,16 +134,80 @@ finally:
     W.check_url = real_check
     srv.shutdown()
 
-# ---- redirect to a refused address is refused after the redirect
+# ---- A213: a redirect to a private address is refused BEFORE it is requested
+class _Rec(urllib.request.HTTPHandler):
+    """Answers a 302 to a private address, and records every host actually asked for."""
+    asked = []
+
+    def http_open(self, req):
+        _Rec.asked.append(req.full_url)
+        import email, io, http.client
+        loc = "http://127.0.0.1:9/inside" if "/bounce" in req.full_url else None
+        class R(io.BytesIO):
+            def __init__(s):
+                io.BytesIO.__init__(s, b"")
+                s.status, s.code = (302, 302) if loc else (200, 200)
+                s.headers = email.message_from_string(("Location: " + loc + "\n") if loc else "Content-Type: text/html\n")
+                s.msg = "Found" if loc else "OK"
+            def geturl(s):
+                return req.full_url
+            def info(s):
+                return s.headers
+        r = R()
+        if loc:
+            raise urllib.error.HTTPError(req.full_url, 302, "Found", r.headers, r)
+        return r
+
+
+_Rec.asked = []
+_op = urllib.request.build_opener(_Rec())
+_real = W.check_url
+W.check_url = lambda u: (True, "") if "public.test" in u else _real(u)
+try:
+    r = W.read("http://public.test/bounce", grant_path=GRANT, ledger_path=LEDGER, opener=_op)
+    check("WB1.13 a redirect to a private address is refused, and the private address is NEVER requested",
+          r["ok"] is False and "redirect to a refused address" in r["reason"]
+          and not any("127.0.0.1:9" in a for a in _Rec.asked), (r.get("reason"), _Rec.asked))
+    check("WB1.13 the refusal names the address it would have gone to, and is on the ledger",
+          "127.0.0.1:9" in r["reason"] and rows()[-1]["reason"] == r["reason"])
+finally:
+    W.check_url = _real
+
+# The two checks above pass their own opener, so they exercise the hop LOOP and
+# not the opener read() builds for itself. Without the two below, removing
+# _NoRedirect from that default left the suite green -- measured 2026-09-21, and
+# that is the fake-guard shape A65 is about. These drive the real default.
+check("WB1.13 _NoRedirect refuses to follow a 3xx (urllib follows only when this returns a request)",
+      W._NoRedirect().redirect_request(None, None, 302, "Found", {}, "http://127.0.0.1/") is None)
+_probe = {}
+_bo = urllib.request.build_opener
+
+
+def _spy(*h):
+    _probe["handlers"] = h
+    return _bo(*h)
+
+
+_real2 = W.check_url
+try:
+    W.check_url = lambda u: (True, "")          # past the address gate, which WB1.3 already drives
+    urllib.request.build_opener = _spy
+    W.read("http://127.0.0.1:9/never-answers", grant_path=GRANT, ledger_path=LEDGER)
+finally:
+    urllib.request.build_opener = _bo
+    W.check_url = _real2
+check("WB1.13 the opener read() builds for itself carries _NoRedirect, so the default never follows blindly",
+      any(isinstance(h, W._NoRedirect) for h in _probe.get("handlers", ())), _probe.get("handlers"))
+
 check("WB1.12 urls_in strips trailing punctuation", W.urls_in("see https://a.test/x, and https://b.test/y.") == ["https://a.test/x", "https://b.test/y"])
 
 # ---- one real public read
 try:
     socket.create_connection(("www.gutenberg.org", 443), timeout=5).close()
     r = W.read("https://www.gutenberg.org/ebooks/1497", grant_path=GRANT, ledger_path=LEDGER, max_chars=500)
-    check("WB1.13 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
+    check("WB1.14 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
 except OSError:
-    not_run("WB1.13 a real public read", "no network")
+    not_run("WB1.14 a real public read", "no network")
 
 print("\nnot measured here: the door under his real grant file (ops/web_grant.json is read by the doors, this suite uses its own)")
 print("\nWB1: %d/%d passed" % (sum(ok), len(ok)))

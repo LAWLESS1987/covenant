@@ -7095,6 +7095,70 @@ two callers by text.
 
 ---
 
+### A213. [no backdoors / audited, and the newest code brought up to the same standard] "There should be no backdoors." -- "So encode the newest stuff the same way for security." AUDITED AND HARDENED 2026-09-21
+
+**The audit, by discovery, not by recall.** Every shape a backdoor takes was
+looked for and the population it read is named, because a check that hides its
+blind spot manufactures confidence about the part it never looked at.
+
+| looked for | measured |
+|---|---|
+| an environment variable that switches a check OFF | 1 found in our code, and it switches strictness ON (`COVENANT_REPO_LINK_STRICT=1`) |
+| a state-changing route with no guard at all | **0 of 45 routes.** Each is covered by the signed-operator hook (6), a tailnet/mycelium caller test, or its own signature check |
+| a caller test that trusts a HEADER instead of the socket | none: `_tailnet_caller` reads `request.remote_addr`, `tailnet_ok` admits only loopback or 100.64.0.0/10, and no `trusted_proxy` / `X-Forwarded-For` handling exists anywhere |
+| a hardcoded key or token | none. 10 files match the pattern and every one is a DETECTOR or a doc placeholder -- the regexes that refuse keys, not keys |
+| path traversal on a route taking a parameter | none: `^[0-9a-f]{64}$`, driven with `../`, backslashes, a long suffix and an empty string -- all refused, and the card's own sha re-checked after the read |
+
+**What the audit did find: the surface, not a bypass.** The node binds
+`0.0.0.0`, every interface, not loopback. Measured against the firewall: no
+inbound ALLOW rule admits TCP on 5000/5001/5011/5020/5021/5060/5061, and Wi-Fi
+is on the Public profile, so the LAN cannot reach them; Tailscale reaches them
+through its own adapter and `tailnet_ok` still restricts the caller. **NOT
+MEASURED:** reachability from a second device on his Wi-Fi. That needs a second
+machine and is UNDETERMINED from here, which is a real answer.
+
+**The hole was in code written the same evening, by the assistant.**
+`covenant_web.read` let urllib follow redirects and checked the address
+*afterwards* -- so a public host answering `302 -> http://127.0.0.1/` had the
+request **already made** to the private address before the check ran, which is
+the whole of what an SSRF guard exists to prevent. Fixed: `_NoRedirect` hands
+each 3xx back, redirects are followed by hand to `MAX_HOPS`, and every hop is
+checked **before** it is fetched.
+
+**And the test for it was fake, which is worse.** The first version of WB1.13
+passed its own opener, so it exercised the hop loop and never the opener
+`read()` builds for itself. Removing `_NoRedirect` from that default left the
+suite GREEN -- measured, and exactly the A65 shape. Two checks added that drive
+the real default; the same mutation now turns WB1.13 red. **WB1 30, red under
+mutation, green restored.**
+
+**"Encode the newest stuff the same way."** `covenant_feed` and
+`covenant_study.fetch_oa` called `urllib` directly, so none of the door's checks
+reached them. `covenant_web.api_get` is now the single way out for both: HTTPS
+only, the host must be on that caller's list (exactly or a subdomain -- the
+look-alike `api.openalex.org.evil.test` is refused), every redirect hop checked
+against both the address rules and the host list, and each call recorded in the
+same ledger as any other read. Driven: plain http refused, an off-list host
+refused, the look-alike refused, loopback refused, a real call served.
+The PMC id is interpolated into a URL and comes from a remote answer, so it is
+now checked against `^PMC[0-9]{1,12}$` first.
+
+**A defect found while hardening, and fixed.** The feed's paper topics had
+never worked: they used arXiv category syntax against an API that answered 406
+to every query asking for more than one result. They now read OpenAlex (open
+metadata, CC0, no key, open-access works only) with arXiv as the fallback.
+Measured after: **13 topics, 26 items, 13 digest rows, 0 sources failed**,
+where the run before the fix had 9 of 13 failing.
+
+**Suites:** WB1 30 (2 new, and the fake pair replaced), OA1 10, OW1 12 green.
+**Still open and named:** DNS rebinding -- `check_url` resolves the host and
+`urlopen` resolves again, so a hostile authority answering differently on the
+second lookup is not caught by address checking alone. The host allow-list on
+`api_get` closes it for the feed and the study; the open web door is still
+exposed to it and this ledger says so rather than implying otherwise.
+
+---
+
 ### A212. [Tetsu reserved / the door opened / the caps on learning lifted] "Put a stricter copyright on tetsu for his safety." -- "We can make the crypto strategy unsettled." -- "I want it open on coinbase just verify strategy with me daily." -- "Now sift back through for any caps on learning other than mutual benefit and remove them." -- "I approve." DONE 2026-09-21
 
 **A stricter copyright, for him.** The repository is Apache-2.0, which lets

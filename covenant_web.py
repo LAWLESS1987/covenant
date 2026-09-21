@@ -46,9 +46,18 @@ GRANT = os.path.join(HERE, "ops", "web_grant.json")
 LEDGER = os.path.join(HERE, "ops", "web_reads.jsonl")
 UA = "covenant-web (read-only; github.com/LAWLESS1987/covenant)"
 MAX_BYTES = 2_000_000
+MAX_HOPS = 10               # A213: redirects are followed by hand, each hop checked first
 MAX_CHARS = 12_000
 TIMEOUT_S = 30
 _TAILNET = ipaddress.ip_network("100.64.0.0/10")
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Hands the 3xx back as an HTTPError so read() can check the next hop's
+    ADDRESS before the request to it is made."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def grant(path=None):
@@ -106,6 +115,54 @@ def check_url(url):
     return True, ""
 
 
+def api_get(url, allow_hosts, timeout=60, max_bytes=MAX_BYTES, ledger_path=None, opener=None):
+    """A213 (2026-09-21, his words: "So encode the newest stuff the same way for
+    security"). The newest modules -- the feed and the study's open-access
+    fetcher -- called urllib directly, so none of the checks above applied to
+    them: no scheme test, no address test, no redirect discipline, no record.
+    This is the one way in for them. HTTPS only, the host must be ON THE LIST
+    (exactly, or a subdomain of a listed host), every redirect hop checked
+    before it is followed, and every call recorded like any other read.
+
+    Returns the decoded body. Raises ValueError with the reason when refused."""
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    listed = any(host == h or host.endswith("." + h) for h in allow_hosts)
+    if not urllib.parse.urlsplit(url).scheme == "https" or not listed:
+        why = "api_get refuses %s: %s" % (url[:120], "not https" if host and not url.startswith("https://") else "host %r is not on this caller's list" % host)
+        _record({"ok": False, "url": url[:300], "reason": why, "kind": "api"}, ledger_path)
+        raise ValueError(why)
+    ok, why = check_url(url)
+    if not ok:
+        _record({"ok": False, "url": url[:300], "reason": why, "kind": "api"}, ledger_path)
+        raise ValueError("api_get refuses %s: %s" % (url[:120], why))
+    op = opener or urllib.request.build_opener(_NoRedirect())
+    target, hops = url, 0
+    while True:
+        req = urllib.request.Request(target, headers={"User-Agent": UA, "Accept": "application/json, application/xml, text/plain, */*;q=0.5"})
+        try:
+            r = op.open(req, timeout=timeout)
+            break
+        except urllib.error.HTTPError as e:
+            loc = e.headers.get("Location") if e.headers else None
+            if e.code in (301, 302, 303, 307, 308) and loc:
+                hops += 1
+                target = urllib.parse.urljoin(target, loc)
+                h2 = (urllib.parse.urlsplit(target).hostname or "").lower()
+                ok2, why2 = check_url(target)
+                if hops > MAX_HOPS or not ok2 or not any(h2 == h or h2.endswith("." + h) for h in allow_hosts):
+                    why = "api_get refuses the redirect to %s: %s" % (target[:120], why2 or "off this caller's host list")
+                    _record({"ok": False, "url": url[:300], "reason": why, "kind": "api"}, ledger_path)
+                    raise ValueError(why)
+                continue
+            _record({"ok": False, "url": url[:300], "reason": "HTTP %s" % e.code, "kind": "api"}, ledger_path)
+            raise
+    with r:
+        raw = r.read(max_bytes + 1)[:max_bytes]
+    _record({"ok": True, "url": url[:300], "final_url": (r.geturl() or target)[:300], "bytes": len(raw), "kind": "api"}, ledger_path)
+    m = re.search(r"charset=([\w-]+)", str(r.headers.get("Content-Type", "")))
+    return raw.decode(m.group(1) if m else "utf-8", "replace")
+
+
 def to_text(raw, content_type=""):
     """HTML (or plain text) to readable text: scripts, styles, nav and tags out,
     entities decoded, whitespace folded, paragraphs kept."""
@@ -134,13 +191,40 @@ def read(url, max_chars=MAX_CHARS, grant_path=None, ledger_path=None, opener=Non
     if not ok:
         row = {"ok": False, "url": url, "reason": why}
         _record(row, ledger_path); return row
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,text/plain;q=0.9,*/*;q=0.5"})
+    # A213 (2026-09-21, his words: "There should be no backdoors"). The first
+    # version of this let urllib follow redirects and checked the address only
+    # afterwards -- so a public host that answered 302 to http://127.0.0.1/ had
+    # already had the request MADE to the private address before the check ran,
+    # which is the whole of what an SSRF guard exists to stop. Redirects are now
+    # followed by hand, at most MAX_HOPS, and EVERY hop is checked before it is
+    # fetched.
+    hops, target, final, r = 0, url, url, None
     try:
-        with (opener or urllib.request.build_opener()).open(req, timeout=TIMEOUT_S) as r:
-            final = r.geturl()
+        op = opener or urllib.request.build_opener(_NoRedirect())
+        while True:
+            req = urllib.request.Request(target, headers={"User-Agent": UA, "Accept": "text/html,text/plain;q=0.9,*/*;q=0.5"})
+            try:
+                r = op.open(req, timeout=TIMEOUT_S)
+            except urllib.error.HTTPError as e:
+                loc = e.headers.get("Location") if e.headers else None
+                if e.code in (301, 302, 303, 307, 308) and loc:
+                    hops += 1
+                    if hops > MAX_HOPS:
+                        row = {"ok": False, "url": url, "reason": "more than %d redirects" % MAX_HOPS}
+                        _record(row, ledger_path); return row
+                    target = urllib.parse.urljoin(target, loc)
+                    ok2, why2 = check_url(target)          # checked BEFORE the next request is made
+                    if not ok2:
+                        row = {"ok": False, "url": url, "reason": "redirect to a refused address (%s): %s" % (target[:200], why2)}
+                        _record(row, ledger_path); return row
+                    continue
+                raise
+            break
+        with r:
+            final = r.geturl() or target
             ok2, why2 = check_url(final)
             if not ok2:
-                row = {"ok": False, "url": url, "reason": "redirected to a refused address: %s" % why2}
+                row = {"ok": False, "url": url, "reason": "landed on a refused address: %s" % why2}
                 _record(row, ledger_path); return row
             ctype = str(r.headers.get("Content-Type", ""))
             raw = r.read(MAX_BYTES + 1)
