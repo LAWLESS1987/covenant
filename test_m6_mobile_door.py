@@ -376,8 +376,33 @@ def main():
     check("M6q the leash: http, an unlisted host, a look-alike host and junk are refused",
           not cov._agent_fetch_ok("http://github.com/x") and not cov._agent_fetch_ok("https://example.com/")
           and not cov._agent_fetch_ok("https://github.com.evil.io/x") and not cov._agent_fetch_ok("not a url"))
-    txt, note = cov._agent_fetch("https://example.com/")
-    check("M6q an off-list fetch is refused before any network, with no text", txt == "" and note.startswith("refused"), note)
+    # A210 ("Free browser access"): with NO web grant the leash is what it was;
+    # with his grant on record the off-list fetch goes through the web door,
+    # which refuses a private address before any network and says which door.
+    _g = os.environ.get("COVENANT_WEB_GRANT")
+    os.environ["COVENANT_WEB_GRANT"] = os.path.join(tempfile.gettempdir(), "m6q-no-grant-%d.json" % os.getpid())
+    try:
+        txt, note = cov._agent_fetch("https://example.com/")
+        check("M6q an off-list fetch with no web grant is refused before any network, with no text", txt == "" and note.startswith("refused"), note)
+    finally:
+        if _g is None:
+            os.environ.pop("COVENANT_WEB_GRANT", None)
+        else:
+            os.environ["COVENANT_WEB_GRANT"] = _g
+    _gp = os.path.join(tempfile.gettempdir(), "m6q-grant-%d.json" % os.getpid())
+    with open(_gp, "w", encoding="utf-8") as _fh:
+        _fh.write('{"granted": true, "words": ["test"]}')
+    os.environ["COVENANT_WEB_GRANT"] = _gp
+    os.environ["COVENANT_WEB_LEDGER"] = _gp + ".jsonl"
+    try:
+        txt, note = cov._agent_fetch("http://10.0.0.1/secret")
+        check("M6q under a web grant the off-list fetch goes through the web door, which refuses a private address before any network",
+              txt == "" and note.startswith("refused (web door)") and "not the public internet" in note, note)
+    finally:
+        for _k in ("COVENANT_WEB_GRANT", "COVENANT_WEB_LEDGER"):
+            os.environ.pop(_k, None)
+        if _g is not None:
+            os.environ["COVENANT_WEB_GRANT"] = _g
     log_rows = []
     try:
         with open(os.environ["COVENANT_ASK_LOG"], "r", encoding="utf-8") as fh:

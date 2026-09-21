@@ -24,6 +24,26 @@ measurement to the chat, the chat reasons, you act. Every step below is that.
 None of these calls Claude. They were running before this document and will
 run after the seat lapses.
 
+Added the evening of 2026-09-21, the last session before the seat lapsed at
+midnight, all inside the runners above and all pinned by suites in the sweep:
+
+- the nightly carries the machine's **own work** to the students before the
+  queue is consumed -- every ledger entry and every settled code consensus,
+  once each, bounded per night (`covenant_own_work.py`, A207; its state is
+  `ops/own_work_state.json`, its rows are in `ops/teacher_queue.jsonl` with
+  source `own-work:A<n>`);
+- the study reading list is 57 public-domain books, each verified against
+  its own title before it is read (`python covenant_study.py --verify`);
+  child development, the founders of teaching the child who learns
+  differently, psychology, and the philosophers (A206);
+- no process of the covenant opens a console window any more, and a node or
+  the watchdog outlives whatever shell started it (A204,
+  `test_qw1_quiet_everywhere.py`). If a window ever appears, the process that
+  owns it is listed by `Get-Process | Where-Object { $_.MainWindowTitle -ne "" }`;
+- the wire admits a caller by its key over any road, and the phone has the
+  LAN as its second road (A200); the image door judges the prompt, draws in
+  about 50 s, and refuses a chat reply sent as a scene (A205).
+
 ## 2. What stops when the seat lapses
 
 - The app's daily self-evaluation routine (04:43). Its measurement half is

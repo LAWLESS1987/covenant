@@ -76,7 +76,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 # 2026-09-21 (A174, A175): Tetsu refines himself and speaks on the
                 # forum; both suites pin the gate on each, so a pass that broke
                 # them is NOT GREEN.
-                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py", "test_im1_immunity.py", "test_mk1_model_keeper.py", "test_rl1_refine_loop.py", "test_ig1_image_guard.py", "test_qw1_quiet_everywhere.py", "test_my1_mycelium.py",
+                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py", "test_im1_immunity.py", "test_mk1_model_keeper.py", "test_rl1_refine_loop.py", "test_ig1_image_guard.py", "test_qw1_quiet_everywhere.py", "test_my1_mycelium.py", "test_ow1_own_work.py", "test_wb1_web.py", "test_oa1_open_access.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
@@ -250,6 +250,16 @@ def main():
 
     try:
         import covenant_study as S
+        # A208 (his words: "Find open source autism stuff"): a bounded few
+        # open-access articles per topic each night, then extraction, before
+        # the study draws its precepts. Network failure is reported, not fatal.
+        try:
+            if a.study > 0:
+                _new, _sk = S.fetch_oa(per_query=2, say=say)
+                _tot, _per = S.extract(say=lambda *_x: None)
+                say("open access: +%d article(s), %d precept(s) extracted" % (_new, _tot))
+        except Exception as _oe:                                     # noqa: BLE001
+            say("open access FAILED (not fatal): %s: %s" % (type(_oe).__name__, str(_oe)[:120]))
         kept, rej = S.generate(a.study, say=say)
         say("study: +%d kept, %d rejected" % (kept, rej))
     except Exception as e:                                       # noqa: BLE001
@@ -359,6 +369,18 @@ def main():
     # tonight trains on them -- balanced, once each, panel-labelled only
     # (covenant_teacher_queue). Its failure is reported and does not stop the
     # pass.
+    # ITS OWN WORK (A207, 2026-09-21, his words: "refine and improve all apps
+    # towards recursive learning coding and mutual benefit"). Before the queue
+    # is consumed, every ledger entry and every settled code consensus not yet
+    # carried becomes a teacher row (covenant_own_work), bounded per night,
+    # once each. A source, not a shortcut: the queue's panel and balance still
+    # apply. Its failure is reported and does not stop the pass.
+    try:
+        if a.queue > 0:
+            import covenant_own_work as OWN
+            OWN.run(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("own-work FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
     try:
         if a.queue > 0:
             import covenant_teacher_queue as TQ

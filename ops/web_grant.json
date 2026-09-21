@@ -1,0 +1,16 @@
+{
+ "t": "2026-09-21",
+ "by": "Lawrence Adam Moskowski, the operator",
+ "granted": true,
+ "words": [
+  "Free browser access and access to all \"banned\" books"
+ ],
+ "what_it_grants": "the PC and Tetsu read any public http(s) page as text, read-only, through covenant_web.py; every read is one row in ops/web_reads.jsonl",
+ "what_it_does_not": [
+  "no forms, logins, cookies or POST",
+  "no credential, ever",
+  "no loopback, private, link-local or tailnet address",
+  "no scheme but http(s)"
+ ],
+ "revoke": "set granted to false"
+}

@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12660   # 2026-09-21: moved with the core pin below, in the same change as the core (A174 persona, A175 Tetsu on the forum, A190 his immunity, A200 the wire); was 12649 at the A190 re-pin
+EXPECTED_LINES = 12675   # 2026-09-21 (A210 web door in the fetch verb; K1/K2/P19/A3s green before the move), earlier: moved with the core pin below, in the same change as the core (A174 persona, A175 Tetsu on the forum, A190 his immunity, A200 the wire); was 12649 at the A190 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -91,7 +91,7 @@ MANIFEST = {
     # this line moved; M6 59/59, DP1 30/30, TQ1 17/17 and PC1 25/25 pin the
     # new behaviour and went red under mutation.
     "covenant_unified_v8.py":
-        "447ed5ecdffc92bab34a46f6c2a427bdc5ad26f989aa953d2daca1ace503c8c5",
+        "18cc3fb577b5fa5cdec940c81f9c919a3de4ce9d50fb57f9e11eacf804547e5f",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live

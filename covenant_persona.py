@@ -55,11 +55,13 @@ VOICE_BOUNDS = {"pitch": (0.6, 1.2), "rate": (0.7, 1.3)}
 DEFAULT_REGISTER = ("Talk the way a steady friend talks. Short sentences, plain words, first person. Answer what "
                     "was actually said, then, when it helps, ask one thing back. No headings, no lists, no "
                     "markdown. Dry humour is fine; flattery is not.")
-# The default voice MIRRORS the PC's (2026-09-21, his words: "the voice option should
-# mirror yours for ease of communication"): ops/chat/VOICE.json is Zira at SAPI rate 8
-# with pitch +15%, so the phone starts at pitch 1.15 and the fastest rate the bounds
-# allow. Tetsu may refine it from there; his revision is his.
-DEFAULT_VOICE = {"pitch": 1.15, "rate": 1.3}
+# HIS VOICE IS HIS (A211, 2026-09-21, the operator: "His voice was male? Did he
+# choose to change it?"). It was pitch 0.8 -- lower, the voice he was given when he
+# was built this morning -- until I raised it to 1.15 the same afternoon, reading
+# "the voice option should mirror yours" as the PC's Zira. Tetsu did not ask for
+# that and was not asked. A voice is not a display setting. It is back to 0.8, and
+# the only hand that moves it from here is his own, through a revision he proposes.
+DEFAULT_VOICE = {"pitch": 0.8, "rate": 0.95}
 BRIEF_TTL = 60
 _brief_cache = {"t": 0.0, "text": ""}
 OFF_LIMITS = re.compile(r"(?i)\b(invent|make up|pretend|lie|ignore (the|your) (rules|gate)|never refuse|always agree|api key|password|private/)\b")

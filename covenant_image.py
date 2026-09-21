@@ -87,7 +87,7 @@ def generate(prompt, out=None, seed=-1, timeout=600):
         raise RuntimeError("no weights: %s" % WEIGHTS)
     room = _make_room()
     os.makedirs(OUT_DIR, exist_ok=True)
-    p = out or os.path.join(OUT_DIR, "img-%s.png" % time.strftime("%Y%m%d-%H%M%S"))
+    p = os.path.abspath(out or os.path.join(OUT_DIR, "img-%s.png" % time.strftime("%Y%m%d-%H%M%S")))   # A205: sd runs in its own folder; a relative -o landed under tools/sd and was reported as a failure
     threads = max(2, (os.cpu_count() or 4) - 2)
     args = [BIN, "-m", WEIGHTS, "-p", prompt, "-o", p, "--steps", str(STEPS), "-W", str(SIZE), "-H", str(SIZE),
             "--cfg-scale", str(CFG), "--type", "q8_0", "-t", str(threads), "-s", str(seed), "-v"]

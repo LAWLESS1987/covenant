@@ -1,0 +1,39 @@
+﻿python.exe : semantic judge available: model 41bba7d7d753 (provider 'semantic'; add it to COVENANT_JUDGE_PROVIDERS to 
+use it)
+At line:1 char:340
++ ... e\covenant; & C:\Users\Lawre\covenant\.venv\Scripts\python.exe rollin ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (semantic judge ...DERS to use it):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+rolling restart -- one at a time, each proved back before the next
+disk source: 447ed5ecdffc   imports: 7889dcbd52cf
+order: C then B then A
+
+  node C (port 5060)
+    before: height 39, source 447ed5ecdffc
+    stopping pid(s) 30544
+2026-09-21T20:02:45Z WARN  node C restarted -> logs/nodeC.log
+    started; waiting for it to answer
+    up: height 39, source 447ed5ecdffc, peers 1, genesis 00009b31
+
+  node B (port 5020)
+    before: height 39, source 447ed5ecdffc
+    stopping pid(s) 24980
+2026-09-21T20:02:52Z WARN  node B restarted -> logs/nodeB.log
+    started; waiting for it to answer
+    up: height 39, source 447ed5ecdffc, peers 2, genesis 00009b31
+
+  node A (port 5000)
+    before: height 39, source 447ed5ecdffc
+    stopping pid(s) 3752
+2026-09-21T20:03:00Z WARN  node A restarted -> logs/nodeA.log
+    started; waiting for it to answer
+    up: height 39, source 447ed5ecdffc, peers 2, genesis 00009b31
+
+done: restarted C, B, A
+
+disk source: 447ed5ecdffc   imports: 7889dcbd52cf (22 modules)
+  node A  port 5000  height 39   peers 2  source 447ed5ecdffc  on the disk source, imports current
+  node B  port 5020  height 39   peers 2  source 447ed5ecdffc  on the disk source, imports current
+  node C  port 5060  height 39   peers 1  source 447ed5ecdffc  on the disk source, imports current

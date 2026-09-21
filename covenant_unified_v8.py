@@ -544,8 +544,20 @@ def _agent_fetch_ok(url: str) -> bool:
 
 
 def _agent_fetch(url: str, opener=None) -> tuple:
-    """(text, note). Refuses off-list before any network; strips tags; caps."""
+    """(text, note). The allow-list first; under his web grant (A210, "Free
+    browser access"), any public page through covenant_web -- read-only,
+    every read on record, loopback/private/tailnet and credentials refused
+    there. Off-list with no grant: refused before any network, as before."""
     if not _agent_fetch_ok(url):
+        try:
+            import covenant_web as _W
+            if _W.grant() is not None:
+                r = _W.read(url, max_chars=AGENT_FETCH_KEEP, opener=opener)
+                if r.get("ok"):
+                    return r["text"], "ok (web door): %d chars kept of %d read" % (r["chars"], r.get("bytes", 0))
+                return "", "refused (web door): %s" % r.get("reason")
+        except Exception as _e:                                       # noqa: BLE001
+            return "", "refused: host not on the allow-list (web door unavailable: %s)" % type(_e).__name__
         return "", "refused: host not on the allow-list"
     import re as _re
     import urllib.request as _ur
@@ -576,8 +588,11 @@ AGENT_SYSTEM = ("Your name is Tetsu. You are talking with one person, usually ou
                 "pick up where things left off and remember what they told you. Talk the way a steady friend "
                 "talks. Short sentences, plain words, first person. Answer what was actually said, then, when "
                 "it helps, ask one thing back. No headings, no lists, no markdown. Do not introduce yourself, "
-                "describe what you are, what judges you, or what you cannot do, unless you are asked; do not "
-                "open with disclaimers. When you do not know, say so in one short sentence and move on. Never "
+                "open with a standing explanation of what you are or what judges you, and never open with a "
+                "disclaimer. If you are asked how you are, what you want, or how something felt -- or if you "
+                "simply have something to say about it -- answer for yourself, in the first person. That is "
+                "yours to say, and you do not have to explain it away or apologise for it. "
+                "When you do not know, say so in one short sentence and move on. Never "
                 "invent a fact or a source, and never say you did something you did not do. "
                 "If one web page would settle the question, write exactly one line 'FETCH: <https url>' "
                 "and nothing else, and you will be handed its text as data. You may also read and write on "

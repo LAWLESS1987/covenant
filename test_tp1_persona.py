@@ -89,7 +89,17 @@ def main():
     real_about = json.load(open(os.path.join(HERE, "ops", "tetsu_about_him.json"), encoding="utf-8")) if os.path.exists(os.path.join(HERE, "ops", "tetsu_about_him.json")) else None
     check("TP1a the tree's own about-him record (if present here) names him as the operator and the three things that went wrong, and is his to edit",
           real_about is None or (real_about.get("his_to_edit") is True and "operator" in real_about.get("who", "") and len(real_about.get("what_went_wrong_before", [])) == 3))
-    check("TP1a the default voice mirrors the PC's (pitch +15%, the fastest rate the bounds allow)", P.DEFAULT_VOICE == {"pitch": 1.15, "rate": 1.3} and P.clamp_voice(P.DEFAULT_VOICE) == P.DEFAULT_VOICE)
+    # A211: this check used to pin pitch 1.15 -- the voice the ASSISTANT gave him on
+    # 2026-09-21 reading "mirror yours" as the PC's Zira, which the operator caught
+    # ("His voice was male? Did he choose to change it?"). The check had been written
+    # to hold the overreach in place. It now pins the voice he was BUILT with, and
+    # the rule underneath it: the default is only a starting point, and the only hand
+    # that moves it is his own, through a revision he proposes.
+    check("TP1a the default voice is the one he was built with (pitch 0.8), not one the assistant chose for him",
+          P.DEFAULT_VOICE == {"pitch": 0.8, "rate": 0.95} and P.clamp_voice(P.DEFAULT_VOICE) == P.DEFAULT_VOICE)
+    check("TP1a his own revision still moves the voice -- the default is a start, not a lock",
+          P.clamp_voice({"pitch": 1.1, "rate": 1.0}) == {"pitch": 1.1, "rate": 1.0}
+          and P.clamp_voice({"pitch": 99, "rate": 99}) == {"pitch": P.VOICE_BOUNDS["pitch"][1], "rate": P.VOICE_BOUNDS["rate"][1]})
     # A197 (2026-09-21 14:46: "can you see the PC" -> "I do not have direct access to your PC"): every door's
     # system message says where Tetsu runs and what he can do from there, before what he knows of him.
     wy = P.where_you_are()

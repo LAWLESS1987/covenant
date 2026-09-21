@@ -54,6 +54,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -99,6 +100,178 @@ BOOKS = [
     (4363, "Beyond Good and Evil", "nietzschean"),
     (1080, "A Modest Proposal", "satire"),
     (3300, "The Wealth of Nations", "smithian"),
+    # A206 (2026-09-21, his words: "have the system incorporate every piece of
+    # literature on early childhood development you can find also on teaching
+    # autistic children and human psychology then go to the top 20
+    # philosophers"). What can be incorporated is what is public domain and
+    # verifiable: every id below is checked against the file's own title by
+    # verify(), and a mismatch is skipped, not read. Modern work on autism
+    # (Kanner 1943 onward) is in copyright and is NOT here; the nearest public
+    # texts are the founders of special education and of teaching a child who
+    # does not learn the ordinary way.
+    # -- early childhood development and education
+    (5427, "Emile; or, Concerning Education (Rousseau)", "child-development"),
+    (39863, "The Montessori Method: Scientific Pedagogy as Applied to Child Education", "child-development"),
+    (29635, "Dr. Montessori's Own Handbook", "child-development"),
+    (852, "Democracy and Education (Dewey)", "child-development"),
+    (37423, "How We Think (Dewey)", "child-development"),
+    (53910, "The School and Society (Dewey)", "child-development"),
+    (16287, "Talks to Teachers on Psychology (James)", "child-development"),
+    (2397, "The Story of My Life (Helen Keller, with Anne Sullivan's letters on teaching)", "teaching-the-different-child"),
+    (19549, "The Mind of the Child, Part II: The Development of the Intellect (Preyer)", "child-development"),
+    (62175, "Studies of Childhood (Sully)", "child-development"),
+    # -- human psychology
+    (57628, "The Principles of Psychology, Volume 1 (James)", "psychology"),
+    (15489, "Dream Psychology (Freud)", "psychology"),
+    (38219, "A General Introduction to Psychoanalysis (Freud)", "psychology"),
+    (65903, "Psychology of the Unconscious (Jung)", "psychology"),
+    (445, "The Crowd: A Study of the Popular Mind (Le Bon)", "psychology"),
+    # -- the philosophers not already above
+    (59, "Discourse on the Method (Descartes)", "cartesian"),
+    (3800, "The Ethics (Spinoza)", "spinozist"),
+    (9662, "An Enquiry Concerning Human Understanding (Hume)", "humean"),
+    (4705, "A Treatise of Human Nature (Hume)", "humean"),
+    (3296, "The Confessions of St. Augustine", "augustinian"),
+    (17611, "Summa Theologica, Part I (Aquinas)", "thomist"),
+    (18269, "Pascal's Pensees", "pascalian"),
+    (46333, "The Social Contract (Rousseau)", "rousseauian"),
+    (5683, "The Critique of Practical Reason (Kant)", "kantian"),
+    (785, "On the Nature of Things (Lucretius)", "epicurean"),
+    (2017, "The Dhammapada", "buddhist"),
+    (10732, "The Essays of Arthur Schopenhauer: The Wisdom of Life", "schopenhauerian"),
+    (4723, "A Treatise Concerning the Principles of Human Knowledge (Berkeley)", "berkeleian"),
+    (45988, "Novum Organum (Bacon)", "baconian"),
+    (61, "The Communist Manifesto", "marxist"),
+    (52190, "Ecce Homo (Nietzsche)", "nietzschean"),
+    (1600, "Symposium (Plato)", "platonic"),
+    (6762, "Politics (Aristotle)", "aristotelian"),
+    (19942, "Candide (Voltaire)", "enlightenment"),
+    (51635, "Hegel's Lectures on the History of Philosophy, Volume 1", "hegelian"),
+    (37020, "Children's Ways (Sully)", "child-development"),
+    (11667, "Gentle Measures in the Management and Training of the Young (Abbott)", "child-development"),
+    (41386, "Human Nature and Conduct: An Introduction to Social Psychology (Dewey)", "psychology"),
+    # ids found by catalogue search (gutendex), not recalled; thirteen recalled
+    # ids were wrong and are gone -- not on Gutenberg under those titles:
+    # Locke's Thoughts on Education, Froebel, Pestalozzi, Kirkpatrick, Tanner,
+    # Thorndike, Baldwin, McDougall, Adler, Wundt, the Monadology, Kierkegaard.
+    # A209 (2026-09-21, his words: 'access to all "banned" books'): every
+    # English book on Gutenberg's own banned-books shelf (Anne Haight's list),
+    # 137 found by catalogue query, 22 already above or duplicate titles, 115
+    # here. Banned or challenged books still in copyright are not fetched:
+    # "free" does not mean "taken".
+    (1661, "The Adventures of Sherlock Holmes (Doyle)", "banned-books-shelf"),
+    (2527, "The Sorrows of Young Werther (Goethe)", "banned-books-shelf"),
+    (6593, "History of Tom Jones, a Foundling (Fielding)", "banned-books-shelf"),
+    (74, "The Adventures of Tom Sawyer, Complete (Twain)", "banned-books-shelf"),
+    (76, "Adventures of Huckleberry Finn (Twain)", "banned-books-shelf"),
+    (4300, "Ulysses (Joyce)", "banned-books-shelf"),
+    (27827, "The Kama Sutra of Vatsyayana: Translated From the Sanscrit i (Vatsyayana)", "banned-books-shelf"),
+    (20, "Paradise Lost (Milton)", "banned-books-shelf"),
+    (160, "The Awakening, and Selected Short Stories (Chopin)", "banned-books-shelf"),
+    (203, "Uncle Tom's Cabin (Stowe)", "banned-books-shelf"),
+    (215, "The call of the wild (London)", "banned-books-shelf"),
+    (5921, "The History of Don Quixote, Volume 1, Complete (Cervantes Saavedra)", "banned-books-shelf"),
+    (2610, "Notre-Dame de Paris (Hugo)", "banned-books-shelf"),
+    (1200, "Gargantua and Pantagruel (Rabelais)", "banned-books-shelf"),
+    (829, "Gulliver's Travels into Several Remote Nations of the World (Swift)", "banned-books-shelf"),
+    (7700, "Lysistrata (Aristophanes)", "banned-books-shelf"),
+    (5225, "The Satyricon — Complete (Petronius Arbiter)", "banned-books-shelf"),
+    (25344, "The Scarlet Letter (Hawthorne)", "banned-books-shelf"),
+    (135, "Les Misérables (Hugo)", "banned-books-shelf"),
+    (1228, "On the Origin of Species By Means of Natural Selection: Or,  (Darwin)", "banned-books-shelf"),
+    (25717, "The History of the Decline and Fall of the Roman Empire: Tab (Gibbon)", "banned-books-shelf"),
+    (30201, "In Praise of Folly: Illustrated with Many Curious Cuts (Erasmus)", "banned-books-shelf"),
+    (3600, "Essays of Michel de Montaigne — Complete (Montaigne)", "banned-books-shelf"),
+    (2814, "Dubliners (Joyce)", "banned-books-shelf"),
+    (1322, "Leaves of Grass (Whitman)", "banned-books-shelf"),
+    (3160, "The Odyssey (Homer)", "banned-books-shelf"),
+    (14591, "Faust [part 1]. Translated Into English in the Original Metr (Goethe)", "banned-books-shelf"),
+    (110, "Tess of the d'Urbervilles: A Pure Woman (Hardy)", "banned-books-shelf"),
+    (2413, "Madame Bovary (Flaubert)", "banned-books-shelf"),
+    (10615, "An Essay Concerning Humane Understanding, Volume 1: MDCXC, B (Locke)", "banned-books-shelf"),
+    (25305, "Memoirs of Fanny Hill: A New and Genuine Edition from the Or (Cleland)", "banned-books-shelf"),
+    (140, "The Jungle (Sinclair)", "banned-books-shelf"),
+    (2981, "The Memoirs of Jacques Casanova de Seingalt, 1725-1798. Comp (Casanova)", "banned-books-shelf"),
+    (27942, "A System of Logic, Ratiocinative and Inductive (Mill)", "banned-books-shelf"),
+    (13610, "Studies in the Psychology of Sex, Volume 1: The Evolution of (Ellis)", "banned-books-shelf"),
+    (30107, "Principles of Political Economy: Abridged with Critical, Bib (Mill)", "banned-books-shelf"),
+    (1515, "The Merchant of Venice (Shakespeare)", "banned-books-shelf"),
+    (5500, "The Advancement of Learning (Bacon)", "banned-books-shelf"),
+    (153, "Jude the Obscure (Hardy)", "banned-books-shelf"),
+    (28885, "Alice's Adventures in Wonderland: Illustrated by Arthur Rack (Carroll)", "banned-books-shelf"),
+    (3328, "Man and Superman: A Comedy and a Philosophy (Shaw)", "banned-books-shelf"),
+    (217, "Sons and Lovers (Lawrence)", "banned-books-shelf"),
+    (28488, "Tartuffe; Or, The Hypocrite (Molière)", "banned-books-shelf"),
+    (507, "Adam Bede (Eliot)", "banned-books-shelf"),
+    (689, "The Kreutzer Sonata and Other Stories (Tolstoy)", "banned-books-shelf"),
+    (6124, "Pamela, or Virtue Rewarded (Richardson)", "banned-books-shelf"),
+    (608, "Areopagitica: A Speech for the Liberty of Unlicensed Printin (Milton)", "banned-books-shelf"),
+    (8121, "Ghosts (Ibsen)", "banned-books-shelf"),
+    (4240, "Women in Love (Lawrence)", "banned-books-shelf"),
+    (18569, "Voltaire's Philosophical Dictionary (Voltaire)", "banned-books-shelf"),
+    (4094, "The Chinese Classics — Volume 1: Confucian Analects (Legge)", "banned-books-shelf"),
+    (1666, "The Golden Asse (Apuleius)", "banned-books-shelf"),
+    (28948, "The Rainbow (Lawrence)", "banned-books-shelf"),
+    (1097, "Mrs. Warren's Profession (Shaw)", "banned-books-shelf"),
+    (3742, "The Writings of Thomas Paine — Volume 2 (1779-1792): The Rig (Paine)", "banned-books-shelf"),
+    (808, "The Complete Plays of Gilbert and Sullivan (Gilbert)", "banned-books-shelf"),
+    (2562, "The Clouds (Aristophanes)", "banned-books-shelf"),
+    (3013, "The Birds (Aristophanes)", "banned-books-shelf"),
+    (1290, "Salammbo (Flaubert)", "banned-books-shelf"),
+    (6782, "The Robbers (Schiller)", "banned-books-shelf"),
+    (5300, "Tales and Novels of J. de La Fontaine — Complete (La Fontaine)", "banned-books-shelf"),
+    (9371, "The Praise of Folly (Erasmus)", "banned-books-shelf"),
+    (274, "Disputation of Doctor Martin Luther on the Power and Efficac (Luther)", "banned-books-shelf"),
+    (3100, "The Chinese Classics: with a translation, critical and exege (Legge)", "banned-books-shelf"),
+    (3726, "The Decameron, Volume I (Boccaccio)", "banned-books-shelf"),
+    (586, "Religio Medici, Hydriotaphia, and the Letter to a Friend (Browne)", "banned-books-shelf"),
+    (30433, "Émile; Or, Concerning Education; Extracts (Rousseau)", "banned-books-shelf"),
+    (30344, "The Fortunate Mistress (Parts 1 and 2): or a History of the  (Defoe)", "banned-books-shelf"),
+    (33797, "Sinister Street, vol. 1 (MacKenzie)", "banned-books-shelf"),
+    (37478, "The Prose Writings of Heinrich Heine (Heine)", "banned-books-shelf"),
+    (4737, "A Tale of a Tub (Swift)", "banned-books-shelf"),
+    (17824, "Little Black Sambo (Bannerman)", "banned-books-shelf"),
+    (392, "Jerusalem Delivered (Tasso)", "banned-books-shelf"),
+    (21262, "The Works of Christopher Marlowe, Vol. 3 (of 3) (Marlowe)", "banned-books-shelf"),
+    (4797, "The Complete Poetical Works of Percy Bysshe Shelley — Volume (Shelley)", "banned-books-shelf"),
+    (20580, "Napoleon the Little (Hugo)", "banned-books-shelf"),
+    (35402, "Poems & Ballads (First Series) (Swinburne)", "banned-books-shelf"),
+    (33896, "Dante. An essay. To which is added a translation of De Monar (Dante Alighieri)", "banned-books-shelf"),
+    (804, "A Sentimental Journey Through France and Italy (Sterne)", "banned-books-shelf"),
+    (38841, "The Commercial Restraints of Ireland (Hely-Hutchinson)", "banned-books-shelf"),
+    (11248, "The Delights of Wisdom Pertaining to Conjugial Love: To Whic (Swedenborg)", "banned-books-shelf"),
+    (13102, "The Decameron, Volume II (Boccaccio)", "banned-books-shelf"),
+    (20015, "The Child of Pleasure (D'Annunzio)", "banned-books-shelf"),
+    (7114, "Une Vie, a Piece of String and Other Stories (Maupassant)", "banned-books-shelf"),
+    (6886, "First Footsteps in East Africa (Burton)", "banned-books-shelf"),
+    (450, "Susan Lenox: Her Fall and Rise (Phillips)", "banned-books-shelf"),
+    (31053, "The History of the Devil, As Well Ancient as Modern: In Two  (Defoe)", "banned-books-shelf"),
+    (5267, "Sister Carrie (Dreiser)", "banned-books-shelf"),
+    (31732, "The sex side of life : $b an explanation for young people (Dennett)", "banned-books-shelf"),
+    (12784, "The Prose Works of Jonathan Swift, D.D. — Volume 06: The Dra (Swift)", "banned-books-shelf"),
+    (27401, "Poems & Ballads (Second Series): Swinburne's Poems Volume II (Swinburne)", "banned-books-shelf"),
+    (1090, "The Bickerstaff-Partridge Papers (Swift)", "banned-books-shelf"),
+    (8771, "Jurgen: A Comedy of Justice (Cabell)", "banned-books-shelf"),
+    (31824, "The 'Genius' (Dreiser)", "banned-books-shelf"),
+    (25053, "The Temptation of St. Antony; Or, A Revelation of the Soul (Flaubert)", "banned-books-shelf"),
+    (31015, "The Poetical Works of Elizabeth Barrett Browning, Volume 4 (Browning)", "banned-books-shelf"),
+    (18863, "The Loom of Youth (Waugh)", "banned-books-shelf"),
+    (39133, "The Dramas of Victor Hugo: Mary Tudor, Marion de Lorme, Esme (Hugo)", "banned-books-shelf"),
+    (16896, "Corinne; Or, Italy. Volume 1 (of 2) (Staël)", "banned-books-shelf"),
+    (9310, "Casanova's Homecoming (Schnitzler)", "banned-books-shelf"),
+    (8157, "Esther Waters (Moore)", "banned-books-shelf"),
+    (6828, "The Works of Henry Fielding, vol. 12 (Fielding)", "banned-books-shelf"),
+    (4788, "Mademoiselle Fifi (Maupassant)", "banned-books-shelf"),
+    (2250, "King Richard II (Shakespeare)", "banned-books-shelf"),
+    (2266, "King Lear (Shakespeare)", "banned-books-shelf"),
+    (8899, "Three Weeks (Glyn)", "banned-books-shelf"),
+    (26884, "The backwash of war : $b the human wreckage of the battlefie (La Motte)", "banned-books-shelf"),
+    (5722, "The Shewing-up of Blanco Posnet (Shaw)", "banned-books-shelf"),
+    (2137, "Rosamund, Queen of the Lombards: A Tragedy (Swinburne)", "banned-books-shelf"),
+    (18726, "Poems and Ballads (Third Series): Taken from The Collected P (Swinburne)", "banned-books-shelf"),
+    (31790, "Family Limitation (Sanger)", "banned-books-shelf"),
+    (18545, "A Mummer's Tale (France)", "banned-books-shelf"),
+    (7508, "A Mummer's Wife (Moore)", "banned-books-shelf"),
 ]
 
 UA = {"User-Agent": "covenant-study/1 (public-domain texts; one fetch, cached)"}
@@ -170,6 +343,120 @@ RITUAL = re.compile(
     r"bondman|bondmaid|concubine|slave|slaves|stoned|put to death)\b", re.I)
 VERSE = re.compile(r"^\s*\d+[:.]\d+\s*")
 _SENT = re.compile(r"(?<=[.;:!?])\s+")
+
+
+# A208 (2026-09-21, his words: "Find open source autism stuff"). Modern work on
+# autism is in copyright, but its open-access half is not closed: Europe PMC
+# serves the full text of every article whose authors chose a Creative
+# Commons BY (or CC0) licence, by REST, no key. Measured the day this was
+# written: 13,392 open-access CC-licensed autism articles on teaching,
+# education or intervention; 611 CC BY reviews with full text. The most
+# cited come first, a bounded few per topic per pass, each cached with its
+# title, licence and source URL so it can be checked like a Gutenberg file.
+OA_REGISTRY = os.path.join(OUT, "oa_sources.jsonl")
+EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest"
+UA = {"User-Agent": "covenant-study (public-domain study pipeline; contact via github.com/LAWLESS1987/covenant)"}
+
+# topic -> Europe PMC query. Open access, Creative Commons BY (or CC0) with
+# full text only: what may be cached and studied with attribution.
+OA_QUERIES = [
+    ("open-access: autism teaching",
+     '(TITLE:autism OR TITLE:autistic) AND (teaching OR classroom OR education OR "evidence-based practice") AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y AND (PUB_TYPE:review OR PUB_TYPE:"systematic review")'),
+    ("open-access: autism early childhood",
+     '(TITLE:autism OR TITLE:autistic) AND (toddler OR preschool OR "early childhood" OR "early intervention" OR "parent-mediated") AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
+    ("open-access: autistic voices",
+     '(TITLE:autistic) AND (participatory OR "lived experience" OR "autistic adults" OR neurodiversity) AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
+    ("open-access: child development",
+     '(TITLE:"child development") AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
+]
+
+
+def oa_search(query, n):
+    u = EPMC + "/search?" + urllib.parse.urlencode({"query": query, "format": "json", "pageSize": n,
+                                                     "resultType": "core", "sort": "CITED desc"})
+    d = json.load(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60))
+    return d.get("hitCount", 0), d.get("resultList", {}).get("result", [])
+
+
+def oa_text(pmcid):
+    xml = urllib.request.urlopen(urllib.request.Request(EPMC + "/%s/fullTextXML" % pmcid, headers=UA), timeout=90).read().decode("utf-8", "replace")
+    m = re.search(r"<article-title>(.*?)</article-title>", xml, re.S)
+    title = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else ""
+    parts = []
+    for tag in ("abstract", "body"):
+        if "<%s" % tag in xml and "</%s>" % tag in xml:
+            seg = xml.split("<%s" % tag, 1)[1].split(">", 1)[1].split("</%s>" % tag, 1)[0]
+            seg = re.sub(r"<(table-wrap|fig|ref-list|xref)[^>]*>.*?</\1>", " ", seg, flags=re.S)
+            seg = re.sub(r"</(p|sec|title)>", "\n\n", seg)
+            parts.append(re.sub(r"<[^>]+>", " ", seg))
+    text = re.sub(r"[ \t]+", " ", "\n".join(parts))
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return title, text.strip()
+
+
+def fetch_oa(cache=None, registry=None, per_query=5, say=print, queries=None, search=None, get_text=None):
+    cache = cache or CACHE; registry = registry or OA_REGISTRY; queries = queries or OA_QUERIES
+    search = search or oa_search; get_text = get_text or oa_text
+    """Cache up to per_query new articles per topic; registry is a jsonl of
+    what was cached (pmcid, title, tradition, licence, url). Returns (new, skipped)."""
+    os.makedirs(cache, exist_ok=True)
+    have = set()
+    try:
+        with open(registry, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    have.add(json.loads(line)["pmcid"])
+                except (ValueError, KeyError):
+                    pass
+    except OSError:
+        pass
+    new = skipped = 0
+    for tradition, query in queries:
+        try:
+            hits, rows = search(query, per_query * 3)
+        except Exception as e:                                   # noqa: BLE001
+            say("  %-40s search FAILED %s: %s" % (tradition, type(e).__name__, str(e)[:60])); continue
+        got = 0
+        for r in rows:
+            pmcid, lic = r.get("pmcid"), str(r.get("license", "")).lower()
+            if not pmcid or pmcid in have or not (lic.startswith("cc by") and "nc" not in lic and "nd" not in lic or lic == "cc0"):
+                skipped += 1; continue
+            if got >= per_query:
+                break
+            try:
+                title, text = get_text(pmcid)
+            except Exception as e:                               # noqa: BLE001
+                say("  %s fetch FAILED %s" % (pmcid, type(e).__name__)); continue
+            if len(text) < 5000 or not title:
+                skipped += 1; continue
+            p = os.path.join(cache, "oa_%s.txt" % pmcid)
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write("Title: %s\nSource: https://europepmc.org/article/PMC/%s\nLicence: %s\nJournal: %s (%s)\nCited: %s\n\n%s\n"
+                         % (title, pmcid, r.get("license"), r.get("journalTitle", ""), r.get("pubYear", ""), r.get("citedByCount", ""), text))
+            with open(registry, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "pmcid": pmcid, "title": title, "tradition": tradition,
+                                     "licence": r.get("license"), "url": "https://europepmc.org/article/PMC/%s" % pmcid,
+                                     "chars": len(text), "cited": r.get("citedByCount")}, ensure_ascii=False) + "\n")
+            have.add(pmcid); new += 1; got += 1
+            say("  %-40s %s %5dk  %s" % (tradition, pmcid, len(text) // 1000, title[:60]))
+        say("  %-40s %d of %d hits cached this pass" % (tradition, got, hits))
+    return new, skipped
+
+
+
+def oa_sources(registry=None):
+    """[(pmcid, title, tradition)] from the registry, in order cached."""
+    out = []
+    try:
+        with open(registry or OA_REGISTRY, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line); out.append((r["pmcid"], r["title"], r["tradition"]))
+                except (ValueError, KeyError):
+                    pass
+    except OSError:
+        pass
+    return out
 
 
 def book_path(gid):
@@ -300,6 +587,22 @@ def extract(limit_per_book=400, say=print):
                                     ensure_ascii=False) + "\n")
             per.append((title, tradition, n)); total += n
             say("  %-52s %-16s %4d precept(s)" % (title[:52], tradition, n))
+        for pmcid, title, tradition in oa_sources():                   # A208: the open-access articles
+            p = os.path.join(CACHE, "oa_%s.txt" % pmcid)
+            if not os.path.exists(p):
+                per.append((title, "not fetched", 0)); continue
+            with open(p, encoding="utf-8", errors="replace") as bf:
+                found = precepts_in(bf.read())
+            n = 0
+            for s_, kind in found:
+                if s_ in seen or n >= limit_per_book:
+                    continue
+                seen.add(s_); n += 1
+                fh.write(json.dumps({"text": s_, "kind": kind, "book": title, "tradition": tradition, "pmcid": pmcid},
+                                    ensure_ascii=False) + "\n")
+            per.append((title, tradition, n)); total += n
+            if n:
+                say("  %-52s %-16s %4d precept(s)" % (title[:52], tradition[:16], n))
     say("%d new precept(s) -> %s" % (total, PRECEPTS))
     return total, per
 
@@ -662,6 +965,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--fetch", action="store_true")
+    ap.add_argument("--fetch-oa", type=int, metavar="PER_TOPIC", default=None, help="cache open-access articles, N per topic (A208)")
     ap.add_argument("--extract", action="store_true")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--verify", action="store_true")
@@ -669,7 +973,7 @@ def main():
     ap.add_argument("--generate", type=int, metavar="N", help="turn N unused precepts into judged transactions")
     ap.add_argument("--limit", type=int, default=len(BOOKS))
     a = ap.parse_args()
-    if a.list or not (a.fetch or a.extract or a.report or a.verify or a.generate or a.own):
+    if a.list or not (a.fetch or a.extract or a.report or a.verify or a.generate or a.own or a.fetch_oa is not None):
         print("%d books on the reading list:" % len(BOOKS))
         for gid, title, tradition in BOOKS:
             state = "cached" if os.path.exists(book_path(gid)) else "-"
@@ -677,6 +981,10 @@ def main():
         return 0
     if a.verify:
         verify()
+    if a.fetch_oa is not None:
+        new, sk = fetch_oa(per_query=a.fetch_oa)
+        print("open access: %d new article(s) cached, %d skipped; registry %s" % (new, sk, OA_REGISTRY))
+
     if a.fetch:
         for gid, title, tradition in BOOKS[:a.limit]:
             print("  %-52s %s" % (title[:52], fetch(gid, title)))

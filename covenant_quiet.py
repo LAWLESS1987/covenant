@@ -84,9 +84,10 @@ _orig_init = None
 
 
 def _quiet_init(self, *args, **kw):
-    flags = int(kw.get("creationflags", 0) or 0)
-    if not flags & (DETACHED_PROCESS | CREATE_NEW_CONSOLE):
-        kw["creationflags"] = flags | NO_WINDOW
+    if os.name == "nt":                       # off Windows the patch is present and inert:
+        flags = int(kw.get("creationflags", 0) or 0)   # POSIX Popen refuses creationflags
+        if not flags & (DETACHED_PROCESS | CREATE_NEW_CONSOLE):
+            kw["creationflags"] = flags | NO_WINDOW
     return _orig_init(self, *args, **kw)
 
 
@@ -125,11 +126,10 @@ def popen_survivor(cmd, **kw):
 
 
 def install():
-    """Make every child of THIS process windowless (Windows only; a no-op
-    elsewhere). Returns True when the patch is in place, False on Linux."""
+    """Make every child of THIS process windowless. The patch is put in place
+    on every platform so a suite can see that an entry point called it; it
+    adds the flag on Windows only. Returns True once in place."""
     global _installed, _orig_init
-    if os.name != "nt":
-        return False
     if not _installed:
         _orig_init = subprocess.Popen.__init__
         subprocess.Popen.__init__ = _quiet_init
@@ -195,9 +195,23 @@ def selftest():
             uninstall()
             subprocess.Popen.__init__ = real_init
     else:
-        check("Q5 install() is a no-op off Windows", install() is False)
-        check("Q6 (Windows only) NOT RUN here", True)
-        check("Q7 (Windows only) NOT RUN here", True)
+        seen = {}
+        real_init = subprocess.Popen.__init__
+        def probe(self, *a, **kw):
+            seen["kw"] = dict(kw); return real_init(self, *a, **kw)
+        subprocess.Popen.__init__ = probe
+        try:
+            check("Q5 off Windows install() puts the patch in place", install() is True
+                  and subprocess.Popen.__init__ is _quiet_init)
+            r = subprocess.run([__import__("sys").executable, "-c", "print('plain')"],
+                               capture_output=True, text=True, timeout=60)
+            check("Q6 off Windows the patch adds no creationflags and the child still answers",
+                  "creationflags" not in seen.get("kw", {}) and "plain" in r.stdout)
+            uninstall()
+            check("Q7 uninstall() restores the probe", subprocess.Popen.__init__ is probe)
+        finally:
+            uninstall()
+            subprocess.Popen.__init__ = real_init
     # "N/N passed" is the shape run_all_tests.sh scrapes for. Anything else is
     # reported UNSCORED, which that runner is careful to say is not a pass.
     print("\nQUIET: %d/%d passed" % (sum(ok), len(ok)))

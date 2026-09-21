@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe\" \"C:\\Users\\Lawre\\covenant\\.claude\\hooks\\verify_citations.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
