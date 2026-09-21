@@ -7095,6 +7095,48 @@ two callers by text.
 
 ---
 
+### A172. [the phone / the PC] "Phone app not cleanly communicating with the pc": every chat and image call from the app was refused on the phone before it left, by the app's own network policy; the check-in never was. FIXED 2026-09-21 (covenant-phone acf068a): the chat and the image take the check-in's road
+
+**Measured on the PC.** Check-ins from the phone every ten minutes without
+a gap (`ops/phone_checkins.jsonl`, app 0.1.651); the model door up and
+answering loopback in seconds; the direct line's first message marked seen
+by the phone; and **zero** chat rows from any tailnet address in
+`ops/chat/ask_log.jsonl`, ever, across three phone builds that called
+`/m/agent`. No refusal recorded at the doors. So the calls were not reaching
+the PC at all.
+
+**The cause.** `res/xml/network_security_config.xml` permits cleartext HTTP
+to loopback only (127.0.0.1, localhost), and Android enforces it on Java's
+`HttpURLConnection`: the Activity's calls to `http://<pc tailnet>:5000/m/
+agent` and `/m/image` failed on the phone with a cleartext refusal, every
+time, and the fallback spoke the local judge's verdict. The check-in, the
+learning sync and the AI-chat sync go through `entry.py`'s `urllib`, which
+that policy does not govern, which is why they always arrived. Two earlier
+fixes today (the patient timeout, the honest fallback) treated the symptom.
+
+**Fixed.** `entry.pc_talk(host, port, text)` and `entry.pc_draw(host, port,
+prompt)` carry the chat and the picture from the phone's own sockets, with
+the door's JSON back and the PNG as base64 across the bridge; the Activity
+calls them and opens no URL to the PC itself. The policy is unchanged.
+Pinned by `mobile/app/test_m5_app.py` M5.42 (both functions run against a
+dead port and answer an error JSON with a reason within seconds; the
+Activity's road; the policy still loopback-only), 291/291. Driven from the
+PC against the real door with the same function: an answer in 4 s, a row in
+the chat memory.
+
+**Two things found on the way, both this PC's.** (1) Every Linux `--ci` run
+in WSL today spawned real nodes on 5000/5020/5060 that outlived the run,
+and WSL2 forwards Windows loopback to them: a PC-side probe of the door hit
+a Linux node with no model runtime, and the watchdog read B and C at height
+2 for 48 rounds. The phone, reaching the Windows address over Tailscale,
+never saw them. Killed; after any WSL sweep the ports are checked empty.
+(2) Two watchdogs had run since the same second (the guard's venv one and a
+store-python one); the A160 twin rule leaves a tie alone. Stopped by hand;
+the guard restarts one within its threshold. Neither is fixed in code here;
+both are named so the next reader looks for them.
+
+---
+
 ### A171. [ci / the public repository] The Linux CI of the public repository went red on 67c8d12 with five suites, and a fresh clone fails the same five at 3455312 too. FIXED 2026-09-21: three platform fixes carried back from the artifact, two operator-state checks made honest on a clone
 
 **Measured.** github.com/LAWLESS1987/covenant/actions: run 35595511516 on
