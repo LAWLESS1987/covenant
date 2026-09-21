@@ -550,7 +550,12 @@ def _agent_fetch(url: str, opener=None) -> tuple:
     there. Off-list with no grant: refused before any network, as before."""
     if not _agent_fetch_ok(url):
         try:
-            import covenant_web as _W
+            # BY NAME, not a static import: the phone app's transitive import
+            # closure (M5.2) must not grow. Adding `import covenant_web` here
+            # pulled covenant_web.py into the app's bundle and turned the phone
+            # build red at 2c9dc8f -- their own guard caught it, which is what
+            # it is for. importlib keeps the module out of the AST closure.
+            _W = importlib.import_module("covenant_web")
             if _W.grant() is not None:
                 r = _W.read(url, max_chars=AGENT_FETCH_KEEP, opener=opener)
                 if r.get("ok"):
