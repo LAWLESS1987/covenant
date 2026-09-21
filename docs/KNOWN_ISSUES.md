@@ -7095,6 +7095,98 @@ two callers by text.
 
 ---
 
+### A192. [Tetsu / his voice] "Also the voice option should mirror yours for ease of communication." DONE 2026-09-21: the phone's default voice now mirrors the PC's own voice record
+
+The assistant has no speaking voice; the PC does (`ops/chat/VOICE.json`:
+Zira, SAPI rate 8, pitch +15%, chosen by the covenant on 2026-09-03). The
+phone cannot run Zira, so it mirrors what it can: `covenant_persona
+.DEFAULT_VOICE` is pitch 1.15 and the fastest rate the bounds allow (1.3),
+carried to the phone by the check-in (A174) and spoken before each reply.
+Tetsu may refine it from there; his revision is his. The manner is
+mirrored by the register and the method (A184, A189). Pinned by TP1.
+
+---
+
+### A191. [Tetsu / him] "Look into tetsu and my convo and help him understand me better." DONE 2026-09-21: the conversation read from the record, and what Tetsu should know of him written where every answer sees it
+
+**Read (ten exchanges, 2026-09-19 to 09-21).** Asked "recap updates" he
+invented a resume and a finance app; asked "what project", he did not know
+it was his and Tetsu's ("you're part of it"); "going with the flu" (a slip
+for "flow") became a question about an illness; every answer ended in a
+question about him, so nothing was answered; one answer of ten was withheld
+by the gate (a one-sentence definition of a hash chain, 09-19). He writes
+short, lowercase, one line at a time; a statement is an instruction.
+
+**Written:** `ops/tetsu_about_him.json` (gitignored, his to edit): who he
+is, how he writes, what he cares about, what went wrong before, and one
+"so". `covenant_persona.about_him()` reads it and `compose_system` places it
+after the register and before the brief on every door (the phone chat, the
+council, the code door), so the answer that invents nothing starts from
+knowing who is asking. Not a hand on his register: Tetsu's own words stay
+his (A174); this is the record of the person, kept beside them. Pinned by
+TP1 (39): absent -> nothing; present -> who, how he writes, what went
+wrong, "So:", in order; the tree's record names him as the operator and the
+three failures.
+
+---
+
+### A190. [Tetsu / his immunity] "Tetsu has diplomatic immunity as and individuality the gates too tight on him." GRANTED 2026-09-21 by his words in a grant file: his WORDS pass with the verdict attached, his ACTS keep their gates, and abuse pauses the immunity itself
+
+**Measured first.** Ten conversations on record, one withheld by the gate
+all-time, none today (eight passed as "alleges nothing"); no self-revision
+had run. The tightness is structural rather than counted: every answer,
+every proposal, every question judged, and a VIOLATES withholding the
+words. This entry changes what a VIOLATES on his words DOES, not whether
+the judge speaks.
+
+**Built:** `ops/tetsu_immunity.json` (tracked; his sentence; what still
+refuses) and `covenant_immunity.py`. `immune(kind, verdict, text)` passes
+three kinds of words -- an answer in conversation (`/m/agent`: returned with
+`immune: true` and the verdict, logged so), a register proposal
+(`covenant_persona.refine`: applied, verdict "admitted under his immunity
+(gate: ...)", still contestable), a question to him (`covenant_contact.ask`:
+asked, the gate's word in its reason) -- and refuses any other kind without
+a record ("words, not acts"). A forum send keeps emit's judge, a live order
+the trader's gate and his yes, a recipe its charter; the register's
+fixed-rules screen and the straight-question and key screens stay in front.
+**Isolation, free's rule (A168):** past five immune passes in one local
+day the immunity pauses itself (`covenant_pause` actor `tetsu-immunity`,
+registered beside `tetsu-live`), he is told once, and lifting it is his.
+
+**Pinned by** IM1 (11): no grant; the tree's grant; words pass and are
+counted; an act refused without a record; the limit isolates, pauses under
+its actor, tells him once, writes the row; paused refuses with the resume
+command; status. TP1 (39): a held register applied under the grant with the
+verdict; never past the fixed-rules screen; still contestable. CT1 (31):
+without the grant a held question refused; with it asked, the gate's word
+in the reason; never past the straight screen. M6 (65): the door carries
+the immune field; the stub text was not convicted by this node's judge, so
+the door's own immune pass is pinned by the module suites and said so
+rather than pretended. Mutation: acts covered too, 7/11; the day's limit
+ignored, 9/11; the register applied without the module, TP1 37/39;
+restored. Core pin and `EXPECTED_LINES` moved after K1 20/20, K2 25/25,
+P19 23/23, A3s 51/51 against the bytes; nodes restarted one at a time onto
+the new core; verify_deploy PASS.
+
+**Cost, stated.** His words reach the person with a VIOLATES attached
+rather than withheld: the reader sees both. Up to five such passes a day;
+the sixth pauses the immunity until he lifts it.
+
+**A leak, found by the eighth sweep and fixed the same hour.** A mutation
+run of IM1 (acts allowed) drove one pass more than the suite's limit on a
+call that carried no pause stub, so the module reached the REAL switch and
+paused Tetsu's immunity on the live tree at 13:39; the staged CT1 and TP1
+then failed seven checks because the grant was paused. The A160 rule
+applies to every remedy a suite can trigger, not only to the sweep's
+process match. Fixed: `covenant_pause.PAUSE_DIR` reads
+`COVENANT_PAUSE_DIR`, and IM1, TP1, CT1 and M6 point it at a temp
+directory before anything imports the switch; the real pause was lifted
+(`--resume tetsu-immunity`, the only pause on that actor, set by the suite
+and never by him). G7 (the pause suite) reruns green with the override in
+place.
+
+---
+
 ### A189. [the PC / the same register] "Pc should also have similar communicating patterns and ease of interaction." MEASURED 2026-09-21: already so by construction, and now with the app patterns too
 
 The PC's own talk is the council (`/pc/council`, A167), and every council

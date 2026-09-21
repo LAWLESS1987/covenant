@@ -430,6 +430,7 @@ SUITES = [
     ("test_cc1_code_consensus.py",        180,  "JUDGE"),
     ("test_tm1_tetsu_money.py",           180,  "JUDGE"),
     ("test_tl1_tetsu_live.py",            120,  "JUDGE"),
+    ("test_im1_immunity.py",              120,  "JUDGE"),
     ("test_dp1_daily_plan.py",           120,  "TRADER"),
     ("test_sm1_sealed_mail.py",          120,  "TRADER"),
     ("test_ac1_ai_consult.py",           120,  "TRADER"),

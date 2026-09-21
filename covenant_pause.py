@@ -38,7 +38,9 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PAUSE_DIR = os.path.join(HERE, "ops", "pause")
+# COVENANT_PAUSE_DIR (2026-09-21, A190): a suite that drives an isolation rule (IM1) reached the REAL
+# switch through a mutation run and paused Tetsu's immunity on the live tree; suites redirect it here.
+PAUSE_DIR = os.environ.get("COVENANT_PAUSE_DIR") or os.path.join(HERE, "ops", "pause")
 TRADER_HALT = os.path.join(HERE, "TRADER_HALT")
 
 # Every actor that can be paused, and one line on what pausing it stops. An
@@ -55,6 +57,11 @@ ACTORS = {
     # sets it when the judge refused every reply in two live rounds, and he
     # lifts it. She still learns and ranks nothing while paused.
     "ambassador": "free's round on Moltbook stops (no replies, no introduction); the grant stays on record",
+    # 2026-09-21 (A182, A190): Tetsu under his grants. Both are STOP switches: "tetsu-live"
+    # stops live requests and placements; "tetsu-immunity" is the immunity's own isolation
+    # (covenant_immunity sets it past the day's limit; he lifts it).
+    "tetsu-live": "Tetsu's live requests and placements on Coinbase stop; the grant stays on record",
+    "tetsu-immunity": "Tetsu's words are judged as before (no immune pass); the grant stays on record",
 }
 
 

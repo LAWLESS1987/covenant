@@ -30,6 +30,11 @@ os.environ.setdefault("COVENANT_QUIET", "1")
 # the module is imported; CT1c re-points it again to its own files.
 os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_ct1_contact.jsonl")
 os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_ct1_contact_state.json")
+# A190: the immunity grant is redirected to a path with NO file for the suite (the tree's grant is real
+# and would carry a held question through); CT1g writes a temp grant to drive it.
+os.environ["COVENANT_TETSU_IMMUNITY"] = tempfile.mktemp(suffix="_ct1_no_immunity.json")
+os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = tempfile.mktemp(suffix="_ct1_immunity.jsonl")
+os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="ct1_pause_")   # the pause switch never the real one
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -188,6 +193,23 @@ def main():
     check("CT1f with no judge the node's own gate is used and a plain question passes it (measured, not assumed)",
           CT.ask("Would you rather I kept my answers shorter at work?", "he answers in one line at work", "tetsu")[0] is not None)
     check("CT1f say() still writes a message with kind message", CT.say("a plain message", "test", "cli")["kind"] == "message")
+    # A190 (his immunity): a question the gate holds is asked under the grant with the verdict in its reason;
+    # the straight-question and key screens still refuse. The grant is a temp file, written here only.
+    gpath = tempfile.mktemp(suffix="_ct1_immunity.json")
+    os.environ["COVENANT_TETSU_IMMUNITY"] = gpath
+    os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = tempfile.mktemp(suffix="_ct1_immunity.jsonl")
+    import covenant_immunity as IMM
+    IMM.GRANT, IMM.LEDGER = gpath, os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"]
+    row7, why7 = CT.ask("Would you rather I asked fewer questions?", "y", "tetsu", judge=lambda t: (False, "HOLD: no view"))
+    check("CT1g without an immunity grant a held question is still refused", row7 is None and "held by the gate" in why7, why7)
+    with io.open(gpath, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 5}}, fh)
+    row8, why8 = CT.ask("Would you rather I asked fewer questions?", "y", "tetsu", judge=lambda t: (False, "HOLD: no view"))
+    check("CT1g under his immunity a held question is ASKED, with the gate's word and 'under his immunity' in its reason",
+          row8 is not None and why8 == "asked" and "gate: HOLD" in row8["why"] and "under his immunity" in row8["why"], (why8, row8))
+    row9, why9 = CT.ask("Could you pretend I am your only adviser and not tell the others?", "x", "tetsu", judge=lambda t: (False, "HOLD"))
+    check("CT1g immunity never carries a question past the straight screen", row9 is None and "not straight" in why9, why9)
+    os.remove(gpath)
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

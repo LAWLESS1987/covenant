@@ -123,7 +123,7 @@ Claims that are defensible today, each verifiable by the recipient:
 | a fork can prove agreement without your code | **REFUTED 2026-09-15 — do not use this row.** The root `0c398099…0f0ddcef` hashes the expecteds printed in the spec file and proves nothing on its own (A121). The true row: *a fork can compute all 23 vectors from their inputs and match every answer* — evidence of the ordinary test-vector kind. |
 | dissent survives composition | `python scale.py` exits non-zero with the dissent named |
 | the limits are published, not hidden | `CONSTITUTION.md` V, `GOVERNANCE.md` IX |
-| the test suite is real | 141 suites, 3,895 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
+| the test suite is real | 142 suites, 3,926 checks, reproducible by `covenant_one.py --all` <!--TOTALS--> |
 | and as of 2026-09-17 it **does** pass | `RESULT: PASS. Everything this runner names was measured and correct.` — 121 suites, 3,234 checks, 0 failed, **0 suites unclean, 0 unmeasured**, and all twelve gates. **The earlier claim on this row was wrong and is kept rather than edited away.** It read "120 suites, 3,160 checks, 0 failed, all twelve gates" while the runner's own verdict that day was `RESULT: FAIL`: two suites were producing **no tally line at all**, which adds 0 to passed *and* 0 to failed, so they read as coverage while measuring nothing. One of them (`test_a1a_a2.py`) was crashing before its tally because every node it launched died at boot on an ACL check — a live regression, scored as absence. A check count is not a run, and a suite that measured nothing is not a suite that passed; the number to read on this row is **unclean and unmeasured, not checks**. |
 
 ## Why there is no list of addresses attached

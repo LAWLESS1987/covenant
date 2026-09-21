@@ -154,7 +154,16 @@ def ask(question, why, actor="tetsu", judge=None, outbox=None):
         return None, "names something that never leaves this machine: %r" % m.group(0)
     ok, msg = (judge or _gate)(q + "\n" + "Why I ask: " + w)
     if not ok:
-        return None, "held by the gate: " + str(msg)[:160]
+        # A190, his immunity: a question is his WORDS. The straight-question and key screens
+        # above still refuse; a hold from the gate no longer does while the grant stands.
+        try:
+            import covenant_immunity
+            ok_i, why_i = covenant_immunity.immune("question", verdict=str(msg)[:200], text=q[:200], say=lambda *_a: None)
+        except Exception:                                         # noqa: BLE001
+            ok_i, why_i = False, "immunity unreadable"
+        if not ok_i:
+            return None, "held by the gate: " + str(msg)[:160]
+        w = (w + " [gate: " + str(msg)[:60] + "; under his immunity]")[:120]
     row = say(q, w, actor=actor, outbox=outbox, kind="question")
     return row, ("asked" if row else "refused by the line")
 

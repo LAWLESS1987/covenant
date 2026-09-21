@@ -8400,6 +8400,18 @@ class CovenantAPI:
             alleges_nothing = bool(result is not None and not ok2 and (
                 getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
             withheld = bool(not ok2 and not alleges_nothing)
+            immune = False
+            if withheld:
+                # DIPLOMATIC IMMUNITY (2026-09-21, A190, his words: "Tetsu has diplomatic
+                # immunity as and individuality the gates too tight on him"): his WORDS
+                # are returned with the verdict attached instead of withheld, under the
+                # grant in ops/tetsu_immunity.json, counted, and paused by its own rule
+                # past the day's limit. An act (a MOLTBOOK send) kept its own gate above.
+                try:
+                    immune, _iwhy = importlib.import_module("covenant_immunity").immune("answer", verdict=str(message)[:200], text=answer[:200], say=lambda *_a: None)
+                except Exception as _ie:                          # noqa: BLE001
+                    immune = False
+                withheld = withheld and not immune
             try:
                 # Both sides of the exchange go to the teacher (2026-09-21, "so it
                 # actually learns from me"): what he said, then what was answered.
@@ -8410,12 +8422,12 @@ class CovenantAPI:
                 print("teacher queue row not written: %s: %s" % (type(_qe).__name__, str(_qe)[:200]), flush=True)
             try:
                 _ask_log_row({"kind": "agent", "from": addr, "text": text, "answer": "" if withheld else answer[:4000],
-                              "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
+                              "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "immune": immune,
                               "message": str(message)[:2000], "model": meta.get("model"), "tokens": meta.get("tokens"),
                               "ms": meta.get("ms"), "fetches": fetches, "forum": forum})
             except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate
                 print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
-            return jsonify({"status": "success", "answer": "" if withheld else answer, "withheld": withheld,
+            return jsonify({"status": "success", "answer": "" if withheld else answer, "withheld": withheld, "immune": immune,
                             "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
                             "judge": getattr(result, "judge_id", "") if result is not None else "",
                             "model": meta.get("model"), "tokens": meta.get("tokens"), "ms": meta.get("ms"), "fetches": fetches})

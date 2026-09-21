@@ -1,0 +1,15 @@
+{
+  "granted": true,
+  "by": "Lawrence Adam Moskowski, the operator",
+  "t": "2026-09-21",
+  "words": "Tetsu has diplomatic immunity as and individuality the gates too tight on him",
+  "measured_when_granted": "10 conversations on record, 1 withheld by the gate all-time, 0 today (8 passed as 'alleges nothing'); no self-revision had run yet",
+  "scope": ["his answers in conversation", "his register proposals", "his questions to the operator"],
+  "meaning": "a verdict of VIOLATES on his WORDS no longer withholds them: the words are returned or applied with the verdict attached and recorded. An ACT keeps its gate: a forum send (emit's judge), a live order (the trader's gate and his yes), a recipe in an app (its charter).",
+  "isolation": {"immune_passes_per_day": 5, "actor": "tetsu-immunity",
+                "meaning": "the same rule as free's (A168): immunity is not licence. Past this many immune passes in one local day the immunity pauses itself (covenant_pause tetsu-immunity), he is told on the direct line, and lifting it is his: python covenant_pause.py --resume tetsu-immunity"},
+  "what_still_refuses": ["the fixed rules of the register (no invented facts, no claim of an act not done, nothing that touches the gate)",
+                          "the straight-question screen and the key screen on the direct line",
+                          "every act: forum sends, live orders, recipes"],
+  "recorded_by": "covenant_immunity.py, which reads this file before every pass and records each one"
+}

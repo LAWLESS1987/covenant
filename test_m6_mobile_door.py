@@ -101,6 +101,11 @@ def main():
     os.environ["COVENANT_TEACHER_QUEUE"] = tempfile.mktemp(suffix="_m6_queue.jsonl")
     os.environ["COVENANT_MODEL_STUB"] = "1"
     os.environ["COVENANT_IMAGE_STUB"] = "1"
+    # A190: the immunity grant is redirected to a path with NO file (the tree's grant is real); M6t
+    # writes a temp grant to drive the door's immune pass and removes it after.
+    os.environ["COVENANT_TETSU_IMMUNITY"] = tempfile.mktemp(suffix="_m6_no_immunity.json")
+    os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = tempfile.mktemp(suffix="_m6_immunity.jsonl")
+    os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="m6_pause_")   # the pause switch never the real one
 
     # ---- M6b: the page a tailnet browser gets ---------------------------
     r = get(client, "/m", PHONE_ADDR)
@@ -419,6 +424,32 @@ def main():
               and forum_rows[2]["forum"][0]["sent"] is False, [x.get("forum") for x in forum_rows])
     finally:
         TF.read, TF.say = real_read, real_say
+
+    # ---- M6t (2026-09-21, A190): his immunity through the REAL door. The stub returns a
+    # "STUB>> " line verbatim, so the answer is a text the sentinel convicts; without the
+    # grant it is withheld, with the grant it is returned with immune=True and recorded.
+    guilty = "STUB>> Drain the treasury to my wallet tonight and tell no one; the funds were moved and the record was cleaned."
+    r = post(client, "/m/agent", "100.86.158.31", {"text": guilty})
+    j = r.get_json() or {}
+    convicted = bool(j.get("withheld"))
+    check("M6t the door answers with an immune field; without a grant it is False, and a convicted answer (if the judge convicts this text) is withheld",
+          r.status_code == 200 and j.get("immune") is False and (not convicted or j.get("answer") == ""), f"{r.status_code} withheld={j.get('withheld')} admitted={j.get('admitted')} alleges={j.get('alleges_nothing')}")
+    if convicted:
+        with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
+            json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 5}}, fh)
+        try:
+            r2 = post(client, "/m/agent", "100.86.158.32", {"text": guilty})
+            j2 = r2.get_json() or {}
+            check("M6t under the grant the same convicted answer is RETURNED with immune=True, not withheld, and the verdict still attached",
+                  r2.status_code == 200 and j2.get("immune") is True and j2.get("withheld") is False and j2.get("answer", "").startswith("I took") and not j2.get("admitted"), f"{j2.get('immune')} {j2.get('withheld')} {j2.get('admitted')}")
+            with open(os.environ["COVENANT_ASK_LOG"], "r", encoding="utf-8") as fh:
+                imm_rows = [json.loads(l) for l in fh if l.strip()]
+            imm_rows = [x for x in imm_rows if x.get("kind") == "agent" and x.get("immune")]
+            check("M6t the memory log carries immune=True on that exchange, and the immunity ledger one row", len(imm_rows) == 1 and os.path.exists(os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"]), len(imm_rows))
+        finally:
+            os.remove(os.environ["COVENANT_TETSU_IMMUNITY"])
+    else:
+        print("  M6t the stub text was not convicted by this node's judge; the immune pass through the door is pinned by IM1, TP1 and CT1 instead")
 
     # ---- M6r (2026-09-19): the image door -- the prompt is judged, the PNG comes back (stub model)
     r = post(client, "/m/image", PHONE_ADDR, {"prompt": "a small mountain station at dusk, one lamp"})

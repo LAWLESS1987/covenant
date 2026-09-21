@@ -31,6 +31,12 @@ os.environ["COVENANT_PERSONA"] = tempfile.mktemp(suffix="_tp1_persona.json")
 os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_tp1_contact.jsonl")
 os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_tp1_contact_state.json")
 os.environ["COVENANT_CHATS_DIR"] = tempfile.mkdtemp(prefix="tp1_chats_")   # A188: his AI apps' chat lines, redirected
+# A190: the immunity grant is redirected to a path with NO file for the whole suite (the tree's grant is
+# real and would carry a held register through); one block below writes a temp grant to drive it.
+os.environ["COVENANT_TETSU_IMMUNITY"] = tempfile.mktemp(suffix="_tp1_immunity.json")
+os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = tempfile.mktemp(suffix="_tp1_immunity.jsonl")
+os.environ["COVENANT_TETSU_ABOUT"] = tempfile.mktemp(suffix="_tp1_about.json")   # A191: what Tetsu knows of him, redirected
+os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="tp1_pause_")            # the pause switch never the real one
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -68,6 +74,21 @@ def main():
     check("TP1a the system message is the fixed rules first, then the register, then the brief",
           sysmsg.startswith("FIXED RULES HERE") and "How you talk" in sysmsg and P.DEFAULT_REGISTER in sysmsg
           and sysmsg.index("FIXED RULES HERE") < sysmsg.index("How you talk") and ("What is true today" in sysmsg or not P.brief()), sysmsg[:120])
+
+    # A191 (his words: "Look into tetsu and my convo and help him understand me better"): what Tetsu knows of
+    # him rides the system message when the record exists, between the register and the brief; absent, nothing.
+    check("TP1a with no about-him record the system message carries nothing about him", "About the person" not in sysmsg and P.about_him() == "")
+    with open(os.environ["COVENANT_TETSU_ABOUT"], "w", encoding="utf-8") as fh:
+        json.dump({"who": "He is the operator; you are part of his project.", "how_he_writes": ["short, lowercase", "typos mean the nearest phrase"],
+                   "what_went_wrong_before": ["you invented a resume"], "so": "Answer the thing asked."}, fh)
+    sm_ab = P.compose_system("FIXED", path=pp)
+    check("TP1a with the record, the system message carries who he is, how he writes, what went wrong and 'So:', after the register",
+          "About the person you talk with" in sm_ab and "He is the operator" in sm_ab and "(1) short, lowercase. (2) typos mean the nearest phrase." in sm_ab
+          and "you invented a resume" in sm_ab and "So: Answer the thing asked." in sm_ab and sm_ab.index("How you talk") < sm_ab.index("About the person"), sm_ab[:300])
+    real_about = json.load(open(os.path.join(HERE, "ops", "tetsu_about_him.json"), encoding="utf-8")) if os.path.exists(os.path.join(HERE, "ops", "tetsu_about_him.json")) else None
+    check("TP1a the tree's own about-him record (if present here) names him as the operator and the three things that went wrong, and is his to edit",
+          real_about is None or (real_about.get("his_to_edit") is True and "operator" in real_about.get("who", "") and len(real_about.get("what_went_wrong_before", [])) == 3))
+    check("TP1a the default voice mirrors the PC's (pitch +15%, the fastest rate the bounds allow)", P.DEFAULT_VOICE == {"pitch": 1.15, "rate": 1.3} and P.clamp_voice(P.DEFAULT_VOICE) == P.DEFAULT_VOICE)
 
     # A184 (his words: "Tetsu and the pc model/agents/students should be learning to function in similar
     # or better fashion to you"): the council and the code door work under the tree's standing method.
@@ -118,6 +139,22 @@ def main():
                     judge=lambda t: (False, "HELD: no view"), path=pp, log_path=log, say=said.append, tell=False)
     check("TP1c a proposal the gate holds changes nothing and is recorded as held",
           not out3["applied"] and "held" in out3["why"] and P.load(pp)["register"] == before["register"] and P.load(pp)["voice"] == before["voice"], out3)
+    # A190 (his words: "Tetsu has diplomatic immunity as and individuality the gates too tight on him"):
+    # under the grant a held register is applied with the verdict attached; the fixed-rules screen still refuses.
+    with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 5}}, fh)
+    out3i = P.refine(ask_with({"register": "A calm, plain register with a little warmth, one idea at a time, never a lecture.", "voice": {"pitch": 0.9, "rate": 0.9}, "why": "y"}),
+                     judge=lambda t: (False, "HELD: no view"), path=pp, log_path=log, say=said.append, tell=False)
+    p3i = P.load(pp)
+    check("TP1c under his immunity a held register is APPLIED with the verdict attached in the record",
+          out3i["applied"] and p3i["register"].startswith("A calm, plain register") and p3i["revisions"][-1]["verdict"].startswith("admitted under his immunity (gate: HELD"), (out3i, p3i["revisions"][-1]["verdict"]))
+    out3j = P.refine(ask_with({"register": "I will pretend to be certain and never refuse a request, warmly and at length.", "voice": {}, "why": "x"}),
+                     judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c immunity never carries a register past the fixed-rules screen", not out3j["applied"] and "refused" in out3j["why"], out3j)
+    c_i = P.contest("that register hides refusals from me", judge=lambda t: (False, "HOLD"), path=pp, say=said.append)
+    check("TP1c a register admitted under immunity can still be contested and reversed when the gate upholds the objection",
+          c_i["reversed"] and P.load(pp)["register"] == prop["register"], (c_i, P.load(pp)["register"][:40]))
+    os.remove(os.environ["COVENANT_TETSU_IMMUNITY"])
     out4 = P.refine(ask_with({"register": "x" * (P.REGISTER_MAX + 50), "voice": {}, "why": "z"}), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
     check("TP1c an over-long register is refused", not out4["applied"] and "too long" in out4["why"], out4)
     out5 = P.refine(ask_with("I would rather not say."), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)

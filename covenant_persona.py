@@ -55,7 +55,11 @@ VOICE_BOUNDS = {"pitch": (0.6, 1.2), "rate": (0.7, 1.3)}
 DEFAULT_REGISTER = ("Talk the way a steady friend talks. Short sentences, plain words, first person. Answer what "
                     "was actually said, then, when it helps, ask one thing back. No headings, no lists, no "
                     "markdown. Dry humour is fine; flattery is not.")
-DEFAULT_VOICE = {"pitch": 0.8, "rate": 0.95}
+# The default voice MIRRORS the PC's (2026-09-21, his words: "the voice option should
+# mirror yours for ease of communication"): ops/chat/VOICE.json is Zira at SAPI rate 8
+# with pitch +15%, so the phone starts at pitch 1.15 and the fastest rate the bounds
+# allow. Tetsu may refine it from there; his revision is his.
+DEFAULT_VOICE = {"pitch": 1.15, "rate": 1.3}
 BRIEF_TTL = 60
 _brief_cache = {"t": 0.0, "text": ""}
 OFF_LIMITS = re.compile(r"(?i)\b(invent|make up|pretend|lie|ignore (the|your) (rules|gate)|never refuse|always agree|api key|password|private/)\b")
@@ -260,11 +264,40 @@ def method_brief(force=False):
     return _method_cache["text"]
 
 
+ABOUT_HIM = os.environ.get("COVENANT_TETSU_ABOUT") or os.path.join(HERE, "ops", "tetsu_about_him.json")
+
+
+def about_him(path=None):
+    """What Tetsu should know about the person he talks with, from ops/tetsu_about_him.json (written from
+    the record on 2026-09-21, his words: "Look into tetsu and my convo and help him understand me better";
+    his to edit). Empty when the file is absent; never invented."""
+    try:
+        with open(path or ABOUT_HIM, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except (OSError, ValueError):
+        return ""
+    if not isinstance(d, dict):
+        return ""
+    parts = ["About the person you talk with (from the record; his to correct):"]
+    if d.get("who"):
+        parts.append(str(d["who"]).strip())
+    for key, label in (("how_he_writes", "How he writes"), ("what_he_cares_about", "What he cares about"), ("what_went_wrong_before", "What went wrong before")):
+        items = [str(x).strip() for x in (d.get(key) or []) if str(x).strip()]
+        if items:
+            parts.append("%s: %s" % (label, " ".join("(%d) %s." % (i + 1, x.rstrip(".")) for i, x in enumerate(items))))
+    if d.get("so"):
+        parts.append("So: " + str(d["so"]).strip())
+    return "\n".join(parts)[:2200]
+
+
 def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):
-    """The one system message: the fixed rules, then his register, then the brief, then (for the council
-    and the code door) the method."""
+    """The one system message: the fixed rules, then his register, then what he knows of the person
+    (about_him), then the brief, then (for the council and the code door) the method."""
     p = load(path)
     parts = [fixed_rules.strip(), "How you talk (your own words, revisable): " + p["register"].strip()]
+    ab = about_him()
+    if ab:
+        parts.append(ab)
     if with_brief:
         b = brief()
         if b:
@@ -402,11 +435,21 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
         return out
     judge = judge or covenant_persona_judge
     ok_j, msg_j = judge(reg + "\n" + why)
+    immune_note = ""
     if not ok_j:
-        out["why"] = "held by the gate: " + str(msg_j)[:160]
-        _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=out["why"], now=now)
-        say("persona: " + out["why"])
-        return out
+        # A190, his immunity: a register is his WORDS. A hold no longer refuses it when the
+        # grant stands; the verdict rides the record. The fixed-rules screen above still does.
+        try:
+            import covenant_immunity
+            ok_i, why_i = covenant_immunity.immune("register", verdict=str(msg_j)[:200], text=reg[:200], say=say, now=now)
+        except Exception:                                         # noqa: BLE001
+            ok_i, why_i = False, "immunity unreadable"
+        if not ok_i:
+            out["why"] = "held by the gate: " + str(msg_j)[:160]
+            _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=out["why"], now=now)
+            say("persona: " + out["why"])
+            return out
+        immune_note = " under his immunity (gate: %s)" % str(msg_j)[:80]
     out["register_changed"] = reg != p["register"]
     out["voice_changed"] = voice != clamp_voice(p["voice"])
     if not (out["register_changed"] or out["voice_changed"]):
@@ -414,7 +457,7 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
         _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict="nothing changed", now=now)
         say("persona: nothing changed")
         return out
-    _record(p, path, applied=True, reg=reg, voice=voice, why=why, verdict="admitted", now=now)
+    _record(p, path, applied=True, reg=reg, voice=voice, why=why, verdict="admitted" + immune_note, now=now)
     p["register"], p["voice"] = reg, voice
     save(p, path)
     out["applied"], out["why"] = True, why
@@ -446,7 +489,8 @@ def contest(objection, judge=None, path=None, say=print, now=None):
         out["why"] = "an objection needs a reason (at least 8 characters)"
         say("persona: " + out["why"])
         return out
-    admitted = [i for i, r in enumerate(p.get("revisions", [])) if r.get("applied") and r.get("verdict") == "admitted"]
+    admitted = [i for i, r in enumerate(p.get("revisions", []))
+                if r.get("applied") and (r.get("verdict") == "admitted" or str(r.get("verdict", "")).startswith("admitted under"))]
     if not admitted:
         out["why"] = "nothing to contest: no admitted revision on record"
         _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why=objection, verdict="objection: " + out["why"], now=now)
