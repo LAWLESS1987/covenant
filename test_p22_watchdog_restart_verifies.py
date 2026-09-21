@@ -156,18 +156,34 @@ def main():
              "[void][System.Management.Automation.Language.Parser]::ParseFile("
              "'%s',[ref]$null,[ref]$e);"
              "if ($e) { $e.Count } else { 0 }" % tmp.replace("\\", "\\\\"))
-    try:
-        out = subprocess.run(["powershell", "-NoProfile", "-Command", probe],
-                             capture_output=True, text=True, timeout=120)
-        errs = (out.stdout or "").strip().splitlines()
-        n = errs[-1].strip() if errs else "?"
-        check("parses with 0 syntax errors", n == "0",
-              "parser reported %r; stderr=%s" % (n, (out.stderr or "")[:300]))
-    except Exception as e:                                    # noqa: BLE001
-        check("parses with 0 syntax errors", False, "could not run parser: %r" % (e,))
+    # The restarter is a Windows script and its parser is PowerShell. Where no
+    # PowerShell exists (the public repository's Linux CI, and the artifact's:
+    # fixed there 2026-09-21 at 5c9c0d9 and carried back here the same day)
+    # the parse cannot be measured, and an unmeasurable check is reported as
+    # SKIPPED with its reason -- counted neither as passed nor as failed, per
+    # check.sh's rule that a skipped check is never rounded up. `pwsh`
+    # (PowerShell 7) is accepted where it is installed.
+    import shutil
+    skipped = 0
+    ps = shutil.which("powershell") or shutil.which("pwsh")
+    if ps is None:
+        skipped += 1
+        print("  %-62s SKIPPED  no PowerShell on this platform; the parse is not measured here"
+              % "parses with 0 syntax errors")
+    else:
+        try:
+            out = subprocess.run([ps, "-NoProfile", "-Command", probe],
+                                 capture_output=True, text=True, timeout=120)
+            errs = (out.stdout or "").strip().splitlines()
+            n = errs[-1].strip() if errs else "?"
+            check("parses with 0 syntax errors", n == "0",
+                  "parser reported %r; stderr=%s" % (n, (out.stderr or "")[:300]))
+        except Exception as e:                                    # noqa: BLE001
+            check("parses with 0 syntax errors", False, "could not run parser: %r" % (e,))
 
     print()
-    print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
+    print("%d passed, %d failed%s" % (PASSED[0], len(FAILURES),
+                                       (", %d skipped (named above, not counted)" % skipped) if skipped else ""))
     if FAILURES:
         print("P22 result: FAILED (%d)" % len(FAILURES))
         for f in FAILURES:

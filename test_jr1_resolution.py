@@ -242,6 +242,18 @@ def flip_still_off_checks():
         not_run("JR6 the flip is a policy key, not a rewire",
                 "could not read the policy (%s)" % type(e).__name__)
         return
+    # THE FLIP IS THE OPERATOR'S STATE, not the tree's (2026-09-21). The policy
+    # file is gitignored; a fresh clone -- the public repository's Linux CI, a
+    # stranger's machine -- has no operator and no flip, and load_policy() then
+    # hands back defaults without raising. Measured: JR6.a/b/c read 19/22 on
+    # every fresh Linux clone, at 3455312 and at 67c8d12 alike, while this PC
+    # read 22/22. Where there is no policy file there is nothing to pin: NOT
+    # RUN, with the reason, never a pass and never a red about the tree.
+    if not os.path.isfile(getattr(D, "POLICY", "")):
+        not_run("JR6 the flip is a policy key, not a rewire",
+                "no operator policy file on this tree (%s): the flip is this PC's state, not the code's"
+                % os.path.basename(getattr(D, "POLICY", "ops/quorum_policy.json")))
+        return
     providers = str(pol.get("providers", ""))
     check("JR6.a the seat list is unchanged by the flip -- both_seats is a key "
           "inside the deferring seat, so deleting it reverts exactly",

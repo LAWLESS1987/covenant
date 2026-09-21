@@ -7092,6 +7092,46 @@ two callers by text.
 
 ---
 
+### A171. [ci / the public repository] The Linux CI of the public repository went red on 67c8d12 with five suites, and a fresh clone fails the same five at 3455312 too. FIXED 2026-09-21: three platform fixes carried back from the artifact, two operator-state checks made honest on a clone
+
+**Measured.** github.com/LAWLESS1987/covenant/actions: run 35595511516 on
+67c8d12 (Ubuntu, Python 3.11 and 3.12) FAILED in `covenant_one.py --ci`
+with five suites not clean: `test_p22_watchdog_restart_verifies.py`,
+`test_p23_second_operator_security.py`, `test_dp1_daily_plan.py`,
+`test_jr1_resolution.py` (19/22), `test_g4_money_gates.py` (16/17). A fresh
+Linux clone in WSL reproduces all five; checked out at 3455312, whose run
+had a green tick, the same clone fails `jr1` 19/22 and `g4` 16/17 as well.
+So the tick on 3455312 did not measure what a fresh clone measures; a full
+`--ci` run of both commits, side by side, is in progress as this is written
+and its reading goes here when it lands.
+
+**The three platform failures** are the ones the artifact fixed at
+5c9c0d9 (its A-table row "Linux") and this tree never received: the
+PowerShell parse now SKIPPED with its reason where no PowerShell exists,
+counted neither way; the credential store stubbed so P23d measures the
+gate both ways on any machine (+2 checks); the daily-plan fixture writes
+its key owner-only as the node does. Carried back verbatim.
+
+**The two operator-state checks.** `JR6` pins the second-judge flip in
+`ops/quorum_policy.json` and `G4.4b` an approved day in
+`ops/daily_approvals.jsonl`; both files are gitignored, both are this PC's
+state, and a fresh clone has neither. `load_policy()` returned defaults
+without raising, so JR6.a/b/c read a stranger's clone as a broken flip;
+G4.4b failed by design ("NOT MEASURED ... not a pass") where no ledger can
+ever exist. Now: no policy file, or no ledger file at all, is reported NOT
+RUN with the reason ("an operator's decision, not the code's"), counted
+neither as passed nor as failed; a file that exists and lacks the record
+still fails as before. On this PC both suites still read 22/22 and 17/17.
+
+**Verified** on a fresh Linux clone with the five edited suites: p22 23
+passed + 1 skipped, p23 20/20, dp1 30/30, jr1 19/19 with one section NOT
+RUN, g4 16/16 with one check NOT RUN; on Windows 24/24, 20/20, 30/30,
+22/22, 17/17. The rule this adds to the artifact's: **a push is green when
+the remote run is, and a suite that reads this PC's state says NOT RUN
+where that state does not exist.**
+
+---
+
 ### A170. [learning / the promotion gate] A promoted student regressed the pinned disposition claims a second time (04:03 today), and the pass only REPORTED it after the file was replaced. FIXED 2026-09-21: the claims are measured on the candidate, and a candidate that fails them is refused
 
 **Measured.** The 04:03 nightly promoted a student (digest `8571b16b1784`)

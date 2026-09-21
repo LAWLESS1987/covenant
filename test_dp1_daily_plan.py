@@ -105,6 +105,12 @@ def main():
         # the PC-side path: a node identity key on disk, loaded the way the node loads it, signs and is verified the same way
         kp = os.path.join(td, "node.db.key")
         open(kp, "wb").write(phone.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        # The node refuses a key readable beyond its owner (ops/owner_only.py), and the way the
+        # node loads it is what D16 tests. On Linux the fixture's default mode is 0o644 and the
+        # refusal fired on every CI run (carried back from the artifact, 5c9c0d9, 2026-09-21);
+        # on NTFS the mode bit is not carried and Windows never saw it. The fixture writes the
+        # key the way the node writes its own -- owner-only.
+        os.chmod(kp, 0o600)
         code, out = DP.decide_locally("decline", "from the PC", key_path=kp, plan_dir=plan_dir, approvals=approvals, signers_path=signers)
         ok4, why4 = DP.approved(plan["date"], plan_dir, approvals)
         check("D16 --decline on the PC signs with the node key, verifies as the registered signer, and is the last word", code == 200 and not ok4 and "from the PC" in why4, (code, out))

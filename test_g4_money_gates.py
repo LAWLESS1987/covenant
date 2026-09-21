@@ -191,6 +191,15 @@ def main():
               "reads the decision, it does not assume one",
               ok_appr and not any("daily plan" in r.lower() for r in off_appr),
               "%s: %s | %s" % (day, why_appr[:60], str(off_appr)[:50]))
+    elif not os.path.exists(_dp.APPROVALS):
+        # A fresh clone -- the public repository's Linux CI, a stranger's machine --
+        # has no approvals ledger at all: the ledger is the operator's state, not the
+        # tree's (gitignored). Measured 2026-09-21: 16/17 on every fresh Linux clone,
+        # at 3455312 and at 67c8d12 alike, while this PC read 17/17. Nothing to drive
+        # here, so it is said as NOT RUN and counted neither way; a ledger that EXISTS
+        # and holds no approval still fails below, as designed (A65, A74).
+        print("  [NOT RUN] G4.4b ...and a day the operator DID approve is not  -- no approvals ledger on this tree "
+              "(%s): an operator's decision, not the code's" % os.path.basename(_dp.APPROVALS))
     else:
         check("G4.4b ...and a day the operator DID approve is not",
               False, "NOT MEASURED: no approval has ever been recorded in %s, so "

@@ -179,17 +179,46 @@ def main():
     # nothing in the tree sets COVENANT_GITHUB_JUDGE and the runner writes
     # 1583 of the 3487 rows the students learn from. Both directions, or this
     # regresses the moment someone tightens it again.
+    # The credential store is STUBBED for both directions (carried back from
+    # the artifact, 5c9c0d9, 2026-09-21). What is under test is the gate --
+    # shut, the helper is never reached even though it would answer; opened by
+    # the teacher, the helper is reached and its answer is the token -- not
+    # whether THIS machine holds a github credential. Unstubbed, this passed
+    # only on the author's PC and failed every Linux CI run.
+    store_calls = []
+
+    class _Answer:
+        stdout = "protocol=https\nhost=github.com\nusername=x\npassword=teacher-token-p23d\n"
+        stderr = ""
+        returncode = 0
+
+    def stub_store(cmd, **kw):
+        store_calls.append(list(cmd))
+        return _Answer()
+
     for var in ("GITHUB_TOKEN", "GH_TOKEN", "COVENANT_GITHUB_JUDGE"):
         os.environ.pop(var, None)
     G._CREDENTIAL_STORE_OK["allowed"] = False
     G._CACHE.pop("token", None)
-    check("a node with no opt-in gets no token", not G.token())
+    Q.run = stub_store
+    try:
+        node_token = G.token()
+        check("a node with no opt-in gets no token", not node_token,
+              "got %r" % (node_token,))
+        check("...and the store was never asked, though it would have answered",
+              not store_calls, "calls=%r" % (store_calls,))
 
-    G.allow_credential_store("P23d: the teacher, started deliberately")
-    G._CACHE.pop("token", None)
-    teacher_token = G.token()
-    check("the teacher, having opted in, DOES get one", bool(teacher_token),
-          "the distiller cannot reach the runner -- corpus generation is dead")
+        G.allow_credential_store("P23d: the teacher, started deliberately")
+        G._CACHE.pop("token", None)
+        teacher_token = G.token()
+    finally:
+        Q.run = real_run
+    check("the teacher, having opted in, DOES get one", teacher_token == "teacher-token-p23d",
+          "got %r, store calls=%r -- the distiller cannot reach the runner, corpus generation is dead"
+          % (teacher_token, store_calls))
+    check("...and it is the store's answer, fetched by `git credential fill`",
+          bool(store_calls) and store_calls[-1][:3] == ["git", "credential", "fill"],
+          "calls=%r" % (store_calls,))
     check("the reason is recorded, not implicit",
           "teacher" in G._CREDENTIAL_STORE_OK["why"])
 
