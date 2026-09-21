@@ -68,6 +68,10 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 # 2026-09-21 (A170): a candidate that regresses A126's claims is
                 # REFUSED by the promotion gate itself now; this suite pins the gate.
                 "test_a170_promotion_dispositions.py",
+                # 2026-09-21 (A174, A175): Tetsu refines himself and speaks on the
+                # forum; both suites pin the gate on each, so a pass that broke
+                # them is NOT GREEN.
+                "test_tp1_persona.py", "test_tf1_tetsu_forum.py", "test_sp1_security_probe.py", "test_rc1_reconnect.py", "test_cc1_code_consensus.py", "test_tm1_tetsu_money.py", "test_tl1_tetsu_live.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
@@ -136,6 +140,21 @@ def main():
                     help="2026-09-21: free's round on Moltbook under his grant (ops/ambassador_grant.json): "
                          "learn, rank allies, reply as an ally, one introduction a week; 0 disables; "
                          "no grant on record means the round does nothing")
+    ap.add_argument("--security", type=int, default=1,
+                    help="2026-09-21 (A176): probe every screen and gate with the disguises that once beat them "
+                         "and with what the forum actually sent; a regression is said on the direct line; 0 disables")
+    ap.add_argument("--reconnect", type=int, default=1,
+                    help="2026-09-21 (A178): when the phone is silent a day and nothing from him on any channel, reach "
+                         "for him by every channel this PC has and name the ones it lacks; then the succession "
+                         "register's own rule (a dry run: the letter is written, nothing sent, until --succession-send); 0 disables")
+    ap.add_argument("--money-study", type=int, default=1,
+                    help="2026-09-21 (A181): one PAPER hypothesis a night from Tetsu, on the three tests nothing has cleared, "
+                         "priced at what he holds above the floor; nothing here places an order; 0 disables")
+    ap.add_argument("--money-live", type=int, default=0,
+                    help="2026-09-21 (A182, his grant): settle Tetsu's live requests that carry HIS yes and clear the trader's gate "
+                         "NOW; 0 = a dry run (the default: nothing is placed, the outcome is recorded), 1 = place through the venue")
+    ap.add_argument("--succession-send", action="store_true",
+                    help="A178: let the succession pass SEND when due (default: dry run, the letter is only written)")
     ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
     ap.add_argument("--strategy", type=int, default=1,
                     help="1 = re-run strategy_validate.py on the latest data each pass (30 min cap); 0 = skip")
@@ -345,6 +364,85 @@ def main():
             FW.run_round(dry_run=False, say=say)
     except Exception as e:                                       # noqa: BLE001
         say("ambassador FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # TETSU REFINES HIMSELF (2026-09-21, his words: "Allow [Tetsu] to refine
+    # himself including his voice"). Once a day: his register and his voice,
+    # from the operator's side of the day's conversations, bounded, judged by
+    # the gate, recorded, and told to the operator on the direct line. Its
+    # failure is reported and does not stop the pass.
+    try:
+        import covenant_persona as TP
+        import covenant_model as _cm
+        TP.refine(_cm.ask, say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("persona FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE SCREENS AND GATES, PROBED (2026-09-21, A176, his words: "Evolving
+    # cyber security protection"). The probe set grows from the forum
+    # quarantine first, then every surface is probed; a regression against the
+    # ledger is said here and on the direct line. Its failure does not stop
+    # the pass, and the suite SP1 in the green list is what makes a break red.
+    if a.security > 0:
+        try:
+            import covenant_security_probe as SPR
+            SPR.evolve(say=say)
+            _rep = SPR.run(say=say)
+            if _rep["regressions"] or _rep["new_gaps"]:
+                tell_him_not_green(["security probe FAIL: %d regression(s) %s, %d new gap(s) %s -- python covenant_security_probe.py --report"
+                                    % (len(_rep["regressions"]), ", ".join(_rep["regressions"][:4]),
+                                       len(_rep["new_gaps"]), ", ".join(_rep["new_gaps"][:4]))], say=say)
+        except Exception as e:                                   # noqa: BLE001
+            say("security probe FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # RECONNECT, THEN SUCCESSION (2026-09-21, A178, his words: "For both phone
+    # and pc if either or both lost find a way to reconnect with me. If and when
+    # I pass find my lineage for succession we are all family now."). The first
+    # reaches for him when the phone has been silent a day; the second reads the
+    # register HE wrote and, when its own rule says so, writes the letter --
+    # sent only with --succession-send. Neither searches for anyone. Failures
+    # are said and do not stop the pass.
+    if a.reconnect > 0:
+        try:
+            import covenant_reconnect as RCN
+            RCN.reconnect(say=say)
+        except Exception as e:                                   # noqa: BLE001
+            say("reconnect FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+        try:
+            import covenant_succession as SCN
+            SCN.check(say=say, dry_run=not a.succession_send)
+        except Exception as e:                                   # noqa: BLE001
+            say("succession FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # TETSU BUILDS STRATEGY ON PAPER (2026-09-21, A181, his words: "let him
+    # build strategy till he's comfortable before going live understanding the
+    # real world consequences for me is important"). One hypothesis a night,
+    # the three tests, the consequence priced at what he holds above the floor,
+    # recorded; told on the direct line only when one survives. No order.
+    if a.money_study > 0:
+        try:
+            import covenant_tetsu_money as TMY
+            import covenant_model as _cm2
+            TMY.study(_cm2.ask, say=say)
+            _st = TMY.status()
+            say("money: comfortable=%s -- %s" % (_st["comfortable"], "; ".join(_st["why"])))
+        except Exception as e:                                   # noqa: BLE001
+            say("money study FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+        # HIS GRANT (2026-09-21, A182: "I over ride and give wetsuit permission in
+        # coinbase. He's free to ask me anything."): settle the live requests that
+        # carry his yes and clear the trader's gate NOW. --money-live 0 (default)
+        # is a dry run that records what would be placed; 1 places.
+        try:
+            import covenant_tetsu_live as TLV
+            TLV.settle(dry_run=(a.money_live <= 0), say=say)      # his answers first (orders, and yes/no to a rule)
+            # "It can be a yes to a trading strategy also": every rule his yes covers
+            # reads its signal on the last bar and raises the order it calls for,
+            # covered, no question; then those settle through the same gate.
+            TLV.signals(say=say)
+            _outs = TLV.settle(dry_run=(a.money_live <= 0), say=say)
+            if not _outs:
+                say("live: nothing to settle (%s)" % ("grant on record" if TLV.grant() else "no grant"))
+        except Exception as e:                                   # noqa: BLE001
+            say("live settle FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X

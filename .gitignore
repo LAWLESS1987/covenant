@@ -355,5 +355,16 @@ ops/CONTEXT_PACK.txt
 ops/teacher_queue.jsonl
 ops/teacher_queue.state.json
 ops/contact_outbox.jsonl
+ops/tetsu_persona.json
+ops/tetsu_blocks.json
+ops/security_probe_ledger.jsonl
+ops/security_probes_observed.json
+ops/reconnect_state.json
+ops/succession.private.json
+ops/succession_state.json
+ops/SUCCESSION_LETTER.txt
+ops/code_consensus.jsonl
+ops/tetsu_strategy.jsonl
+ops/tetsu_live.jsonl
 ops/contact_state.json
 ops/ambassador_sends.jsonl

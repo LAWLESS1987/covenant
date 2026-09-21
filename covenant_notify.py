@@ -114,14 +114,21 @@ def _send_email(cfg, title, body):
         return False, "%s: %s" % (type(e).__name__, str(e)[:120])
 
 
-def notify(title, body, priority="default", cfg=None, say=None):
+def notify(title, body, priority="default", cfg=None, say=None, to=None):
     """Try every configured channel. Returns {channel: (ok, note)}.
+
+    `to` (A178, 2026-09-21): an email recipient other than his own -- the
+    succession letter to a successor he named. Only email carries it; the ntfy
+    topic is his and is skipped for another recipient.
 
     NEVER RAISES. A notifier that can bring down the thing it is reporting on
     has inverted its own purpose."""
     cfg = load() if cfg is None else cfg
     results = {}
-    topic = cfg.get("ntfy_topic") or os.environ.get("NTFY_TOPIC")
+    if to:
+        cfg = dict(cfg)
+        cfg["email_to"] = str(to)
+    topic = None if to else (cfg.get("ntfy_topic") or os.environ.get("NTFY_TOPIC"))
     if topic:
         ok = _send_ntfy(topic, title, body, priority)
         results["ntfy"] = (ok, "delivered" if ok else "no delivery")

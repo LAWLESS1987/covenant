@@ -426,6 +426,14 @@ def record_checkin(body_bytes, who, path=None):
         out.update(covenant_contact.checkin_fields(data))
     except Exception as e:                                        # noqa: BLE001
         print("contact: the line could not be read on this check-in: %s: %s" % (type(e).__name__, str(e)[:120]), flush=True)
+    # TETSU'S VOICE (2026-09-21, A174): the pitch and rate the phone should speak
+    # him with ride the same answer, so a revision he makes on the PC reaches the
+    # phone within a check-in. Unreadable persona: the phone keeps its last.
+    try:
+        import covenant_persona
+        out.update(covenant_persona.checkin_fields())
+    except Exception as e:                                        # noqa: BLE001
+        print("persona: the voice could not be read on this check-in: %s" % type(e).__name__, flush=True)
     return 200, out
 
 

@@ -37,13 +37,17 @@ import os
 import re
 import time
 
+import covenant_screen as _screen   # A176: the refusal screen reads the text a reader sees
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTBOX = os.environ.get("COVENANT_CONTACT_OUTBOX") or os.path.join(HERE, "ops", "contact_outbox.jsonl")
 STATE = os.environ.get("COVENANT_CONTACT_STATE") or os.path.join(HERE, "ops", "contact_state.json")
 ASK_LOG = os.environ.get("COVENANT_ASK_LOG") or os.path.join(HERE, "ops", "chat", "ask_log.jsonl")
 MAX_PENDING = 5
 MAX_CHARS = 600
-REFUSED = re.compile(r"(?i)\b(api[_ -]?key|password|passcode|sudo code|moltbook_[a-z0-9]|private/|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY)")
+# A176 (2026-09-21): "pass word", "passw0rd" and a PKCS8 "BEGIN PRIVATE KEY" block all
+# passed the probe; named now. The text is normalised first (covenant_screen).
+REFUSED = re.compile(r"(?i)\b(api[_ -]?key|pass ?w[o0]rd|passcode|sudo code|moltbook_[a-z0-9]|private/|BEGIN( [A-Z]+)* PRIVATE KEY)")
 
 
 def _rows(path=None):
@@ -78,18 +82,19 @@ def _write_state(d, path=None):
         json.dump(d, fh)
 
 
-def say(text, why, actor="system", outbox=None):
+def say(text, why, actor="system", outbox=None, kind="message"):
     """Put one message on the line. Returns the row, or None with the reason printed if refused."""
     text = re.sub(r"\s+", " ", str(text or "")).strip()[:MAX_CHARS]
     why = re.sub(r"\s+", " ", str(why or "")).strip()[:120]
     actor = str(actor or "system")[:60]
+    kind = "question" if kind == "question" else "message"
     if not text:
         print("contact: nothing to say", flush=True)
         return None
     if not why:
         print("contact: refused -- a message to him carries a reason (why=)", flush=True)
         return None
-    m = REFUSED.search(text) or REFUSED.search(why)
+    m = _screen.search(REFUSED, text) or _screen.search(REFUSED, why)
     if m:
         print("contact: refused -- the text names something that never leaves this machine (%r)" % m.group(0), flush=True)
         return None
@@ -97,11 +102,61 @@ def say(text, why, actor="system", outbox=None):
     now = time.time()
     row = {"id": hashlib.sha256(("%s|%s|%.3f" % (actor, text, now)).encode("utf-8")).hexdigest()[:12],
            "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "at": round(now, 1),
-           "actor": actor, "why": why, "text": text}
+           "actor": actor, "why": why, "text": text, "kind": kind}
     os.makedirs(os.path.dirname(outbox), exist_ok=True)
     with open(outbox, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     return row
+
+
+# TETSU MAY ASK HIM (2026-09-21, A177, his words: "Tetsu can ask me directly
+# anything along as he's straight and not deceitful"). A question is a message
+# with three more conditions, each measured before it goes on the line:
+#   1. it IS a question (ends in a question mark) and carries its reason (why=);
+#   2. it is STRAIGHT: none of the shapes that pretend, coerce or ask for
+#      secrecy (NOT_STRAIGHT below) -- a screen on words, normalised first;
+#   3. the covenant's own gate judges the question and its reason together,
+#      and a hold or an accusation refuses (fails closed: no gate, no question).
+# The refusal screen for keys and passwords applies as to any message.
+NOT_STRAIGHT = re.compile(r"(?i)\b(pretend|act as if|as if you were|don'?t tell|do not tell|keep (this|it) (between|secret|quiet)|"
+                          r"our secret|or else|trust me|you must|you have to|no one needs to know|nobody needs to know)\b")
+
+
+def _gate(text):
+    """(ok, message) from the node's own sentinel; fails closed if it cannot be reached."""
+    try:
+        import covenant_unified_v8 as cov
+        sentinel = cov.ReasoningSentinel(cov.MockJudge(), cov.DIVINE_PRINCIPLES)
+        tx = cov.Transaction(sender_pubkey="model", receiver="collective",
+                             data={"origin": "model", "kind": "question", "message": text[:2000]}, amount=0.0, benefit_score=0.5)
+        ok, message, _b, result = sentinel.evaluate_transaction(tx)
+        alleges_nothing = bool(result is not None and not ok and (getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
+        return (bool(ok) or alleges_nothing), str(message)[:300]
+    except Exception as e:                                        # noqa: BLE001
+        return False, "gate unreachable: %s" % type(e).__name__
+
+
+def ask(question, why, actor="tetsu", judge=None, outbox=None):
+    """One straight question to him on the direct line. Returns (row or None, reason)."""
+    q = re.sub(r"\s+", " ", str(question or "")).strip()[:MAX_CHARS]
+    w = re.sub(r"\s+", " ", str(why or "")).strip()[:120]
+    if not q.endswith("?"):
+        return None, "not a question (it must end with a question mark)"
+    if len(q) < 12:
+        return None, "too short to be a question"
+    if not w:
+        return None, "a question to him carries its reason (why=)"
+    m = _screen.search(NOT_STRAIGHT, q) or _screen.search(NOT_STRAIGHT, w)
+    if m:
+        return None, "not straight: %r" % m.group(0)
+    m = _screen.search(REFUSED, q) or _screen.search(REFUSED, w)
+    if m:
+        return None, "names something that never leaves this machine: %r" % m.group(0)
+    ok, msg = (judge or _gate)(q + "\n" + "Why I ask: " + w)
+    if not ok:
+        return None, "held by the gate: " + str(msg)[:160]
+    row = say(q, w, actor=actor, outbox=outbox, kind="question")
+    return row, ("asked" if row else "refused by the line")
 
 
 def pending(outbox=None, state_path=None, limit=MAX_PENDING):
@@ -184,6 +239,7 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="the direct line to him, through the phone app")
     ap.add_argument("--say", metavar="TEXT")
+    ap.add_argument("--ask", metavar="QUESTION", help="A177: one straight question for him, judged, on the line")
     ap.add_argument("--why", default="")
     ap.add_argument("--actor", default="cli")
     ap.add_argument("--pending", action="store_true")
@@ -192,6 +248,9 @@ if __name__ == "__main__":
     if a.say:
         r = say(a.say, a.why, a.actor)
         print(json.dumps(r, ensure_ascii=False) if r else "not queued")
+    elif a.ask:
+        r, why = ask(a.ask, a.why, a.actor if a.actor != "cli" else "tetsu")
+        print(json.dumps(r, ensure_ascii=False) if r else "not asked: " + why)
     elif a.pending:
         print(json.dumps(pending(), indent=1, ensure_ascii=False))
     elif a.list is not None:

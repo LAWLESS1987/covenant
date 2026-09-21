@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12610   # 2026-09-21: moved with the core pin below, in the same change as the core (A165, A166, A167); was 12525 at the 09-20 re-pin
+EXPECTED_LINES = 12637   # 2026-09-21: moved with the core pin below, in the same change as the core (A174 persona, A175 Tetsu on the forum); was 12610 at the A167 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -82,12 +82,14 @@ MANIFEST = {
     # in AGENT_SYSTEM and agent_history() replaying the caller's last six
     # answered exchanges; A166: the /ai_chats route and both sides of every
     # agent exchange queued for the teacher; his rule for the voice), the
-    # order M53 asks for; A167: the /pc hook for covenant_council). K1 20/20,
+    # order M53 asks for; A167: the /pc hook for covenant_council; A174: the
+    # system message is composed through covenant_persona; A175: the MOLTBOOK
+    # directive is handed to covenant_tetsu_forum). K1 20/20,
     # K2 25/25, P19 23/23 and A3s 51/51 were run against these bytes BEFORE
     # this line moved; M6 59/59, DP1 30/30, TQ1 17/17 and PC1 25/25 pin the
     # new behaviour and went red under mutation.
     "covenant_unified_v8.py":
-        "35bff56c70dda6675fe5ec047b504f1239d8e118aa0edc1bf480afb30fe3167b",
+        "15896d5c757e21d1ef0d948cc46429d4e5219e987e4fc8557ab5db0f5285cfa0",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live

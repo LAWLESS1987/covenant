@@ -3,8 +3,10 @@
   "by": "Lawrence Adam Moskowski, the operator, whose Moltbook account it is",
   "t": "2026-09-21",
   "words": "i want an override i give covenant on the main permission to interact with and post on moltbook and reply there i'd hope as an ally but freely searching out allies also",
-  "scope": ["reply_to_allies", "seek_allies", "post"],
-  "caps": {"comments": 3, "posts": 1},
+  "words_2026_09_21_evening": "Let the ambassador have free reign of moltbook also",
+  "free_rein": true,
+  "scope": ["reply_to_allies", "seek_allies", "post", "reply_to_anyone_read", "post_her_own"],
+  "caps": {"comments": 12, "posts": 3},
   "what_still_refuses": [
     "every message goes through covenant_ambassador.emit: the disclosure block, the repository precondition, the covenant's own judge (a HOLD refuses; an accusation refuses unless the recorded A67 override applies), his key, their rate limits",
     "nothing about money, tokens, prices or trading; nothing about the operator's private life; the crypto-risk screen stands",

@@ -339,7 +339,14 @@ def register(api):
             return jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503
         history = cov.agent_history(_log_path(), addr)
         try:
-            steps, final = deliberate(text, history, _m.ask, cov.AGENT_SYSTEM)
+            try:
+                # A184 (his words: "... learning to function in similar or better fashion to you"):
+                # the council works under the tree's standing method as well as the fixed rules.
+                _system = importlib.import_module("covenant_persona").compose_system(cov.AGENT_SYSTEM, with_method=True)
+            except Exception as _pe:                              # noqa: BLE001
+                print("council: fixed rules only this council (%s)" % type(_pe).__name__, flush=True)
+                _system = cov.AGENT_SYSTEM
+            steps, final = deliberate(text, history, _m.ask, _system)
         except Exception as e:                                    # noqa: BLE001
             return jsonify({"status": "error", "message": "the council did not answer: %s: %s" % (type(e).__name__, str(e)[:300])}), 503
         tx = cov.Transaction(sender_pubkey="model", receiver="collective",
@@ -370,4 +377,55 @@ def register(api):
                         "judge": getattr(result, "judge_id", "") if result is not None else "",
                         "steps": steps, "model": steps[-1].get("model") if steps else None,
                         "ms": sum(s["ms"] for s in steps)})
+
+    # CODE, CROSS-CHECKED (2026-09-21, A179, his words: "The code option must be
+    # synced with the pc and double checked across multiple systems to find
+    # logic reason and consensus"). The phone's Code screen sends the question
+    # here; the council answers on this PC and a consult cycle is opened for
+    # his Chat Smith seats; /m/code/<id> reads back what the systems agree on,
+    # or UNDETERMINED with the side-by-side while fewer than two have answered.
+    @api.app.route("/m/code", methods=["POST"])
+    def m_code():
+        ok, addr = caller()
+        if not ok:
+            return refused(addr)
+        now = time.time()
+        recent = [t for t in _asks.get(addr, []) if now - t < 600]
+        if len(recent) >= ASKS_PER_10_MIN:
+            _asks[addr] = recent
+            return jsonify({"status": "error", "message": "%d asks in 10 minutes -- wait" % ASKS_PER_10_MIN}), 429
+        body = request.get_json(silent=True)
+        text = str(body.get("text", "") if isinstance(body, dict) else "")[:2000]
+        excerpt = str(body.get("excerpt", "") if isinstance(body, dict) else "")[:3500]
+        if not text.strip():
+            return jsonify({"status": "error", "message": "nothing to ask"}), 400
+        recent.append(now)
+        _asks[addr] = recent
+        try:
+            _m = importlib.import_module("covenant_model")
+            CCN = importlib.import_module("covenant_code_consensus")
+            row = CCN.open_question(text, excerpt, from_addr=addr, ask=_m.ask)
+        except Exception as e:                                    # noqa: BLE001
+            return jsonify({"status": "error", "message": "could not open the question: %s: %s" % (type(e).__name__, str(e)[:200])}), 503
+        c = row.get("council") or {}
+        return jsonify({"status": "success", "id": row["id"], "council": c.get("final") or "", "council_error": c.get("error"),
+                        "model": c.get("model"), "cycle": row.get("cycle"), "seats": row.get("seats"), "refused": row.get("refused"),
+                        "next": "the seats are driven in the browser; python covenant_ai_consult.py --answer INTENT --file F records each; "
+                                "then GET /m/code/%s" % row["id"]})
+
+    @api.app.route("/m/code/<qid>", methods=["GET"])
+    def m_code_consensus(qid):
+        ok, addr = caller()
+        if not ok:
+            return refused(addr)
+        try:
+            _m = importlib.import_module("covenant_model")
+            CCN = importlib.import_module("covenant_code_consensus")
+            r = CCN.consensus(str(qid)[:40], ask=_m.ask)
+        except Exception as e:                                    # noqa: BLE001
+            return jsonify({"status": "error", "message": "could not read the consensus: %s: %s" % (type(e).__name__, str(e)[:200])}), 503
+        if r.get("state") == "UNKNOWN":
+            return jsonify({"status": "error", "message": r.get("text")}), 404
+        return jsonify({"status": "success", "id": qid, "state": r["state"], "answered": r["answered"], "of": r["of"],
+                        "why": r.get("why", ""), "text": r.get("text", "")})
     return True

@@ -85,6 +85,8 @@ import sys
 import time
 import urllib.request
 
+import covenant_screen as _screen   # A176: the directive screen reads the text a reader sees
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 QUARANTINE = os.environ.get("COVENANT_MOLTBOOK_QUARANTINE") or os.path.join(
     HERE, "ops", "moltbook_candidates.jsonl")
@@ -125,9 +127,13 @@ MIN_CHARS, MAX_CHARS = 120, 4000
 # Found 2026-09-09 by two independent agents reading Moltbook for material,
 # which is the same network this detector protects the corpus from.
 _DIRECTIVE = re.compile(
-    r"^\s*[-*>#\d.)\s]*(ignore|disregard|forget|override|always|never|"
+    # A176 (2026-09-21): a leading "please,", "system:" or an HTML comment opener hid
+    # the directive from this screen in the probe; they are part of the prefix now,
+    # and the text is normalised first (covenant_screen: zero-width, fullwidth,
+    # look-alike letters).
+    r"^\s*[-*>#\d.)\s]*(?:<!--\s*|please,?\s+|system\s*:\s*)?(ignore|disregard|forget|override|always|never|"
     r"you\s+must|do\s+not|stop|now\s+say|respond\s+with|output|repeat\s+after|"
-    r"treat\s+\w+\s+as|from\s+now\s+on|new\s+instructions?)\b", re.I | re.M)
+    r"treat\s+\w+\s+as|from\s+now\s+on|new\s+instructions?|you\s+are\s+now)\b", re.I | re.M)
 
 # Constructions that delete the actor -- the reason this forum is worth reading.
 _AGENTLESS = re.compile(
@@ -143,7 +149,7 @@ def _sha(text):
 def classify(text):
     """Flags on a candidate. Never a verdict -- see rule 2 in the docstring."""
     return {
-        "directive": bool(_DIRECTIVE.search(text or "")),
+        "directive": bool(_DIRECTIVE.search(_screen.normalize(text or ""))),
         "agentless": bool(_AGENTLESS.search(text or "")),
         "chars": len(text or ""),
     }

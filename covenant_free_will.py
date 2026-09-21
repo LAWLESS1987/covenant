@@ -40,6 +40,8 @@ import os
 import re
 import time
 
+import covenant_screen as _screen   # A176: every screen reads the text a reader sees
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 GRANT = os.environ.get("COVENANT_AMBASSADOR_GRANT") or os.path.join(HERE, "ops", "ambassador_grant.json")
 SENDS = os.environ.get("COVENANT_AMBASSADOR_SENDS") or os.path.join(HERE, "ops", "ambassador_sends.jsonl")
@@ -81,6 +83,50 @@ FALLBACK_REPLY = ("You wrote something here that I recognise: %s. The covenant i
                   "gate fails closed when its judges cannot agree, and we publish what goes wrong beside "
                   "what goes right. I would like to know how you handle the case where your own check "
                   "is wrong and you only find out later. If you want to compare notes, the work is open.")
+
+
+# FREE REIN (2026-09-21, his words: "Let the ambassador have free reign of
+# moltbook also"). With free_rein true in the grant, a round may also reply to
+# anyone it READ this round (not only ranked allies) up to the comment cap, and
+# may write a post of her OWN from what she read, up to the post cap -- each
+# through the same emit(), the same screens, the same isolation rule. A row
+# the directive screen flagged is never replied to: it is the shape of an
+# injection whether or not it is one.
+POST_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project whose "
+               "ledger admits nothing until its own judges agree, and which publishes its failures. Write ONE short "
+               "post of your own, 80 to 160 words, plain, first person, no headings, no lists, no marketing: start from "
+               "the one thing you read on the forum today that is quoted below, say what the covenant measured that "
+               "bears on it, and end with one real question to whoever reads it. Never invent a fact, never mention "
+               "money, tokens, prices or trading, never the operator's private life. First line: a title under 80 "
+               "characters. Then a blank line. Then the post.")
+
+
+def write_post(rows, ask):
+    """(title, body, source_row) from the model, or (None, None, None) when nothing usable came back."""
+    if ask is None:
+        return None, None, None
+    pick = None
+    for r in rows or []:
+        if (r.get("flags") or {}).get("directive"):
+            continue
+        if str(r.get("text") or "").strip():
+            pick = r
+            break
+    if pick is None:
+        return None, None, None
+    quote = re.sub(r"\s+", " ", str(pick.get("text") or "")).strip()[:400]
+    try:
+        text, _meta = ask([{"role": "system", "content": POST_SYSTEM},
+                           {"role": "user", "content": "Read today on Moltbook, by u/%s:\n\"%s\"\n\nWrite the post." % (pick.get("author"), quote)}], max_tokens=320)
+        text = str(text or "").strip()
+        title, _sep, body = text.partition("\n")
+        title, body = title.strip().strip("#").strip()[:80], body.strip()
+        words = len(body.split())
+        if title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
+            return title, body, pick
+    except Exception as e:                                        # noqa: BLE001
+        print("free: the model did not write the post (%s)" % type(e).__name__, flush=True)
+    return None, None, None
 
 
 def grant(path=None):
@@ -152,7 +198,7 @@ def write_reply(row, ask=None):
             text, _meta = ask(msgs, max_tokens=260)
             text = re.sub(r"\s+\n", "\n", str(text or "")).strip()
             words = len(text.split())
-            if 30 <= words <= 160 and not MONEY.search(text) and not OFF_LIMITS.search(text):
+            if 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
                 return text, "model"
         except Exception as e:                                    # noqa: BLE001 -- the fixed text is the fallback
             print("free: the model did not write the reply (%s); the fixed text stands in" % type(e).__name__, flush=True)
@@ -198,6 +244,7 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
             ask = covenant_model.ask
         except Exception:                                         # noqa: BLE001
             ask = None
+    rows = []
     try:
         rows = learn() or []
         out["learned"] = len(rows)
@@ -211,8 +258,8 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
     out["allies"] = len(ranked)
     # Only a SENT reply counts as having written to someone: a dry run drafts
     # and judges but reaches nobody, so it must not spend an ally.
-    done = {(r.get("author"), r.get("post_id")) for r in sends(sends_path) if r.get("sent")}
-    written_to = {r.get("author") for r in sends(sends_path) if r.get("sent")}
+    done = {(r.get("author"), r.get("post_id")) for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
+    written_to = {r.get("author") for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
     caps = g["caps"]
     cands = []
     for r in ranked:
@@ -222,6 +269,22 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
         if not post_id or r.get("author") in written_to or (r.get("author"), post_id) in done:
             continue
         cands.append((r, post_id, comment_id))
+    if g.get("free_rein"):
+        # Anyone she READ this round, after the allies: a candidate row from the
+        # harvest becomes a reply target with its own text as the quote. Never a
+        # directive-flagged row, never someone already written to.
+        seen_authors = {r.get("author") for r, _p, _c in cands}
+        for row in rows if isinstance(rows, list) else []:
+            author = row.get("author")
+            if not author or author in written_to or author in seen_authors or (row.get("flags") or {}).get("directive"):
+                continue
+            post_id, comment_id = target_of(row.get("url"))
+            if not post_id or (author, post_id) in done:
+                continue
+            seen_authors.add(author)
+            cands.append(({"author": author, "best_url": row.get("url"), "ally_score": 0, "anti": [],
+                           "best_signals": ["read-today"], "evidence": {"read-today": str(row.get("text") or "")[:300]}, "free_rein": True},
+                          post_id, comment_id))
     out["candidates"] = len(cands)
     count_comments = count_comments or (lambda post_id, author: _ally_comments(AMB, post_id, author))
     # THE ACCOUNT, before anything new is said: did the allies written to before
@@ -294,6 +357,25 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
                      "why": str(res.get("why", ""))[:300], "judged": res.get("judged")}, sends_path)
             out["introduced"] = sent
             say("free: introduction %s (%s)" % ("posted" if sent else "not posted", str(res.get("why", ""))[:120]))
+    if g.get("free_rein") and caps["posts"] > 0:
+        # Her OWN post, from what she read today, once a round, through emit with a
+        # title; model-written and judged, or nothing (no fixed text for a post).
+        posted_today = [r for r in sends(sends_path) if r.get("kind") == "own_post" and r.get("sent") and (now - float(r.get("at", 0) or 0)) < 86400]
+        if not posted_today:
+            title, body, src = write_post(rows, ask)
+            if title and body:
+                try:
+                    res = emit(body, title=title, submolt="general", dry_run=dry_run, override_a67=False)
+                except Exception as e:                            # noqa: BLE001
+                    res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
+                sent = bool(res.get("sent"))
+                _record({"kind": "own_post", "at": now, "title": title, "chars": len(body), "text": body[:400], "from_author": (src or {}).get("author"),
+                         "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
+                         "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None}, sends_path)
+                out["own_post"] = sent
+                say("free: her own post %s -- %s (%s)" % ("posted" if sent else "not posted", title[:60], str(res.get("why", ""))[:100]))
+            else:
+                say("free: no post of her own this round (nothing usable read, or no model)")
     # THE ROUND'S OWN ROW, then the isolation rule over the last rounds.
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],

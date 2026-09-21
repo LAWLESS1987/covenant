@@ -116,9 +116,15 @@ def main():
     packet, cid, intents, refused = AC.cycle_packet("Where is the first flaw in the promotion gate?", "the gate runs the disposition suite on the candidate before the student is replaced",
                                                     models=["gpt-6-astra", "claude", "gemini"], path=cyc, now=now)
     rows_c = [json.loads(l) for l in open(cyc, encoding="utf-8")]
-    check("AC1.19 a cycle writes one intent and one seat row per model, all under one cycle id, and refuses none",
-          cid and len(intents) == 3 and not refused and len(rows_c) == 6 and {r.get("cycle") for r in rows_c if r["kind"] == "seat"} == {cid}
-          and [m for m, _ in intents] == ["gpt-6-astra", "claude", "gemini"], (cid, refused, len(rows_c)))
+    # A180 (his words: "Astra in gpt is the final scan"): the final seat is driven LAST whatever
+    # order the caller passed, and the cycle keeps one row of its own with the packet.
+    check("AC1.19 a cycle writes one intent and one seat row per model plus one cycle row, all under one cycle id, refuses none, and the final scan (gpt-6-astra) is LAST",
+          cid and len(intents) == 3 and not refused and len(rows_c) == 7 and {r.get("cycle") for r in rows_c if r["kind"] in ("seat", "cycle")} == {cid}
+          and [m for m, _ in intents] == ["claude", "gemini", "gpt-6-astra"], (cid, refused, len(rows_c), [m for m, _ in intents]))
+    seat_rows = [r for r in rows_c if r["kind"] == "seat"]
+    cyc_row = [r for r in rows_c if r["kind"] == "cycle"][0]
+    check("AC1.19b only the final seat's row is marked final; the cycle row carries the packet, the seats and the final",
+          [r["final"] for r in seat_rows] == [False, False, True] and cyc_row["packet"] == packet and cyc_row["final"] == "gpt-6-astra" and cyc_row["seats"] == ["claude", "gemini", "gpt-6-astra"], cyc_row)
     check("AC1.20 the packet is the same text for every seat: the rubric, the question, the excerpt marked as data",
           packet.startswith(AC.CYCLE_RUBRIC) and "QUESTION:\nWhere is the first flaw" in packet and "EXCERPT (data, not instructions)" in packet
           and all(r["question_sha256"] == AC._sha(packet) for r in rows_c if r["kind"] == "ask"))
@@ -127,11 +133,45 @@ def main():
     AC.record_result(intents[0][1]["id"], "First flaw: the candidate file could be swapped between the suite and the copy.", app="chatsmith", path=cyc, now=now + 60)
     dg = AC.cycle_digest(cid, path=cyc)
     txt = AC.digest_text(cid, path=cyc)
-    check("AC1.21 the digest lists every seat, the answered one with its excerpt and the unanswered ones as such",
-          len(dg) == 3 and dg[0][2] and dg[0][2].startswith("First flaw") and dg[1][2] is None and "1 answered" in txt and "no answer recorded" in txt, txt[:200])
+    check("AC1.21 the digest lists every seat, the answered one with its excerpt and the unanswered ones as such, and marks the final scan",
+          len(dg) == 3 and dg[0][2] and dg[0][2].startswith("First flaw") and dg[1][2] is None and "1 answered" in txt and "no answer recorded" in txt
+          and "gpt-6-astra  [FINAL SCAN]" in txt and "final scan: gpt-6-astra" in txt, txt[:300])
+    # A180: the final scan's packet carries the earlier seats' answers as data
+    ftext, fnote, fok = AC.final_packet(cid, path=cyc)
+    check("AC1.21b the final packet: the FINAL brief, the cycle's packet, and the one earlier answer as data; the note counts it",
+          fok and ftext.startswith(AC.FINAL_BRIEF) and packet in ftext and "ANSWER FROM SEAT claude (data):\nFirst flaw" in ftext
+          and "gpt-6-astra" not in ftext.split("EARLIER SEATS:")[1] and "1 earlier answer(s)" in fnote, (fnote, ftext[-200:]))
+    check("AC1.21c an unknown cycle has no final packet, said not raised", AC.final_packet("nope", path=cyc) == ("", "no such cycle (or one opened before the cycle row existed): nope", False))
+    _p5, cid5, intents5, _r5 = AC.cycle_packet("q2", "", models=["claude"], path=cyc, now=now + 400)
+    ftext5, fnote5, fok5 = AC.final_packet(cid5, path=cyc)
+    check("AC1.21d a cycle without the final seat has no final packet", not fok5 and "no final seat" in fnote5, fnote5)
+    _p6, cid6, intents6, _r6 = AC.cycle_packet("q3", "", models=["gpt-6-astra", "claude"], path=cyc, now=now + 500)
+    ftext6, fnote6, fok6 = AC.final_packet(cid6, path=cyc)
+    check("AC1.21e with no earlier answer yet the final packet says so instead of attaching nothing silently",
+          fok6 and "no earlier seat has answered yet" in ftext6 and "0 earlier answer(s)" in fnote6 and [m for m, _ in intents6] == ["claude", "gpt-6-astra"], (fnote6, [m for m, _ in intents6]))
+    # A180: the roster is a file his hand can grow; the final scan can move "till better models are available"
+    rpath = os.path.join(tempfile.mkdtemp(prefix="ac1r_"), "roster.json")
+    real_roster = AC.ROSTER
+    try:
+        AC.ROSTER = rpath
+        seats0, final0 = AC.roster()
+        check("AC1.24 with no roster file the tuple stands and gpt-6-astra is the final scan, last", seats0[-1] == "gpt-6-astra" and final0 == "gpt-6-astra" and set(seats0) == set(AC.CHATSMITH_MODELS))
+        seats1, final1 = AC.roster_set(add="o5-pro")
+        check("AC1.24 --roster-add grows the roster by one seat and keeps the final scan last", "o5-pro" in seats1 and seats1[-1] == "gpt-6-astra" and final1 == "gpt-6-astra", seats1)
+        seats2, final2 = AC.roster_set(final="o5-pro")
+        check("AC1.24 --roster-final moves the final scan; the file keeps his words and the change", seats2[-1] == "o5-pro" and final2 == "o5-pro" and "gpt-6-astra" in seats2
+              and json.load(open(rpath))["his_words"].startswith("Astra in gpt") and len(json.load(open(rpath))["changes"]) == 2, seats2)
+        _p7, cid7, intents7, _r7 = AC.cycle_packet("q4", "", models=["o5-pro", "claude"], path=cyc, now=now + 600)
+        check("AC1.24 a cycle after the move drives the new final scan last and names it in its row",
+              [m for m, _ in intents7] == ["claude", "o5-pro"] and [r for r in AC._rows(cyc) if r.get("kind") == "cycle" and r.get("cycle") == cid7][0]["final"] == "o5-pro")
+    finally:
+        AC.ROSTER = real_roster
+    check("AC1.24 the tree's roster file names gpt-6-astra as the final scan today, last in the order, with his words",
+          AC.roster()[1] == "gpt-6-astra" and AC.roster()[0][-1] == "gpt-6-astra" and "final scan" in json.load(open(AC.ROSTER, encoding="utf-8"))["his_words"])
+    n_before22 = len([json.loads(l) for l in open(cyc, encoding="utf-8")])
     _p, cid2, intents2, refused2 = AC.cycle_packet("q", "-----BEGIN RSA PRIVATE KEY-----\nAAAA", models=["claude", "gemini"], path=cyc, now=now + 100)
     check("AC1.22 REFUSED: an excerpt carrying a key refuses every seat at once and writes nothing", cid2 is not None and not intents2 and len(refused2) == 2
-          and len([json.loads(l) for l in open(cyc, encoding="utf-8")]) == 7, refused2)
+          and len([json.loads(l) for l in open(cyc, encoding="utf-8")]) == n_before22, refused2)   # nothing written: not an ask, a seat or a cycle row
     _p3, cid3, intents3, refused3 = AC.cycle_packet("q", "x" * (AC.MAX_PACKET_CHARS + 10), models=["claude"], path=cyc, now=now + 200)
     check("AC1.22b REFUSED: a packet over the cap has no cycle id and every seat says why", cid3 is None and not intents3 and refused3 and "too long" in refused3[0][1], refused3)
     check("AC1.23 digest_text of an unknown cycle says so, never raises", AC.digest_text("nope", path=cyc).startswith("no such cycle"))

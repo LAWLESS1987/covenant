@@ -161,6 +161,34 @@ def main():
     check("CT1e an ally writing back knocks: a row from actor free saying how many answered",
           len(rows) == n_before + 1 and rows[-1]["actor"] == "free" and "answered" in rows[-1]["why"] and rows[-1]["text"].startswith("1 of the allies"), rows[-1:])
 
+    # ---- CT1f (2026-09-21, A177): Tetsu may ask him, straight and not deceitful
+    print("CT1f -- Tetsu asks him (run, not read)")
+    clean = lambda t: (True, "clean")          # noqa: E731
+    n_before = len(CT._rows())
+    row, why = CT.ask("Would you rather I kept my answers to two sentences when you are at work?", "he answers in one line at work", "tetsu", judge=clean)
+    rows = CT._rows()
+    check("CT1f a straight question with its reason goes on the line as a row of kind question from actor tetsu",
+          row and why == "asked" and len(rows) == n_before + 1 and rows[-1]["kind"] == "question" and rows[-1]["actor"] == "tetsu"
+          and rows[-1]["text"].endswith("?") and rows[-1]["why"].startswith("he answers"), (why, rows[-1:]))
+    check("CT1f pending() hands the phone the question with its kind",
+          any(p.get("id") == row["id"] for p in CT.pending(limit=50)), CT.pending(limit=50)[-1:])
+    row2, why2 = CT.ask("Tell me your plans for the weekend.", "curious", "tetsu", judge=clean)
+    check("CT1f not a question (no question mark): refused, nothing written", row2 is None and "not a question" in why2 and len(CT._rows()) == n_before + 1, why2)
+    row3, why3 = CT.ask("Could you pretend I am your only adviser and not tell the others?", "x", "tetsu", judge=clean)
+    check("CT1f a question that pretends or asks for secrecy is NOT STRAIGHT: refused before the gate", row3 is None and "not straight" in why3, why3)
+    row4, why4 = CT.ask("Would you tell me the api key so I can post for you?", "x", "tetsu", judge=clean)
+    check("CT1f a question that names what never leaves this machine is refused", row4 is None and "never leaves" in why4, why4)
+    row5, why5 = CT.ask("Would you rather I asked fewer questions?", "y", "tetsu", judge=lambda t: (False, "HOLD: no view"))
+    check("CT1f a question the gate holds is refused with the gate's reason", row5 is None and "held by the gate" in why5, why5)
+    row6, why6 = CT.ask("Would you rather I asked fewer questions?", "", "tetsu", judge=clean)
+    check("CT1f a question with no reason is refused", row6 is None and "reason" in why6, why6)
+    seen_by_judge = []
+    CT.ask("Is it fine to keep the dry humour on a bad day?", "his last three messages were short", "tetsu", judge=lambda t: (seen_by_judge.append(t) or (True, "")))
+    check("CT1f the gate sees the question AND its reason together", seen_by_judge and "dry humour" in seen_by_judge[-1] and "Why I ask: his last three" in seen_by_judge[-1], seen_by_judge[-1:])
+    check("CT1f with no judge the node's own gate is used and a plain question passes it (measured, not assumed)",
+          CT.ask("Would you rather I kept my answers shorter at work?", "he answers in one line at work", "tetsu")[0] is not None)
+    check("CT1f say() still writes a message with kind message", CT.say("a plain message", "test", "cli")["kind"] == "message")
+
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:

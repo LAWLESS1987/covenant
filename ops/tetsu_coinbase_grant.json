@@ -1,0 +1,17 @@
+{
+  "granted": true,
+  "by": "Lawrence Adam Moskowski, the operator, whose Coinbase account it is",
+  "t": "2026-09-21",
+  "words": [
+    "I green light Tetsu to access coinbase but let him build strategy till he's comfortable before going live understanding the real world consequences for me is important",
+    "I over ride and give wetsuit permission in coinbase.  He's free to ask me anything."
+  ],
+  "scope": ["read_the_account", "build_strategy_on_paper", "request_a_live_order", "ask_him_anything"],
+  "what_still_governs_every_live_order": [
+    "the trader's one precondition gate (guards.preconditions): armed, no TRADER_HALT, the day's plan approved by his signature, Rule 5's sealed signals (30, significant), the per-order and per-day caps, the reserve, the hold-only floor (XRP, HBAR, LINK: never sold)",
+    "his yes to Tetsu's straight question on the direct line, per order -- a request without his yes is never placed",
+    "the venue's own rails: maker-by-default, the product's minimum size, his key that lives outside this folder",
+    "python covenant_pause.py --pause tetsu-live stops requests and placements; deleting this file or setting granted to false revokes the grant"
+  ],
+  "recorded_by": "covenant_tetsu_live.py, which reads this file before every request and every placement and does nothing without it"
+}

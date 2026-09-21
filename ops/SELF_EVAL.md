@@ -3550,3 +3550,47 @@ repo      PASS  core 35bff56c70dd matches MANIFEST.sha256. This compares the man
 git       PASS  HEAD 8d8edc3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 44.2h ago; 34 file(s) not committed
 disk      PASS  303G free of 476G (36% used); logs/ 25M
 
+## 2026-09-21T12:46:17Z  overall FAIL  (round 5880)
+nodes     WARN  3/3 up, height 39 (spread 37), source 35bff56c70dd
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: height gap [39, 2, 2] -- peers not keeping up
+trader    FAIL  log 23.8h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 35bff56c70dd matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ccf94a, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 45.3h ago; 24 file(s) not committed
+disk      PASS  299G free of 476G (37% used); logs/ 25M
+
+## 2026-09-21T13:55:49Z  overall FAIL  (round 5940)
+nodes     PASS  3/3 up, height 39 (spread 0), source 35bff56c70dd
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 0.9h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- HTTP 500: {"error": "HTTP Error 500: INTERNAL SERVER ERROR"}
+repo      PASS  core 35bff56c70dd matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ab5d566, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 46.5h ago; 20 file(s) not committed
+disk      PASS  307G free of 476G (35% used); logs/ 26M
+
+## 2026-09-21T15:02:41Z  overall FAIL  (round 6000)
+nodes     PASS  3/3 up, height 39 (spread 0), source 15896d5c757e
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are 15896d5c757e, peers report ['35bff56c70dd'] (last heard 4
+trader    FAIL  log 2.0h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- HTTP 500: {"error": "HTTP Error 500: INTERNAL SERVER ERROR"}
+repo      PASS  core 15896d5c757e matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ab5d566, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 47.6h ago; 51 file(s) not committed
+disk      PASS  306G free of 476G (35% used); logs/ 26M
+
+## 2026-09-21T16:11:22Z  overall FAIL  (round 6060)
+nodes     PASS  3/3 up, height 39 (spread 0), source 15896d5c757e
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 15896d5c757e, peers report ['35bff56c70dd'] (last heard 3
+trader    FAIL  log 3.2h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- HTTP 500: {"error": "HTTP Error 500: INTERNAL SERVER ERROR"}
+repo      PASS  core 15896d5c757e matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD ab5d566, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 48.8h ago; 64 file(s) not committed
+disk      PASS  304G free of 476G (36% used); logs/ 26M
+
