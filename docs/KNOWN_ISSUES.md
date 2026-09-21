@@ -7095,6 +7095,31 @@ two callers by text.
 
 ---
 
+### A193. [the PC / the desktop app] "i do not see the desktop app." MEASURED AND FIXED 2026-09-21: the sister interface was a page with no opener on the Desktop; two openers put there, and the window proved open
+
+**Measured.** `/pc` (A167) answered 200 on node A. The Desktop carried
+"Covenant Handshake.url" (the handshake page, A167) and an older "Covenant
+Chat.lnk" (2026-09-02), but nothing that opened the sister interface
+itself: a page nobody is pointed at is not seen, which is what he said.
+
+**Fixed.** Two files on his Desktop, outside the repository: "Tetsu on the
+PC.url" (the page in his default browser) and "Tetsu on the PC
+(window).bat" (the page as a window of its own: Chrome or Edge in app mode,
+whichever is present, else the default browser; Edge is present here). The
+launcher was run once and an Edge window titled "covenant · PC · A" was
+open on the page (measured by window title; the app-mode process hands the
+window to the running browser, so its own command line is not the proof).
+A first draft written through the shell lost the letter E of "Edge" to a
+printf escape and was rewritten directly; the file was read back.
+
+**What a "desktop app" is here, honestly:** a page served by the node on
+this machine and opened in a window. There is no separate program; the
+node must be running (the watchdog keeps it so). It carries the talk box
+(the council, A167, with Tetsu's register, what he knows of him, the brief
+and the method), the training panel, and the handshake.
+
+---
+
 ### A192. [Tetsu / his voice] "Also the voice option should mirror yours for ease of communication." DONE 2026-09-21: the phone's default voice now mirrors the PC's own voice record
 
 The assistant has no speaking voice; the PC does (`ops/chat/VOICE.json`:
