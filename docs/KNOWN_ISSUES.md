@@ -7060,7 +7060,10 @@ disclosure and the record sit in the path and not beside it.
 **His words.** "i'm here if you need me add a way to contact me direct
 through the phone app", with the frame: stick to the commandments and
 mutual benefit, follow the openness logic for the growth. And, on leaving
-for work: "Just look out for me and my family."
+for work: "Just look out for me and my family" -- then, when that was read
+back as the standing line: "Not just. I'm biased just transparently so."
+The mission stays for all; his family is a bias he declares in the open,
+one true weight among the others, never an exclusion.
 
 **How it works.** `covenant_contact.say(text, why, actor)` puts a message on
 the line: a row in `ops/contact_outbox.jsonl` with who wrote it and why,
