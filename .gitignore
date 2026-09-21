@@ -374,3 +374,23 @@ ops/security_threats.jsonl
 ops/contact_state.json
 ops/ambassador_sends.jsonl
 coinbase_balance.prev.json
+
+# A211b (2026-09-21): the assistant's `git add -A` swept its own scratch
+# transcripts into this PUBLIC repo in 382ffb7. They carry tailnet addresses and
+# local paths and were never deliverables -- the same class as ONE_RUN.txt above,
+# simply not on the list. No key or balance was in them (scanned); they are out
+# of the tree at HEAD and the pattern stops the next one.
+SWEEP_RUN*.txt
+SWEEP_END.txt
+SWEEP_HYST.txt
+SWEEP_RESULTS.txt
+C4_RUN.txt
+CLAIMS_RECHECK.txt
+H2_RUN.txt
+ONE_CHECK.txt
+ROLLING_RESTART_*.txt
+ops/sweep_heal_last.txt
+# operational ledgers: what the mesh did and what Tetsu read are his, not public
+ops/highway.jsonl
+ops/web_reads.jsonl
+ops/ambassador_rate.json
