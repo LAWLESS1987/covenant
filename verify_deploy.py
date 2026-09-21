@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12525   # 2026-09-20: moved with the core pin below (was 11214 at the 09-11 re-pin)
+EXPECTED_LINES = 12610   # 2026-09-21: moved with the core pin below, in the same change as the core (A165, A166, A167); was 12525 at the 09-20 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -78,8 +78,16 @@ MANIFEST = {
     # sha256 39341fb726a9a77b" on its line 14) and finished 0 failed, with
     # K1 20/20, K2 25/25, P19 23/23 and A3s 51/51 against these bytes before
     # the pin moved -- the order the b969 lesson below requires.
+    # 2026-09-21: moved in the SAME change as the core (A165: Tetsu's register
+    # in AGENT_SYSTEM and agent_history() replaying the caller's last six
+    # answered exchanges; A166: the /ai_chats route and both sides of every
+    # agent exchange queued for the teacher; his rule for the voice), the
+    # order M53 asks for; A167: the /pc hook for covenant_council). K1 20/20,
+    # K2 25/25, P19 23/23 and A3s 51/51 were run against these bytes BEFORE
+    # this line moved; M6 59/59, DP1 30/30, TQ1 17/17 and PC1 25/25 pin the
+    # new behaviour and went red under mutation.
     "covenant_unified_v8.py":
-        "39341fb726a9a77b34591713b1ebd2a2db7414472b2f650097c224c590ea2280",
+        "35bff56c70dda6675fe5ec047b504f1239d8e118aa0edc1bf480afb30fe3167b",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live

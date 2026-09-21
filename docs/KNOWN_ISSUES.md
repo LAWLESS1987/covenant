@@ -6815,6 +6815,171 @@ these claims is refused rather than promoted.
 
 ---
 
+### A165. [the agent / the phone] The phone's box only ever asked the gate for a verdict, and the PC's model started every ask cold. CHANGED 2026-09-21 on his instruction: the box talks to Tetsu on the PC with the turns before it in hand, a microphone on the phone, hands-free after each answer
+
+**His words, 2026-09-21:** "the model needs to sound more human and have
+smoother conversations with mic access to we can talk and it learns from
+convos with me." Measured before changing anything: the phone's box called
+`entry.judge_text` and nothing else, so every line typed there came back as
+ADMITTED / REFUSED / HELD with the gate's message, spoken; the PC's
+`/m/agent` handed the model one system line and the newest text, so a second
+question never knew the first; the phone had no speech recognizer path at
+all (no `RecognizerIntent`, no `RECORD_AUDIO`); and every exchange was
+already a row in `ops/chat/ask_log.jsonl`, read by nothing at ask time.
+
+**Changed, and what pins each change.**
+
+- `AGENT_SYSTEM` speaks as Tetsu (`covenant-phone/docs/PERSONA.md`) in a
+  spoken register: short sentences, first person, no lists, one question back
+  when unclear, what it knows before what it does not, never a claim of an
+  act not done. The FETCH leash and the gate sentence are unchanged.
+- `agent_history()` reads the same ask log back for the SAME tailnet caller:
+  the last 6 answered exchanges, 600 characters a side, oldest first, and
+  `/m/agent` hands them to the model as the turns before this one. Withheld
+  answers are not replayed. Pinned by `test_m6_mobile_door.py` M6q2 (four
+  checks): the second ask from the phone reaches the model as 4 messages, a
+  different caller's ask as 2, `turns=1` keeps one pair in order, a missing
+  log is empty. The stub model names its message count so a suite can see
+  this. Mutation, same day: history dropped from the call, the 4-message
+  check goes red, the rest stay green.
+- Phone (`covenant-phone` at the commit carrying this entry): the box sends
+  a conversation to `http://<pc>:<api>/m/agent` (the peer setting's host, the
+  API one port below the P2P port, as the heartbeat already resolves it) and
+  speaks the answer; `judge: <text>` still asks this node's gate; if the PC
+  does not answer, the text is judged on the phone and the stream says so. A
+  **Mic** button: tap for one utterance through the phone's own recognizer
+  (`RecognizerIntent`, no new permission), long-press for hands-free, which
+  reopens the microphone after Tetsu finishes speaking and ends on silence
+  or cancel. Pinned by `mobile/app/test_m5_app.py` (283/283) and the syntax
+  check; the behaviour on the device is his to confirm.
+
+**What "learns from convos" means here, and does not.** Every exchange is
+memory the next ask reads (the six turns above), and every exchange is a row
+the students' teacher-labelled queue can draw from. That queue is the
+durable path, and it is still the unapplied patch named in the 2026-09-20
+handoff: the students do not yet retrain from these rows. Said plainly so
+nobody reads "it learns" as more than it is.
+
+**Cost, stated.** Six replayed turns add up to 7,200 characters to each ask
+on a 3B model at about ten tokens a second on this PC; a long conversation
+answers slower. The limit is a constant (`AGENT_HISTORY_TURNS`), not a
+policy, and moves with a measurement, not a wish.
+
+**Same night, his rule for the voice:** "it doesnt need to explain its self
+unless asked as far as standing but needs to be a better conversationilist."
+`AGENT_SYSTEM` no longer introduces the model, names its judge, or opens
+with what it cannot do; it answers what was said, uses the turns before,
+asks one thing back when that helps, and says "I don't know" in one
+sentence when it does not. The FETCH leash and the gate sentence stay.
+
+---
+
+### A166. [learning / the teacher's queue] The students never trained on his conversations: the queue existed only as an unapplied patch, and nothing consumed it. APPLIED and CLOSED 2026-09-21 on his instruction, both halves
+
+**His words:** "apply the teacher queue patch so it actually learns from me";
+then "recursive self improvement allow a screen sharing option to learn from
+also." Measured before changing anything: the 2026-09-20 handoff had left
+`patch_ai_chats_core.py` and `patch_ai_chats_phone.py` written but
+unapplied; the ask log was memory the agent door read back (A165) and
+nothing more; `covenant_distill.load_verdicts` trains only on rows with
+`violates` and, for teacher sources, a valid panel; the students' own
+verdicts are not labels (A159).
+
+**The writer (the patch, applied).** `covenant_daily_plan.teacher_queue_append`
+and `record_ai_chats`; `POST /ai_chats` on the node, signed like every phone
+request, keeping only the named fields under `ops/chat/phone/` (gitignored)
+and queuing each kept line; `/m/agent` queues BOTH sides of every exchange
+(what he said, source `you:<addr>`; what was answered, `agent:<model>`).
+Pinned by `test_dp1_daily_plan.py` D21c (30/30).
+
+**The consumer (new).** `covenant_teacher_queue.consume`, run by the
+nightly before the cycle (`--queue`, default 24): the unconsumed rows go to
+the PANEL under the panel rule; a text already in the ledger is not judged
+twice; in one pass no more clean rows are kept than violating rows
+(BALANCE, the drift `load_verdicts` measured on 2026-09-04); rows past the
+balance and rows the panel held are written to `distill_rejected.jsonl`
+with their reason; every row is consumed once, by offset, in
+`ops/teacher_queue.state.json`. Kept rows carry the panel's provenance and
+`source: "queue"`, which is now a teacher source in `covenant_distill`, so
+a queue row without a valid panel does not teach. Pinned by
+`test_tq1_teacher_queue.py` (17 checks) in the runner and in the nightly's
+green list. Mutation, same night: balance removed, five checks red;
+"queue" removed from the teacher sources, the no-panel check red.
+
+**The screen (the phone patch, applied; `covenant-phone` at the commit
+carrying this entry).** A Settings switch "Learn from my AI apps"; while
+one of a fixed list of AI apps is in front (ChatGPT, Grok, Gemini,
+DeepSeek, Claude, Copilot, Perplexity) and its window content changes, the
+visible text nodes are read at most once every two seconds, never a
+password field, into `files/ai_chats/<pkg>.jsonl` on the phone; the
+heartbeat carries the unsent lines through the leak check (a key or a
+password is dropped on the phone) and signs them to `/ai_chats`. Pinned by
+`mobile/app/test_m5_app.py` M5.40 (286/286). This is the "screen sharing
+option": it reads the screens of those apps, not every app. Widening the
+list to any app on screen would carry bank and message text into the
+queue; that is his call, not a default.
+
+**"Recursive self-improvement", said exactly.** The loop is now closed:
+conversation and screen -> queue -> panel -> ledger -> the student refines
+nightly (A127) -> the gate and Tetsu's judge improve -> the next
+conversation. It is bounded at every step by a check that can refuse: the
+panel must be unanimous across two families, the balance holds the label
+mix, the promotion gate and A126's pinned claims refuse a vaguer student,
+and the nightly's green list turns the pass NOT GREEN if TQ1 fails. What it
+is not: a model editing its own guards. Code proposals still refuse on
+this platform, by design.
+
+**Not done, by choice.** The scheduled task's arguments were not changed
+(the auto-mode classifier refused the edit as a persistence change, and the
+default covers it: the nightly runs the queue step without the flag).
+
+---
+
+### A167. [the agent / the PC] The PC had no interface of its own: the browser reached the phone's page or nothing. BUILT 2026-09-21 on his instruction: /pc, a council of roles, and the training panel with graduation criteria measured
+
+**His words:** "need a sister interface app on the pc which can use multi
+agents for reasoning and training to graduate to an agent." Measured before
+building: `/m` is the phone's page and serves the PC's browser too, but it
+is one box to the gate or to Tetsu; the agent door takes one prompt to one
+model; nothing showed the learning loop's state; "graduate" had no
+definition anywhere in the tree.
+
+**Built (`covenant_council.py`, one hook in the core beside `/m/students`).**
+- `/pc`: a page for the PC's browser and the tailnet, three panels.
+- `/pc/council`: one question, three roles of the local model in turn --
+  proposer, critic, reviser -- each handed what the ones before it said,
+  each bounded to 500 tokens, thirty councils per ten minutes per caller;
+  the reviser's answer is the council's and is judged by this node's gate
+  before it is returned, exactly as a single answer is; the council is a row
+  in the chat memory with its steps, and both sides go to the teacher's
+  queue (A166). It is one model in several roles in sequence, not several
+  models in parallel (the PC holds one llama-server at a time), and not an
+  agent that acts: nothing here edits, sends or moves value.
+- `/pc/training`: measured from the tree on each call, each value naming
+  its source: the queue (waiting, consumed), the ledger (rows, rows that
+  teach, panel coverage against the 0.9 bar), the deployed student's exam,
+  the last nightly pass, and five graduation criteria: (1) no false clean on
+  the exam; (2) it decides the exam; (3) panel coverage at the bar; (4) the
+  last nightly GREEN; (5) a node someone else runs reaches the same verdicts
+  on a shared challenge set. The first four are measured; the fifth is
+  UNDETERMINED on one machine and `graduated` stays False until it is not.
+  That is the second-operator cap, stated where the student's progress is
+  read, not hidden behind a number.
+
+**Pinned by** `test_pc1_sister_interface.py` (25 checks, in the runner):
+the gate both ways with mutation, the roles in order with the prior steps
+carried forward (measured by what each role was handed), the verdict on the
+council's answer, the memory row and the queue rows at redirected paths, the
+training JSON's shape and sources, the burst bound, and `deliberate()` with a
+fake model that records every call and its token budget.
+
+**Cost, stated.** A council is three model calls; on the 3B at about ten
+tokens a second that is up to a minute and a half per question, and three
+times the memory rows of a single ask. The training panel runs the exam on
+each call (53 cases against the loaded student, under a second).
+
+---
+
 ### A150. [minor / p2p] One anomaly reported three conditions: an echo, a node behind, and a fork. FIXED 2026-09-19 — found through A9's relay race going red once in eight sweeps
 
 **Evidence.** `test_a9_relay_race.py` S1 asserts that node C records **no**

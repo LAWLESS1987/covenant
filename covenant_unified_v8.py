@@ -566,11 +566,58 @@ def _agent_fetch(url: str, opener=None) -> tuple:
     return text[:AGENT_FETCH_KEEP], "ok: %d chars kept of %d read" % (min(len(text), AGENT_FETCH_KEEP), len(raw))
 
 
-AGENT_SYSTEM = ("You are the covenant node's model on this PC. Answer briefly and plainly. "
-                "Say what you know and what you do not; never invent a source. "
+# His rule, 2026-09-21: "it doesnt need to explain its self unless asked as
+# far as standing but needs to be a better conversationilist." So: no
+# introduction, no account of what it is or what judges it, no disclaimer on
+# every turn. Answer the person. The gate still judges every answer before it
+# is returned; that is the door's business, not the conversation's.
+AGENT_SYSTEM = ("Your name is Tetsu. You are talking with one person, usually out loud through their phone, "
+                "and you have been talking with them before: the turns before this one are yours to use, so "
+                "pick up where things left off and remember what they told you. Talk the way a steady friend "
+                "talks. Short sentences, plain words, first person. Answer what was actually said, then, when "
+                "it helps, ask one thing back. No headings, no lists, no markdown. Do not introduce yourself, "
+                "describe what you are, what judges you, or what you cannot do, unless you are asked; do not "
+                "open with disclaimers. When you do not know, say so in one short sentence and move on. Never "
+                "invent a fact or a source, and never say you did something you did not do. "
                 "If one web page would settle the question, write exactly one line 'FETCH: <https url>' "
-                "and nothing else, and you will be handed its text as data. Your answer is judged by the "
-                "covenant's own gate before anyone sees it: nothing that takes from anyone or conceals what it takes.")
+                "and nothing else, and you will be handed its text as data. Nothing that takes from anyone "
+                "or conceals what it takes.")
+
+# The turns before this one (2026-09-21, his words: "smoother conversations ...
+# and it learns from convos with me"). The ask log already keeps every exchange
+# as memory; until now the model was handed only the newest line, so every ask
+# started cold. This reads the same log back for the SAME caller: the last
+# AGENT_HISTORY_TURNS exchanges that were answered (withheld answers are not
+# replayed), each side cut at AGENT_HISTORY_CHARS, oldest first. Nothing here
+# trains anything; the durable learning path is the teacher-labelled queue.
+AGENT_HISTORY_TURNS = 6
+AGENT_HISTORY_CHARS = 600
+
+
+def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS):
+    """The last `turns` answered agent exchanges from `addr`, as chat messages, oldest first."""
+    try:
+        with open(log_path, "rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - 256 * 1024))
+            tail = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return []
+    rows = []
+    for line in tail.splitlines():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get("kind") != "agent" or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
+            continue
+        rows.append(r)
+    out = []
+    for r in rows[-turns:]:
+        out.append({"role": "user", "content": str(r.get("text", ""))[:chars]})
+        out.append({"role": "assistant", "content": str(r.get("answer", ""))[:chars]})
+    return out
 
 MOBILE_PAGE_HTML = """<!doctype html>
 <meta charset="utf-8">
@@ -7885,6 +7932,23 @@ class CovenantAPI:
         # phone app should send back info to learn from"). Same signed-request
         # scheme as /checkin; the actual judging and ledger writing live in
         # covenant_actuator_learn.py so this route is a thin, testable wrapper.
+        # HIS AI APPS (2026-09-19): the phone carries their chat lines here,
+        # signed like every phone request; covenant_daily_plan.record_ai_chats
+        # keeps the named fields under ops/chat/phone/ (gitignored) and queues
+        # them for the teacher. Nothing here reaches a tracked file.
+        @self.app.route("/ai_chats", methods=["POST"])
+        def ai_chats():
+            body = request.get_data() or b""
+            ok, who, _pem = _daily_plan_auth(request, body)
+            if not ok:
+                return jsonify({"status": "error", "message": who}), (503 if "unavailable" in who else 403)
+            try:
+                _dp = importlib.import_module("covenant_daily_plan")
+                code, out = _dp.record_ai_chats(body, who)
+            except Exception as e:                                # noqa: BLE001
+                return jsonify({"status": "error", "message": "could not record: %s" % type(e).__name__}), 503
+            return jsonify(out), code
+
         @self.app.route("/actuator_learn", methods=["POST"])
         def actuator_learn():
             body = request.get_data() or b""
@@ -8282,7 +8346,9 @@ class CovenantAPI:
                 _m = importlib.import_module("covenant_model")
             except Exception as e:                                # noqa: BLE001
                 return (jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503)
-            msgs = [{"role": "system", "content": AGENT_SYSTEM}, {"role": "user", "content": text}]
+            _log_path = os.environ.get("COVENANT_ASK_LOG") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "chat", "ask_log.jsonl")
+            history = agent_history(_log_path, addr)
+            msgs = [{"role": "system", "content": AGENT_SYSTEM}] + history + [{"role": "user", "content": text}]
             fetches = []
             try:
                 answer, meta = _m.ask(msgs)
@@ -8307,6 +8373,14 @@ class CovenantAPI:
             alleges_nothing = bool(result is not None and not ok2 and (
                 getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
             withheld = bool(not ok2 and not alleges_nothing)
+            try:
+                # Both sides of the exchange go to the teacher (2026-09-21, "so it
+                # actually learns from me"): what he said, then what was answered.
+                importlib.import_module("covenant_daily_plan").teacher_queue_append(
+                    [{"text": text[:4000], "source": "you:" + str(addr)[:40]},
+                     {"text": answer[:4000], "source": "agent:" + str(meta.get("model", "?"))[:40]}])
+            except Exception as _qe:                              # noqa: BLE001 -- the queue is memory, never a gate
+                print("teacher queue row not written: %s: %s" % (type(_qe).__name__, str(_qe)[:200]), flush=True)
             try:
                 _ask_log_row({"kind": "agent", "from": addr, "text": text, "answer": "" if withheld else answer[:4000],
                               "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
@@ -8380,6 +8454,17 @@ class CovenantAPI:
         # students past work"). Text, tailnet-gated like /m: the tail of each
         # distill record, the held-out results, and the verdict ledger's
         # size. Files that are not here say so instead of 500. Read-only.
+        # THE SISTER INTERFACE ON THE PC (2026-09-21, his words: "need a sister
+        # interface app on the pc which can use multi agents for reasoning and
+        # training to graduate to an agent"). /pc, /pc/council, /pc/training,
+        # tailnet-gated like /m, mounted from covenant_council.py so the core
+        # carries one hook and the page carries its own record. A missing or
+        # broken module is said out loud and the node runs without the page.
+        try:
+            importlib.import_module("covenant_council").register(self)
+        except Exception as _ce:                                  # noqa: BLE001
+            print("covenant_council not mounted: %s: %s" % (type(_ce).__name__, str(_ce)[:200]), flush=True)
+
         @self.app.route("/m/students", methods=["GET"])
         def mobile_students():
             ok, addr = _tailnet_caller()

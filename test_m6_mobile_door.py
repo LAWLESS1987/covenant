@@ -337,6 +337,29 @@ def main():
     check("M6q /m/agent from the tailnet answers 200 with the answer, the verdict and the model's cost",
           r.status_code == 200 and j.get("status") == "success" and "answer" in j and "admitted" in j
           and "withheld" in j and "ms" in j and j.get("model") == "stub", f"{r.status_code} {sorted(j)}")
+    # M6q2 (2026-09-21): the turns before this one reach the model, for the SAME caller only.
+    # The stub names how many messages it was handed: system + user = 2 on a cold ask; with one
+    # answered exchange replayed it is system + user + assistant + user = 4. A different caller
+    # on the tailnet starts cold. Read from the answer the door returned, not from the log.
+    first_withheld = bool(j.get("withheld"))
+    r2 = post(client, "/m/agent", PHONE_ADDR, {"text": "and three plus three"})
+    j2 = r2.get_json() or {}
+    if first_withheld:
+        check("M6q2 the first answer was withheld, so nothing is replayed: the second ask is cold (2 messages)",
+              r2.status_code == 200 and "(2 messages)" in str(j2.get("answer", "")) + str(j2.get("message", "")), f"{j2.get('answer')!r}")
+    else:
+        check("M6q2 the second ask from the same caller carries the first exchange (4 messages)",
+              r2.status_code == 200 and "(4 messages)" in str(j2.get("answer", "")), f"{j2.get('answer')!r} withheld={j2.get('withheld')}")
+    r3 = post(client, "/m/agent", "100.86.158.9", {"text": "who am i"})
+    j3 = r3.get_json() or {}
+    check("M6q2 a different tailnet caller starts cold: no one else's turns are replayed to it (2 messages)",
+          r3.status_code == 200 and "(2 messages)" in str(j3.get("answer", "")), f"{j3.get('answer')!r} withheld={j3.get('withheld')}")
+    hist = cov.agent_history(os.environ["COVENANT_ASK_LOG"], PHONE_ADDR, turns=1)
+    check("M6q2 agent_history keeps the caller's newest exchange only when turns=1, user then assistant",
+          len(hist) == 2 and hist[0]["role"] == "user" and hist[1]["role"] == "assistant"
+          and hist[0]["content"].startswith("and three plus three"), hist)
+    check("M6q2 agent_history of a missing log is empty, never an error",
+          cov.agent_history(os.path.join(os.environ["COVENANT_ASK_LOG"], "nowhere.jsonl"), PHONE_ADDR) == [])
     r = post(client, "/m/agent", LAN_ADDR, {"text": "hello"})
     check("M6q /m/agent refuses a LAN address 403", r.status_code == 403, f"got {r.status_code}")
     check("M6q the leash: an https URL on a listed host passes, a subdomain of one passes",

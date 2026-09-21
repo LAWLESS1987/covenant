@@ -1074,7 +1074,7 @@ def gh_write_cases(category, n):
     return out, ans.get("model")
 
 
-TEACHER_SOURCES = ("generated+judged", "github", "study")   # rows a teacher labelled (the seed rows are the author's)
+TEACHER_SOURCES = ("generated+judged", "github", "study", "queue")   # rows a teacher labelled (the seed rows are the author's); "queue" = his conversations, carried to the panel by covenant_teacher_queue (2026-09-21), so they teach only with a valid panel on them
 LAST_LOAD = {}                                              # what load_verdicts kept and skipped, for the cycle line
 RUN_WITHOUT_POLICY = os.path.join(HERE, "ops", "run_without_policy.json")
 RUN_WITHOUT = os.path.join(HERE, "ops", "RUN_WITHOUT.json")

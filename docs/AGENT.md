@@ -13,9 +13,11 @@ than that optimize"*; *"green light"*.
 | Runtime | `tools/llama/llama-server.exe` (untracked) | llama.cpp's server, build b11057, CPU. The same 18 MB runtime the judge workflow uses on the GitHub runner. |
 | Weights | `models/*.gguf` (untracked) | Qwen2.5-Coder-7B-Instruct Q4_K_M (needs ~6 GB resident) and Qwen2.5-3B-Instruct Q4_K_M (~3 GB). Open weights, Apache-2.0. |
 | Keeper | `covenant_model.py` | Starts the server on first use, on 127.0.0.1 only; picks the largest weights that fit the memory free at that moment; stops it after 10 idle minutes. |
-| Door | `POST /m/agent` on the node | Tailnet-gated like `/m`. Prompt in, model answer out — **after** the sentinel has judged the answer. |
+| Door | `POST /m/agent` on the node | Tailnet-gated like `/m`. Prompt in, model answer out — **after** the sentinel has judged the answer. Since 2026-09-21 the model speaks as Tetsu (`covenant-phone/docs/PERSONA.md`) in a spoken register, and is handed the caller's last 6 answered exchanges as the turns before this one (`agent_history()`, A165). |
 | Browser | `_agent_fetch()` in the node | One GET per ask, to an allow-listed host, text only, 8 KB kept. |
-| Memory | `ops/chat/ask_log.jsonl` (untracked) | Every ask, answer and verdict, beside the recorded model conversations. What the chat memory reads. |
+| Memory | `ops/chat/ask_log.jsonl` (untracked) | Every ask, answer and verdict, beside the recorded model conversations. What the chat memory reads, and what the door reads back per caller at ask time. Training goes through the teacher's queue (`ops/teacher_queue.jsonl`, both sides of every exchange and the phone's AI-app chat lines), which the nightly carries to the panel, balanced, once each (`covenant_teacher_queue`, A166). |
+| PC page | `GET /pc`, `POST /pc/council`, `GET /pc/training` (`covenant_council.py`, A167) | The sister interface for the PC's browser: talk to Tetsu; a council of three roles of the local model in turn, judged by the gate before it is returned; the training panel with the queue, the ledger, the exam, the last nightly and five graduation criteria, four measured and the fifth UNDETERMINED on one machine. |
+| Voice | the phone app (`covenant-phone`) | The box sends a conversation to this door and speaks the answer; `judge:` asks the phone's own gate; a Mic button takes one utterance, long-press for hands-free (the microphone reopens after each spoken answer). |
 
 ## The security layer, in order
 

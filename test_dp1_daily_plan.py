@@ -165,6 +165,24 @@ def main():
             DP.record_checkin(json.dumps({"node_id": "phone", "installer": {"x": "y" * 200}}).encode(), "phone", led2)
             DP.record_checkin(json.dumps({"node_id": "phone"}).encode(), "phone", led2)
             r2 = [json.loads(l) for l in open(led2, encoding="utf-8")]
+            # D21c (2026-09-19): the AI-chat batch recorder and the teacher's queue, both ways.
+            cd, qp = os.path.join(td2, "chats"), os.path.join(td2, "queue.jsonl")
+            body = json.dumps({"v": 1, "node_id": "phone", "lines": [
+                {"t": 1, "pkg": "com.openai.chatgpt", "text": "a plain line about hash chains", "secret": "x" * 500},
+                {"t": 2, "pkg": "../evil/../", "text": "y" * 900},
+                "not a dict", {"t": 3, "pkg": "ai.x.grok", "text": "   "}]}).encode()
+            code, out = DP.record_ai_chats(body, "phone", chats_dir=cd, queue_path=qp)
+            files = sorted(os.listdir(cd))
+            q = [json.loads(l) for l in open(qp, encoding="utf-8")]
+            check("D21c a signed batch keeps the named fields only, caps a line at 600, sanitises the package name, skips junk and blanks, and queues every kept line for the teacher",
+                  code == 200 and out["recorded"] == 2 and out["queued"] == 2 and files == ["..evil...jsonl", "com.openai.chatgpt.jsonl"]
+                  and len(q) == 2 and len(q[1]["text"]) == 600 and "secret" not in open(os.path.join(cd, "com.openai.chatgpt.jsonl"), encoding="utf-8").read(),
+                  (code, out, files, [len(x["text"]) for x in q]))
+            code2, _ = DP.record_ai_chats(b"{}", "phone", chats_dir=cd, queue_path=qp)
+            check("D21c a body without a lines list is refused 400 and nothing is written", code2 == 400 and len([json.loads(l) for l in open(qp, encoding="utf-8")]) == 2)
+            check("D21c the queue is bounded: past TEACHER_QUEUE_MAX_ROWS nothing more is appended",
+                  DP.teacher_queue_append([{"text": "z"}] * 3, path=qp) == 3 and (lambda: (setattr(DP, "TEACHER_QUEUE_MAX_ROWS", 5), DP.teacher_queue_append([{"text": "over"}], path=qp))[1])() == 0)
+            DP.TEACHER_QUEUE_MAX_ROWS = 5000
             check("D21b the check-in's `installer` is kept as a string capped at 80, and absent when not sent",
                   r2[0].get("installer") == "org.covenant.node" and isinstance(r2[1]["installer"], str) and len(r2[1]["installer"]) == 80
                   and "installer" not in r2[2], r2)

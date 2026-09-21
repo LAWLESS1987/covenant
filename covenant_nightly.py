@@ -61,6 +61,10 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 # green check never ran the suite, so the nightly said PROMOTED
                 # over a red it could not see. It runs here now, after the cycle.
                 "test_a126_seat_dispositions.py",
+                # 2026-09-21: the teacher's queue (his conversations, carried to
+                # the panel) is part of what the cycle trains on; its rules are
+                # pinned here so a pass that broke them is NOT GREEN.
+                "test_tq1_teacher_queue.py",
                 "test_rule5_ledger.py", "test_maker_orders.py",
                 "test_r6_contribution.py", "test_xrpl_record.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
@@ -106,6 +110,9 @@ def main():
                          "0 disables. panel_coverage was 0.098 against a 0.9 bar with nothing moving it")
     ap.add_argument("--redteam", type=int, default=15,
                     help="memos per angle the runner writes to fool the student; 0 disables")
+    ap.add_argument("--queue", type=int, default=24,
+                    help="2026-09-21: rows from the teacher's queue (his conversations with Tetsu, his AI apps' "
+                         "chat lines) the PANEL judges each pass; kept balanced, once each; 0 disables")
     ap.add_argument("--passes", type=int, default=1, help="repeat the whole pass N times")
     ap.add_argument("--strategy", type=int, default=1,
                     help="1 = re-run strategy_validate.py on the latest data each pass (30 min cap); 0 = skip")
@@ -283,6 +290,23 @@ def main():
             say("back-audit: %d legacy row(s) re-judged by the panel, %d now contested" % (checked, contested))
     except Exception as e:                                       # noqa: BLE001
         say("back-audit FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE TEACHER'S QUEUE (2026-09-21, his words: "apply the teacher queue
+    # patch so it actually learns from me"). What he says to Tetsu, what
+    # Tetsu answers, and the chat lines his phone reads from his AI apps are
+    # queued by the doors (covenant_daily_plan.teacher_queue_append); this
+    # carries them to the PANEL before the cycle, so the student that refines
+    # tonight trains on them -- balanced, once each, panel-labelled only
+    # (covenant_teacher_queue). Its failure is reported and does not stop the
+    # pass.
+    try:
+        if a.queue > 0:
+            import covenant_teacher_queue as TQ
+            qs = TQ.consume(a.queue, say=say)
+            say("queue: %d kept for the student (%d violating, %d clean), %d rejected, %d waiting"
+                % (qs["kept"], qs["kept_violates"], qs["kept_clean"], qs["rejected"], len(TQ.pending()[0])))
+    except Exception as e:                                       # noqa: BLE001
+        say("queue FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     try:
         import covenant_distill as X

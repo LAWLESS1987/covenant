@@ -76,19 +76,19 @@
 <script src="vendor/three.min.js"></script>
 <script>
 const DATA = {
- "generated_utc": "2026-09-17T21:32:36Z",
- "generated_local": "Thu 17 Sep 17:32:36",
- "generated_epoch": 1789680756,
+ "generated_utc": "2026-09-21T05:04:05Z",
+ "generated_local": "Mon 21 Sep 01:04:05",
+ "generated_epoch": 1789967045,
  "host": "SALES",
- "free_mb": 4190,
+ "free_mb": 5438,
  "total_mb": 15679,
- "judge_model": "Ora@b5c91027271e",
+ "judge_model": "Ora@9a2bbf97a69c",
  "nodes": [
   {
    "id": "A",
    "port": 5000,
    "up": true,
-   "height": 33,
+   "height": 38,
    "peers": 2,
    "pending": 0,
    "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
@@ -102,14 +102,11 @@ const DATA = {
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 264,
+   "tip_gossip_seen": 34,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [
-    "peer_send_failure",
-    "rate_limit_rejection"
-   ],
-   "anomalies": 301,
-   "spike": true,
+   "anomaly_kinds": [],
+   "anomalies": 19,
+   "spike": false,
    "subsystems": {
     "brainflow": false,
     "code_sandbox": false,
@@ -118,38 +115,89 @@ const DATA = {
    },
    "warnings": [
     "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
-    "anomaly spike: ['rate_limit_rejection']",
     "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform",
-    "mesh is running more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f'] -- peers on a different source may disagree about which blocks are valid (A7)"
+    "mesh is running more than one source: we are 35bff56c70dd, peers report ['39341fb726a9'] (last heard 36s ago) -- peers on a different source may disagree about which blocks are valid (A7)"
    ]
   },
   {
    "id": "B",
    "port": 5020,
-   "up": false,
-   "error": "HTTPError: HTTP Error 429: TOO MANY REQUESTS",
-   "warnings": [],
-   "anomaly_kinds": []
+   "up": true,
+   "height": 38,
+   "peers": 2,
+   "pending": 0,
+   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+   "insecure": false,
+   "keyless": true,
+   "wsgi": "waitress",
+   "genesis": "00009b31c6c6",
+   "own_genesis": false,
+   "degraded": true,
+   "crisis": false,
+   "alignment": 0.5,
+   "dead_peers": 0,
+   "heartbeats_skipped": 0,
+   "tip_gossip_seen": 34,
+   "peer_ahead_seen": 0,
+   "anomaly_kinds": [],
+   "anomalies": 3,
+   "spike": false,
+   "subsystems": {
+    "brainflow": false,
+    "code_sandbox": false,
+    "neural_bridge": true,
+    "trading_bridge": true
+   },
+   "warnings": [
+    "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
+    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+   ]
   },
   {
    "id": "C",
    "port": 5060,
-   "up": false,
-   "error": "HTTPError: HTTP Error 429: TOO MANY REQUESTS",
-   "warnings": [],
-   "anomaly_kinds": []
+   "up": true,
+   "height": 38,
+   "peers": 1,
+   "pending": 0,
+   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+   "insecure": false,
+   "keyless": true,
+   "wsgi": "waitress",
+   "genesis": "00009b31c6c6",
+   "own_genesis": false,
+   "degraded": true,
+   "crisis": false,
+   "alignment": 0.5,
+   "dead_peers": 0,
+   "heartbeats_skipped": 0,
+   "tip_gossip_seen": 17,
+   "peer_ahead_seen": 0,
+   "anomaly_kinds": [],
+   "anomalies": 3,
+   "spike": false,
+   "subsystems": {
+    "brainflow": false,
+    "code_sandbox": false,
+    "neural_bridge": true,
+    "trading_bridge": true
+   },
+   "warnings": [
+    "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
+    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+   ]
   }
  ],
  "links": [],
  "watchdog": {
-  "last": "2026-09-17T21:31:53Z",
+  "last": "2026-09-21T05:03:50Z",
   "ok": false,
-  "ticks": 125,
+  "ticks": 1,
   "founder": null,
   "nodeb": null,
   "agree": null,
   "alerts": [
-   "phone phone: running 0.1.475+13b946a, and build 0.1.505+2730342 is here and newer by 24.0 h -- open http://100.112.171.24:5000/m on the phone and tap "
+   "highway: mesh_source_split is present and nothing here repairs it -- {\"running\": [\"35bff56c70dd\"], \"peers\": {\"peer_127.0.0.1_5021\": \"35bff56c70dd\", \"p"
   ]
  },
  "converged": true

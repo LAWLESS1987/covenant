@@ -418,6 +418,8 @@ SUITES = [
     # fix, deleting the fold entirely, and mutation-testing confirms it does.
     ("test_a119_stopword_stems.py",      120,  "JUDGE"),
     ("test_teacher_panel.py",            120,  "JUDGE"),
+    ("test_tq1_teacher_queue.py",        120,  "JUDGE"),
+    ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_dp1_daily_plan.py",           120,  "TRADER"),
     ("test_sm1_sealed_mail.py",          120,  "TRADER"),
     ("test_ac1_ai_consult.py",           120,  "TRADER"),

@@ -300,6 +300,77 @@ CHECKINS = os.path.join(HERE, "ops", "phone_checkins.jsonl")
 SILENT_AFTER_S = 3600          # a phone that reported within a day and then went quiet this long is an alert
 
 
+# ---------------------------------------------------------------- his AI apps, and the teacher's queue (2026-09-19)
+#
+# "give access to all my ai apps to learn from each. Have the phone app cross
+# reference all of them for student training" / "train students on all
+# you've learned in our relationship together". Two files, both under ops/
+# and both gitignored -- this repository is public, and nothing personal is
+# ever tracked (his standing line):
+#   ops/chat/phone/<pkg>.jsonl  -- the phone's AI-app chat lines, as memory
+#   ops/teacher_queue.jsonl     -- texts waiting for the TEACHER to label
+# The queue is the honest path to the students: their own verdicts are not
+# labels (A159), the teacher's are. Consuming the queue in the nightly is the
+# next pass; this writes it. Both paths take COVENANT_* overrides for tests.
+CHATS_DIR = os.path.join(HERE, "ops", "chat", "phone")
+TEACHER_QUEUE = os.path.join(HERE, "ops", "teacher_queue.jsonl")
+AI_CHATS_MAX_LINES, AI_CHATS_LINE_CAP, TEACHER_QUEUE_MAX_ROWS = 200, 600, 5000
+
+
+def teacher_queue_append(rows, path=None):
+    """Append (text, source) rows for the teacher; bounded file, oldest kept."""
+    path = path or os.environ.get("COVENANT_TEACHER_QUEUE") or TEACHER_QUEUE
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    n = 0
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            n = sum(1 for _ in fh)
+    except OSError:
+        n = 0
+    kept = 0
+    with open(path, "a", encoding="utf-8") as fh:
+        for r in rows:
+            if n + kept >= TEACHER_QUEUE_MAX_ROWS:
+                break
+            text = str(r.get("text", ""))[:4000].strip()
+            if not text:
+                continue
+            fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "text": text,
+                                 "source": str(r.get("source", ""))[:80]}, ensure_ascii=False) + "\n")
+            kept += 1
+    return kept
+
+
+def record_ai_chats(body_bytes, who, chats_dir=None, queue_path=None):
+    """A signed batch of AI-app chat lines from a phone. Only the named fields are
+    kept, capped; the batch is bounded; everything else is dropped unread."""
+    try:
+        data = json.loads(body_bytes.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return 400, {"status": "error", "message": "body is not JSON"}
+    if not isinstance(data, dict) or not isinstance(data.get("lines"), list):
+        return 400, {"status": "error", "message": "body needs a lines list"}
+    chats_dir = chats_dir or os.environ.get("COVENANT_CHATS_DIR") or CHATS_DIR
+    os.makedirs(chats_dir, exist_ok=True)
+    kept, per_file = [], {}
+    for r in data["lines"][:AI_CHATS_MAX_LINES]:
+        if not isinstance(r, dict):
+            continue
+        text = str(r.get("text", ""))[:AI_CHATS_LINE_CAP].strip()
+        pkg = "".join(ch for ch in str(r.get("pkg", ""))[:80] if ch.isalnum() or ch in "._-") or "unknown"
+        if not text:
+            continue
+        row = {"t": r.get("t") if isinstance(r.get("t"), (int, float)) else 0, "signer": who, "pkg": pkg, "text": text}
+        per_file.setdefault(pkg, []).append(row)
+        kept.append({"text": text, "source": "phone:" + pkg})
+    for pkg, rows in per_file.items():
+        with open(os.path.join(chats_dir, pkg + ".jsonl"), "a", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    queued = teacher_queue_append(kept, path=queue_path)
+    return 200, {"status": "success", "recorded": len(kept), "queued": queued, "apps": sorted(per_file)}
+
+
 def record_checkin(body_bytes, who, path=None):
     """One signed line from a phone: what its node says about itself. Only the
     named fields are kept; anything else in the body is dropped unread."""

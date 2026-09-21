@@ -34,7 +34,9 @@ run after the seat lapses.
   carry the evidence in and the fix out by hand.
 - Email replies drafted and sent from here. The reply kit in
   `private/outreach/` is written so you can answer by hand, and section 4
-  says what to paste to get a draft from a free chat.
+  says what to paste to get a draft from a free chat. That folder is never
+  published and a reader of this file cannot check it; nothing here rests a
+  claim on it.
 - Browser automation: posting, reading forum replies, the GitHub access
   page. All of it is a few clicks by you; nothing is lost, only convenience.
 
@@ -59,7 +61,7 @@ last sweep tally, the newest self-evaluation block, the watchdog's last lines,
 the open entries of `docs/KNOWN_ISSUES.md` by title, and the standing method.
 Every section names its source file and how old it is, so the chat can see
 staleness too. `--private` adds the reply kit and writes to `private/` instead,
-which git never sees.
+which git never sees and which is never published; a reader cannot open it.
 
 Weekly, or before quoting the system as green anywhere:
 
@@ -102,7 +104,7 @@ exists on 2026-09-21:
 | read the pack and say what is green | the agent door answers questions over the tree at about ten tokens a second | no suite measures its answers against the transcript; a wrong "green" from it is the failure mode this repository was built to refuse |
 | draft an outward reply from the kit's numbers | the app drafts and nothing leaves the device | no guard yet pins that a draft quotes only figures a script printed |
 | decide a fix and apply it | the code proposals path exists and refuses every proposal on Windows (no sandbox) | by design; a model that edits its own guards unwatched is the thing the covenant judges, not the thing it is |
-| close the students' loop from its own use | the teacher-labelled queue is written as a patch, not applied (see the 2026-09-20 handoff) | nightly consumption of that queue |
+| close the students' loop from its own use | done 2026-09-21 (A166): conversations and the phone's AI-app screens go to the teacher's queue, and the nightly carries it to the panel, balanced, once each | none open; the panel and the promotion gate decide what teaches |
 
 The honest order is the same as the phone-app rule already on record: the
 pipeline first, then one app build, then the local model doing more. None of

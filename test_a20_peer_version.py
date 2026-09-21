@@ -246,10 +246,24 @@ def digest_checks(live_digest_on_wire):
     bad = [k for k in d if any(f in k.lower() for f in FORBIDDEN)]
     check("D2 no substrate/judge/path key is in the digest", not bad, str(bad))
 
+    # 2026-09-21: matched as WORDS, not substrings. The digest's `src` is twelve
+    # hex characters, and the core that day hashed to ab09e1284dba -- "db" inside
+    # a hex string, which this check read as a leaked database word (26/27 in
+    # the sweep). A hex id legitimately contains any pair of a-f letters; a word
+    # standing on its own in a value is still the leak this looks for, and
+    # D3b below proves the check still catches one.
+    import re as _re
     blob = json.dumps(d).lower()
-    leaked = [f for f in FORBIDDEN if f in blob]
+
+    def _leaks(text):
+        return [f for f in FORBIDDEN if _re.search(r"(?<![0-9a-z_])%s(?![0-9a-z_])" % _re.escape(f), text)]
+    leaked = _leaks(blob)
     check("D3 and none of those words appear in its VALUES either",
           not leaked, str(leaked))
+    check("D3b the word check still catches a real leak and ignores a hex id",
+          _leaks('{"src": "ab09e1284dba", "v": "v8.40"}') == []
+          and _leaks('{"src": "x", "note": "the db path is /home"}') == ["db", "path"],
+          (_leaks('{"src": "ab09e1284dba"}'), _leaks('{"note": "the db path is /home"}')))
 
     check("D4 the digest is small enough to ride a heartbeat",
           len(json.dumps(d)) < 300, f"{len(json.dumps(d))} bytes")

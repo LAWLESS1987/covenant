@@ -195,7 +195,9 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     """One chat completion. messages: [{"role","content"}...]. Returns (text, meta) or raises."""
     if os.environ.get("COVENANT_MODEL_STUB"):
         last = messages[-1]["content"] if messages else ""
-        return "stub answer to: " + last[:80], {"model": "stub", "tokens": 0, "ms": 0}
+        # The stub names how many messages it was handed, so a suite can see
+        # whether the turns before this one reached the model (M6q, 2026-09-21).
+        return "stub answer to: " + last[:80] + " (%d messages)" % len(messages), {"model": "stub", "tokens": 0, "ms": 0}
     with _lock:
         ok, why = start(say=lambda *_a: None)
         if not ok:
