@@ -91,6 +91,41 @@ finally:
 rows = [json.loads(l) for l in open(LEDGER, encoding="utf-8") if l.strip()]
 check("AV1.10 every vetting is on the record, with its verdict", len(rows) == 3 and all(r["kind"] == "vet" for r in rows))
 
+# ---- A219: the covenant pulls the update and JUDGES it. Four rules, each
+#      driven the way that passes and the way that must not.
+def vpair(b, a):
+    base = {"signature": "1.0.0.0", "engine": "1.0.0.0", "platform": "1.0.0.0",
+            "age_days": 1, "realtime": True, "service": True}
+    return dict(base, **b), dict(base, **a)
+
+
+def upd(b, a, ran=True):
+    bb, aa = vpair(b, a)
+    return IM.update(run=lambda: (ran, "updated"), before=bb, after=aa, ledger_path=LEDGER)
+
+
+r = upd({}, {"signature": "1.0.1.0"})
+check("AV1.14 a signature version that moves FORWARD passes, and the move is named",
+      r["verdict"] == "PASSED" and "1.0.0.0 -> 1.0.1.0" in r["why"], r["why"])
+r = upd({"signature": "1.0.9.0"}, {"signature": "1.0.1.0"})
+check("AV1.15 broken the other way: a version that moves BACKWARDS is REFUSED -- a rollback is not an update",
+      r["verdict"] == "REFUSED" and "BACKWARDS" in r["why"], r["why"])
+r = upd({}, {"realtime": False})
+check("AV1.16 broken the other way: an update that leaves protection OFF is REFUSED",
+      r["verdict"] == "REFUSED" and "real-time protection" in r["why"], r["why"])
+r = upd({}, {"service": False})
+check("AV1.17 broken the other way: an update that stops the antimalware service is REFUSED",
+      r["verdict"] == "REFUSED" and "service" in r["why"], r["why"])
+r = upd({}, {}, ran=False)
+check("AV1.18 an update that did not run and moved nothing is FAILED, never a quiet success",
+      r["verdict"] == "FAILED", r["why"])
+r = upd({"age_days": 5}, {"age_days": 0})
+check("AV1.19 nothing moved but the signatures are current: PASSED, and it says nothing moved",
+      r["verdict"] == "PASSED" and "nothing moved" in r["why"], r["why"])
+check("AV1.20 every update verdict is on the record with both postures",
+      any(x.get("kind") == "update" and x.get("before") and x.get("after")
+          for x in [json.loads(l) for l in open(LEDGER, encoding="utf-8") if l.strip()]))
+
 # ---- the improvement: the question an antivirus cannot answer
 t = IM.tree_integrity()
 check("AV1.11 tree_integrity answers 'is this still the file we shipped' from the manifest, which no antivirus can",

@@ -152,6 +152,101 @@ def tree_integrity():
         return {"ok": False, "says": "the manifest could not be checked (%s: %s)" % (type(e).__name__, str(e)[:120])}
 
 
+def versions(ps=None):
+    """What the defence IS, by version. Every part is numbered, so a change can
+    be judged rather than trusted."""
+    ok, d = (ps or _ps)("Get-MpComputerStatus -ErrorAction Stop | Select-Object AntivirusSignatureVersion, "
+                        "AMEngineVersion, AMProductVersion, AntivirusSignatureAge, RealTimeProtectionEnabled, "
+                        "AMServiceEnabled | ConvertTo-Json -Compress")
+    if not ok or not isinstance(d, dict):
+        return None
+    return {"signature": str(d.get("AntivirusSignatureVersion") or ""),
+            "engine": str(d.get("AMEngineVersion") or ""),
+            "platform": str(d.get("AMProductVersion") or ""),
+            "age_days": d.get("AntivirusSignatureAge"),
+            "realtime": bool(d.get("RealTimeProtectionEnabled")),
+            "service": bool(d.get("AMServiceEnabled"))}
+
+
+def _ver_tuple(v):
+    out = []
+    for part in str(v or "").split("."):
+        try:
+            out.append(int(part))
+        except ValueError:
+            out.append(0)
+    return tuple(out) or (0,)
+
+
+def update(ps=None, ledger_path=None, run=None, before=None, after=None):
+    """A219 (2026-09-21, his words: "Defender should now be run by our system
+    locally any updates must pass our logic and reason or the system itself
+    grows and improves it").
+
+    The covenant pulls the update itself, on its own schedule, and JUDGES the
+    result. Four rules, each one a thing that can actually be true or false:
+      1. no version may move BACKWARDS (signature, engine or platform);
+      2. something must actually have moved, or the age must have fallen --
+         an update that changed nothing is reported as nothing, not as a win;
+      3. real-time protection must be no worse after than before;
+      4. the antimalware service must still be running.
+    A verdict of REFUSED does not roll anything back -- this account is not an
+    administrator and Microsoft's updates are not the covenant's to revoke --
+    it is recorded, and named to him, which is the honest meaning of a gate we
+    can actually hold.
+
+    WHAT CANNOT BE JUDGED, and is not pretended: the CONTENTS of a signature
+    definition. It is opaque binary from Microsoft. A module claiming to reason
+    about it would be measuring nothing, which this repository calls a fake
+    guard. What is judged is what is observable: provenance by version, and
+    effect on the posture."""
+    b = before if before is not None else versions(ps)
+    if b is None:
+        row = {"kind": "update", "verdict": "UNKNOWN", "why": "the defence could not be read before the update"}
+        return _record(row, ledger_path)
+    ok, said = (run or (lambda: (ps or _ps)("Update-MpSignature -ErrorAction Stop; 'updated'", timeout=900)))()
+    a = after if after is not None else versions(ps)
+    if a is None:
+        row = {"kind": "update", "verdict": "UNKNOWN", "before": b,
+               "why": "the defence could not be read after the update (ran: %s)" % ok}
+        return _record(row, ledger_path)
+    reasons, moved = [], []
+    for part in ("signature", "engine", "platform"):
+        if _ver_tuple(a[part]) < _ver_tuple(b[part]):
+            reasons.append("%s version went BACKWARDS: %s -> %s" % (part, b[part], a[part]))
+        elif _ver_tuple(a[part]) > _ver_tuple(b[part]):
+            moved.append("%s %s -> %s" % (part, b[part], a[part]))
+    if b.get("realtime") and not a.get("realtime"):
+        reasons.append("real-time protection was ON before and is OFF after")
+    if b.get("service") and not a.get("service"):
+        reasons.append("the antimalware service was running before and is not after")
+    try:
+        fell = a.get("age_days") is not None and b.get("age_days") is not None and a["age_days"] <= b["age_days"]
+    except TypeError:
+        fell = False
+    if not ok and not moved:
+        verdict, why = "FAILED", "the update did not run (%s) and nothing moved" % str(said)[:120]
+    elif reasons:
+        verdict, why = "REFUSED", "; ".join(reasons)
+    elif moved:
+        verdict, why = "PASSED", "moved forward: " + "; ".join(moved)
+    elif fell:
+        verdict, why = "PASSED", "nothing moved; already current (signatures %s day(s) old)" % a.get("age_days")
+    else:
+        verdict, why = "NOTHING", "the update ran and changed nothing measurable"
+    row = {"kind": "update", "verdict": verdict, "why": why, "before": b, "after": a, "ran": bool(ok)}
+    # THE SYSTEM GROWS: new signatures can newly flag a file we have already
+    # accounted for by hash. That is Defender's judgement changing while ours
+    # did not, and it is recorded as such rather than alarming him again.
+    try:
+        f = findings(1)
+        row["after_update_findings"] = {"settled": len(f.get("settled") or []), "needs_you": len(f.get("needs_you") or [])}
+        row["ours_still_accounted"] = [x.get("path") for x in (f.get("settled") or [])][:6]
+    except Exception:                                             # noqa: BLE001
+        pass
+    return _record(row, ledger_path)
+
+
 def vet(path, do_scan=True, ledger_path=None):
     """Before the covenant trusts a file it did not write: account for it by
     hash AND have the defence look at it. {"trust", "why", ...}.
@@ -195,6 +290,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="the defence, incorporated: posture, findings judged, our own files")
     ap.add_argument("--scan", metavar="PATH", help="tell the defence to look at this path now")
     ap.add_argument("--vet", metavar="PATH", help="account for a file by hash AND scan it")
+    ap.add_argument("--update", action="store_true", help="pull the defence's update and judge the result (A219)")
     a = ap.parse_args(argv)
     if a.scan:
         ok, says = scan(a.scan)
@@ -204,6 +300,10 @@ def main(argv=None):
         r = vet(a.vet)
         print("trust: %s -- %s" % (r["trust"], r["why"]))
         return 0 if r["trust"] else 1
+    if a.update:
+        r = update()
+        print("%s -- %s" % (r["verdict"], r["why"]))
+        return 0 if r["verdict"] in ("PASSED", "NOTHING") else 1
     s = state()
     print(s["says"])
     for n in s["needs_you"]:

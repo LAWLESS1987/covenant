@@ -1377,18 +1377,35 @@ def remedy_refresh_defender(measured, dry_run=True):
         return False, "nothing here is mine to mend (%s)" % ("; ".join(lapses)[:160] or "no lapse")
     if dry_run:
         return True, "would refresh signatures and start a quick scan for: " + "; ".join(mendable)
-    ps = "Update-MpSignature -ErrorAction SilentlyContinue; Start-MpScan -ScanType QuickScan -ErrorAction SilentlyContinue; 'done'"
+    # A219 (2026-09-21, his words: "Defender should now be run by our system
+    # locally any updates must pass our logic and reason"). The update is no
+    # longer a fire-and-forget PowerShell line. It goes through
+    # covenant_immune.update(), which reads every version BEFORE, pulls the
+    # update, reads them AFTER, and judges: a version that moved BACKWARDS,
+    # protection that went off, or a service that stopped is a REFUSED verdict
+    # -- recorded and named to him, not a silent success. The scan follows only
+    # when the update did not fail, and it is pointed at OUR OWN TREE, which is
+    # the part of this machine the covenant is answerable for.
     try:
-        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=600)
-        return p.returncode == 0, ("signatures refreshed and a quick scan started for: " + "; ".join(mendable)) if p.returncode == 0 else (p.stderr or "")[-200:]
-    except (OSError, subprocess.SubprocessError) as e:
-        return False, "could not run Defender's own commands: %s" % type(e).__name__
+        IM = importlib.import_module("covenant_immune")
+        verdict = IM.update()
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the judged update could not run: %s: %s" % (type(e).__name__, str(e)[:120])
+    if verdict.get("verdict") in ("REFUSED", "FAILED"):
+        return False, "the update did NOT pass our judgement: %s" % str(verdict.get("why"))[:180]
+    try:
+        ok_s, says_s = IM.scan(HERE, timeout=1800)
+        scanned = "; a scan of our own tree %s" % ("ran" if ok_s else "was refused (" + str(says_s)[:60] + ")")
+    except Exception as e:                                       # noqa: BLE001
+        scanned = "; the scan could not be started (%s)" % type(e).__name__
+    return True, "update %s -- %s%s (for: %s)" % (verdict.get("verdict"), str(verdict.get("why"))[:120],
+                                                  scanned, "; ".join(mendable))
 
 
 REMEDIES = {
     "refresh_defender": {"fn": remedy_refresh_defender, "klass": AUTO_REVERSIBLE,
                          "for": ["defense_lapse"], "kind": "stateless",
-                         "touches": ["Defender's signature update and a quick scan; never its settings"],
+                         "touches": ["Defender's signature update, judged by covenant_immune.update(), and a scan of our own tree; never its settings"],
                          "benefit": {"gains": ["stale signatures are refreshed without waiting for him", "a fortnight without a scan ends"],
                                      "cost": ["minutes of CPU for the scan; a network fetch for the signatures"],
                                      "irreversible": []}},

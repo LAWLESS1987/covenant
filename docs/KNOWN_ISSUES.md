@@ -7228,6 +7228,71 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A219. [the defence, run by us and judged] "Defender should now be run by our system locally any updates must pass our logic and reason or the system itself grows and improves it." -- "Its my account I am the administrator do it." BUILT 2026-09-21, with the one part that cannot be done named
+
+**Run by us: done, and it needed no permission at all.** The covenant now
+pulls the signature update itself, on its own schedule -- from the nightly and
+from the highway's `refresh_defender` remedy -- rather than only when Windows
+decides. Proved live: **1.459.324.0 -> 1.459.327.0 in 10 seconds**, driven from
+here.
+
+**Judged: four rules, each a thing that can actually be true or false.** Every
+version is read BEFORE, the update is pulled, and they are read AFTER.
+`covenant_immune.update()` returns REFUSED when any version moved **backwards**
+(a rollback is not an update), when real-time protection was on before and off
+after, or when the antimalware service stopped; FAILED when it did not run and
+nothing moved; PASSED when something moved forward, or when nothing moved
+because the signatures were already current. A REFUSED verdict is **recorded
+and named to him, not rolled back** -- Microsoft's updates are not the
+covenant's to revoke, and this account could not revoke them anyway. That is
+the honest meaning of a gate we can actually hold.
+
+**The one part that cannot be done, measured rather than assumed.** He said
+*"Its my account I am the administrator do it"*, and he is right that it is his
+machine. The measurement is narrower than elevation: the account this runs as,
+`SALES\Lawre`, **is not in the Administrators group at all** -- not merely
+unelevated -- so no Defender POLICY change (update interval, update source,
+turning the automatic channel off so everything must come through ours) can be
+made from here even with a prompt. His administrator rights are on another
+account. Tamper protection is off, so nothing is locked; the account simply is
+not the one that holds it. Changing a security setting is his in any case.
+
+**And it should not be done anyway, which is the more important half.** Gating
+Microsoft's automatic channel so updates only arrive through ours would put
+this machine's scheduler and this repository's code in front of his only
+real-time protection. If our gate ever failed while he was away he would run on
+stale signatures, which is strictly less safe than today. The judgement he
+asked for needs no such change: the covenant already pulls and judges every
+update **without** standing between him and Microsoft.
+
+**What CANNOT be judged, and is not pretended.** The CONTENTS of a signature
+definition. It is opaque binary from Microsoft; a module claiming to reason
+about it would be measuring nothing, which this repository calls a fake guard
+(A65). What is judged is what is observable: **provenance by version, and
+effect on the posture.**
+
+**"Or the system itself grows and improves it."** After every update the
+standing detections are re-judged. When new signatures newly flag a file the
+covenant has already accounted for **by hash against its publisher**, that is
+Defender's judgement changing while ours did not: it is recorded as such and
+the file stays accounted for, so the same false positive never reaches him
+twice. That is the growth, and it is the covenant's layer improving, not a
+claim to have improved Microsoft's.
+
+**Pinned by** `test_av1_immune.py` (20, seven new), every rule driven the way
+that passes and the way that must not: forward passes, **backwards is
+REFUSED**, protection left off is REFUSED, a stopped service is REFUSED, a
+non-run is FAILED, already-current is PASSED and says nothing moved, and both
+postures land on the record. Broken: accepting a backwards version -> red;
+ignoring protection going off -> red; restored -> 20/20. H1 115 green.
+
+**What still needs him, in one place:** a full scan has never run on this
+machine, and from an administrator account
+`Set-MpPreference -SignatureUpdateInterval 4` would have Windows check four
+times a day alongside the covenant's own pulls. Neither is the covenant's to do.
+
+---
+
 ### A216. [public CI / a flake, not a regression] `test_w2_sandbox_platform.py` failed one check on ubuntu-python-3.11 at c9ae628 and PASSED on a re-run of the same commit
 
 **Measured, not assumed.** Commit c9ae628 ran the Linux sweep four times

@@ -36,6 +36,7 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import argparse
+import importlib
 import io
 import os
 import sys
@@ -360,6 +361,24 @@ def main():
             say("back-audit: %d legacy row(s) re-judged by the panel, %d now contested" % (checked, contested))
     except Exception as e:                                       # noqa: BLE001
         say("back-audit FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE DEFENCE, RUN BY US (A219, 2026-09-21, his words: "Defender should now
+    # be run by our system locally any updates must pass our logic and reason").
+    # The covenant pulls the signature update on ITS schedule, not only
+    # Windows', and judges the result: versions before and after, protection,
+    # the service. A REFUSED verdict is reported here and recorded; it is not
+    # rolled back, because Microsoft's updates are not ours to revoke and this
+    # account could not do it anyway. Its failure never stops the pass.
+    try:
+        _im = importlib.import_module("covenant_immune")
+        _v = _im.update()
+        say("defence: update %s -- %s" % (_v.get("verdict"), str(_v.get("why"))[:140]))
+        _st = _im.state()
+        say("defence: %s" % str(_st.get("says"))[:200])
+        for _n in (_st.get("needs_you") or [])[:3]:
+            say("defence: NEEDS HIM -- %s" % str(_n.get("says"))[:150])
+    except Exception as e:                                       # noqa: BLE001
+        say("defence FAILED (not fatal): %s: %s" % (type(e).__name__, str(e)[:160]))
 
     # THE TEACHER'S QUEUE (2026-09-21, his words: "apply the teacher queue
     # patch so it actually learns from me"). What he says to Tetsu, what
