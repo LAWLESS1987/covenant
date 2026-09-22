@@ -247,6 +247,62 @@ def update(ps=None, ledger_path=None, run=None, before=None, after=None):
     return _record(row, ledger_path)
 
 
+def full_scan(ledger_path=None, popen=None):
+    """A219b (2026-09-21, his word: "Full scan"). A full scan takes hours, so it
+    is started as a SURVIVOR: windowless, its own process group, out of this
+    shell's job. Started from a tool shell as an ordinary background job it
+    died with the shell and nothing ran -- measured, twice, with MsMpEng at
+    zero CPU and no start time to show for it (the same lesson as A204b).
+    Returns the row; ask running() whether it is actually under way."""
+    cmd = ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command",
+           "Start-MpScan -ScanType FullScan -ErrorAction Stop"]
+    row = {"kind": "full_scan", "started": False, "pid": None}
+    try:
+        if popen is None:
+            import covenant_quiet
+            popen = covenant_quiet.popen_survivor
+        p = popen(cmd, cwd=HERE)
+        row["started"], row["pid"] = True, getattr(p, "pid", None)
+        row["why"] = ("a full scan was started as a survivor process (pid %s); it runs for hours and "
+                      "outlives whatever started it" % row["pid"])
+    except Exception as e:                                        # noqa: BLE001
+        row["why"] = "the full scan could not be started: %s: %s" % (type(e).__name__, str(e)[:140])
+    return _record(row, ledger_path)
+
+
+def running(ps=None):
+    """Is a scan actually under way? Read from Defender, not from whether we
+    asked. {"scanning", "since", "full_scan_ever", "says"}."""
+    # A219b: FullScanStartTime is NOT populated while a scan runs -- measured
+    # 2026-09-21, two minutes of polling it said "no scan" while Defender
+    # itself refused a second one with "A scan is already in progress". The
+    # ground truth is the engine's own work: CPU consumed and files read over
+    # a short window. 252 s of CPU across threads and 44,000 reads in 30 s is
+    # a scan; an idle engine moves neither.
+    ok, d = (ps or _ps)("$p=Get-CimInstance Win32_Process -Filter \"Name='MsMpEng.exe'\"; "
+                        "$t1=[int64]$p.KernelModeTime+[int64]$p.UserModeTime; $r1=[int64]$p.ReadOperationCount; "
+                        "Start-Sleep -Seconds 6; "
+                        "$q=Get-CimInstance Win32_Process -Filter \"Name='MsMpEng.exe'\"; "
+                        "$s=Get-MpComputerStatus; [pscustomobject]@{ "
+                        "cpu=[double]((([int64]$q.KernelModeTime+[int64]$q.UserModeTime)-$t1)/10000000); "
+                        "reads=[int64]([int64]$q.ReadOperationCount-$r1); "
+                        "end=[string]$s.FullScanEndTime; age=[string]$s.FullScanAge } | ConvertTo-Json -Compress",
+                        timeout=120)
+    if not ok or not isinstance(d, dict):
+        return {"scanning": None, "says": "could not be read (%s)" % str(d)[:100]}
+    cpu = float(d.get("cpu") or 0)
+    reads = int(d.get("reads") or 0)
+    scanning = cpu > 2.0 or reads > 2000
+    end = (d.get("end") or "").strip()
+    never = (d.get("age") or "") in ("", str(NEVER))
+    return {"scanning": scanning, "engine_cpu_s_per_6s": round(cpu, 1), "engine_reads_per_6s": reads,
+            "full_scan_ever": not never,
+            "says": ("a scan is under way -- the engine burned %.0f s of CPU and read %d files in six seconds"
+                     % (cpu, reads)) if scanning else
+                    ("no full scan has ever completed on this machine" if never else
+                     "the last full scan finished %s" % end)}
+
+
 def vet(path, do_scan=True, ledger_path=None):
     """Before the covenant trusts a file it did not write: account for it by
     hash AND have the defence look at it. {"trust", "why", ...}.
