@@ -60,6 +60,7 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import argparse
+import importlib
 import io
 import json
 import os
@@ -789,8 +790,15 @@ THREATS = os.path.join(HERE, "ops", "security_threats.jsonl")
 def _defender_detections(hours=24):
     """Windows Defender's own detection history for the last `hours`, as rows; None when unreadable."""
     import subprocess
-    ps = ("$t=(Get-Date).AddHours(-%d); Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.InitialDetectionTime -gt $t } | "
+    # A217: the NAME comes too, not only the id. Get-MpThreatDetection carries
+    # ThreatID and no name, so the name is joined from Get-MpThreat -- and the
+    # name is what says whether a verdict was a signature match or a
+    # machine-learning guess (the `!ml` suffix), which is half of what decides
+    # whether covenant_provenance may settle a hit without him.
+    ps = ("$t=(Get-Date).AddHours(-%d); $names=@{}; Get-MpThreat -ErrorAction SilentlyContinue | ForEach-Object { $names[[string]$_.ThreatID]=[string]$_.ThreatName }; "
+          "Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.InitialDetectionTime -gt $t } | "
           "ForEach-Object { [pscustomobject]@{ t=$_.InitialDetectionTime.ToString('s'); id=[string]$_.ThreatID; ok=[bool]$_.ActionSuccess; "
+          "threat=[string]$names[[string]$_.ThreatID]; "
           "process=[string]$_.ProcessName; resources=(($_.Resources) -join ' | ') } } | ConvertTo-Json -Compress" % int(hours))
     try:
         p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=90)
@@ -841,15 +849,50 @@ def detect_defender_threat(health=None):
         with io.open(THREATS, "a", encoding="utf-8") as fh:
             for r in rows:
                 key = "%s|%s|%s" % (r.get("t"), r.get("id"), str(r.get("resources"))[:120])
-                row = {"key": key, "t": r.get("t"), "threat_id": r.get("id"), "acted": r.get("ok"), "process": r.get("process"),
+                # A217: the NAME is recorded beside the id. The ledger carried only
+                # the number, so a reader (and the provenance judge) could not tell a
+                # signature match from a machine-learning guess without looking it up.
+                row = {"key": key, "t": r.get("t"), "threat_id": r.get("id"), "threat": r.get("threat"),
+                       "acted": r.get("ok"), "process": r.get("process"),
                        "resources": str(r.get("resources"))[:400], "recorded": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
                 kept.append(row)
                 if key not in seen:
                     fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     except OSError:
         pass
-    return {"state": PRESENT, "measured": {"detections_24h": len(rows), "newest": kept[0] if kept else rows[0],
-                                           "note": "Defender acted on each (acted=true) or not; the file and the writing process are named; the hash against the publisher is a person's next step"}}
+    # A217 (2026-09-21, his words: "Delete the anti-virus and have the system
+    # act as one"). The antivirus stays -- nothing here scans a file as it runs
+    # and deleting the only thing that does would leave him with nothing. What
+    # the covenant CAN take over is the JUDGEMENT. This used to end with "the
+    # hash against the publisher is a person's next step"; he should not have to
+    # hold the hash. covenant_provenance answers it from the bytes: a hit is
+    # SETTLED only when the file is a member of an archive that still matches
+    # what its publisher published AND the verdict was a machine-learning guess
+    # (`!ml`). A signature match, a foreign path, a file in this tree with no
+    # registered archive, and a file with the right NAME but the wrong bytes all
+    # still reach him. Defender remains the senses; this is the judgement.
+    judged, unsettled = [], []
+    try:
+        _prov = importlib.import_module("covenant_provenance")
+        for r in (kept or rows):
+            j = _prov.judge_detection(r)
+            judged.append(j)
+            if not j.get("settled"):
+                unsettled.append(j)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": PRESENT, "measured": {"detections_24h": len(rows), "newest": kept[0] if kept else rows[0],
+                                               "note": "provenance could not be judged (%s: %s) -- every hit stands"
+                                                       % (type(e).__name__, str(e)[:80])}}
+    if judged and not unsettled:
+        return {"state": ABSENT, "measured": {
+            "detections_24h": len(rows), "all_settled": True,
+            "settled": [{"path": j["path"], "says": j["says"]} for j in judged][:6],
+            "note": "every detection is a machine-learning verdict on a file this repository can account for "
+                    "by hash against its publisher. Defender still acted on each; nothing was waved through blind."}}
+    return {"state": PRESENT, "measured": {"detections_24h": len(rows), "newest": (unsettled or judged or [None])[0],
+                                           "needs_you": len(unsettled),
+                                           "note": "%d of %d detection(s) could NOT be settled by provenance and are his"
+                                                   % (len(unsettled), len(judged))}}
 
 
 def _defender_status():

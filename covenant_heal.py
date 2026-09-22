@@ -34,6 +34,7 @@ LICENCE: public domain.
 """
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import sys
@@ -99,6 +100,14 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
         out["lines"] = [str(x)[:300] for x in (list(alerts) + list(infos))][:40]
     except Exception as e:                                        # noqa: BLE001
         out["error"] = "%s: %s" % (type(e).__name__, str(e)[:200])
+    # A218 (his words: "Incorporate the antvirus take it over and use it to
+    # protect the entire system"): one press also says what the defence is
+    # doing, what it found and whether our own files are still ours. Said, not
+    # acted on -- a failure to read it never fails the heal.
+    try:
+        out["defence"] = importlib.import_module("covenant_immune").state()
+    except Exception as e:                                        # noqa: BLE001
+        out["defence"] = {"ok": False, "says": "the defence could not be read (%s)" % type(e).__name__}
     out["summary"] = summary(out)
     _record(dict(out, kind="heal"), ledger_path)
     return out
@@ -136,13 +145,19 @@ def summary(out):
                 "resume it with: python covenant_pause.py --resume highway" % out.get("looked_at", 0))
     f, n = len(out.get("fixed", [])), len(out.get("still_needs_a_person", []))
     if not f and not n:
-        return "looked at %d condition(s); nothing was wrong" % out.get("looked_at", 0)
+        base = "looked at %d condition(s); nothing was wrong" % out.get("looked_at", 0)
+        d0 = out.get("defence") or {}
+        return base + (". Defence: " + d0["says"] if d0.get("says") else "")
     bits = []
     if f:
         bits.append("fixed %d (%s)" % (f, ", ".join(x["condition"] for x in out["fixed"][:4])))
     if n:
         bits.append("%d still needs a person (%s)" % (n, ", ".join(x["condition"] for x in out["still_needs_a_person"][:4])))
-    return "looked at %d condition(s); %s" % (out.get("looked_at", 0), "; ".join(bits))
+    line = "looked at %d condition(s); %s" % (out.get("looked_at", 0), "; ".join(bits))
+    d = out.get("defence") or {}
+    if d.get("says"):
+        line += ". Defence: " + d["says"]
+    return line
 
 
 def heal_peer(host, port, dry_run=False, timeout=PEER_TIMEOUT_S, ledger_path=None, post=None):

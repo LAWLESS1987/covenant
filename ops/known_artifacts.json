@@ -1,0 +1,12 @@
+{
+ "what": "Archives whose bytes were checked against what the project published. A file flagged by the antivirus is judged a false positive ONLY if it is a member of one of these AND the archive still matches (covenant_provenance, A217).",
+ "artifacts": [
+  {
+   "archive": "tools/llama/llama-b11057-bin-win-cpu-x64.zip",
+   "sha256": "42222e06e2b00c21230788d40870f7067a21634c3518148d2134bd0b7d19ae3e",
+   "source": "github.com/ggml-org/llama.cpp release b11057 (asset llama-b11057-bin-win-cpu-x64.zip)",
+   "verified": "2026-09-21: the GitHub API's own digest for the asset equalled this hash, and its size (18,463,000 bytes) matched; the asset had 920 downloads",
+   "note": "the local language-model runtime. Defender flagged its llama-gguf-split.exe twice on 2026-09-21 with Trojan:Win32/Wacatac.B!ml -- a machine-learning verdict, on a binary byte-identical to the published release."
+  }
+ ]
+}

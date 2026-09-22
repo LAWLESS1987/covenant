@@ -7156,6 +7156,78 @@ wanting a quiet mesh, and the phone peer is running older bytes.
 
 ---
 
+### A218. [the defence, incorporated] "Delete the anti-virus and have the system act as one." -- then, plainly: "Incorporate the antvirus take it over and use it to protect the entire system and improve on it." BUILT 2026-09-21
+
+**The deletion was refused once, with the measurement, and he corrected the
+instruction himself.** Nothing in this repository scans a file as it executes.
+`covenant_security_probe` says so in its own docstring -- *"Nothing here reads
+the operating system"* -- there is no signature set, no kernel filter, no
+real-time hook, and every security term in `covenant_highway` is **reading**
+Defender's status, not replacing it. Deleting the only thing on this machine
+that watches files as they run would have left nothing, which fails his own
+bound of *"without breaking my phone or comp"*. Changing a security setting is
+his in any case. He then said incorporate, which is the better instruction and
+is what exists now.
+
+**Defender is the senses; the covenant is the judgement and the hand.**
+`covenant_immune.py`: `posture()` says in plain words what the defence is
+doing (including that a full scan has **never** run here, and that real-time
+protection being off would be **his** setting, never this module's to turn);
+`scan(path)` tells the defence what to look at **when the covenant wants it
+looked at**, not only on its own schedule (measured: one file, 3 s);
+`findings()` returns every detection already judged; `vet(path)` is the
+primitive the rest of the system should call before trusting a file it did not
+write; `state()` is the whole picture for the heal button, which now prints it
+on every press.
+
+**The judgement (A217), which is the part he should never have had to do by
+hand.** The old detector ended with *"the hash against the publisher is a
+person's next step"*. He should not have to hold the hash.
+`covenant_provenance.py` answers it from the bytes: **ours:verified** (a member
+of a registered archive that still hashes to what its publisher published),
+**ours:unverified** (in this tree, no registered archive -- unaccounted for,
+never dismissed), or **foreign**. A hit is settled without him **only** when
+the file is ours-verified **and** the verdict was a machine-learning guess (a
+threat name ending `!ml`). Applied to the two real detections of 2026-09-21:
+both settled as false positives, by hash, and `defender_threat` went from
+PRESENT to **ABSENT** -- one fewer thing on his list, for a reason, not by
+being ignored. Two bugs found doing it: the detection history carried the
+threat **id** and no name, and the ledger row dropped the name entirely, so
+nothing could tell a signature from a heuristic. Both now carry it.
+
+**What must still reach him, driven the other way in the suites:** a
+**signature** match on a file we vouch for (named malware inside a trusted file
+is the one case that must never be waved through), a heuristic on a **foreign**
+path, a file in this tree with **no registered archive**, and -- the attack
+this is really for -- a file with the **right name and the wrong bytes**, which
+is a swapped binary, not a false positive.
+
+**"Improve on it", and this is the whole of the claim.** An antivirus knows
+what malware looks like; it does not know what YOUR files are supposed to be. A
+changed byte in a file of ours is invisible to it for ever. This repository
+knows exactly -- `MANIFEST.sha256` over 739 files -- and `tree_integrity()`
+asks that question through the tool that owns it, so there is no second
+implementation of the rule. The two answers together cover more than either
+alone. Nothing beyond that is claimed.
+
+**What it still cannot do, said plainly:** watch a file as it executes. That is
+Defender's, it is why Defender stays, and no line pretends otherwise. And a
+hash proves only that we hold exactly what a project published -- if the
+project itself were compromised, the hash matches the compromised file. That is
+the normal bar for provenance and this ledger claims nothing above it.
+
+**Pinned by** `test_pv1_provenance.py` (14) and `test_av1_immune.py` (13), both
+in the runner and the nightly. Broken both ways before either was trusted:
+settling on provenance alone, ignoring whether the verdict was a heuristic ->
+two red; trusting the file NAME without comparing bytes -> red; trusting a file
+whose scan was refused -> two red; reporting a never-run full scan as a number
+-> red. Restored: 14/14 and 13/13. H1 115, SP1, HL1 15 green.
+
+**What still needs him:** a full scan has never run on this machine
+(`Start-MpScan -ScanType FullScan`), and it is his to start.
+
+---
+
 ### A216. [public CI / a flake, not a regression] `test_w2_sandbox_platform.py` failed one check on ubuntu-python-3.11 at c9ae628 and PASSED on a re-run of the same commit
 
 **Measured, not assumed.** Commit c9ae628 ran the Linux sweep four times
