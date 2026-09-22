@@ -7095,6 +7095,67 @@ two callers by text.
 
 ---
 
+### A214b. [optimize, measured this time] "Optimize." PROFILED 2026-09-21: the watchdog's pass is 15 s of every 60, and 73% of it was one module -- 15 s -> 3.4 s
+
+**Profiled, not guessed.** The first optimisation pass (A214) guessed twice and
+was wrong twice, so this one started with `cProfile` on a real
+`covenant_watchdog.one_pass()`:
+
+| | |
+|---|---|
+| one_pass | **14.60 s** |
+| of which `covenant_highway.run_once` | **10.74 s (73%)** |
+| of which `sense()` | 10.72 s |
+| 15 subprocess launches | 7.9 s |
+| 16 HTTP calls | 6.3 s |
+
+Then every detector timed individually: **17 detectors, 10.78 s**, and two of
+them were 8.3 s of it. The other fifteen together were 2.5 s.
+
+**`stale_test_mesh`: 6.09 s -> 1.08 s.** It asked `/health` on 6000, 6020 and
+6060 with a 3-second timeout. A SYN to a closed 60x0 port on this machine is
+**dropped rather than refused**, so each call sat out ~2.0 s, three times, every
+minute. Measured alternative: a socket `connect_ex` answers "is anything
+listening" in 0.36 s when nothing is, and in **under 18 ms when something is**
+(three tries each on 5000/5020/5060, slowest 17.6 ms) -- a 20x margin on the
+0.35 s budget. A port that connects is still asked `/health`, and only a 200
+still counts. **Driven both ways before it was trusted:** nothing listening ->
+ABSENT in 1.08 s; a real server on 6000 -> PRESENT naming the port.
+
+**`held_core_drift`: 2.20 s -> 0.02 s.** It shelled out to
+`covenant_sync_held_core.py --check`. Calling the same `main(["--check"])` in
+process changed nothing: **still 2.16 s** -- the third wrong guess, and it is
+recorded here beside the gains. Profiling *that* found the real cost:
+`declared_version` runs `ast.parse` over **thirteen copies of a 12,700-line
+core**, 1.90 s, every pass, to read one string. It is now cached on each file's
+own identity (path, size, mtime in nanoseconds), so a copy that changed by one
+byte is parsed again and one that did not is not. Proved both ways: a file
+rewritten between two calls returns the new version, not the cached one.
+
+**Result: 15 s -> 9.0 s on the first pass (which fills the cache) and 3.4 s on
+every pass after.** About 11.6 seconds of every minute handed back to the
+machine the watchdog is supposed to be watching -- his standing bound on all of
+this being *"without breaking my phone or comp or slowing down"*.
+
+**Two checks had to be rewritten, and they are STRONGER, not moved.** H1's
+fixtures faked the transports these detectors no longer use: a `urlopen` mock
+that the socket probe now short-circuits before reaching, and a
+`subprocess.run` stub for a call that is gone. Either would have gone on
+passing while measuring nothing -- the A65 shape this repository exists to
+refuse. `stale_test_mesh` now binds **three real HTTP servers on ephemeral
+ports** (ephemeral so a sweep's own test nodes on 60x0 can never collide) and
+drives the real socket-then-HTTP path; `held_core_drift` takes an injected
+`check` seam, its own, instead of a mock of a transport. **Broken both ways:**
+the socket probe forced to see nothing -> three H1x checks red; the exit code
+ignored -> H1w red; restored -> **H1 115/115**.
+
+**Suites:** H1 115, P18 20, A115 32, HL1 15, watchdog_outage 10 green.
+`test_c2_watchdog_live.py` is 13/26 -- **measured on the tree WITHOUT these
+changes and it is 13/26 there too**, so it is not this work; it is a live suite
+wanting a quiet mesh, and the phone peer is running older bytes.
+
+---
+
 ### A216. [public CI / a flake, not a regression] `test_w2_sandbox_platform.py` failed one check on ubuntu-python-3.11 at c9ae628 and PASSED on a re-run of the same commit
 
 **Measured, not assumed.** Commit c9ae628 ran the Linux sweep four times

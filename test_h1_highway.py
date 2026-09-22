@@ -615,10 +615,15 @@ def main():
 
     try:
         _sp2.run = lambda cmd, *a, **k: R3(stub.get("rc", 0), stub.get("out", ""))
-        stub.update(rc=1, out="held copies: OUT OF SYNC")
-        d1 = H.detect_held_core_drift()
-        stub.update(rc=0, out="held copies: in sync")
-        d0 = H.detect_held_core_drift()
+        # A214b: this detector no longer shells out -- it was 2.20 s of the
+        # highway's 10.78 s of sensing, nearly all of it re-parsing thirteen
+        # copies of a 12,700-line core, every sixty seconds. It calls
+        # held_core_check() in process now, so this drives THAT seam, the
+        # detector's own. A stub of subprocess.run would pass here while
+        # measuring nothing, which is exactly the A65 shape this file exists
+        # to refuse.
+        d1 = H.detect_held_core_drift(check=lambda: (1, "held copies: OUT OF SYNC"))
+        d0 = H.detect_held_core_drift(check=lambda: (0, "held copies: in sync"))
         check("H1w held_core_drift reads the sync tool's exit code, both ways",
               d1["state"] == H.PRESENT and d0["state"] == H.ABSENT,
               "%s / %s" % (d1["state"], d0["state"]))
@@ -782,34 +787,59 @@ def main():
     # nodes but tetsu needs to begin handling these fixes also well between him and pc").
     # Driven here with the two measurements stubbed: ports answering, and whether a
     # covenant_one.py sweep is running. The remedy is never run for real in a suite.
-    _real_sr, _real_uo = H._sweep_running, None
-    import urllib.request as _ur
-    _real_uo = _ur.urlopen
+    # A214b: REAL listeners on ephemeral ports, not a mock of urlopen. The
+    # detector now asks the SOCKET whether anything is there before it asks
+    # HTTP -- a dropped SYN to a closed 60x0 port cost ~2.0 s, three times a
+    # minute, 56% of all sensing -- so a urlopen mock alone would short-circuit
+    # before reaching the fake and pass while measuring nothing. These bind and
+    # answer /health for real. The ports are ephemeral, so a sweep's own test
+    # nodes on 6000/6020/6060 can never collide with this check.
+    import http.server as _hs
+    import json as _json
+    import threading as _th
 
-    class _Up:
-        status = 200
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
+    class _HealthOK(_hs.BaseHTTPRequestHandler):
+        def do_GET(self):                                         # noqa: N802
+            b = _json.dumps({"node_id": "TESTMESH"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def log_message(self, *_a):
+            return
+
+    _real_sr = H._sweep_running
+    _servers, _ports = [], []
+    for _i in range(3):
+        _srv = _hs.HTTPServer(("127.0.0.1", 0), _HealthOK)
+        _th.Thread(target=_srv.serve_forever, daemon=True).start()
+        _servers.append(_srv)
+        _ports.append(_srv.server_address[1])
     try:
-        _ur.urlopen = lambda url, timeout=3: _Up()          # every test port answers
         H._sweep_running = lambda: False
-        r_tm = H.detect_stale_test_mesh()
+        r_tm = H.detect_stale_test_mesh(ports=tuple(_ports))
         H._sweep_running = lambda: True
-        r_tm_owned = H.detect_stale_test_mesh()
+        r_tm_owned = H.detect_stale_test_mesh(ports=tuple(_ports))
         H._sweep_running = lambda: None
-        r_tm_unk = H.detect_stale_test_mesh()
-        _ur.urlopen = lambda url, timeout=3: (_ for _ in ()).throw(OSError("refused"))
-        H._sweep_running = lambda: False
-        r_tm_none = H.detect_stale_test_mesh()
+        r_tm_unk = H.detect_stale_test_mesh(ports=tuple(_ports))
     finally:
-        _ur.urlopen, H._sweep_running = _real_uo, _real_sr
-    check("H1x stale_test_mesh: test ports answering with NO sweep running is PRESENT, naming the ports",
-          r_tm["state"] == H.PRESENT and r_tm["measured"]["test_ports_up"] == [6000, 6020, 6060], str(r_tm))
+        for _srv in _servers:
+            _srv.shutdown()
+        H._sweep_running = _real_sr
+    try:
+        H._sweep_running = lambda: False
+        r_tm_none = H.detect_stale_test_mesh(ports=tuple(_ports))   # same ports, now closed
+    finally:
+        H._sweep_running = _real_sr
+    check("H1x stale_test_mesh: REAL listeners with no sweep running is PRESENT, naming the ports",
+          r_tm["state"] == H.PRESENT and sorted(r_tm["measured"]["test_ports_up"]) == sorted(_ports), str(r_tm)[:150])
     check("H1x stale_test_mesh: the same ports with a sweep running is ABSENT (a sweep owns its nodes)",
-          r_tm_owned["state"] == H.ABSENT and "owns them" in r_tm_owned["measured"].get("note", ""), str(r_tm_owned))
+          r_tm_owned["state"] == H.ABSENT and "owns them" in r_tm_owned["measured"].get("note", ""), str(r_tm_owned)[:150])
     check("H1x stale_test_mesh: the process list unreadable is UNKNOWN, never ABSENT",
-          r_tm_unk["state"] == H.UNKNOWN and "error" in r_tm_unk["measured"], str(r_tm_unk))
-    check("H1x stale_test_mesh: no test port answering is ABSENT", r_tm_none["state"] == H.ABSENT, str(r_tm_none))
+          r_tm_unk["state"] == H.UNKNOWN and "error" in r_tm_unk["measured"], str(r_tm_unk)[:150])
+    check("H1x stale_test_mesh: nothing listening on those ports is ABSENT, so the condition can clear",
+          r_tm_none["state"] == H.ABSENT and r_tm_none["measured"]["test_ports_up"] == [], str(r_tm_none)[:150])
     ok_dry, note_dry = H.remedy_evict_test_mesh({"test_ports_up": [6000, 6020]}, dry_run=True)
     ok_no, note_no = H.remedy_evict_test_mesh({"test_ports_up": []}, dry_run=False)
     try:

@@ -85,6 +85,9 @@ SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", "logs",
              ".claude"}
 
 
+_DECLARED_CACHE = {}
+
+
 def declared_version(path):
     """The module-level COVENANT_VERSION assignment, read from the AST.
 
@@ -92,11 +95,27 @@ def declared_version(path):
     imports and never execs -- see the module docstring. A SyntaxError is
     reported as None rather than raised: this is a hygiene check and must not
     be the thing that stops a sweep.
+
+    A214b (2026-09-21, his word: "Optimize"): MEASURED at 1.90 s per call set
+    -- thirteen held copies of a 12,700-line core parsed in full, every
+    watchdog pass, every sixty seconds, to read one string. The answer is
+    cached on the file's OWN IDENTITY (size and modification time), so a copy
+    that changed by a single byte is parsed again and one that did not is not.
+    This is not a different way of reading the version; it is the same AST walk,
+    not repeated on bytes that have not moved.
     """
+    try:
+        st = os.stat(path)
+        key = (os.path.abspath(path), st.st_size, st.st_mtime_ns)
+    except OSError:
+        return None
+    if key in _DECLARED_CACHE:
+        return _DECLARED_CACHE[key]
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
             tree = ast.parse(fh.read(), filename=path)
     except (OSError, SyntaxError, ValueError):
+        _DECLARED_CACHE[key] = None
         return None
     for node in tree.body:                      # module level only, by design
         if isinstance(node, ast.Assign):
@@ -104,7 +123,9 @@ def declared_version(path):
                 if isinstance(tgt, ast.Name) and tgt.id == "COVENANT_VERSION":
                     if isinstance(node.value, ast.Constant) and \
                             isinstance(node.value.value, str):
+                        _DECLARED_CACHE[key] = node.value.value
                         return node.value.value
+    _DECLARED_CACHE[key] = None
     return None
 
 

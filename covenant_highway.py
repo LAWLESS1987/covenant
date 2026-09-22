@@ -493,21 +493,40 @@ def detect_manifest_stale(health=None):
             "measured": {"rc": p_.returncode, "changed": changed[:10], "n_changed": len(changed)}}
 
 
-def detect_held_core_drift(health=None):
+def held_core_check():
+    """(exit code, what it said) from the sync tool's own --check, in process.
+    The one seam a suite replaces, so a check drives THIS function rather than
+    a mock of a transport this detector no longer uses (A214b)."""
+    import contextlib
+    import importlib
+    import io
+    _sync = importlib.import_module("covenant_sync_held_core")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = _sync.main(["--check"])
+    return rc, buf.getvalue().strip()
+
+
+def detect_held_core_drift(health=None, check=None):
     """A held copy of the core claiming the live version with different bytes.
 
     P18 V3. Re-broken by every core change until someone copies the file, which
     is exactly the class of chore that gets forgotten -- it went red on GitHub
     thirty-seven commits in a row once.
     """
-    import subprocess
+    # A214b (2026-09-21, his word: "Optimize"). MEASURED at 2.20 s, the second
+    # largest detector, and nearly all of it was a fresh Python interpreter
+    # starting on Windows to run a file-hash comparison. The SAME code path is
+    # called in-process here -- main(["--check"]) with its stdout captured, not
+    # a reimplementation of the rule, so there is no second version of "is a
+    # held copy out of sync" to drift from the first. The exit code it returns
+    # is the one the subprocess returned; the verdict is identical.
     try:
-        p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_sync_held_core.py"), "--check"],
-                           cwd=HERE, capture_output=True, text=True, timeout=120, creationflags=_NOWIN)
+        rc, said = (check or held_core_check)()
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
-    return {"state": PRESENT if p.returncode != 0 else ABSENT,
-            "measured": {"rc": p.returncode, "said": (p.stdout or p.stderr or "").strip()[:200]}}
+    return {"state": PRESENT if rc != 0 else ABSENT,
+            "measured": {"rc": rc, "said": said[:200]}}
 
 
 def _watchdog_like():
@@ -710,7 +729,7 @@ def _sweep_running():
         return None                                  # could not read the process list: the caller says UNKNOWN, never evicts
 
 
-def detect_stale_test_mesh(health=None):
+def detect_stale_test_mesh(health=None, ports=(6000, 6020, 6060)):
     """Test nodes (run_node.py --port 60x0) answering while no sweep is running.
 
     2026-09-21, his words: "Fix the test nodes but tetsu needs to begin handling
@@ -722,9 +741,32 @@ def detect_stale_test_mesh(health=None):
     process exists. A sweep in flight owns its test nodes; this never touches
     them then. Production is 50x0 and is never in the pattern.
     """
+    import socket
     import urllib.request
+    # A214b (2026-09-21, his word: "Optimize"). MEASURED: this detector was
+    # 6.09 s of the highway's 10.78 s of sensing -- 56% of it -- and the
+    # highway is 10.7 s of the watchdog's 14.6-second pass, every sixty
+    # seconds. All of it was waiting: a SYN to a closed 60x0 port is dropped
+    # rather than refused on this machine, so each urlopen sat out ~2.0 s
+    # three times over. A socket connect answers the same question -- is
+    # anything listening at all -- in 0.36 s when nothing is, and in under
+    # 18 ms when something is (measured over three tries on 5000/5020/5060,
+    # slowest 17.6 ms). The 0.35 s budget is ~20x the slowest live connect.
+    # The VERDICT is unchanged: a port that connects is still asked /health,
+    # and only a 200 counts as a node. Nothing that was detected before is
+    # missed now; what is skipped is the wait for a port with nothing on it.
     up = []
-    for port in (6000, 6020, 6060):
+    for port in ports:
+        probe = socket.socket()
+        probe.settimeout(0.35)
+        try:
+            listening = probe.connect_ex(("127.0.0.1", port)) == 0
+        except OSError:
+            listening = False
+        finally:
+            probe.close()
+        if not listening:
+            continue
         try:
             with urllib.request.urlopen("http://127.0.0.1:%d/health" % port, timeout=3) as r:
                 if r.status == 200:
