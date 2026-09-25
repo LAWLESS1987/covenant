@@ -1522,8 +1522,15 @@ def recalibrate(name, why, ledger=None):
                          "remedy": name, "outcome": "recalibrated", "why": why}, ledger)
 
 
-def _recent_identical(name, detector, ledger=None, within_s=None):
+def _recent_identical(name, detector, ledger=None, within_s=None, include_dry=True):
     """The last row for this (remedy, detector) if it is younger than the cooldown.
+
+    A DRY RUN IS NOT AN ATTEMPT (2026-09-25). With include_dry=False -- a real
+    repair asking -- rows that only rehearsed are passed over. Measured that
+    evening: a test's dry pass wrote "restart_nodes ... dry run" into the live
+    ledger at 18:45:50, and for the next hour every real pass printed "last dry
+    run ... nothing done this pass" while three nodes ran a stale core. A
+    rehearsal still holds another rehearsal, so the ledger stays quiet.
 
     The first hour of live running wrote the same proposal row every 66 seconds,
     twenty-four times, each one re-loading the judge to re-ask a question whose
@@ -1535,6 +1542,8 @@ def _recent_identical(name, detector, ledger=None, within_s=None):
     now = time.time()
     for row in reversed(read_ledger(ledger)):
         if row.get("remedy") == name and row.get("detector") == detector:
+            if row.get("dry_run") and not include_dry:
+                continue
             return row if (now - float(row.get("at", 0))) < within_s else None
     return None
 
@@ -1653,7 +1662,7 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         eff = max(cooldown_s, declared)
     else:
         eff = cooldown_s
-    prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff)
+    prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff, include_dry=bool(dry_run))
     if prev is not None:
         out = dict(prev)
         out["repeat"] = True

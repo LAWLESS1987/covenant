@@ -72,6 +72,9 @@ def spy_remedy(calls, ok=True):
 
 
 def main():
+    # Every pass this suite drives saves its sensed states (save_last_sense, 2026-09-25); they go
+    # to a temp file, never the live ops/highway_last_sense.json the PC page reads.
+    os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = tempfile.mktemp(suffix="_h1_last_sense.json")
     # ---- H1a: the engine refuses the class, and the function is never entered
     calls = []
     real = dict(H.REMEDIES["install_on_phone"])
@@ -310,6 +313,20 @@ def main():
                               choices={}, cooldown_s=0)
         check("H1m mutation: asked for explicitly (cooldown_s=0) it runs again",
               len(calls) == 2 and not row3.get("repeat"), "calls=%d" % len(calls))
+        # H1m2 (2026-09-25): a DRY RUN is not an attempt. A rehearsal row held the real
+        # node restart for an hour on the live ledger (18:45:50). Both ways: a dry row does
+        # not hold a real run; it still holds another dry run, so rehearsals stay quiet.
+        led2 = tmp_ledger()
+        H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=led2, choices={})
+        n0 = len(calls)
+        real_after_dry = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led2, choices={})
+        check("H1m2 a real repair is not held by a rehearsal's row: it runs",
+              len(calls) == n0 + 1 and not real_after_dry.get("repeat"), "calls=%d repeat=%s" % (len(calls) - n0, real_after_dry.get("repeat")))
+        led3 = tmp_ledger()
+        H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=led3, choices={})
+        dry_again = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=led3, choices={})
+        check("H1m2 ...while a second rehearsal inside the hour is still held (no second row)",
+              dry_again.get("repeat") is True and len(H.read_ledger(led3)) == 1, dry_again.get("repeat"))
     finally:
         H.REMEDIES["rotate_log"] = real_rl
 
@@ -695,7 +712,9 @@ def main():
           [n for n, r in H.REMEDIES.items()
            if "mesh_source_split" in (r.get("for") or [])] == [],
           str({n: r.get("for") for n, r in H.REMEDIES.items()}))
-    a_ms, _i_ms = H.run_once(dry_run=True, health=_mesh_health("aaaaaaaaaaaa", "ffffffffffff"))
+    # A TEMP LEDGER (2026-09-25): this pass used to write its dry-run rows into the LIVE
+    # ops/highway.jsonl, where one held the real node restart for an hour (18:45:50).
+    a_ms, _i_ms = H.run_once(dry_run=True, health=_mesh_health("aaaaaaaaaaaa", "ffffffffffff"), ledger=tmp_ledger())
     check("H1w ...and run_once still ALERTS on it, with the numbers -- a finding "
           "with no remedy is not a finding nobody is told about",
           any("mesh_source_split" in a and "phone:5001" in a for a in a_ms),
