@@ -78,16 +78,8 @@ async function heal(){const b=document.getElementById('heal');const a=document.g
  b.disabled=true;const was=b.textContent;b.textContent='healing…';a.style.display='block';a.textContent='looking at everything that can go wrong…';
  try{const r=await fetch('/m/heal',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const j=await r.json();
   let t=j.summary||'no answer';
-  if(j.fixed&&j.fixed.length)t+='
-
-FIXED:
-'+j.fixed.map(x=>'  '+x.condition).join('
-');
-  if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='
-
-STILL NEEDS YOU:
-'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('
-');
+  if(j.fixed&&j.fixed.length)t+='\\n\\nFIXED:\\n'+j.fixed.map(x=>'  '+x.condition).join('\\n');
+  if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='\\n\\nSTILL NEEDS YOU:\\n'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('\\n');
   a.textContent=t;speak(j.summary||'');}
  catch(e){a.textContent='the heal could not be reached: '+e;}
  b.disabled=false;b.textContent=was;}
@@ -114,7 +106,11 @@ function label(text,pos,color){const c=document.createElement('canvas');c.width=
 // STATUS AT A GLANCE (Tetsu's first suggestion, 2026-09-21): green = measured fine, amber = not known, red = a condition is present
 const OK=0x2E8B6E, UNK=0xC9A227, BAD=0xC0392B;
 function statusColor(st){return st==='present'?BAD:(st==='absent'?OK:UNK);}
-function layout(){for(const o of orbs.filter(o=>o!==tetsu))scene.remove(o);orbs.length=1;links.clear();labels.clear();if(!state)return;const d=state.detail||{};const hw=d.highway||{};
+// 2026-09-25 ("the pc app needs optimization"): the scene is rebuilt only when what the orbs SHOW
+// changes (their names and colours); otherwise the clicked details are refreshed in place. A rebuild
+// releases the old materials, line geometry and label textures, which were leaked every 15 s before.
+let lastSig='';
+function layout(){if(!state)return;const d=state.detail||{};const hw=d.highway||{};
 // one Tetsu; the nodes are his cells, each its own orb from its own /health (A, B, C), and the phone's node by its address
 const items=[];const mesh=state.mesh||[];
 if(mesh.length){for(const m of mesh)items.push({name:'node '+(m.node_id||'?')+(m.me?' (here)':'')+(m.down?' (down)':''),color:m.down?BAD:(m.degraded?UNK:OK),detail:m,kind:'node'});}
@@ -124,6 +120,12 @@ items.push({name:'Phone',color:(d.phone&&d.phone.last_checkin_hours!=null)?(d.ph
 items.push({name:'Moltbook',color:(d.forum&&d.forum.length)?OK:UNK,detail:d.forum,kind:'forum'});
 items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),detail:d.money,kind:'money'});
 items.push({name:'Highway',color:Object.values(hw).some(v=>v==='present')?BAD:(Object.values(hw).some(v=>v==='unknown')?UNK:OK),detail:hw,kind:'highway'});
+const sig=items.map(p=>p.name+'|'+p.color).join(';');
+if(sig===lastSig){items.forEach((p,i)=>{const o=orbs[i+1];if(o)o.userData.detail=p.detail;});return;}
+lastSig=sig;
+for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);o.material.dispose();}orbs.length=1;
+for(const l of links.children){l.geometry.dispose();l.material.dispose();}links.clear();
+for(const s of labels.children){if(s.material.map)s.material.map.dispose();s.material.dispose();}labels.clear();
 const n=items.length;items.forEach((p,i)=>{const a=(i/n)*Math.PI*2;const o=orb(p.name,p.color,Math.cos(a)*4.4,Math.sin(a)*4.4);o.userData.detail=p.detail;o.userData.kind=p.kind;label(p.name,o.position);const g=new THREE.BufferGeometry().setFromPoints([o.position,tetsu.position]);links.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x2E8B6E,transparent:true,opacity:0.45})));});label('Tetsu',new THREE.Vector3(0,0.9,0),'#9fc7b0');}
 setInterval(layout,15000);setTimeout(layout,2500);
 const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
@@ -191,12 +193,19 @@ def register(api, caller, refused, cov):
                 try:
                     with _ur.urlopen("http://127.0.0.1:%d/health" % port, timeout=3) as r:
                         h = _json.loads(r.read().decode("utf-8", "replace"))
+                    # /health reports `peers` as a COUNT (an int, since the first commit);
+                    # len() of it threw, and the bare except below filed every live node
+                    # as down (measured 2026-09-25: all three "down" while each answered
+                    # in 0.02 s). A list is still counted, if one ever arrives.
+                    _p = h.get("peers")
+                    _np = len(_p) if isinstance(_p, (list, tuple)) else int(_p or 0)
                     out["mesh"].append({"node_id": h.get("node_id") or "?", "port": port, "version": h.get("version"),
-                                        "chain_height": h.get("chain_height"), "peers": len(h.get("peers") or []),
+                                        "chain_height": h.get("chain_height"), "peers": _np,
                                         "source": (h.get("source_sha256") or "")[:12], "degraded": bool(h.get("degraded")),
                                         "me": port == 5000 and (h.get("node_id") == self_h["node_id"])})
-                except Exception:                                # noqa: BLE001
-                    out["mesh"].append({"node_id": "?", "port": port, "down": True})
+                except Exception as _e:                          # noqa: BLE001
+                    # the reason rides with the orb, so "down" is never a guess again
+                    out["mesh"].append({"node_id": "?", "port": port, "down": True, "why": "%s: %s" % (type(_e).__name__, str(_e)[:120])})
         except Exception:                                        # noqa: BLE001
             pass
         try:
@@ -224,8 +233,15 @@ def register(api, caller, refused, cov):
             pass
         try:
             import covenant_highway
-            sensed = covenant_highway.sense(only=["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"])
-            out["detail"]["highway"] = {k: v.get("state") for k, v in sensed.items()}
+            want = ["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"]
+            # What the watchdog's own last pass saw, when it is fresh (2026-09-25: sensing again
+            # here was 95% of a cold read, profiled); sense only when there is no fresh pass.
+            seen = covenant_highway.last_sense()
+            if seen is not None and all(k in seen for k in want):
+                out["detail"]["highway"] = {k: seen[k] for k in want}
+            else:
+                sensed = covenant_highway.sense(only=want)
+                out["detail"]["highway"] = {k: v.get("state") for k, v in sensed.items()}
         except Exception:                                        # noqa: BLE001
             pass
         try:

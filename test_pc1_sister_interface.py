@@ -83,6 +83,83 @@ def main():
     check("PC1z /pc/3d/state answers the tailnet with this node, its peers, the voice and the immunity state",
           rs.status_code == 200 and js.get("self", {}).get("node_id") and "chain_height" in js.get("self", {}) and "peers" in js and "voice" in js and "immunity" in js, js)
     check("PC1z /pc/3d/state refuses a LAN address 403", get(client, "/pc/3d/state", "192.168.1.50").status_code == 403)
+
+    # ---- PC1z2 (2026-09-25, his words: "theres only one orb now"). Measured in a browser: the
+    # page threw "Uncaught SyntaxError: Invalid or unexpected token" -- A215's Self-heal code
+    # carried real line breaks inside JavaScript quotes (a shell ate its \n escapes), so the
+    # main script never ran, `state` was never declared, and only Tetsu's orb was drawn. The
+    # checks above passed the whole time: they read text, they never parsed. This one PARSES
+    # what a browser parses first: a JS string in single quotes cannot span a line, so a line
+    # of inline script with an odd count of unescaped single quotes is a broken script.
+    def broken_script_lines(html):
+        bad = []
+        for block in re.findall(r"<script(?![^>]*importmap)[^>]*>(.*?)</script>", html, re.S):
+            for n, line in enumerate(block.split("\n"), 1):
+                s = line.strip()
+                if not s or s.startswith("//"):
+                    continue
+                if (s.replace("\\\\", "").replace("\\'", "").count("'")) % 2:
+                    bad.append((n, s[:80]))
+        return bad
+    check("PC1z2 the checker measures something: it flags a line break inside a quoted string",
+          len(broken_script_lines("<script>t+='\n\nFIXED:\n'+x;</script>")) >= 1)
+    pages = {p: get(client, p, "100.86.158.1").get_data(as_text=True) for p in ("/pc/3d", "/pc")}
+    bad = {p: broken_script_lines(h) for p, h in pages.items()}
+    check("PC1z2 every inline script the PC serves (/pc/3d, /pc) parses: no quoted string spans a line",
+          not any(bad.values()), bad)
+
+    # ---- PC1z3 (2026-09-25): /health reports `peers` as a COUNT; the state route took len()
+    # of it, threw, and filed every live node as down. A health answer with an int peers
+    # field must come back as a live orb with that count, and a failed read must say why.
+    import urllib.request as _ur
+    import covenant_pc3d as P3
+
+    class _Resp:
+        def __init__(self, body): self._b = body
+        def read(self): return self._b
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    real_open, real_ttl = _ur.urlopen, P3.STATE_TTL
+    try:
+        P3.STATE_TTL = -1
+        _ur.urlopen = lambda url, timeout=None: _Resp(json.dumps({"node_id": "X", "chain_height": 7, "peers": 2, "source_sha256": "ab" * 32}).encode())
+        mesh = (get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("mesh", [])
+        check("PC1z3 a node whose /health reports peers as a count is a live orb with that count, not down",
+              len(mesh) == 3 and all(not x.get("down") and x.get("peers") == 2 and x.get("chain_height") == 7 for x in mesh), mesh)
+        def _refuse(url, timeout=None):
+            raise ConnectionRefusedError("refused")
+        _ur.urlopen = _refuse
+        mesh = (get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("mesh", [])
+        check("PC1z3 a node that cannot be read is down WITH the reason, never a bare guess",
+              len(mesh) == 3 and all(x.get("down") and "ConnectionRefusedError" in str(x.get("why")) for x in mesh), mesh)
+    finally:
+        _ur.urlopen, P3.STATE_TTL = real_open, real_ttl
+
+    # ---- PC1z4 (2026-09-25, "the pc app needs optimization"): profiled, 95% of a cold state
+    # read was the page sensing the highway again. A fresh pass from the watchdog is used as
+    # is and sense() is NOT called; with no fresh pass the page senses, exactly as before.
+    import covenant_highway as HW
+    import time as _t
+    snap = tempfile.mktemp(suffix="_pc1_last_sense.json")
+    os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = snap
+    calls, real_sense, real_ttl = [], HW.sense, P3.STATE_TTL
+    want = ["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"]
+    try:
+        P3.STATE_TTL = -1
+        HW.sense = lambda only=None, **kw: (calls.append(1), {k: {"state": "absent"} for k in (only or want)})[1]
+        HW.save_last_sense({k: {"state": "present" if k == "sweep_red" else "absent"} for k in want}, path=snap)
+        hw = ((get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("detail") or {}).get("highway")
+        check("PC1z4 a fresh pass from the watchdog is used as is: its states come back and sense() is not called",
+              calls == [] and hw and hw.get("sweep_red") == "present", (calls, hw))
+        with open(snap, "w", encoding="utf-8") as fh:
+            json.dump({"at": _t.time() - 3600, "conditions": {k: "present" for k in want}}, fh)
+        hw = ((get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("detail") or {}).get("highway")
+        check("PC1z4 a stale pass is not trusted: the page senses for itself, as before",
+              calls == [1] and hw and hw.get("sweep_red") == "absent", (calls, hw))
+    finally:
+        HW.sense, P3.STATE_TTL = real_sense, real_ttl
+        os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)
     LOOP, PHONE, LAN = "127.0.0.1", "100.86.158.1", "192.168.1.50"
 
     print("PC1a -- the page and its gate")

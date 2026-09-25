@@ -1777,6 +1777,35 @@ def write_ledger(row, path=None):
 
 # ----------------------------------------------------------------- sharing
 
+# WHAT THE LAST PASS SAW (2026-09-25, his words: "the pc app needs optimization"). The
+# PC's 3D page re-ran sense() on every uncached read -- profiled: 1.74 of a 1.83 s cold
+# read, 7.3 s on the live node under load, 1.10 s of it one process listing -- while the
+# watchdog runs the same sense() every pass and kept nothing. Each pass now leaves its
+# states here, and a reader that finds them fresh uses them instead of sensing again.
+# A write that fails is skipped: seeing is never blocked by a file.
+LAST_SENSE = os.path.join(HERE, "ops", "highway_last_sense.json")
+
+
+def save_last_sense(conditions, path=None):
+    try:
+        import durable
+        durable.write_json(path or os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE,
+                           {"at": round(time.time(), 1), "conditions": {k: (v or {}).get("state") for k, v in conditions.items()}})
+    except Exception:                                             # noqa: BLE001
+        pass
+
+
+def last_sense(max_age_s=300.0, path=None, now=None):
+    """{detector: state} from the last pass if it is under max_age_s old, else None."""
+    try:
+        with open(path or os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE, encoding="utf-8") as fh:
+            d = json.load(fh)
+        age = (now if now is not None else time.time()) - float(d.get("at", 0))
+        return d.get("conditions") if 0 <= age <= max_age_s and isinstance(d.get("conditions"), dict) else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
 def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None,
              cooldown_s=None):
     """One sense-and-repair pass. (alerts, infos) in the watchdog's shape.
@@ -1787,6 +1816,7 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     """
     alerts, infos = [], []
     conditions = sense(health=health)
+    save_last_sense(conditions)
     # PAUSED MEANS NO ACTION, NOT NO SIGHT (2026-09-16, the operator's
     # instruction: "ensure they all running independent so you can pause tasks
     # for restart and update"). The sensing above has already happened and is
