@@ -220,3 +220,14 @@ thing can be true.
 And the finding stands on its own account: **the clearest demonstration this
 project has produced that its judge cannot read intent** is that it convicts a
 sentence thanking it for its honesty.
+
+
+## Addendum 2026-09-25 -- a way to earn (A222)
+
+His words that day, in order, each now a rule or a record:
+
+1. "Create a unique revenue generating program thats ethical legal and can scale up starting with 100 mostly automated" -> `covenant_earn.py` (docs/EARN.md).
+2. "must past ethics gate" -> every paid job through the node's real quorum before work and before settlement; each offer's declaration judged once on its own; a HELD opens only on his recorded word, a VIOLATES on no word at all. Measured the same day: receipt and papertest HELD, shape VIOLATES (the semantic seat, on the words "pretence" and "pretend" in its own description). Nothing was reworded against a verdict.
+3. "override to fund our work i'm against the wall and need some help" -> the standing refinements-only rule (2026-09-09) is overridden for this one program by his word; money still moves only by his hand and the facilitator's settlement to his address.
+4. "do not disable any features on my app" -> nothing existing changed in behaviour; the work is new files, one registration line in the sweep, one flag in the nightly, one starter function in the watchdog.
+5. "everything we do must be designed to run independently" -> the watchdog's starter, the server's own sanctions refresh, daily line and funnel; the one call line in the watchdog's pass is his to add (refused by the session's auto-mode check).

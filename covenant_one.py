@@ -575,6 +575,10 @@ SUITES = [
     # restart action both ways with spies, so no node is launched and nothing
     # real is paused; the trader's switch is reported, never re-implemented.
     ("test_g7_pause.py", 120, "DEPLOYMENT"),
+    # EA1 (2026-09-25, A222): covenant_earn -- verification for a price over x402, every
+    # paid job through the node's gate before work and before settlement. Drives the whole
+    # flow without a socket and with a stub facilitator; nothing is charged, nothing leaves.
+    ("test_ea1_earn.py", 180, "MONEY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

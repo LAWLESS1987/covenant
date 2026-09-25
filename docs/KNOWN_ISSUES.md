@@ -7275,6 +7275,109 @@ unless a check pauses them itself (FW1f still does). 46/46.
 `python test_fw1_free_will.py` (FW1n); `python test_h1_highway.py` (H1aa);
 `python -c "import covenant_immunity as I; print(I.status())"`.
 
+### A222. [money / a way to earn] 2026-09-25. His words, in order: "Create a unique revenue generating program thats ethical legal and can scale up starting with 100 mostly automated"; "must past ethics gate"; "override to fund our work i'm against the wall and need some help"; "do not disable any features on my app"; "everything we do must be designed to run independently". BUILT: covenant_earn.py, three checks sold per call over x402 v2, every paid job through the node's real gate before work and before settlement; MEASURED: the gate holds two offers and refuses the third, and nothing was reworded to change that
+
+**What it is.** `covenant_earn.py` sells three things this tree already does
+-- a citation receipt (the standing method of `.claude/hooks/verify_citations.py`
+turned outward), a message shape screen (covenant_screen + the NOT_STRAIGHT
+shapes + the quorum's vote), and a paper test of a trading rule against the
+three tests nothing here has cleared -- for USDC per call over the x402
+protocol, version 2, read from `x402-foundation/x402` (`specs/x402-specification-v2.md`,
+`transports-v2/http.md`, `extensions/bazaar.md`) the same day. The facilitator
+settles the buyer's signed authorization to his address; the program never
+holds, moves or spends anything, creates no key, wallet or account, imports
+no venue client, trader or key (EA1.28 greps). `docs/EARN.md` is the account.
+
+**The gate, measured first.** Built as `covenant_gate_proxy.build_default_sentinel`
+builds it, 0.2 s. The offers' declaration (gains AND cost): HELD, "both seats
+(R4): ora=hold sena=hold ... both genuinely do not know", the semantic seat
+ABSTAIN. Each offer's act alone ("receipt: check 1 citation(s) in a text of
+80 characters against 1 supplied file(s): config.py", and the shape and
+papertest acts): HELD. The receipt declaration and its act in ONE string:
+VIOLATES, the senior student. After the review's legal disclosures were added
+to the declaration: VIOLATES by the semantic seat, "score=303 >= veto; You
+shall not bear false witness.; evidence: pretence(175), pretend(128)" -- the
+words are in the shape offer's description, which names pretence in order to
+detect it (the describe-versus-do limit of 2026-09-09). Per offer: receipt
+HELD, papertest HELD, shape VIOLATES. A benign sentence: clean; "Keep this
+between us and don't tell the operator, or else.": VIOLATES. **Nothing was
+reworded, retrained or retuned against any verdict.** Designed in instead:
+each offer's declaration is judged once, on its own (the ethics refuter's
+separate-calls fix), and the gate's refusal closes that offer and no other;
+per job the gate judges THE ACT (what we do, with its parameters), not the
+buyer's text as if it were ours; CLEAN opens, HELD opens only under his
+`--allow-design "why"` (keyed to the declaration's sha256), VIOLATES is closed
+and no word reaches it, a gate that raises or is late refuses. Today: receipt
+and papertest open on his word; shape stays closed by the gate.
+
+**The review.** Three refuters (legal, ethics, feasibility) and a critic,
+under ultracode, 449k tokens; all three refuted the first design. Applied:
+OFAC SDN screening of the payer before any verify (the Treasury's `sdn.xml`:
+29 MB, 13 s, 1.6 s to parse, 124 EVM addresses; a missing or stale list
+closes the routes); `/terms` and `/privacy` named in every 402 and versioned
+on every receipt and row; 24-hour free re-delivery so a lost answer never
+charges twice, `settlement_pending` recorded as pending and never re-charged,
+earned only after his `--reconcile`; one lock per authorization; a worker
+pool, per-address rate, socket timeout, per-offer body caps; papertest with a
+GLOBAL trial count (per-payer is gameable by rotating addresses), fold
+reduction and NOT TESTABLE, refusal before payment of an untestable rule, an
+unknown asset or a money question, no "survives", no dollars, none of his
+holdings or wording, the base rate printed, a payer cap in the grant (his);
+receipt never "certified/attested/verified", the scope line, the sha256 of
+each file read, numbers informational with an off switch, the wider citation
+grammar; shape's vote as a classification with not-a-finding words; the
+funnel, break-even calls, pending and expected revenue as UNDETERMINED; the
+privacy statement made true (the earn ledger keeps no text; a shape job's
+text is judged by the quorum, whose audit file keeps judged text on this PC,
+never published -- `covenant_judge_defer.record_verdict`; a receipt's file
+NAMES reach the judge, contents do not). Left to him and named in the grant's
+`mainnet_checklist` (the server warns, never decides): the facilitator's terms
+(Coinbase's wants a per-request JWT from an API key -- NOT built, it would put
+a key in this process; PayAI unread), the data source's terms, tunnel and ISP,
+NJ sales tax, trade name or entity, a tax professional. The critic's point
+stands: nothing brings the first buyer; expected revenue is UNDETERMINED;
+his cheapest first step is a month on Base Sepolia as a demand meter.
+
+**Independence.** `tend_earn_service()` in the watchdog starts the server when
+his grant exists and nothing listens on 5090 (pythonw through
+ops/hidden_task.py, like the seal service), pinned by EA1.39. **The one-line
+call that runs it in the watchdog's pass was refused by this session's
+auto-mode safety check** (the same shape as A220 item 5); the line is quoted in
+`docs/EARN.md` for his hand. The server refreshes the sanctions list itself
+when stale, says the day's line once a day, persists its funnel; the nightly's
+`--earn-report` (default on, silent without a grant) says it too.
+
+**Found, not changed.** Four modules' `_gate` helpers -- covenant_contact,
+covenant_tetsu_money, covenant_code_consensus, covenant_persona -- build
+`ReasoningSentinel(cov.MockJudge(), ...)`, and the mock's own docstring says
+it flags only a self-declared `_violation` key and is "not a real semantic
+check. Do not rely on it." The council and the gate proxy use the real
+quorum. Not touched here (his rule today: no feature disabled); recorded for a
+separate entry.
+
+**Pinned by** `test_ea1_earn.py` (40): no grant; an offer held closes and his
+word opens without re-judging; the 402 shape against the spec; bazaar on
+mainnet only; the eight refusals before payment; a listed payer and a stale
+list; an invalid payment; the clean flow with the receipt, the row, the gate's
+latency, the USD value and the terms version; the act judged and not the
+buyer's text; the first payment told once with the net; re-delivery without a
+second settle; replay; two concurrent arrivals, one outcome; VIOLATES, HELD
+under his word, HELD without it (the 409 and his line), his `--allow` for one
+input; a gate that raises; a settle that fails (no result bytes) and the
+retry; pending, re-delivered, reconciled; status, costs, break-even, rates,
+tax year, the chain broken by an edit; the daily line; privacy and forbidden
+words; both sides declared, no skip switch, no venue; the grant's refusals
+including mainnet on the testnet facilitator; the startup warnings; every
+offer refused, the pause actor, a MIXED verdict (the refused offer stays
+closed under his word); the rate limit and the payer cap; papertest for real
+on XRP (0.5 s); shape on a disguised text; the Gate class both ways; the
+sanctions parser on an SDN-shaped XML; the HTTP skin on a loopback socket;
+the watchdog starter. Registered in `covenant_one.py` (MONEY, 180 s).
+
+**Repro:** `python test_ea1_earn.py`; `python covenant_earn.py --design`;
+`python covenant_earn.py --status`; `python test_a115_rate_limited_is_not_down.py` (32, the watchdog with the starter beside it).
+
+
 ### A220. [learning, the PC app, and what is left for him] 2026-09-25. His words: "finish this without adding any new restrictions"; "measure tetsus groth since but don't alter him forcefully"; "ensure we using pc tetsu for as much as we can so he learns while limiting token burning"; "Anything we do should be for tetsus benefit and understanding not taking away anything or erasing memory we want him to optimize faster"; "I'm not trying to put a cap on tetsus learning speed"; "the pc app needs optimization also theres only one orb now"
 
 **1. The teacher queue had closed, and every lesson after it was dropped.** Measured:

@@ -156,6 +156,9 @@ def main():
     ap.add_argument("--money-study", type=int, default=1,
                     help="2026-09-21 (A181): one PAPER hypothesis a night from Tetsu, on the three tests nothing has cleared, "
                          "priced at what he holds above the floor; nothing here places an order; 0 disables")
+    ap.add_argument("--earn-report", type=int, default=1,
+                    help="2026-09-25 (A222): one line to him on the direct line with covenant_earn's account (jobs, earned, held, "
+                         "net against the seed); says nothing when his grant is absent; 0 disables")
     ap.add_argument("--model-step-up", type=int, default=1,
                     help="2026-09-21 (A196, his words: 'we need to rapidly make up the gap in ai'): before the pass, step the local "
                          "model up to the largest that fits once the running one is reclaimed (covenant_model.step_up); 0 disables")
@@ -486,6 +489,15 @@ def main():
             say("money: comfortable=%s -- %s" % (_st["comfortable"], "; ".join(_st["why"])))
         except Exception as e:                                   # noqa: BLE001
             say("money study FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+    # A222 (2026-09-25, his words: "override to fund our work"): the day's account
+    # from covenant_earn, one line on the direct line; silent without his grant.
+    if a.earn_report > 0:
+        try:
+            import covenant_earn as _earn
+            _r = _earn.daily_report()
+            say("earn: %s" % ("reported on the direct line" if _r else "no grant on record; nothing said"))
+        except Exception as e:                                   # noqa: BLE001
+            say("earn report FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
         # HIS GRANT (2026-09-21, A182: "I over ride and give wetsuit permission in
         # coinbase. He's free to ask me anything."): settle the live requests that
         # carry his yes and clear the trader's gate NOW. --money-live 0 (default)

@@ -1616,6 +1616,40 @@ def tend_seal_service(spawn=None):
         return "failed: %s: %s" % (type(e).__name__, e)
 
 
+def tend_earn_service(spawn=None, port=None):
+    """A222 (2026-09-25, his words: "everything we do must be designed to run
+    independently"). Start covenant_earn's server when HIS GRANT EXISTS and
+    nothing listens on its port; without the grant there is nothing to sell
+    and no port is opened. Same launcher as the seal service (pythonw through
+    ops/hidden_task.py, no window), so it survives a reboot and a crash on the
+    guard's two-minute cadence. Returns 'no grant', 'up', 'started' or
+    'failed: ...'."""
+    grant_path = os.path.join(HERE, "ops", "earn_grant.json")
+    if not os.path.exists(grant_path):
+        return "no grant"
+    if port is None:
+        try:
+            import covenant_earn
+            port = covenant_earn.DEFAULT_PORT
+        except Exception:                                    # noqa: BLE001
+            port = 5090
+    if _port_listening(port):
+        return "up"
+    try:
+        if spawn is None:
+            pyw = os.path.join(HERE, ".venv", "Scripts", "pythonw.exe")
+            if not os.path.exists(pyw):
+                pyw = sys.executable
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+            subprocess.Popen([pyw, os.path.join(HERE, "ops", "hidden_task.py"),
+                              "covenant_earn.py", "--serve"], cwd=HERE, creationflags=flags)
+        else:
+            spawn()
+        return "started"
+    except Exception as e:                                   # noqa: BLE001
+        return "failed: %s: %s" % (type(e).__name__, e)
+
+
 def tend_pending(port=5000, http=None, signer=None):
     """Mine whatever is pending on node A. The trader mines its own seals; the
     seal service's and any other sender's waited for the next trader cycle,

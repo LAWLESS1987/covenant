@@ -400,3 +400,11 @@ ops/highway_last_sense.json
 
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
 *.results.json
+
+# covenant_earn (A222, 2026-09-25): his grant, the money ledger and the per-payer
+# trial files are private; the example grant is shipped in their place.
+ops/earn_grant.json
+ops/earn_ledger.jsonl
+ops/earn_trials/
+ops/earn_sanctions.json
+ops/earn_funnel.json
