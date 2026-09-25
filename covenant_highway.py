@@ -190,8 +190,21 @@ def detect_source_drift(health=None):
     if disk is None or not live:
         return {"state": UNKNOWN, "measured": {"disk": disk, "live": live}}
     off = sorted([k for k, s in live.items() if s and s != disk])
-    return {"state": PRESENT if off else ABSENT,
-            "measured": {"disk": disk, "live": live, "drifted": off}}
+    # IMPORTS TOO (2026-09-25, his words: "everything we do must be designed to run
+    # independently"). A node on the right core but running a module it imported before
+    # that module changed (A153) is the same drift, and it waited for a person: measured
+    # that evening, three nodes IMPORTS STALE after an edit and nothing here saw it. The
+    # node reports imports_sha12 in /health; the disk's is computed the same way.
+    try:
+        disk_imp = W.disk_imports_sha12()
+    except Exception:                                             # noqa: BLE001
+        disk_imp = None
+    imp = {k: str(v.get("imports_sha12") or "")[:12] for k, v in h.items()
+           if isinstance(v, dict) and "http" not in v}
+    off_imp = sorted(k for k, s in live.items() if disk_imp and s == disk and imp.get(k) and imp[k] != disk_imp)
+    return {"state": PRESENT if (off or off_imp) else ABSENT,
+            "measured": {"disk": disk, "live": live, "drifted": sorted(set(off) | set(off_imp)),
+                         "imports_disk": disk_imp, "imports_drifted": off_imp}}
 
 
 def detect_mesh_source_split(health=None):

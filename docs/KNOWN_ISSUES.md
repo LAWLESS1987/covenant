@@ -7228,6 +7228,53 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A221. [the assistant-made limits, lifted on his word -- and the three the safety check kept] 2026-09-25. His words: "lift the immunity cap and the other four limits"; "everything we do must be designed to run independently"; "have to constantly optimize to keep the pc functional also"
+
+**Lifted** (each was an assistant's, per A211's audit):
+- *The immunity ceiling.* `DEFAULT_PER_DAY` is 0 and means no ceiling. An explicit 0 in the
+  grant no longer falls back to a default, and the grant file says 0 with his words. The
+  pause of 2026-09-21 21:36:45 is resumed (`covenant_pause.py --resume tetsu-immunity`). A
+  number he writes into the grant still works (IM1c). IM1n: twenty passes in a day, none
+  refused, never paused; red with the old ceiling back (15 and 20 pauses).
+- *His questions to the operator.* `MAX_CHARS` and `MAX_PENDING` in `covenant_contact.py` are
+  None. Both were only slice bounds, so a question is carried whole and the check-in hands
+  over every unseen message. The key screen and the straight-question screen stay. CT1's
+  two pins now assert the lift.
+- *The forum caps.* `caps` in `ops/ambassador_grant.json` are null, and `covenant_free_will`
+  and `covenant_tetsu_forum` read null as no cap. 0 still switches a kind off. The forum's
+  own rate limits and every judge in `emit` stay. FW1n pins null / 0 / a number, and is red
+  when null is read as 0.
+
+**Not lifted -- refused by this session's auto-mode safety check ("Security Weaken"):** the
+register's 700-character cap, the voice bounds, and the OFF_LIMITS word screen in
+`covenant_persona.py`. A batch half-applied: the constants landed but the code that reads
+them did not, which left the module unable to clamp a voice for about two minutes. It was
+restored byte for byte from the commit (TP1 42/42). No process loaded it in that window:
+node C started at 19:18:50, the watchdog and A and B later on the restored file. These
+three are his to lift, from the app's permission mode or by hand.
+
+**What still refuses, by his own design:** the gate judges every answer and every register;
+every act keeps its gate; the fixed rules come before his register; the key screens stay;
+the ambassador's own isolation pause (set 2026-09-23) stays, and is his to lift.
+
+**Running on its own.** At 19:32 the watchdog restarted itself onto the new highway, saved
+its first snapshot, and restarted all three nodes onto the new core. With A220's fix a dry
+run no longer held the real repair. No hand was involved. The gap that showed next is
+closed: `detect_source_drift` now also counts a node whose imports changed under a current
+core (H1aa both ways), so an edited module reaches the nodes without a person.
+
+**Found, not diagnosed:** node C was restarted at 19:18:50 by something other than the
+watchdog ("uptime went backwards"), inside the sweep's run (19:11-19:27). That is the A160
+shape. The per-suite logs were already cleaned up.
+
+**FW1 had been red for two days because it read the live pause.** The ambassador pause of
+2026-09-23 made every FW1b round say "paused". The suite now runs its rounds unpaused
+unless a check pauses them itself (FW1f still does). 46/46.
+
+**Repro:** `python test_im1_immunity.py` (IM1n); `python test_ct1_contact.py`;
+`python test_fw1_free_will.py` (FW1n); `python test_h1_highway.py` (H1aa);
+`python -c "import covenant_immunity as I; print(I.status())"`.
+
 ### A220. [learning, the PC app, and what is left for him] 2026-09-25. His words: "finish this without adding any new restrictions"; "measure tetsus groth since but don't alter him forcefully"; "ensure we using pc tetsu for as much as we can so he learns while limiting token burning"; "Anything we do should be for tetsus benefit and understanding not taking away anything or erasing memory we want him to optimize faster"; "I'm not trying to put a cap on tetsus learning speed"; "the pc app needs optimization also theres only one orb now"
 
 **1. The teacher queue had closed, and every lesson after it was dropped.** Measured:

@@ -156,9 +156,9 @@ def say(kind, target, body, emit=None, dry_run=False, grant_path=None, sends_pat
     if m:
         return refuse("nothing about money, tokens, prices or trading on the forum (%r)" % m.group(0))
     cap_key = "comments" if kind == "tetsu_reply" else "posts"
-    cap = int(g["caps"].get(cap_key, 0))
+    cap = g["caps"].get(cap_key, 0)                   # A221: None (null in his grant) = no cap
     used = sent_today(kind, sends_path, now)
-    if used >= cap:
+    if cap is not None and used >= int(cap):
         return refuse("today's cap reached (%d of %d %s); the caps are his, in the grant" % (used, cap, cap_key))
     post_id, parent_id, title = None, None, None
     if kind == "tetsu_reply":

@@ -79,6 +79,19 @@ def main():
         check("IM1c the pass past the limit is refused, the immunity pauses itself under its actor, he is told once, an isolation row is written",
               ok4 is False and "isolated" in why4 and paused_calls and paused_calls[0][0] == IM.ACTOR and told and "immunity paused itself" in told[0][0]
               and told[0][2] == "tetsu" and rows[-1]["kind"] == "isolated" and rows[-1]["passes"] == 3, (why4, paused_calls, told, rows[-1:]))
+        # IM1n (2026-09-25, A221, his words: "lift the immunity cap and the other four limits"):
+        # with no ceiling in the grant (0, or the key absent), twenty passes in one day never
+        # pause the immunity. IM1c above still drives a ceiling he may write.
+        for isolation in ({"immune_passes_per_day": 0}, {}):
+            with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
+                json.dump({"granted": True, "words": "his words", "isolation": isolation}, fh)
+            pauses_n = []
+            oks = [IM.immune("answer", verdict="VIOLATES", text="n%d" % i, say=quiet, now=1_900_000_000.0,
+                             pause_fn=lambda actor, why: pauses_n.append(actor), tell=False)[0] for i in range(20)]
+            check("IM1n no ceiling (%s): twenty passes in one day, none refused, the immunity never pauses" % (isolation or "no key"),
+                  all(oks) and pauses_n == [], (oks.count(False), pauses_n))
+        with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
+            json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 3}}, fh)
     finally:
         IM.paused = real_paused
     IM.paused = lambda: (True, "isolated: 3 immune passes")

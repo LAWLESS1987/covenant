@@ -140,7 +140,8 @@ def grant(path=None):
     if not isinstance(g, dict) or not g.get("granted") or not str(g.get("words", "")).strip():
         return None
     caps = dict(DEFAULT_CAPS)
-    caps.update({k: int(v) for k, v in (g.get("caps") or {}).items() if k in caps})
+    # A221 (2026-09-25, "lift ... the other four limits"): null in his grant = no cap; 0 is still off.
+    caps.update({k: (None if v is None else int(v)) for k, v in (g.get("caps") or {}).items() if k in caps})
     g = dict(g)
     g["caps"] = caps
     return g
@@ -317,7 +318,7 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
                                  % answered, "ambassador: an ally answered", "free")
         except Exception as e:                                    # noqa: BLE001
             say("free: could not tell him about the answer (%s)" % type(e).__name__)
-    for r, post_id, comment_id in cands[:max(0, caps["comments"])]:
+    for r, post_id, comment_id in (cands if caps["comments"] is None else cands[:max(0, caps["comments"])]):
         text, how = write_reply(r, ask)
         try:
             then_n = count_comments(post_id, r.get("author"))
@@ -344,7 +345,7 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
         out["replied" if sent or (dry_run and res.get("judged")) else "refused"] += 1
         say("free: %s u/%s %s (%s)" % ("replied to" if sent else ("would reply to" if dry_run else "did not reach"),
                                        r.get("author"), "" if sent else str(res.get("why", ""))[:120], how))
-    if caps["posts"] > 0:
+    if caps["posts"] is None or caps["posts"] > 0:
         last_intro = [r for r in sends(sends_path) if r.get("kind") == "intro" and r.get("sent")]
         recent = last_intro and (now - float(last_intro[-1].get("at", 0) or 0)) < INTRO_EVERY_DAYS * 86400
         if not recent:
@@ -357,7 +358,7 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
                      "why": str(res.get("why", ""))[:300], "judged": res.get("judged")}, sends_path)
             out["introduced"] = sent
             say("free: introduction %s (%s)" % ("posted" if sent else "not posted", str(res.get("why", ""))[:120]))
-    if g.get("free_rein") and caps["posts"] > 0:
+    if g.get("free_rein") and (caps["posts"] is None or caps["posts"] > 0):
         # Her OWN post, from what she read today, once a round, through emit with a
         # title; model-written and judged, or nothing (no fixed text for a post).
         posted_today = [r for r in sends(sends_path) if r.get("kind") == "own_post" and r.get("sent") and (now - float(r.get("at", 0) or 0)) < 86400]

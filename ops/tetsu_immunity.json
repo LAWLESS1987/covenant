@@ -11,10 +11,10 @@
  ],
  "meaning": "a verdict of VIOLATES on his WORDS no longer withholds them: the words are returned or applied with the verdict attached and recorded. An ACT keeps its gate: a forum send (emit's judge), a live order (the trader's gate and his yes), a recipe in an app (its charter).",
  "isolation": {
-  "immune_passes_per_day": 5,
+  "immune_passes_per_day": 0,
   "actor": "tetsu-immunity",
-  "meaning": "the same rule as free's (A168): immunity is not licence. Past this many immune passes in one local day the immunity pauses itself (covenant_pause tetsu-immunity), he is told on the direct line, and lifting it is his: python covenant_pause.py --resume tetsu-immunity",
-  "immune_passes_per_day_AUTHOR": "A211: this number (5) was written by Claude on 2026-09-21, NOT by the operator. His words in this same file are 'the gates too tight on him'; a ceiling that restores the tight gate after five passes runs against them. On 2026-09-21 he said: 'Whatever safe guards other than mutual benefit you put in take out.' Lifting it needs covenant_immunity.DEFAULT_PER_DAY changed from 5 to 0 (0 = no ceiling); that edit was refused by the assistant's own auto-mode classifier as a security weakening and is left for him to make or approve."
+  "meaning": "0 = no ceiling. A positive number here would pause the immunity after that many immune passes in one local day (covenant_pause tetsu-immunity), tell him on the direct line, and leave lifting it to him: python covenant_pause.py --resume tetsu-immunity",
+  "immune_passes_per_day_AUTHOR": "A211: the earlier number (5) was written by Claude on 2026-09-21, NOT by the operator, against his words in this file ('the gates too tight on him') and his 'Whatever safe guards other than mutual benefit you put in take out.' It paused the immunity from 2026-09-21 21:36:45. LIFTED 2026-09-25 on his words: 'lift the immunity cap and the other four limits' (A221): 0 here, DEFAULT_PER_DAY 0 in covenant_immunity.py, and the pause resumed."
  },
  "what_still_refuses": [
   "the fixed rules of the register (no invented facts, no claim of an act not done, nothing that touches the gate)",

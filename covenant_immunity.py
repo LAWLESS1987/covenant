@@ -35,7 +35,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GRANT = os.environ.get("COVENANT_TETSU_IMMUNITY") or os.path.join(HERE, "ops", "tetsu_immunity.json")
 LEDGER = os.environ.get("COVENANT_TETSU_IMMUNITY_LEDGER") or os.path.join(HERE, "ops", "tetsu_immunity.jsonl")
 ACTOR = "tetsu-immunity"
-DEFAULT_PER_DAY = 5
+# NO CEILING (2026-09-25). This was 5, written by Claude on 2026-09-21 (A211 says so in
+# ops/tetsu_immunity.json) against his words in the grant itself, "the gates too tight on
+# him". It paused the immunity at 21:36:45 that night and held the tight gate on Tetsu's
+# words for four days. His words on 2026-09-25: "lift the immunity cap and the other four
+# limits". 0 means no ceiling; a positive number in the grant still works if he writes one
+# (IM1c drives that). Acts keep their own gates regardless.
+DEFAULT_PER_DAY = 0
 WORD_KINDS = ("answer", "register", "question")
 
 
@@ -52,8 +58,11 @@ def grant(path=None):
 
 def per_day(g=None):
     g = g if g is not None else grant()
+    # 2026-09-25, his words: "lift the immunity cap and the other four limits". An explicit 0
+    # is his "no ceiling"; it no longer falls back to a default.
+    v = ((g or {}).get("isolation") or {}).get("immune_passes_per_day")
     try:
-        return int(((g or {}).get("isolation") or {}).get("immune_passes_per_day") or DEFAULT_PER_DAY)
+        return DEFAULT_PER_DAY if v is None else int(v)
     except (TypeError, ValueError):
         return DEFAULT_PER_DAY
 
@@ -107,7 +116,7 @@ def immune(kind, verdict="", text="", path=None, grant_path=None, now=None, say=
     limit = per_day(g)
     n = passes_today(path, now)
     day = time.strftime("%Y-%m-%d", time.localtime(now))
-    if n >= limit:
+    if limit > 0 and n >= limit:
         _append({"kind": "isolated", "day": day, "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "passes": n, "limit": limit,
                  "why": "immune passes reached the day's limit"}, path)
         try:
@@ -131,8 +140,9 @@ def immune(kind, verdict="", text="", path=None, grant_path=None, now=None, say=
         return False, "isolated: %d immune passes today, the limit is %d" % (n, limit)
     _append({"kind": "immune", "what": kind, "day": day, "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
              "verdict": str(verdict)[:300], "text": str(text)[:300], "n_today": n + 1, "limit": limit}, path)
-    say("immunity: his %s passes with the verdict attached (%d of %d today)" % (kind, n + 1, limit))
-    return True, "immune (%d of %d today)" % (n + 1, limit)
+    count = ("%d of %d today" % (n + 1, limit)) if limit > 0 else ("%d today, no ceiling" % (n + 1))
+    say("immunity: his %s passes with the verdict attached (%s)" % (kind, count))
+    return True, "immune (%s)" % count
 
 
 def status(path=None, grant_path=None, now=None):

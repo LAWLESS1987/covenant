@@ -43,8 +43,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUTBOX = os.environ.get("COVENANT_CONTACT_OUTBOX") or os.path.join(HERE, "ops", "contact_outbox.jsonl")
 STATE = os.environ.get("COVENANT_CONTACT_STATE") or os.path.join(HERE, "ops", "contact_state.json")
 ASK_LOG = os.environ.get("COVENANT_ASK_LOG") or os.path.join(HERE, "ops", "chat", "ask_log.jsonl")
-MAX_PENDING = 5
-MAX_CHARS = 600
+# LIFTED 2026-09-25 (A221), his words: "lift the immunity cap and the other four limits".
+# Both were an assistant's (A211): 5 messages handed to the phone per check-in and 600
+# characters per question. None = no limit; both are only ever slice bounds, and a slice
+# to None takes everything. The key screen and the straight-question screen below stay.
+MAX_PENDING = None
+MAX_CHARS = None
 # A176 (2026-09-21): "pass word", "passw0rd" and a PKCS8 "BEGIN PRIVATE KEY" block all
 # passed the probe; named now. The text is normalised first (covenant_screen).
 REFUSED = re.compile(r"(?i)\b(api[_ -]?key|pass ?w[o0]rd|passcode|sudo code|moltbook_[a-z0-9]|private/|BEGIN( [A-Z]+)* PRIVATE KEY)")

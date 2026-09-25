@@ -450,6 +450,19 @@ def main():
     check("H1t a node that could not be read is not counted as drifted either",
           "B" not in drift["measured"].get("live", {}) and "B" not in drift["measured"].get("drifted", []),
           json.dumps(drift["measured"])[:120])
+    # H1aa (2026-09-25, "everything we do must be designed to run independently"): a node on the
+    # right core whose imports changed under it is drift too, so the watchdog restarts it
+    # without a person. Both ways, against the real disk fingerprints.
+    import covenant_watchdog as _W
+    _disk, _imp = _W.disk_source_sha12(), _W.disk_imports_sha12()
+    _same = {"source_sha256": _disk, "imports_sha12": _imp, "chain_height": 5}
+    _stale = dict(_same, imports_sha12="000000000000")
+    d_same = H.detect_source_drift({"A": _same, "B": _same, "C": _same})
+    d_imp = H.detect_source_drift({"A": _same, "B": _stale, "C": _same})
+    check("H1aa a node on the disk core whose imports changed under it is drift (PRESENT, that node only)",
+          d_imp["state"] == H.PRESENT and d_imp["measured"]["imports_drifted"] == ["B"] and d_imp["measured"]["drifted"] == ["B"],
+          json.dumps(d_imp["measured"])[:160])
+    check("H1aa ...and three nodes current on core and imports are ABSENT", d_same["state"] == H.ABSENT, json.dumps(d_same["measured"])[:160])
     lag = H.detect_height_lag({"A": up, "B": {"http": 429}, "C": up})
     check("H1t ...nor as a height of zero",
           lag["measured"]["heights"].get("B") is None, json.dumps(lag["measured"])[:110])

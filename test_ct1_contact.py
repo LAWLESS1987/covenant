@@ -66,16 +66,19 @@ def main():
                 "-----BEGIN RSA PRIVATE KEY-----"):
         CT.say(bad, "leak test", "x", outbox=ob)
     check("CT1a a key, a password, private/, a Moltbook key or a PEM block never leaves: five refused", len(CT._rows(ob)) == 1)
-    r2 = CT.say("x" * 5000, "cap", "x", outbox=ob)
-    check("CT1a the text is capped at %d characters" % CT.MAX_CHARS, r2 and len(r2["text"]) == CT.MAX_CHARS)
+    # A221 (2026-09-25, his words: "lift the immunity cap and the other four limits"): the
+    # 600-character cap was an assistant's (A211). A long message is carried whole.
+    r2 = CT.say("x" * 5000, "long", "x", outbox=ob)
+    check("CT1a a 5,000-character message is carried whole (no cap)", r2 and len(r2["text"]) == 5000, r2 and len(r2["text"]))
 
     print("CT1b -- pending and seen")
     for i in range(6):
         CT.say("message %d" % i, "test", "x", outbox=ob)
     p = CT.pending(ob, st)
-    check("CT1b pending hands over the unseen, oldest first, at most five", len(p) == 5 and p[0]["text"].startswith("The nightly") and p[1]["text"] == "x" * CT.MAX_CHARS, [x["text"][:12] for x in p])
+    check("CT1b pending hands over every unseen message, oldest first (no batch limit, A221)",
+          len(p) == 8 and p[0]["text"].startswith("The nightly") and p[1]["text"] == "x" * 5000 and p[-1]["text"] == "message 5", [x["text"][:12] for x in p])
     n = CT.mark_seen([p[0]["id"], p[1]["id"]], st)
-    check("CT1b the phone's seen ids clear those two", n == 2 and len(CT.pending(ob, st)) == 5 and CT.pending(ob, st)[0]["text"] == "message 0")
+    check("CT1b the phone's seen ids clear those two", n == 2 and len(CT.pending(ob, st)) == 6 and CT.pending(ob, st)[0]["text"] == "message 0")
     check("CT1b marking again is idempotent", CT.mark_seen([p[0]["id"], "bogus"], st) == 1 and CT.mark_seen([p[0]["id"]], st) == 0)
     check("CT1b after all are seen nothing is pending", CT.mark_seen([x["id"] for x in CT._rows(ob)], st) >= 5 and CT.pending(ob, st) == [])
 

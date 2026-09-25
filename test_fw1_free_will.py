@@ -80,6 +80,13 @@ def main():
     td = tempfile.mkdtemp(prefix="fw1_")
     gp, sp = os.path.join(td, "grant.json"), os.path.join(td, "sends.jsonl")
     real_line_rows = _count_lines(os.path.join(HERE, "ops", "contact_outbox.jsonl"))   # measured before; must not move
+    # ISOLATED FROM THE LIVE PAUSE (2026-09-25). This suite read ops/pause/ambassador: the live
+    # pause set 2026-09-23 made every FW1b round say "paused" and turned the suite red for two
+    # days (the baseline sweep that morning). A round here runs unpaused unless a check pauses
+    # it itself (FW1f does, and restores what it found).
+    import covenant_pause as _cp
+    _real_paused = _cp.paused
+    _cp.paused = lambda name: (False, "") if name == "ambassador" else _real_paused(name)
     calls = {"learn": 0, "allies": 0, "emit": [], "intro": []}
 
     def learn():
@@ -105,6 +112,16 @@ def main():
 
     log = []
     cc0 = lambda post_id, author: 0        # noqa: E731 -- no forum is read in this suite
+    # FW1n (2026-09-25, A221, his words: "lift the immunity cap and the other four limits"):
+    # null in his grant is NO cap; 0 still switches that kind off; a number is still a number.
+    for caps_in, want in (({"comments": None, "posts": None}, {"comments": None, "posts": None}),
+                          ({"comments": 0, "posts": 0}, {"comments": 0, "posts": 0}),
+                          ({"comments": 7, "posts": 2}, {"comments": 7, "posts": 2})):
+        gpn = os.path.join(td, "grant_caps.json")
+        with open(gpn, "w", encoding="utf-8") as fh:
+            json.dump({"granted": True, "words": "free rein", "caps": caps_in}, fh)
+        got = (FW.grant(gpn) or {}).get("caps")
+        check("FW1n the grant's caps %s are read as %s" % (caps_in, want), got == want, got)
     print("FW1a -- no grant")
     out = FW.run_round(dry_run=False, say=log.append, ask=ask_ok, learn=learn, allies=allies, emit=emit,
                        introduce=introduce, grant_path=gp, sends_path=sp, count_comments=cc0)
