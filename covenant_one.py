@@ -506,6 +506,7 @@ SUITES = [
     # stayed private to it while three live ledgers went on truncating.
     ("test_du1_durable.py", 120, "DAILY + GUARDS"),
     ("test_a153_import_drift.py", 120, "DAILY + GUARDS"),
+    ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     # JR1 (2026-09-19): how Ora and Sena resolve a disagreement, written down
     # and driven BEFORE the second judge is flipped on -- his four conditions.
     # All nine cells of the table asserted independently of the module, the
@@ -1598,6 +1599,45 @@ def main():
         else:
             say("  RESULT: PASS. Everything this runner names was measured and correct.")
             code = 0
+        # RAW RESULTS, NO PROSE (2026-09-25, his words: "Prioritize testability over
+        # persuasion. Separate the governing rules, verification harness, and experimental
+        # logs into clear layers so others can reproduce results without the author's
+        # interpretation"). The transcript above interprets; this file only counts: every
+        # suite's state and numbers, every in-place check, the gates' code, the exit code,
+        # and what tree and platform produced them. Beside the transcript, same stem. A
+        # write that fails is said and changes nothing about the run.
+        try:
+            import hashlib as _hl
+            import json as _json
+            import platform as _pf
+            _stem = os.path.splitext(say.path)[0]
+            _core = os.path.join(HERE, "covenant_unified_v8.py")
+            _head = None
+            try:
+                _head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True,
+                                       text=True, timeout=10).stdout.strip() or None
+            except Exception:                                    # noqa: BLE001 -- no git is a fact, not an error
+                _head = None
+            _raw = {
+                "schema": "covenant-one-results-v1",
+                "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "platform": _pf.platform(), "python": _pf.python_version(),
+                "git_head": _head,
+                "core_sha256": _hl.sha256(open(_core, "rb").read()).hexdigest() if os.path.exists(_core) else None,
+                "mode": {"ci": bool(args.ci), "quick": bool(args.quick), "only": args.only, "repeat": args.repeat},
+                "suites": [{"suite": s, "state": st, "seconds": (round(dt, 1) if isinstance(dt, (int, float)) else None),
+                            "passed": p, "failed": f} for (s, st, dt, p, f) in results],
+                "in_place": [{"name": n, "state": st} for n, st in inplace],
+                "totals": {"checks_passed": checks, "checks_failed": fails, "suites_not_clean": len(bad),
+                           "suites_unmeasured": len(unmeasured)},
+                "gates": gates, "exit_code": code,
+            }
+            _text = _json.dumps(_raw, indent=1)                    # serialised first: a failure leaves no empty file
+            with open(_stem + ".results.json", "w", encoding="utf-8") as _fh:
+                _fh.write(_text)
+            say("  raw results:  %s.results.json (numbers only; no interpretation)" % _stem)
+        except Exception as _e:                                   # noqa: BLE001
+            say("  raw results:  NOT written (%s: %s)" % (type(_e).__name__, str(_e)[:120]))
         say("")
         say("  transcript: %s" % say.path)
         say("")

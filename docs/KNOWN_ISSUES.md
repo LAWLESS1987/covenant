@@ -7332,8 +7332,23 @@ voice bounds and the OFF_LIMITS word screen (`covenant_persona.py`); (d) the for
 12 comments and 3 posts (`ops/ambassador_grant.json`). Some of (c) guards honesty: "invent",
 "lie" and "api key" are among the words it bars. Each is one line; which go is his call.
 
+**10. The layers, finished (his 2026-09-19 ask; `docs/LAYERS.md`).** Nothing moved. Five
+read-only passes counted every consumer of a root path and found two moves that would have
+been new restrictions: a grant read at a fixed path refuses when it is missing, and the
+issue register moved away silently starves the students of our own work. So:
+`tools/layers.py` puts every tracked file in exactly one of seven layers by rule, and
+reports core -> system imports (22) without refusing anything (LY1, 8 checks, red under
+two mutations, green in the staged copy). `covenant_one.py` now writes
+`<transcript>.results.json` beside the transcript, numbers only, so a stranger's
+`python covenant_one.py --ci` yields results separate from our interpretation. Found on
+the way and **not fixed here**: `test_wb1_web.py:35` and `test_qw1_quiet_everywhere.py:56`
+count NOT RUN as passed (`ok.append(True)` in `not_run()`), and `tools/sentinel_baseline.py
+--check` exits 1 (its frozen size for the seal service is 15359, the file is 16666 bytes),
+and nothing runs it.
+
 **Repro:** `python test_dp1_daily_plan.py` (D21d); `python test_pc1_sister_interface.py`
-(PC1z2-z4); `python test_m6_mobile_door.py` (M6u); `python tools/tetsu_work.py --help`.
+(PC1z2-z4); `python test_m6_mobile_door.py` (M6u); `python test_ly1_layers.py`;
+`python tools/layers.py`; `python tools/tetsu_work.py --help`.
 
 ### A219. [the defence, run by us and judged] "Defender should now be run by our system locally any updates must pass our logic and reason or the system itself grows and improves it." -- "Its my account I am the administrator do it." BUILT 2026-09-21, with the one part that cannot be done named
 

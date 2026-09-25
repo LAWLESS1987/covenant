@@ -397,3 +397,6 @@ ops/ambassador_rate.json
 
 # the watchdog pass's last sensed states (2026-09-25), read by the PC 3D page
 ops/highway_last_sense.json
+
+# covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
+*.results.json
