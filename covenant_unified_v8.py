@@ -543,6 +543,29 @@ def _agent_fetch_ok(url: str) -> bool:
         return False
 
 
+def _agent_fetch_url(answer: str) -> str:
+    """The address from the first 'FETCH:' line anywhere in an answer, or "".
+
+    2026-09-25, measured in the ask log: his one real web read was refused as
+    "scheme '' refused" because the fixed rules show the form as
+    'FETCH: <https url>' and he copied the angle brackets; another answer put
+    FETCH mid-reply, and only the first line was ever read, so nothing was
+    fetched. The door now reads the line wherever it is and takes the address
+    with its brackets or quotes removed. What may be fetched is unchanged: the
+    allow-list and his web grant decide, exactly as before."""
+    for line in str(answer or "").splitlines():
+        s = line.strip()
+        i = s.upper().find("FETCH:")
+        if i < 0:
+            continue
+        rest = s[i + 6:].strip()
+        tok = rest.split()[0] if rest.split() else ""
+        tok = tok.rstrip(".,;:!?").strip("<>\"'`()[]").rstrip(".,;:!?")
+        if tok:
+            return tok
+    return ""
+
+
 def _agent_fetch(url: str, opener=None) -> tuple:
     """(text, note). The allow-list first; under his web grant (A210, "Free
     browser access"), any public page through covenant_web -- read-only,
@@ -8399,8 +8422,8 @@ class CovenantAPI:
             try:
                 answer, meta = _m.ask(msgs)
                 first = answer.strip().splitlines()[0].strip() if answer.strip() else ""
-                if first.upper().startswith("FETCH:"):
-                    url = first[6:].strip()
+                url = _agent_fetch_url(answer)
+                if url:
                     page, note = _agent_fetch(url)
                     fetches.append({"url": url[:300], "note": note})
                     msgs.append({"role": "assistant", "content": answer})

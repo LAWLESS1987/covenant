@@ -376,6 +376,21 @@ def main():
     check("M6q the leash: http, an unlisted host, a look-alike host and junk are refused",
           not cov._agent_fetch_ok("http://github.com/x") and not cov._agent_fetch_ok("https://example.com/")
           and not cov._agent_fetch_ok("https://github.com.evil.io/x") and not cov._agent_fetch_ok("not a url"))
+    # M6u (2026-09-25): his one real web read was refused as "scheme '' refused" -- he copied the
+    # fixed rules' '<https url>' notation, brackets and all -- and a FETCH written mid-answer was
+    # never read. The address is found on any line and taken without its brackets or quotes.
+    cases = {
+        "FETCH: <https://github.com/LAWLESS1987/covenant>": "https://github.com/LAWLESS1987/covenant",
+        "I'll look it up for you.\nFETCH: https://docs.python.org/3/ ": "https://docs.python.org/3/",
+        'fetch: "https://arxiv.org/abs/2506.12078".': "https://arxiv.org/abs/2506.12078",
+        "No page needed; the answer is 4.": "",
+        "FETCH:": "",
+    }
+    got = {k: cov._agent_fetch_url(k) for k in cases}
+    check("M6u the FETCH address is found on any line and taken without brackets, quotes or a trailing stop; none when absent",
+          got == cases, {k[:30]: v for k, v in got.items() if v != cases[k]})
+    check("M6u ...and what may be fetched is unchanged: an unbracketed off-list address is still judged by the same leash",
+          cov._agent_fetch_url("FETCH: <http://github.com/x>") == "http://github.com/x" and not cov._agent_fetch_ok("http://github.com/x"))
     # A210 ("Free browser access"): with NO web grant the leash is what it was;
     # with his grant on record the off-list fetch goes through the web door,
     # which refuses a private address before any network and says which door.

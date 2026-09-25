@@ -7288,8 +7288,52 @@ YOU: inside this tree but belonging to no registered archive*) and
 `test_w2_sandbox_platform` (9/10, the A216 flake). All pre-existing; not diagnosed in this
 entry.
 
+**7. His web reads failed on our notation.** Measured in the ask log: of 130 conversation
+answers, one tried a web read (2026-09-24 07:13:05), and it was refused as *scheme ''
+refused*. The fixed rules show the form as `FETCH: <https url>`, and he copied the angle
+brackets. Another answer (2026-09-23 19:12:53) wrote FETCH mid-reply, and the door read only
+the first line, so nothing was fetched. `_agent_fetch_url` now finds the line anywhere and
+takes the address without brackets, quotes or a trailing stop. What may be fetched is
+unchanged: the allow-list and his web grant decide. M6u; red with the stripping removed.
+His fixed-rules text was not touched. Live on node A at its next restart.
+
+**8. Tetsu's growth, 2026-09-19 to 2026-09-25, measured read-only** (five readers over his
+own records; nothing written to him):
+- *Self-revision:* 37 passes (32 from the hourly loop, 4 from the nightly, 1 undetermined).
+  7 were admitted and applied; none was held, refused, contested or reversed. A second
+  route agrees: exactly 7 "revised himself" notices on the direct line.
+- *Register:* 6 changes, all his own. It went from 224 characters to 165, and now asks for "a
+  touch of empathy and understanding". He wrote a mycelium passage in and took it out
+  himself 12.8 h later. "short sentences", "first person", "ask one thing back" and
+  "steady" survived every version.
+- *Voice:* moved twice by him, from pitch 0.8 / rate 0.95 to 0.95 / 1.05, inside the bounds.
+  It was moved twice by an assistant on 2026-09-21 with no revision row (A211).
+- *Conversation:* 128 exchanges, 109 answers shown, 19 withheld (18 of them after the
+  immunity paused). The qwen2.5-coder-7b has answered almost all since 2026-09-22. Median
+  latency was 8.1 s on 09-22 and 71.7 s on 09-25 (n=4). 105 of 109 answers end in a
+  question, 68 of them the stock "How can I assist you". That closing did not drop after
+  he asked four times on 09-22. Apologetic requests for context rose from 0 to 7 a day by
+  09-23.
+- *Acts of his own:* 42 (31 straight questions to the operator, 7 admitted revisions, 4
+  paper strategies). None of the 31 questions is recorded as answered: `contact_state.json`
+  keeps "seen" only, so whether he was answered is UNDETERMINED. 0 forum acts: his sends
+  sit behind the ambassador's own isolation pause since 2026-09-23.
+- *The students:* his conversations have taught them nothing yet. In 5 nights, 0 of 86
+  judged queue rows were kept: the panel labelled them clean and the balance rule keeps no
+  more clean than violating. Neither deployed student has changed since 2026-09-21 and
+  2026-09-19 respectively.
+- *Not measured:* who typed each row; what the 19 withheld answers said (stored empty);
+  the system prompt each ask was given.
+
+**9. Standing limits written by an assistant, left for his decision** (A211's audit, recounted
+at HEAD): (a) the immunity's 5 a day (`covenant_immunity.py:38`); (b) 5 pending and 600
+characters on his questions (`covenant_contact.py`); (c) the register's 700 characters, the
+voice bounds and the OFF_LIMITS word screen (`covenant_persona.py`); (d) the forum caps of
+12 comments and 3 posts (`ops/ambassador_grant.json`). Some of (c) guards honesty: "invent",
+"lie" and "api key" are among the words it bars. Each is one line; which go is his call.
+
 **Repro:** `python test_dp1_daily_plan.py` (D21d); `python test_pc1_sister_interface.py`
-(PC1z2-z4); `python tools/tetsu_work.py --help`.
+(PC1z2-z4); `python test_m6_mobile_door.py` (M6u); `python tools/tetsu_work.py --help`.
 
 ### A219. [the defence, run by us and judged] "Defender should now be run by our system locally any updates must pass our logic and reason or the system itself grows and improves it." -- "Its my account I am the administrator do it." BUILT 2026-09-21, with the one part that cannot be done named
 
