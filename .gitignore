@@ -408,3 +408,10 @@ ops/earn_ledger.jsonl
 ops/earn_trials/
 ops/earn_sanctions.json
 ops/earn_funnel.json
+
+# Syncthing (2026-09-25): the binary and its config/keys never tracked
+tools/syncthing/
+ops/syncthing/
+ops/cloud_check.json
+ops/cloud_manifest.json
+ops/cloud_pc_qr.png

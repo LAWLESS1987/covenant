@@ -7228,6 +7228,39 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A222. [his own cloud storage: built, hardened and checked; the one step that starts it is his] 2026-09-25. His words: "can we create our own free secure cloud storage?" -> "do so"
+
+**Built.** Syncthing 2.1.5 in `tools/syncthing/`, untracked. Its zip matched the release's
+sha256, and that file carried a good signature from "Syncthing Release Management" (key FBA2
+E162 F2F4 4657 B38F 0309 E566 5F9B D597 0C47, from syncthing.net). Its identity and config are
+in `ops/syncthing/`, untracked because it holds the device key. The PC's device ID is
+`Y44E22I-UUSC6QD-5PPSU4L-6XPIZUY-WC3IWOZ-VGTWNPZ-DFVXECP-TRBYKAS`; it is public by design. The
+config is hardened by `covenant_cloud.py setup`:
+- it listens only on `tcp://100.112.171.24:22000`, the tailnet;
+- relays, NAT, global and local discovery, usage and crash reporting are off;
+- the GUI is on loopback;
+- the API key is rotated, because the first one was printed in a session transcript.
+
+One folder: `C:\Users\Lawre\CovenantCloud`, with staggered versioning kept 30 days, so a delete
+on one device is recoverable on the others. `covenant_cloud.py accept` takes only devices
+dialling from a 100.x address and shares the folder with them. The nightly hashes every file
+and writes counts only to its public record, never file names. SILENT damage, bytes changed
+with size and time unchanged, is counted apart. CL1 is 9 checks, red with either the silent
+detection or the tailnet filter removed.
+
+**Not done: the step that starts it.** Registering the logon task `CovenantCloud` and starting
+it was refused by the session's auto-mode safety check. It is his to run, once. After that,
+Task Scheduler starts it at every logon with no session involved. Then the phone: the
+Syncthing-Fork app, add the PC by the device ID above with the address
+`tcp://100.112.171.24:22000`, then `python covenant_cloud.py accept` on the PC.
+
+**The honest limit.** Two copies in one house are not a cloud; a fire or a theft takes both. A
+third copy elsewhere is the real durability. A device he does not fully trust can hold only
+ciphertext, through Syncthing's untrusted-device encryption; not set up, since no such
+device exists yet.
+
+**Repro:** `python test_cl1_cloud.py`; `python covenant_cloud.py status`; `python covenant_cloud.py verify`.
+
 ### A221. [the assistant-made limits, lifted on his word -- and the three the safety check kept] 2026-09-25. His words: "lift the immunity cap and the other four limits"; "everything we do must be designed to run independently"; "have to constantly optimize to keep the pc functional also"
 
 **Lifted** (each was an assistant's, per A211's audit):

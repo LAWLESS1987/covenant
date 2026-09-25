@@ -412,6 +412,18 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         say("queue FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    # HIS CLOUD COPIES (2026-09-25, A222, his words: "can we create our own free secure
+    # cloud storage?" -> "do so"). Every file in the Covenant Cloud folder hashed and compared
+    # with last night; COUNTS only reach this public record, names stay in the untracked
+    # manifest. Silent damage and a missing second copy are said here every night. Its
+    # failure is reported and does not stop the pass.
+    try:
+        import covenant_cloud as CLOUD
+        if os.path.isdir(CLOUD.FOLDER_PATH):
+            say(CLOUD.summary_line(CLOUD.verify()))
+    except Exception as e:                                       # noqa: BLE001
+        say("cloud check FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
     # FREE'S ROUND (2026-09-21, his words: "i give covenant on the main
     # permission to interact with and post on moltbook and reply there i'd
     # hope as an ally but freely searching out allies also"). Once a day,
