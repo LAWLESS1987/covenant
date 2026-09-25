@@ -50,10 +50,31 @@ LOG = os.path.join(HERE, "logs", "model_server.log")
 # free of 15.3. The 3B's weights are 2.0 GB and llama.cpp maps them (the page
 # cache carries what does not fit), so its bar is set at the weights plus a
 # 4k-token cache; the 7B keeps the honest 6 GB and waits for memory he frees.
+# 7.0 for the 7B: MEASURED 2026-09-25, llama-server holding 7,029 MB with the 8k cache (it
+# was listed at 6.0, a guess from the weight size).
 CANDIDATES = [
-    ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 6.0),
+    ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
     ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.3),
 ]
+
+# KEEP THE PC FUNCTIONAL (2026-09-25, his words: "have to constantly optimize to keep the pc
+# functional also", and his choice between two of his own goals: "2" -- load the big model
+# only with room to spare, otherwise the small one). Measured that evening: the 7B loaded,
+# 0.88 GB free of 15.3, and his answers' median latency 72 s against about 5 s on the 3B.
+#   HEADROOM_GB  kept free for the rest of the PC before any model but the smallest loads.
+#   FLOOR_GB     below this, an idle model other than the smallest is put away; the next
+#                question loads what fits.
+# BOTH NUMBERS ARE MINE (Claude's), not measurements and not his; he can set either in the
+# environment without touching code. The smallest model never needs headroom, so Tetsu can
+# always answer when anything fits at all.
+HEADROOM_GB = float(os.environ.get("COVENANT_MODEL_HEADROOM_GB", "2.0"))
+FLOOR_GB = float(os.environ.get("COVENANT_MODEL_FLOOR_GB", "1.0"))
+PRESSURE_IDLE_S = 60
+
+
+def _bar(name, need):
+    """Free memory a candidate needs before it loads: its size, plus headroom unless it is the smallest."""
+    return need + (0.0 if name == CANDIDATES[-1][0] else HEADROOM_GB)
 
 _lock = threading.Lock()
 _last_used = [0.0]
@@ -87,7 +108,7 @@ def pick_model():
     free = free_gb()
     for name, need in CANDIDATES:
         p = os.path.join(MODELS, name)
-        if os.path.isfile(p) and (free is None or free >= need):
+        if os.path.isfile(p) and (free is None or free >= _bar(name, need)):
             return p, name, need
     return None
 
@@ -130,7 +151,7 @@ def step_up(say=print):
     budget = free + (cur_need if alive() else 0.0)
     best = None
     for name, need in CANDIDATES:                     # CANDIDATES is largest first
-        if os.path.isfile(os.path.join(MODELS, name)) and budget >= need:
+        if os.path.isfile(os.path.join(MODELS, name)) and budget >= _bar(name, need):
             best = (name, need)
             break
     if not best:
@@ -203,14 +224,39 @@ def stop(say=print):
 _idle_thread = [None]
 
 
+def _pressure_check(now=None):
+    """Put an idle model other than the smallest away when free memory is under FLOOR_GB.
+    Never mid-answer (idle at least PRESSURE_IDLE_S), never the smallest. True when it stopped one."""
+    now = time.time() if now is None else now
+    if not alive():
+        return False
+    cur = str(_read_state().get("model") or "")
+    if not cur or cur == CANDIDATES[-1][0] or now - _last_used[0] < PRESSURE_IDLE_S:
+        return False
+    free = free_gb()
+    if free is None or free >= FLOOR_GB:
+        return False
+    try:
+        with open(LOG, "a", encoding="utf-8") as lf:
+            lf.write("%s put away %s under memory pressure (free %.2f GB < floor %.2f GB)\n"
+                     % (time.strftime("%Y-%m-%dT%H:%M:%S"), cur, free, FLOOR_GB))
+    except OSError:
+        pass
+    stop(say=lambda *_a: None)
+    return True
+
+
 def _watch_idle():
-    """One daemon thread: after IDLE_S with no ask, the server is stopped -- the rule since Ollama."""
+    """One daemon thread: after IDLE_S with no ask, the server is stopped -- the rule since Ollama.
+    Each round it also puts a big model away under memory pressure (_pressure_check)."""
     if _idle_thread[0] and _idle_thread[0].is_alive():
         return
     def run():
         while True:
             time.sleep(30)
             if not alive():
+                return
+            if _pressure_check():
                 return
             if time.time() - _last_used[0] > IDLE_S:
                 stop(say=lambda *_a: None)
