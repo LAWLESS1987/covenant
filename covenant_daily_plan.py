@@ -314,24 +314,24 @@ SILENT_AFTER_S = 3600          # a phone that reported within a day and then wen
 # next pass; this writes it. Both paths take COVENANT_* overrides for tests.
 CHATS_DIR = os.path.join(HERE, "ops", "chat", "phone")
 TEACHER_QUEUE = os.path.join(HERE, "ops", "teacher_queue.jsonl")
-AI_CHATS_MAX_LINES, AI_CHATS_LINE_CAP, TEACHER_QUEUE_MAX_ROWS = 200, 600, 5000
+AI_CHATS_MAX_LINES, AI_CHATS_LINE_CAP = 200, 600
+# NO ROW CAP (2026-09-25). This writer counted every line ever written, consumed or
+# not, and stopped appending at 5,000. The nightly consumes by line offset
+# (covenant_teacher_queue: 96 consumed of 5,000 on 2026-09-25), so the cap closed the
+# queue for good the moment the 5,000th line landed -- 11:13:47 that day -- and every
+# lesson after it was dropped while the queue still held 4,904 rows waiting. His words
+# the same morning: "finish this without adding any new restrictions" and "ensure we
+# using pc tetsu for as much as we can so he learns". The file is gitignored and grows
+# by the size of what is said to Tetsu; nothing here drops a row.
 
 
 def teacher_queue_append(rows, path=None):
-    """Append (text, source) rows for the teacher; bounded file, oldest kept."""
+    """Append (text, source) rows for the teacher. Every row is kept; none is dropped."""
     path = path or os.environ.get("COVENANT_TEACHER_QUEUE") or TEACHER_QUEUE
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    n = 0
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            n = sum(1 for _ in fh)
-    except OSError:
-        n = 0
     kept = 0
     with open(path, "a", encoding="utf-8") as fh:
         for r in rows:
-            if n + kept >= TEACHER_QUEUE_MAX_ROWS:
-                break
             text = str(r.get("text", ""))[:4000].strip()
             if not text:
                 continue

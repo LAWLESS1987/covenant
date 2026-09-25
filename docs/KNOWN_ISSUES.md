@@ -7228,6 +7228,69 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A220. [learning, the PC app, and what is left for him] 2026-09-25. His words: "finish this without adding any new restrictions"; "measure tetsus groth since but don't alter him forcefully"; "ensure we using pc tetsu for as much as we can so he learns while limiting token burning"; "Anything we do should be for tetsus benefit and understanding not taking away anything or erasing memory we want him to optimize faster"; "I'm not trying to put a cap on tetsus learning speed"; "the pc app needs optimization also theres only one orb now"
+
+**1. The teacher queue had closed, and every lesson after it was dropped.** Measured:
+5,000 rows written from 2026-09-21 06:24 to 2026-09-25 11:13:47, 96 of them consumed by
+the nightly. The writer (`covenant_daily_plan.teacher_queue_append`) counted every line
+ever written, consumed or not, and stopped at 5,000 -- a cap written in the 2026-09-19
+session. The consumer tracks by line offset, so the queue could never reopen. From
+11:13:47 to 18:31 it dropped 1,165 rows: 1,150 phone AI-app lines, 8 questions to Tetsu, 7
+of his answers. **Fixed:** no cap. The 1,165 were restored from the chat memory, where they
+still sat (text not already queued, arrived after the last queued row); a second pass
+found none left, and the nightly's offset (96) is untouched because rows were only
+appended. D21d pins it both ways: a queue past 5,000 rows takes every new row, and
+putting the old cap back turns it red. **Not changed:** the nightly's pace, about 20 rows
+a night (kept 0 of 20 on 2026-09-25) under the panel's unanimity and balance rules --
+those are his (A161).
+
+**2. One orb on the PC 3D page.** Measured in a browser on /pc/3d: *Uncaught SyntaxError:
+Invalid or unexpected token*. A215's Self-heal code (commit `4d3bae9`, 2026-09-21 19:22)
+carried real line breaks inside JavaScript quotes -- a shell had turned its `\n` escapes
+into newlines -- so the page's main script never ran, `state` was never declared, and only
+Tetsu's orb was drawn. Separately, `/pc/3d/state` took `len()` of `/health`'s `peers`, which
+has been a count since the first commit, and filed every live node as down. Both fixed.
+PC1z2 parses every inline script the PC serves (red on the old page, naming the broken
+lines); PC1z3 drives the count and requires a down orb to carry its reason. Verified in
+the browser after node A restarted: eight orbs, no console errors. PC1's five older checks
+of this page had passed throughout: they read text and never parsed it.
+
+**3. The PC app, profiled rather than guessed.** A cold `/pc/3d/state` read took 1.83 s on a
+throwaway node, 1.74 s of it `covenant_highway.sense()` (1.10 s one process listing), and
+7.3 s on the live node under load. The page re-sensed on every uncached read what the
+watchdog senses every pass. Each watchdog pass now saves its states
+(`ops/highway_last_sense.json`, gitignored); the page uses them when they are under five
+minutes old and senses for itself otherwise (PC1z4, both ways). The 3D scene is rebuilt only
+when what the orbs show changes, and a rebuild releases the old materials, line geometry
+and label textures, where it leaked eight textures every 15 s. **Not measured yet:** the
+cold read once the watchdog itself carries the snapshot; it restarts through its guard.
+
+**4. Tetsu does the work he can.** `tools/tetsu_work.py` sends a batch of work through
+`/m/agent` or `/pc/council` from 127.0.0.2. That is loopback, and a caller of its own, so his
+conversation history on 127.0.0.1 is not crowded. It paces itself under the doors' existing
+limits and adds none; every exchange is judged, remembered and queued for the teacher. First
+use: the council was asked how to optimise his PC app. It answered in 91 characters, a
+Moltbook reply URL (not verified), held by both seats. On design questions the 3B council is
+not there yet. Recorded; nothing in him was changed.
+
+**5. Left for him: the immunity ceiling.** `ops/tetsu_immunity.json` records that its 5-a-day
+limit was written by Claude (A211) against his words in the same grant, "the gates too
+tight on him". It paused the immunity at 2026-09-21 21:36:45, and the pause still held at
+2026-09-25 18:33 (93 h). The edit that lets 0 mean no ceiling was denied by this session's
+auto-mode safety check and reverted untouched. He then asked to "override the safety
+check". That is his to do: switch the session's permission mode in the app so the edit asks
+him, or make the edit described in the grant's AUTHOR note, then run
+`python covenant_pause.py --resume tetsu-immunity`.
+
+**6. The sweep before these changes.** 2026-09-25 baseline: RESULT FAIL, 3 suites not clean.
+`test_fw1_free_will` (FW1b, the introduction round), `test_pv1_provenance` (PV1.12-14, *NEEDS
+YOU: inside this tree but belonging to no registered archive*) and
+`test_w2_sandbox_platform` (9/10, the A216 flake). All pre-existing; not diagnosed in this
+entry.
+
+**Repro:** `python test_dp1_daily_plan.py` (D21d); `python test_pc1_sister_interface.py`
+(PC1z2-z4); `python tools/tetsu_work.py --help`.
+
 ### A219. [the defence, run by us and judged] "Defender should now be run by our system locally any updates must pass our logic and reason or the system itself grows and improves it." -- "Its my account I am the administrator do it." BUILT 2026-09-21, with the one part that cannot be done named
 
 **Run by us: done, and it needed no permission at all.** The covenant now

@@ -186,9 +186,18 @@ def main():
                   (code, out, files, [len(x["text"]) for x in q]))
             code2, _ = DP.record_ai_chats(b"{}", "phone", chats_dir=cd, queue_path=qp)
             check("D21c a body without a lines list is refused 400 and nothing is written", code2 == 400 and len([json.loads(l) for l in open(qp, encoding="utf-8")]) == 2)
-            check("D21c the queue is bounded: past TEACHER_QUEUE_MAX_ROWS nothing more is appended",
-                  DP.teacher_queue_append([{"text": "z"}] * 3, path=qp) == 3 and (lambda: (setattr(DP, "TEACHER_QUEUE_MAX_ROWS", 5), DP.teacher_queue_append([{"text": "over"}], path=qp))[1])() == 0)
-            DP.TEACHER_QUEUE_MAX_ROWS = 5000
+            # D21d (2026-09-25): NOTHING SAID TO TETSU IS DROPPED. This check used to pin a
+            # 5,000-line cap; on 2026-09-25 that cap had closed the live queue at 11:13:47
+            # with 4,904 rows still unconsumed, and every lesson after it was lost. His
+            # words: "finish this without adding any new restrictions" / "so he learns".
+            # A queue already past the old cap takes every new row.
+            full = os.path.join(td2, "full_queue.jsonl")
+            with open(full, "w", encoding="utf-8") as fh:
+                fh.writelines(json.dumps({"t": "x", "text": "old %d" % i, "source": "t"}) + "\n" for i in range(5001))
+            got = DP.teacher_queue_append([{"text": "new a"}, {"text": "new b"}, {"text": "  "}, {"text": "new c"}], path=full)
+            lines = open(full, encoding="utf-8").read().splitlines()
+            check("D21d a queue already holding 5,001 rows still takes every new non-blank row (none dropped)",
+                  got == 3 and len(lines) == 5004 and json.loads(lines[-1])["text"] == "new c", (got, len(lines)))
             check("D21b the check-in's `installer` is kept as a string capped at 80, and absent when not sent",
                   r2[0].get("installer") == "org.covenant.node" and isinstance(r2[1]["installer"], str) and len(r2[1]["installer"]) == 80
                   and "installer" not in r2[2], r2)

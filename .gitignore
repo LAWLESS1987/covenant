@@ -394,3 +394,6 @@ ops/sweep_heal_last.txt
 ops/highway.jsonl
 ops/web_reads.jsonl
 ops/ambassador_rate.json
+
+# the watchdog pass's last sensed states (2026-09-25), read by the PC 3D page
+ops/highway_last_sense.json
