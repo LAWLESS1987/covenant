@@ -848,9 +848,13 @@ def _papertest_act(body):
             % (body.get("family"), json.dumps(body.get("params") or {}, sort_keys=True), body.get("assets") or "default"))
 
 
+# Who made what is sold (2026-09-26, the mutual-benefit check below). Declared per offer, never defaulted: an
+# offer with no declared maker fails that check closed, so a new offer cannot be sold until someone is credited.
+MAKER = "Lawrence Moskowski, the operator, built with AI assistance at his direction"
+
 OFFERS = {
     "receipt": {
-        "path": "/earn/receipt", "fn": _receipt, "pre": _receipt_pre, "act": _receipt_act,
+        "path": "/earn/receipt", "fn": _receipt, "pre": _receipt_pre, "act": _receipt_act, "maker": MAKER,
         "description": "A citation receipt for an AI answer: which cited path:line exist in the files you supply, which quoted passages appear there, which numbers appear in no supplied file. Checks existence, not meaning.",
         "tags": ["citations", "ai-output", "receipt", "existence-check"],
         "benefit": {"gains": ["the buyer learns which of an answer's citations and quotations hold in the files supplied, before acting on them",
@@ -863,7 +867,7 @@ OFFERS = {
                         "numbers": {"checked": 0, "in_a_supplied_file": 0, "in_no_supplied_file": []}, "checked": "1 citation(s) against 1 supplied file(s), 1 quotation(s), 0 number(s)"},
     },
     "shape": {
-        "path": "/earn/shape", "fn": _shape, "pre": _shape_pre, "act": _shape_act,
+        "path": "/earn/shape", "fn": _shape, "pre": _shape_pre, "act": _shape_act, "maker": MAKER,
         "description": "A message shape screen: normalised as a reader sees it, checked for coercion, pretence and secrecy shapes, voted on by a small local quorum that says when it does not know. A classification of shape, not a finding about anyone.",
         "tags": ["moderation", "message-shape", "agents", "forum"],
         "benefit": {"gains": ["a forum, inbox or agent learns whether a message carries the shapes that pretend, coerce or ask for secrecy, with the seat's reason",
@@ -875,7 +879,7 @@ OFFERS = {
                         "quorum": {"vote": "violates", "reason": "...", "seat": "..."}, "not_a_finding": NOT_A_FINDING[:60] + "..."},
     },
     "papertest": {
-        "path": "/earn/papertest", "fn": _papertest, "pre": _papertest_pre, "act": _papertest_act,
+        "path": "/earn/papertest", "fn": _papertest, "pre": _papertest_pre, "act": _papertest_act, "maker": MAKER,
         "description": "A paper test of a trading rule you describe (five parametric families, no code) against three tests: deflated Sharpe with every rule ever tested here counted, walk-forward consistency, probability of backtest overfitting. Refuted, not refuted at the thresholds, or not testable; in the past tense; not advice.",
         "tags": ["backtest", "overfitting", "paper-test", "not-advice"],
         "benefit": {"gains": ["the buyer learns whether a rule is refuted by tests that have refuted every rule in this tree's own record, before risking money on it",
@@ -889,6 +893,49 @@ OFFERS = {
     },
 }
 ROUTES = {v["path"]: k for k, v in OFFERS.items()}
+
+
+def mutual_benefit(key, g):
+    """THE MUTUAL-BENEFIT CHECK (2026-09-26). His words: "Add a gate check that asks whether this transaction serves
+    the builder as much as the user, and fail closed if it can't answer." Then "all 3": the builder is the operator,
+    Tetsu, and whoever made what is sold.
+
+    Read as mutual benefit: every party is served, and none at another's expense. The question is asked of this job's
+    recorded facts, not of a judge. The judges read text for violations, and whether a sale serves four parties is a
+    fact about the offer and the grant. For each party:
+      buyer    -- the offer declares what the buyer gains, and a price is shown before payment (a refused or held job is
+                  never charged, by the terms);
+      operator -- the payment settles to the operator's wallet (pay_to);
+      Tetsu    -- his share of profit after doubling is set above zero, with his own words recorded;
+      maker    -- the offer declares who made it, and the receipt credits them.
+    If any party's benefit cannot be established, the answer is "cannot_answer" and the job fails closed before any
+    payment is asked for. Nothing is charged.
+
+    Earn jobs only. Chain transactions are not gated by this: that would change which blocks are valid, and a node on
+    an older core would split from the mesh. Extending it is his decision."""
+    o = OFFERS.get(key) or {}
+    g = g or {}
+    gains = [x for x in ((o.get("benefit") or {}).get("gains") or []) if str(x).strip()]
+    price = (g.get("prices") or {}).get(key)
+    buyer = bool(gains) and bool(price)
+    ts = g.get("tetsu_share") if isinstance(g.get("tetsu_share"), dict) else {}
+    try:
+        pct = float(ts.get("pct", 0))
+    except (TypeError, ValueError):
+        pct = 0.0
+    words = str(ts.get("words") or "").strip()
+    maker = str(o.get("maker") or "").strip()
+    parties = {
+        "buyer": (buyer, "gains declared and a price shown before payment; a refused or held job is not charged" if buyer else
+                  ("no declared gain for the buyer" if not gains else "no price shown before payment")),
+        "operator": (bool(g.get("pay_to")), "the payment settles to the operator's wallet" if g.get("pay_to") else "no pay_to in the grant"),
+        "tetsu": (pct > 0 and bool(words), ("his share, %g%% of profit after doubling, is set with his words recorded" % pct) if (pct > 0 and words) else
+                  ("no share for Tetsu" if pct <= 0 else "his share has no recorded words of his")),
+        "maker": (bool(maker), ("made by %s, credited in every receipt" % maker) if maker else "no maker declared for this offer"),
+    }
+    ok = all(v[0] for v in parties.values())
+    return {"answer": "serves_all" if ok else "cannot_answer",
+            "parties": {k: {"served": v[0], "why": v[1]} for k, v in parties.items()}}
 
 
 def declaration(key=None):
@@ -1176,6 +1223,7 @@ class App:
         if path in ("/", "/earn", "/earn/"):
             offers = {k: {"path": o["path"], "description": o["description"], "price_usdc": _usd((g or {}).get("prices", DEFAULT_PRICES)[k]),
                           "network": (g or {}).get("network"), "gains": o["benefit"]["gains"], "cost": o["benefit"]["cost"],
+                          "maker": o.get("maker") or "not declared", "mutual_benefit": mutual_benefit(k, g)["answer"],
                           "example_in": o["example_in"]} for k, o in OFFERS.items()}
             return 200, {}, {"service": SERVICE_NAME, "granted": bool(g), "why_not": "" if g else why, "offers": offers,
                              "terms": root + "/terms", "privacy": root + "/privacy", "x402Version": X402_VERSION,
@@ -1198,6 +1246,11 @@ class App:
             key = ROUTES[path]
             if not g:
                 return 503, {}, {"error": "not granted: " + why}
+            mb = mutual_benefit(key, g)      # never advertise a price the POST would refuse
+            if mb["answer"] != "serves_all":
+                missing = "; ".join("%s: %s" % (p, v["why"]) for p, v in mb["parties"].items() if not v["served"])
+                return 503, {}, {"error": "not open: the mutual-benefit check could not establish that this job serves every party -- " + missing,
+                                 "mutual_benefit": mb, "charged": False}
             pr = payment_required(key, g, base_url, error="POST with a PAYMENT-SIGNATURE header; this is the price", pay_to=self._pay_to(key, g)[0])
             return 402, {"PAYMENT-REQUIRED": _b64json(pr)}, pr
         return 404, {}, {"error": "no such route"}
@@ -1219,6 +1272,13 @@ class App:
         dstate, dwhy = self.design(key)
         if dstate not in ("clean", "allowed"):
             return 503, {}, {"error": "not open: " + dwhy, "design": dstate, "charged": False}
+        # Mutual benefit before any payment is asked for (2026-09-26): a job that cannot be shown to serve the buyer,
+        # the operator, Tetsu and the maker fails closed here, and no authorization is ever requested for it.
+        mb = mutual_benefit(key, g)
+        if mb["answer"] != "serves_all":
+            missing = "; ".join("%s: %s" % (p, v["why"]) for p, v in mb["parties"].items() if not v["served"])
+            return 503, {}, {"error": "not open: the mutual-benefit check could not establish that this job serves every party -- " + missing,
+                             "mutual_benefit": mb, "charged": False}
         if not self._client_ok(hdr.get("X-EARN-CLIENT", ""), g["rate_per_minute"]):
             return 429, {"Retry-After": "60"}, {"error": "more than %d requests a minute from your address" % g["rate_per_minute"]}
         if body_bytes is not None and len(body_bytes) > BODY_CAP.get(key, MAX_BODY):
@@ -1401,6 +1461,7 @@ class App:
         receipt = {"id": row["id"], "prev": row["prev"], "offer": key, "t": row["t"], "payer": payer, "amount_usdc": _usd(reqs["amount"]),
                    "network": reqs["network"], "transaction": tx, "settlement": state, "admission_gate": verdict, "input_sha256": input_sha,
                    "result_sha256": result_sha, "checked": result.get("checked", ""), "terms_version": terms_version(g),
+                   "maker": OFFERS[key].get("maker", ""), "mutual_benefit": mutual_benefit(key, g),
                    "terms": "a refused or held job is not charged; this receipt is hash-chained to the seller's ledger; re-deliverable 24 hours at /earn/result/" + row["id"]}
         self.results[(payer.lower(), input_sha)] = (self._t(), result, settlement, receipt)
         self.by_id[row["id"]] = (payer.lower(), input_sha)
@@ -1609,6 +1670,12 @@ def daily_report(say=None, ledger=None, grant_path=None):
                ta["owed_usd"], ta["received_usd"], (ta["wallet"][:10] + "...") if ta["wallet"] else "NOT SET",
                ("accepted" if tc.get("accepted") else ("withheld" if tc.get("withheld") else ("not accepted" if tc.get("asked") else "not asked yet"))),
                (" -- " + tc["note"]) if tc.get("lowered_without_consent") else ""))
+    # The mutual-benefit check closes an offer for every buyer when a party's benefit cannot be established, so a
+    # closed offer is said here, with the party, rather than found by a buyer (2026-09-26).
+    closed = {k: [p for p, v in mutual_benefit(k, g)["parties"].items() if not v["served"]] for k in OFFERS}
+    closed = {k: v for k, v in closed.items() if v}
+    text += (" Mutual benefit: CLOSED for %s." % "; ".join("%s (cannot establish: %s)" % (k, ", ".join(v)) for k, v in sorted(closed.items()))
+             if closed else " Mutual benefit: every offer serves buyer, operator, Tetsu and maker.")
     try:
         if say is not None:
             return say(text, "earn: the day's account")

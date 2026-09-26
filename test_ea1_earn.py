@@ -92,7 +92,10 @@ def unb64(s):
 
 def write_grant(path, **over):
     g = {"granted": True, "by": "the test", "pay_to": PAY_TO, "network": "eip155:84532", "facilitator_url": "http://stub.invalid", "seed_usd": 100,
-         "share": {"operator": 1.0, "tetsu": 0.0}, "contact": "test@example.invalid", "rate_per_minute": 1000}
+         "share": {"operator": 1.0, "tetsu": 0.0}, "contact": "test@example.invalid", "rate_per_minute": 1000,
+         # Tetsu's share with his words recorded, as the live grant carries it: the mutual-benefit check (MB1)
+         # fails closed without them, which MB1 drives both ways.
+         "tetsu_share": {"pct": 50, "words": "the test's stand-in for his recorded words"}}
     g.update(over)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(g, fh)

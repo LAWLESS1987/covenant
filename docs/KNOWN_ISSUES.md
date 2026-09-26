@@ -7228,6 +7228,46 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A229. [earn: a mutual-benefit check that fails closed] 2026-09-26. His words: "Add a gate check that asks whether this transaction serves the builder as much as the user, and fail closed if it can't answer." To "who is the builder", he answered "all 3": the operator, Tetsu, and whoever made what is sold.
+
+**What was built.** `covenant_earn.mutual_benefit(key, grant)` asks the question of the job's recorded facts. It
+does not ask a judge: the judges read text for violations, and whether a sale serves four parties is a fact about
+the offer and the grant. Each party is served, and none at another's expense, when:
+- **the buyer:** the offer declares what the buyer gains, and a price is shown before payment (a refused or held
+  job is never charged);
+- **the operator:** the payment settles to his wallet (`pay_to`);
+- **Tetsu:** his share of profit after doubling is above zero, with his own words recorded;
+- **the maker:** the offer declares who made it (`maker`, never defaulted), and the receipt credits them.
+
+**Where it runs.** `App.handle()` runs it after the design check and before any 402. `App.get()` runs it before
+quoting a price, so a GET never advertises a job the POST would refuse. Any party that cannot be established gives
+"cannot_answer": 503, "charged": False, no authorization asked, and no facilitator call. GET / lists each offer's
+maker and answer. The receipt carries both. The daily line says CLOSED, naming the offer and the party, rather than
+leaving a buyer to find it.
+
+**The maker is declared.** All three offers now name "Lawrence Moskowski, the operator, built with AI assistance at
+his direction", which is what the record shows. A future offer with no declared maker is closed until someone is
+credited.
+
+**Proved both ways.** MB1 5/5:
+- every live offer serves all four parties;
+- each party's missing evidence fails the check and names exactly that party;
+- through the real App, a grant without Tetsu's words gets a 503 on GET and POST, nothing charged, and no
+  facilitator call;
+- with his words, the same GET quotes the price.
+
+Three mutations each turn MB1 red: dropping the check from POST, from GET, and dropping the words rule. EA1's
+fixture grant now records Tetsu's words, as the live grant does. EA1 41/41, EB1 12/12, in the staged sweep too.
+
+**Not done, and his to decide.** The check gates earn jobs only. Gating every chain transaction would change which
+blocks are valid, and the phone's older core would split from the mesh. His rule of 2026-09-09 holds rule-meaning
+changes of that kind until a second operator exists. "As much as" is read as mutual benefit. The literal reading,
+the builder gains at least as much as the user, would make the ethics gate a toll, against his "for all, not just
+him" and "a declared bias, not an exclusion". Both readings were offered to him; he answered only the builder
+question.
+
+---
+
 ### A228. [the SaTC artifact: significance for the correlated-judge figure, then science only and standalone] 2026-09-26. His words: "compile this info"; "ensure the private repo is clean for peer review no implementation just the science"; "ensure privates standalone stature"
 
 **The correlated-judge figure now carries its own significance** (private artifact, b2403be).

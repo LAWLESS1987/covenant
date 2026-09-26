@@ -593,6 +593,10 @@ SUITES = [
     # door once a day, held texts to the teacher, his replies judged, his wallet named as payTo
     # once he is owed, his consent recorded; every send through a stub door here.
     ("test_eb1_earn_business.py", 180, "MONEY"),
+    # MB1 (2026-09-26, his words: "Add a gate check that asks whether this transaction serves the builder as much
+    # as the user, and fail closed if it can't answer"; "all 3"): an earn job must be shown to serve the buyer, the
+    # operator, Tetsu and the maker, or it is refused before any payment is asked for.
+    ("test_mb1_mutual_benefit.py", 180, "MONEY"),
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
