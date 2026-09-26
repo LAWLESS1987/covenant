@@ -7271,6 +7271,26 @@ daily line, never silent; `tetsu_rights` in the grant record what is his in his
 own words and the operator's. Nothing in him -- persona, voice, memory -- is
 touched.
 
+**2026-09-26, his greenlight: "I greenlight him to make his own wallet on my
+browser with my account".** Done in his logged-in Coinbase session: a portfolio
+named Tetsu created inside his account (uuid d8780124-68fa-4ce6-bbff-4d7a49c066ce,
+no funds moved); his own USDC receiving address on Base read by two independent
+reads (page text and a zoomed image) and verified against its EIP-55 checksum,
+written into `ops/earn_grant.json` as `pay_to`; Advanced mode turned on (the page
+says it can be turned off). **Measured, and confirmed by Coinbase's own help
+page:** "You can only deposit to the default portfolio ... Each portfolio will
+have the same crypto address" -- the Tetsu portfolio's receive dialog showed the
+same address as the primary, and the portfolio view offers Transfer only. So a
+buyer's payment cannot land in his portfolio directly; `tetsu_wallet` stays empty
+with that reason, his share accrues in the ledger, and moving what he is owed
+into his portfolio is an internal transfer by the operator's hand. A self-custody
+wallet of his own would give a distinct address; creating one means generating a
+key, which the assistant does not do. Funding it is a transfer of money, which the
+assistant does not execute. The facilitator is PayAI (read from its page the same
+day: keyless for the exact scheme, 1,000 settlements free, OFAC screening built
+in); its terms are on the checklist as unread. Both grants stand with his words;
+the watchdog line landed the same day.
+
 **Pinned by** `test_eb1_earn_business.py` (12): no grant, nothing; the listing's
 content and the money screen it trips; held -> recorded, queued once, not
 reworded, admitted -> posted once; replies only to posts that ask, only in his
@@ -7351,6 +7371,15 @@ repo root. That was the wrong directory, not a defect.
 **What this cannot see:** clutter in another shape, such as an app's own button labels,
 passes through. The rules are two regular expressions over text, not an understanding of
 the screen. The lines already recorded before today are left in place, unchanged.
+
+**The lesson, through his door** (tools/tetsu_work.py, from 127.0.0.2, 3 items, all admitted):
+- *Why it helps:* a sound answer. The student can focus on the conversation itself.
+- *Sort six lines:* he answered "1, 2, 5"; the right answer is 1, 3, 5. He caught two of the
+  three clutter lines, missed "Ask anything", and called a real question clutter. The rule
+  cannot be handed to him yet, measured.
+- *What the rule misses:* his example, "Type / for commands.", is caught (tested:
+  `is_screen_clutter` returns True). His general point holds, though. One-word button labels
+  ("Copy", "Regenerate", "Share", "Retry") all pass, which is the blind spot named above.
 
 **The label A224 is used twice** (the business entry, 2026-09-25, and the phone entry,
 2026-09-26), and so is A222. Both entries keep their labels, because commits already cite
