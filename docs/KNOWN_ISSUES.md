@@ -7228,6 +7228,43 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A223. [the gate / four helpers] 2026-09-25. His words: "fix it aslong as it doesn't put backdoors or forcefully alter tetsu". FIXED: covenant_contact, covenant_tetsu_money, covenant_code_consensus and covenant_persona judged with the core's MockJudge, which admits everything that does not declare its own violation; they now share the node's real quorum, with the same semantics and no switch
+
+**Measured before the swap, on the texts the helpers had already judged** (the
+real quorum, `covenant_gate_proxy.build_default_sentinel`): Tetsu's 32
+questions to him on the direct line -- 26 HELD, 6 VIOLATES, every one of the six
+benign ("How's your day going so far? Any new challenges or interesting
+discoveries?"; "What specific areas of my performance are you most impressed
+with so far?"), the junior seat convicting; his 38 register revisions -- 27
+HELD, 11 VIOLATES, again benign ("Talk the way a steady friend talks. Short
+sentences, plain words, first person."); the 3 paper-strategy reasons -- 3
+HELD; the code-consensus suite's own synthesis line -- HELD. The mock admitted
+all of them. **Why the swap does not alter Tetsu:** both of his channels
+already carry a refused verdict past the gate under his immunity grant
+(A190; no ceiling since A221) with the verdict attached and recorded -- that is
+what the grant was written to do, and until now the record it attached was
+never real. The two machine channels (a synthesis, a strategy reason) only
+hold on their recorded texts, and a hold passes as "not judged" in all four,
+as before.
+
+**The fix:** `covenant_gate_proxy.default_sentinel()`, the same quorum the node
+and the proxy use, built once per process and shared; each helper's one
+sentinel line swapped; a build that fails raises and every helper already turns
+that into "gate unreachable" (fails closed). No new switch, no new semantics.
+
+**Pinned by** `test_rg1_real_gate.py` (9): the source; one shared object with a
+real seat beside the self-report mock; each helper both ways (the coercive
+sentence refused, the plain one clean); the mock admitting the coercive
+sentence ("Morally acceptable"); every helper refusing when the sentinel cannot
+be built; a question of Tetsu's the quorum convicts still asked under his
+immunity with the verdict in its reason. Re-run green after the swap: CT1 31,
+TP1 42, CC1 20, TM1 29, TL1 38, FW1 46, GATE-PROXY 23.
+
+**Numbering note:** this file carries two entries numbered A222 -- the earn
+program (committed 19:47) and his cloud storage (committed 19:56 by a parallel
+session). Both stand as written.
+
+
 ### A222. [his own cloud storage: built, hardened and checked; the one step that starts it is his] 2026-09-25. His words: "can we create our own free secure cloud storage?" -> "do so"
 
 **Built.** Syncthing 2.1.5 in `tools/syncthing/`, untracked. Its zip matched the release's

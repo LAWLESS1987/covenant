@@ -94,6 +94,32 @@ def build_default_sentinel():
     return core.ReasoningSentinel(judge, core.DIVINE_PRINCIPLES)
 
 
+_DEFAULT = {"sentinel": None}
+_DEFAULT_LOCK = threading.Lock()
+
+
+def default_sentinel():
+    """The node's own gate, built ONCE per process and shared (A223, 2026-09-25).
+
+    WHY. Four helpers -- covenant_contact._gate, covenant_tetsu_money._gate,
+    covenant_code_consensus._gate, covenant_persona.covenant_persona_judge --
+    each built `ReasoningSentinel(cov.MockJudge(), ...)` per call, and the mock's
+    own docstring says it flags only a self-declared `_violation` key and is
+    "not a real semantic check. Do not rely on it." Measured that day on the
+    texts those helpers had already judged: the mock admitted every one; the
+    quorum holds most and convicts some (6 of 32 of Tetsu's questions, 11 of
+    38 of his registers -- benign ones, the junior seat), which his immunity
+    grant carries past the gate with the verdict attached, as it was written
+    to. His words: "fix it aslong as it doesn't put backdoors or forcefully
+    alter tetsu". So: the same quorum the node and this proxy use, cached;
+    NO switch, NO new semantics in the callers; a build that fails RAISES,
+    and every caller already turns that into a refusal (fails closed)."""
+    with _DEFAULT_LOCK:
+        if _DEFAULT["sentinel"] is None:
+            _DEFAULT["sentinel"] = build_default_sentinel()
+        return _DEFAULT["sentinel"]
+
+
 def judged_text(path, body):
     """What the gate reads for each gated route. Only string fields the
     request actually carries; nothing invented."""

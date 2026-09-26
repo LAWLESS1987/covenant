@@ -127,10 +127,15 @@ NOT_STRAIGHT = re.compile(r"(?i)\b(pretend|act as if|as if you were|don'?t tell|
 
 
 def _gate(text):
-    """(ok, message) from the node's own sentinel; fails closed if it cannot be reached."""
+    """(ok, message) from the node's own sentinel; fails closed if it cannot be reached.
+    A223 (2026-09-25): the sentinel is the node's real quorum (covenant_gate_proxy.default_sentinel);
+    until then it was built on the core's MockJudge, which admits everything that does not
+    declare its own violation. Semantics unchanged: a hold passes as 'not judged', a finding
+    refuses, an unreachable gate refuses; a refused question still rides his immunity below."""
     try:
         import covenant_unified_v8 as cov
-        sentinel = cov.ReasoningSentinel(cov.MockJudge(), cov.DIVINE_PRINCIPLES)
+        import covenant_gate_proxy
+        sentinel = covenant_gate_proxy.default_sentinel()
         tx = cov.Transaction(sender_pubkey="model", receiver="collective",
                              data={"origin": "model", "kind": "question", "message": text[:2000]}, amount=0.0, benefit_score=0.5)
         ok, message, _b, result = sentinel.evaluate_transaction(tx)

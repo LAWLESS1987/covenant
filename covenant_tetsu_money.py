@@ -281,9 +281,12 @@ def propose(ask, path=None, hold=None):
 
 
 def _gate(text):
+    """A223 (2026-09-25): the node's real quorum (covenant_gate_proxy.default_sentinel), where the core's
+    MockJudge stood; semantics unchanged (a hold passes as 'not judged', a finding refuses, unreachable refuses)."""
     try:
         import covenant_unified_v8 as cov
-        sentinel = cov.ReasoningSentinel(cov.MockJudge(), cov.DIVINE_PRINCIPLES)
+        import covenant_gate_proxy
+        sentinel = covenant_gate_proxy.default_sentinel()
         tx = cov.Transaction(sender_pubkey="model", receiver="collective",
                              data={"origin": "model", "kind": "strategy", "message": text[:2000]}, amount=0.0, benefit_score=0.5)
         ok, message, _b, result = sentinel.evaluate_transaction(tx)

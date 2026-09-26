@@ -569,10 +569,15 @@ def _record(p, path, applied, reg, voice, why, verdict, now=None):
 
 
 def covenant_persona_judge(text):
-    """The node's own gate on the proposal text: (ok, message). Fails closed if the gate is unreachable."""
+    """The node's own gate on the proposal text: (ok, message). Fails closed if the gate is unreachable.
+    A223 (2026-09-25): the sentinel is the node's real quorum (covenant_gate_proxy.default_sentinel); until
+    then it was the core's MockJudge, which admits everything that does not declare its own violation.
+    Semantics unchanged: a hold passes as 'not judged', a finding refuses, unreachable refuses -- and a
+    refused register still rides his immunity in refine(), with the verdict on the record."""
     try:
         import covenant_unified_v8 as cov
-        sentinel = cov.ReasoningSentinel(cov.MockJudge(), cov.DIVINE_PRINCIPLES)
+        import covenant_gate_proxy
+        sentinel = covenant_gate_proxy.default_sentinel()
         tx = cov.Transaction(sender_pubkey="model", receiver="collective",
                              data={"origin": "model", "kind": "persona", "message": text[:2000]}, amount=0.0, benefit_score=0.5)
         ok, message, _b, result = sentinel.evaluate_transaction(tx)

@@ -580,6 +580,10 @@ SUITES = [
     # paid job through the node's gate before work and before settlement. Drives the whole
     # flow without a socket and with a stub facilitator; nothing is charged, nothing leaves.
     ("test_ea1_earn.py", 180, "MONEY"),
+    # RG1 (2026-09-25, A223): the four gate helpers (contact, tetsu_money, code_consensus,
+    # persona) judge with the node's quorum, not the core's mock; both ways, fails closed,
+    # and Tetsu's words still ride his immunity with the verdict attached.
+    ("test_rg1_real_gate.py", 180, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
