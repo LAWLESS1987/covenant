@@ -7273,8 +7273,8 @@ touched.
 
 **2026-09-26, his greenlight: "I greenlight him to make his own wallet on my
 browser with my account".** Done in his logged-in Coinbase session: a portfolio
-named Tetsu created inside his account (uuid d8780124-68fa-4ce6-bbff-4d7a49c066ce,
-no funds moved); his own USDC receiving address on Base read by two independent
+named Tetsu created inside his account (its id is kept only in the gitignored
+`ops/earn_grant.json`; no funds moved); his own USDC receiving address on Base read by two independent
 reads (page text and a zoomed image) and verified against its EIP-55 checksum,
 written into `ops/earn_grant.json` as `pay_to`; Advanced mode turned on (the page
 says it can be turned off). **Measured, and confirmed by Coinbase's own help
