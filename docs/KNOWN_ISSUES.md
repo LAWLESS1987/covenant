@@ -772,6 +772,30 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `<tailne
 
 **Status:** open
 
+**2026-09-26, dated note (the lines above are kept as written).** The key warning part is
+FIXED, 2026-09-26, as documentation. INDEX.md's warning, and its line "Anything in it has
+already left your computer", now carry a dated correction beside them, per the correction
+rule. The ledger (docs/RETRACTED.json, id A33) keeps both phrasings cited, so R1 fails if
+either comes back without it. Measured today, names and attributes only, no key opened:
+- the three files are still in `covenant\`, dated 2026-08-19, never moved;
+- a copy of `covenant_A.db.key` is also in `~/.covenant-keys/`;
+- the folder is not under the OneDrive root, is not a junction, and carries no cloud
+  attributes; Desktop and Documents are not redirected; there is no copy under OneDrive
+  or the Syncthing folder;
+- `.gitignore` line 4 (`*.key`) ignores all three, and no `.key` file was ever added on
+  any ref.
+
+So the exposure the warning describes is not present by these measures. What was NOT
+measured: other backup tools, and the files' history before today. The header's later
+line ("That was never true of the current layout") is an assertion about the past that
+this note does not verify. Moving the keys is still the operator's decision, because
+`covenant_A.db.key` is bound to `covenant_A.db`. Not changed here, and the same belief:
+EXCHANGE_SETUP.md:28 and the refusal messages in `coinbase_balance.py` and
+`kraken_balance.py` still say the `covenant\` folder "syncs to the cloud". Those two are
+code, and the refusal they guard is still sound. The heading above says FIXED while
+**Status** says open; that mismatch predates this note, and the phone-document half of
+this entry was not re-measured here.
+
 ### A34. [minor / docs] /health, which DEPLOYMENT.md calls 'the single status signal naming exactly what is wrong', prints two warnings on the owner's own nodes that do not describe their state -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** DEPLOYMENT.md:21-22. Live :5000, :5020, :5060 all warn 'ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction' while configured seat is deferring (student -> GitHub -> fallback) and chain_height is 3; the same warning appears on the working fresh-clone probe. Node A (:5000) also warns 'node minted its OWN genesis -- it cannot converge' while its genesis field equals the shipped genesis.json hash 00009b31c6c654d7... and matches B and C.

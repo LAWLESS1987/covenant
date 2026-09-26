@@ -15,6 +15,17 @@ Audited 2026-08-20 against the real contents of `C:\Users\<user>\covenant`.
 
 ## FIX THIS FIRST — three private keys are in a folder that leaves your machine
 
+> **Correction, 2026-09-26 (KNOWN_ISSUES A33).** Measured without opening any key. The
+> three files named below are **still in this folder** and were never moved (dated
+> 2026-08-19). A copy of `covenant_A.db.key` also sits in `C:\Users\<user>\.covenant-keys\`.
+> By every measure taken, this folder is **not** cloud-synced: it is not under the OneDrive
+> root and is not a junction into it, the files carry no cloud attributes, Desktop and
+> Documents are not redirected, and no copy exists under OneDrive or the Syncthing folder.
+> Git ignores them (`*.key`, and `.covenant-keys/`), and no `.key` file was ever
+> committed on any ref. Moving them out of `covenant\` is still the operator's decision:
+> `covenant_A.db.key` is bound to `covenant_A.db`. Not measured: other backup tools, and
+> where the files were before today. The original text is kept below as published (A33).
+
 ```
 covenant_A.db.key
 nodeA_run.db.key

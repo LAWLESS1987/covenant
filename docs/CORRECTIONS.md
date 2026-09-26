@@ -28,6 +28,7 @@ perfection is not the goal, mutual benefit and honesty is.*
 | **35 of 36 "guards" protected what they named** | Confirmed fake by mutation: the dominant mechanism is a check that **greps the source text** instead of running it. A guard that passes without the property holding is not a guard | [A74](KNOWN_ISSUES.md) |
 | **A node earns something by running the chain** | Zero, measured. The only reward is 1% of value *moved*, paid exclusively to stakers; nothing has ever been staked, so all 0.12 tokens ever computed were discarded. Supply is still the 1000-token genesis mint | [PARTNER.md](PARTNER.md) |
 | **The summarise path runs a local judge and nothing leaves this machine** | There is no local path in `covenant_route.py` — since 2026-09-12 every task dispatches to a GitHub Actions runner in the **public** repo, and the runner's job summary is rendered publicly. Public run `35064624218` published a readable summary of one of the operator's videos. The defect was the **claim**, not the publishing: he is not aiming for private, so the tool now announces the destination rather than refusing | [A128](KNOWN_ISSUES.md) |
+| **Three private keys are in a folder that leaves your machine** — INDEX.md, audited 2026-08-20: "This folder syncs to the cloud. Anything in it has already left your computer." | Measured 2026-09-26 without opening a key. The three files are still in `covenant\`, never moved, and that folder is **not** cloud-synced by any measure taken: not under OneDrive, not a junction, no cloud attributes, no copy under OneDrive or Syncthing. Git ignores `*.key`, and none was ever committed on any ref. Moving them is still the operator's decision (`covenant_A.db.key` is bound to `covenant_A.db`). Not measured: other backup tools, and where the files were before today | [A33](KNOWN_ISSUES.md), [INDEX.md](../INDEX.md) |
 | Two further claims of the author's that did not survive checking | Written out in full | [WHAT_WE_FOUND §7](WHAT_WE_FOUND.md) |
 
 ## Missteps of conduct, not of code
@@ -112,3 +113,8 @@ Its first run found two live sites the hand sweep had missed.
   result.
 - **`peers.txt` still reads `self`.** No second party has run the vectors. The federation
   is one node, and section IX's cap, L5 = 1, applies to every claim in this repository.
+- **The same "covenant\ syncs to the cloud" belief as INDEX.md's key warning** (A33,
+  corrected 2026-09-26) still stands in `EXCHANGE_SETUP.md:28` and in the refusal
+  messages of `coinbase_balance.py` and `kraken_balance.py`. Not changed with that
+  correction: the two are code, and the refusal they guard (no credential file inside
+  the repository folder) is sound on its own. Only the reason given is not.
