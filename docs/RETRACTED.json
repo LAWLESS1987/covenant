@@ -150,6 +150,35 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "The four added files are sweep transcripts -- a verbatim record of what the suite printed on a given day, the one kind of file whose purpose is to hold the old wording unedited. test_g4_money_gates.py is deliberately NOT allowed: it quotes the retracted sentence in the comment explaining the retraction, and cites G4b two lines above it, so containment covers it. That is the rule working as intended rather than being waived."
+  },
+  {
+   "id": "A33",
+   "claim": "That three private node keys (covenant_A.db.key, nodeA_run.db.key, nodeB_run.db.key) sit in a folder that syncs to the cloud and have already left the machine -- INDEX.md, audited 2026-08-20, the page's opening section.",
+   "refuted_by": "Measurement on 2026-09-26, names and attributes only, no key opened: the covenant folder is not under the OneDrive root, is not a junction, its key files carry no cloud attributes, Desktop and Documents are not redirected, and no copy exists under OneDrive or the Syncthing folder; .gitignore line 4 (*.key) ignores all three, and no .key file was ever added on any ref.",
+   "truth": "The three files are still in the covenant folder (dated 2026-08-19, never moved; a copy of covenant_A.db.key also sits in ~/.covenant-keys/), and by every measure taken that folder does not sync to the cloud and git never carried them. Moving them is still the operator's decision, because covenant_A.db.key is bound to covenant_A.db. Not measured: other backup tools, and where the files were before 2026-09-26.",
+   "why_restated_rather_than_left_red": "The original warning is kept in INDEX.md as it was published, with a dated correction beside it -- the rule in docs/CORRECTIONS.md. This entry makes that correction load-bearing: the warning's phrasings may appear only within the window of an A33 citation.",
+   "the_other_perspective": "The warning's habit is sound and stays: nothing secret should live in the repository folder. What was wrong is the stated fact (that the folder syncs, and that the keys had left). The same belief remains in EXCHANGE_SETUP.md:28 and in two scripts' refusal messages; it is listed under 'What has not been corrected' in docs/CORRECTIONS.md rather than patterned here.",
+   "verbatim": [
+    "## FIX THIS FIRST — three private keys are in a folder that leaves your machine",
+    "This folder syncs to the cloud. Anything in it has already left your computer."
+   ],
+   "patterns": [
+    "folder\\s+that\\s+leaves\\s+your\\s+machine",
+    "Anything\\s+in\\s+it\\s+has\\s+already\\s+left\\s+your\\s+computer"
+   ],
+   "note_on_patterns": "Two patterns, both the page's own wording. A pattern over 'syncs to the cloud' would also match EXCHANGE_SETUP.md and the two balance scripts, which state the same belief as the reason for a refusal that is sound on its own; those are recorded as uncorrected instead of being made to carry a citation they would not explain.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_SWEEP.txt",
+    "ops/_sweep2.txt",
+    "ops/_sweep3.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The record files, and the sweep transcripts that print what the suite read, as for G4b. INDEX.md is deliberately NOT allowed: it keeps the original text, so it must carry the A33 citation within the window."
   }
  ]
 }
