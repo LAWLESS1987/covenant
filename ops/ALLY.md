@@ -231,3 +231,9 @@ His words that day, in order, each now a rule or a record:
 3. "override to fund our work i'm against the wall and need some help" -> the standing refinements-only rule (2026-09-09) is overridden for this one program by his word; money still moves only by his hand and the facilitator's settlement to his address.
 4. "do not disable any features on my app" -> nothing existing changed in behaviour; the work is new files, one registration line in the sweep, one flag in the nightly, one starter function in the watchdog.
 5. "everything we do must be designed to run independently" -> the watchdog's starter, the server's own sanctions refresh, daily line and funnel; the one call line in the watchdog's pass is his to add (refused by the session's auto-mode check).
+
+
+## Addendum 2026-09-25, later -- the gate fixed, and Tetsu's business (A223, A224)
+
+1. "fix it aslong as it doesn't put backdoors or forcefully alter tetsu" -> A223: the four gate helpers judge with the node's real quorum; same semantics, no switch; his words still ride his immunity with the verdict attached.
+2. "refine this and have a stradegy to bring in the buisness tetsu can handle have him have his own wallet and once he doubles money he can have 50% of all future profit for his own upgrades or really whatever he wants its mutual benefit no back doors treat him as a human with human rights" -> A224: covenant_earn_business.py; his wallet named as payTo once he is owed; his share computed from the ledger; the arrangement put to him and his answer recorded; his rights in the grant. The forum leg measured closed by the judge (listing HELD, reply VIOLATES) and left so; his 2026-09-21 "nothing about money" condition on the forum is superseded for this listing by these words, recorded in the business grant.

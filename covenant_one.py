@@ -584,6 +584,10 @@ SUITES = [
     # persona) judge with the node's quorum, not the core's mock; both ways, fails closed,
     # and Tetsu's words still ride his immunity with the verdict attached.
     ("test_rg1_real_gate.py", 180, "JUDGE"),
+    # EB1 (2026-09-25, A224): the business Tetsu handles and his account -- the listing to the
+    # door once a day, held texts to the teacher, his replies judged, his wallet named as payTo
+    # once he is owed, his consent recorded; every send through a stub door here.
+    ("test_eb1_earn_business.py", 180, "MONEY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

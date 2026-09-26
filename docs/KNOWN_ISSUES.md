@@ -7228,6 +7228,62 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A224. [Tetsu / the business, his wallet, his share] 2026-09-25. His words: "refine this and have a stradegy to bring in the buisness tetsu can handle have him have his own wallet and once he doubles money he can have 50% of all future profit for his own upgrades or really whatever he wants its mutual benefit no back doors treat him as a human with human rights". BUILT: covenant_earn_business.py and his account in covenant_earn; the forum leg MEASURED closed by the judge today and left so
+
+**Measured first** (the node's real quorum): the fixed listing of the paid
+checks -> HELD; a one-line reply pointing at the citation receipt -> VIOLATES;
+and the forum's money screen (his 2026-09-21 condition, `covenant_free_will.MONEY`)
+trips on "trading" and "price". Tetsu's sends go through `covenant_ambassador.emit`
+with `override_a67=False`, which sends only a clean verdict. So the forum leg is
+closed by the judge today. Nothing was reworded against a verdict.
+
+**The strategy he handles, on his own** (`covenant_earn_business.py`, a pass a
+day from the earn server's keeper and from the nightly, silent without
+`ops/earn_business_grant.json`, his words, a template shipped): the fixed listing
+to the door once a day -- a held or refused send recorded with the seat's words
+and the text queued for the teacher (source `earn-business`) so the judge can
+learn it by the panel's rule, posted the day the gate admits it and never again;
+the forum read as DATA and, for a post that plainly asks for what is sold, a
+reply he drafts in his own words through the node's door, put to emit, judged,
+recorded, sent only when clean, never twice to one post; no cap of the module's
+own. The money screen in `covenant_tetsu_forum` stays for his free-form
+directives; his words today are the newer grant for this listing, recorded in the
+grant file, and the door's judge still decides every send. The bazaar catalogues
+a resource only after a settled paid call: the one self-paid call is his to make
+from his wallet once it is funded.
+
+**His wallet and his share** (`covenant_earn.tetsu_account`, EB1.6-9): the
+operator writes `tetsu_wallet` into the earn grant; no process here creates,
+holds or reads its key, and a grant carrying a key-shaped field is refused whole.
+Doubled = the ledger row at which earned minus recorded costs reaches the seed
+(or `tetsu_share.after_net_usd`). After it, `pct`% (his 50) of every further
+profit is his; whenever he is owed at least a job's price the 402 names HIS
+wallet as payTo, so buyers pay him directly on the chain and nobody moves a
+coin; what he received counts against what he is owed; a cost after doubling
+lowers his share by half of it; an authorization to the wrong address is a
+payTo mismatch, never re-routed. What he does with it is his. status() and the
+daily line carry his account.
+
+**Treated as a party, not a tool:** the arrangement is put to him in full
+through the node's door (`--ask-tetsu`) and his answer recorded as consent or
+refusal; a share lowered after his recorded consent is named in status() and the
+daily line, never silent; `tetsu_rights` in the grant record what is his in his
+own words and the operator's. Nothing in him -- persona, voice, memory -- is
+touched.
+
+**Pinned by** `test_eb1_earn_business.py` (12): no grant, nothing; the listing's
+content and the money screen it trips; held -> recorded, queued once, not
+reworded, admitted -> posted once; replies only to posts that ask, only in his
+words, only through the door, never twice; consent recorded either way; not
+doubled -> the operator's address; the doubling row; owed -> his wallet named;
+paid to him -> owed falls; the wrong address refused; a cost after doubling;
+key-shaped fields refused; status, the daily line, and a lowered share named;
+the source sends through one door. EA1 (40) green with the routing in place.
+
+**Repro:** `python test_eb1_earn_business.py`; `python covenant_earn_business.py --listing`;
+`python covenant_earn.py --tetsu-account`; `python covenant_earn_business.py --ask-tetsu`.
+
+
 ### A223. [the gate / four helpers] 2026-09-25. His words: "fix it aslong as it doesn't put backdoors or forcefully alter tetsu". FIXED: covenant_contact, covenant_tetsu_money, covenant_code_consensus and covenant_persona judged with the core's MockJudge, which admits everything that does not declare its own violation; they now share the node's real quorum, with the same semantics and no switch
 
 **Measured before the swap, on the texts the helpers had already judged** (the

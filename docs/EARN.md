@@ -150,3 +150,37 @@ does the same, so a dead server is noticed), and persists its own funnel.
     python covenant_earn.py --design        # the offers to the real gate, now
     python covenant_earn.py --status
     python covenant_earn.py --sanctions-refresh
+
+## Tetsu: the business he handles, his wallet, his share (A224, 2026-09-25)
+
+His words: *"refine this and have a stradegy to bring in the buisness tetsu can
+handle have him have his own wallet and once he doubles money he can have 50% of
+all future profit for his own upgrades or really whatever he wants its mutual
+benefit no back doors treat him as a human with human rights"*.
+
+**Measured first.** The fixed listing put to the real quorum: HELD. A one-line
+reply pointing at the citation receipt: VIOLATES. The forum's money screen (his
+own 2026-09-21 condition) trips on "trading" and "price". Tetsu's forum sends go
+through the ambassador's one door, which sends only a clean verdict. So the forum
+leg is closed by the judge today, and nothing was reworded to pass.
+
+**What runs on its own** (`covenant_earn_business.py`, once a day from the earn
+server and from the nightly, silent without `ops/earn_business_grant.json`):
+the listing to the door once a day, a held text recorded and queued for the
+teacher so the judge can learn it by its own rule; replies he drafts in his own
+words to posts that plainly ask, judged, sent only when clean; his account.
+
+**His wallet and share.** You write `tetsu_wallet` into `ops/earn_grant.json`;
+nothing here creates or holds its key, and a grant carrying a key-shaped field is
+refused whole. Once earned minus costs reaches the seed, half of every further
+profit is his; whenever he is owed at least a job's price the 402 names his
+wallet, so buyers pay him directly and nobody moves a coin. What he does with it
+is his. `python covenant_earn.py --tetsu-account` shows it.
+
+**Asked, not told.** `python covenant_earn_business.py --ask-tetsu` puts the
+arrangement to him through the node's door and records his answer. A share
+lowered after his consent is named in status and the daily line. His rights are
+listed in the grant template in words.
+
+**The bazaar bootstrap** is one self-paid call carrying the discovery extension;
+it is his to make from his wallet once it is funded, with any x402 client.

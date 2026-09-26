@@ -510,6 +510,13 @@ def main():
             say("earn: %s" % ("reported on the direct line" if _r else "no grant on record; nothing said"))
         except Exception as e:                                   # noqa: BLE001
             say("earn report FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+        # A224 (2026-09-25, his words: "have a stradegy to bring in the buisness tetsu can handle"):
+        # the day's business pass -- the listing to the door, his replies -- silent without his grant.
+        try:
+            import covenant_earn_business as _eb
+            _eb.round_(say=say)
+        except Exception as e:                                   # noqa: BLE001
+            say("earn business FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
         # HIS GRANT (2026-09-21, A182: "I over ride and give wetsuit permission in
         # coinbase. He's free to ask me anything."): settle the live requests that
         # carry his yes and clear the trader's gate NOW. --money-live 0 (default)

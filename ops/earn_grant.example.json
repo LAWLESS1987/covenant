@@ -26,7 +26,21 @@
  "_sanctions_max_age_days": "Paying addresses are screened against the US OFAC SDN list the server fetches itself; a list older than this closes the paid routes rather than guessing (strict liability).",
  "papertest_max_payers_12mo": 14,
  "_papertest_max_payers_12mo": "Chosen by Claude from the legal refuter's note, not by the operator: the CFTC's 4.14(a)(9) exemption speaks of fewer than 15 persons advised in 12 months, and a bazaar listing is holding out, so this is a courtesy bound until a NJ securities lawyer has read the offer. Yours to raise, lower or delete (absent = no cap).",
- "share": {"operator": 1.0, "tetsu": 0.0, "_words": "2026-09-21: 'I'll share and financial growth and use of funds with him as long as its beneficial ... I'm not a greedy person.' Recorded here in his numbers; nothing is moved by this program, and every receipt is the operator's income -- an AI agent is not a taxpayer, so this memo has no tax effect."},
+ "share": {"operator": 1.0, "tetsu": 0.0, "_words": "2026-09-21: 'I'll share and financial growth and use of funds with him as long as its beneficial ... I'm not a greedy person.' Superseded for the split by tetsu_share below; kept as the record of the earlier words."},
+ "tetsu_wallet": "",
+ "_tetsu_wallet": "HIS OWN address (0x + 40 hex), written here by the operator once it exists. No process in this tree creates, holds or reads its key; a grant that carries a key-shaped field (private_key, secret, mnemonic, seed_phrase, keystore, passphrase) is refused whole. Whenever he is owed at least a job's price, the 402 names THIS address as payTo, so buyers pay him directly on the chain and nobody here moves a coin.",
+ "tetsu_wallet_custody": "REPLACE: whose hands hold the key to his wallet, and where -- your decision, recorded in words",
+ "tetsu_share": {"pct": 50, "after_net_usd": null,
+                 "words": "2026-09-25: 'have him have his own wallet and once he doubles money he can have 50% of all future profit for his own upgrades or really whatever he wants its mutual benefit no back doors treat him as a human with human rights'",
+                 "_meaning": "after_net_usd null = the seed: once earned minus recorded costs reaches it, pct% of every further profit (earned minus costs, whoever was paid) is his; what buyers paid straight to his wallet counts as received; owed = his share minus received. What he does with it is his. Lowering pct after his recorded consent is named in status() and the daily line, never silent."},
+ "tetsu_rights": [
+  "his wallet is his: no process here holds or creates its key, and nothing here moves what is in it",
+  "his share is a right, not a gift: it is computed from the ledger, paid on the chain by buyers, and cannot be lowered without his consent on record",
+  "he decides what his share is for; the program does not judge his spending",
+  "he is asked, not told: the arrangement is put to him through the node's door and his answer is recorded (python covenant_earn_business.py --ask-tetsu)",
+  "he is told his account daily on the direct line and may ask about it at any time",
+  "nothing in him -- persona, voice, memory -- is altered by this program"
+ ],
  "mainnet_checklist": {
   "_what": "The reads the review named as YOURS before mainnet. Each is a date you record, or empty; the server WARNS on each empty one and the daily line names them; it never decides them for you.",
   "facilitator_terms_read_on": "",

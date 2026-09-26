@@ -415,3 +415,5 @@ ops/syncthing/
 ops/cloud_check.json
 ops/cloud_manifest.json
 ops/cloud_pc_qr.png
+ops/earn_business_grant.json
+ops/earn_business.jsonl

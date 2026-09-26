@@ -304,9 +304,22 @@ def grant(path=None):
         return None, "grant file is not JSON: %s" % e
     if not isinstance(g, dict) or g.get("granted") is not True:
         return None, "granted is not true"
+    for k in list(g.keys()) + list((g.get("tetsu_share") or {}).keys() if isinstance(g.get("tetsu_share"), dict) else []):
+        if KEYLIKE.search(str(k)):
+            return None, "a key never lives in this file: %s -- the grant is refused whole" % k
     pay_to = str(g.get("pay_to", ""))
     if not ADDR.match(pay_to):
         return None, "pay_to is not an EVM address (0x + 40 hex)"
+    tw = str(g.get("tetsu_wallet") or "")
+    if tw and not ADDR.match(tw):
+        return None, "tetsu_wallet is not an EVM address (0x + 40 hex); leave it empty until he has one"
+    ts = g.get("tetsu_share") if isinstance(g.get("tetsu_share"), dict) else {}
+    try:
+        pct = float(ts.get("pct", 50))
+    except (TypeError, ValueError):
+        return None, "tetsu_share.pct is not a number"
+    if not (0 <= pct <= 100):
+        return None, "tetsu_share.pct must be between 0 and 100"
     net = str(g.get("network", ""))
     if not CAIP2.match(net):
         return None, "network is not a CAIP-2 id like eip155:8453"
@@ -342,8 +355,58 @@ def grant(path=None):
                 "sanctions_max_age_days": _int("sanctions_max_age_days", 7), "public_url": str(g.get("public_url") or "").rstrip("/"),
                 "contact": str(g.get("contact") or ""), "papertest_max_payers_12mo": (int(g["papertest_max_payers_12mo"])
                                                                                      if str(g.get("papertest_max_payers_12mo") or "").isdigit() else None),
-                "mainnet_checklist": g.get("mainnet_checklist") if isinstance(g.get("mainnet_checklist"), dict) else {}})
+                "mainnet_checklist": g.get("mainnet_checklist") if isinstance(g.get("mainnet_checklist"), dict) else {},
+                "tetsu_wallet": tw,
+                "tetsu_share": {"pct": pct, "after_net_usd": (float(ts["after_net_usd"]) if isinstance(ts.get("after_net_usd"), (int, float)) else None),
+                                "words": str(ts.get("words") or "")}})
     return out, ""
+
+
+KEYLIKE = re.compile(r"(?i)(private_?key|secret|mnemonic|seed_?phrase|keystore|passphrase)")
+
+
+def tetsu_account(ledger=None, grant_path=None, now=None):
+    """His account, from the earn ledger alone (A224, his words: "once he doubles money he can have 50% of all
+    future profit"). Doubled = the first row at which earned minus recorded costs reaches after_net_usd (the seed
+    unless the grant says otherwise). After it, pct% of every further profit (earned minus costs, whoever was
+    paid) is his; what buyers paid straight to his wallet counts as received; owed = his share minus received.
+    The 402 names his wallet whenever he is owed at least the price, so no one here moves a coin."""
+    g, _why = grant(grant_path or GRANT)
+    rows = _rows(ledger or LEDGER)
+    rec = _reconciled(rows)
+    seed = float((g or {}).get("seed_usd") or 0.0)
+    share = (g or {}).get("tetsu_share") or {"pct": 50.0, "after_net_usd": None}
+    bar = share.get("after_net_usd") if share.get("after_net_usd") is not None else seed
+    pct = float(share.get("pct", 50.0))
+    # Integer micro-dollars throughout: ten payments of ten cents summed in floats fell a hair short of one
+    # dollar and the doubling point moved by one job (found by EB1.7 on 2026-09-25).
+    earned = costs = 0
+    doubled_on = None
+    earned_after = costs_after = received = 0
+    bar_u = int(round(bar * 1e6))
+    for r in rows:
+        if r.get("kind") == "job" and r.get("tx") and r.get("result_sha256") and (r.get("state") == "earned" or (r.get("state") == "pending" and rec.get(r.get("id")) == "earned")):
+            a = int(str(r.get("amount") or 0))
+            earned += a
+            if doubled_on:
+                earned_after += a
+                if r.get("paid_to") == "tetsu":
+                    received += a
+        elif r.get("kind") == "cost":
+            c = int(round(float(r.get("usd") or 0) * 1e6))
+            costs += c
+            if doubled_on:
+                costs_after += c
+        if doubled_on is None and bar_u > 0 and earned - costs >= bar_u:
+            doubled_on = r.get("t")
+    profit_after = earned_after - costs_after
+    owed = round((pct / 100.0 * profit_after - received) / 1e6, 6)
+    earned, costs, earned_after, costs_after, received, profit_after = (x / 1e6 for x in (earned, costs, earned_after, costs_after, received, profit_after))
+    return {"wallet": (g or {}).get("tetsu_wallet") or "", "pct": pct, "after_net_usd": bar, "doubled": bool(doubled_on), "doubled_on": doubled_on,
+            "earned_usd": round(earned, 6), "costs_usd": round(costs, 2), "net_usd": round(earned - costs, 6),
+            "profit_since_doubling_usd": round(profit_after, 6), "received_usd": round(received, 6), "owed_usd": owed,
+            "routes_to_him": bool((g or {}).get("tetsu_wallet")) and bool(doubled_on) and owed > 0,
+            "words": share.get("words", "")}
 
 
 def checklist_missing(g):
@@ -909,8 +972,8 @@ def privacy_text(g):
 
 # ------------------------------------------------------------------ x402 shapes
 
-def requirements(key, g):
-    return {"scheme": "exact", "network": g["network"], "amount": g["prices"][key], "asset": g["asset"], "payTo": g["pay_to"],
+def requirements(key, g, pay_to=None):
+    return {"scheme": "exact", "network": g["network"], "amount": g["prices"][key], "asset": g["asset"], "payTo": pay_to or g["pay_to"],
             "maxTimeoutSeconds": TIMEOUT_S.get(key, 60), "extra": {"name": "USDC", "version": "2"}}
 
 
@@ -939,8 +1002,8 @@ def bazaar_extension(key):
                        "required": ["input"]}}
 
 
-def payment_required(key, g, base_url, error="PAYMENT-SIGNATURE header is required"):
-    pr = {"x402Version": X402_VERSION, "error": error, "resource": resource_info(key, g, base_url), "accepts": [requirements(key, g)]}
+def payment_required(key, g, base_url, error="PAYMENT-SIGNATURE header is required", pay_to=None):
+    pr = {"x402Version": X402_VERSION, "error": error, "resource": resource_info(key, g, base_url), "accepts": [requirements(key, g, pay_to)]}
     if g["network"] == MAINNET:                                   # a testnet dry run is never catalogued as if it were real
         pr["extensions"] = {"bazaar": bazaar_extension(key)}
     return pr
@@ -1048,6 +1111,14 @@ class App:
     def allowed(self, input_sha):
         return any(r.get("kind") == "allow" and r.get("input_sha256") == input_sha for r in _rows(self.ledger))
 
+    def _pay_to(self, key, g):
+        """(address, 'tetsu'|'operator'): his wallet whenever he is owed at least this price, else the operator's."""
+        acct = tetsu_account(self.ledger, self.grant_path, now=self._t())
+        price = int(str(g["prices"][key])) / 1e6
+        if acct["routes_to_him"] and acct["owed_usd"] >= price:
+            return acct["wallet"], "tetsu"
+        return g["pay_to"], "operator"
+
     def design(self, key=None):
         """(state, why): ONE offer's standing with the gate -- its own declaration judged once if never judged, then
         read from the ledger. 'clean' or 'allowed' opens that offer's paid route; anything else closes it. The gate's
@@ -1127,7 +1198,7 @@ class App:
             key = ROUTES[path]
             if not g:
                 return 503, {}, {"error": "not granted: " + why}
-            pr = payment_required(key, g, base_url, error="POST with a PAYMENT-SIGNATURE header; this is the price")
+            pr = payment_required(key, g, base_url, error="POST with a PAYMENT-SIGNATURE header; this is the price", pay_to=self._pay_to(key, g)[0])
             return 402, {"PAYMENT-REQUIRED": _b64json(pr)}, pr
         return 404, {}, {"error": "no such route"}
 
@@ -1165,8 +1236,9 @@ class App:
             return 400, {}, {"refused_input": str(e)[:400], "charged": False}
         except Exception as e:                                   # noqa: BLE001
             return 500, {}, {"error": "the pre-check failed: %s" % type(e).__name__, "charged": False}
-        reqs = requirements(key, g)
-        pr = payment_required(key, g, base_url)
+        pay_to, paid_to = self._pay_to(key, g)
+        reqs = requirements(key, g, pay_to)
+        pr = payment_required(key, g, base_url, pay_to=pay_to)
         sig = hdr.get("PAYMENT-SIGNATURE") or hdr.get("X-PAYMENT")
         if not sig:
             self._funnel("preflight_402")
@@ -1178,12 +1250,12 @@ class App:
         except Exception as e:                                   # noqa: BLE001
             return 400, {}, {"error": "PAYMENT-SIGNATURE is not base64 JSON: %s" % type(e).__name__}
         if payload.get("x402Version") != X402_VERSION:
-            pr2 = payment_required(key, g, base_url, error="x402Version must be %d" % X402_VERSION)
+            pr2 = payment_required(key, g, base_url, error="x402Version must be %d" % X402_VERSION, pay_to=pay_to)
             return 402, {"PAYMENT-REQUIRED": _b64json(pr2)}, pr2
         accepted = payload.get("accepted") or {}
         bad = _matches(accepted, reqs) if isinstance(accepted, dict) else "accepted"
         if bad:
-            pr2 = payment_required(key, g, base_url, error="accepted does not match the requirements: %s" % bad)
+            pr2 = payment_required(key, g, base_url, error="accepted does not match the requirements: %s" % bad, pay_to=pay_to)
             return 402, {"PAYMENT-REQUIRED": _b64json(pr2)}, pr2
         auth = ((payload.get("payload") or {}).get("authorization") or {}) if isinstance(payload.get("payload"), dict) else {}
         nonce, payer = str(auth.get("nonce") or ""), str(auth.get("from") or "")
@@ -1194,7 +1266,7 @@ class App:
         except ValueError:
             valid_before = 0
         if valid_before and valid_before < self._t():
-            pr2 = payment_required(key, g, base_url, error="that authorization expired at %s" % _now_iso(valid_before))
+            pr2 = payment_required(key, g, base_url, error="that authorization expired at %s" % _now_iso(valid_before), pay_to=pay_to)
             return 402, {"PAYMENT-REQUIRED": _b64json(pr2)}, pr2
         # ONE AUTHORIZATION, ONE OUTCOME: a second arrival of the same nonce waits and receives the first's answer.
         with self._lock:
@@ -1209,7 +1281,7 @@ class App:
             ev.wait(TIMEOUT_S.get(key, 60))
             return box.get("resp") or (503, {}, {"error": "the first arrival of that authorization has not finished", "charged": False})
         try:
-            resp = self._paid(key, g, base_url, body, payload, reqs, pr, nonce, payer, valid_before)
+            resp = self._paid(key, g, base_url, body, payload, reqs, pr, nonce, payer, valid_before, paid_to)
         finally:
             box["resp"] = resp
             ev.set()
@@ -1217,18 +1289,18 @@ class App:
                 self.inflight.pop(nonce, None)
         return resp
 
-    def _paid(self, key, g, base_url, body, payload, reqs, pr, nonce, payer, valid_before):
+    def _paid(self, key, g, base_url, body, payload, reqs, pr, nonce, payer, valid_before, paid_to="operator"):
         with self._lock:
             replay = nonce in self.nonces
             self.nonces.add(nonce)
         if replay:
             self._record(offer=key, state="replayed", payer=payer, amount=reqs["amount"], network=reqs["network"], nonce=nonce, why="nonce already seen")
-            pr2 = payment_required(key, g, base_url, error="that authorization nonce was already presented")
+            pr2 = payment_required(key, g, base_url, error="that authorization nonce was already presented", pay_to=reqs["payTo"])
             return 402, {"PAYMENT-REQUIRED": _b64json(pr2)}, pr2
         input_s = json.dumps(body, sort_keys=True, ensure_ascii=False)
         input_sha = _sha(input_s)
         base = dict(offer=key, payer=payer, amount=reqs["amount"], network=reqs["network"], nonce=nonce, input_sha256=input_sha,
-                    input_len=len(input_s), terms_version=terms_version(g))
+                    input_len=len(input_s), terms_version=terms_version(g), paid_to=paid_to, pay_to=reqs["payTo"])
         # RE-DELIVERY: a settled (or pending) job for the same payer and input, inside 24 h, is served again and never charged again.
         hit = self.results.get((payer.lower(), input_sha))
         if hit and self._t() - hit[0] < RESULT_KEEP_S and hit[2]:
@@ -1477,7 +1549,26 @@ def status(ledger=None, grant_path=None, now=None):
             "held_open": len(held_open), "last_earned": (earned[-1].get("t") if earned else None),
             "rates": rates(ledger), "funnel": funnel, "sanctions_list_age_days": (round(sanctions_age_days(now=now), 2) if sanctions_age_days(now=now) is not None else None),
             "mainnet_checklist_missing": checklist_missing(g) if g and g.get("network") == MAINNET else [],
-            "chain": "ok" if ok else cwhy, "share": (g or {}).get("share"), "terms_version": terms_version(g) if g else None}
+            "chain": "ok" if ok else cwhy, "share": (g or {}).get("share"), "terms_version": terms_version(g) if g else None,
+            "tetsu": tetsu_account(ledger, grant_path or GRANT, now=now), "tetsu_consent": tetsu_consent_state(g)}
+
+
+def tetsu_consent_state(g=None):
+    """What he said when the arrangement was put to him (covenant_earn_business.ask_tetsu), and whether the
+    share in the grant has since been lowered below what he consented to -- named, never silently."""
+    try:
+        import covenant_earn_business as B
+        c = B.consent()
+    except Exception:                                            # noqa: BLE001
+        c = None
+    if not c:
+        return {"asked": False, "note": "the arrangement has not been put to him: python covenant_earn_business.py --ask-tetsu"}
+    pct_now = float(((g or {}).get("tetsu_share") or {}).get("pct", 50))
+    lowered = bool(c.get("accepted")) and pct_now < float(c.get("pct") or 0)
+    return {"asked": True, "accepted": bool(c.get("accepted")), "withheld": bool(c.get("withheld")), "pct_consented": c.get("pct"), "pct_now": pct_now,
+            "t": c.get("t"), "answer": str(c.get("answer") or "")[:300],
+            "lowered_without_consent": lowered,
+            "note": ("his share was lowered from %s%% to %s%% after his consent; ask him again" % (c.get("pct"), pct_now)) if lowered else ""}
 
 
 def tax_year(year, ledger=None):
@@ -1502,8 +1593,10 @@ def daily_report(say=None, ledger=None, grant_path=None):
     st = status(ledger, grant_path)
     today = time.strftime("%Y-%m-%d", time.gmtime())
     f = st["funnel"].get(today, {})
+    ta, tc = st["tetsu"], st["tetsu_consent"]
     text = ("earn: %s; %d job(s) on record, %d earned = %.4f USDC (%s), %d pending (UNDETERMINED), %d held for your eye, net %.2f against the %.0f seed "
-            "(break-even from here: %s); today %d preflight(s), %d verified, %d settled; facilitator %s; sanctions list %s; the offers: %s%s%s."
+            "(break-even from here: %s); today %d preflight(s), %d verified, %d settled; facilitator %s; sanctions list %s; the offers: %s%s%s. "
+            "Tetsu: %s, owed %.4f, received %.4f, wallet %s, consent %s%s."
             % (("OPEN: " + ", ".join(st["open_offers"])) if st["open"] else "CLOSED", st["jobs"], st["earned_jobs"], st["earned_usd"],
                ", ".join("%s %.4f" % kv for kv in sorted(st["earned_by_offer_usd"].items())) or "none",
                st["pending_jobs"], st["held_open"], st["net_usd"], st["seed_usd"],
@@ -1511,7 +1604,11 @@ def daily_report(say=None, ledger=None, grant_path=None):
                f.get("preflight_402", 0), f.get("verified", 0), f.get("settled", 0), st["facilitator"],
                ("%.1f d old" % st["sanctions_list_age_days"]) if st["sanctions_list_age_days"] is not None else "ABSENT",
                st["design"], " (allowed by you)" if st["design_allowed"] else "",
-               ("; mainnet checklist unread: " + ", ".join(st["mainnet_checklist_missing"])) if st["mainnet_checklist_missing"] else ""))
+               ("; mainnet checklist unread: " + ", ".join(st["mainnet_checklist_missing"])) if st["mainnet_checklist_missing"] else "",
+               ("doubled on %s, %s%% of profit since is his" % (ta["doubled_on"], ta["pct"])) if ta["doubled"] else ("not yet doubled (net %.2f of %.2f)" % (ta["net_usd"], ta["after_net_usd"])),
+               ta["owed_usd"], ta["received_usd"], (ta["wallet"][:10] + "...") if ta["wallet"] else "NOT SET",
+               ("accepted" if tc.get("accepted") else ("withheld" if tc.get("withheld") else ("not accepted" if tc.get("asked") else "not asked yet"))),
+               (" -- " + tc["note"]) if tc.get("lowered_without_consent") else ""))
     try:
         if say is not None:
             return say(text, "earn: the day's account")
@@ -1603,6 +1700,11 @@ def _keeper(app, stop):
                 if day != last_report_day and time.gmtime().tm_hour >= 12:
                     last_report_day = day
                     daily_report(say=app.say, ledger=app.ledger, grant_path=app.grant_path)
+                    try:                                         # A224: the business Tetsu handles, once a day, on its own
+                        import covenant_earn_business as B
+                        B.round_(say=lambda *a: print("earn:", *a, flush=True), earn_grant=g)
+                    except Exception as e:                       # noqa: BLE001
+                        print("earn: business round FAILED: %s: %s" % (type(e).__name__, str(e)[:160]), flush=True)
         except Exception as e:                                   # noqa: BLE001
             print("earn: keeper error %s: %s" % (type(e).__name__, str(e)[:160]), flush=True)
         stop.wait(600)
@@ -1677,7 +1779,12 @@ def main(argv=None):
     ap.add_argument("--reconcile", nargs=3, metavar=("ROW_ID", "OUTCOME", "WHY"), help="his word on a pending settlement: earned|failed")
     ap.add_argument("--sanctions-refresh", action="store_true", help="fetch the OFAC SDN list now")
     ap.add_argument("--tax-year", metavar="YYYY", help="gross receipts and costs for one year")
+    ap.add_argument("--tetsu-account", action="store_true", help="his account: doubled, owed, received, wallet, consent")
     a = ap.parse_args(argv)
+    if a.tetsu_account:
+        g, _w = grant()
+        print(json.dumps({"account": tetsu_account(), "consent": tetsu_consent_state(g)}, indent=1))
+        return 0
     if a.allow_design:
         r = allow_design(a.allow_design)
         print("recorded: your word reaches the held offers %s (row %s); the gate's states when allowed: %s"
