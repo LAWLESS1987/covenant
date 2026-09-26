@@ -34,7 +34,21 @@ PLAIN = "Thanks for reviewing this, the meeting is at noon."
 
 
 def main():
+    # THE SWEEP RUNS EVERY SUITE UNDER THE INSECURE MOCK PROVIDER (COVENANT_JUDGE_PROVIDERS=mock), so
+    # in the staged copy default_sentinel() built a quorum of two mocks and RG1.2/RG1.3 were vacuous
+    # (measured 2026-09-25: 4/9 there, 9/9 in the working tree). This suite measures the helpers with
+    # the tree's REAL seats, so it names them itself: the policy's providers, else the core default.
+    providers = ""
+    try:
+        with open(os.path.join(HERE, "ops", "quorum_policy.json"), encoding="utf-8") as fh:
+            providers = str(json.load(fh).get("providers") or "")
+    except (OSError, ValueError):
+        providers = ""
+    os.environ["COVENANT_JUDGE_PROVIDERS"] = providers or "deferring,semantic"
+    os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
+    print("RG1: judging with providers=%s" % os.environ["COVENANT_JUDGE_PROVIDERS"], flush=True)
     import covenant_gate_proxy as GP
+    GP._DEFAULT["sentinel"] = None
     import covenant_contact as CT
     import covenant_tetsu_money as TM
     import covenant_code_consensus as CC
