@@ -131,6 +131,41 @@ the design on 2026-09-25; all three refuted it as first drafted. Applied:
   session's auto-mode safety check). It reports "no grant" and starts nothing
   until `ops/earn_grant.json` exists.
 
+## Where buyers reach it (2026-09-26)
+
+    https://covenant-pc.tail51e137.ts.net/
+
+Tailscale Funnel, enabled on his greenlight and sign-in, proxies that name to
+port 5090 on this PC and is kept by the Tailscale service across reboots. The
+grant's `public_url` names it, so every 402 carries it as the resource URL. His
+word on publishing the name: "the tailnet name can be public, if buyers need it".
+Only that port is exposed; nothing else on the PC.
+
+## Bringing buyers: advertising (2026-09-26, his words: "start an online advertisment program to generate revenue")
+
+What was built: a readable front page. A browser's GET on the public address now
+returns a plain page with the three checks, their prices, both sides of each,
+the gate line, the terms and privacy links, and no script -- so a link, a post
+or an ad has somewhere to land. A client's GET stays JSON.
+
+What was not started, and why, in numbers he can argue with:
+
+- **Paying for ads.** A receipt call earns $0.02 and a paper test $0.10. A paid
+  click on any ad network costs more than a single call earns, so ad spend pays
+  back only if a buyer returns many times; nothing has measured that yet, because
+  no buyer has arrived. Spending the seed on clicks before the free channels have
+  been tried would be assuming abundance rather than earning it. The free
+  channels first: the bazaar listing (one self-paid call from his wallet), Tetsu
+  on Moltbook when the judge admits the listing, and the address itself.
+- **Earning from ads on our page.** Ad revenue needs an audience; this page has
+  none yet, and every ad network needs an account the operator creates and terms
+  he accepts, which the assistant does not do. When the page has readers, that is
+  a one-day change: a script tag from the network he chooses, in the page, under
+  the same terms.
+- **His decision, when he wants to spend:** name the network and the daily cap in
+  the earn grant (`ads`: `{"network": "...", "daily_cap_usd": N}`), and record
+  each spend with `--cost` so the break-even in status() stays a measurement.
+
 ## Independence
 
 With that line in, the guard's two-minute pass starts the server whenever his

@@ -563,8 +563,15 @@ def main():
                                          headers=dict(sig("shape", g), **{"Content-Type": "application/json"}))
             with urllib.request.urlopen(req, timeout=10) as r:
                 st200, hdr200, body200 = r.status, dict(r.headers), json.loads(r.read().decode())
+            with urllib.request.urlopen(urllib.request.Request(u + "/", headers={"Accept": "text/html,application/xhtml+xml"}), timeout=10) as r:
+                st_html, ctype, page = r.status, r.headers.get("Content-Type", ""), r.read().decode()
         finally:
             srv.shutdown(); srv.server_close()
+        check("EA1.40 a browser's GET / (Accept text/html) is a readable landing page with the three offers, their prices, both sides, the gate line, "
+              "'Not advice', the terms link and no script; a client's GET / stays JSON",
+              st_html == 200 and ctype.startswith("text/html") and "<h2>receipt" in page and "USDC a call" in page and "What it costs you" in page
+              and "ethics gate" in page and "Not advice" in page and "/terms" in page and "<script" not in page and home.get("service") == E.SERVICE_NAME,
+              (st_html, ctype, page[:200]))
         check("EA1.38 over HTTP: GET / is the offers and terms link, a POST without payment is a 402 with a PAYMENT-REQUIRED header, a paid POST is 200 with PAYMENT-RESPONSE and a receipt",
               home.get("service") == E.SERVICE_NAME and st402 == 402 and "PAYMENT-REQUIRED" in {k.upper() for k in hdr402}
               and st200 == 200 and "PAYMENT-RESPONSE" in {k.upper() for k in hdr200} and body200.get("receipt", {}).get("offer") == "shape"

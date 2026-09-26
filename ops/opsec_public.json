@@ -5,6 +5,21 @@
    "sha256": "69149cef37196c0cd0311736eaa69ac8765969c6936cc6df98a851d80a9e6ba1",
    "what": "his contact e-mail (also his tailnet's name)",
    "where": "docs/CASE_STUDY_SELF_REPORT.md:103, in his words: the address is published here by me"
+  },
+  {
+   "sha256": "5dafb2b194789b72b813f2308b6715a56df1708e45c912ac26bf366b2b3416db",
+   "what": "this PC's tailnet DNS name -- the earn service's public address (Tailscale Funnel to port 5090)",
+   "where": "docs/EARN.md and docs/KNOWN_ISSUES.md A226, in his words on 2026-09-26: the tailnet name can be public, if buyers need it"
+  },
+  {
+   "sha256": "a62ed6e395377e36096c391e37655690f85ce8617916039016df8e05b5a53b4c",
+   "what": "this PC's device name -- the first label of the earn service's public address",
+   "where": "docs/EARN.md and docs/KNOWN_ISSUES.md A226, in his words on 2026-09-26: the tailnet name can be public, if buyers need it (it is the earn service's public address)"
+  },
+  {
+   "sha256": "d43085a6be3634e694a64e2ca145dd7a609f775f3765a59d77d2395e40bd3a94",
+   "what": "his tailnet's DNS suffix -- the rest of the earn service's public address",
+   "where": "docs/EARN.md and docs/KNOWN_ISSUES.md A226, in his words on 2026-09-26: the tailnet name can be public, if buyers need it (it is the earn service's public address)"
   }
  ]
 }

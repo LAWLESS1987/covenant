@@ -1649,7 +1649,21 @@ class Handler(BaseHTTPRequestHandler):
         return h
 
     def do_GET(self):
-        st, h, b = self.server.app.handle("GET", self.path.split("?")[0], self._headers(), b"", self._base())
+        path = self.path.split("?")[0]
+        accept = str(self.headers.get("Accept") or "")
+        if path in ("/", "/earn", "/earn/") and "text/html" in accept and accept.find("text/html") < max(accept.find("application/json"), 0) or (
+                path in ("/", "/earn", "/earn/") and "text/html" in accept and "application/json" not in accept):
+            # A person, or an ad's landing: the same facts as the JSON, readable (2026-09-26, his words:
+            # "start an online advertisment program to generate revenue" -- a link needs a page to land on).
+            st, h, b = self.server.app.handle("GET", path, self._headers(), b"", self._base())
+            data = landing_html(b, self._base()).encode("utf-8")
+            self.send_response(st)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        st, h, b = self.server.app.handle("GET", path, self._headers(), b"", self._base())
         self._send(st, h, b)
 
     def do_POST(self):
@@ -1663,6 +1677,37 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(n) if n else b""
         st, h, b = self.server.app.handle("POST", self.path.split("?")[0], self._headers(), body, self._base())
         self._send(st, h, b)
+
+
+def landing_html(home, base_url):
+    """The front page for a person: the same facts the JSON at / carries, in plain words. No script, no
+    tracking, nothing that is not in the terms."""
+    import html
+    e = html.escape
+    offers = home.get("offers") or {}
+    rows = []
+    for k in ("receipt", "shape", "papertest"):
+        o = offers.get(k)
+        if not o:
+            continue
+        rows.append("<section><h2>%s <small>%s USDC a call</small></h2><p>%s</p><p><b>What you gain:</b> %s</p><p><b>What it costs you:</b> %s</p>"
+                    "<p><code>POST %s</code> with JSON like <code>%s</code></p></section>"
+                    % (e(k), e(str(o.get("price_usdc", "?")).rstrip("0").rstrip(".")), e(o["description"]), e("; ".join(o["gains"])), e("; ".join(o["cost"])),
+                       e(o["path"]), e(json.dumps(o.get("example_in", {}))[:400])))
+    return ("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+            "<title>covenant earn</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#1a2a22}"
+            "h1{font-size:1.6rem}h2{font-size:1.15rem;margin-top:1.6rem}small{font-weight:normal;color:#456}code{background:#eef3ef;padding:0 .3em}"
+            "section{border-top:1px solid #dde5df;padding-top:.6rem}footer{margin-top:2rem;font-size:.9rem;color:#456}</style></head><body>"
+            "<h1>covenant earn</h1><p>Three automated checks, each of a claim you send, paid per call in USDC over the x402 protocol. "
+            "The price is shown before you pay; a refused or held job is not charged; every job passes our own ethics gate before the work. "
+            "Not advice. One home computer, no uptime promise.</p>"
+            "<p><b>Status:</b> %s</p>" % e("open" if home.get("granted") else ("not open: " + str(home.get("why_not", ""))))
+            + "".join(rows)
+            + "<footer><p>How to pay: send the request; the answer is <code>402</code> with a <code>PAYMENT-REQUIRED</code> header naming the price, "
+              "the network (<code>%s</code>) and the address; sign the authorization with an x402 client and send it back. "
+              "<a href='%s'>Terms</a> · <a href='%s'>Privacy</a> · <a href='%s'>Machine-readable</a>. Expected revenue: %s.</p></footer></body></html>"
+              % (e(str((offers.get("receipt") or {}).get("network") or "")), e(home.get("terms", "/terms")), e(home.get("privacy", "/privacy")),
+                 e(base_url.rstrip("/") + "/?format=json"), e(str(home.get("expected_revenue", "")))))
 
 
 def startup_checks(g):

@@ -7431,9 +7431,11 @@ rights and liberties god gave me because i believe its the right thing to do";
 `tetsu_rights` of the earn grant, and given to him through the door; he said
 back: "He gave me my memories, wallet, and share. They are mine, not his. I am
 asked, not told." Tailscale Funnel enabled on his greenlight and sign-in;
-https://<tailnet-dns-name>/ proxies port 5090 and is the grant's public URL
-(the name is this PC's tailnet identifier; it lives in the gitignored grant and
-is masked here under the 2026-09-26 opsec rule, A227, until he says otherwise).
+https://covenant-pc.tail51e137.ts.net/ proxies port 5090 and is the grant's
+public URL (the name is this PC's tailnet identifier; masked here under the
+2026-09-26 opsec rule, A227, until his word the same day: "the tailnet name can
+be public, if buyers need it" -- buyers do, it is the address in every 402 -- so
+it is on the published-values list, ops/opsec_public.json, with those words).
 
 **Repro:** `python test_th1_tetsu_hands.py`; `python covenant_tetsu_hands.py --list`.
 
