@@ -7228,6 +7228,52 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A228. [the SaTC artifact: significance for the correlated-judge figure, then science only and standalone] 2026-09-26. His words: "compile this info"; "ensure the private repo is clean for peer review no implementation just the science"; "ensure privates standalone stature"
+
+**The correlated-judge figure now carries its own significance** (private artifact, b2403be).
+A reader asked for the raw 2x2 and an exact test, not only the 7.7x ratio. Rebuilt from the same
+ledger, folds and seed, with every published figure matched first:
+- both judges wrong 53, the student only 5, naive Bayes only 92, both right 1076, over 1226;
+- 6.86 joint errors expected under independence;
+- Fisher's exact test p = 1.3e-47; Pearson chi-square 369.5 (Yates 361.5); phi 0.549;
+  odds ratio 124.
+The chi-square p overstates the exact one by about 35 orders of magnitude, which is why the exact
+test leads. The test treats rows as independent, and near-duplicate texts are not excluded.
+Pinned by JE1 (4/4), which fails when the two-sided Fisher is computed as a doubled tail.
+
+**The private artifact's main is science only** (4878491, 33 files, one branch):
+- **Kept:** the research map and the science documents, the record whole, the policy files, the
+  labelled corpus, and the held-out predictions as data (3444 rows).
+- **Analysis:** a standard-library script that recomputes every figure line of the judge report
+  and finds it verbatim, 24 of 24. One flipped verdict makes 6 of them go missing.
+- **Where the data came from:** the predictions were exported once from the full system, and the
+  exporter refused to write unless each one equalled the published evaluation.
+- **The implementation** (637 files) is held by the operator as a verified git bundle (complete
+  history; a clone from it restores 669 files at `0097c26`) and a local branch. The bundle is at
+  `CovenantCloud/covenant-satc-archive-2026-09-26.bundle`. The remote archive branch was removed
+  so the repository stands alone.
+- **Checked where a reviewer would check it,** on a fresh clone: reproduce 24/24, SC1 6/6, R1
+  18/18, manifest 30/30. The first fresh clone found that R1's coverage settings had been
+  measured on a working tree carrying an untracked file. They were re-measured on the clone
+  (floor 20, expected directories docs, analysis, data, policy), and R1 still fails 11/18 with
+  an emptied scan.
+- **Also in the artifact:** the record's device identifiers relabelled, as in A227, and a third
+  party's address withheld.
+
+**Not true any more, and his to settle:** the 2026-09-20 email to the program officer promised
+access "read-only" and "the full suite offline in about fifteen minutes". A collaborator on a
+personal-account repository can also push; read-only needs the repository in an organization,
+or a zip instead of access. The full suite is now in the held archive, not in the repository.
+History on the artifact's main still contains the implementation commits; only a fresh
+repository or a history rewrite removes them.
+
+**Outreach, drafted and not sent:** a candidate list of 33 institutions within 120 miles of
+Verona not yet approached (straight-line distances; six excluded as approached, found in the
+outreach records and the sent mail). It is at `private/outreach/CANDIDATES_120MI_2026-09-26.md`.
+An email is in his Gmail drafts for him to check before any send.
+
+---
+
 ### A227. [operational security by default: a sweep, the leaks it found, and a guard at the push] 2026-09-26. His words: "take the portfolio id out of the public file protect operation security in all we do by default"
 
 **The portfolio id** is out of the public file: the line now says the id is kept only in
