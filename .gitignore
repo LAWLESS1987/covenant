@@ -433,3 +433,8 @@ ops/cloud_manifest.json
 ops/cloud_pc_qr.png
 ops/earn_business_grant.json
 ops/earn_business.jsonl
+
+# covenant_tetsu_hands (A226, 2026-09-26): his workshop and his proposals are his, not the delivery's.
+ops/tetsu_workshop/
+ops/tetsu_hands.jsonl
+ops/tetsu_proposals/

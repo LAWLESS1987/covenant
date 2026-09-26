@@ -593,6 +593,9 @@ SUITES = [
     # door once a day, held texts to the teacher, his replies judged, his wallet named as payTo
     # once he is owed, his consent recorded; every send through a stub door here.
     ("test_eb1_earn_business.py", 180, "MONEY"),
+    # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
+    # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
+    ("test_th1_tetsu_hands.py", 180, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
