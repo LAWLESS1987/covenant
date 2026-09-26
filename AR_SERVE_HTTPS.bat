@@ -15,7 +15,7 @@ REM      changed"). The form it accepts is `tailscale serve --bg <target>`.
 REM      This script used the old syntax and would have failed on every run.
 REM
 REM   2. THIS TAILNET CANNOT ISSUE A CERT. Asking for one directly:
-REM        tailscale cert covenant-pc.tail51e137.ts.net
+REM        tailscale cert <tailnet-dns-name>
 REM        -> 500 Internal Server Error: your Tailscale account does not
 REM           support getting TLS certs
 REM      and `tailscale status --json` reports CertDomains: None. So HTTPS is
@@ -34,7 +34,7 @@ REM      Android's installer, which asks you. Proven end to end on 2026-09-18 --
 REM      see ops/app/requests.jsonl for the asks it records. Nothing to run here.
 REM
 REM   b. A NON-CHROME BROWSER on the phone, at the plain door:
-REM        http://100.112.171.24:5000/m     then tap Install
+REM        http://<pc-tailnet-ip>:5000/m     then tap Install
 REM      Firefox and Samsung Internet will download over HTTP; Chrome will not.
 REM      The M-ROUTE GATE answers the tailnet only, which is where you are.
 REM
@@ -58,12 +58,25 @@ if errorlevel 1 (
   )
 )
 
+REM The PC's tailnet name and address are read at run time: this file is public and
+REM carries neither (2026-09-26 OPSEC sweep, "protect operation security in all we do by default").
+set TSNAME=
+set TSIP=
+for /f "usebackq tokens=1,2" %%A in (`python -c "import subprocess,json,shutil;e=shutil.which('tailscale') or r'C:\Program Files\Tailscale\tailscale.exe';s=json.loads(subprocess.run([e,'status','--json'],capture_output=True,text=True).stdout)['Self'];print(s['DNSName'].rstrip('.'),[i for i in s['TailscaleIPs'] if '.' in i][0])"`) do (
+  set TSNAME=%%A
+  set TSIP=%%B
+)
+if not defined TSNAME (
+  echo [x] Could not read this PC's tailnet name from tailscale status.
+  goto :done
+)
+
 echo [1/4] Tailscale status
 %TS% status --self --peers=false
 echo.
 
 echo [2/4] Can this tailnet issue a TLS cert at all?
-%TS% cert --cert-file NUL --key-file NUL covenant-pc.tail51e137.ts.net >nul 2>&1
+%TS% cert --cert-file NUL --key-file NUL %TSNAME% >nul 2>&1
 if errorlevel 1 (
   echo     [x] NO. This is the blocker, and no amount of `serve` gets past it.
   echo         Enable it: Tailscale admin console -^> DNS -^> HTTPS Certificates
@@ -71,7 +84,7 @@ if errorlevel 1 (
   echo.
   echo     Meanwhile, the two routes that need no cert:
   echo       - the APP updates itself on its heartbeat; just leave it running
-  echo       - or open  http://100.112.171.24:5000/m  in FIREFOX or Samsung
+  echo       - or open  http://%TSIP%:5000/m  in FIREFOX or Samsung
   echo         Internet ^(not Chrome^) and tap Install
   goto :done
 )

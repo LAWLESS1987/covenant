@@ -66,7 +66,7 @@ def chat(text, at):
     # the real ask log writes LOCAL time with its offset, and the direct line reads it back with mktime
     t = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(at))
     with open(os.environ["COVENANT_ASK_LOG"], "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"t": t, "kind": "agent", "from": "100.86.158.1", "text": text}) + "\n")
+        fh.write(json.dumps({"t": t, "kind": "agent", "from": "100.72.0.10", "text": text}) + "\n")
 
 
 class Venue:

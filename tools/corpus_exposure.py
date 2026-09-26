@@ -2,9 +2,8 @@
 """corpus_exposure.py -- what would publishing the private corpus actually expose?
 
 ASKED 2026-09-18: copy the covenant memories somewhere unblocked, redacting
-every name except the operator's own and his family's (his mother included --
-he holds power of attorney, she has dementia, he is her only heir, and that
-decision is his).
+every name except the operator's own and his family's (on legal authority he
+holds; that decision is his, and its basis is recorded privately).
 
 WHY THIS TOOL EXISTS RATHER THAN A REDACTOR THAT JUST RUNS. A name blocklist is
 an EXISTENCE ORACLE: it answers "does this string appear?" and nothing else. It

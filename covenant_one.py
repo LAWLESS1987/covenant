@@ -508,6 +508,11 @@ SUITES = [
     ("test_a153_import_drift.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
+    # OS1 (2026-09-26, "protect operation security in all we do by default"): his
+    # identifiers, read at run time from private sources, stay out of the public tree;
+    # the push guard is proved on a throwaway repository. OS1g/OS1h report NOT RUN here
+    # (no git index in the staged copy) and run in the working tree.
+    ("test_os1_opsec.py", 180, "DAILY + GUARDS"),
     # JR1 (2026-09-19): how Ora and Sena resolve a disagreement, written down
     # and driven BEFORE the second judge is flipped on -- his four conditions.
     # All nine cells of the table asserted independently of the module, the

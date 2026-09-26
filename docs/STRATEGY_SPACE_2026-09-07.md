@@ -12,7 +12,7 @@ clear."* And `strategy_cross_sectional.py` measured PBO **0.986** — a 98.6%
 probability that the best in-sample config underperforms out of sample.
 
 So this is a scan of **families**, not variants: what exists, what has been
-tested here, what is structurally reachable by a $3,889 spot-only account, and
+tested here, what is structurally reachable by a small spot-only account, and
 what information each one needs. Sorted by the only axis that has ever mattered
 in this project's own results — `strategy_lab.py`'s closing line: *"Refining
 further means NEW INFORMATION (a different data source, a real structural
@@ -70,7 +70,7 @@ is not trading at all.** No forecast required.
 | Cross-exchange arbitrage | capital on both venues, speed | effectively institutional now; the spread is gone before a retail order lands |
 | Market making / maker rebates | volume tier + inventory + latency | locked out: the fee tier is a function of volume this book cannot generate |
 | Airdrop / points farming | capital at risk in new protocols | real but lottery-shaped; not a strategy, and a smart-contract risk the constitution does not cover |
-| Fee-tier optimisation | volume | structurally unavailable at $3,889 |
+| Fee-tier optimisation | volume | structurally unavailable at this size |
 
 ## Group D — disqualified by this system's own constraints
 

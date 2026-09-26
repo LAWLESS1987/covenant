@@ -46,9 +46,9 @@ TEXT_EXT = (".md", ".txt", ".json", ".jsonl")
 OUT = os.path.join(HERE, "private", "NAME_APPROVAL.tsv")
 
 #: Pre-approved: the operator's own name and the family he holds authority for.
-#: His mother is included at his instruction -- he holds power of attorney, she
-#: has dementia, he is her only heir, and he has stated the decision is his.
-#: Recorded here rather than inferred, so the basis is auditable later.
+#: Family members are included at his instruction, on legal authority he holds;
+#: the decision is his. The basis is recorded privately (not in this public
+#: file, 2026-09-26 OPSEC sweep) rather than inferred, so it stays auditable.
 PRE_APPROVED = ("Lawrence", "Adam", "Moskowski", "Lawless")
 
 NAME_RUN = re.compile(r"\b([A-Z][a-z]{1,15}(?:\s+[A-Z][a-z]{1,15}){1,3})\b")

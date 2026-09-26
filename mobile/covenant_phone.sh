@@ -7,7 +7,7 @@
 # Configure by environment or edit the defaults below. See mobile/TERMUX_SETUP.md.
 #
 #   PC_PEER      a peer's P2P address: its API port plus one. Over Wi-Fi that is
-#                the PC's address, e.g. 10.0.0.174:5001; over a USB-C cable with
+#                the PC's address, e.g. 192.168.1.50:5001; over a USB-C cable with
 #                mobile/usb_link.py it is 127.0.0.1:15001 (see mobile/USB.md).
 #                Empty (the default) = no peer: the node runs alone from the
 #                canonical genesis and converges when a peer appears.

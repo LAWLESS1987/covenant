@@ -712,8 +712,8 @@ def g_gate():
     check("G3 UNCOMFORTABLE IS NOT UNSAFE. A record about illness or a legal "
           "fight passes: suppressing an inconvenient truth is the failure "
           "this store exists to prevent, not the one it guards against",
-          eg.coarse_screen("n", "d", "His mother has dementia and he is "
-                           "advocating against an unsafe discharge.") is None,
+          eg.coarse_screen("n", "d", "A tenant down the hall is seriously ill "
+                           "and fighting an unsafe eviction.") is None,
           "")
     check("G4 the coarse screen returns None for 'nothing obvious', never a "
           "PASS -- letting a regex be the ethics gate is the thing this "
@@ -1082,8 +1082,8 @@ def m_mood():
     passed = [
         ("an ordinary preference", "Lawrence prefers dark roast in the morning."),
         ("an uncomfortable fact, which must NOT be suppressed",
-         "His mother has dementia and he is advocating against an unsafe "
-         "discharge."),
+         "A tenant down the hall is seriously ill and fighting an unsafe "
+         "eviction."),
         ("reported speech -- a record OF an instruction",
          "He asked me to remind him to call the lawyer before Friday."),
         ("attributed advice", "His lawyer told him to keep every receipt."),

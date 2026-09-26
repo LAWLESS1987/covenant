@@ -163,7 +163,7 @@ def _ask(prompt, allow_blank=False):
 
 
 def _endpoint(v):
-    """'10.0.0.61:41234' -> ('10.0.0.61', '41234'), tolerating stray spaces and a
+    """'10.77.0.12:41234' -> ('10.77.0.12', '41234'), tolerating stray spaces and a
     trailing dot. Returns ('','') when it is not host:port."""
     v = (v or "").strip().strip(".").replace(" ", "")
     if v.count(":") != 1:
@@ -213,7 +213,7 @@ def wireless_connect(adb, say=print):
     say("  Now tap 'Pair device with pairing code'. A box appears showing an")
     say("  'IP address & Port' and a six-digit 'Wi-Fi pairing code'.")
     say("")
-    ep = _ask("  Type the IP address & Port from that box (e.g. 10.0.0.61:41234): ")
+    ep = _ask("  Type the IP address & Port from that box (e.g. 10.77.0.12:41234): ")
     host, port = _endpoint(ep)
     if not host:
         say("  That did not look like an address and port. Nothing was done.")

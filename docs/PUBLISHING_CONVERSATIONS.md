@@ -61,7 +61,7 @@ before publishing them anywhere:
 1. **Named people.** A transcript that names a living private individual makes
    that person worse off, and they never agreed. This project already carries a
    standing constraint of exactly this kind: a living private individual
-   connected to the Mahowald thread who is not to be named in any file here.
+   who is not to be named in any file here.
    The premise fails on the first such name, not on the hundredth.
 2. **The operator's own exposure.** These conversations discuss holdings, keys,
    node identities and a live trading configuration. "No human is worse off"

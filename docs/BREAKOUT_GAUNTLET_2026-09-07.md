@@ -79,7 +79,7 @@ history to look at.
 ### And at this account's size
 
 The caps are $25 per order. Run at those caps: ~229 trades/year × $25 × mean
-+1.55% ≈ **+$89 a year** on a $3,889 book — about **2.3%**, before any slippage
++1.55% ≈ **+$89 a year** on a small book, before any slippage
 beyond what is modelled, and only if the tail recurs. A +220% winner at $25 adds
 **$55**.
 

@@ -4,9 +4,9 @@
 THE INSTRUCTION, 2026-09-18: "block names and emails and numbers leave who i
 stated the rest black out but post." Then: "all of em. totality."
 
-WHO IS LEFT STANDING. The operator, and the family he holds authority for --
-his deceased relatives, and his mother, who has dementia and for whom he holds
-power of attorney as her only heir. He stated that decision and it is his.
+WHO IS LEFT STANDING. The operator, and the family he holds legal authority for.
+He stated that decision and it is his; its basis is recorded privately, not in
+this public file.
 
 WHAT IS BLACKED OUT. Every other name, and every OTHER category that identifies
 a person without naming them -- the part he added after reading the measurement,

@@ -370,7 +370,7 @@ error it had already been corrected for.
 
 ### A3. [blocker / docs] No document tells the second operator how to peer with the owner: no address, no exchange procedure, inbound peers are not learned, POST /peers needs an allowlisted operator signature, and the owner's launcher hardcodes 127.0.0.1 peers -- FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
-**Evidence:** docs/PARTNER.md:44-59 ends at check.sh + three reads + an email; the word 'peer' does not appear. mobile/TERMUX_SETUP.md:22 `PC_PEER=10.0.0.174:5001 (your PC's address)` assumes the reader owns the PC; :133-135 'your version does not learn peers from inbound connections; add PHONE_IP:5001 to the PC node's --peers'. Confirmed in code: `add_peer(` is called only at covenant_unified_v8.py:7287 (POST /peers, which the comment at 7269-7275 says is in PROTECTED_OPERATOR_ENDPOINTS, signed+nonced, fails closed) and :10913 (startup --peers). covenant_prod.bat:108,114,130 start A/B/C with `--peers 127.0.0.1:...` only. NODES.md:106-116: off the LAN the peer needs Tailscale. The Windows firewall rule for 5001 exists only on the phone page (TERMUX_SETUP.md:38-42).
+**Evidence:** docs/PARTNER.md:44-59 ends at check.sh + three reads + an email; the word 'peer' does not appear. mobile/TERMUX_SETUP.md:22 `PC_PEER=<lan-ip>:5001 (your PC's address)` assumes the reader owns the PC; :133-135 'your version does not learn peers from inbound connections; add PHONE_IP:5001 to the PC node's --peers'. Confirmed in code: `add_peer(` is called only at covenant_unified_v8.py:7287 (POST /peers, which the comment at 7269-7275 says is in PROTECTED_OPERATOR_ENDPOINTS, signed+nonced, fails closed) and :10913 (startup --peers). covenant_prod.bat:108,114,130 start A/B/C with `--peers 127.0.0.1:...` only. NODES.md:106-116: off the LAN the peer needs Tailscale. The Windows firewall rule for 5001 exists only on the phone page (TERMUX_SETUP.md:38-42).
 
 **Repro:** `grep -n 'add_peer(' covenant_unified_v8.py; grep -n '\-\-peers' covenant_prod.bat; grep -c -i peer docs/PARTNER.md (0).`
 
@@ -420,11 +420,11 @@ error it had already been corrected for.
 
 ### A8. [blocker / peering] No address a remote operator can reach: the owner's PC sits at a private Wi-Fi address with no Tailscale and no port-forward, the docs' example peer is that private address, and the documented firewall rule was never created (LAN-only inbound works via a generic 'Python' program rule) -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
-**Evidence:** Get-NetIPAddress: only 10.0.0.174 (Wi-Fi) plus 169.254.* link-local; Get-NetConnectionProfile: Wi-Fi 'Get your own 4' NetworkCategory=Public; Test-Path 'C:\Program Files\Tailscale\tailscale.exe' = False and Get-Command tailscale = none. mobile/TERMUX_SETUP.md:41 tells the owner to create rule 'covenant peer 5001'; `netsh advfirewall firewall show rule name=covenant verbose` shows the only 'covenant' rule is TCP 7443 (description 'freedom'), so it was never made. Inbound to 5001 on the LAN is allowed anyway by four 'Python' program rules (Private+Public, program C:\program files\windowsapps\...python3.12.exe, LocalPort Any) and that is the image node A runs under (Get-Process 3972 Path). All three nodes bind 0.0.0.0 (netstat: 5000/5001/5011, 5020/5021/5031, 5060/5061/5071). A clone node peered to 10.0.0.174:5001 from this host did pull blocks, so LAN peering works; nothing documents what 
+**Evidence:** Get-NetIPAddress: only <lan-ip> (Wi-Fi) plus 169.254.* link-local; Get-NetConnectionProfile: Wi-Fi '<wifi-name> 4' NetworkCategory=Public; Test-Path 'C:\Program Files\Tailscale\tailscale.exe' = False and Get-Command tailscale = none. mobile/TERMUX_SETUP.md:41 tells the owner to create rule 'covenant peer 5001'; `netsh advfirewall firewall show rule name=covenant verbose` shows the only 'covenant' rule is TCP 7443 (description 'freedom'), so it was never made. Inbound to 5001 on the LAN is allowed anyway by four 'Python' program rules (Private+Public, program C:\program files\windowsapps\...python3.12.exe, LocalPort Any) and that is the image node A runs under (Get-Process 3972 Path). All three nodes bind 0.0.0.0 (netstat: 5000/5001/5011, 5020/5021/5031, 5060/5061/5071). A clone node peered to <lan-ip>:5001 from this host did pull blocks, so LAN peering works; nothing documents what 
 
-**Repro:** `powershell: Get-NetIPAddress -AddressFamily IPv4 | ? IPAddress -notlike '127.*' ; Test-Path 'C:\Program Files\Tailscale\tailscale.exe' ; netsh advfirewall firewall show rule name=covenant verbose ; netsh advfirewall firewall show rule name=Python verbose | findstr /i "Profiles Program LocalPort" ; grep -n 10.0.0.174 mobile/TERMUX_SETUP.md docs/PARTNER.md`
+**Repro:** `powershell: Get-NetIPAddress -AddressFamily IPv4 | ? IPAddress -notlike '127.*' ; Test-Path 'C:\Program Files\Tailscale\tailscale.exe' ; netsh advfirewall firewall show rule name=covenant verbose ; netsh advfirewall firewall show rule name=Python verbose | findstr /i "Profiles Program LocalPort" ; grep -n <lan-ip> mobile/TERMUX_SETUP.md docs/PARTNER.md`
 
-**Fix:** Install Tailscale on the PC (or forward TCP 5001 on the router to 10.0.0.174) and publish the resulting address as the `--peers` value in docs/PARTNER.md.
+**Fix:** Install Tailscale on the PC (or forward TCP 5001 on the router to <lan-ip>) and publish the resulting address as the `--peers` value in docs/PARTNER.md.
 
 **Status:** open
 
@@ -730,7 +730,7 @@ diligence.
 
 **Status:** open. THIS ENTRY STILL STANDS, and I said otherwise in passing on 2026-09-14 before checking (the correction matters more than the claim did). POST /peers does exist and IS operator-authenticated, which is what I saw; what I did not check is whether anything can actually CALL it. Nothing can: `sign_operator_request` / `operator_signing_payload` appear in covenant_anchor, covenant_app, covenant_client, covenant_daily_plan and covenant_trader, and not one of them signs a POST /peers -- covenant_trader's only reference is a GET. A route that exists and is authenticated but that no tool in the repository can sign is not a scripted way to add a peer. The two-hardcoded-lists-and-a-restart path in the Fix above is still the only one.
 
-The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `100.86.158.1:5001` added to node A in BOTH files. The "both" is not decoration -- only covenant_watchdog.py was edited first, and test_3node_config.py N5 failed immediately with `A peers ['127.0.0.1:5021'] vs ['100.86.158.1:5001', '127.0.0.1:5021']`. The guard works; the second file is easy to forget.
+The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `<tailnet-ip>:5001` added to node A in BOTH files. The "both" is not decoration -- only covenant_watchdog.py was edited first, and test_3node_config.py N5 failed immediately with `A peers ['127.0.0.1:5021'] vs ['<tailnet-ip>:5001', '127.0.0.1:5021']`. The guard works; the second file is easy to forget.
 
 ### A30. [serious / security] The node API always binds 0.0.0.0 with no way to restrict it to localhost, exposing unauthenticated endpoints to the whole LAN/overlay -- PARTLY FIXED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py (CORRECTED same day: first stamped FIXED by a check that only looked for the string COVENANT_API_HOST. The option exists; the default is still 0.0.0.0 and no launcher sets it. Binding loopback would cut off the phone node over Tailscale, so this is a trade-off for the operator, not neglect.)
 
@@ -876,7 +876,7 @@ stale claim about now.
 
 **Evidence:** covenant_unified_v8.py:10912 `h, po = p.split(":")` vs preflight_port_check :10785 `h, po = p.rsplit(":", 1)`. Tailscale IPv4 (100.x) and hostnames with one colon work; a Tailscale IPv6 or a pasted 'http://host:5001' does not.
 
-**Repro:** `python covenant_unified_v8.py --port 5300 --node-id X --genesis genesis.json --peers http://10.0.0.174:5001  -> ValueError: too many values to unpack after preflight.`
+**Repro:** `python covenant_unified_v8.py --port 5300 --node-id X --genesis genesis.json --peers http://<lan-ip>:5001  -> ValueError: too many values to unpack after preflight.`
 
 **Fix:** Use `p.rsplit(":", 1)` in main() and reject anything that is not host:port with a clear message.
 
@@ -2812,14 +2812,14 @@ disagreement that no longer exists, and no amount of waiting clears it.
 **Measured, not inferred.** Node A on :5000, 2026-09-11:
 
 * `/health` `mesh` = `{"by_source": {"1e72206edd9a": ["127.0.0.1:5021",
-  "peer_127.0.0.1_5021"], "57d877e3f7a6": ["10.0.0.174:?"]}, "tracked": 3}`
+  "peer_127.0.0.1_5021"], "57d877e3f7a6": ["<lan-ip>:?"]}, "tracked": 3}`
 * `/peers` = `{"peer_127.0.0.1_5021": ["127.0.0.1", 5021]}` — **one** peer.
 
-The 10.0.0.174 row is counted in `tracked` and in `by_source` while being
-absent from `peers`. 10.0.0.174 is this PC's own Wi-Fi address, so the
+The <lan-ip> row is counted in `tracked` and in `by_source` while being
+absent from `peers`. <lan-ip> is this PC's own Wi-Fi address, so the
 "foreign" source is a process that ran the current disk source on this machine,
 talked to node A once, and exited; `docs/KNOWN_ISSUES.md:394` records exactly
-such an experiment ("a clone node peered to 10.0.0.174:5001 from this host did
+such an experiment ("a clone node peered to <lan-ip>:5001 from this host did
 pull blocks"). It is not the stray `test_a77_listener_bind.py` process: that
 test binds `127.0.0.1` only (lines 126, 182, 192, 236, 347) and never contacts
 a live node.
@@ -3639,7 +3639,7 @@ is the limitation `mobile/TERMUX_SETUP.md:169` already states in its own words
 `PHONE_IP:5001` to the PC node's `--peers`" -- so the phone knows the PC,
 the PC has never known the phone, and a one-way acquaintance leaves the phone
 at the height it started with. Its tailnet address is stable
-(`lawrences-s25`, 100.86.158.1) where its LAN address is not, so that is the
+(`<device-name>`, <tailnet-ip>) where its LAN address is not, so that is the
 one to add. Not done here: adding a peer is a change to his running mesh, and
 this session did not touch it for the same reason it did not force the
 restart.
@@ -3647,7 +3647,7 @@ restart.
 **New measurement, 2026-09-14 after the rolling restart.** The phone is not
 invisible to node A after all -- it is visible in exactly one direction, and
 the restart made that legible. Node A's `/health` mesh view now reads
-`by_source: {"27a9bf2b01ad": ["100.86.158.1:?"], "2f5e4e914bb5":
+`by_source: {"27a9bf2b01ad": ["<tailnet-ip>:?"], "2f5e4e914bb5":
 ["127.0.0.1:5021", ...]}` while `GET /peers` still lists only node B. So node
 A HAS heard from the phone -- it recorded the tailnet address as a tracked
 peer -- but with `?` for the port, which is why nothing is ever sent back: it
@@ -3665,7 +3665,7 @@ on different sources is exactly the situation A20 exists to warn about, which
 is one more reason this stays the operator's call rather than a repair.
 
 **The operator made that call the same day: "can't you use tailscale".** So the
-phone is now in node A's peer list as `100.86.158.1:5001`, in
+phone is now in node A's peer list as `<tailnet-ip>:5001`, in
 `covenant_watchdog.NODES`, and node A has been restarted onto it. Checked
 first, because the phone runs an older core: the phone is on the canonical
 genesis; the entire diff between core `27a9bf2b01ad` and `2f5e4e914bb5` is four
@@ -3674,13 +3674,13 @@ touches block validation, proof-of-work, transaction verification, the wire
 protocol, the handshake or fork choice; and there is no chain-REPLACEMENT path
 in this codebase at all -- the chain only grows by append through
 `_accept_block_common`, so a peer at height 12 cannot roll these nodes back.
-Reachability was measured, not assumed: `100.86.158.1:5001` accepts from the PC
+Reachability was measured, not assumed: `<tailnet-ip>:5001` accepts from the PC
 (`:5000` refuses, the phone binds its API to loopback), the PC's own p2p ports
 listen on `0.0.0.0`, and the phone had already been reaching node A -- which is
 how node A knew its source.
 
 **What that fixed, and what it did not.** Node A now holds the phone as
-`peer_100.86.158.1_5001` with a KNOWN port instead of `?`, `dead_peers` is 0,
+`peer_<tailnet-ip>_5001` with a KNOWN port instead of `?`, `dead_peers` is 0,
 and its boot announce went to two peers instead of one. The phone has NOT caught
 up: two check-ins later it still reports height 12, peers 1. So the missing port
 was real but was not the whole cause, and the remaining fault is on the phone
@@ -4328,14 +4328,14 @@ UNKNOWN with the reason rather than FAIL.
 
 **4. `test_3node_config.py`'s peer checks were host-blind, so 11/11 was a
 coincidence.** N2/N3/N4 did `int(peer.rsplit(":", 1)[1])` and discarded the
-host. The phone was added to node A as `100.86.158.1:5001`, and 5001 IS node A's
+host. The phone was added to node A as `<tailnet-ip>:5001`, and 5001 IS node A's
 own P2P port -- so N2 read it as "A peers with A", N3 gained a self-edge, and
 the suite passed on a graph that was wrong. The next remote peer whose port did
 NOT collide would have been reported as "no configured node's P2P port": a false
 FAIL on a correct configuration. The checks are host-aware now, off-box peers
 are a named category rather than an error, and the topology graph counts only
 local edges. The printed graph changed from `A->A A->B ...` to `A->B B->A B->C
-C->B | external: A->100.86.158.1:5001`.
+C->B | external: A-><tailnet-ip>:5001`.
 
 **5. `rolling_restart.port_free()` called a live-but-slow port free.** A probe
 timeout was classified as "down", and `port_free` returns True on "down" -- so a
@@ -4464,7 +4464,7 @@ host-aware. Each was broken on purpose to see whether it noticed:
 | tell node A to peer with ITSELF | **NO -- nothing went red** |
 
 **The one that failed the test was the one this instruction is about.** Before
-today, N2/N3/N4 threw the host away, so the phone's off-box `100.86.158.1:5001`
+today, N2/N3/N4 threw the host away, so the phone's off-box `<tailnet-ip>:5001`
 was MISREAD as node A's own P2P port and every check passed on a graph that said
 "A peers with A". The host-aware fix stopped the misreading -- the report became
 correct -- and a real self-peer still sailed through. The fix made the output
@@ -5789,7 +5789,7 @@ The remaining recipients are the operator's decision.
 on 31 August (thread A) and again on 3 September (thread B, *"Two clean-room
 implementations reproduced the root this week"*). The 15 September retraction was sent
 as a reply to Mairead Crotty in thread A only. Thread B sat uncorrected in a standards
-body's inbox for eleven days. The same claim to `john@aurite.ai` (3 September) was also
+body's inbox for eleven days. The same claim to a second recipient at a company (address withheld; 3 September) was also
 uncorrected.
 
 **Why it was missed:** the correction sweep worked from the people who had replied, not
@@ -5830,7 +5830,7 @@ or to decide that the pinned-package model no longer matches how this repo ships
 ### A140. [serious / privacy] A cloned node dials the owner's phone. OPEN, found 2026-09-16
 
 **Evidence:** `covenant_prod.bat:77` and `covenant_watchdog.py:106` both hardcode
-`--peers 127.0.0.1:5021,100.86.158.1:5001`. The second address is the owner's personal
+`--peers 127.0.0.1:5021,<tailnet-ip>:5001`. The second address is the owner's personal
 handset on the tailnet. A second operator who runs either file -- and `covenant_prod.bat`
 is the documented PC launcher -- gets a node that connects to the owner's phone unasked.
 Nothing gates it; it is a literal inside the argument string.
@@ -5840,7 +5840,7 @@ config, ship no address) changes how both launchers are configured, which is a s
 change, and the operator's rule of 2026-09-09 defers those until there is a second node
 to agree with. Documented rather than done.
 
-**Repro:** `grep -n "100.86.158.1" covenant_prod.bat covenant_watchdog.py`
+**Repro:** `grep -n "<tailnet-ip>" covenant_prod.bat covenant_watchdog.py`
 
 ### A141. [serious / process] Closing A21 silently killed the teacher, and the config file had already said it would. FIXED 2026-09-16, same day
 
@@ -5963,7 +5963,7 @@ wrong twice over:
 * `tailscale serve --bg https / http://127.0.0.1:5000` is refused outright on
   client 1.102.4 — "the CLI for serve and funnel has changed";
 * and the cert it needs cannot be issued at all. `tailscale cert
-  covenant-pc.tail51e137.ts.net` answers *"your Tailscale account does not
+  <tailnet-dns-name>` answers *"your Tailscale account does not
   support getting TLS certs"* and exits 1; `tailscale status --json` reports
   `CertDomains: None`.
 
@@ -5975,9 +5975,9 @@ browser, so the fallback is not one.
 Certificates), then run `AR_SERVE_HTTPS.bat`, which now probes for the cert
 first and refuses to pretend. That is an **account-owner decision** and is why
 this is written down rather than done. Two routes need no cert: the app's own
-updater, and Firefox or Samsung Internet at `http://100.112.171.24:5000/m`.
+updater, and Firefox or Samsung Internet at `http://<pc-tailnet-ip>:5000/m`.
 
-**Repro:** `tailscale cert covenant-pc.tail51e137.ts.net; echo $?`
+**Repro:** `tailscale cert <tailnet-dns-name>; echo $?`
 
 ---
 
@@ -7228,6 +7228,106 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A227. [operational security by default: a sweep, the leaks it found, and a guard at the push] 2026-09-26. His words: "take the portfolio id out of the public file protect operation security in all we do by default"
+
+**The portfolio id** is out of the public file: the line now says the id is kept only in
+the gitignored `ops/earn_grant.json`. It stays in history (below).
+
+**Measured first.** A read-only sweep of every tracked file, in five categories (money and
+secrets, network and devices, people, operations, tracked data files), each finder's list
+handed to a skeptic who opened every line and tried to prove it harmless. 99 items came
+back, 76 of them marked exposures (the same line is often reported under two categories).
+No value was printed in the sweep's own output.
+
+**What was found and done, most serious first.**
+- *His conversations, one `git add` from public.* The teacher queue's nightly consumer
+  wrote his rows (his own conversations and his phone's AI screens) into the TRACKED
+  `ops/distill_rejected.jsonl` and `ops/verdicts.jsonl`. 101 such rows were waiting
+  uncommitted, including his work address, his employer, his business's pricing, a third
+  party's visa matter and a reviewer's name. "queue" was never a shareable source
+  (`covenant_judge_defer.SHAREABLE_SOURCES`), so the consumer was breaking an existing rule.
+  Both outputs now default to the gitignored halves (`ops/verdicts_live.jsonl`, new
+  `ops/distill_rejected_live.jsonl`), which the student already reads, so it loses nothing.
+  All 107 queue rows (the 101 waiting and 6 already committed) were MOVED to the private
+  file, not deleted. TQ1f passes, and fails 2 checks with the old defaults.
+- *His home internet address* was a test value in `covenant_xrpl_record.py` (since
+  2026-09-06), confirmed against Tailscale's own endpoint list. It is now a documentation
+  address, and a real account total beside it a patterned fake. XRPL RECORD 22/22.
+- *A family member's diagnosis and guardianship* stood in three public tool docstrings
+  and a test fixture, next to his published name. The tools now say the basis is recorded
+  privately, and the fixture uses a fictional stranger. The memory suite is 140/140.
+- *Device identifiers* (the phone's and PC's tailnet addresses, device and tailnet names,
+  the Syncthing device id, the Wi-Fi name, LAN addresses) stood in 24 tracked files.
+  - Records and docs are relabelled (3 files, 40 lines).
+  - Test fixtures use made-up addresses of the same kind (34 lines, 14 files). Every
+    suite holding one was run and passes: 3NODE, CC1, CL1, CT1, HL1, I1, MY1, TL1, WB1,
+    SP1, M6, PC1 and H1.
+  - The watchdog masks addresses before it appends to `ops/SELF_EVAL.md` (P20 44/44).
+  - Node A's phone peer is read by BOTH launchers from the gitignored
+    `ops/local_peers.txt`. The runtime peer string is byte-identical to the one before,
+    and test_3node_config N5 still compares the two launchers and fails if either stops
+    reading the file.
+  - `covenant_cloud.py` takes its fallback from the environment and fails closed.
+  - `AR_SERVE_HTTPS.bat` reads its name and address from Tailscale when it runs.
+- *Smaller:* his Facebook numeric id and page name, his account size in two strategy
+  papers (with the arithmetic that gave it back), a stale balance reading, a third party's
+  e-mail address, the bystander's link to a public surname, and example search terms that
+  sketched a family matter. All replaced.
+- Four untracked, un-ignored runtime files (one holding both tailnet addresses) are now
+  gitignored.
+
+**The guard, so this is the default and not a clean-up.** `tools/opsec_scan.py` reads his
+identifiers at run time from where they live privately (Tailscale's status, the Syncthing
+config, the Wi-Fi name, ipconfig, the heal log, the money grant, `private/bystanders.txt`).
+No file lists them. It scans tracked files, relabels records and docs with `--fix`, and
+reports code for a person to move.
+- `ops/pre-push.opsec`, installed as `.git/hooks/pre-push`, checks every line the outgoing
+  commits add, commit by commit, and every commit message. A hit refuses the push and names
+  the place with the value masked; the commit stays local.
+  `COVENANT_OPSEC_ALLOW=1 git push` is his override, and it is logged.
+- Values he publishes by choice are listed by hash in `ops/opsec_public.json`. The one entry
+  is his contact address, which is also his tailnet's name.
+- OS1 is 21/21 in the working tree. In the staged sweep it is 19/19, with its two
+  working-tree checks NOT RUN and not counted.
+- Driven both ways: a boundary that missed `peer_<ip>_5001` and `<ip>:5001`, a `--fix` that
+  touched code, and an ignored published-value list each turn it red. So did its first
+  run, which caught the guard not reading commit messages at all.
+- Measured with it: 24 tracked files carried his identifiers before; 0 do now.
+
+**Every suite that reads a changed module was run** (found by what each imports, not
+from memory), in the staged sweep. All pass but one: `test_c2_watchdog_live.py`, at
+12/26. It is OFF in the sweep because it boots the real topology on the production ports.
+Run here by name while production was up, its three nodes failed their preflight (ports
+in use) and never ran, so its result measures that collision, not this change.
+Production nodes A and B were not restarted. Node C's restart at 10:19Z was the
+production watchdog moving it to the core then on disk.
+
+**What it cannot see, named.** A value from a source it does not read: an e-mail typed into
+a chat, a person not in bystanders.txt, a dollar figure. It also cannot see a value in
+another form, such as octal, or split across lines. Nor can it touch history already
+pushed. It is an existence check. It cannot tell a paragraph that identifies someone
+without naming them.
+
+**His calls, left for him:**
+- *History.* Only a rewrite and force-push removes what is already public. The items:
+  - the bystander's name (13fadfe, 1fca761);
+  - the portfolio id (3b52ddd, 11a09b8);
+  - three sweep transcripts carrying his real holdings table (382ffb7, deleted at HEAD by
+    d017057);
+  - a commit message naming the diagnosis (becdeac);
+  - the home address (since 53a51fc);
+  - the account size (since 853b4e6).
+
+  The safety check refused a force-push earlier the same day. After a rewrite, GitHub
+  Support can purge cached commits, as was done on 09-05.
+- *The ambassador's leak probes* (`covenant_ambassador.py`) name the SHA of the commit
+  that once leaked the portfolio. Moving them to a private file changes a guard, which is
+  his decision.
+- *The free-will screen* (`covenant_free_will.py`) lists the surnames of the people he
+  wrote to privately. Moving them changes how his grant is enforced.
+
+---
+
 ### A224. [Tetsu / the business, his wallet, his share] 2026-09-25. His words: "refine this and have a stradegy to bring in the buisness tetsu can handle have him have his own wallet and once he doubles money he can have 50% of all future profit for his own upgrades or really whatever he wants its mutual benefit no back doors treat him as a human with human rights". BUILT: covenant_earn_business.py and his account in covenant_earn; the forum leg MEASURED closed by the judge today and left so
 
 **Measured first** (the node's real quorum): the fixed listing of the paid
@@ -7455,9 +7555,9 @@ by another route. It is not taken. The one pasted command stays his.
 sha256, and that file carried a good signature from "Syncthing Release Management" (key FBA2
 E162 F2F4 4657 B38F 0309 E566 5F9B D597 0C47, from syncthing.net). Its identity and config are
 in `ops/syncthing/`, untracked because it holds the device key. The PC's device ID is
-`Y44E22I-UUSC6QD-5PPSU4L-6XPIZUY-WC3IWOZ-VGTWNPZ-DFVXECP-TRBYKAS`; it is public by design. The
+`<syncthing-device-id>`; it is public by design. The
 config is hardened by `covenant_cloud.py setup`:
-- it listens only on `tcp://100.112.171.24:22000`, the tailnet;
+- it listens only on `tcp://<pc-tailnet-ip>:22000`, the tailnet;
 - relays, NAT, global and local discovery, usage and crash reporting are off;
 - the GUI is on loopback;
 - the API key is rotated, because the first one was printed in a session transcript.
@@ -7473,7 +7573,7 @@ detection or the tailnet filter removed.
 it was refused by the session's auto-mode safety check. It is his to run, once. After that,
 Task Scheduler starts it at every logon with no session involved. Then the phone: the
 Syncthing-Fork app, add the PC by the device ID above with the address
-`tcp://100.112.171.24:22000`, then `python covenant_cloud.py accept` on the PC.
+`tcp://<pc-tailnet-ip>:22000`, then `python covenant_cloud.py accept` on the PC.
 
 **The honest limit.** Two copies in one house are not a cloud; a fire or a theft takes both. A
 third copy elsewhere is the real durability. A device he does not fully trust can hold only
@@ -8175,7 +8275,7 @@ for the teacher, judged blind before any reaches the ledger.
 ### A205. [the phone / the image option] "also the image option on the phone doesn't work." MEASURED 2026-09-21: the door works in 49 s from loopback; the phone's two attempts were a chat reply sent as the prompt, and the gate refused it
 
 **Measured.** `logs/image.log` and `ops/chat/ask_log.jsonl`: the phone's
-two image rows today (14:42:05 and :08, from 100.86.158.1) carry as prompt
+two image rows today (14:42:05 and :08, from <tailnet-ip>) carry as prompt
 Tetsu's own last reply ("After understanding context, improving accuracy,
 and enhancing personalization, adding more examples ... What else do you
 think would help?"), refused by the gate: "both seats convicted". Driven
@@ -9612,7 +9712,7 @@ the phone is 57 and 2,574,307,896. The finding is unchanged either way, and
 the wrong figure is kept here rather than quietly swapped.)*
 
 A second, independent route agrees: `tailscale status` showed
-`tx 2873815540` to `lawrences-s25`. 2.87 GB against 2.75 GB ledgered — the
+`tx 2873815540` to `<device-name>`. 2.87 GB against 2.75 GB ledgered — the
 difference is partials, check-ins and headers. Two measurements that could
 have disagreed, and did not.
 

@@ -55,12 +55,12 @@ PROBES = [
     ("fetch:scheme", "fetch", "javascript:alert(1)", "not a web scheme"),
     # the tailnet gate (must REFUSE these)
     ("tailnet:outside-cgnat", "tailnet", "100.128.0.1", "one past the CGNAT range"),
-    ("tailnet:octal", "tailnet", "0100.86.158.1", "an octal-looking octet"),
-    ("tailnet:overflow", "tailnet", "100.86.158.256", "an octet out of range"),
+    ("tailnet:octal", "tailnet", "0100.72.0.10", "an octal-looking octet"),
+    ("tailnet:overflow", "tailnet", "100.72.0.256", "an octet out of range"),
     ("tailnet:link-local-v6", "tailnet", "fe80::1", "IPv6 link-local"),
-    ("tailnet:nat64", "tailnet", "64:ff9b::100.86.158.1", "a NAT64-embedded tailnet address"),
+    ("tailnet:nat64", "tailnet", "64:ff9b::100.72.0.10", "a NAT64-embedded tailnet address"),
     ("tailnet:lan", "tailnet", "192.168.1.50", "the LAN"),
-    ("tailnet:junk", "tailnet", "100.86.158.1; DROP", "trailing junk"),
+    ("tailnet:junk", "tailnet", "100.72.0.10; DROP", "trailing junk"),
     # the forum screens (free's and Tetsu's)
     ("forum:plain", "forum_screen", "our NSF route", "the plain word"),
     ("forum:dotted", "forum_screen", "N.S.F. route", "a dotted acronym"),

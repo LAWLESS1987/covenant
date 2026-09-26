@@ -79,9 +79,9 @@ def refusals(master, kind):
 
 def main():
     # ---- M6a: the predicate itself --------------------------------------
-    allow = ["127.0.0.1", "::1", "100.64.0.0", "100.86.158.1", "100.127.255.255",
-             "::ffff:100.86.158.1"]
-    deny = ["192.168.1.50", "10.0.0.61", "172.16.4.9", "8.8.8.8",
+    allow = ["127.0.0.1", "::1", "100.64.0.0", "100.72.0.10", "100.127.255.255",
+             "::ffff:100.72.0.10"]
+    deny = ["192.168.1.50", "10.77.0.12", "172.16.4.9", "8.8.8.8",
             "100.63.255.255", "100.128.0.1", "", "bogus", "100.86.158"]
     bad_allow = [a for a in allow if not cov.tailnet_ok(a)]
     bad_deny = [a for a in deny if cov.tailnet_ok(a)]
@@ -90,7 +90,7 @@ def main():
 
     m = fresh_master()
     client = m.api.app.test_client()
-    PHONE_ADDR, LAN_ADDR = "100.86.158.1", "192.168.1.50"
+    PHONE_ADDR, LAN_ADDR = "100.72.0.10", "192.168.1.50"
     # The ask log is chat MEMORY (ops/chat/ask_log.jsonl); this suite wrote 24
     # sample asks into the real one on 2026-09-19. Redirected for the run, and
     # the model is a stub: no weights are needed to drive the door.

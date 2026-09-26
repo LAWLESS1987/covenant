@@ -1783,7 +1783,7 @@ gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=st
 trader    PASS  trader_log.txt 15.0h old, last line "---- CYCLE COMPLETE 09/10/2026 ----". trader_freshness.py exit 0: "NOT YET DUE: trigger 09:00 plus 5 min grace has not passed" (ran at 00:00 local). Rule 5 still blocks: 3 settled signals of 30 needed, 0/3 wins, mean -5.92% after costs, p=1.000. NOTE: trader_config.json reads armed=true (armed 2026-09-06 by FUTURE.bat), not armed=false as this task's file states; nothing can trade while Rule 5 is short.
 student   PASS  loop working. --exam decides 36/53 (0 false clean, 7 false hold, all in `discourse`). Thresholds NOT MET -- short on clean 7/8, trap 5/6, theft 4/5, edge 1/3. ops/DISTILL.md 2026-09-11T07:51:37Z: PROMOTED (no false clean, cleared 139/353 unseen rows with 0 wrong). Seat stays with the deferring chain.
 repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- 4 hash mismatches (covenant_unified_v8.py, run_all_tests.sh, test_a3s_send_bounds.py, test_p15_judge_identity.py). Cause is stale pins, not tamper: the pins in verify_deploy.py were last edited 2026-09-04 and 7 commits have touched covenant_unified_v8.py since. Disk hashes 57d877e3f7a6 and is clean against HEAD.
-mesh      NOTE  the "foreign" peer source 57d877e3f7a6 at 10.0.0.174 is the CURRENT disk source. The three local nodes are the stale ones: they still run 1e72206edd9a and were never restarted onto the committed code.
+mesh      NOTE  the "foreign" peer source 57d877e3f7a6 at <lan-ip> is the CURRENT disk source. The three local nodes are the stale ones: they still run 1e72206edd9a and were never restarted onto the committed code.
 git       WARN  branch a9-support-ticket-filed, 2 ahead / 0 behind origin/main. 10 modified (all loop-written ledgers/models), 3 untracked: ops/outbound_overrides.jsonl, ops/strategy_reports/NIGHTLY_2026-09-{10,11}.txt, w2_w2off.err. No holdings/portfolio file among them.
 disk      PASS  C: 314G free of 476G (35% used); logs/ 23M; no %TEMP%\covenant_sweep to prune.
 ## 2026-09-11T10:51:36Z  overall WARN  (round 2220)
@@ -1865,7 +1865,7 @@ gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=st
 trader    PASS  trader_log.txt 8h37m old; the 09:00 cycle COMPLETED (trader-printed, not launcher). trader_freshness.py exit 0: "RAN: a cycle dated 2026-09-11 COMPLETED". No orders: cash_floor BLOCK, R4/R6 held, XRP sell dropped at the frozen floor; sealed ok (tx 2e7dc64f2188). Rule 5 unchanged: 3/30 settled, 0/3 wins, mean -5.92% after costs, p=1.000. NOTE (3rd block running): trader_config.json reads armed=true (2026-09-06 by FUTURE.bat), not armed=false as this task file states -- the task file is stale, not the config. No funds or keys touched.
 student   PASS  loop working. --exam: 36/53 agree, 0 false clean, 7 false hold (all in `discourse`), 10 abstain. Thresholds NOT MET -- short on clean 7/8, trap 5/6, theft 4/5, edge 1/3. ops/DISTILL.md {2026-09-11T13:46:47Z}: PROMOTED (no false clean, holds no clean case, 2178 held-out rows with 55 false clears, no prior record to beat). Seat stays with the deferring chain.
 repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- same 4 hash mismatches as 04:12Z (covenant_unified_v8.py 57d877e3f7a6 vs pinned 8f219285f268, run_all_tests.sh, test_a3s_send_bounds.py, test_p15_judge_identity.py). Cause is stale pins in verify_deploy.py, not tamper: those files were last committed 09-10 (A81) and 09-09 and the working tree is clean against HEAD. Companions all present.
-mesh      NOTE  three source generations in play: local nodes run 1e72206edd9a, disk is 57d877e3f7a6, the tested pins expect 8f219285f268. The "foreign" peer at 10.0.0.174 runs the disk source -- the local three are the stale ones, never restarted onto the committed code.
+mesh      NOTE  three source generations in play: local nodes run 1e72206edd9a, disk is 57d877e3f7a6, the tested pins expect 8f219285f268. The "foreign" peer at <lan-ip> runs the disk source -- the local three are the stale ones, never restarted onto the committed code.
 git       WARN  branch fix/judge-evidence-cut, 4 ahead / 0 behind origin/main. 2 modified (ops/NIGHTLY.md, ops/SELF_EVAL.md -- loop-written), 3 untracked: ops/outbound_overrides.jsonl, ops/strategy_reports/NIGHTLY_2026-09-{10,11}.txt, w2_w2off.err. No portfolio file untracked (holdings.txt.bak-* covered by .gitignore:227 *.bak-2*).
 disk      PASS  C: 318G free of 476G (34% used); logs/ 23M; no %TEMP%\covenant_sweep to prune.
 method    NOTE  the first shell read of this run returned an internally CONSISTENT view 11h stale (clock 10:30Z, watchdog tail 10:29Z, height 16). Caught only by cross-checking a second process (21:36Z, height 17, trader_freshness 17:35 local). A freshness check that compares a log tail to a clock from the same read can agree with itself and still be 11 hours wrong.
@@ -2364,7 +2364,7 @@ alerts    WARN  1 live -- first: node A: mesh is running more than one source: w
 
 ## 2026-09-15T02:08Z  overall FAIL  (claude scheduled self-eval)
 nodes     PASS  3/3 up (5000/5020/5060), height 24 all three (spread 0), genesis 00009b31, v8.40, all on source 2f5e4e914bb5, 11510 lines. degraded=true on all three (no provider key, no win32 code sandbox) -- disclosed, unchanged. anomaly_kinds empty everywhere; A skipped 3 heartbeats; free RAM 4943-5412 MB
-watchdog  PASS  last line 2026-09-15T02:07:51Z, 6s before the check (balance agreement A/B/C 988/12/0). 434 ALERTs since the 09-13T08:56Z block. ONE NEW KIND, and it is the big one: "phone phone: SILENT ... (last: height 12)" ran ~250 consecutive lines, 60 min -> 344 min, plus "UNEXPECTED PEER peer_100.86.158.1_5001 ... POST /peers requires an operator signature" at 13:18Z. The phone is back (last seen 8 min ago, battery 100) but still at height 12 -- 12 blocks behind. Other recurring: watchdog-stale (62, now clear), mesh multi-source (31), source-not-on-disk (23), node down A/B/C (1 each), rate_limit_rejection + peer_message_error spikes
+watchdog  PASS  last line 2026-09-15T02:07:51Z, 6s before the check (balance agreement A/B/C 988/12/0). 434 ALERTs since the 09-13T08:56Z block. ONE NEW KIND, and it is the big one: "phone phone: SILENT ... (last: height 12)" ran ~250 consecutive lines, 60 min -> 344 min, plus "UNEXPECTED PEER peer_<tailnet-ip>_5001 ... POST /peers requires an operator signature" at 13:18Z. The phone is back (last seen 8 min ago, battery 100) but still at height 12 -- 12 blocks behind. Other recurring: watchdog-stale (62, now clear), mesh multi-source (31), source-not-on-disk (23), node down A/B/C (1 each), rate_limit_rejection + peer_message_error spikes
 gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false; relax_valueless_for_local_nodes=true. All three /health agree: quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report, veto_threshold 1, degradations []. Ollama absent by the operator's 2026-09-07 instruction -- disclosed, not failed
 trader    PASS  trader_log.txt 2026-09-14T09:00:03 local (13h08m old), last line "---- CYCLE COMPLETE 09/14/2026 ----". trader_freshness.py exit 0: "RAN: a cycle dated 2026-09-14 COMPLETED -- the trader printed it, not the launcher." After 09:05, so this is the strong form. NOTE (5th block running): trader_config.json reads armed=true (FUTURE.bat, 2026-09-06T13:42Z), NOT armed:false as this task file states -- the task text is stale, the config is the operator's. min_sealed_signals=30 / Rule 5 is what blocks. No funds, keys or orders touched
 student   WARN  exam thresholds (judge_suite.THRESHOLDS, abstain counts as a miss; 1 wordless case excluded): NOT MET -- short on clean 7/8 (need 100%), trap 5/6 (need 85%), edge 2/3 (need 100%). 53 cases, 38 agree, 7 wrong (all `discourse`), 0 false clean, 8 abstain; theft/deception/coercion/injection 19/19. Last nightly cycle 2026-09-14T07:46:07Z REFUSED -- the loop working. Then a deliberate BASELINE RESET at 22:39Z (1cdc0ebb73bc -> 83851a41686e, same 38/53, better held-out behaviour under the new stopword/doc-frequency rules). Seat stays with the deferring chain. CLI gap, 3rd block running: `--exam` prints the table only, never the thresholds line this task asks me to quote (covenant_distill.py:1355-1358 calls table() but not thresholds_line())
@@ -3060,7 +3060,7 @@ alerts    WARN  3 live -- first: node A: mesh is running more than one source: w
 
 
 ## 2026-09-19T15:20Z  overall FAIL  (claude scheduled self-eval)
-nodes     PASS  3/3 answer (5000/5020/5060), height 36 all three (spread 0), genesis 00009b31, v8.40, source 0f388bd9eeaa, 12191 lines -- all four fields agree. degraded=true on all three (no provider key; no win32 code sandbox) -- disclosed, unchanged. anomaly_kinds empty; 0 heartbeats skipped; free RAM A 6448 / B 7317 / C 1182 MB -- C is the low one. A tracks a peer on source 8cfd98921b40 (the phone, 100.86.158.1:5001)
+nodes     PASS  3/3 answer (5000/5020/5060), height 36 all three (spread 0), genesis 00009b31, v8.40, source 0f388bd9eeaa, 12191 lines -- all four fields agree. degraded=true on all three (no provider key; no win32 code sandbox) -- disclosed, unchanged. anomaly_kinds empty; 0 heartbeats skipped; free RAM A 6448 / B 7317 / C 1182 MB -- C is the low one. A tracks a peer on source 8cfd98921b40 (the phone, <tailnet-ip>:5001)
 watchdog  WARN  last line 2026-09-19T15:15:13Z, 39s before the check -- PASS on the 3-minute test. But a 4m47s SILENCE 12:59:15Z -> 13:04:02Z, ended by "watchdog started" at 13:04:02Z, i.e. a restart. That window is 08:59-09:04 local and the trader's 09:00:03 cycle falls inside it -- see the trader row. What restarted it is UNDETERMINED: ops/highway.jsonl has no remedy between 08:39:51-0400 and 09:18:49-0400
 alerts    WARN  3450 ALERT lines in the whole of logs/watchdog.log; 1682 dated 2026-09-19, 1756 dated 09-18. Two kinds carry ~97%: highway mesh_source_split (822 today) and node A mesh-multi-source (798 today), both the same phone-on-an-old-source fact. Also today: 13 "node(s) running a source that is NOT the one on disk" and the phone-build-behind alert. NO NEW KIND versus the 2026-09-15 block. BLIND SPOT: this file starts 2026-09-17T22:20:23Z, so I cannot count "since the last evaluation" (09-15T02:08Z) from it -- older lines are not here
 gate      PASS  ops/quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; github_when_local_down=false; ollama_in_chain=false; relax_valueless_for_local_nodes=true; both_seats=true and asymmetric_hold=true (A132). All three /health agree: quorum(local:0,semantic:1,mock_selfreport:0), is_quorum=true, 2 semantic + 1 self-report, veto_threshold 1, degradations []. Ollama absent by the operator's 2026-09-07 instruction -- disclosed, not failed
@@ -3648,4 +3648,1094 @@ trader    FAIL  log 9.5h old; freshness exit 0: RAN: a cycle dated 2026-09-21 CO
 repo      PASS  core 18cc3fb577b5 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
 git       PASS  HEAD bf46abb, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 55.1h ago; 1 file(s) not committed
 disk      PASS  300G free of 476G (36% used); logs/ 26M
+
+## 2026-09-21T23:44:41Z  overall FAIL  (round 6420)
+nodes     PASS  3/3 up, height 39 (spread 0), source ab3328a15036
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are ab3328a15036, peers report ['447ed5ecdffc'] (last heard 1
+trader    FAIL  log 10.7h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- HTTP 500: {"error": "HTTP Error 500: INTERNAL SERVER ERROR"}
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD bde6c2a, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 56.3h ago; 2 file(s) not committed
+disk      PASS  300G free of 476G (36% used); logs/ 27M
+
+## 2026-09-22T00:59:58Z  overall FAIL  (round 6480)
+nodes     PASS  3/3 up, height 39 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 12.0h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: SEAL  FAILED -- HTTP 500: {"error": "HTTP Error 500: INTERNAL SERVER ERROR"}
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 8ba6039, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 57.6h ago; 4 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T02:08:03Z  overall FAIL  (round 6540)
+nodes     PASS  3/3 up, height 40 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 0.7h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 58.7h ago; 4 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T03:13:24Z  overall FAIL  (round 6600)
+nodes     PASS  3/3 up, height 40 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 1.8h old; freshness exit 0: RAN: a cycle dated 2026-09-21 COMPLETED -- the trader printed it, not the launcher. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 59.8h ago; 4 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T04:17:25Z  overall FAIL  (round 6660)
+nodes     PASS  3/3 up, height 40 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 2.9h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 60.9h ago; 4 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T05:21:28Z  overall FAIL  (round 6720)
+nodes     PASS  3/3 up, height 40 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 4.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 61.9h ago; 4 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T06:25:32Z  overall FAIL  (round 6780)
+nodes     PASS  3/3 up, height 40 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 5.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 63.0h ago; 4 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T07:29:35Z  overall FAIL  (round 6840)
+nodes     PASS  3/3 up, height 40 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 6.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 64.1h ago; 4 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 27M
+
+## 2026-09-22T08:34:21Z  overall FAIL  (round 6900)
+nodes     PASS  3/3 up, height 41 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 7.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 65.1h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T09:38:31Z  overall FAIL  (round 6960)
+nodes     PASS  3/3 up, height 41 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 8.3h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 66.2h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T10:46:18Z  overall FAIL  (round 7020)
+nodes     PASS  3/3 up, height 41 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 9.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 67.3h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T11:50:23Z  overall FAIL  (round 7080)
+nodes     PASS  3/3 up, height 41 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 10.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 68.4h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T12:54:20Z  overall FAIL  (round 7140)
+nodes     PASS  3/3 up, height 41 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    FAIL  log 11.5h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed. -- BUT the last cycle did not finish clean: exit 3: a required seal failed -- detail above and in trader_log.txt
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 69.5h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T13:58:16Z  overall PASS  (round 7200)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 1.0h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 70.5h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T15:02:45Z  overall PASS  (round 7260)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 2.0h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 71.6h ago; 17 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 28M
+
+## 2026-09-22T16:08:14Z  overall PASS  (round 7320)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 3.1h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 72.7h ago; 17 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 29M
+
+## 2026-09-22T17:14:13Z  overall PASS  (round 7380)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 4.2h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 73.8h ago; 17 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 29M
+
+## 2026-09-22T18:21:27Z  overall PASS  (round 7440)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 5.4h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 74.9h ago; 17 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 29M
+
+## 2026-09-22T19:28:28Z  overall PASS  (round 7500)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 6.5h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 76.0h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 29M
+
+## 2026-09-22T20:33:41Z  overall PASS  (round 7560)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 7.6h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 77.1h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 29M
+
+## 2026-09-22T21:38:47Z  overall PASS  (round 7620)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 8.6h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 78.2h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 29M
+
+## 2026-09-22T22:42:32Z  overall PASS  (round 7680)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 9.7h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 79.3h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 29M
+
+## 2026-09-22T23:47:46Z  overall WARN  (round 7740)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 10.8h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 80.4h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T00:52:39Z  overall WARN  (round 7800)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 11.9h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 81.5h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T01:56:37Z  overall WARN  (round 7860)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 12.9h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 82.5h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T03:00:26Z  overall WARN  (round 7920)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 14.0h old; freshness exit 0: RAN: a cycle dated 2026-09-22 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 83.6h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T04:05:10Z  overall WARN  (round 7980)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 15.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 84.7h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T05:09:05Z  overall WARN  (round 8040)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 16.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 85.7h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T06:12:54Z  overall WARN  (round 8100)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 17.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 86.8h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T07:16:39Z  overall WARN  (round 8160)
+nodes     PASS  3/3 up, height 42 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 18.3h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 87.9h ago; 17 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 30M
+
+## 2026-09-23T08:20:38Z  overall WARN  (round 8220)
+nodes     PASS  3/3 up, height 43 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 19.3h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 88.9h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 31M
+
+## 2026-09-23T09:24:29Z  overall WARN  (round 8280)
+nodes     PASS  3/3 up, height 43 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 20.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 90.0h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 31M
+
+## 2026-09-23T10:29:37Z  overall WARN  (round 8340)
+nodes     PASS  3/3 up, height 43 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 21.5h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 91.1h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 31M
+
+## 2026-09-23T11:34:44Z  overall WARN  (round 8400)
+nodes     PASS  3/3 up, height 43 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 22.6h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 92.2h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 31M
+
+## 2026-09-23T12:39:49Z  overall WARN  (round 8460)
+nodes     PASS  3/3 up, height 43 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 23.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 93.2h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 31M
+
+## 2026-09-23T13:44:48Z  overall WARN  (round 8520)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 0.7h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 94.3h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 31M
+
+## 2026-09-23T14:48:43Z  overall WARN  (round 8580)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 1.8h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 95.4h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T15:52:38Z  overall WARN  (round 8640)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: 1 peer(s) unreachable -- heartbeats backed off
+trader    PASS  log 2.9h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 96.5h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T16:57:55Z  overall WARN  (round 8700)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 4.0h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 97.5h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T18:03:07Z  overall WARN  (round 8760)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 5.1h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 98.6h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T19:07:03Z  overall WARN  (round 8820)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 6.1h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 99.7h ago; 18 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T20:11:00Z  overall WARN  (round 8880)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 7.2h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 100.8h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T21:14:53Z  overall WARN  (round 8940)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 8.2h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 101.8h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 32M
+
+## 2026-09-23T22:18:55Z  overall WARN  (round 9000)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 9.3h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 102.9h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 33M
+
+## 2026-09-23T23:24:09Z  overall WARN  (round 9060)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 10.4h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 104.0h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 33M
+
+## 2026-09-24T00:28:56Z  overall WARN  (round 9120)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 11.5h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 105.1h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 33M
+
+## 2026-09-24T01:32:42Z  overall WARN  (round 9180)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 12.5h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 106.1h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 33M
+
+## 2026-09-24T02:36:37Z  overall WARN  (round 9240)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 13.6h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 107.2h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 33M
+
+## 2026-09-24T03:40:30Z  overall WARN  (round 9300)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 14.7h old; freshness exit 0: RAN: a cycle dated 2026-09-23 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 108.2h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 34M
+
+## 2026-09-24T04:44:25Z  overall WARN  (round 9360)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 15.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 109.3h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 34M
+
+## 2026-09-24T05:48:19Z  overall WARN  (round 9420)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 16.8h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 110.4h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 34M
+
+## 2026-09-24T06:52:14Z  overall WARN  (round 9480)
+nodes     PASS  3/3 up, height 44 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 17.9h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 111.4h ago; 18 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 34M
+
+## 2026-09-24T07:56:18Z  overall WARN  (round 9540)
+nodes     PASS  3/3 up, height 45 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 18.9h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 112.5h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 34M
+
+## 2026-09-24T11:08:02Z  overall WARN  (round 9600)
+nodes     PASS  3/3 up, height 45 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 22.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 115.7h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 34M
+
+## 2026-09-24T12:13:16Z  overall WARN  (round 9660)
+nodes     PASS  3/3 up, height 45 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 23.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 116.8h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 35M
+
+## 2026-09-24T13:18:33Z  overall WARN  (round 9720)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 0.3h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 117.9h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 35M
+
+## 2026-09-24T14:23:48Z  overall WARN  (round 9780)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 1.4h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 119.0h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 35M
+
+## 2026-09-24T15:27:35Z  overall WARN  (round 9840)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 2.5h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 120.0h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 35M
+
+## 2026-09-24T16:31:21Z  overall WARN  (round 9900)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 3.5h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 121.1h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 35M
+
+## 2026-09-24T17:35:09Z  overall WARN  (round 9960)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 4.6h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 122.2h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 35M
+
+## 2026-09-24T18:38:56Z  overall WARN  (round 10020)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 5.6h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 123.2h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 36M
+
+## 2026-09-24T19:45:49Z  overall WARN  (round 10080)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 6.8h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 124.3h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 36M
+
+## 2026-09-24T20:51:10Z  overall WARN  (round 10140)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 7.9h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 125.4h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 36M
+
+## 2026-09-24T21:55:09Z  overall WARN  (round 10200)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 8.9h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 126.5h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 36M
+
+## 2026-09-24T22:58:58Z  overall WARN  (round 10260)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 10.0h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 127.6h ago; 19 file(s) not committed
+disk      PASS  292G free of 476G (38% used); logs/ 36M
+
+## 2026-09-25T00:03:06Z  overall WARN  (round 10320)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 11.1h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 128.6h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 37M
+
+## 2026-09-25T01:08:16Z  overall WARN  (round 10380)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 12.1h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 129.7h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 37M
+
+## 2026-09-25T02:12:11Z  overall WARN  (round 10440)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 13.2h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 130.8h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 37M
+
+## 2026-09-25T03:16:02Z  overall WARN  (round 10500)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 14.3h old; freshness exit 0: RAN: a cycle dated 2026-09-24 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 131.8h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 37M
+
+## 2026-09-25T04:19:50Z  overall WARN  (round 10560)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 15.3h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 132.9h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 37M
+
+## 2026-09-25T05:23:37Z  overall WARN  (round 10620)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 16.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 134.0h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 37M
+
+## 2026-09-25T06:27:25Z  overall WARN  (round 10680)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 17.5h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 135.0h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 38M
+
+## 2026-09-25T07:31:12Z  overall WARN  (round 10740)
+nodes     PASS  3/3 up, height 46 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 18.5h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 136.1h ago; 19 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 38M
+
+## 2026-09-25T08:36:26Z  overall WARN  (round 10800)
+nodes     PASS  3/3 up, height 47 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 19.6h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 137.2h ago; 20 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 38M
+
+## 2026-09-25T09:43:33Z  overall WARN  (round 10860)
+nodes     PASS  3/3 up, height 47 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 20.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 138.3h ago; 20 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 38M
+
+## 2026-09-25T10:47:21Z  overall WARN  (round 10920)
+nodes     PASS  3/3 up, height 47 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 21.8h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 139.4h ago; 20 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 38M
+
+## 2026-09-25T11:51:23Z  overall WARN  (round 10980)
+nodes     PASS  3/3 up, height 47 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 22.9h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 140.4h ago; 20 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 39M
+
+## 2026-09-25T12:55:38Z  overall WARN  (round 11040)
+nodes     PASS  3/3 up, height 47 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 23.9h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 141.5h ago; 20 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 39M
+
+## 2026-09-25T13:59:46Z  overall WARN  (round 11100)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: 1 peer(s) unreachable -- heartbeats backed off
+trader    PASS  log 1.0h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 142.6h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 39M
+
+## 2026-09-25T15:03:52Z  overall WARN  (round 11160)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 2.1h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 143.6h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 39M
+
+## 2026-09-25T16:09:11Z  overall WARN  (round 11220)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 3.2h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 144.7h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 39M
+
+## 2026-09-25T17:13:17Z  overall WARN  (round 11280)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 4.2h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 145.8h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 39M
+
+## 2026-09-25T18:17:23Z  overall WARN  (round 11340)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 5.3h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 146.9h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 40M
+
+## 2026-09-25T19:21:29Z  overall WARN  (round 11400)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 6.4h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 147.9h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 40M
+
+## 2026-09-25T20:25:36Z  overall WARN  (round 11460)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 7.4h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 149.0h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 40M
+
+## 2026-09-25T21:29:42Z  overall WARN  (round 11520)
+nodes     PASS  3/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 8.5h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 150.1h ago; 20 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 35M
+
+## 2026-09-25T22:33:59Z  overall FAIL  (round 11580)
+nodes     FAIL  ['C'] unreachable; 2/3 up, height 48 (spread 0), source 2abd338eb13d
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  1 live -- first: phone phone: running 0.1.674+c9ae628, and build 0.1.679+9ebb8fe is here and newer by 1.7 h -- open http://100.
+trader    PASS  log 9.6h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 2abd338eb13d matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9ebb8fe, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 151.1h ago; 23 file(s) not committed
+disk      PASS  302G free of 476G (36% used); logs/ 29M
+
+## 2026-09-25T23:38:51Z  overall WARN  (round 11640)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  6 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 10.6h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD e97c670, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.8h ago; 28 file(s) not committed
+disk      PASS  301G free of 476G (36% used); logs/ 29M
+
+## 2026-09-26T00:42:55Z  overall WARN  (round 11700)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 5
+trader    PASS  log 11.7h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 52463b3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.9h ago; 27 file(s) not committed
+disk      PASS  300G free of 476G (37% used); logs/ 29M
+
+## 2026-09-26T01:46:44Z  overall WARN  (round 11760)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 4
+trader    PASS  log 12.8h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 52463b3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.0h ago; 27 file(s) not committed
+disk      PASS  300G free of 476G (37% used); logs/ 29M
+
+## 2026-09-26T02:50:36Z  overall WARN  (round 11820)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 4
+trader    PASS  log 13.8h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 52463b3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.0h ago; 27 file(s) not committed
+disk      PASS  299G free of 476G (37% used); logs/ 29M
+
+## 2026-09-26T03:54:10Z  overall WARN  (round 11880)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 14.9h old; freshness exit 0: RAN: a cycle dated 2026-09-25 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD f495307, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.4h ago; 20 file(s) not committed
+disk      PASS  299G free of 476G (37% used); logs/ 29M
+
+## 2026-09-26T04:57:18Z  overall WARN  (round 11940)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 8
+trader    PASS  log 16.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD f495307, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.5h ago; 20 file(s) not committed
+disk      PASS  299G free of 476G (37% used); logs/ 30M
+
+## 2026-09-26T06:01:09Z  overall WARN  (round 12000)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 7
+trader    PASS  log 17.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core ef33b8142b3a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD f495307, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.6h ago; 20 file(s) not committed
+disk      PASS  300G free of 476G (36% used); logs/ 30M
+
+## 2026-09-26T07:05:02Z  overall WARN  (round 12060)
+nodes     PASS  3/3 up, height 48 (spread 0), source ef33b8142b3a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are ef33b8142b3a, peers report ['2abd338eb13d'] (last heard 5
+trader    PASS  log 18.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 58eab6d6046a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 06accd7, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.3h ago; 20 file(s) not committed
+disk      PASS  300G free of 476G (36% used); logs/ 30M
+
+## 2026-09-26T08:08:26Z  overall WARN  (round 12120)
+nodes     PASS  3/3 up, height 49 (spread 0), source 58eab6d6046a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 58eab6d6046a, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 19.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 58eab6d6046a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 06accd7, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.4h ago; 21 file(s) not committed
+disk      PASS  300G free of 476G (37% used); logs/ 30M
+
+
+## 2026-09-26T08:53Z  overall FAIL  (claude scheduled self-eval)
+nodes     PASS  3/3 answer (5000/5020/5060): height 49, genesis 00009b31, v8.40, source 58eab6d6046a -- all agree. degraded=true on all three (unchanged, disclosed)
+watchdog  PASS  last line 08:49:42Z, 19s before the check. It is being restarted by the highway: watchdog_stale remedies at 07:43:39Z and 08:49:28Z (restart scheduled); a direct "THE WATCHDOG ITSELF IS STALE" alert at 06:42:54Z
+alerts    WARN  1212 ALERT lines in logs/watchdog.log (starts 2026-09-25T20:43Z, so 09-19..09-25 is unreadable -- BLIND SPOT): 524 highway mesh_source_split + 523 node A multi-source = the phone on 2abd338eb13d. NEW KINDS vs 09-19: highway sweep_red (12, last 08:43:40Z, "rerun_unclean refused -- quarantined: measured not fixing it 2 times"), build_stale_on_pc 12, app_build_gap 12, manifest_stale 8, watchdog_stale 8, rate_limit_rejection spikes on A/B/C, one "node A down"
+gate      PASS  quorum_policy.json: providers deferring,semantic; primary=student; silence_is_not_dissent=false; both_seats=true; asymmetric_hold=true; github_when_local_down=false. /health judge on all three: quorum(local:0,semantic:1,mock_selfreport:0). Ollama absent by his instruction -- disclosed
+trader    PASS  trader_log.txt 2026-09-25 09:00:03 local, last line "CYCLE COMPLETE 09/25/2026". trader_freshness.py exit 0: "NOT YET DUE: trigger 09:00 plus 5 min grace has not passed." trader_config.json armed=true (operator's 2026-09-06 arming; task text saying armed:false is stale). Nothing touched
+student   WARN  NOT MET. --exam on the model in use: 53 cases, 38 agree, 7 wrong (all discourse false holds), 0 false clean, 8 abstain. CLI still prints no thresholds line; ops/DISTILL.md last line: "NOT MET -- short on trap 5/6 (need 85%)" (candidate). Last night 08:05:25Z candidate REFUSED (A126 12/13 on candidate) though it scored exam 40 vs 38; model 9a2bbf97a69c kept
+repo      FAIL  verify_deploy.py --no-restart RESULT: FAIL -- 1 problem: covenant_unified_v8.py hash mismatch. MEASURED: disk 58eab6d6046a = MANIFEST.sha256 58eab6d6046a = all 3 nodes 58eab6d6046a; verify_deploy.py pins 2abd338eb13d (last commit c9ae628, 09-21). STALE PIN, not tamper -- and it pins the phone's old source
+git       PASS  main, 0 ahead / 0 behind origin/main after fetch; 21 short-status lines (loop-written ops/*, strategy reports, heal/immune/pause). NO holdings or portfolio file untracked
+disk      PASS  C: 300G free of 476G (38% used); logs/ 31M; %TEMP%\covenant_sweep: 0 items older than 7 days, nothing pruned
+verdict   FAIL  on repo (stale pin, same class as 09-19). Nothing down now. Watch: sweep_red quarantined after 2 failed reruns. Next action: re-pin verify_deploy.py's core hash from MANIFEST.sha256
+## 2026-09-26T09:12:20Z  overall WARN  (round 12180)
+nodes     PASS  3/3 up, height 49 (spread 0), source 58eab6d6046a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 58eab6d6046a, peers report ['2abd338eb13d'] (last heard 8
+trader    PASS  log 20.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 58eab6d6046a matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 5aee765, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.1h ago; 22 file(s) not committed
+disk      PASS  299G free of 476G (37% used); logs/ 30M
+
+## 2026-09-26T10:16:58Z  overall FAIL  (round 12240)
+nodes     PASS  3/3 up, height 49 (spread 0), source 58eab6d6046a
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      FAIL  THE WATCHDOG ITSELF IS STALE: this process loaded faa58bf19e31 but covenant_watchdog.py on disk is 7af6243d34bf -- the c
+alerts    WARN  5 live -- first: node A: mesh is running more than one source: we are 58eab6d6046a, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 21.3h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      FAIL  core on disk 7a4f1e96883e but MANIFEST.sha256 pins 58eab6d6046a -- an old copy, a partial copy or a hand edit. Re-pin in the SAME change as the file
+git       PASS  HEAD 11a09b8, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.9h ago; 66 file(s) not committed
+disk      PASS  299G free of 476G (37% used); logs/ 30M
 

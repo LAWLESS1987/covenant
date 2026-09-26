@@ -57,7 +57,10 @@ FOLDER_PATH = os.environ.get("COVENANT_CLOUD_DIR") or os.path.join(os.path.expan
 GUI = "http://127.0.0.1:8384"
 CHECK = os.environ.get("COVENANT_CLOUD_CHECK") or os.path.join(HERE, "ops", "cloud_check.json")
 MANIFEST = os.environ.get("COVENANT_CLOUD_MANIFEST") or os.path.join(HERE, "ops", "cloud_manifest.json")
-PC_TAILNET_IP = "100.112.171.24"          # measured 2026-09-12; `tailscale ip -4` is asked first
+# No address is written here (2026-09-26 OPSEC sweep: this repository is public).
+# `tailscale ip -4` is asked first; COVENANT_TAILNET_IP is the fallback; with neither,
+# setup refuses rather than listen anywhere else.
+PC_TAILNET_IP = os.environ.get("COVENANT_TAILNET_IP", "")
 SKIP_DIRS = {".stfolder", ".stversions"}
 
 
@@ -69,7 +72,7 @@ def tailnet_ip():
                 return out[0].strip()
         except (OSError, subprocess.SubprocessError):
             continue
-    return PC_TAILNET_IP
+    return PC_TAILNET_IP if PC_TAILNET_IP.startswith("100.") else None
 
 
 def _opt(opts, tag, value):
@@ -87,6 +90,8 @@ def setup(config=CONFIG, folder_path=FOLDER_PATH, say=print):
     my_id = me.get("id")
     me.set("name", "Lawless PC")
     ip = tailnet_ip()
+    if not ip:
+        raise RuntimeError("tailscale did not give this PC's tailnet address and COVENANT_TAILNET_IP is not set; refusing to choose a listen address")
     opts = root.find("options")
     for el in opts.findall("listenAddress"):
         opts.remove(el)

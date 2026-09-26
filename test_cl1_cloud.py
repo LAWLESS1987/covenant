@@ -99,7 +99,7 @@ def main():
               "a.txt" not in written and "b.txt" not in written and "b.txt" in open(man, encoding="utf-8").read())
 
         calls = []
-        pending = {"PHONEID": {"address": "100.86.158.1:22000", "name": "phone"},
+        pending = {"PHONEID": {"address": "100.72.0.10:22000", "name": "phone"},
                    "STRANGER": {"address": "203.0.113.9:22000", "name": "x"}}
         folder_cfg = {"id": C.FOLDER_ID, "devices": [{"deviceID": "ME"}]}
 

@@ -58,8 +58,10 @@ RUN
 import argparse
 import hashlib
 import http.client            # HTTPException: not an OSError, not a URLError (A115b)
+import ipaddress
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -85,10 +87,10 @@ LOG_KEEP = 5
 # POST /peers is operator-authenticated, so one did not arrive by accident.
 # THE PHONE IS PEERED TO NODE A OVER THE TAILNET (2026-09-14, the operator's
 # "can't you use tailscale"). It heartbeats to node A's API and node A had
-# already recorded it inbound as 100.86.158.1 with an UNKNOWN port, which is an
+# already recorded it inbound as <tailnet-ip> with an UNKNOWN port, which is an
 # address it could never dial -- so the acquaintance ran one way and the phone
 # sat at chain height 12 through fourteen check-ins while these three went to
-# 23. The tailnet address is the stable one (lawrences-s25); the phone's LAN
+# 23. The tailnet address is the stable one (<device-name>); the phone's LAN
 # address is not. Port 5001 is its P2P port (API 5000 + 1, the same convention
 # as the loopback entries below), and it is the only one reachable: the phone
 # binds its API to loopback, so 5000 refuses and 5001 accepts.
@@ -106,9 +108,26 @@ LOG_KEEP = 5
 #     _accept_block_common. A peer at height 12 cannot roll these nodes back.
 # What node A does with it is announce its tip at boot, which is what tells the
 # phone it is behind so it can pull the gap itself.
+# THE PHONE'S ADDRESS IS NOT IN THIS FILE (2026-09-26, his words: "protect operation
+# security in all we do by default"). This repository is public. Node A's off-box peers
+# live in the gitignored ops/local_peers.txt, one comma-separated line, and
+# covenant_prod.bat reads the same file, so the two launchers cannot differ
+# (test_3node_config.py N5). No file means no off-box peer, never a guessed one.
+LOCAL_PEERS = os.path.join(HERE, "ops", "local_peers.txt")
+
+
+def _local_peers(path=LOCAL_PEERS):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            s = fh.readline().strip().strip(",")
+    except OSError:
+        return ""
+    return "," + s if s and re.fullmatch(r"[\w.\-]+:\d+(,[\w.\-]+:\d+)*", s) else ""
+
+
 NODES = [
     {"id": "A", "port": 5000, "db": "nodeA_prod.db", "key": "nodeA_prod.db.key",
-     "peers": "127.0.0.1:5021,100.86.158.1:5001"},
+     "peers": "127.0.0.1:5021" + _local_peers()},
     {"id": "B", "port": 5020, "db": "nodeB_prod.db", "key": "nodeB_prod.db.key",
      "peers": "127.0.0.1:5001,127.0.0.1:5061"},
     {"id": "C", "port": 5060, "db": "nodeC_prod.db", "key": "nodeC_prod.db.key",
@@ -1036,9 +1055,31 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
     return "\n".join(block) + "\n\n", overall
 
 
+_ADDR = re.compile(r"(?<![\d.])(\d{1,3})([._])(\d{1,3})\2(\d{1,3})\2(\d{1,3})(?!\d)")
+
+
+def _mask_addresses(text):
+    """ops/SELF_EVAL.md is tracked and the repository is public (2026-09-26, his words:
+    "protect operation security in all we do by default"). Peer names carry addresses
+    (peer_<ip>_<port>), so a device's tailnet, LAN or public address is replaced with
+    its kind before the line is written. Loopback identifies nobody and stays."""
+    def sub(m):
+        try:
+            a = ipaddress.ip_address(".".join(m.group(i) for i in (1, 3, 4, 5)))
+        except ValueError:
+            return m.group(0)
+        if a.is_loopback or a.is_unspecified:
+            return m.group(0)
+        if a in ipaddress.ip_network("100.64.0.0/10"):
+            return "<tailnet-ip>"
+        return "<lan-ip>" if a.is_private else "<public-ip>"
+    return _ADDR.sub(sub, text)
+
+
 def _self_eval_write(block):
     """Append one block to the ledger. A failed write is logged and never
     raised: the evaluation must not be able to kill the evaluator."""
+    block = _mask_addresses(block)
     try:
         os.makedirs(os.path.dirname(SELF_EVAL_PATH), exist_ok=True)
         fresh = not os.path.exists(SELF_EVAL_PATH)

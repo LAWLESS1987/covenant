@@ -20,7 +20,7 @@ curl -sL https://raw.githubusercontent.com/LAWLESS1987/covenant/main/mobile/inst
 ```
 
 That installs the packages, clones or updates this repository, puts a
-button on your home screen (with Termux:Widget), and starts the node. Put `PC_PEER=10.0.0.174:5001`
+button on your home screen (with Termux:Widget), and starts the node. Put `PC_PEER=<lan-ip>:5001`
 (your PC's address) in front of it to peer with a PC on the same Wi-Fi; without it the node
 runs alone from the canonical genesis and converges when a peer appears. This project would
 rather you read before you run: `curl -sLO .../mobile/install.sh`, then `less install.sh`,
@@ -106,7 +106,7 @@ variables, or edit the defaults at the top of the script:
 
 | variable | default | meaning |
 |---|---|---|
-| `PC_PEER` | empty | a peer's P2P address (API port plus one), e.g. `10.0.0.174:5001`; empty runs the node alone until a peer appears |
+| `PC_PEER` | empty | a peer's P2P address (API port plus one), e.g. `<lan-ip>:5001`; empty runs the node alone until a peer appears |
 | `PHONE_PORT` | `5000` | the phone node's API port; it also takes 5001 and **5011** |
 | `NODE_ID` | `phone` | the name the node signs with |
 

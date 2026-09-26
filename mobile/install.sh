@@ -9,7 +9,7 @@
 #   less install.sh && sh install.sh
 #
 # Knobs (environment, all optional):
-#   PC_PEER      a peer's P2P address (API port + 1), e.g. 10.0.0.174:5001. Empty = no
+#   PC_PEER      a peer's P2P address (API port + 1), e.g. 192.168.1.50:5001. Empty = no
 #                peer: the node runs alone from the canonical genesis and converges when
 #                a peer appears. Nothing here invents a peer for you.
 #   NODE_ID      the name the node signs with (default phone)

@@ -121,9 +121,9 @@ def fake_post(host, port, path, payload, timeout):
                             "fixed": [], "still_needs_a_person": []})
 
 
-p = H.heal_peer("100.86.158.1", 5000, ledger_path=LEDGER, post=fake_post)
+p = H.heal_peer("100.72.0.10", 5000, ledger_path=LEDGER, post=fake_post)
 check("HL1.12 heal_peer presses the PEER'S OWN button (/m/heal) and passes no remedy of its own",
-      POSTED == [("100.86.158.1", 5000, "/m/heal", {"dry_run": False})], POSTED)
+      POSTED == [("100.72.0.10", 5000, "/m/heal", {"dry_run": False})], POSTED)
 check("HL1.13 and reports back what the peer said it did", p["ok"] is True and "nothing was wrong" in p["summary"])
 
 

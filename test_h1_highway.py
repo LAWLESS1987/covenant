@@ -599,7 +599,7 @@ def main():
 
     r = client.get("/hwy/state", environ_base={"REMOTE_ADDR": "192.168.1.50"})
     check("H1k /hwy/state refuses a LAN address", r.status_code == 403, str(r.status_code))
-    r = client.get("/hwy/state", environ_base={"REMOTE_ADDR": "100.86.158.1"})
+    r = client.get("/hwy/state", environ_base={"REMOTE_ADDR": "100.72.0.10"})
     body = r.get_json() or {}
     check("H1k /hwy/state answers the tailnet", r.status_code == 200, str(r.status_code))
     check("H1k ...with states and a recent-row shape, nothing wider",
@@ -609,7 +609,7 @@ def main():
           json.dumps(body)[:120])
 
     r = client.post("/hwy/report", data=json.dumps({"node": "peer", "conditions": {}}),
-                    environ_base={"REMOTE_ADDR": "100.86.158.1"})
+                    environ_base={"REMOTE_ADDR": "100.72.0.10"})
     check("H1l /hwy/report refuses an unsigned offer", r.status_code == 403, str(r.status_code))
 
     seen = {}
@@ -620,7 +620,7 @@ def main():
         import base64 as _b64
         hdrs = {"X-Operator-Pubkey": _b64.b64encode(b"-----BEGIN PUBLIC KEY-----\\n").decode()}
         r = client.post("/hwy/report", data=json.dumps({"node": "peer", "conditions": {"log_bloat": H.PRESENT}}),
-                        headers=hdrs, environ_base={"REMOTE_ADDR": "100.86.158.1"})
+                        headers=hdrs, environ_base={"REMOTE_ADDR": "100.72.0.10"})
         check("H1l a signed offer is accepted", r.status_code == 200, str(r.status_code))
         check("H1l ...and is considered with dry_run FORCED true -- a packet cannot make this node act",
               seen.get("dry_run") is True, json.dumps(seen)[:120])

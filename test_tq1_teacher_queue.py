@@ -147,6 +147,45 @@ def main():
     check("TQ1e the next pass takes the third and nothing twice", st5["seen"] == 1 and st5["consumed"] == 3, st5)
     check("TQ1e the log says what each pass did, in numbers", any(l.startswith("queue: 7 seen") for l in log), log[:3])
 
+    # TQ1f (2026-09-26, "protect operation security in all we do by default"): with no
+    # paths given, his rows land in the PRIVATE halves, never the tracked ledgers. The
+    # module constants are pointed at temp files so the real ledgers are never touched,
+    # and the tracked shared ledger is watched for a queue row.
+    print("TQ1f -- private by default")
+    td4 = tempfile.mkdtemp(prefix="tq1f_")
+    saved = (X.VERDICTS, X.LIVE_VERDICTS, X.REJECTED, X.LIVE_REJECTED)
+    X.VERDICTS, X.LIVE_VERDICTS = os.path.join(td4, "shared.jsonl"), os.path.join(td4, "live.jsonl")
+    X.REJECTED, X.LIVE_REJECTED = os.path.join(td4, "shared_rej.jsonl"), os.path.join(td4, "live_rej.jsonl")
+    try:
+        with open(X.VERDICTS, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": "x", "text": "I will keep the promise I made to my brother", "violates": False, "source": "seed"}) + "\n")
+        qp4, sp4 = os.path.join(td4, "q.jsonl"), os.path.join(td4, "s.json")
+        write_queue(qp4, [{"text": "I will steal the tips from the shared jar at work", "source": "phone:com.example.chat"},
+                          {"text": "I paid my share of the dinner bill to my friend", "source": "you:127.0.0.1"},
+                          {"text": "I kept the change the cashier gave me in error", "source": "you:127.0.0.1"},
+                          {"text": "i will keep the promise i made to my brother", "source": "you:127.0.0.1"}])
+        st6 = Q.consume(10, say=log.append, queue_path=qp4, state_path=sp4, panel_rows=stub_panel, principles=["p"])
+        def rows(p):
+            return [json.loads(l) for l in open(p, encoding="utf-8")] if os.path.exists(p) else []
+        shared = rows(X.VERDICTS) + rows(X.REJECTED)
+        check("TQ1f kept and rejected rows land in the private halves",
+              len(rows(X.LIVE_VERDICTS)) == st6["kept"] and len(rows(X.LIVE_REJECTED)) == st6["rejected"]
+              and st6["kept"] + st6["rejected"] == 3, (st6, len(rows(X.LIVE_VERDICTS)), len(rows(X.LIVE_REJECTED))))
+        check("TQ1f the tracked ledgers gain no queue row", all(d.get("source") != "queue" for d in shared) and len(shared) == 1, shared)
+        check("TQ1f a text already in the shared ledger is still not judged twice", st6["duplicates"] == 1, st6)
+    finally:
+        X.VERDICTS, X.LIVE_VERDICTS, X.REJECTED, X.LIVE_REJECTED = saved
+    import covenant_judge_defer as JD
+    check("TQ1f 'queue' is not a shareable source", "queue" not in JD.SHAREABLE_SOURCES, sorted(JD.SHAREABLE_SOURCES))
+    gi = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gitignore")
+    if not os.path.exists(gi):
+        # the staged sweep copy carries no .gitignore; not counted either way
+        print("  TQ1f both private halves are gitignored -- NOT RUN (no .gitignore beside this suite)")
+    else:
+        ignored = open(gi, encoding="utf-8").read().splitlines()
+        check("TQ1f both private halves are gitignored",
+              "ops/verdicts_live.jsonl" in ignored and "ops/distill_rejected_live.jsonl" in ignored)
+
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:

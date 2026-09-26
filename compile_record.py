@@ -51,9 +51,9 @@ THE THREE MARKS, used on every line
   be written by a person who is willing to sign it.
 
 USE
-  python compile_record.py --topic "aunt" "hospital" "2024"
+  python compile_record.py --topic "invoice" "contract" "2024"
   python compile_record.py --import path\\to\\chatgpt-export.zip
-  python compile_record.py --topic "false imprisonment" --out record.md
+  python compile_record.py --topic "contract dispute" --out record.md
 
 LICENCE: Apache-2.0.
 """
@@ -77,7 +77,7 @@ LOCAL_SOURCES = [
 ]
 
 # The session doing the compiling must not appear in it. Measured: a search
-# for "false imprisonment" returned 6 passages, and every one was THIS
+# for a legal term returned 6 passages, and every one was THIS
 # conversation asking for the search. A tool that surfaces the request as
 # though it were evidence is manufacturing the thing it was asked to find --
 # the same class of error as counting a tool's boilerplate as testimony.
@@ -88,7 +88,7 @@ MAX_HITS_PER_FILE = 6  # so one chatty file cannot bury the rest
 
 # Text that is present in EVERY session because a tool injected it, and which
 # therefore proves nothing about what anyone said. Measured on 2026-08-31: a
-# search for "hospice" and "nursing home" returned five sessions each, and
+# search for two care-related terms returned five sessions each, and
 # every hit was the NPI healthcare-provider tool description sitting in the
 # system prompt. A compilation that reported those as evidence would have been
 # worse than one that found nothing.

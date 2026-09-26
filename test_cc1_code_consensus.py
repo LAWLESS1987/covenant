@@ -118,7 +118,7 @@ def main():
     import test_pc1_sister_interface as PC1
     m = PC1.fresh_master("CC1", 5398)
     client = m.api.app.test_client()
-    PHONE, LAN = "100.86.158.1", "192.168.1.50"
+    PHONE, LAN = "100.72.0.10", "192.168.1.50"
     r = PC1.post(client, "/m/code", PHONE, {"text": "STUB>> proposer: is this loop safe?", "excerpt": "for x in q: q.append(x)"})
     j = r.get_json() or {}
     check("CC1c /m/code from the tailnet: 200 with the id, the council's answer (the stub), the cycle and its seats",

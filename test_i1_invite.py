@@ -128,7 +128,7 @@ def line_checks():
           "PC_PEER" in msg and all(v in ("...", "") for v in assigned), str(assigned))
 
     # BROKEN ON PURPOSE: prove I5-I7 can fail, so their green is earned.
-    poisoned = msg + "\n  PC_PEER=100.112.171.24:5001  token=abc123"
+    poisoned = msg + "\n  PC_PEER=100.72.0.50:5001  token=abc123"
     would_catch = bool(re.search(r"\b100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.", poisoned)) \
         and any(s in poisoned for s in FORBIDDEN_SUBSTRINGS)
     check("I8 and those checks DO fire on a message that leaks both",

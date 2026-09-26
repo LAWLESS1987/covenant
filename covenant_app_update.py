@@ -209,7 +209,7 @@ def requests_tail(n=20, route=None):
 # route, not by intent), totalling 2,574,307,896 bytes. Over the same window
 # the phone's own /checkin reported `0.1.475+13b946a` on all 200 of its rows.
 # Not one changed. A second, independent route agrees: `tailscale status` shows
-# tx 2,873,815,540 bytes to lawrences-s25, the extra being partials, check-ins,
+# tx 2,873,815,540 bytes to <device-name>, the extra being partials, check-ins,
 # headers and the four transfers below.
 #
 # CORRECTED, and the correction belongs here. This first read "61 deliveries,

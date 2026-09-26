@@ -46,6 +46,20 @@ HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 PROD = os.path.join(HERE, "covenant_prod.bat")
 WATCHDOG = os.path.join(HERE, "covenant_watchdog.py")
 RESTART = os.path.join(HERE, "AB_RESTART_NODES.bat")
+# Node A's off-box peers (the phone's tailnet address) live in this gitignored file,
+# read by BOTH launchers (2026-09-26 OPSEC sweep): the public files carry no address.
+# N5 still compares the two launchers' TEXT; the shared file is resolved the same way
+# for each, so dropping it from either launcher is a mismatch here.
+LOCAL_PEERS = os.path.join(HERE, "ops", "local_peers.txt")
+
+
+def local_peers():
+    try:
+        with open(LOCAL_PEERS, encoding="utf-8") as fh:
+            s = fh.readline().strip().strip(",")
+    except OSError:
+        return []
+    return [p for p in s.split(",") if p]
 
 _passed, _failed = 0, 0
 
@@ -113,10 +127,13 @@ def parse_prod():
             continue
         api, nid, genesis, peers = m.group(1), m.group(2), m.group(3), m.group(4)
         d = DBPATH.search(line)
+        plist = [] if not peers else [p for p in peers.split(",") if p]
+        if m.group(4) is not None and line[m.end():].startswith("%A_EXTRA%"):
+            plist += local_peers()
         nodes[nid] = {
             "api": int(api),
             "genesis": genesis,
-            "peers": [] if not peers else [p for p in peers.split(",") if p],
+            "peers": plist,
             "db": d.group(1) if d else None,
         }
     return nodes
@@ -129,10 +146,11 @@ def parse_watchdog():
     out = {}
     for m in re.finditer(
             r'\{"id":\s*"(\w+)",\s*"port":\s*(\d+),\s*"db":\s*"([^"]+)",'
-            r'\s*"key":\s*"([^"]+)",\s*"peers":\s*"([^"]*)"\}', block):
+            r'\s*"key":\s*"([^"]+)",\s*"peers":\s*"([^"]*)"(\s*\+\s*_local_peers\(\))?\}', block):
         out[m.group(1)] = {"api": int(m.group(2)), "db": m.group(3),
                            "key": m.group(4),
-                           "peers": [p for p in m.group(5).split(",") if p]}
+                           "peers": [p for p in m.group(5).split(",") if p]
+                                    + (local_peers() if m.group(6) else [])}
     return out
 
 
@@ -160,7 +178,7 @@ def main():
     # HOST-AWARE SINCE 2026-09-14. These checks used to do
     # `int(peer.rsplit(":", 1)[1])` and throw the host away, which is only safe
     # while every peer is on loopback. The operator's phone was added to node A
-    # as 100.86.158.1:5001, and 5001 IS node A's own P2P port -- so N2 read it
+    # as 100.72.0.10:5001, and 5001 IS node A's own P2P port -- so N2 read it
     # as "A peers with A", N3 gained a self-edge, and the suite reported 11/11
     # on a graph that was wrong. It passed by coincidence of port numbers, and
     # the next remote peer whose port happened NOT to collide would have been
@@ -196,7 +214,7 @@ def main():
                 # PROTECTIVE, and the answer was no: planting
                 # `127.0.0.1:5001` in node A's peers -- node A's own P2P port --
                 # left every check in this file green. Before the host-aware
-                # fix above, the phone's off-box `100.86.158.1:5001` was being
+                # fix above, the phone's off-box `100.72.0.10:5001` was being
                 # MISREAD as exactly this and passing; the fix stopped the
                 # misreading without ever making the real thing fail, which is
                 # a report that got truer while protecting nothing.

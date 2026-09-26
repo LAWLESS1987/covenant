@@ -1,0 +1,10 @@
+{
+ "why": "Values he publishes on purpose. sha256 of the lowercased value; the list republishes nothing. tools/opsec_scan.py skips these. Add one only on his word, with where he published it.",
+ "public": [
+  {
+   "sha256": "69149cef37196c0cd0311736eaa69ac8765969c6936cc6df98a851d80a9e6ba1",
+   "what": "his contact e-mail (also his tailnet's name)",
+   "where": "docs/CASE_STUDY_SELF_REPORT.md:103, in his words: the address is published here by me"
+  }
+ ]
+}

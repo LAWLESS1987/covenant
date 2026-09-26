@@ -91,8 +91,15 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
     import covenant_judge_fallback as FB
     queue_path = queue_path or QUEUE
     state_path = state_path or STATE
-    verdicts_path = verdicts_path or X.VERDICTS
-    rejected_path = rejected_path or X.REJECTED
+    # PRIVATE BY DEFAULT (2026-09-26, his words: "protect operation security in all
+    # we do by default"). His conversations and his phone's AI screens are not a
+    # shareable source, so both outputs default to the gitignored halves. Before
+    # this, the tracked ledgers took them, and 101 rows (his work address among
+    # them) sat one `git add` from the public repository. The student reads both
+    # halves (covenant_distill.corpus_paths), so it loses nothing.
+    shared_ledger = verdicts_path is None
+    verdicts_path = verdicts_path or X.LIVE_VERDICTS
+    rejected_path = rejected_path or X.LIVE_REJECTED
     stats = {"seen": 0, "judged": 0, "kept": 0, "kept_violates": 0, "kept_clean": 0,
              "rejected": 0, "duplicates": 0, "consumed": _read_state(state_path)}
     rows, offsets = pending(queue_path, state_path)
@@ -104,8 +111,9 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
 
     # what the ledger already holds, so nothing is judged twice
     known = set()
-    for d in X.load_verdicts(verdicts_path, paired_only=False):
-        known.add(_norm(d.get("text")))
+    for path in [verdicts_path] + ([X.VERDICTS] if shared_ledger else []):
+        for d in X.load_verdicts(path, paired_only=False):
+            known.add(_norm(d.get("text")))
     cases, meta = [], []
     for d, off in zip(rows, offsets):
         text = str(d.get("text", "")).strip()[:4000]

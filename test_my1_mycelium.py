@@ -71,7 +71,7 @@ def main():
     LAN = "192.168.1.50"
 
     print("MY1a -- the tailnet and the unsigned")
-    ok, addr, who, how = MY.admit(Req("100.86.158.1"), body, tail, signers_path=signers)
+    ok, addr, who, how = MY.admit(Req("100.72.0.10"), body, tail, signers_path=signers)
     check("MY1a a tailnet address is admitted as before", ok and how == "tailnet" and who == "tailnet")
     ok, addr, who, how = MY.admit(Req(LAN), body, tail, signers_path=signers)
     check("MY1a an unsigned request off the tailnet is refused as before, and leaves no row", not ok and "unsigned" in how and not os.path.exists(os.environ["COVENANT_MYCELIUM_LEDGER"]), how)

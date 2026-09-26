@@ -352,10 +352,10 @@ def _self_test() -> int:
 
     for bad, why in (
             ({"k": "x", "positions": {"a": 1}}, "P2 a positions field is refused"),
-            ({"k": "x", "c": "1", "note": "$3,860.99 total"}, "P3 a dollar figure is refused"),
+            ({"k": "x", "c": "1", "note": "$1,234.56 total"}, "P3 a dollar figure is refused"),
             ({"k": "x", "XRP": 3155.41}, "P4 a ticker field is refused"),
             ({"k": "x", "c": "1", "who": "a@b.com"}, "P5 an email is refused"),
-            ({"k": "x", "c": "1", "from": "73.150.40.24"}, "P6 an IP is refused"),
+            ({"k": "x", "c": "1", "from": "203.0.113.24"}, "P6 an IP is refused"),
             ({"k": "x", "c": "1", "key": "-----BEGIN EC PRIVATE KEY-----"}, "P7 key material is refused"),
             ({"k": "x", "c": "1", "pad": "z" * 600}, "P8 an oversized payload is refused")):
         try:

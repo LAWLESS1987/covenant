@@ -42,7 +42,7 @@ set /p SRC=  export:
 goto END
 :SEARCH
 echo.
-echo   Terms must ALL appear in a passage. Example:  aunt hospital 2024
+echo   Terms must ALL appear in a passage. Example:  invoice contract 2024
 set /p TERMS=  terms:
 "%PY%" compile_record.py --topic %TERMS% --out RECORD_OUT.md
 echo.

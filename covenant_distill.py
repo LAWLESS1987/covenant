@@ -90,6 +90,12 @@ def corpus_paths():
     ledger is the normal case, not an error."""
     return [q for q in (VERDICTS, LIVE_VERDICTS) if os.path.exists(q)] or [VERDICTS]
 REJECTED = os.path.join(HERE, "ops", "distill_rejected.jsonl")
+# The local half of the rejected file (2026-09-26, his words: "protect operation
+# security in all we do by default"). Rows from his own conversations and his
+# phone's AI apps (source "queue") are not a shareable source
+# (covenant_judge_defer.SHAREABLE_SOURCES), so a rejected one lands here, never
+# in the tracked file above. Gitignored.
+LIVE_REJECTED = os.path.join(HERE, "ops", "distill_rejected_live.jsonl")
 REPORT = os.path.join(HERE, "ops", "DISTILL.md")
 MODEL_PATH = FB.MODEL_PATH
 CANDIDATE = os.path.join(HERE, "fallback_model.candidate.json")

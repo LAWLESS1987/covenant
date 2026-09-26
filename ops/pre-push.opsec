@@ -1,0 +1,20 @@
+#!/bin/sh
+# OPSEC GUARD at the push (2026-09-26, his words: "protect operation security in all
+# we do by default").
+# Install once:  cp ops/pre-push.opsec .git/hooks/pre-push
+#
+# Every line the outgoing commits ADD, commit by commit, and every commit message is
+# checked against his identifiers -- read at run time from where they live privately
+# (Tailscale's status, the Syncthing config, the Wi-Fi name, the gitignored money
+# grant, private/bystanders.txt) by tools/opsec_scan.py. A hit refuses the push and
+# names file:line with the value masked. The commit stays local; nothing is lost.
+#
+# It sits at the PUSH, not the commit, on purpose: .git/hooks/pre-commit must never
+# block a commit (its own rule), and post-commit pushes every commit at once -- so the
+# push is the moment something becomes public, and the only place a refusal costs
+# nothing but a second push.
+#
+# His override, for one push, logged to ops/opsec_overrides.jsonl (gitignored):
+#   COVENANT_OPSEC_ALLOW=1 git push
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+exec python "$root/tools/opsec_scan.py" --pre-push "$@"

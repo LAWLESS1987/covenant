@@ -1783,7 +1783,7 @@ correctly is not function.**
   stays). It fired at the same minute, covered two of the nine symbols, used
   WebFetch for both the prices and the ntfy push, and is the task the 08-21
   entry proved fails even with literal URLs in its prompt.
-- `pc/daily_state.json` seeded with a real reading ($3,201.64 at 14:19 UTC), so
+- `pc/daily_state.json` seeded with a real reading (value kept in the private state file; 14:19 UTC), so
   tomorrow's run has a genuine start-of-day inside 48 h instead of a guard that
   blocks for want of data.
 - **`TRIGGER_PROMPT_PROPOSED.md` APPLIED.** Eight runs wrote proposals into that

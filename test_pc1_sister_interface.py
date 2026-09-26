@@ -70,7 +70,7 @@ def main():
     client = m.api.app.test_client()
     # ---- A194 (2026-09-21, his words: "I want it to be a 3d interactive app ... with a symbol that
     # mirrors the phone app"): the 3D page and its state, tailnet only, the phone's icon inlined.
-    r3 = get(client, "/pc/3d", "100.86.158.1")
+    r3 = get(client, "/pc/3d", "100.72.0.10")
     b3 = r3.get_data(as_text=True)
     check("PC1z /pc/3d answers the tailnet 200 as HTML with the three.js scene, the council talk box and the spoken answer",
           r3.status_code == 200 and "text/html" in r3.headers.get("Content-Type", "") and "three.module.js" in b3 and "/pc/council" in b3
@@ -78,7 +78,7 @@ def main():
     check("PC1z the page carries the phone app's symbol path for path (the Tree of Life's canopy colours) and names this node",
           "#4FB08E" in b3 and "#175A48" in b3 and "M54,20 C68,20 78,28 80,38" in b3 and "__NODE__" not in b3 and "__SYMBOL__" not in b3)
     check("PC1z /pc/3d refuses a LAN address 403", get(client, "/pc/3d", "192.168.1.50").status_code == 403)
-    rs = get(client, "/pc/3d/state", "100.86.158.1")
+    rs = get(client, "/pc/3d/state", "100.72.0.10")
     js = rs.get_json() or {}
     check("PC1z /pc/3d/state answers the tailnet with this node, its peers, the voice and the immunity state",
           rs.status_code == 200 and js.get("self", {}).get("node_id") and "chain_height" in js.get("self", {}) and "peers" in js and "voice" in js and "immunity" in js, js)
@@ -103,7 +103,7 @@ def main():
         return bad
     check("PC1z2 the checker measures something: it flags a line break inside a quoted string",
           len(broken_script_lines("<script>t+='\n\nFIXED:\n'+x;</script>")) >= 1)
-    pages = {p: get(client, p, "100.86.158.1").get_data(as_text=True) for p in ("/pc/3d", "/pc")}
+    pages = {p: get(client, p, "100.72.0.10").get_data(as_text=True) for p in ("/pc/3d", "/pc")}
     bad = {p: broken_script_lines(h) for p, h in pages.items()}
     check("PC1z2 every inline script the PC serves (/pc/3d, /pc) parses: no quoted string spans a line",
           not any(bad.values()), bad)
@@ -124,13 +124,13 @@ def main():
     try:
         P3.STATE_TTL = -1
         _ur.urlopen = lambda url, timeout=None: _Resp(json.dumps({"node_id": "X", "chain_height": 7, "peers": 2, "source_sha256": "ab" * 32}).encode())
-        mesh = (get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("mesh", [])
+        mesh = (get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("mesh", [])
         check("PC1z3 a node whose /health reports peers as a count is a live orb with that count, not down",
               len(mesh) == 3 and all(not x.get("down") and x.get("peers") == 2 and x.get("chain_height") == 7 for x in mesh), mesh)
         def _refuse(url, timeout=None):
             raise ConnectionRefusedError("refused")
         _ur.urlopen = _refuse
-        mesh = (get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("mesh", [])
+        mesh = (get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("mesh", [])
         check("PC1z3 a node that cannot be read is down WITH the reason, never a bare guess",
               len(mesh) == 3 and all(x.get("down") and "ConnectionRefusedError" in str(x.get("why")) for x in mesh), mesh)
     finally:
@@ -149,12 +149,12 @@ def main():
         P3.STATE_TTL = -1
         HW.sense = lambda only=None, **kw: (calls.append(1), {k: {"state": "absent"} for k in (only or want)})[1]
         HW.save_last_sense({k: {"state": "present" if k == "sweep_red" else "absent"} for k in want}, path=snap)
-        hw = ((get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("detail") or {}).get("highway")
+        hw = ((get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("detail") or {}).get("highway")
         check("PC1z4 a fresh pass from the watchdog is used as is: its states come back and sense() is not called",
               calls == [] and hw and hw.get("sweep_red") == "present", (calls, hw))
         with open(snap, "w", encoding="utf-8") as fh:
             json.dump({"at": _t.time() - 3600, "conditions": {k: "present" for k in want}}, fh)
-        hw = ((get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("detail") or {}).get("highway")
+        hw = ((get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("detail") or {}).get("highway")
         check("PC1z4 a stale pass is not trusted: the page senses for itself, as before",
               calls == [1] and hw and hw.get("sweep_red") == "absent", (calls, hw))
         # PC1z5 (2026-09-26): a pass stamped a hair in the future (the stamp is rounded) is still
@@ -166,7 +166,7 @@ def main():
     finally:
         HW.sense, P3.STATE_TTL = real_sense, real_ttl
         os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)
-    LOOP, PHONE, LAN = "127.0.0.1", "100.86.158.1", "192.168.1.50"
+    LOOP, PHONE, LAN = "127.0.0.1", "100.72.0.10", "192.168.1.50"
 
     print("PC1a -- the page and its gate")
     r = get(client, "/pc", LOOP)

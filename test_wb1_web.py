@@ -61,7 +61,7 @@ for url, why in [("file:///etc/passwd", "scheme"), ("ftp://example.com/x", "sche
                  ("https://user:pw@example.com/", "credential"), ("http://localhost/", "not the public internet"),
                  ("http://127.0.0.1/", "not the public internet"), ("http://10.1.2.3/", "not the public internet"),
                  ("http://192.168.1.1/", "not the public internet"), ("http://169.254.169.254/latest/meta-data/", "not the public internet"),
-                 ("http://100.112.171.24/", "not the public internet"), ("http://example.com:5000/health", "node's own ports"),
+                 ("http://100.72.0.50/", "not the public internet"), ("http://example.com:5000/health", "node's own ports"),
                  ("http://example.com:5061/", "node's own ports"), ("garbage", "scheme")]:
     okk, reason = W.check_url(url)
     check("WB1.3 refused: %-40s (%s)" % (url[:40], why), okk is False and why in reason, reason)

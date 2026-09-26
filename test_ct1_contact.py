@@ -103,7 +103,7 @@ def main():
     m = cov.CovenantUnifiedMaster("CT1", host="127.0.0.1", port=5399, p2p_port=5400, db_path=tmp)
     m.add_genesis_block()
     client = m.api.app.test_client()
-    r = client.post("/checkin", data=json.dumps({"node_id": "phone"}), content_type="application/json", environ_base={"REMOTE_ADDR": "100.86.158.1"})
+    r = client.post("/checkin", data=json.dumps({"node_id": "phone"}), content_type="application/json", environ_base={"REMOTE_ADDR": "100.72.0.10"})
     check("CT1c an unsigned check-in is still refused at the route (the line rides a signed request only)", r.status_code in (403, 503), r.status_code)
 
     print("CT1d -- answered")
@@ -115,11 +115,11 @@ def main():
     early = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(t_seen - 600))
     late = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(t_seen + 60))
     with io.open(al, "w", encoding="utf-8") as fh:
-        fh.write(json.dumps({"t": early, "kind": "agent", "from": "100.112.171.24", "text": "earlier, unrelated"}) + "\n")
+        fh.write(json.dumps({"t": early, "kind": "agent", "from": "100.72.0.50", "text": "earlier, unrelated"}) + "\n")
         fh.write(json.dumps({"t": late, "kind": "agent", "from": "127.0.0.1", "text": "from the PC, not him"}) + "\n")
     check("CT1d an ask before the message, or from loopback, is not an answer", CT.answered(ask_log=al) == [])
     with io.open(al, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"t": late, "kind": "agent", "from": "100.112.171.24", "text": "no, keep it disarmed"}) + "\n")
+        fh.write(json.dumps({"t": late, "kind": "agent", "from": "100.72.0.50", "text": "no, keep it disarmed"}) + "\n")
     got = CT.answered(ask_log=al)
     check("CT1d an ask from the tailnet after delivery is recorded as the answer, once",
           len(got) >= 1 and got[-1][1]["text"] == "no, keep it disarmed" and CT.answered(ask_log=al) == [], got)

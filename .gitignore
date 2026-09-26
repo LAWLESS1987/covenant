@@ -253,6 +253,22 @@ judged_by_student.jsonl
 # of it while the repository carries only what is not the submitter's to
 # publish. Same reasoning as the entry above. Pinned by test_a91.
 ops/verdicts_live.jsonl
+# Its twin for rejected rows (2026-09-26, "protect operation security in all we
+# do by default"): the teacher queue's rows are his conversations and his phone's
+# AI screens, never a shareable source. Pinned by TQ1f.
+ops/distill_rejected_live.jsonl
+# Runtime state that was untracked but NOT ignored, so one `git add -A` would have
+# published it (the 2026-09-26 OPSEC sweep): heal.jsonl carries the phone's and the
+# PC's tailnet addresses; the rest are this machine's own state.
+ops/heal.jsonl
+ops/immune.jsonl
+ops/own_work_state.json
+ops/pause/
+# Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
+# and covenant_prod.bat alike, so neither public file carries the address.
+ops/local_peers.txt
+# The pre-push guard's record of pushes let through on his say (masked values only).
+ops/opsec_overrides.jsonl
 
 # The operator's standing decision about the ethics quorum (2026-09-11). This
 # repository is public and is meant to be read as GUIDANCE, and a policy file
