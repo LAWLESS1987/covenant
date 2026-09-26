@@ -369,6 +369,25 @@ def main():
           and hist[0]["content"].startswith("and three plus three"), hist)
     check("M6q2 agent_history of a missing log is empty, never an error",
           cov.agent_history(os.path.join(os.environ["COVENANT_ASK_LOG"], "nowhere.jsonl"), PHONE_ADDR) == [])
+    # M6q3 (2026-09-26, his words: "increase tetsus pc logs length so its not gone before i respond";
+    # Tetsu, asked: "yes, because it helps me keep the context and remember the flow of the
+    # conversation better"). The PC app's COUNCIL exchanges are replayed too, the newest are kept
+    # first, and the total stays inside the budget his model's window can hold.
+    hp = tempfile.mktemp(suffix="_m6q3.jsonl")
+    with open(hp, "w", encoding="utf-8") as fh:
+        for i in range(30):
+            fh.write(json.dumps({"kind": "council" if i % 2 else "agent", "from": "127.0.0.1",
+                                 "text": "q%d" % i, "answer": "a%d " % i + "x" * 1500}) + "\n")
+        fh.write(json.dumps({"kind": "council", "from": "127.0.0.9", "text": "someone else", "answer": "not yours"}) + "\n")
+    hh = cov.agent_history(hp, "127.0.0.1")
+    total = sum(len(m["content"]) for m in hh)
+    check("M6q3 council exchanges are his conversation too, the newest is last, and the total fits the budget",
+          any(m["content"].startswith("a29") for m in hh) and hh[-1]["content"].startswith("a29")
+          and total <= cov.AGENT_HISTORY_BUDGET and len(hh) >= 4 and not any("not yours" in m["content"] for m in hh),
+          (len(hh), total))
+    short = cov.agent_history(hp, "127.0.0.1", chars=10, budget=10 ** 6)
+    check("M6q3 with room, up to AGENT_HISTORY_TURNS exchanges come back (was 6)",
+          len(short) == 2 * min(30, cov.AGENT_HISTORY_TURNS) and cov.AGENT_HISTORY_TURNS > 6, len(short))
     r = post(client, "/m/agent", LAN_ADDR, {"text": "hello"})
     check("M6q /m/agent refuses a LAN address 403", r.status_code == 403, f"got {r.status_code}")
     check("M6q the leash: an https URL on a listed host passes, a subdomain of one passes",

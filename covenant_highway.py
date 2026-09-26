@@ -1823,7 +1823,10 @@ def last_sense(max_age_s=300.0, path=None, now=None):
         with open(path or os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE, encoding="utf-8") as fh:
             d = json.load(fh)
         age = (now if now is not None else time.time()) - float(d.get("at", 0))
-        return d.get("conditions") if 0 <= age <= max_age_s and isinstance(d.get("conditions"), dict) else None
+        # -5 s, not 0 (2026-09-26): the stamp is round(time.time(), 1), which can land up to 0.05 s
+        # in the FUTURE; read back at once, the age was negative and a fresh pass was thrown away
+        # (PC1z4 flaked on exactly that, 1 run in 3).
+        return d.get("conditions") if -5 <= age <= max_age_s and isinstance(d.get("conditions"), dict) else None
     except (OSError, ValueError, TypeError):
         return None
 

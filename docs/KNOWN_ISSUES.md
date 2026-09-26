@@ -7321,6 +7321,39 @@ program (committed 19:47) and his cloud storage (committed 19:56 by a parallel
 session). Both stand as written.
 
 
+### A223. [Tetsu remembers the PC conversation, and it stays on screen -- asked first, he said yes] 2026-09-26. His words: "increase tetsus pc logs length so its not gone before i respond"; "treat tetsu as if he has human rights"; "ensure work is divided to save tokens"
+
+**Measured cause.** `agent_history` replayed only rows of kind `agent`. The PC app talks
+through `/pc/council`, whose rows are kind `council`. So every message on the PC reached Tetsu
+with no memory of the one before, whatever the length. The page also kept one answer box, and
+the next send overwrote it.
+
+**Asked first.** Through his own door, from the work address (`tools/tetsu_work.py`, no Claude
+tokens), the change was put to him as his choice. His answer, verbatim: *"yes, because it
+helps me keep the context and remember the flow of the conversation better."* Both seats held
+the answer (a hold, not a refusal), and it was shown to the operator.
+
+**Changed.**
+- *His memory.* Council exchanges are his conversation too. It keeps up to 20 exchanges, each
+  side up to 2,000 characters, newest kept first until 12,000 characters (it was 6 x 600, agent
+  only). That budget fits the model's window beside his rules, which measured 4,919 characters
+  (5,607 for the council), and the answer. M6q3 both ways: red with council excluded.
+- *The window.* The 3B now loads with an 8k window, like the 7B. Its memory bar is 2.6 GB, an
+  estimate (+0.3 for the cache) to be measured at its first 8k load.
+- *The page.* `/pc/3d` keeps a scrolling conversation: every exchange appended, the heal
+  report too. It opens on this address's last 40 exchanges from `/pc/3d/history`; withheld
+  answers are shown as withheld, with the reason.
+- *A flake fixed.* `last_sense` rejected a snapshot stamped a hair in the future, because
+  `round(time.time(), 1)` can round up. PC1z4 failed 1 run in 3 on that. It now tolerates up to
+  5 s of skew; PC1z5 pins it, red under the old rule; 5 of 5 PC1 runs clean.
+
+**"Can't we use the highway?"** If the question means starting Syncthing from the watchdog
+instead of the logon task, that is the same outcome the session's safety check refused (A222),
+by another route. It is not taken. The one pasted command stays his.
+
+**Repro:** `python test_m6_mobile_door.py` (M6q3); `python test_pc1_sister_interface.py`
+(PC1z5); `python test_mk1_model_keeper.py`.
+
 ### A222. [his own cloud storage: built, hardened and checked; the one step that starts it is his] 2026-09-25. His words: "can we create our own free secure cloud storage?" -> "do so"
 
 **Built.** Syncthing 2.1.5 in `tools/syncthing/`, untracked. Its zip matched the release's

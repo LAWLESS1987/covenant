@@ -56,6 +56,7 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 #talk textarea{flex:1;min-height:44px;max-height:160px;resize:vertical;background:#0f1d2e;color:#E7F4EA;border:1px solid #2E8B6E66;border-radius:12px;padding:10px 12px;font:15px system-ui}
 #talk button{background:#2E8B6E;color:#fff;border:0;border-radius:12px;padding:12px 16px;font:600 15px system-ui;cursor:pointer}
 #answer{position:fixed;left:16px;right:16px;bottom:84px;max-height:38vh;overflow:auto;background:#10203390;backdrop-filter:blur(6px);border:1px solid #2E8B6E55;border-radius:14px;padding:12px 14px;white-space:pre-wrap;display:none}
+#answer .ln{margin:0 0 8px}#answer .you{color:#9fc7b0}#answer .heal{color:#e3c878}
 #nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
 </style></head><body>
 <canvas id="scene"></canvas>
@@ -69,23 +70,28 @@ const NODE='__NODE__';
 let state=null, voice={pitch:0.8,rate:0.95};
 async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');}catch(e){document.getElementById('live').textContent='state unreadable';}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
-async function send(){const q=document.getElementById('q');const t=q.value.trim();if(!t)return;const a=document.getElementById('answer');a.style.display='block';a.textContent='thinking…';try{const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});const j=await r.json();const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');a.textContent=txt;speak(txt);q.value='';}catch(e){a.textContent='no answer: '+e;}}
+// THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
+// its not gone before i respond"). Every exchange is appended, never replaced, and the page
+// opens with the earlier exchanges from this address read back from the log (/pc/3d/history).
+function line(who,text){const a=document.getElementById('answer');a.style.display='block';const d=document.createElement('div');d.className='ln '+who;d.textContent=(who==='you'?'you: ':(who==='heal'?'heal: ':'Tetsu: '))+text;a.appendChild(d);a.scrollTop=a.scrollHeight;return d;}
+async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');line('tetsu',x.withheld?'(withheld: '+(x.why||'')+')':(x.a||''));}}catch(e){}}
+async function send(){const q=document.getElementById('q');const t=q.value.trim();if(!t)return;q.value='';line('you',t);const pend=line('tetsu','thinking…');try{const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});const j=await r.json();const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');pend.textContent='Tetsu: '+txt;speak(txt);}catch(e){pend.textContent='Tetsu: no answer: '+e;}document.getElementById('answer').scrollTop=1e9;}
 document.getElementById('send').onclick=send;
 // A215 (his words: "Give me a one click self heal button on the pc and phone apps").
 // One press: the node runs covenant_heal, which runs the highway's own remedies
 // with the person's cooldown waived, and says what it fixed and what still needs him.
 async function heal(){const b=document.getElementById('heal');const a=document.getElementById('answer');
- b.disabled=true;const was=b.textContent;b.textContent='healing…';a.style.display='block';a.textContent='looking at everything that can go wrong…';
+ b.disabled=true;const was=b.textContent;b.textContent='healing…';const hl=line('heal','looking at everything that can go wrong…');
  try{const r=await fetch('/m/heal',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const j=await r.json();
   let t=j.summary||'no answer';
   if(j.fixed&&j.fixed.length)t+='\\n\\nFIXED:\\n'+j.fixed.map(x=>'  '+x.condition).join('\\n');
   if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='\\n\\nSTILL NEEDS YOU:\\n'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('\\n');
-  a.textContent=t;speak(j.summary||'');}
- catch(e){a.textContent='the heal could not be reached: '+e;}
+  hl.textContent='heal: '+t;speak(j.summary||'');}
+ catch(e){hl.textContent='heal: could not be reached: '+e;}
  b.disabled=false;b.textContent=was;}
 document.getElementById('heal').onclick=heal;
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
-getState();setInterval(getState,15000);
+getState();setInterval(getState,15000);loadHistory();
 </script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <script type="module">
@@ -158,6 +164,33 @@ def register(api, caller, refused, cov):
                     .replace("__VERSION__", str(getattr(cov, "COVENANT_VERSION", "")))
                     .replace("__SOURCE__", str(getattr(cov, "CORE_SOURCE_SHA12", "") or "unreadable")))
         return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+    @api.app.route("/pc/3d/history", methods=["GET"])
+    def pc_3d_history():
+        """This caller's last 40 exchanges with Tetsu (agent and council), oldest first, so the
+        page opens on the conversation (2026-09-26, "so its not gone before i respond").
+        Withheld answers are shown as withheld, with the reason, never dropped."""
+        ok, addr = caller()
+        if not ok:
+            return refused(addr)
+        path = os.environ.get("COVENANT_ASK_LOG") or os.path.join(HERE, "ops", "chat", "ask_log.jsonl")
+        turns = []
+        try:
+            with open(path, "rb") as fh:
+                fh.seek(0, 2)
+                fh.seek(max(0, fh.tell() - 1024 * 1024))
+                tail = fh.read().decode("utf-8", "replace")
+            for ln in tail.splitlines():
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                if r.get("kind") in ("agent", "council") and r.get("from") == addr:
+                    turns.append({"t": r.get("t"), "q": str(r.get("text", ""))[:4000], "a": str(r.get("answer", ""))[:4000],
+                                  "withheld": bool(r.get("withheld")), "why": str(r.get("message", ""))[:300] if r.get("withheld") else ""})
+        except OSError:
+            turns = []
+        return jsonify({"turns": turns[-40:]})
 
     _cache = {"t": 0.0, "body": None}
 

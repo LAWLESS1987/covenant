@@ -54,7 +54,7 @@ LOG = os.path.join(HERE, "logs", "model_server.log")
 # was listed at 6.0, a guess from the weight size).
 CANDIDATES = [
     ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
-    ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.3),
+    ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),     # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
 ]
 
 # KEEP THE PC FUNCTIONAL (2026-09-25, his words: "have to constantly optimize to keep the pc
@@ -179,7 +179,10 @@ def start(say=print):
     path, name, need = pick
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     threads = max(2, (os.cpu_count() or 4) - 2)                   # leave the nodes and the desk two threads
-    ctx = "8192" if need >= 5 else "4096"                        # a smaller cache for the small model on a tight PC
+    # 8k for both (2026-09-26): his longer conversation memory (up to 12,000 characters of
+    # history, agent_history) must fit beside the rules and the answer. The 3B's bar in
+    # CANDIDATES carries the larger cache.
+    ctx = "8192"
     args = [BIN, "-m", path, "--host", HOST, "--port", str(PORT), "-c", ctx, "-t", str(threads),
             "--no-webui", "--log-disable"]
     creation = 0x08000000 if os.name == "nt" else 0               # CREATE_NO_WINDOW

@@ -157,6 +157,12 @@ def main():
         hw = ((get(client, "/pc/3d/state", "100.86.158.1").get_json() or {}).get("detail") or {}).get("highway")
         check("PC1z4 a stale pass is not trusted: the page senses for itself, as before",
               calls == [1] and hw and hw.get("sweep_red") == "absent", (calls, hw))
+        # PC1z5 (2026-09-26): a pass stamped a hair in the future (the stamp is rounded) is still
+        # fresh -- the cause of PC1z4's 1-in-3 flake, pinned deterministically with an explicit now.
+        with open(snap, "w", encoding="utf-8") as fh:
+            json.dump({"at": 1000.1, "conditions": {"sweep_red": "present"}}, fh)
+        check("PC1z5 a pass stamped 0.05 s ahead of now (rounding) is fresh; one an hour old is not",
+              HW.last_sense(now=1000.05, path=snap) == {"sweep_red": "present"} and HW.last_sense(now=4600.1, path=snap) is None)
     finally:
         HW.sense, P3.STATE_TTL = real_sense, real_ttl
         os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)

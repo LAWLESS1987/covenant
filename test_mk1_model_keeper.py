@@ -90,13 +90,16 @@ def main():
         check("MK1f small up, 3.0 + 2.3 < the big one's bar: stays (already on the largest that fits)", ok is False and calls == [] and "already on the largest" in why, (ok, why))
 
         # (h) the plain pick honours the headroom for the big one only
+        big_need, small_need = M.CANDIDATES[0][1], M.CANDIDATES[-1][1]
+        points = (big_need + M.HEADROOM_GB + 0.5, big_need + M.HEADROOM_GB - 1.0, small_need + 0.1, small_need - 0.1)
         picks = {}
-        for f in (9.5, 8.0, 2.4, 2.0):
+        for f in points:
             M.free_gb = (lambda v: (lambda: v))(f)
             p = M.pick_model()
             picks[f] = p[1] if p else None
-        check("MK1h pick: 9.5 free -> big; 8.0 -> small (big needs 7.0 + headroom); 2.4 -> small (no headroom); 2.0 -> none",
-              picks == {9.5: big, 8.0: small, 2.4: small, 2.0: None}, picks)
+        check("MK1h pick: room for the big one plus headroom -> big; short of the headroom -> small; "
+              "just over the small one's need -> small (no headroom); just under -> none",
+              [picks[f] for f in points] == [big, small, small, None], picks)
 
         # (i) memory pressure puts an IDLE big model away; never mid-answer, never the small one
         stops = []

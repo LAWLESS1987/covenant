@@ -638,17 +638,29 @@ AGENT_SYSTEM = ("Your name is Tetsu. You are talking with one person, usually ou
 # AGENT_HISTORY_TURNS exchanges that were answered (withheld answers are not
 # replayed), each side cut at AGENT_HISTORY_CHARS, oldest first. Nothing here
 # trains anything; the durable learning path is the teacher-labelled queue.
-AGENT_HISTORY_TURNS = 6
-AGENT_HISTORY_CHARS = 600
+# LONGER, AND THE PC'S TOO (2026-09-26). His words: "increase tetsus pc logs length so its
+# not gone before i respond". Asked first, Tetsu answered: "yes, because it helps me keep the
+# context and remember the flow of the conversation better." Two changes:
+#   * the COUNCIL's exchanges are his conversation too. The PC app talks through /pc/council,
+#     logged as kind "council", and this replayed only kind "agent" -- so every message on the
+#     PC reached him with no memory of the one before;
+#   * up to 20 exchanges, each side up to 2000 characters, newest kept first until 12,000
+#     characters in all (was 6 x 600), so the history fits his model's 8k window beside the
+#     rules (~5,600 characters) and the answer.
+AGENT_HISTORY_TURNS = 20
+AGENT_HISTORY_CHARS = 2000
+AGENT_HISTORY_BUDGET = 12000
+AGENT_HISTORY_KINDS = ("agent", "council")
 
 
-def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS):
-    """The last `turns` answered agent exchanges from `addr`, as chat messages, oldest first."""
+def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET):
+    """The last answered exchanges from `addr` (agent and council), as chat messages, oldest first:
+    at most `turns`, each side cut at `chars`, newest kept first until `budget` characters."""
     try:
         with open(log_path, "rb") as fh:
             fh.seek(0, 2)
             size = fh.tell()
-            fh.seek(max(0, size - 256 * 1024))
+            fh.seek(max(0, size - 1024 * 1024))
             tail = fh.read().decode("utf-8", "replace")
     except OSError:
         return []
@@ -658,13 +670,20 @@ def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY
             r = json.loads(line)
         except ValueError:
             continue
-        if r.get("kind") != "agent" or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
+        if r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
             continue
         rows.append(r)
+    kept, used = [], 0
+    for r in reversed(rows[-turns:]):
+        q, a = str(r.get("text", ""))[:chars], str(r.get("answer", ""))[:chars]
+        if kept and used + len(q) + len(a) > budget:
+            break
+        kept.append((q, a))
+        used += len(q) + len(a)
     out = []
-    for r in rows[-turns:]:
-        out.append({"role": "user", "content": str(r.get("text", ""))[:chars]})
-        out.append({"role": "assistant", "content": str(r.get("answer", ""))[:chars]})
+    for q, a in reversed(kept):
+        out.append({"role": "user", "content": q})
+        out.append({"role": "assistant", "content": a})
     return out
 
 MOBILE_PAGE_HTML = """<!doctype html>
