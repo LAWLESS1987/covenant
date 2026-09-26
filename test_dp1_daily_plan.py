@@ -198,6 +198,13 @@ def main():
             lines = open(full, encoding="utf-8").read().splitlines()
             check("D21d a queue already holding 5,001 rows still takes every new non-blank row (none dropped)",
                   got == 3 and len(lines) == 5004 and json.loads(lines[-1])["text"] == "new c", (got, len(lines)))
+            # D21e (2026-09-26): the app's CPU time and uptime are kept as integers; anything else is dropped.
+            led3 = os.path.join(td2, "cpu.jsonl")
+            DP.record_checkin(json.dumps({"node_id": "phone", "cpu_ms": 12345, "up_ms": "600000"}).encode(), "phone", led3)
+            DP.record_checkin(json.dumps({"node_id": "phone", "cpu_ms": {"x": 1}, "up_ms": "not a number"}).encode(), "phone", led3)
+            r3 = [json.loads(l) for l in open(led3, encoding="utf-8")]
+            check("D21e cpu_ms and up_ms are kept as integers; a non-number is dropped, never stored",
+                  r3[0].get("cpu_ms") == 12345 and r3[0].get("up_ms") == 600000 and "cpu_ms" not in r3[1] and "up_ms" not in r3[1], r3)
             check("D21b the check-in's `installer` is kept as a string capped at 80, and absent when not sent",
                   r2[0].get("installer") == "org.covenant.node" and isinstance(r2[1]["installer"], str) and len(r2[1]["installer"]) == 80
                   and "installer" not in r2[2], r2)

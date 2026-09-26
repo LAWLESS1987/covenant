@@ -411,6 +411,14 @@ def record_checkin(body_bytes, who, path=None):
     # prediction gets checked against the phone instead of against a comment.
     if "installer" in data:
         row["installer"] = str(data["installer"])[:80]
+    # cpu_ms / up_ms (2026-09-26): the app's own CPU time and uptime, so its share of the
+    # battery can be measured before anything on the phone is cut. Integers only.
+    for k in ("cpu_ms", "up_ms"):
+        if k in data:
+            try:
+                row[k] = int(data[k])
+            except (TypeError, ValueError):
+                pass
     path = path or CHECKINS
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:
