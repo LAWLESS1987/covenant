@@ -8461,6 +8461,18 @@ class CovenantAPI:
                         msgs.append({"role": "assistant", "content": answer})
                         msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what you read or what happened. Do not write MOLTBOOK again."})
                         answer, meta = _m.ask(msgs)
+                elif first.upper().startswith("HANDS"):
+                    # Tetsu's hands (2026-09-26, A226, his words: "make his hands thumbs are
+                    # important for building"): his own workshop on this PC -- write, read,
+                    # run bounded, and propose a change to the tree for the operator's hand.
+                    # The act is judged by the node's gate; the outcome, done or refused with
+                    # the reason, is handed back as data so what he says is what happened.
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer)
+                    if _handled:
+                        forum.append(_rec)
+                        msgs.append({"role": "assistant", "content": answer})
+                        msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what happened. Do not write HANDS again."})
+                        answer, meta = _m.ask(msgs)
             except Exception as e:                                # noqa: BLE001
                 return (jsonify({"status": "error", "message": "the model did not answer: %s: %s" % (type(e).__name__, str(e)[:300])}), 503)
             tx = Transaction(sender_pubkey="model", receiver="collective",
