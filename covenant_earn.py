@@ -1694,7 +1694,16 @@ class Handler(BaseHTTPRequestHandler):
     timeout = 10                                                 # socket read timeout: a slow-loris holds nothing for long
 
     def log_message(self, fmt, *args):                          # one line, no client text
-        sys.stderr.write("earn %s %s\n" % (self.address_string(), fmt % args))
+        # Under pythonw -- the watchdog's launcher -- there is no stderr (sys.stderr is None). The write raised inside
+        # send_response BEFORE the status line went out, so every request got an empty reply (2026-09-26, found on the
+        # first watchdog restart). The log line is a convenience; the reply is not.
+        err = sys.stderr
+        if err is None:
+            return
+        try:
+            err.write("earn %s %s\n" % (self.address_string(), fmt % args))
+        except (OSError, ValueError, AttributeError):
+            pass
 
     def _send(self, status, headers, body):
         data = json.dumps(body, ensure_ascii=False, indent=1, default=str).encode("utf-8")

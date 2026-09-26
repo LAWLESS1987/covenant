@@ -626,6 +626,30 @@ def main():
               not alive_after and stop2.is_set() and time.time() - t0 < 10 and unchanged_now and changed_when_moved
               and st_h == 200 and bh["source_sha256"] == orig_sha and bh["source_changed"] is False, (alive_after, stop2.is_set(), unchanged_now, changed_when_moved, bh))
 
+    # 43. the server as the watchdog runs it: pythonw has no stderr and no stdout (both None). A request logger that
+    # writes to stderr raised inside send_response before the status line, and every live request got an empty reply.
+    with tempfile.TemporaryDirectory() as td3:
+        app7 = E.App(gate=StubGate("clean"), facilitator=StubFacilitator(), ledger=os.path.join(td3, "l.jsonl"), grant_path=os.path.join(td3, "none.json"),
+                     say=lambda t, w: {}, trials_dir=os.path.join(td3, "t"), paused_=lambda: (False, ""), sanctions_path=os.path.join(td3, "s.json"),
+                     funnel_path=os.path.join(td3, "f.json"))
+        srv3 = ThreadingHTTPServer(("127.0.0.1", 0), E.Handler)
+        srv3.daemon_threads = True
+        srv3.app = app7
+        threading.Thread(target=srv3.serve_forever, daemon=True).start()
+        saved = sys.stdout, sys.stderr
+        st_bare, body_bare = None, ""
+        try:
+            sys.stdout = sys.stderr = None
+            with urllib.request.urlopen("http://127.0.0.1:%d/health" % srv3.server_address[1], timeout=10) as r:
+                st_bare, body_bare = r.status, r.read().decode()
+        except Exception as e:                                   # noqa: BLE001
+            body_bare = "%s: %s" % (type(e).__name__, e)
+        finally:
+            sys.stdout, sys.stderr = saved
+            srv3.shutdown(); srv3.server_close()
+        check("EA1.43 with no stderr and no stdout (pythonw, as the watchdog launches it) a GET /health still gets a 200 and its body",
+              st_bare == 200 and "source_sha256" in body_bare, (st_bare, body_bare[:160]))
+
     n_ok, n = sum(results), len(results)
     print("EA1: %d/%d passed" % (n_ok, n))
     return 0 if n_ok == n else 1
