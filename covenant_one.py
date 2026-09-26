@@ -600,6 +600,10 @@ SUITES = [
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
+    # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
+    # written in from the first dataset and printed beside tables that said otherwise.
+    ("test_je1_judge_eval_stats.py", 120, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

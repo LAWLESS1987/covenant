@@ -7228,6 +7228,72 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A231. [the science re-measured on the live system; two defects the run found] 2026-09-26. His words: "do it and run the public to retrieve scientific data then update the private and and needed text docs".
+
+**"Do it": the earn restart, and the defect it exposed.** The watchdog restarted the earn server on the day's code,
+and the server then answered every request with an empty reply. Under pythonw, the watchdog's launcher,
+`sys.stderr` is None. `Handler.log_message` wrote to it inside `send_response` before the status line went out, so
+every reply died. The in-process tests never saw it, because they run with a stderr. The logger now skips a missing
+or failing stderr. EA1.43 drives GET /health with stdout and stderr both None. With the old logger restored it fails
+with the live symptom, the connection closed without a response. EA1 43/43, also in the staged sweep. The running
+server noticed its changed source and stepped down, and the watchdog started the new code, which is the keeper
+path's first live proof. /health answers `a878d408`, granted; all three offers answer mutual_benefit serves_all; an
+unpaid call is 402. Committed at `412634b`.
+
+**The evaluation, run on the live system.** `tools/judge_eval.py` and `tools/export_judge_predictions.py` are
+brought in from the artifact's archive with two changes:
+- They read the shareable ledger only (`X.load_verdicts(X.VERDICTS)`). By default, corpus_paths() would add the
+  private half, 164 rows of his own conversations.
+- The provenance table names the built-in policy, because this tree has no policy file.
+
+Measured: 3563 rows. The export of every held-out prediction is refused unless it equals `evaluate()`, and it
+did. The report is `docs/JUDGE_EVALUATION.md`, with the corpus as the working ledger (`c607d223a5f9`). That ledger is
+159 lines ahead of the copy committed at `412634b` (`317a099cad76`), because the nightly loop's rows are not yet
+committed.
+
+**A second defect, in the report's prose.** Two figures in the template were written in from the first dataset:
+the "3.4% vs 23.9%" false-clear gap and "the 7.7x is not noise". This run printed them beside tables that said
+3.2% vs 25.4% and 9.1x. An existence check passes such a sentence, because the strings exist. Both figures are now
+computed, and the not-noise sentence is written only when both p-values are below 0.001. JE1e and JE1f pin this.
+With the old prose restored, JE1 is 4/6. JE1 6/6, registered in the sweep.
+
+**What it measured, beside the first measurement.**
+
+| figure | first | this run |
+|---|---|---|
+| student false clear | 3.4% | 3.2% (2.3–4.1) |
+| forced same-words naive Bayes | 23.9% | 25.4% |
+| student abstention | 34.8% | 35.2% |
+| correlated-error ratio | 7.7x | 9.1x |
+| Fisher p | 1.3e-47 | 4.6e-56 |
+| raw table | 53/5/92/1076 | 54/1/82/1124 |
+| label panel's Fleiss' kappa | 0.857 over 374 voted rows | 0.744 over 952 |
+
+Of the 55 violations the student wrongly admitted, the naive Bayes admitted 54, so a quorum of the two would lower
+false clear only from 4.4% to 4.3%.
+
+**What it is not.** It is not an independent replication. 2397 of its 2541 distinct texts are in the first
+dataset. The labels are model-made, and the lower kappa over more voted rows is the better estimate of how far
+they agree.
+
+**The private artifact.** The run is added as a second, dated dataset (`data/live_2026-09-26/`, with its report),
+at `1e70812`, and the provenance is stated exactly at `c7a656d`. The panel votes ship keyed by text hash, with no
+memo text. Checks, on a fresh clone:
+- `analysis/reproduce.py`: 24 of 24 figure lines for each report;
+- SC1 9/9, and a flipped verdict breaks it (a dropped vote row breaks two panel lines, checked by hand, not
+  pinned);
+- R1 18/18;
+- manifest 34/34.
+
+The first report, and every figure the outreach emails cite, are unchanged. The OPSEC scan of that tree found one
+file, a 2026-09-20 sweep byproduct holding a machine address. It was never committed on any branch and is now
+ignored there.
+
+**His to decide.** The emails cited kappa 0.857. Whether to tell anyone who replies that the larger measurement is
+0.744 is an outward message and his call. It is noted in the reply kit.
+
+---
+
 ### A229. [earn: a mutual-benefit check that fails closed] 2026-09-26. His words: "Add a gate check that asks whether this transaction serves the builder as much as the user, and fail closed if it can't answer." To "who is the builder", he answered "all 3": the operator, Tetsu, and whoever made what is sold.
 
 **What was built.** `covenant_earn.mutual_benefit(key, grant)` asks the question of the job's recorded facts. It
