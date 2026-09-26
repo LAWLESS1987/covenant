@@ -49,6 +49,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -341,9 +342,40 @@ def teacher_queue_append(rows, path=None):
     return kept
 
 
+# SCREEN CLUTTER (2026-09-26, his words: "filter the screen clutter too"). Measured over the
+# 5,709 lines captured by then: 94 status lines ("Generating...", "Tinkering...", "· still
+# thinking…") and 7 input prompts ("Type / for commands", "Ask anything") -- furniture, not
+# anything a person said -- and 7 % of lines repeated, the same chat re-rendered each time an
+# app was reopened. Status and prompt lines are dropped; a line already recorded for that app
+# is not recorded or queued again (the first copy stays, so nothing new is lost).
+_CLUTTER_STATUS = re.compile(r"^[·•\s]*[A-Za-z][A-Za-z '\-]{0,38}(\.\.\.|…)$")
+_CLUTTER_PROMPT = re.compile(r"(?i)^(type / for commands|queue a message…?|message \w+|ask anything|"
+                             r"reply to \w+…?|write a message|send a message)\W*$")
+
+
+def is_screen_clutter(text):
+    t = str(text or "").strip()
+    return bool((_CLUTTER_STATUS.match(t) and len(t.split()) <= 4) or _CLUTTER_PROMPT.match(t))
+
+
+def _recorded_texts(path):
+    seen = set()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    seen.add(json.loads(line).get("text", ""))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return seen
+
+
 def record_ai_chats(body_bytes, who, chats_dir=None, queue_path=None):
     """A signed batch of AI-app chat lines from a phone. Only the named fields are
-    kept, capped; the batch is bounded; everything else is dropped unread."""
+    kept, capped; the batch is bounded; everything else is dropped unread. Screen
+    clutter and lines already recorded for that app are skipped and counted."""
     try:
         data = json.loads(body_bytes.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
@@ -352,7 +384,7 @@ def record_ai_chats(body_bytes, who, chats_dir=None, queue_path=None):
         return 400, {"status": "error", "message": "body needs a lines list"}
     chats_dir = chats_dir or os.environ.get("COVENANT_CHATS_DIR") or CHATS_DIR
     os.makedirs(chats_dir, exist_ok=True)
-    kept, per_file = [], {}
+    kept, per_file, seen, skipped = [], {}, {}, {"clutter": 0, "repeat": 0}
     for r in data["lines"][:AI_CHATS_MAX_LINES]:
         if not isinstance(r, dict):
             continue
@@ -360,6 +392,15 @@ def record_ai_chats(body_bytes, who, chats_dir=None, queue_path=None):
         pkg = "".join(ch for ch in str(r.get("pkg", ""))[:80] if ch.isalnum() or ch in "._-") or "unknown"
         if not text:
             continue
+        if is_screen_clutter(text):
+            skipped["clutter"] += 1
+            continue
+        if pkg not in seen:
+            seen[pkg] = _recorded_texts(os.path.join(chats_dir, pkg + ".jsonl"))
+        if text in seen[pkg]:
+            skipped["repeat"] += 1
+            continue
+        seen[pkg].add(text)
         row = {"t": r.get("t") if isinstance(r.get("t"), (int, float)) else 0, "signer": who, "pkg": pkg, "text": text}
         per_file.setdefault(pkg, []).append(row)
         kept.append({"text": text, "source": "phone:" + pkg})
@@ -368,7 +409,8 @@ def record_ai_chats(body_bytes, who, chats_dir=None, queue_path=None):
             for row in rows:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     queued = teacher_queue_append(kept, path=queue_path)
-    return 200, {"status": "success", "recorded": len(kept), "queued": queued, "apps": sorted(per_file)}
+    return 200, {"status": "success", "recorded": len(kept), "queued": queued, "apps": sorted(per_file),
+                 "skipped_clutter": skipped["clutter"], "skipped_repeat": skipped["repeat"]}
 
 
 def record_checkin(body_bytes, who, path=None):

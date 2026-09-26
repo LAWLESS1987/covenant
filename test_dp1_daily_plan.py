@@ -198,6 +198,22 @@ def main():
             lines = open(full, encoding="utf-8").read().splitlines()
             check("D21d a queue already holding 5,001 rows still takes every new non-blank row (none dropped)",
                   got == 3 and len(lines) == 5004 and json.loads(lines[-1])["text"] == "new c", (got, len(lines)))
+            # D21g (2026-09-26, "filter the screen clutter too"): status lines and input prompts are
+            # dropped, a real line is kept, and a line already recorded for that app is not again.
+            cdg, qdg = os.path.join(td2, "chats_g"), os.path.join(td2, "queue_g.jsonl")
+            batch = {"v": 1, "node_id": "phone", "lines": [
+                {"t": 1, "pkg": "com.openai.chatgpt", "text": "Generating..."},
+                {"t": 2, "pkg": "com.openai.chatgpt", "text": "· still thinking…"},
+                {"t": 3, "pkg": "com.openai.chatgpt", "text": "Type / for commands"},
+                {"t": 4, "pkg": "com.openai.chatgpt", "text": "Can you check the hash chain for me please"}]}
+            c1, o1 = DP.record_ai_chats(json.dumps(batch).encode(), "phone", chats_dir=cdg, queue_path=qdg)
+            c2, o2 = DP.record_ai_chats(json.dumps(batch).encode(), "phone", chats_dir=cdg, queue_path=qdg)
+            recs = [json.loads(l)["text"] for l in open(os.path.join(cdg, "com.openai.chatgpt.jsonl"), encoding="utf-8")]
+            check("D21g clutter (a status, a thinking line, an input prompt) is dropped and counted; the real line is kept once, its repeat skipped",
+                  o1["recorded"] == 1 and o1["skipped_clutter"] == 3 and o2["recorded"] == 0 and o2["skipped_repeat"] == 1
+                  and recs == ["Can you check the hash chain for me please"], (o1, o2, recs))
+            check("D21g a real short line that ends in dots but says something is not clutter",
+                  not DP.is_screen_clutter("I think we should wait until tomorrow to push it...") and DP.is_screen_clutter("Synthesizing..."))
             # D21e (2026-09-26): the app's CPU time and uptime are kept as integers; anything else is dropped.
             led3 = os.path.join(td2, "cpu.jsonl")
             DP.record_checkin(json.dumps({"node_id": "phone", "cpu_ms": 12345, "up_ms": "600000"}).encode(), "phone", led3)

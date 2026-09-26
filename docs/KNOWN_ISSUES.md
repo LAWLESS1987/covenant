@@ -7321,6 +7321,43 @@ program (committed 19:47) and his cloud storage (committed 19:56 by a parallel
 session). Both stand as written.
 
 
+### A225. [screen clutter filtered out of what the students learn from] 2026-09-26. His words: "filter the screen clutter too"
+
+A224 measured the phone's AI-app capture and left it unfiltered, because what the students
+learn from was his call. He has now made it.
+
+**Measured first,** over the 5,709 recorded lines (unit: LINES, not conversations): 94 were
+status lines of one to four words ending in dots ("Generating...", "Synthesizing..."), 7 were
+input prompts ("Type / for commands", "Ask anything"). Recounted with the shipped function
+over the 3 app files, that is 101 clutter lines, and it agrees. Repeats were counted two ways
+that differ in unit. The first pass found 112 SHORT lines repeated. The shipped rule drops
+every exact repeat within an app, whatever its length, and it finds 163 after the clutter is
+removed. The 163 is what the code does. Tetsu was asked to review the list first. His answer was
+"Generating...", which is the clutter itself, so the rules below are mine and not his.
+
+**Built,** in `covenant_daily_plan.record_ai_chats`:
+- A status line or input prompt is dropped. `is_screen_clutter` requires both the trailing
+  dots and four words or fewer, so a real sentence that trails off is kept.
+- A line already recorded for that app is dropped. The set is rebuilt from the app's own file,
+  so nothing is erased and the history stays whole.
+- The reply counts both (`skipped_clutter`, `skipped_repeat`). The phone reads only
+  `recorded`, so its code is unchanged.
+
+**Proved both ways:** D21g passes (DP1 33/33). It fails with the clutter test off (32/33),
+and again with the repeat test off (32/33). M5 is 292/292 run from the covenant root. Run
+from inside `mobile/app` it reads 241/245, because M5.1, M5.1b and M5.2 look for files at the
+repo root. That was the wrong directory, not a defect.
+
+**What this cannot see:** clutter in another shape, such as an app's own button labels,
+passes through. The rules are two regular expressions over text, not an understanding of
+the screen. The lines already recorded before today are left in place, unchanged.
+
+**The label A224 is used twice** (the business entry, 2026-09-25, and the phone entry,
+2026-09-26), and so is A222. Both entries keep their labels, because commits already cite
+them. Read each by its title.
+
+---
+
 ### A224. [the phone had been skipping every core-only rebuild; the phone app measured before cut; the highway route refused] 2026-09-26. His words: "optimize the phone app too but i over ride on the highway"
 
 **The update defect.** The phone fetched the signed manifest every ten minutes for four days
