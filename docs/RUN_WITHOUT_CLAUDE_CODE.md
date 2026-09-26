@@ -20,7 +20,7 @@ measurement to the chat, the chat reasons, you act. Every step below is that.
 | GitHub Actions, public repo | `covenant.yml` (the sweep on Ubuntu) and `judge.yml` (the teacher panel the students learn from) | on push and on schedule | github.com/LAWLESS1987/covenant/actions |
 | GitHub Actions, private artifact | `covenant.yml`, the artifact's own sweep | on push and every 2 hours | github.com/LAWLESS1987/covenant-satc/actions |
 | the nodes themselves | A/B/C on 5000/5020/5060, gossip, re-validation, the mesh with the phone | always | `/health` on each port, `logs/node*.log` |
-| `covenant_earn.py --serve` (A222, 2026-09-25) | the paid checks over x402, every job through the gate; started by the watchdog's `tend_earn_service()` once his grant exists -- the call line in the watchdog's pass is his to add (docs/EARN.md) | always, once started; it refreshes its own sanctions list and says its own daily line | `GET /health` on 5090, `ops/earn_ledger.jsonl`, the direct line |
+| `covenant_earn.py --serve` (A222, 2026-09-25) | the paid checks over x402, every job through the gate; started by the watchdog's `tend_earn_service()` once his grant exists (the call landed 2026-09-26 on his word; docs/EARN.md) | always, once started; it refreshes its own sanctions list and says its own daily line | `GET /health` on 5090, `ops/earn_ledger.jsonl`, the direct line |
 
 None of these calls Claude. They were running before this document and will
 run after the seat lapses.

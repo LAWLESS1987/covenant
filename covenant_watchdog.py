@@ -1311,6 +1311,11 @@ def one_pass(strict=False):
         ss = tend_seal_service()
         if ss != "up":
             log("INFO", "seal service: %s" % ss)
+        # A222/A224 (2026-09-26, his words: "add the watchdog line"): the earn server is
+        # tended like the seal service -- started only when his grant file exists.
+        es = tend_earn_service()
+        if es not in ("up", "no grant"):
+            log("INFO", "earn service: %s" % es)
         mp = tend_pending()
         if mp != "nothing pending":
             log("INFO", "pool: %s" % mp)

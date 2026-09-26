@@ -125,16 +125,11 @@ the design on 2026-09-25; all three refuted it as first drafted. Applied:
   the discovery extension (attached on mainnet only). The critic's advice,
   recorded as his choice: run on Base Sepolia for a month as a demand meter
   first; it costs nothing and answers the only question that matters.
-- One line in `covenant_watchdog.py`: the starter `tend_earn_service()` is
-  there and tested (EA1.39); the call that runs it every two minutes beside
-  the seal service was refused by this session's auto-mode safety check.
-  The line, for his hand, right after `log("INFO", "seal service: %s" % ss)`:
-
-      es = tend_earn_service()
-      if es not in ("up", "no grant"):
-          log("INFO", "earn service: %s" % es)
-
-  Until then: `python covenant_earn.py --serve` from his own hand or task.
+- The watchdog line: the starter `tend_earn_service()` is called in the
+  watchdog's pass beside the seal service since 2026-09-26, on his word ("add
+  the watchdog line"; the first attempt on 2026-09-25 was refused by the
+  session's auto-mode safety check). It reports "no grant" and starts nothing
+  until `ops/earn_grant.json` exists.
 
 ## Independence
 

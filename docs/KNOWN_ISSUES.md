@@ -7466,10 +7466,11 @@ his cheapest first step is a month on Base Sepolia as a demand meter.
 
 **Independence.** `tend_earn_service()` in the watchdog starts the server when
 his grant exists and nothing listens on 5090 (pythonw through
-ops/hidden_task.py, like the seal service), pinned by EA1.39. **The one-line
-call that runs it in the watchdog's pass was refused by this session's
-auto-mode safety check** (the same shape as A220 item 5); the line is quoted in
-`docs/EARN.md` for his hand. The server refreshes the sanctions list itself
+ops/hidden_task.py, like the seal service), pinned by EA1.39. The one-line
+call that runs it in the watchdog's pass was refused by the session's
+auto-mode safety check on 2026-09-25 (the same shape as A220 item 5) and
+**landed on 2026-09-26 on his word: "add the watchdog line"** (A115 32/32
+with it). It reports "no grant" and starts nothing until the grant exists. The server refreshes the sanctions list itself
 when stale, says the day's line once a day, persists its funnel; the nightly's
 `--earn-report` (default on, silent without a grant) says it too.
 
