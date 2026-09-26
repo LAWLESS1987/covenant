@@ -1234,7 +1234,8 @@ class App:
             return 200, {}, {"text": privacy_text(g), "version": terms_version(g)}
         if path == "/health":
             p, pw = self.paused_()
-            return 200, {}, {"ok": True, "granted": bool(g), "paused": bool(p), "why": pw if p else ("" if g else why)}
+            return 200, {}, {"ok": True, "granted": bool(g), "paused": bool(p), "why": pw if p else ("" if g else why),
+                             "source_sha256": SOURCE_SHA256, "source_changed": source_changed()}
         if path.startswith("/earn/result/"):
             rid = path.rsplit("/", 1)[-1]
             key = self.by_id.get(rid)
@@ -1794,13 +1795,44 @@ def startup_checks(g):
     return fatal, warn
 
 
-def _keeper(app, stop):
-    """The server's own hands: refresh the sanctions list when stale, say the day's line once a day, once."""
+def _self_sha():
+    try:
+        with open(os.path.abspath(__file__), "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return ""
+
+
+SOURCE_SHA256 = _self_sha()
+
+
+def source_changed():
+    """True when covenant_earn.py on disk is not the file this process loaded (a commit landed)."""
+    now = _self_sha()
+    return bool(now) and now != SOURCE_SHA256
+
+
+def _keeper(app, stop, srv=None, changed=None, period=120.0):
+    """The server's own hands: refresh the sanctions list when stale, say the day's line once a day, once --
+    and STEP DOWN when its own source has changed on disk (2026-09-26: two live earn processes were found
+    running code from before the commits of the day; nothing restarts a long-lived process from a shell here,
+    and the watchdog only starts one when the port is silent). So the server itself notices a new
+    covenant_earn.py, shuts its listener, and exits; the watchdog's tend_earn_service starts the new code on
+    its next pass. In-flight requests finish first: shutdown waits for the serve loop, and the pool drains."""
     last_report_day = None
+    changed = changed or source_changed
+    n = 0
     while not stop.is_set():
+        n += 1
         try:
+            if changed():
+                print("earn: covenant_earn.py changed on disk; stepping down so the watchdog starts the new code", flush=True)
+                stop.set()
+                if srv is not None:
+                    threading.Thread(target=srv.shutdown, daemon=True).start()
+                return
             g, _w = grant(app.grant_path)
-            if g:
+            if g and n % max(1, int(600 // max(1.0, period))) == 1:
                 age = sanctions_age_days(app.sanctions_path)
                 if age is None or age > max(0.5, g["sanctions_max_age_days"] - 1):
                     try:
@@ -1819,7 +1851,7 @@ def _keeper(app, stop):
                         print("earn: business round FAILED: %s: %s" % (type(e).__name__, str(e)[:160]), flush=True)
         except Exception as e:                                   # noqa: BLE001
             print("earn: keeper error %s: %s" % (type(e).__name__, str(e)[:160]), flush=True)
-        stop.wait(600)
+        stop.wait(period)
 
 
 def serve(port=DEFAULT_PORT, host="0.0.0.0", app=None, block=True):
@@ -1861,7 +1893,8 @@ def serve(port=DEFAULT_PORT, host="0.0.0.0", app=None, block=True):
     srv.app = app
     stop = threading.Event()
     srv.keeper_stop = stop
-    threading.Thread(target=_keeper, args=(app, stop), daemon=True).start()
+    threading.Thread(target=_keeper, args=(app, stop, srv), daemon=True).start()
+    print("earn: source %s" % SOURCE_SHA256[:12], flush=True)
     print("earn: serving on %s:%d (GET / for the terms and prices)" % (host, port), flush=True)
     if block:
         try:

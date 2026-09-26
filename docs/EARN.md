@@ -170,7 +170,12 @@ What was not started, and why, in numbers he can argue with:
 
 With that line in, the guard's two-minute pass starts the server whenever his
 grant exists and nothing listens on port 5090, so it survives a reboot and a
-crash. The server refreshes the sanctions list itself when stale, says the
+crash. Since 2026-09-26 it also survives a commit: the server hashes its own
+source at start, checks the file on disk every two minutes, and when the file
+has changed it shuts its listener and exits, so the watchdog starts the new
+code on its next pass. `/health` reports the source sha it runs and whether the
+file has changed. The first server started before this change does not know to
+step down; that one restart is by hand. The server refreshes the sanctions list itself when stale, says the
 day's line to him once a day on the direct line (the nightly's `--earn-report`
 does the same, so a dead server is noticed), and persists its own funnel.
 

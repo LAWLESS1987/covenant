@@ -596,6 +596,36 @@ def main():
         check("EA1.39 the watchdog's tend_earn_service starts the server only when his grant exists and nothing listens, reports 'up' when it does, and 'no grant' without the file",
               r_start == "started" and spawned == [1] and r_up == "up" and r_none == "no grant", (r_start, r_up, r_none, spawned))
 
+    # 42. the server steps down on its own when its source changes on disk, so the watchdog starts the new code
+    from http.server import ThreadingHTTPServer
+    with tempfile.TemporaryDirectory() as td2:
+        app6 = E.App(gate=StubGate("clean"), facilitator=StubFacilitator(), ledger=os.path.join(td2, "l.jsonl"), grant_path=os.path.join(td2, "none.json"),
+                     say=lambda t, w: {}, trials_dir=os.path.join(td2, "t"), paused_=lambda: (False, ""), sanctions_path=os.path.join(td2, "s.json"),
+                     funnel_path=os.path.join(td2, "f.json"))
+        srv2 = ThreadingHTTPServer(("127.0.0.1", 0), E.Handler)
+        srv2.daemon_threads = True
+        srv2.app = app6
+        served = threading.Thread(target=srv2.serve_forever, daemon=True)
+        served.start()
+        stop2 = threading.Event()
+        flips = [False, True]
+        keeper = threading.Thread(target=E._keeper, args=(app6, stop2, srv2), kwargs={"changed": lambda: flips.pop(0) if flips else True, "period": 0.2}, daemon=True)
+        t0 = time.time()
+        keeper.start()
+        served.join(10)
+        alive_after = served.is_alive()
+        srv2.server_close()
+        unchanged_now = E.source_changed() is False
+        orig_sha = E.SOURCE_SHA256
+        E.SOURCE_SHA256 = "0" * 64
+        changed_when_moved = E.source_changed()
+        E.SOURCE_SHA256 = orig_sha
+        st_h, _hh, bh = app6.handle("GET", "/health", {}, b"", "http://127.0.0.1")
+        check("EA1.42 the keeper steps the server down when covenant_earn.py on disk is not what it loaded: the serve loop ends within seconds and the stop is set; "
+              "source_changed() is false for the file as loaded and true when the loaded sha differs; /health reports the source sha and whether it changed",
+              not alive_after and stop2.is_set() and time.time() - t0 < 10 and unchanged_now and changed_when_moved
+              and st_h == 200 and bh["source_sha256"] == orig_sha and bh["source_changed"] is False, (alive_after, stop2.is_set(), unchanged_now, changed_when_moved, bh))
+
     n_ok, n = sum(results), len(results)
     print("EA1: %d/%d passed" % (n_ok, n))
     return 0 if n_ok == n else 1
