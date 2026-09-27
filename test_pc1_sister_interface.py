@@ -163,6 +163,20 @@ def main():
             json.dump({"at": 1000.1, "conditions": {"sweep_red": "present"}}, fh)
         check("PC1z5 a pass stamped 0.05 s ahead of now (rounding) is fresh; one an hour old is not",
               HW.last_sense(now=1000.05, path=snap) == {"sweep_red": "present"} and HW.last_sense(now=4600.1, path=snap) is None)
+        # PC1z6 (2026-09-26): the fixtures above wrote lower-case states, but the watchdog writes the detector
+        # constants (HW.PRESENT == "PRESENT"); the page compared against 'present', so a live Highway with
+        # node_down and manifest_stale PRESENT was drawn GREEN. The page now gets lower-case whatever arrives.
+        HW.save_last_sense({k: {"state": HW.PRESENT if k == "sweep_red" else (HW.UNKNOWN if k == "node_down" else HW.ABSENT)}
+                            for k in want}, path=snap)
+        hw = ((get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("detail") or {}).get("highway")
+        HW.sense = lambda only=None, **kw: {k: {"state": HW.PRESENT} for k in (only or want)}
+        with open(snap, "w", encoding="utf-8") as fh:
+            json.dump({"at": _t.time() - 3600, "conditions": {}}, fh)
+        hw2 = ((get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("detail") or {}).get("highway")
+        check("PC1z6 the watchdog's own state constants reach the page as the lower-case words it colours by "
+              "(a PRESENT drawn green was the bug), from a fresh pass and from sensing alike",
+              hw and hw.get("sweep_red") == "present" and hw.get("node_down") == "unknown" and hw.get("source_drift") == "absent"
+              and hw2 and set(hw2.values()) == {"present"}, (hw, hw2))
     finally:
         HW.sense, P3.STATE_TTL = real_sense, real_ttl
         os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)

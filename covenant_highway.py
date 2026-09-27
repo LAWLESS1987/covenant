@@ -431,15 +431,22 @@ def detect_build_stale_on_pc(health=None, hours=24):
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
     if not d:
         return {"state": PRESENT, "measured": {"fetched": None, "why": "no build fetched yet"}}
-    stamp = str(d.get("fetched", ""))
+    # LOOKED, NOT DOWNLOADED (2026-09-26, A231). This read only `fetched`, which changes when a build is
+    # DOWNLOADED. A look that found nothing newer ("already have build 2ab1ba5") left it untouched, so the
+    # condition stayed PRESENT right after the PC had looked, fetch_build was graded "did not fix" twice
+    # for doing its job, and it has been quarantined since 2026-09-23 -- while two newer builds were made
+    # and never collected. covenant_app_update.fetch now stamps `checked` on every look.
+    stamps = [str(d.get(k)) for k in ("fetched", "checked") if d.get(k)]
     try:
         import datetime
-        age_h = (time.time() - datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z").timestamp()) / 3600.0
+        newest = max(datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%S%z").timestamp() for s in stamps)
+        age_h = (time.time() - newest) / 3600.0
     except (ValueError, TypeError):
-        return {"state": UNKNOWN, "measured": {"fetched": stamp, "why": "unparseable timestamp"}}
+        return {"state": UNKNOWN, "measured": {"fetched": d.get("fetched"), "checked": d.get("checked"),
+                                               "why": "unparseable timestamp"}}
     return {"state": PRESENT if age_h > hours else ABSENT,
-            "measured": {"fetched": stamp, "age_hours": round(age_h, 1), "limit_hours": hours,
-                         "have": d.get("sha7")}}
+            "measured": {"fetched": d.get("fetched"), "checked": d.get("checked"), "age_hours": round(age_h, 1),
+                         "limit_hours": hours, "have": d.get("sha7")}}
 
 
 def detect_phone_build_behind_core(health=None):
@@ -460,6 +467,23 @@ def detect_phone_build_behind_core(health=None):
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
     if not d.get("built"):
         return {"state": UNKNOWN, "measured": {"why": "no build fetched to compare against"}}
+    # WHAT THE PHONE CARRIES, NOT EVERY COMMIT (2026-09-26, A231). The APK ships an allowlist of files
+    # (covenant-phone's python_sources.txt) and the build names the core commit it was made from. Measured
+    # that day: 31 commits on main since the build's core, 4 of them touching a shipped file -- so every
+    # docs or test commit turned this PRESENT (and the PC page's Highway red) for code the phone never runs.
+    # With the list and the build's core both readable, the question is exactly "has a shipped file changed
+    # since the core this build carries"; with either missing, the old time comparison stands, and says so.
+    shipped, core = _phone_shipped_paths(), d.get("core")
+    if shipped and core:
+        for ref_ in ("origin/main", "HEAD"):
+            p = subprocess.run(["git", "rev-list", "%s..%s" % (core, ref_), "--", *shipped], cwd=HERE,
+                               capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
+            if p.returncode == 0:
+                behind = p.stdout.split()
+                return {"state": PRESENT if behind else ABSENT,
+                        "measured": {"basis": "files the APK ships", "shipped_files": len(shipped),
+                                     "build": d.get("sha7"), "build_core": core, "ref": ref_,
+                                     "shipped_commits_since": len(behind), "newest": [s[:7] for s in behind[:5]]}}
     ref = "origin/main"
     try:
         p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
@@ -479,8 +503,26 @@ def detect_phone_build_behind_core(health=None):
     except (ValueError, TypeError) as e:
         return {"state": UNKNOWN, "measured": {"head": head, "built": d.get("built"), "error": str(e)}}
     return {"state": PRESENT if head_t > built_t else ABSENT,
-            "measured": {"core_committed": head, "ref": ref, "build_built": d["built"],
+            "measured": {"basis": "any commit (no shipped-file list, or no core on the build record)",
+                         "core_committed": head, "ref": ref, "build_built": d["built"],
                          "build": d.get("sha7"), "behind_by_min": round((head_t - built_t) / 60.0, 1)}}
+
+
+def _phone_shipped_paths():
+    """The repo-root files the phone APK carries: covenant-phone's python_sources.txt, read from its clone
+    (COVENANT_PHONE_REPO, else the sibling folder covenant-phone). None when it cannot be read -- the caller
+    then falls back to comparing against every commit, which over-reports rather than under-reports."""
+    for base in (os.environ.get("COVENANT_PHONE_REPO"), os.path.join(os.path.dirname(HERE), "covenant-phone")):
+        p = os.path.join(base, "python_sources.txt") if base else None
+        if p and os.path.isfile(p):
+            try:
+                with io.open(p, encoding="utf-8", errors="replace") as fh:
+                    names = [ln.strip() for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
+            except OSError:
+                continue
+            if names:
+                return names
+    return None
 
 
 def detect_manifest_stale(health=None):
@@ -685,7 +727,10 @@ def detect_sweep_red(health=None):
     # named in `skipped` rather than silently passed over -- a filter that
     # discards without saying so is how this went unnoticed for an hour.
     verdict_re = re.compile(r"^\s*RESULT:\s*(PASS|FAIL)", re.M)
-    newest, skipped = None, []
+    # A PARTIAL RUN IS NOT THE SWEEP (2026-09-26): `covenant_one.py --only` states it in its header, and
+    # its 5-suite FAIL was read here as THE sweep's verdict. Named in `skipped_partial`, never silent.
+    partial_re = re.compile(r"^#\s*scope:\s*PARTIAL\b", re.M)
+    newest, skipped, partial = None, [], []
     for p in glob.glob(os.path.join(HERE, "*.txt")):
         try:
             with io.open(p, encoding="utf-8", errors="replace") as fh:
@@ -697,6 +742,9 @@ def detect_sweep_red(health=None):
         if not verdict_re.search(txt):
             skipped.append(os.path.basename(p))
             continue                       # e.g. a --check run: INCOMPLETE
+        if partial_re.search(txt):
+            partial.append(os.path.basename(p))
+            continue                       # a --only run: it speaks for its suites, not the sweep
         mt = os.path.getmtime(p)
         if newest is None or mt > newest[0]:
             newest = (mt, p, txt)
@@ -704,7 +752,7 @@ def detect_sweep_red(health=None):
     if newest is None:
         return {"state": UNKNOWN,
                 "measured": {"why": "no sweep artifact on disk states PASS or FAIL",
-                             "skipped_no_verdict": sorted(skipped)}}
+                             "skipped_no_verdict": sorted(skipped), "skipped_partial": sorted(partial)}}
 
     mt, path, txt = newest
     verdict = "UNKNOWN"
@@ -723,6 +771,8 @@ def detect_sweep_red(health=None):
     measured = {"verdict": verdict, "artifact": os.path.basename(path),
                 "age_d": round((time.time() - mt) / 86400.0, 2),
                 "unclean": unclean, "checks_failed": failed}
+    if partial:
+        measured["skipped_partial"] = sorted(partial)
 
     if verdict == "FAIL":
         return {"state": PRESENT, "measured": measured}

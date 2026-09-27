@@ -541,6 +541,22 @@ def is_new_build(current, run):
     return current.get("run_id") != run.get("id")
 
 
+def mark_checked(cur, path=None):
+    """Record that this PC LOOKED for a newer build and found none (2026-09-26, A231). `fetched` moves only
+    on a download, so a look that found nothing newer left the highway's build_stale_on_pc PRESENT right
+    after the PC had looked; fetch_build was graded "did not fix" twice for that and quarantined. Returns
+    the record with `checked` stamped (the file is rewritten atomically; a failed write changes nothing)."""
+    if not cur:
+        return cur
+    cur = dict(cur, checked=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
+    try:
+        import durable
+        durable.write_json(path or LATEST, cur, indent=1)
+    except Exception:                                            # noqa: BLE001
+        pass
+    return cur
+
+
 def fetch(say=print):
     """The newest green build's APK from the private repository, kept under ops/app/.
     Returns the latest.json dict, or None with the reason said."""
@@ -581,7 +597,7 @@ def fetch(say=print):
         # existed, and the fetch refused to collect it. Two builds of one commit
         # are two builds.
         if not is_new_build(cur, run):
-            say("app update: already have build %s from run %d" % (sha7, run["id"])); return cur
+            say("app update: already have build %s from run %d" % (sha7, run["id"])); return mark_checked(cur)
         blob = _download(arts[0]["archive_download_url"], tok)
         with zipfile.ZipFile(io.BytesIO(blob)) as z:
             apk = z.read("covenant-node.apk")

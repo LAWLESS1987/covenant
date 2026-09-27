@@ -173,6 +173,29 @@ def main():
               and "ONE_CHECK.txt" in (r["measured"].get("skipped_no_verdict") or []),
               r["measured"])
 
+        # P25.D9 (2026-09-26): a `covenant_one.py --only` run wrote ONE_RUN.txt with a 5-suite FAIL, newer
+        # than the last full sweep, and this detector read it as THE sweep -- red on the PC page for a run
+        # nobody meant as one. A partial run says so in its header; it is skipped and named.
+        write_sweep(tmp, "ONE_SWEEP.txt", "PASS", age_s=3600)
+        part = write_sweep(tmp, "ONE_RUN_ONLY.txt", "FAIL", failed=0)
+        with open(part, encoding="utf-8") as fh:
+            body = fh.read()
+        with open(part, "w", encoding="utf-8") as fh:
+            fh.write("#  scope: PARTIAL -- --only 5 suite(s); not the sweep, and its verdict speaks for them alone\n" + body)
+        r = H.detect_sweep_red()
+        check("P25.D9 a newer PARTIAL (--only) transcript is not the sweep: the full sweep's verdict decides, "
+              "and the partial one is named",
+              r["state"] == H.ABSENT and r["measured"].get("artifact") == "ONE_SWEEP.txt"
+              and r["measured"].get("skipped_partial") == ["ONE_RUN_ONLY.txt"], r["measured"])
+        with open(part, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        r = H.detect_sweep_red()
+        check("P25.D9b ...and the same transcript without the PARTIAL line is still read as a sweep (the skip "
+              "rests on what the file says, not on its name)", r["state"] == H.PRESENT
+              and r["measured"].get("artifact") == "ONE_RUN_ONLY.txt", r["measured"])
+        for n in ("ONE_SWEEP.txt", "ONE_RUN_ONLY.txt"):      # back to D8b's state for the R checks
+            os.remove(os.path.join(tmp, n))
+
         # ---- R: the remedy is targeted and honest --------------------------
         ok, why = H.remedy_rerun_unclean({"unclean": []}, dry_run=True)
         check("P25.R1 red with NO unclean suite is refused -- real failing "

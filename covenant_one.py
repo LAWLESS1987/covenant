@@ -488,6 +488,10 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
+    # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
+    # files the APK ships, not in every docs commit.
+    ("test_pb1_phone_build_signals.py", 120, "DAILY + GUARDS"),
     # MF (2026-09-19): the two federation rules, adopted at his instruction --
     # most favoured peer, and unilateral exit. Driven both ways, including the
     # direction that would break the federation if it were wrong: a peer
@@ -1475,11 +1479,21 @@ def main():
         # actually observe.
         args.transported = True
 
+    # A PARTIAL RUN IS NOT THE SWEEP (2026-09-26, A231). `--only` used to write ONE_RUN.txt like a full
+    # sweep: it overwrote the last full transcript other checks read as evidence, and the highway's
+    # sweep_red took its 5-suite FAIL (a folder-integrity line while files were uncommitted) as THE
+    # sweep's verdict -- red on the PC page for a run nobody meant as one. A partial run now writes its
+    # own file by default and says PARTIAL in its header; detect_sweep_red skips what says so.
+    if args.only and args.out == "ONE_RUN.txt":
+        args.out = "ONE_RUN_ONLY.txt"
     say = Tee(os.path.join(HERE, args.out))
     t0 = time.time()
     say("#" * 74)
     say("#  COVENANT -- ONE COMMAND.  Nothing hidden, nothing silent.")
     say("#  transcript: %s" % say.path)
+    if args.only:
+        say("#  scope: PARTIAL -- --only %d suite(s); not the sweep, and its verdict speaks for them alone"
+            % len(args.only))
     say("#" * 74)
 
     absent = orphans = []

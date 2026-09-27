@@ -269,12 +269,15 @@ def register(api, caller, refused, cov):
             want = ["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"]
             # What the watchdog's own last pass saw, when it is fresh (2026-09-25: sensing again
             # here was 95% of a cold read, profiled); sense only when there is no fresh pass.
+            # LOWER-CASE, whatever arrives (2026-09-26): the watchdog writes the detector constants
+            # ("PRESENT"), the page colours by 'present' -- so a Highway with node_down PRESENT was
+            # drawn GREEN, and the test fixtures, written in lower case, never saw it. PC1z6.
             seen = covenant_highway.last_sense()
             if seen is not None and all(k in seen for k in want):
-                out["detail"]["highway"] = {k: seen[k] for k in want}
+                out["detail"]["highway"] = {k: str(seen[k] or "unknown").lower() for k in want}
             else:
                 sensed = covenant_highway.sense(only=want)
-                out["detail"]["highway"] = {k: v.get("state") for k, v in sensed.items()}
+                out["detail"]["highway"] = {k: str((v or {}).get("state") or "unknown").lower() for k, v in sensed.items()}
         except Exception:                                        # noqa: BLE001
             pass
         try:
