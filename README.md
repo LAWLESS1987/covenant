@@ -281,6 +281,38 @@ Three things, in one process:
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
 
+## Wrong in public
+
+This project has been wrong in public, and it says so where the error was made rather
+than editing the error away.
+
+The most recent: a post of the operator's on the Hugging Face forum (2026-09-24), kept
+here as [confidence-trap.md](confidence-trap.md), says in its title that AI systems are
+*deliberately* trained to sound certain when they are wrong. "Deliberately" asserts intent,
+and nothing in the post supports intent. What the evidence supports is weaker in one way
+and stronger in another: raters prefer confident answers, so the training incentive
+produces overconfidence without anyone choosing it. The original stays up, on the forum
+and here. The correction sits beside it: [confidence-trap.CORRECTION.md](confidence-trap.CORRECTION.md),
+recorded as A236.
+
+The rule, and the machinery behind it:
+
+- **The original text is never deleted or quietly reworded.** A correction is written
+  beside it and both stay. Where a claim went out to a person, the correction goes back to
+  the same person, unprompted.
+- **[docs/CORRECTIONS.md](docs/CORRECTIONS.md)** is the index of everything this project
+  has got wrong and said so, including the one that cost the most: the conformance root
+  that was supposed to prove two builds computed the same thing, refuted by the author of
+  the idea it borrowed.
+- **[docs/RETRACTED.json](docs/RETRACTED.json)** is the machine-read ledger of retracted
+  claims, and `test_r1_retracted.py` fails the build if a retracted wording reappears
+  anywhere in the tree without its retraction's id within ten lines of it. It caught two
+  live sites the hand sweep had missed on its first run.
+
+Why: a system that governs whoever runs it has to survive being checked, and that only
+works if correction is welcome. Everything wrong with the current way of doing things is
+people doubling down. If you find another, say so.
+
 ## Allies wanted
 
 This is a constitution for humans and machines under one rule: **no one may make
@@ -552,7 +584,9 @@ claims a profit edge or promises a return; it claims what a reader can verify.
 The same work, and the person behind it, in the other places it lives:
 
 - **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile exists and holds
-  nothing yet: no models, datasets, spaces or posts (checked 2026-09-27).
+  nothing yet: no models, datasets, spaces or posts (checked 2026-09-27). On the forum, the same account posted
+  [the confidence-trap thread](https://discuss.huggingface.co/t/the-confidence-trap-why-ai-systems-are-deliberately-trained-to-sound-certain-when-theyre-wrong/180706)
+  (2026-09-24), whose title this project has since corrected: see *Wrong in public* above and A236.
 - **X:** [@NJEst1987](https://x.com/NJEst1987). These are screen recordings of the conversations with AI assistants
   that much of this repository grew out of.
 - **This repository:** [github.com/LAWLESS1987/covenant](https://github.com/LAWLESS1987/covenant).

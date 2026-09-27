@@ -150,6 +150,32 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "The four added files are sweep transcripts -- a verbatim record of what the suite printed on a given day, the one kind of file whose purpose is to hold the old wording unedited. test_g4_money_gates.py is deliberately NOT allowed: it quotes the retracted sentence in the comment explaining the retraction, and cites G4b two lines above it, so containment covers it. That is the rule working as intended rather than being waived."
+  },
+  {
+   "id": "A236",
+   "claim": "That AI systems are DELIBERATELY trained to sound certain when they are wrong -- intent, asserted in the title of the operator's Hugging Face forum post of 2026-09-24 (discuss.huggingface.co/t/180706), kept in the tree as confidence-trap.md.",
+   "refuted_by": "the post's own body, read back on 2026-09-27: RLHF raters score confident answers higher, so the incentive produces overconfidence with nobody choosing it. Raised by the Claude app on his phone that morning (ops/teacher_queue.jsonl, phone:com.anthropic.claude); conceded by the operator the same morning ('I concede it.'); the correction ordered by him that day.",
+   "truth": "The mechanism the post describes is an incentive artifact and needs no intent to be true: weaker in one way (nobody chose it), stronger in another (nobody had to). The word 'deliberately' is retracted; the finding is not defended here either way, because nothing in this project measured rater preference or calibration. The original stays up unedited, on the forum and as confidence-trap.md; confidence-trap.CORRECTION.md sits beside it; docs/CORRECTIONS.md has the row; the README section 'Wrong in public' says the rule.",
+   "verbatim": [
+    "Why AI Systems Are Deliberately Trained to Sound Certain When They're Wrong",
+    "engineered overconfidence in AI systems",
+    "a system trained to mislead through tone"
+   ],
+   "patterns": [
+    "deliberately\\s+trained\\s+to\\s+sound\\s+certain",
+    "engineered\\s+overconfidence",
+    "trained\\s+to\\s+mislead\\s+through\\s+tone"
+   ],
+   "note_on_patterns": "Three phrasings, all present in the original and nowhere else in the scanned tree when this was written (grep over .md .py .sh .ps1 .json .txt .bat .html, 2026-09-27). 'overconfident' or 'RLHF' alone would match the correction, the docs and every honest discussion of the mechanism, none of which assert intent; these three carry the assertion.",
+   "allow": [
+    "confidence-trap.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py"
+   ],
+   "note_on_allow": "confidence-trap.md is the original and is allowed for the same reason the sweep transcripts are: its whole purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md, the README and ops/CONFIDENCE_TRAP_POSTS.md are deliberately NOT allowed: each quotes the phrase while citing A236 within the window, which is the rule working rather than being waived."
   }
  ]
 }

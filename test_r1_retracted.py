@@ -85,6 +85,16 @@ def allowed(relpath, allow):
 def walk_files():
     for dp, dn, fn in os.walk(HERE):
         dn[:] = [d for d in dn if d not in SKIP_DIR]
+        # A236 (2026-09-27): a git worktree the assistant's app keeps under
+        # .claude/worktrees/ is a whole second copy of the tree at an OLDER
+        # commit, git-excluded (.git/info/exclude). Walking it read 2438 files
+        # instead of the tree, and every one of its hits was an allowed record
+        # (docs/KNOWN_ISSUES.md, the sweep transcripts) whose relative path no
+        # longer matched the allow-list -- 33 "violations" that were the record
+        # itself, read through a copy. Pruned by PATH, not by name: the rest of
+        # .claude/ (the hooks) is tree and stays scanned.
+        if os.path.relpath(dp, HERE).replace(os.sep, "/") == ".claude":
+            dn[:] = [d for d in dn if d != "worktrees"]
         for f in fn:
             if os.path.splitext(f)[1].lower() in SCAN_EXT:
                 yield os.path.join(dp, f)

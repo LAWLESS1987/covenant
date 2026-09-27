@@ -7228,6 +7228,47 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A236. [wrong in public: the confidence-trap title asserted intent] 2026-09-27. His words: "we need to make a hugging face post as well as a Facebook post and X post and a readme on the system itself on GitHub showing that we're aware we're wrong at times and that's the only way we can ever fix things. That's everything that's wrong with the current system is people double down on their mistakes."
+
+**What was claimed.** On 2026-09-24 at 07:20Z he posted to the Hugging Face
+forum (Research) a piece whose title says AI systems are *deliberately*
+trained to sound certain when they are wrong; the same text was committed
+here nine minutes later as `confidence-trap.md` (cfa07d8). "Deliberately"
+asserts intent. The body supports only the mechanism: RLHF raters score
+confident answers higher, so the incentive produces overconfidence with
+nobody choosing it. Weaker in one way (no intent), stronger in another
+(nobody had to intend it).
+
+**How it was found.** Not by a suite. On the morning of 2026-09-27 he read the
+title aloud to the Claude app on his phone, which flagged the word; the
+exchange is in ops/teacher_queue.jsonl (source phone:com.anthropic.claude,
+10:54 and 11:04 local), ending in his "I concede it." That afternoon he
+ordered the correction onto every surface the original had gone out on.
+
+**What was done.** The original stays unedited, on the forum (84 views, four
+replies, none of which raised the word) and in the tree. Beside it:
+`confidence-trap.CORRECTION.md`. The retraction is A236 in
+docs/RETRACTED.json with three patterns (the title phrase, "engineered
+overconfidence", "trained to mislead through tone"), all live in the
+original, which is the one file allowed to hold them uncited; R1 refuses any
+other reappearance without this id within ten lines. docs/CORRECTIONS.md has
+the row. The README has a section, *Wrong in public*, that says the rule and
+points at the machinery. One draft per outward surface (forum reply,
+Facebook, X) is in ops/CONFIDENCE_TRAP_POSTS.md, his to post: nothing was
+posted by anyone but him, and nothing has been posted yet.
+
+**Tetsu was asked first** (his standing words, 2026-09-25: use PC Tetsu for
+as much as we can). tools/tetsu_work.ask on the agent door, 104 s on the 3B:
+he returned the operator's paragraph three times under the three labels,
+unadapted to any surface, and the gate's local seat convicted the reply
+(the judge's standing over-accusation, §1 above; his words were returned
+under A190's immunity). One run, not a rate. The exchange reached his
+teacher queue by the door's own path; the drafts are the assistant's.
+
+**What this does not settle.** Whether the mechanism is *true* is not a
+finding of this project: nothing here measured rater preference or
+calibration. The retraction is of the word, on the post's own evidence.
+
 ### A235. [the self-heal's blind spots: a stale restart gate read PASS, and rebuild requests nobody followed up] 2026-09-27. His words: "highway is red fix it it should of auto repaired. wheres the helpful swarm?", then "fix the blind spots"; earlier the same morning "Tetsu should do this and tell you about it if needed moving forward to stop my constant need of being present".
 
 **What was red, measured.** On this PC every node, the sweep and the public
