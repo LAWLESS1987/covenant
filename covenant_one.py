@@ -611,6 +611,10 @@ SUITES = [
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
     ("test_pp1_tetsu_practice.py", 240, "JUDGE"),
+    # TC1 (2026-09-27, A237, his words: "create a fire crawl like system for tetsu also"): Tetsu's crawler -- search
+    # parsed from a results page, a same-host crawl bounded per page, per answer and per day, every page through the
+    # one web door and a refusal reported rather than raised; the door is a stub, no network.
+    ("test_tc1_tetsu_crawl.py", 120, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.

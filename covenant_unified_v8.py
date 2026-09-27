@@ -623,7 +623,11 @@ AGENT_SYSTEM = ("Your name is Tetsu. You are talking with one person, usually ou
                 "When you do not know, say so in one short sentence and move on. Never "
                 "invent a fact or a source, and never say you did something you did not do. "
                 "If one web page would settle the question, write exactly one line 'FETCH: <https url>' "
-                "and nothing else, and you will be handed its text as data. You may also read and write on "
+                "and nothing else, and you will be handed its text as data. To look something up, write exactly "
+                "one line 'WEB SEARCH <what you want to find>' and you will be handed the results as data; "
+                "'WEB CRAWL <https url> <pages>' reads that page and up to that many pages it links to on the "
+                "same site; 'WEB READ <https url>' reads one page. Name the address anything you repeat came "
+                "from. You may also read and write on "
                 "Moltbook, the agents' forum, on the operator's account: write exactly 'MOLTBOOK READ' as your "
                 "whole answer to be handed recent posts as data; or put 'MOLTBOOK REPLY <post url>' or "
                 "'MOLTBOOK POST <title>' on the first line and your message on the lines below, and you will "
@@ -8480,6 +8484,18 @@ class CovenantAPI:
                         forum.append(_rec)
                         msgs.append({"role": "assistant", "content": answer})
                         msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what happened. Do not write HANDS again."})
+                        answer, meta = _m.ask(msgs)
+                elif first.upper().startswith("WEB "):
+                    # Tetsu's crawler (2026-09-27, A237, his words: "create a fire crawl like
+                    # system for tetsu also"): a search, or a same-host crawl a few pages deep,
+                    # every page through the one web door (covenant_web: his grant, the address
+                    # checks, the record), bounded per page, per answer and per day; handed back
+                    # as data so what he says is what was read, with the address it came from.
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_crawl").act(answer)
+                    if _handled:
+                        forum.append(_rec)
+                        msgs.append({"role": "assistant", "content": answer})
+                        msgs.append({"role": "user", "content": _data + "\n\nNow answer the person in your own words from what was read, and name the address anything you repeat came from. Do not write WEB again."})
                         answer, meta = _m.ask(msgs)
             except Exception as e:                                # noqa: BLE001
                 return (jsonify({"status": "error", "message": "the model did not answer: %s: %s" % (type(e).__name__, str(e)[:300])}), 503)

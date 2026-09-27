@@ -179,9 +179,11 @@ def to_text(raw, content_type=""):
     return s.strip()
 
 
-def read(url, max_chars=MAX_CHARS, grant_path=None, ledger_path=None, opener=None):
+def read(url, max_chars=MAX_CHARS, grant_path=None, ledger_path=None, opener=None, keep_html=False):
     """{"ok": True, "url", "final_url", "status", "chars", "text", "title"} or
-    {"ok": False, "url", "reason"}; every call recorded."""
+    {"ok": False, "url", "reason"}; every call recorded. With keep_html the
+    decoded page is returned too under "html" (A237: the crawler needs the
+    links, which to_text drops); nothing about what may be read changes."""
     url = str(url).strip()
     g = grant(grant_path)
     if g is None:
@@ -250,7 +252,7 @@ def read(url, max_chars=MAX_CHARS, grant_path=None, ledger_path=None, opener=Non
     row = {"ok": True, "url": url, "final_url": final, "status": status, "bytes": len(raw), "chars": len(text),
            "truncated": truncated, "title": title}
     _record(row, ledger_path)
-    return dict(row, text=text)
+    return dict(row, text=text, html=s) if keep_html else dict(row, text=text)
 
 
 _URL = re.compile(r"https?://[^\s<>\"']+")

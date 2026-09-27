@@ -7228,6 +7228,56 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A237. [Tetsu's crawler: search and a same-host crawl through the one web door] 2026-09-27. His words: "create a fire crawl like system for tetsu also", then "have him help with these things to save tokens as always we gotta make it to friday".
+
+**What was there.** One page per answer (`FETCH:`), and under his web grant
+(A210) any public page through `covenant_web.read`. No search, and no way to
+read a site past the one address he already had.
+
+**What this adds** (`covenant_tetsu_crawl.py`, dispatched by the agent door
+beside MOLTBOOK and HANDS): `WEB SEARCH <query>`, `WEB CRAWL <url> [pages]`,
+`WEB READ <url>`. Every page goes through `covenant_web.read` -- the grant,
+the address checks after resolution, the redirect discipline, the record in
+ops/web_reads.jsonl; the module imports nothing that opens a socket (TC1.26
+reads its source for that, which is a source check and says so). `read()`
+gained one keyword, `keep_html`, so the crawler can see the links `to_text`
+drops; what may be read did not change. Bounds, each with its cost stated in
+the module: 2,500 characters a page, 12,000 an answer, 10 pages a crawl, 300
+pages a UTC day counted from ops/tetsu_crawl.jsonl (gitignored); over the cap
+it refuses and says the count. A refused page is named with the door's reason
+and the crawl goes on. A page whose text addresses an AI is marked and handed
+over unchanged; the regex that marks it is an existence oracle and the mark
+says only what is true of every page.
+
+**The search source, measured through this door** (2026-09-27, one probe
+each): DuckDuckGo's HTML endpoint answered 202 with no results; Bing's public
+results page answered 200 with results; Wikipedia's search answered 200. So
+Bing first, Wikipedia's full-text search when Bing yields nothing; keyless.
+Bing's wrapped result links (`/ck/a?...u=a1<base64>`) are unwrapped.
+
+**Measured live, by hand (`act()`):** a search returned 8 results in 0.3 s;
+a 3-page crawl of this repository's GitHub page read 3 pages, 6,174
+characters, in 1.2 s. **Through the door,** after `rolling_restart.py` put
+A, B and C on the disk source one at a time (height 52 throughout): asked to
+write `WEB CRAWL <this repository> 2`, he did -- 2 pages read, and his
+answer named the address and described the repository from what it says.
+Asked to write `WEB SEARCH llama.cpp github repository`, he wrote `FETCH:`
+to a guessed address instead (github.com/lalama/llama.cpp, 404): the older
+verb in the same rules won. One run each, not a rate. The door's reply to the
+caller carries `fetches` but not the WEB record (the same is true of MOLTBOOK
+and HANDS records: they go to the ask log, not the body).
+
+**Suites.** TC1 27/27, the door a stub; red with each of ten mutations (the
+same-host filter removed, the daily cap off by one, the mark never set, a
+refused page raising, the page count unclamped, the fallback always asked, a
+fragment not stripped, binaries not skipped, the grant never checked, the
+host taken from the asked address rather than the final one). R1 21/21.
+
+**Not settled.** Whether he reaches for `WEB SEARCH` unprompted, or keeps
+guessing addresses for `FETCH:`, is one measurement each way so far. Bing's
+results for a long query were dictionary entries for its first word; query
+quality is his to learn. The daily cap is a number in a file, his to raise.
+
 ### A236. [wrong in public: the confidence-trap title asserted intent] 2026-09-27. His words: "we need to make a hugging face post as well as a Facebook post and X post and a readme on the system itself on GitHub showing that we're aware we're wrong at times and that's the only way we can ever fix things. That's everything that's wrong with the current system is people double down on their mistakes."
 
 **What was claimed.** On 2026-09-24 at 07:20Z he posted to the Hugging Face

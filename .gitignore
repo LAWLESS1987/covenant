@@ -413,6 +413,8 @@ ops/sweep_heal_last.txt
 # operational ledgers: what the mesh did and what Tetsu read are his, not public
 ops/highway.jsonl
 ops/web_reads.jsonl
+# covenant_tetsu_crawl (A237, 2026-09-27): what he searched and crawled, per day, for the cap and the record.
+ops/tetsu_crawl.jsonl
 ops/ambassador_rate.json
 
 # the watchdog pass's last sensed states (2026-09-25), read by the PC 3D page
