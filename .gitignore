@@ -417,6 +417,8 @@ ops/ambassador_rate.json
 
 # the watchdog pass's last sensed states (2026-09-25), read by the PC 3D page
 ops/highway_last_sense.json
+# this PC's last reading of the public CI (A232): the detector's throttle and cache
+ops/public_ci.json
 
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
 *.results.json

@@ -782,6 +782,159 @@ def detect_sweep_red(health=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
+PUBLIC_CI = os.path.join(HERE, "ops", "public_ci.json")       # gitignored: this PC's last reading of the public CI
+CI_REPO = os.environ.get("COVENANT_CI_REPO", "LAWLESS1987/covenant")
+CI_WORKFLOW = "covenant.yml"
+CI_EVERY_S = 1800        # one read per 30 min: the unauthenticated API allows 60 an hour per address, for everything on this PC
+CI_RETRY_S = 300         # after a failed read
+CI_STALE_S = 7200        # no good read for 2 h: the last verdict is too old to stand for today's
+CI_SILENT_H = 6.0        # the schedule runs every 2 h; nothing finished on main for 6 h is a condition of its own
+
+
+def _ci_get(path, timeout=10):
+    """GET api.github.com<path> as JSON, without a token (the repository is public). Raises on any failure."""
+    req = urllib.request.Request("https://api.github.com" + path, headers={
+        "Accept": "application/vnd.github+json", "User-Agent": "covenant-highway"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _utc_ts(s):
+    import calendar
+    try:
+        return calendar.timegm(time.strptime(str(s), "%Y-%m-%dT%H:%M:%SZ"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _tell_him(text, why, actor="highway"):
+    import covenant_contact
+    return covenant_contact.say(text, why, actor=actor)
+
+
+def detect_public_ci_red(health=None, get=None, now=None, cache=None, tell=None):
+    """The public CI's newest FINISHED run on main failed -- or nothing has finished there for CI_SILENT_H hours.
+
+    A232 (2026-09-26, his words: "need to ensure green runs without you"). detect_sweep_red reads THIS PC's
+    sweep. Nothing read the public one: from 2026-09-22 00:05Z every finished run on main was red, two suites
+    that could only pass on this PC, and for four days the only listener was a person opening the Actions tab.
+    This asks the public API (no token, no login), at most once per CI_EVERY_S, and names the failing checks
+    from the run's public annotation, fetched once per failing run.
+
+    A cancelled run is neither green nor red and is skipped (the workflow cancels a superseded push). A read
+    that fails is UNKNOWN, never the cached verdict: an offline PC must not keep reporting yesterday's green.
+    No remedy is attached. The fix is a change to the code.
+
+    HOW IT REACHES HIM. A PRESENT becomes a watchdog ALERT, and alert push is off on this PC, so the alert
+    alone reaches the log and the PC page. So this also says it on the direct line (covenant_contact.say,
+    A169): once when a red streak or a silence begins, and once when main is green again. The streak it last
+    told is kept in the cache, so the watchdog's every-round pass says nothing new while nothing changes. The
+    outbox is under HERE, so a staged sweep's copy writes to its own and is never delivered.
+    """
+    get = get or _ci_get
+    tell = tell or _tell_him
+    now = time.time() if now is None else float(now)
+    cache = cache or PUBLIC_CI
+    try:
+        with io.open(cache, encoding="utf-8") as fh:
+            st = json.load(fh)
+    except (OSError, ValueError):
+        st = {}
+    dirty = False
+    if now >= float(st.get("next_at") or 0):
+        dirty = True
+        try:
+            d = get("/repos/%s/actions/workflows/%s/runs?branch=main&per_page=30" % (CI_REPO, CI_WORKFLOW))
+            st["runs"] = [{"id": r.get("id"), "sha": str(r.get("head_sha") or "")[:7], "event": r.get("event"),
+                           "created": r.get("created_at"), "status": r.get("status"),
+                           "conclusion": r.get("conclusion"), "url": r.get("html_url")}
+                          for r in (d.get("workflow_runs") or [])]
+            st.update(ok_at=now, next_at=now + CI_EVERY_S, error=None)
+        except Exception as e:                                   # noqa: BLE001 -- any failure is "could not read"
+            st.update(next_at=now + CI_RETRY_S, error="%s: %s" % (type(e).__name__, str(e)[:120]))
+
+    def _save():
+        try:
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            with io.open(cache, "w", encoding="utf-8") as fh:
+                json.dump(st, fh, indent=1)
+        except OSError:
+            pass
+
+    ok_at = float(st.get("ok_at") or 0)
+    if now - ok_at > CI_STALE_S:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {
+            "repo": CI_REPO, "error": st.get("error") or "never read",
+            "last_good_read_h": round((now - ok_at) / 3600.0, 1) if ok_at else None}}
+    done = sorted((r for r in (st.get("runs") or [])
+                   if r.get("status") == "completed" and r.get("conclusion") in ("success", "failure")),
+                  key=lambda r: str(r.get("created") or ""), reverse=True)
+    if not done:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {"repo": CI_REPO, "why": "no finished run on main in the newest 30"}}
+    newest = done[0]
+    streak = done[:next((i for i, r in enumerate(done) if r["conclusion"] == "success"), len(done))]
+    created = _utc_ts(newest.get("created"))
+    age_h = round((now - created) / 3600.0, 1) if created else None
+    measured = {"repo": CI_REPO, "newest": {k: newest.get(k) for k in ("sha", "conclusion", "event", "created", "url")},
+                "age_h": age_h, "read_h_ago": round((now - ok_at) / 3600.0, 2)}
+    if newest["conclusion"] == "failure":
+        key = str(newest.get("id"))
+        ann = st.get("annotations") or {}
+        if key not in ann:
+            dirty = True
+            lines = []
+            try:
+                for j in get("/repos/%s/actions/runs/%s/jobs" % (CI_REPO, key)).get("jobs") or []:
+                    if j.get("conclusion") != "failure":
+                        continue
+                    for a in get("/repos/%s/check-runs/%s/annotations" % (CI_REPO, j.get("id"))) or []:
+                        if a.get("title") == "covenant_one.py --ci":
+                            # the runner prints a suite's failing lines as "| FAIL ..." (A232): the bar is dropped
+                            lines = [x.strip().lstrip("|").strip() for x in str(a.get("message") or "").split("~")]
+                            lines = [x for x in lines if x]
+                            break
+                    if lines:
+                        break
+                st["annotations"] = {key: lines[:16]}          # only the newest failing run is kept
+            except Exception as e:                               # noqa: BLE001
+                measured["annotation_error"] = "%s: %s" % (type(e).__name__, str(e)[:80])
+            ann = st.get("annotations") or {}
+        # No green run among the newest 30 means the red began earlier than this page reaches: say "at least".
+        measured.update(failing=ann.get(key) or [], red_runs=len(streak),
+                        red_since=(streak[-1].get("created") if streak else None),
+                        red_since_sha=(streak[-1].get("sha") if streak else None),
+                        red_since_is=("at least" if len(streak) == len(done) else "exact"))
+        named = [x for x in measured["failing"] if x.startswith(("FAIL", "suites not clean"))][:4]
+        episode = "red:%s" % measured["red_since_sha"]
+        text = ("The public CI is red on main: %s%d finished run(s) since %s%s, the newest %s. %s"
+                % ("at least " if measured["red_since_is"] == "at least" else "", len(streak),
+                   measured["red_since_sha"], " or earlier" if measured["red_since_is"] == "at least" else "",
+                   newest.get("sha"), "; ".join(named) or "The annotation named no check."))
+        state = PRESENT
+    elif age_h is not None and age_h > CI_SILENT_H:
+        measured["why"] = ("nothing on main has finished for %.1f h, and the schedule runs every 2 h -- "
+                           "a missing run is not a passing run" % age_h)
+        episode = "silent:%s" % newest.get("id")
+        text = ("Nothing on the public CI's main has finished for %.1f h, and the schedule runs every 2 h. "
+                "A missing run is not a passing run." % age_h)
+        state = PRESENT
+    else:
+        episode, text, state = None, "The public CI is green again on main at %s." % newest.get("sha"), ABSENT
+    if episode != st.get("told"):
+        if episode or st.get("told"):
+            said = tell(text[:600], "highway: the public CI (A232)")
+            measured["told"] = "said" if said else "refused by the direct line"
+        st["told"] = episode                  # said once, refused or not: a refusal is not retried every round
+        dirty = True
+    if dirty:
+        _save()
+    return {"state": state, "measured": measured}
+
+
 def _sweep_running():
     """Is a covenant_one.py sweep in flight on this machine? Read from the process list, never guessed."""
     import subprocess
@@ -1038,6 +1191,7 @@ DETECTORS = {
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,
     "sweep_red": detect_sweep_red,
+    "public_ci_red": detect_public_ci_red,
     "source_drift": detect_source_drift,
     "mesh_source_split": detect_mesh_source_split,
     "height_lag": detect_height_lag,

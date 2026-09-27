@@ -696,6 +696,92 @@ def main():
     check("H1w ...and a dry run says what it WOULD do without doing it",
           ok_rr2 is True and "would re-run" in why_rr2, why_rr2)
 
+    # ---- H1ci: public_ci_red (A232), with a stub API and a fixed clock -----
+    # H1v drives the real one against the network; these pin its behaviour
+    # without it, each way.
+    _t0 = 1790000000.0
+
+    def _run(i, concl, hours_ago, status="completed"):
+        return {"id": i, "head_sha": "%07x" % i + "0" * 33, "event": "push", "status": status,
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(_t0 - hours_ago * 3600)),
+                "conclusion": concl, "html_url": "https://example.test/run/%d" % i}
+
+    def _api(runs, lines, calls):
+        def get(path):
+            calls.append(path)
+            if "/actions/workflows/" in path:
+                return {"workflow_runs": runs}
+            if path.endswith("/jobs"):
+                return {"jobs": [{"id": 11, "conclusion": "success"}, {"id": 12, "conclusion": "failure"}]}
+            if "/check-runs/12/annotations" in path:
+                return [{"title": "", "message": "Node.js 20 is deprecated"},
+                        {"title": "covenant_one.py --ci", "message": "~".join(lines)}]
+            return []
+        return get
+
+    def _down(path):
+        raise OSError("offline")
+
+    # Every call below passes a stub `tell`: the real one writes the direct line to his phone.
+    _told = []
+
+    def _tell(text, why):
+        _told.append(text)
+        return {"id": "stub"}
+
+    _cdir = tempfile.mkdtemp(prefix="h1ci_")
+    _red = [_run(9, "cancelled", 0.1), _run(8, "failure", 0.5), _run(7, "failure", 1.5),
+            _run(6, "success", 3.0), _run(5, "failure", 4.0)]
+    _ann = ["RESULT: FAIL. Something is wrong and it is named above.",
+            "suites not clean    1  -> test_pv1_provenance.py",
+            "      | FAIL  PV1.6 a file outside the tree entirely is foreign"]
+    _calls = []
+    r_ci = H.detect_public_ci_red(get=_api(_red, _ann, _calls), now=_t0,
+                                  cache=os.path.join(_cdir, "red.json"), tell=_tell)
+    m_ci = r_ci["measured"]
+    check("H1ci the newest FINISHED run on main failed -> PRESENT: the cancelled one skipped, the failing check named "
+          "from the public annotation, the red counted back to the last green",
+          r_ci["state"] == H.PRESENT and m_ci["newest"]["sha"] == "0000008"
+          and "FAIL  PV1.6 a file outside the tree entirely is foreign" in m_ci["failing"] and m_ci["red_runs"] == 2
+          and m_ci["red_since_sha"] == "0000007" and m_ci["red_since_is"] == "exact", m_ci)
+    check("H1ci ...and it tells him on the direct line, naming the check",
+          len(_told) == 1 and "red on main" in _told[0] and "PV1.6" in _told[0], _told)
+    _n = len(_calls)
+    r_ci2 = H.detect_public_ci_red(get=_api(_red, [], _calls), now=_t0 + 60,
+                                   cache=os.path.join(_cdir, "red.json"), tell=_tell)
+    check("H1ci within its 30 minutes it asks the API nothing, the annotation was fetched once, and he is not told twice",
+          len(_calls) == _n and r_ci2["state"] == H.PRESENT and len(_told) == 1
+          and any("PV1.6" in x for x in r_ci2["measured"]["failing"]), (_calls, _told))
+    r_ci = H.detect_public_ci_red(get=_api([_run(11, "success", 0.1)] + _red, [], _calls), now=_t0 + H.CI_EVERY_S + 1,
+                                  cache=os.path.join(_cdir, "red.json"), tell=_tell)
+    check("H1ci broken the other way: when main turns green he is told once that it is green again",
+          r_ci["state"] == H.ABSENT and len(_told) == 2 and "green again" in _told[1], _told)
+    r_ci = H.detect_public_ci_red(get=_api([_run(4, "failure", 0.5), _run(3, "failure", 1.0)], [], []),
+                                  now=_t0, cache=os.path.join(_cdir, "allred.json"), tell=_tell)
+    check("H1ci no green run in the page: the start of the red is said as 'at least', not as exact -- to him too",
+          r_ci["state"] == H.PRESENT and r_ci["measured"]["red_since_is"] == "at least"
+          and any("at least 2 finished run(s) since 0000003 or earlier" in t for t in _told[-1:]),
+          (r_ci["measured"], _told[-1:]))
+    _green = [_run(10, "success", 0.5), _run(8, "failure", 1.0)]
+    _k = len(_told)
+    r_ci = H.detect_public_ci_red(get=_api(_green, [], []), now=_t0, cache=os.path.join(_cdir, "green.json"),
+                                  tell=_tell)
+    check("H1ci broken the other way: the newest finished run green -> ABSENT, whatever came before it, and nothing said",
+          r_ci["state"] == H.ABSENT and len(_told) == _k, r_ci["measured"])
+    r_ci = H.detect_public_ci_red(get=_api([_run(10, "success", 7.0)], [], []), now=_t0,
+                                  cache=os.path.join(_cdir, "silent.json"), tell=_tell)
+    check("H1ci green, but nothing on main finished for over 6 h -> PRESENT: a missing run is not a passing run",
+          r_ci["state"] == H.PRESENT and "missing run" in r_ci["measured"].get("why", ""), r_ci["measured"])
+    r_ci = H.detect_public_ci_red(get=_down, now=_t0, cache=os.path.join(_cdir, "none.json"), tell=_tell)
+    check("H1ci an API that cannot be read -> UNKNOWN, never ABSENT",
+          r_ci["state"] == H.UNKNOWN and "offline" in str(r_ci["measured"].get("error")), r_ci["measured"])
+    H.detect_public_ci_red(get=_api(_green, [], []), now=_t0, cache=os.path.join(_cdir, "old.json"), tell=_tell)
+    r_ci = H.detect_public_ci_red(get=_down, now=_t0 + 3 * 3600, cache=os.path.join(_cdir, "old.json"), tell=_tell)
+    check("H1ci broken the other way: a green read three hours old with the API down is UNKNOWN, not the cached green",
+          r_ci["state"] == H.UNKNOWN, r_ci["measured"])
+    check("H1ci public_ci_red has no remedy: the fix is a change to the code, and PRESENT reaches him as an alert",
+          not [n for n, rr in H.REMEDIES.items() if "public_ci_red" in (rr.get("for") or [])])
+
     # mesh_source_split arrived 2026-09-18 and H1v caught it with no coverage
     # here, which is again exactly what H1v is for. Its behaviour is pinned in
     # test_h2_update_witness.py (S1-S6, R1-R3); what is driven HERE is the one
