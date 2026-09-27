@@ -7292,6 +7292,86 @@ ignored there.
 **His to decide.** The emails cited kappa 0.857. Whether to tell anyone who replies that the larger measurement is
 0.744 is an outward message and his call. It is noted in the reply kit.
 
+**Later the same evening: the sync report, and the push guard it led to.** His words: "I approve it". That approved
+moving the remote sentinel-witness onto main, and the hook fix offered with it.
+
+*The report.* Since 2026-09-25 18:53, the remote sentinel-witness held `15adc13`, a pre-rebase copy of A220. Main
+holds the same tree plus one file. `ops/post-commit.autosync` pushed main and sentinel-witness in one command, so
+every commit for a day printed "push FAILED" while main had landed. The hook now pushes and reports each ref on its
+own. AS1 drives it against a scratch remote, both ways: with the old hook, AS1a fails with the live symptom. AS1 is
+3/3, and in the staged sweep 2/2 with AS1c NOT RUN, because no hooks are in use there. The installed hook is the
+tracked one.
+
+*The guard refused the approved move, wrongly, and could also fail open.* `tools/opsec_scan.py --pre-push` counted
+from the old tip of the ref being updated. So moving sentinel-witness onto main was refused for 29 commits the remote
+already held in main. It also read "git printed nothing" as "nothing added": with a remote tip this clone lacked, a
+commit carrying a new value went through (measured on a scratch remote).
+
+Rewritten over three rounds of adversarial review. Each reviewer had to reproduce a finding, with a real push to a
+scratch remote using fake values. What the guard does now:
+- It lists the objects the push would send (`git rev-list --objects`) and reads them (`cat-file`). It no longer
+  parses `git log -p` text.
+- It asks the remote what it already holds (`ls-remote`). This clone's copies of THAT remote's branches count only
+  when fetch url, push url and the hook's url agree.
+- It scans:
+  - blob bytes, as UTF-8, as cp1252 when they are not UTF-8, as UTF-32 on a BOM, and as UTF-16 when binary;
+  - a plain reading of names (JSON `\u` escapes, HTML entities, NFKC, curly and non-breaking characters);
+  - commit and tag text, and file and directory names.
+- Hex, IPv6 and names match in any case, and the wallet matches with or without `0x`.
+- It refuses, NOT MEASURED, on: a push line it cannot parse, objects git cannot read, and a private source that
+  exists but cannot be read.
+- Git reads ignore `refs/replace`. With a local replacement in place, the old reader saw a clean stand-in while
+  `git push` sent the hidden commit. Measured: 0 hits read, and the value on the remote.
+- The hook runs one copy of the guard for every worktree: the main worktree's, else the one committed on main.
+  Before, a worktree on an older commit ran the old reader, and one from before the tool failed every push.
+
+Reproduced and now closed:
+- *Round 1:* tag messages, a blob on a non-branch ref, merge-added files, UTF-16 files, a form feed or bare CR
+  before a value, lines starting `++`, file names and pure renames, and a ref name read in cp1252. Also the first
+  version's two regressions: a clone behind the remote was refused, and another remote's copies stood in.
+- *Round 2:*
+  - the wallet lower-cased (`covenant_earn` compares addresses that way);
+  - curly, escaped and non-breaking forms of device and Wi-Fi names;
+  - an accented name through `json.dumps`, cp1252, NFD or an HTML entity;
+  - a BOM or UTF-16 bystander list, and an unparsable grant, each dropping values silently;
+  - worktrees running an old or missing tool;
+  - a push url set apart from the fetch url;
+  - refspecs with spaces refused;
+  - the override crashing on a non-cp1252 path;
+  - chance 3-letter matches inside a zip.
+- *Round 3:*
+  - main-worktree coupling;
+  - a separated git dir;
+  - a 7-character name alone between NULs;
+  - a zero-width space in a bystander entry;
+  - a UTF-16 commit message;
+  - replace refs.
+
+The round-3 object-model reviewer was stopped by a safety check before it ran anything. Its cases were run here
+instead, and all came out right: notes, tags of a blob and of a tree, a shallow clone (value refused, clean control
+through), a mirror-shaped push, and a gpgsig header.
+
+*Pinned.* OS1 is 74/74, with sections OS1i, j, k and l added. Every fix was broken in memory or in a temporary copy:
+24 mutations across the rewrite's three versions. Each turned its own checks red, and nothing else apart from the
+hook-installed check while the new hook was not yet installed.
+
+*Measured on this repository.* The approved move reads 0 outgoing commits (1.2 s). The 10 commits since the A227
+cleanup replay with 0 refusals. The whole history as one push (5,728 objects, 277 MB) scans in 64 s, down from 416 s
+before the literal pre-check and fast case fold. The tree scan finds 0 files. The wider readings find 3,923 hits in
+old public history; that history is already public, and rewriting it is his decision.
+
+*The cost, stated.* A file that still holds a value can no longer be pushed again, even though that value was
+already public in its earlier version. 24 of the last 40 commits would have been refused on that ground, every one
+of them from before the A227 cleanup. Since the tree is clean, that is the default he asked for. A value he
+publishes by choice goes on `ops/opsec_public.json`.
+
+*Not seen, and named in the tool:*
+- values in another form: octal, NAT64, full-width, base64, compressed, split, or a name with an inner letter
+  escaped;
+- a 3-to-5-character name alone between NULs in a binary;
+- Git LFS uploads (none here);
+- history already public.
+
 ---
 
 ### A229. [earn: a mutual-benefit check that fails closed] 2026-09-26. His words: "Add a gate check that asks whether this transaction serves the builder as much as the user, and fail closed if it can't answer." To "who is the builder", he answered "all 3": the operator, Tetsu, and whoever made what is sold.
@@ -7437,6 +7517,13 @@ reports code for a person to move.
   commits add, commit by commit, and every commit message. A hit refuses the push and names
   the place with the value masked; the commit stays local.
   `COVENANT_OPSEC_ALLOW=1 git push` is his override, and it is logged.
+  > *Dated correction, 2026-09-26 evening (A231):* this line reader could fail open in
+  > three ways, and an adversarial review then reproduced further ways past it:
+  > - it read "git printed nothing" as "nothing added" when git failed;
+  > - it dropped a push line it could not parse;
+  > - it never read tag messages, merge-added lines, UTF-16 files or file names.
+  >
+  > The guard now scans objects. See A231.
 - Values he publishes by choice are listed by hash in `ops/opsec_public.json`. The one entry
   is his contact address, which is also his tailnet's name.
 - OS1 is 21/21 in the working tree. In the staged sweep it is 19/19, with its two

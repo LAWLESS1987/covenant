@@ -3,11 +3,12 @@
 # we do by default").
 # Install once:  cp ops/pre-push.opsec .git/hooks/pre-push
 #
-# Every line the outgoing commits ADD, commit by commit, and every commit message is
-# checked against his identifiers -- read at run time from where they live privately
+# Every object the push would send that the remote does not already hold -- file
+# contents in every encoding a Windows tool writes, commit and tag text, file names --
+# is checked against his identifiers, read at run time from where they live privately
 # (Tailscale's status, the Syncthing config, the Wi-Fi name, the gitignored money
 # grant, private/bystanders.txt) by tools/opsec_scan.py. A hit refuses the push and
-# names file:line with the value masked. The commit stays local; nothing is lost.
+# names path:line with the value masked. The commit stays local; nothing is lost.
 #
 # It sits at the PUSH, not the commit, on purpose: .git/hooks/pre-commit must never
 # block a commit (its own rule), and post-commit pushes every commit at once -- so the
@@ -16,5 +17,35 @@
 #
 # His override, for one push, logged to ops/opsec_overrides.jsonl (gitignored):
 #   COVENANT_OPSEC_ALLOW=1 git push
-root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-exec python "$root/tools/opsec_scan.py" --pre-push "$@"
+#
+# ONE guard for every worktree (2026-09-26, A231). Hooks are shared by all worktrees. This used to run the
+# PUSHING worktree's own tools/opsec_scan.py: a worktree on an older commit ran the old reader (a review pushed
+# a UTF-16 value through it), and one from before the tool existed failed every push with a Python error.
+# It now runs ONE version, found in this order:
+#   1. the main worktree's copy on disk. The main worktree is the folder that holds .git. With a separated
+#      git dir there is no such folder (git worktree list then names the git dir itself, and the private
+#      sources went unread -- measured), so it is the pushing worktree's top level;
+#   2. else the copy committed on the local main branch. A review showed that a main worktree checked out
+#      to an old commit otherwise refused every clean push from the others.
+# It refuses, saying why, if neither exists. Either copy runs against the main worktree, where the private
+# sources are (COVENANT_OPSEC_ROOT). Objects and refs are shared, so it reads exactly what is being pushed.
+refuse() { echo "opsec pre-push: REFUSED -- $1; nothing was checked" >&2; exit 1; }
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || refuse "git could not name the repository"
+if [ "$(basename "$common")" = ".git" ]; then
+  main_root=$(dirname "$common")
+else
+  main_root=$(git rev-parse --show-toplevel 2>/dev/null)
+fi
+[ -n "$main_root" ] && [ -d "$main_root" ] || refuse "git could not name the main worktree"
+tool="$main_root/tools/opsec_scan.py"
+tmp=""
+if [ ! -f "$tool" ]; then
+  tmp=$(mktemp -d 2>/dev/null) || refuse "no temporary directory for the committed copy of the guard"
+  git cat-file blob refs/heads/main:tools/opsec_scan.py > "$tmp/opsec_scan.py" 2>/dev/null \
+    || { rm -rf "$tmp"; refuse "the guard is neither at $tool nor committed on the main branch"; }
+  tool="$tmp/opsec_scan.py"
+fi
+COVENANT_OPSEC_ROOT="$main_root" python "$tool" --pre-push "$@"
+rc=$?
+[ -n "$tmp" ] && rm -rf "$tmp"
+exit $rc

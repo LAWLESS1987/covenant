@@ -23,9 +23,15 @@ if [ "$b" != "main" ]; then
   exit 0
 fi
 git branch -f sentinel-witness main >/dev/null 2>&1
-if git push -q origin main sentinel-witness >/dev/null 2>&1; then
-  echo "post-commit: pushed main and sentinel-witness ($(git rev-parse --short HEAD))"
+# Each ref is pushed and reported on its own (2026-09-26, A231). One push of both returned non-zero when only
+# sentinel-witness was refused -- its remote copy predated a rebase of main -- so for a day every commit said
+# "push FAILED" while main had landed. A report that names the wrong thing is the quiet-sync defect again.
+if git push -q origin main >/dev/null 2>&1; then
+  echo "post-commit: pushed main ($(git rev-parse --short HEAD))"
 else
-  echo "post-commit: push FAILED -- offline, or the remote is ahead (git pull --rebase, then commit again)" >&2
+  echo "post-commit: push of main FAILED -- offline, refused by the opsec guard, or the remote is ahead (git pull --rebase, then commit again)" >&2
+fi
+if ! git push -q origin sentinel-witness >/dev/null 2>&1; then
+  echo "post-commit: sentinel-witness NOT pushed (main is unaffected) -- see what only the remote copy holds: git fetch origin sentinel-witness, then git log main..FETCH_HEAD" >&2
 fi
 exit 0

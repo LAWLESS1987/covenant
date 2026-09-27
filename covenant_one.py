@@ -513,6 +513,9 @@ SUITES = [
     # the push guard is proved on a throwaway repository. OS1g/OS1h report NOT RUN here
     # (no git index in the staged copy) and run in the working tree.
     ("test_os1_opsec.py", 180, "DAILY + GUARDS"),
+    # AS1 (2026-09-26, A231): the post-commit auto-sync reports main and sentinel-witness each on its own -- one
+    # push of both said "push FAILED" for a day while main had landed.
+    ("test_as1_autosync_report.py", 120, "DAILY + GUARDS"),
     # JR1 (2026-09-19): how Ora and Sena resolve a disagreement, written down
     # and driven BEFORE the second judge is flipped on -- his four conditions.
     # All nine cells of the table asserted independently of the module, the
