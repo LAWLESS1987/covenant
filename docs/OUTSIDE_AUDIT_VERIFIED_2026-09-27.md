@@ -56,11 +56,19 @@ characterization, the background-tab GraphQL behaviour and the
 
 ## What it got wrong
 
-- **X4 STALE, and this one matters most.** *"Every search-based tool returns
-  nothing for this account"* was true when written. Four days before this audit,
-  `ops/chat/phone/ai.x.grok.jsonl:395` records *"The view_x_video tool worked on
-  the direct MP4 URLs"* and :458 returns earliest-accessible videos from late June.
-  The audit built its "false negative by design" conclusion on a superseded line.
+- **X4 STALE, and this one matters most.** The sentence is ours and it reads, at
+  `docs/CORPUS_2026-09-09.md:92-93`, *"Every search-based tool will return nothing for
+  this account and report it as an empty result."* — future tense; the audit's
+  present-tense rendering is a paraphrase, which is why its quote_check is
+  PARAPHRASED rather than FAITHFUL. It was true when written. Four days later
+  `ops/chat/phone/ai.x.grok.jsonl:395` records, in full, *"The view_x_video tool
+  worked on the direct MP4 URLs."*, and :458 *"Here are the earliest accessible
+  videos from late June 2026 (primarily June 28–29):"* — both stamped 2026-09-23,
+  four days before this audit was written. The audit's conclusion that any search
+  of this account is a false negative by construction therefore rests on a
+  superseded line. Note the repo reached for the same phrase first, at :96, *"will
+  get a false negative unless it uses the"* — so the idea is ours; only the claim
+  that it still holds is stale.
 - **X11b REFUTED, and inverted.** The audit says a private video that never
   rendered a player would not expose a `progressive_url` at all. Six of them did.
   It read the document's own method correction backwards.
