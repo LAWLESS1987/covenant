@@ -115,8 +115,25 @@ else:
 # ------------------------------------------------------- W2.7 live /health
 print("\n== W2.7 a live node says so on /health, both ways ==")
 def free_port():
+    """An API port whose P2P (+1) and bridge (+11) ports are free too: the node's own preflight needs all three
+    ("--port N needs ALL of N, N+1, N+11"). This took any free port, and on 2026-09-26 its +1 was held by another
+    connection in three runs of three (Windows hands out ephemeral ports in sequence), so the node refused to start
+    -- PREFLIGHT FAILED, printed to the stdout this suite threw away -- and W2.7 read it as 'no /health'."""
+    # And OUTSIDE the ephemeral range (49152-65535 on Windows): checking N+1 at selection was not enough -- in
+    # the second before the node bound it, the next outgoing connection on this busy machine took it, because
+    # Windows hands ephemeral ports out in sequence. A port below that range is never handed to a connection.
+    import random
     import socket as s
-    x = s.socket(); x.bind(("127.0.0.1", 0)); p = x.getsockname()[1]; x.close(); return p
+    p = 0
+    for _ in range(400):
+        p = random.randint(30000, 45000)
+        try:
+            for q in (p, p + 1, p + 11):
+                y = s.socket(); y.bind(("0.0.0.0", q)); y.close()
+            return p
+        except OSError:
+            continue
+    return p
 
 def boot(tag, extra_env, tries=40):
     port = free_port()
@@ -136,9 +153,11 @@ def boot(tag, extra_env, tries=40):
     try: os.remove(errlog)
     except OSError: pass
     efh = open(errlog, "wb")
+    # stdout too (2026-09-26): the node prints its PREFLIGHT refusal on stdout, which went to DEVNULL -- the
+    # same lost evidence the note above is about, one stream over.
     p = subprocess.Popen([sys.executable, "covenant_unified_v8.py", "--port", str(port),
                           "--node-id", tag],
-                         stdout=subprocess.DEVNULL, stderr=efh, env=env)
+                         stdout=efh, stderr=efh, env=env)
     efh.close()
     for _ in range(tries):
         time.sleep(0.5)

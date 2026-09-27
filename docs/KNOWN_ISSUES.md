@@ -7397,6 +7397,15 @@ What still keeps an orb from green, measured:
 - **Nodes.** A provider key, which he has declined; otherwise amber is the honest state of a keyless mesh.
 - **Money.** Tetsu's own declaration.
 
+*Later the same night.* After A230 (earn on loopback) and A232 (the public CI) landed, the full sweep read 164
+suites, 4,330 checks passed, 1 failed: `test_w2_sandbox_platform.py` W2.7, "node w2off came up -- no /health".
+It failed three runs of three standalone. The node refused to start: PREFLIGHT FAILED, its P2P port (API port + 1)
+not free. The suite chose only a free API port. On this busy machine Windows hands out ephemeral ports in sequence,
+so the port after it was taken by the next outgoing connection, even when checked free at selection. The refusal
+went to stdout, which the suite discarded. The suite now chooses ports below the ephemeral range (Windows'
+starts at 49152, measured) with N, N+1 and N+11 all free, and keeps the node's stdout as evidence. Six runs of six:
+12/12.
+
 ---
 
 ### A231. [the science re-measured on the live system; two defects the run found] 2026-09-26. His words: "do it and run the public to retrieve scientific data then update the private and and needed text docs".
