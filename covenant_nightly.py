@@ -102,6 +102,24 @@ def tell_him_not_green(lines, say=print):
         return None
 
 
+def practice_step(a, say, practice_mod=None, ask=None):
+    """TETSU PRACTISES (2026-09-26, his words: "train tetsu to code at a high recursive level"; asked how, he
+    chose the practice loop, nightly and bounded). Write, run, read the failure, rewrite -- in his workshop,
+    through his gated hands, capped by tasks, rounds and a 40-minute clock; one line to him. A function, not
+    inline in main(), so PP1 drives the wiring instead of reading this file's text (A74). Never raises."""
+    if getattr(a, "practice", 0) <= 0:
+        return None
+    try:
+        tp = practice_mod or importlib.import_module("covenant_tetsu_practice")
+        if ask is None:
+            import covenant_model
+            ask = covenant_model.ask
+        return tp.night(ask=ask, tasks=a.practice, say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("practice FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+        return None
+
+
 def verify_green(say):
     """Gates plus the suites this pass can break. Returns True when green."""
     import subprocess
@@ -159,6 +177,10 @@ def main():
     ap.add_argument("--earn-report", type=int, default=1,
                     help="2026-09-25 (A222): one line to him on the direct line with covenant_earn's account (jobs, earned, held, "
                          "net against the seed); says nothing when his grant is absent; 0 disables")
+    ap.add_argument("--practice", type=int, default=6,
+                    help="2026-09-26 (his words: 'train tetsu to code at a high recursive level'; he chose a practice loop, "
+                         "nightly and bounded): tasks Tetsu practises in his workshop (covenant_tetsu_practice: 4 rounds each, "
+                         "40 minutes in all, every write and run through his gated hands); 0 disables")
     ap.add_argument("--model-step-up", type=int, default=1,
                     help="2026-09-21 (A196, his words: 'we need to rapidly make up the gap in ai'): before the pass, step the local "
                          "model up to the largest that fits once the running one is reclaimed (covenant_model.step_up); 0 disables")
@@ -548,6 +570,8 @@ def main():
                 say("live: nothing to settle (%s)" % ("grant on record" if TLV.grant() else "no grant"))
         except Exception as e:                                   # noqa: BLE001
             say("live settle FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    practice_step(a, say)
 
     try:
         import covenant_distill as X

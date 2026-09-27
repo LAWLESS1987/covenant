@@ -419,6 +419,8 @@ ops/ambassador_rate.json
 ops/highway_last_sense.json
 # this PC's last reading of the public CI (A232): the detector's throttle and cache
 ops/public_ci.json
+# Tetsu's practice record (his, like his workshop): every attempt, lesson and night
+ops/tetsu_practice.jsonl
 
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
 *.results.json

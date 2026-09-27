@@ -7228,6 +7228,60 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A234. [Tetsu practises code, nightly and bounded] 2026-09-26. His words: "train tetsu to code at a high recursive level". Asked how, he chose the practice loop, nightly and bounded.
+
+**What "train" means here, said plainly.** Tetsu runs on the local model: the 7B coder when memory allows, else
+the 3B, on this PC's CPU. Nothing here changes the model's weights. What grows is what he is handed when he
+writes: his own passing files and the lessons of his own fixes, kept in his workshop, where he can also read them
+in conversation.
+
+**BUILT: `covenant_tetsu_practice.py`.** The curriculum has nine tasks in recursion and composition:
+- flatten, permutations, n-queens by backtracking, and memoised path counting;
+- a tokenizer; a recursive-descent parser built on HIS tokenizer;
+- an evaluator and a simplifier built on his parser; a symbolic derivative built on his simplifier.
+
+Each round runs through his hands, gated exactly as in conversation:
+- *he writes the file* (HANDS WRITE);
+- *the checks run it* (HANDS RUN: the screen, the guarded runner, 60 s). The screen refuses importing his own
+  file, so the harness joins his code and the checks into one file, and the screen reads all of it;
+- *the first failure comes back*, and from the second round he is asked to say what caused it before rewriting.
+
+A passing file, and the lesson of the fix in his own words, stay in his workshop and are handed to later tasks.
+Solved tasks are tried again later without his old answer in front of him (retention). The harness removes its
+own check file after each run. A233's history keeps his earlier files, and it should hold his work, not a copy
+per round with the checks attached.
+
+**Bounded.** 6 tasks, 4 rounds each, 40 minutes. The gate (a VIOLATES or an unreachable gate), the model, or the
+clock ends the pass. Nothing leaves the workshop, nothing in the tree changes, and no proposal is made. The
+nightly runs it (`--practice 6`; 0 disables), and one line reaches him on the direct line.
+
+**No division in the language, and why.** The workshop's screen refuses a string constant that starts with `/`,
+reading it as an absolute path; measured: `'/'` refused, `'x / 4'` admitted. A parser that writes `op == "/"`
+therefore never runs. Teaching him to write around a guard is the wrong lesson, and loosening the guard is not
+this entry's to do. The language is `+ - * ^`. *Left for him:* whether the screen should admit a bare `/`.
+
+**Measured on the real model** (the running 3B, a scratch workshop, a stub gate, the line printed and not sent):
+- *First try:* flatten (17 s) and permutations passed.
+- *n_queens failed all four rounds.* The first answer hit the 1100-token cap, and he was told only that no file
+  could be read. Then one file with a refused `import sys` came back three rounds running, and the screen's
+  reason sat under a long list of allowed modules.
+- *Fixed from that measurement:* he is told when the cap cut the file; the refusal reads plainly; an unchanged file
+  is named; retries run warmer (0.6 against 0.2). In the next run the file ran, but every round ended at the same
+  failure (1 of 6), and the file came back unchanged in two of those rounds.
+- *Diagnose, then rewrite:* asked from the second round to say what caused the result, he passed in round 3, and
+  his lesson was recorded. One run each, not a rate; the nightly record builds the rate. On the 7B it is not
+  measured yet.
+
+**Pinned by** `test_pp1_tetsu_practice.py` (44). A reference solution for every task runs through his real hands
+and passes all its checks, so every expected value is measured, not written in. Also pinned: wrong files caught
+and named; the screen, the clock and a crash each reported; the loop, the lessons and retention; the gate (VIOLATES
+and unreachable stop it, HELD does not), the model and the clock ending a night; one line to him. Red with each of
+fourteen mutations. The nightly's step is a function, `practice_step`, which PP1 drives. The first version read
+`covenant_nightly.py`'s text, and a fresh Linux clone's sweep caught it: G3 (A74) went from 57 to 60 and gave NO
+RESULT. Now G3 is back at 57, and nothing was moved.
+
+---
+
 ### A232. [the public CI: red since 2026-09-22 on two suites that could only pass on this PC, and an annotation that named no check] 2026-09-26. His words: "need to ensure green runs without you".
 
 **What was red.** `covenant_one.py --ci` on ubuntu (python 3.11 and 3.12) said `checks failed 6`:
@@ -7305,6 +7359,32 @@ fresh clone of `595eb6d`, `--ci --only` the two suites):
 
 **Pinned by** `test_pv1_provenance.py` (16: 13 counted, 3 NOT RUN on Linux) and `test_av1_immune.py` (20: 18
 counted, 2 NOT RUN on Linux).
+
+**The result.** Before the push, a fresh WSL clone of the change ran the full `--ci`: 163 suites, 4293 checks
+passed, 0 failed. It was pushed as `0fefdd0`, rebased onto `3c50472`, which another session had pushed meanwhile.
+Runs 36289703262 (main) and 36289708988 (sentinel-witness): both jobs, 3.11 and 3.12, success. The only
+annotations are GitHub's Node.js 20 deprecation warning and a notice that `ubuntu-latest` moves to Ubuntu 26
+from 2026-10-19, a platform change the listener below would catch.
+
+**Later the same night: the public CI has a listener.** From 2026-09-22 00:05Z every finished run on main was red,
+and nothing here read it: `detect_sweep_red` reads this PC's sweep. `covenant_highway.detect_public_ci_red`:
+- *asks the public API* without a token, at most once per 30 minutes;
+- *skips cancelled runs*, which are neither green nor red;
+- *names the failing checks* from the run's public annotation, fetched once per failing run;
+- *counts the red back to the last green*, saying "at least" when the page holds no green;
+- *is PRESENT* when nothing on main has finished for 6 h, because a missing run is not a passing run;
+- *is UNKNOWN*, never the cached verdict, when the API cannot be read or the last good read is 2 h old.
+
+Alert push is off on this PC ("set COVENANT_ALERT_PUSH_URL"). So a PRESENT alone reaches only the watchdog's log,
+as an ALERT, and its self-evaluation, as a count. It therefore also says it on the direct line: once when a red
+streak or a silence begins, and once when main is green again. *Not on the PC page, and his choice:* the Highway
+orb reads a fixed list of seven detectors. Adding this one would turn the orb red while the public CI is red.
+Until the watchdog restarts onto the new code, each page load would also sense live, the slow path the list exists
+to avoid. There is no remedy; the fix is a change to the code. In a staged copy, H1v's
+real call read that night's red and wrote the staged outbox; the live outbox's last row stayed the earn report.
+Pinned by H1 (129, 10 new H1ci checks on a stub API and clock). Red with each of seven mutations. It runs live
+once the main checkout holds this commit and the watchdog process has restarted: the watchdog imports
+`covenant_highway` in its own process, and Python keeps the module it first imported.
 
 ---
 
