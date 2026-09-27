@@ -7278,6 +7278,43 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A239. [the corpus-recount guard checks the tool's output, never the document] 2026-09-27. Found by a 21-agent verification of an outside audit, then read first-hand. OPEN
+
+`docs/CORPUS_RECOUNT_2026-09-17.md` bills `test_p24_corpus_counts.py` as the
+mechanism that stops the prose drifting from the data — the whole point of the
+2026-09-17 recount, since rule 1 exists because a media index was checked against
+itself. Read the suite (123 lines) and every assertion is about the TOOL'S OUTPUT,
+not about any document:
+
+    P24c  "X totals reported"        -- a regex finds "X TOTAL n m" in the output
+          "files >= posts"           -- internal sanity
+          "X corpus is non-trivial"  -- posts > 50
+    P24d  "date agreement reported", "every X date matches its own snowflake"
+    P24e  the string "120 on X" appears in the output
+
+Not one assertion opens a markdown file. Nothing compares a number written in
+prose with a number computed from a catalogue, so the property the doc credits it
+with is untested: edit a stated count in `CORPUS_2026-09-09.md` and P24 still
+prints PASSED. This is the A65 shape — a guard that measures that something was
+*printed*, not that two things *agree*.
+
+**And the Facebook side is not read at all.** `grep -n "FB TOTAL\|fb_pre_july\|
+fb_multi\|\b26\b"` over the suite returns nothing. The 26 private videos before
+6 July are the load-bearing number of the J-space closure, and no assertion
+touches them: edit any row of `private/fb_pre_july/catalog.csv` or the 26 in
+`CORPUS_2026-09-09.md` and the suite is unaffected.
+
+**What IS real in it, and should not be lost:** P24b walks `private/` and filters
+by header content, so it genuinely would catch a catalogue the tool stopped
+finding — the rule-2 regression that missed `private/x_missing2`. That one works.
+The gap is the prose-vs-data property and the whole FB population.
+
+**Not fixed here.** Adding assertions that pin prose to data changes what a suite
+refuses, and the first thing such a check would do is go red on whatever prose is
+currently stale — which is the point, and is his to schedule.
+
+---
+
 ### A238. [verify_deploy's EXPECTED_LINES is enforced on the path nobody takes] 2026-09-27. Found while moving the stale pins his instruction "get all nodes and orbs green" required. OPEN
 
 **The stale pin first, because it is the reason anyone looked.** `verify_deploy.py`
