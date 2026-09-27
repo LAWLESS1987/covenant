@@ -7460,6 +7460,30 @@ publishes by choice goes on `ops/opsec_public.json`.
 
 ---
 
+### A230. [earn / exposure] 2026-09-26. The evening sweep (A82's A2, 17/18) found the earn server wildcard-bound on 0.0.0.0:5090 and outside the exposure checker's scope -- the same shape as the six peer ports the checker once missed. FIXED: the server binds to loopback by default (Tailscale Funnel proxies to 127.0.0.1:5090; nothing on the LAN needs the socket) and `exposure_check.py` knows the port
+
+**Measured** by the parallel session's full sweep of 2026-09-26 evening: 164 suites,
+4,319 passed, 4 failed; `test_a82_exposure_unknown.py` A2: open=[5000, 5001, 5011,
+5020, 5021, 5031, 5040, 5060, 5061, 5071, 5090], missed=[5090]. The earn server
+(A222) had been started by the watchdog with `--serve` and the module's default
+host 0.0.0.0, and `exposure_check.PORTS` was built from the node bases alone.
+
+**Fixed, two ways.** `covenant_earn.serve` defaults to 127.0.0.1: buyers reach the
+service through the Funnel, which proxies to loopback; the watchdog's port check
+and a local client see it; the LAN and the firewall's public profile do not.
+`--host 0.0.0.0` stays his to pass. And `exposure_check.EARN_PORTS = [5090]` joins
+the scope, so the checker reports the port as loopback, or as WILDCARD like any
+other if it is ever bound that way again. The live server steps down on its own
+when its source changes (the step-down of the same day) and the watchdog starts
+it on loopback. A82 18/18 after the change, the live socket still wildcard at the
+moment of the run and now inside the scope; EA1 43/43.
+
+**Not changed:** the Funnel, the grant, the ports of the nodes, or the checker's
+posture on any other port.
+
+**Repro:** `python test_a82_exposure_unknown.py`; `python exposure_check.py`.
+
+
 ### A229. [earn: a mutual-benefit check that fails closed] 2026-09-26. His words: "Add a gate check that asks whether this transaction serves the builder as much as the user, and fail closed if it can't answer." To "who is the builder", he answered "all 3": the operator, Tetsu, and whoever made what is sold.
 
 **What was built.** `covenant_earn.mutual_benefit(key, grant)` asks the question of the job's recorded facts. It

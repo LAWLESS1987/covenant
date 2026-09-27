@@ -139,7 +139,11 @@ Tailscale Funnel, enabled on his greenlight and sign-in, proxies that name to
 port 5090 on this PC and is kept by the Tailscale service across reboots. The
 grant's `public_url` names it, so every 402 carries it as the resource URL. His
 word on publishing the name: "the tailnet name can be public, if buyers need it".
-Only that port is exposed; nothing else on the PC.
+Only that port is exposed; nothing else on the PC. Since 2026-09-26 (A230) the
+server itself binds to loopback, 127.0.0.1:5090: the Funnel proxies to that
+address, the LAN cannot reach the socket, and the exposure checker
+(`exposure_check.py`) knows the port. The evening sweep had found it
+wildcard-bound and outside the checker's scope (A82's A2 check, 17/18).
 
 ## Bringing buyers: advertising (2026-09-26, his words: "start an online advertisment program to generate revenue")
 

@@ -1863,8 +1863,14 @@ def _keeper(app, stop, srv=None, changed=None, period=120.0):
         stop.wait(period)
 
 
-def serve(port=DEFAULT_PORT, host="0.0.0.0", app=None, block=True):
-    """Long-lived. The offers are put to the gate first; a VIOLATES refuses to start. Returns the server."""
+def serve(port=DEFAULT_PORT, host="127.0.0.1", app=None, block=True):
+    """Long-lived. The offers are put to the gate first; a VIOLATES refuses to start. Returns the server.
+
+    LOOPBACK BY DEFAULT (2026-09-26, A230). The evening sweep's exposure check (A82's A2) found this server
+    wildcard-bound on 0.0.0.0:5090 and outside the exposure checker's scope. Buyers reach it through
+    Tailscale Funnel, which proxies to 127.0.0.1:5090 on this PC; nothing on the LAN or the public profile
+    of the firewall needs the socket. So the listener binds to loopback: the Funnel, the watchdog's port
+    check and a local client see it, the network does not. --host 0.0.0.0 is still his to pass."""
     try:
         import covenant_quiet
         covenant_quiet.install()

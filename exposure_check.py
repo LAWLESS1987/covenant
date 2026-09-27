@@ -78,7 +78,14 @@ from typing import Dict, List, Optional, Set, Tuple
 # chain traffic, rather than the read-only HTTP API. A security check that
 # under-reports is worse than none, because it is believed.
 BASE_PORTS = [5000, 5020, 5040, 5060, 5100, 5120, 5140]
-PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 1, b + 11)})
+# A230 (2026-09-26): the earn server (covenant_earn.py, A222) listens on 5090. The
+# evening sweep's A82 A2 check found it wildcard-bound and OUTSIDE this scope --
+# the same shape as the six peer ports this file once missed. It is in scope now;
+# the server itself binds to loopback since the same day (Tailscale Funnel proxies
+# to 127.0.0.1:5090), so this tool reports it as "loopback" unless someone passes
+# --host 0.0.0.0, in which case it is reported as WILDCARD like any other.
+EARN_PORTS = [5090]
+PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 1, b + 11)} | set(EARN_PORTS))
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
