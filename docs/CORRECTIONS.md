@@ -42,9 +42,23 @@ perfection is not the goal, mutual benefit and honesty is.*
 | **A third party's name was quoted verbatim into a file in the public repository** while writing up A122 — a bystander who never consented to any of this. Redacted; it remains in git history, which only a rewrite removes | [A129](KNOWN_ISSUES.md) |
 | A privacy posture was **imposed on the operator who does not hold one** — the first fix for A128 refused to send anything under `private/` by default. Replaced within the hour: the tool announces, and he decides | [A128](KNOWN_ISSUES.md) |
 
+## Green that checked nothing — 2026-09-27
+
+Not wrong claims about the world: wrong claims a check made about itself. Filed here because
+the pattern below already names them and they kept happening anyway.
+
+| What was claimed | What is true | Where |
+|---|---|---|
+| **The self-heal re-measures an asynchronous remedy on the next pass** — `apply_remedy` wrote `outcome="started"` with that note, and `docs/HIGHWAY.md` published it | Nothing implemented the next pass. Measured from `ops/highway.jsonl`, unit LEDGER ROWS: **252 starts, 0 outcomes** — `dispatch_phone_build` 11/0, `fetch_build` 177/8, `schedule_watchdog_restart` 64/0 — while `--standing` printed UNPROVEN and explained, correctly, that "nothing checks what they started". It cost five days of phone builds dispatched into a full artifact store. `grade_started()` now keeps it, and its first pass promoted `schedule_watchdog_restart` to **EARNED, 16 fixed / 0 missed**: it had been working the whole time and nothing had ever said so | [HIGHWAY.md](HIGHWAY.md) |
+| **A remedy that declined is recorded `held`, not as a failure** — true of the synchronous path since 2026-09-19 | The **asynchronous** path ignored `ran=False` entirely, so a remedy that did nothing was filed `started`. Compounded by `remedy_fetch_build` returning true whenever *any* build sat on disk, so "already have build 2ab1ba5" reported as a remedy that had acted. Together: 16 correct declines became 16 failures and quarantined it | [HIGHWAY.md](HIGHWAY.md) |
+| **`verify_deploy.py` pins the core's line count** | `EXPECTED_LINES` has one executable use, the running-node comparison, and `--no-restart` never reaches it — the invocation the hourly self-eval and `AM_VERIFY_AND_RESTART` take. Perturbed by one, that path's verdict is unchanged; on the full path it fails on all three nodes. The digest *is* checked on both | [A238](KNOWN_ISSUES.md) |
+| **`test_p24_corpus_counts.py` stops the corpus prose drifting from the data** — the stated purpose of the 2026-09-17 recount | Every assertion is about the **tool's output**: a regex finds `X TOTAL n m`, files ≥ posts, posts > 50, the string "120 on X" is present. None opens a markdown file, so no stated number is ever compared with a computed one. And the Facebook population is absent entirely — the 26 private videos carrying the J-space closure are read by no assertion. Its one real guard, walking `private/` by header content, stays | [A239](KNOWN_ISSUES.md) |
+| **A serialiser benchmark's timing is "evidence, reported and not asserted"** — the comment beneath it | It was asserted, on a single sample, and failed public CI on a commit that changed one markdown file. The same commit passed the same workflow, and passed again on schedule: identical bytes, three verdicts. Fixed by best-of-N — **and the first fix was hollow**: `t_new < t_old` was satisfied by 0.1 ms of 18.5, and passed with both paths doing identical work. A margin was needed too, and only the mutation said so | `test_e2_chain_serialisation.py` |
+
 ## What the pattern is
 
-Three separate findings here are the same shape, and it is worth naming once:
+Findings throughout this file are the same shape — three in the original entries, five more
+added on 2026-09-27 — and it is worth naming once:
 
 > **A check that confirms a claim is *stated consistently* is not a check that the claim
 > is *true*.**
@@ -59,6 +73,23 @@ demonstrated the defect instead.
 **The standing question that follows, for any conformance artifact here:** state what an
 implementation must compute in order to pass, then demonstrate the check **fails** when
 it is not computed. Breaking a green on purpose is the only proof the green was earned.
+
+**2026-09-27 — that question was already written here, and it caught the writer.** Fixing the
+flaky benchmark above, I repaired the estimator, wrote into the comment that the mutation
+made it go red, and only then ran the mutation: with both code paths doing identical work it
+measured 18.5 ms against 18.4 ms and **passed**. The estimator was right and the threshold was
+hollow, and the sentence claiming otherwise was in the file before the test that refuted it.
+So the rule is narrower than "break it on purpose": **break it on purpose BEFORE writing down
+that you did.** Every claim of a both-ways proof on this page was made after the red, not
+before — that one was the exception, and it is recorded rather than quietly corrected.
+
+**And a caveat found by the local model, not by me.** Asked what best-of-N fails to cover, it
+answered that noise can sometimes *reduce* a measurement — imprecise as stated, since noise
+only adds time, but pointing at a real mechanism: taking the minimum also selects the warmest
+cache and the highest clock, and the two paths are measured in a fixed order. So it was
+measured rather than argued. Old-first gave 8.02x, 8.15x, 8.34x; new-first 8.82x, 8.24x,
+8.41x; fully interleaved 7.95x — the ordering does not decide it, and every arrangement clears
+the 2.0x threshold by a wide margin. The objection was right to raise and does not bite here.
 
 ## How a retracted claim is stopped from coming back
 

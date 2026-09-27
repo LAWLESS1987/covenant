@@ -4,7 +4,7 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `447ed5ecdffc` · 12,660 lines · **147 suites, 3,992 checks, 1 failed** on win32 <!--TOTALS-->
+**v8.40** · source `e8a79ee502d8` · 12,783 lines · **166 suites, 4,497 checks, 0 failed** on win32 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
 the version, hash and line count from the core module itself, the suite and
 check counts from the newest `covenant_one.py --all` transcript. The date on
@@ -309,6 +309,45 @@ The rule, and the machinery behind it:
   anywhere in the tree without its retraction's id within ten lines of it. It caught two
   live sites the hand sweep had missed on its first run.
 
+### Green that meant nothing — six in one day, 2026-09-27
+
+The other way to be wrong in public is to publish a green tick that checked nothing. This
+project names that pattern in [docs/CORRECTIONS.md](docs/CORRECTIONS.md) — *a check that
+confirms a claim is stated consistently is not a check that the claim is true* — and then
+found six fresh instances of its own pattern in a single day, one of them inside the fix
+for another.
+
+- **A delivery gate read `FAIL` for days on good bytes.** `verify_deploy.py` pinned the core
+  at a digest five commits stale, so the hourly self-evaluation printed *"verify_deploy reads
+  FAIL and refuses every restart it gates"* — a guard built to refuse a bad delivery refusing
+  a good one, on the schedule most likely to teach its reader to ignore it.
+- **Half of that same pin was never enforced.** `EXPECTED_LINES` has one executable use, the
+  running-node comparison, and the `--no-restart` invocation — the one the hourly check and
+  the restart script actually use — never reaches it. Perturbed by one line, that path's
+  verdict did not change ([A238](docs/KNOWN_ISSUES.md)).
+- **A guard checked its tool's printout instead of the document.** The suite credited with
+  keeping the media-corpus prose honest asserts that a regex finds `X TOTAL n m` in the
+  output, that files ≥ posts, that a string is present. Not one assertion opens a markdown
+  file, and the entire Facebook side — the 26 videos a whole investigation rests on — is read
+  by nothing ([A239](docs/KNOWN_ISSUES.md)).
+- **The self-heal performed 252 actions and never checked one of them.** Asynchronous
+  remedies recorded `started` with the note *"the condition is re-measured next pass"*, and
+  nothing implemented the next pass. Asked which of these mattered most, the local model that
+  runs here picked this one, and it was right: *"the system is making decisions based on
+  unverified actions."* The grader now written for it immediately proved a remedy that had
+  been working silently for weeks — `schedule_watchdog_restart`, 16 fixed, 0 missed, promoted
+  from UNPROVEN — and exposed two bugs only grading could reach.
+- **A red that meant nothing.** Public CI failed on a commit that changed one markdown file,
+  at a benchmark timing each path once. The same commit also *passed* the same workflow, and
+  passed again on its schedule: identical bytes, three verdicts.
+- **And the first fix for that was hollow.** Best-of-N repaired the estimator, but the
+  assertion — the fast path must be *faster* — was satisfied by 0.1 ms out of 18.5. Made to
+  do identical work, it passed. An assertion that a coin lands heads is not an assertion. The
+  mutation caught it; the comment claiming otherwise had already been written.
+
+Each fix was driven both ways before it was believed, which is the only reason the last item
+is on this list rather than shipped.
+
 Why: a system that governs whoever runs it has to survive being checked, and that only
 works if correction is welcome. Everything wrong with the current way of doing things is
 people doubling down. If you find another, say so.
@@ -593,7 +632,7 @@ The same work, and the person behind it, in the other places it lives:
 
 ## Suite coverage
 
-**147 suites · 3,992 checks · 1 failed**, win32, 2026-09-21 <!--TOTALS-->
+**166 suites · 4,497 checks · 0 failed**, win32, 2026-09-27 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.
