@@ -4739,3 +4739,168 @@ repo      FAIL  core on disk 7a4f1e96883e but MANIFEST.sha256 pins 58eab6d6046a 
 git       PASS  HEAD 11a09b8, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.9h ago; 66 file(s) not committed
 disk      PASS  299G free of 476G (37% used); logs/ 30M
 
+## 2026-09-26T11:21:27Z  overall WARN  (round 12300)
+nodes     PASS  3/3 up, height 49 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 22.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 7d3ac2f, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.9h ago; 15 file(s) not committed
+disk      PASS  298G free of 476G (37% used); logs/ 30M
+
+## 2026-09-26T12:25:27Z  overall WARN  (round 12360)
+nodes     PASS  3/3 up, height 49 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 23.4h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 7d3ac2f, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.9h ago; 16 file(s) not committed
+disk      PASS  298G free of 476G (37% used); logs/ 31M
+
+## 2026-09-26T13:29:17Z  overall WARN  (round 12420)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 0.5h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 7d3ac2f, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.0h ago; 16 file(s) not committed
+disk      PASS  298G free of 476G (37% used); logs/ 31M
+
+## 2026-09-26T14:33:08Z  overall WARN  (round 12480)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 1.6h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 7d3ac2f, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 4.0h ago; 16 file(s) not committed
+disk      PASS  298G free of 476G (37% used); logs/ 31M
+
+## 2026-09-26T15:39:06Z  overall WARN  (round 12540)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 2.7h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 63e8f49, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 5.1h ago; 16 file(s) not committed
+disk      PASS  297G free of 476G (37% used); logs/ 31M
+
+## 2026-09-26T16:43:58Z  overall WARN  (round 12600)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 6
+trader    PASS  log 3.7h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 63e8f49, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 6.2h ago; 16 file(s) not committed
+disk      PASS  294G free of 476G (38% used); logs/ 32M
+
+## 2026-09-26T17:48:33Z  overall WARN  (round 12660)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  6 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 4.8h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 63e8f49, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 7.3h ago; 16 file(s) not committed
+disk      PASS  294G free of 476G (38% used); logs/ 32M
+
+## 2026-09-26T18:55:36Z  overall WARN  (round 12720)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 5.9h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 63e8f49, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 8.4h ago; 16 file(s) not committed
+disk      PASS  296G free of 476G (37% used); logs/ 32M
+
+## 2026-09-26T20:02:13Z  overall WARN  (round 12780)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 7.0h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 0f8ebec, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.9h ago; 16 file(s) not committed
+disk      PASS  297G free of 476G (37% used); logs/ 31M
+
+## 2026-09-26T21:07:18Z  overall WARN  (round 12840)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 8.1h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 0f8ebec, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.0h ago; 16 file(s) not committed
+disk      PASS  297G free of 476G (37% used); logs/ 32M
+
+## 2026-09-26T22:12:19Z  overall WARN  (round 12900)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 9.2h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 0f8ebec, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.0h ago; 18 file(s) not committed
+disk      PASS  297G free of 476G (37% used); logs/ 32M
+
+## 2026-09-26T23:16:13Z  overall WARN  (round 12960)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 10.3h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 0c44bb3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.2h ago; 18 file(s) not committed
+disk      PASS  296G free of 476G (37% used); logs/ 32M
+
+## 2026-09-27T00:23:21Z  overall WARN  (round 13020)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 11.4h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 0c44bb3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.3h ago; 22 file(s) not committed
+disk      PASS  296G free of 476G (37% used); logs/ 32M
+
+## 2026-09-27T01:28:56Z  overall WARN  (round 13080)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 3
+trader    PASS  log 12.5h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 0c44bb3, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.4h ago; 23 file(s) not committed
+disk      PASS  296G free of 476G (37% used); logs/ 32M
+
+## 2026-09-27T02:34:01Z  overall WARN  (round 13140)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 13.6h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 595eb6d, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.5h ago; 19 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 32M
+
