@@ -547,6 +547,16 @@ my debts and buys the room to focus. I'm not asking for charity; I'm asking peop
 check the work — the command is at the top of this page — to back it directly. Nothing here
 claims a profit edge or promises a return; it claims what a reader can verify.
 
+## Elsewhere
+
+The same work, and the person behind it, in the other places it lives:
+
+- **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile exists and holds
+  nothing yet: no models, datasets, spaces or posts (checked 2026-09-27).
+- **X:** [@NJEst1987](https://x.com/NJEst1987). These are screen recordings of the conversations with AI assistants
+  that much of this repository grew out of.
+- **This repository:** [github.com/LAWLESS1987/covenant](https://github.com/LAWLESS1987/covenant).
+
 ## Suite coverage
 
 **147 suites · 3,992 checks · 1 failed**, win32, 2026-09-21 <!--TOTALS-->
