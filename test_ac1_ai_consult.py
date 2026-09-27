@@ -107,7 +107,9 @@ def main():
 
     # ---- CLI surface
     import subprocess
-    p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_ai_consult.py"), "--explain"], capture_output=True, text=True, timeout=30)
+    # windowless (2026-09-27): run by the nightly with no console, a child started without the flag opened a black window
+    p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_ai_consult.py"), "--explain"], capture_output=True, text=True, timeout=30,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     check("AC1.17 --explain names the judge, the ledger and why no browser code lives here", p.returncode == 0 and "build_semantic_quorum" in p.stdout and "ops/ai_consult.jsonl" in p.stdout and "cannot" in p.stdout.lower())
 
     # ---- the cycle (2026-09-21): one packet, several Chat Smith seats, one intent each

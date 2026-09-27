@@ -194,15 +194,18 @@ def main():
     # to violate, so the check has no subject; P4 above still pins that the path
     # is under private/. A repository that EXISTS and cannot answer is still a
     # failure, and that distinction is kept.
+    # Windowless (2026-09-27): the nightly runs this suite with no console, so a git started here without the
+    # flag opened a black window on his screen every night.
+    _NOWIN = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     _in_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
-                              cwd=HERE, capture_output=True, text=True)
+                              cwd=HERE, capture_output=True, text=True, creationflags=_NOWIN)
     if not (_in_repo.returncode == 0 and _in_repo.stdout.strip() == "true"):
         check("P4b ...and git genuinely ignores that path -- N/A here, no git "
               "repository (staged copy); P4 above still holds", True,
               "not a git work tree")
     else:
         _ign = subprocess.run(["git", "check-ignore", "-q", T.RESERVE_PATH],
-                              cwd=HERE, capture_output=True)
+                              cwd=HERE, capture_output=True, creationflags=_NOWIN)
         check("P4b ...and git genuinely ignores that path -- the name private/ is "
               "a convention, the ignore rule is the mechanism",
               _ign.returncode == 0, "check-ignore rc=%d" % _ign.returncode)
