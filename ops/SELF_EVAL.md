@@ -4904,3 +4904,174 @@ repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the man
 git       PASS  HEAD 595eb6d, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.5h ago; 19 file(s) not committed
 disk      PASS  293G free of 476G (38% used); logs/ 32M
 
+## 2026-09-27T03:37:59Z  overall WARN  (round 13200)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 6
+trader    PASS  log 14.6h old; freshness exit 0: RAN: a cycle dated 2026-09-26 COMPLETED -- the trader printed it, not the launcher.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD 9a504ec, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.5h ago; 0 file(s) not committed
+disk      PASS  291G free of 476G (38% used); logs/ 32M
+
+## 2026-09-27T04:42:21Z  overall WARN  (round 13260)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 15.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       WARN  HEAD 9a504ec, 0 ahead / 2 behind origin/main as of the last fetch; last fetch 1.6h ago; 1 file(s) not committed
+disk      PASS  290G free of 476G (38% used); logs/ 32M
+
+## 2026-09-27T05:46:23Z  overall WARN  (round 13320)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 16.8h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       WARN  HEAD 9a504ec, 0 ahead / 2 behind origin/main as of the last fetch; last fetch 2.6h ago; 1 file(s) not committed
+disk      PASS  290G free of 476G (38% used); logs/ 33M
+
+## 2026-09-27T06:50:24Z  overall WARN  (round 13380)
+nodes     PASS  3/3 up, height 50 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 17.8h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       WARN  HEAD 9a504ec, 0 ahead / 2 behind origin/main as of the last fetch; last fetch 3.7h ago; 1 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 33M
+
+## 2026-09-27T07:54:25Z  overall WARN  (round 13440)
+nodes     PASS  3/3 up, height 51 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 18.9h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       WARN  HEAD 9a504ec, 0 ahead / 2 behind origin/main as of the last fetch; last fetch 4.8h ago; 4 file(s) not committed
+disk      PASS  290G free of 476G (39% used); logs/ 33M
+
+## 2026-09-27T08:58:07Z  overall WARN  (round 13500)
+nodes     PASS  3/3 up, height 51 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 20.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      PASS  core 52d6503ffd00 matches MANIFEST.sha256. This compares the manifest only; a substitution that also rewrote the manifest would read clean here
+git       PASS  HEAD fbb3969, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.1h ago; 9 file(s) not committed
+disk      PASS  294G free of 476G (38% used); logs/ 33M
+
+
+## 2026-09-27T08:52:00Z  overall FAIL (scheduled covenant-self-eval, Claude)
+nodes     PASS  3/3 up (5000/5020/5060), height 51, genesis 00009b31..., v8.40, source 52d6503ffd00; all degraded:true
+watchdog  PASS  last line 34s old; since 07:54Z: 54 mesh_source_split + node-A A7 alerts (a tailnet peer on 2abd338eb13d), 1 watchdog_stale (self-restart scheduled 08:28Z), phone build behind (0.1.674 vs 0.1.679)
+gate      PASS  quorum_policy providers deferring,semantic; primary student; silence_is_not_dissent=false; /health judge quorum(local:0,semantic:1,mock_selfreport:0)
+trader    PASS  log 19.9h old, last "CYCLE COMPLETE 09/26/2026"; freshness exit 0 NOT YET DUE (09:00); trader_config armed:true (task text says false; known state since 09-06, Rule 5 blocks) -- disclosed, not touched
+student   WARN  --exam printed no "exam thresholds" line (total 53: 40/7/6/0/7); last cycle 08:11Z REFUSED (A126 12/13 regression) -- the loop working; NOT MET
+repo      FAIL  verify_deploy RESULT FAIL: covenant_unified_v8.py on disk 52d6503ffd00, pinned 2abd338eb13d. Disk = HEAD manifest = index = running nodes; pin in verify_deploy.py last set 09-21 (c9ae628), core changed 09-26 (e3492e0) -> stale pin, not a hand edit
+git       WARN  HEAD fbb3969, 0/0 vs origin/main; 8 modified (ops outputs, MANIFEST MM), 1 untracked nightly report; no holdings/portfolio files
+disk      PASS  295G free of 476G; logs/ 34M; 0 sweep temp dirs >7d
+## 2026-09-27T10:02:27Z  overall FAIL  (round 13560)
+nodes     PASS  3/3 up, height 51 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 21.0h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+repo      FAIL  core 52d6503ffd00 (v8.40) matches MANIFEST.sha256, but verify_deploy.py pins 2abd338eb13d (v8.40) -- a stale pin (M53), not a bad delivery: verify_deploy reads FAIL and refuses every restart it gates. Run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD fbb3969, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.2h ago; 14 file(s) not committed
+disk      PASS  294G free of 476G (38% used); logs/ 33M
+
+## 2026-09-27T11:06:07Z  overall FAIL  (round 13620)
+nodes     PASS  3/3 up, height 51 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 8
+trader    PASS  log 22.1h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (3h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core 52d6503ffd00 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at 2abd338eb13d, the core is 52d6503ffd00; EXPECTED_LINES is 12705, the core has 12767 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 185a3e6, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.2h ago; 8 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 33M
+
+## 2026-09-27T12:10:13Z  overall FAIL  (round 13680)
+nodes     PASS  3/3 up, height 51 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 23.2h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (4h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core 52d6503ffd00 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at 2abd338eb13d, the core is 52d6503ffd00; EXPECTED_LINES is 12705, the core has 12767 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 185a3e6, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.3h ago; 8 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 33M
+
+## 2026-09-27T13:14:20Z  overall FAIL  (round 13740)
+nodes     PASS  3/3 up, height 52 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 0.2h old; freshness exit 0: RAN: a cycle dated 2026-09-27 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (5h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core 52d6503ffd00 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at 2abd338eb13d, the core is 52d6503ffd00; EXPECTED_LINES is 12705, the core has 12767 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 185a3e6, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 4.4h ago; 8 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 34M
+
+## 2026-09-27T14:18:23Z  overall FAIL  (round 13800)
+nodes     PASS  3/3 up, height 52 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 1.3h old; freshness exit 0: RAN: a cycle dated 2026-09-27 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (6h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core 52d6503ffd00 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at 2abd338eb13d, the core is 52d6503ffd00; EXPECTED_LINES is 12705, the core has 12767 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 185a3e6, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 5.4h ago; 8 file(s) not committed
+disk      PASS  294G free of 476G (38% used); logs/ 34M
+
+## 2026-09-27T15:22:23Z  overall FAIL  (round 13860)
+nodes     PASS  3/3 up, height 52 (spread 0), source 52d6503ffd00
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are 52d6503ffd00, peers report ['2abd338eb13d'] (last heard 2
+trader    PASS  log 2.4h old; freshness exit 0: RAN: a cycle dated 2026-09-27 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (7h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core 52d6503ffd00 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at 2abd338eb13d, the core is 52d6503ffd00; EXPECTED_LINES is 12705, the core has 12767 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 185a3e6, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 6.5h ago; 8 file(s) not committed
+disk      PASS  294G free of 476G (38% used); logs/ 34M
+
+## 2026-09-27T16:28:14Z  overall FAIL  (round 13920)
+nodes     PASS  3/3 up, height 52 (spread 0), source e8a79ee502d8
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  5 live -- first: node A: mesh is running more than one source: we are e8a79ee502d8, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 3.5h old; freshness exit 0: RAN: a cycle dated 2026-09-27 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (8h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core e8a79ee502d8 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at 2abd338eb13d, the core is e8a79ee502d8; EXPECTED_LINES is 12705, the core has 12783 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD d4304d6, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 7.6h ago; 11 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 29M
+
+## 2026-09-27T17:33:47Z  overall FAIL  (round 13980)
+nodes     PASS  3/3 up, height 52 (spread 0), source e8a79ee502d8
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are e8a79ee502d8, peers report ['2abd338eb13d'] (last heard 1
+trader    PASS  log 4.6h old; freshness exit 0: RAN: a cycle dated 2026-09-27 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (9h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core e8a79ee502d8 (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: EXPECTED_LINES is 12784, the core has 12783 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 6f38b00, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 8.7h ago; 11 file(s) not committed
+disk      PASS  288G free of 476G (39% used); logs/ 29M
+

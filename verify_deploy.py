@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12705   # 2026-09-21 (A210 web door in the fetch verb; K1/K2/P19/A3s green before the move), earlier: moved with the core pin below, in the same change as the core (A174 persona, A175 Tetsu on the forum, A190 his immunity, A200 the wire); was 12649 at the A190 re-pin
+EXPECTED_LINES = 12783   # 2026-09-27 (stale pins, M53 again: five commits of 09-25..09-27 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12705 at the A210 re-pin of 2026-09-21
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -90,8 +90,32 @@ MANIFEST = {
     # K2 25/25, P19 23/23 and A3s 51/51 were run against these bytes BEFORE
     # this line moved; M6 59/59, DP1 30/30, TQ1 17/17 and PC1 25/25 pin the
     # new behaviour and went red under mutation.
+    # 2026-09-27: re-pinned, late -- the M53 failure a fifth time. Five commits
+    # moved the core without moving these pins (60c17a2 A220, 06accd7 A223,
+    # 8f7b9ee + e3492e0 A226 Tetsu's hands, d4304d6 A237 the crawler), so the
+    # core drifted 2abd338eb13d -> e8a79ee502d8 and 12705 -> 12783 lines. Stale
+    # pins, not a bad delivery: the file is clean against HEAD. It had been read
+    # FAIL on every self-eval round for days -- "verify_deploy reads FAIL and
+    # refuses every restart it gates" -- which is the cost of a stale pin: the
+    # guard that should refuse a bad delivery refuses a good one instead, and
+    # whoever reads it learns to disbelieve it. K1 20/20, K2 25/25, P19 23/23
+    # and A3s 51/51 were run against THESE bytes BEFORE this line moved, the
+    # order the b969 lesson below requires.
+    #
+    # DRIVEN BOTH WAYS (rule 8), and the attempt found something. The DIGEST
+    # above is enforced on the disk path: with the old pin this run read
+    # "RESULT: FAIL -- covenant_unified_v8.py hash mismatch", and with the
+    # moved pin nothing fails. EXPECTED_LINES is NOT: perturbed to 12784 and
+    # re-run with --no-restart, the result was unchanged, because the only
+    # executable use of EXPECTED_LINES is the running-node comparison at
+    # `ln == EXPECTED_LINES` below, and --no-restart never reaches it. So a
+    # stale line count is invisible on the disk-only path -- the path
+    # AM_VERIFY_AND_RESTART and the hourly self-eval take most often. It was
+    # the self-eval, reading the live nodes after a restart, that caught this
+    # one. The constant is right (all three nodes report source_lines 12783),
+    # but it is pinned by a check that one common invocation skips.
     "covenant_unified_v8.py":
-        "2abd338eb13d46184e7059b34db7e43a021cf59b8b7b3a2a16301bcbfc05c29e",
+        "e8a79ee502d8f6a3c8279d55ca143dca06b0cfd9fc9e3704badcd66a0bf6e507",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
