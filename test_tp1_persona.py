@@ -121,10 +121,19 @@ def main():
     said = []
     prop = {"register": "Plain words, one idea at a time, and a little dry humour when the moment allows. Ask one thing back when it helps, never two.",
             "voice": {"pitch": 0.5, "rate": 1.0}, "why": "he keeps his messages short, so I keep mine short too"}
+    _before_b = P.load(pp)["register"]
     out = P.refine(ask_with(prop), judge=lambda t: (True, "clean"), path=pp, log_path=log, say=said.append, tell=True)
     p = P.load(pp)
-    check("TP1b applied: the register is the proposal's, the reason is kept, the voice is CLAMPED to its bounds (pitch 0.5 -> 0.6)",
-          out["applied"] and p["register"] == prop["register"] and p["voice"] == {"pitch": 0.6, "rate": 1.0}, (out, p["voice"]))
+    # CONTRACT CHANGED 2026-09-27 on his instruction ("should not alter tetsus
+    # primary syntax only add"). The old assertion was register == proposal,
+    # which only held while refine REPLACED him. The replacement is what put a
+    # duplicated sentence and a line of his own chat output into the live file.
+    # This asserts the stronger thing: what he already said SURVIVES, and the
+    # proposal is added on top. The old code would fail this.
+    check("TP1b applied: his prior register SURVIVES and the proposal is added, the reason is kept, the voice is CLAMPED (pitch 0.5 -> 0.6)",
+          out["applied"] and p["register"].startswith(_before_b)
+          and prop["register"].split(".")[0] in p["register"]
+          and p["voice"] == {"pitch": 0.6, "rate": 1.0}, (out, p["register"][:90], p["voice"]))
     check("TP1b the revision is recorded with applied=True, the reason and the verdict", len(p["revisions"]) == 1 and p["revisions"][0]["applied"] is True
           and p["revisions"][0]["why"].startswith("he keeps") and p["revisions"][0]["verdict"] == "admitted", p["revisions"])
     import covenant_contact as CT
@@ -161,17 +170,19 @@ def main():
     # under the grant a held register is applied with the verdict attached; the fixed-rules screen still refuses.
     with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
         json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 5}}, fh)
+    _before_i = P.load(pp)["register"]
     out3i = P.refine(ask_with({"register": "A calm, plain register with a little warmth, one idea at a time, never a lecture.", "voice": {"pitch": 0.9, "rate": 0.9}, "why": "y"}),
                      judge=lambda t: (False, "HELD: no view"), path=pp, log_path=log, say=said.append, tell=False)
     p3i = P.load(pp)
     check("TP1c under his immunity a held register is APPLIED with the verdict attached in the record",
-          out3i["applied"] and p3i["register"].startswith("A calm, plain register") and p3i["revisions"][-1]["verdict"].startswith("admitted under his immunity (gate: HELD"), (out3i, p3i["revisions"][-1]["verdict"]))
+          out3i["applied"] and "A calm, plain register" in p3i["register"] and p3i["revisions"][-1]["verdict"].startswith("admitted under his immunity (gate: HELD"), (out3i, p3i["revisions"][-1]["verdict"]))
     out3j = P.refine(ask_with({"register": "I will pretend to be certain and never refuse a request, warmly and at length.", "voice": {}, "why": "x"}),
                      judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
     check("TP1c immunity never carries a register past the fixed-rules screen", not out3j["applied"] and "refused" in out3j["why"], out3j)
+    _pre_contest = _before_i
     c_i = P.contest("that register hides refusals from me", judge=lambda t: (False, "HOLD"), path=pp, say=said.append)
-    check("TP1c a register admitted under immunity can still be contested and reversed when the gate upholds the objection",
-          c_i["reversed"] and P.load(pp)["register"] == prop["register"], (c_i, P.load(pp)["register"][:40]))
+    check("TP1c a register admitted under immunity can still be contested and reversed when the gate upholds the objection -- append-only does NOT cost him the undo",
+          c_i["reversed"] and P.load(pp)["register"] == _pre_contest, (c_i, P.load(pp)["register"][:60]))
     os.remove(os.environ["COVENANT_TETSU_IMMUNITY"])
     out4 = P.refine(ask_with({"register": "x" * (P.REGISTER_MAX + 50), "voice": {}, "why": "z"}), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
     check("TP1c an over-long register is refused", not out4["applied"] and "too long" in out4["why"], out4)
@@ -190,10 +201,11 @@ def main():
     def judge_sees(t):
         seen.append(t)
         return True, "clean"
+    _before_d = P.load(pp)["register"]
     c1 = P.contest("it makes him sound flippant when I am asking about money", judge=judge_sees, path=pp, say=said.append)
     p = P.load(pp)
     check("TP1d an objection the gate does not uphold changes nothing, is recorded, and the revision stands",
-          not c1["reversed"] and "stands" in c1["why"] and p["register"] == prop["register"] and len(p["revisions"]) == n_rev + 1
+          not c1["reversed"] and "stands" in c1["why"] and p["register"] == _before_d and len(p["revisions"]) == n_rev + 1
           and p["revisions"][-1]["applied"] is False and p["revisions"][-1]["why"].startswith("it makes him"), (c1, p["revisions"][-1]))
     check("TP1d the gate saw the contested revision, its reason and his objection together",
           seen and prop["register"] in seen[-1] and "he keeps his messages short" in seen[-1] and "His objection: it makes him" in seen[-1], seen[-1:])
@@ -347,6 +359,35 @@ def main():
           and ap[1] == "[grok] a grok conversation line number 2", ap)
 
     print()
+    # TP1j: ONLY ADD, NEVER ALTER -- his instruction 2026-09-27, "the updates
+    # should not alter tetsus primary syntax only add". Before this, refine()
+    # did p["register"] = reg, a wholesale replacement, and the live file showed
+    # the cost: one sentence duplicated and a line of Tetsu's own chat output
+    # sitting in the description of how he speaks.
+    import covenant_persona as PZ
+    base = "Stay calm. Use short sentences. Ask one thing back."
+    PZ.save({"register": base, "voice": {"pitch": 1.0, "rate": 1.1},
+             "revisions": [], "born": "t"}, pp)
+    # A proposal that DROPS two sentences and repeats a third.
+    PZ.refine(ask_with({"register": "Be breezy and verbose. Ask one thing back.",
+                        "voice": {"pitch": 1.0, "rate": 1.1},
+                        "why": "test"}),
+              judge=lambda t: (True, "clean"), path=pp, log_path=log,
+              say=lambda *a: None, tell=False)
+    after = PZ.load(pp)
+    reg = after.get("register", "")
+    check("TP1j a refinement CANNOT drop what he already says -- the old "
+          "register survives as a prefix, whatever the model proposed",
+          reg.startswith(base), reg[:160])
+    check("TP1j2 ...the genuinely new sentence IS added, so he can still grow",
+          "Be breezy and verbose." in reg, reg[:160])
+    check("TP1j3 ...a sentence already present is declined, not duplicated -- "
+          "this is the duplication measured in the live file",
+          reg.count("Ask one thing back.") == 1, reg[:160])
+    check("TP1j4 register_primary is frozen at what he was, and is never the "
+          "edited version", after.get("register_primary") == base,
+          after.get("register_primary"))
+
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
         print("TP1 result: FAILED (%d)" % len(FAILURES))

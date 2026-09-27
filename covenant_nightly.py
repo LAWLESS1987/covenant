@@ -573,6 +573,34 @@ def main():
 
     practice_step(a, say)
 
+    # ARTIFACT STORAGE, EVERY NIGHT. His words 2026-09-27: "optimization has to
+    # always happen to keep continuity", after "only keep the 2 most recent at
+    # all times".
+    #
+    # This is not housekeeping, it is the continuity itself. Measured that day:
+    # the phone build had been red since 2026-09-22, failing at
+    # upload-artifact with "Artifact storage quota has been hit". 120 artifacts,
+    # 1,673 MB, every APK the phone was ever built from still sitting there. The
+    # consequence ran the whole chain: no APK could upload, so the phone stayed
+    # on 0.1.674, so the mesh reported two source digests, so the highway showed
+    # red twice for what was one full disk. The auto-sync was never broken -- it
+    # dispatched rebuild after rebuild into a store with no room, and said so
+    # fifty times a day.
+    #
+    # A one-off clearance would refill. Keeping the newest 2 of each artifact
+    # name every night is what stops the same five days happening again, and 2
+    # rather than 1 so there is always an APK to fall back to.
+    #
+    # Dry run unless the token is present and the operator opted in (A21), and
+    # a failure here is reported and never allowed to end the pass.
+    try:
+        import tools.prune_artifacts as PA
+        for _repo in (PA.PHONE, PA.CORE):
+            PA.prune(_repo, keep=2, apply=True,
+                     say=lambda m: say("artifacts: " + str(m)))
+    except Exception as e:                                       # noqa: BLE001
+        say("artifacts FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
     try:
         import covenant_distill as X
         X.cycle(a.cycle, say=say)

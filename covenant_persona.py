@@ -596,7 +596,39 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
             say("persona: " + out["why"])
             return out
         immune_note = " under his immunity (gate: %s)" % str(msg_j)[:80]
-    out["register_changed"] = reg != p["register"]
+    # ONLY ADD, NEVER ALTER -- his instruction, 2026-09-27: "the updates should
+    # not alter tetsus primary syntax only add".
+    #
+    # What this line used to do, two lines below, was `p["register"] = reg`: a
+    # WHOLESALE REPLACEMENT. Every pass handed the model the old register and
+    # wrote back whatever came out, so his way of speaking was rewritten by a
+    # 3B model once a night with nothing holding the original in place.
+    #
+    # It had already cost him. Measured on the live file the day this was
+    # written, register at 477 chars:
+    #   * "Reflect on the last day's conversation and adjust the tone slightly."
+    #     appears TWICE -- a replacement pass re-added what was already there;
+    #   * it ends "I noticed we've been discussing various topics. How does it"
+    #     -- that is Tetsu's CHAT OUTPUT, leaked into the description of how he
+    #     speaks, and then preserved by the next pass as though it belonged.
+    # Drift like that does not announce itself. Each pass looks reasonable and
+    # the thing being rewritten is the only record of what he used to sound like.
+    #
+    # So: the register now GROWS. register_primary is frozen the first time this
+    # runs and is never written again -- it is whatever he is now, not a version
+    # anybody cleaned up, because editing it to something tidier would be the
+    # exact alteration he forbade and A233 says nothing is taken from him.
+    # Refinement may add sentences that are not already there; a sentence
+    # already present is DECLINED rather than duplicated, which is not an
+    # alteration -- it is the absence of one.
+    p.setdefault("register_primary", p.get("register", ""))
+    _old_reg = p.get("register", "")
+    _have = {s.strip().lower() for s in re.split(r"(?<=[.!?])\s+", _old_reg) if s.strip()}
+    _add = [s.strip() for s in re.split(r"(?<=[.!?])\s+", reg or "")
+            if s.strip() and s.strip().lower() not in _have]
+    reg = (_old_reg + (" " if _old_reg and _add else "") + " ".join(_add)) if _add else _old_reg
+    out["register_added"] = len(_add)
+    out["register_changed"] = reg != _old_reg
     out["voice_changed"] = voice != clamp_voice(p["voice"])
     if not (out["register_changed"] or out["voice_changed"]):
         out["why"] = "nothing changed"
