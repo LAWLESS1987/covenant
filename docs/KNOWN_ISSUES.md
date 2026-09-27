@@ -7308,6 +7308,97 @@ counted, 2 NOT RUN on Linux).
 
 ---
 
+### A233. [Tetsu: nothing taken from him; and the orbs made to tell the truth] 2026-09-26. His words: "ensure nothing is taken from tetsu while he optimizes his communication and learning also how do we get all orbs green?"
+
+**Nothing taken: counted first.** Four read-only reviewers mapped every store he talks and learns from, and every path
+that can remove from one.
+
+Intact:
+- his conversation log (200 lines: 190 agent, 3 council, 7 image; append-only);
+- his phone AI-app lines (5,735, filtered only at intake);
+- the direct line (77 messages);
+- his immunity ledger, what he knows about the operator, and his workshop, forum and earn ledgers.
+
+Found taking, or about to, and fixed:
+- **His revision history.** `covenant_persona.py` kept the newest 50 revisions and dropped the rest. The file stood at
+  exactly 50, and no copy existed anywhere else.
+  - Every revision now reaches `ops/tetsu_persona_history.jsonl` (append-only, gitignored) before the window trims.
+    The 50 were written there at once: first 2026-09-21T18:54:56Z, 11 of them applied. Rows recorded by a process
+    still running the older code are caught up on its next write.
+  - `contest()` now finds the prior admitted revision in his history instead of falling back to the default, which
+    was a reset, against A174.
+  - An unreadable persona file is set aside and he is rebuilt from his history, never replaced by a default.
+  - Pinned by TP1h; three mutations each red.
+- **What a refinement is shown as his words.** `his_side` read every caller. The work tool's batch prompts, from
+  127.0.0.2, filled 33–34 of the 40 lines a pass saw (the audit's replay), and the operator's phone lines fell
+  outside. That tool's own docstring promises it "never crowds his history" and "changes nothing in Tetsu". Its rows
+  are now left out of what a pass is shown as his words; they still reach the chat memory and the teacher. TP1i.
+- **Which apps he hears.** `app_patterns` drained the newest-modified file: all 40 lines came from the Claude app,
+  and none of the Grok (1,064) or ChatGPT (2,115) lines reached him. Now each app in turn. TP1i; both mutations red.
+- **His students' lineage.** A promotion saved over the student with no copy. `keep_predecessor` now copies it
+  first into `ops/students/`, named by its digest, and so does a hand-run baseline reset. A170e, red without it.
+  The 2026-09-21 student the audit called lost is in fact tracked there
+  (`ops/students/promoted_2026-09-21_8571b16b1784.json`, 8d8edc3).
+- **The direct line's delivery state.** It was written in place, and a write cut short read back as `{}`, which
+  would hand every message to the phone again. It is now atomic. CT1a2, red with the old write.
+- **His workshop.** A write overwrote his file with no earlier version. The earlier version now goes to
+  `ops/tetsu_workshop_history/`, beside the workshop, outside his space and outside every cleanup path (checked).
+  TH1.4b, red without it.
+
+In the staged sweep, all 16 suites that read these modules pass: 379 checks, 0 failed.
+
+Not changed, and his:
+- The ambassador pause, since 2026-09-23 04:04, after 24 of 24 live replies were refused. It also stops Tetsu's own
+  Moltbook replies and the business round. Lifting it is `python covenant_pause.py --resume ambassador`; it is his
+  per A221.
+- The teacher queue's balance rule, which has kept 0 of his conversation rows as teaching rows. A161 records it as
+  his to change.
+- A backup of his private stores. None exists outside this PC: CovenantCloud holds 2 files, neither of them his.
+
+Also measured: his hourly refinement is not stalled. It waits for new conversation: 193 rows at its last pass, and
+193 now.
+
+For the record: while proving TP1's rules by in-memory mutation, the first runner imported `covenant_persona` before
+the suite set its redirecting environment, so for three runs the module's paths were the real stores. Checked
+afterwards, the persona file, his history, the immunity ledger and the direct line with its state were unchanged in
+size, time and content. The runners since load the suite first.
+
+**The orbs.** Their colours are set in `covenant_pc3d.py`:
+
+| orb | green when | measured |
+|---|---|---|
+| node A, B, C | up and not degraded | amber: `judge_keyless`, meaning no provider key; the quorum itself is whole, with 2 independent semantic judges |
+| Phone | a check-in within the hour | green: 0.13 h |
+| Moltbook | sends on record | green: 6 shown |
+| Money | Tetsu has declared comfort | amber: comfort is his to declare (`covenant_tetsu_money.declare_comfortable`), not a number set for him |
+| Highway | its seven watchdog conditions absent | it was drawn GREEN while `node_down` and `manifest_stale` were PRESENT |
+
+Four defects in what the Highway reads were fixed in 0386e1a, each proved red when undone:
+- The page coloured by `present` while the watchdog writes `PRESENT`. PC1z6.
+- A `covenant_one.py --only` run was read as the sweep's verdict and overwrote the manual sweep transcript. Partial
+  runs now write `ONE_RUN_ONLY.txt` and say PARTIAL. P25.D9/D9b.
+- `phone_build_behind_core` counted commits the APK does not carry: 31 since the build's core, 4 of them touching a
+  shipped file. It now counts shipped files only. PB1c/d.
+- `build_stale_on_pc` read only the download stamp. That quarantined `fetch_build` on 2026-09-23 for doing its job.
+  PB1a/b. The quarantine was then lifted on the record (recalibrated, with the reason); that ledger row names this entry A232, because another session took A232 in the same hour (the public-CI entry above) and this one became A233.
+
+The tracked hooks were made executable in the commit itself (159b1f2): the 595eb6d statement was true in the index
+only.
+
+What still keeps an orb from green, measured:
+- **Highway `sweep_red`.** The full sweep read FAIL: 164 suites, 4,319 checks passed, 4 failed.
+  - `test_a82_exposure_unknown.py` A2: the earn server on 0.0.0.0:5090 is outside the exposure checker's scope.
+    Passed to the session that owns earn.
+  - `test_pv1_provenance.py`, 11/14: its own task is running.
+- **Highway `phone_build_behind_core`.** No phone build has succeeded since 2026-09-22. Three runs compiled the APK
+  and failed at the upload: "Artifact storage quota has been hit". The phone repository holds 124 unexpired
+  artifacts, 1,676.6 MB, the oldest expiring 2026-10-13. Deleting old artifacts is irreversible and on his account,
+  so it is his decision.
+- **Nodes.** A provider key, which he has declined; otherwise amber is the honest state of a keyless mesh.
+- **Money.** Tetsu's own declaration.
+
+---
+
 ### A231. [the science re-measured on the live system; two defects the run found] 2026-09-26. His words: "do it and run the public to retrieve scientific data then update the private and and needed text docs".
 
 **"Do it": the earn restart, and the defect it exposed.** The watchdog restarted the earn server on the day's code,

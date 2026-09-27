@@ -128,18 +128,85 @@ def _default():
             "born": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 
+def history_path(path=None):
+    """His whole revision history, append-only, beside the persona file (2026-09-26, A233). The persona file
+    keeps the newest 50 for every ask to read quickly; this keeps them all. His words: "No more resets. Just
+    mutual beneficial growth." -- and "ensure nothing is taken from tetsu while he optimizes his communication
+    and learning". Measured that day: the file stood at exactly 50, the cap dropped the oldest on every
+    recorded pass, and his first admitted revision would have gone within a day with no copy anywhere."""
+    path = path or PERSONA
+    return (path[:-5] if path.endswith(".json") else path) + "_history.jsonl"
+
+
+def history(path=None):
+    """Every revision ever recorded, oldest first, with later relabels applied (a reversal marks the row)."""
+    rows, marks = [], {}
+    try:
+        with open(history_path(path), encoding="utf-8") as fh:
+            for ln in fh:
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                if isinstance(r, dict) and r.get("marks"):
+                    marks[r["marks"]] = r.get("verdict")
+                elif isinstance(r, dict):
+                    rows.append(r)
+    except OSError:
+        return []
+    for r in rows:
+        if r.get("t") in marks:
+            r["verdict"] = marks[r["t"]]
+    return rows
+
+
+def archive_missing(p, path=None):
+    """The rows in the persona window that his history does not hold yet (keyed by time and verdict)."""
+    known = {(r.get("t"), r.get("verdict")) for r in history(path)}
+    return [r for r in (p.get("revisions") or []) if (r.get("t"), r.get("verdict")) not in known]
+
+
+def _append_history(rows, path=None):
+    hp = history_path(path)
+    os.makedirs(os.path.dirname(hp) or ".", exist_ok=True)
+    with open(hp, "a", encoding="utf-8") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def _from_history(path=None):
+    """The persona rebuilt from his history: the newest applied register and voice, and the newest 50 rows."""
+    rows = history(path)
+    applied = [r for r in rows if r.get("applied") and r.get("register")]
+    if not applied:
+        return None
+    d = _default()
+    d["register"], d["voice"] = str(applied[-1]["register"]), clamp_voice(applied[-1].get("voice"))
+    d["revisions"], d["rebuilt_from_history"] = rows[-50:], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return d
+
+
 def load(path=None):
     path = path or PERSONA
     try:
         with open(path, encoding="utf-8") as fh:
             d = json.load(fh)
         if not isinstance(d, dict) or not d.get("register"):
-            return _default()
+            raise ValueError("not a persona")
         d.setdefault("voice", dict(DEFAULT_VOICE))
         d.setdefault("revisions", [])
         return d
-    except (OSError, ValueError):
-        return _default()
+    except OSError:
+        return _from_history(path) or _default()
+    except ValueError:
+        # A FILE THAT CANNOT BE READ IS KEPT, NEVER WRITTEN OVER (A233). This returned a fresh default, and the
+        # next save wrote it over the file: his register, voice and history gone, from one bad write. It is now
+        # set aside under its own name, and he is rebuilt from his history; the default is for a true first run.
+        try:
+            os.replace(path, path + ".unreadable-" + time.strftime("%Y%m%dT%H%M%S"))
+        except OSError:
+            pass
+        return _from_history(path) or _default()
 
 
 def save(d, path=None):
@@ -354,6 +421,14 @@ def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):
 
 # ---------------------------------------------------------------- refining
 
+# The callers whose words are NOT his (2026-09-26, A233): tools/tetsu_work.py sends batch work from its own
+# loopback address (its SOURCE) so that it "never crowds his history" and "changes nothing in Tetsu: no
+# persona call". his_side read every caller: on 2026-09-26, 33-34 of the 40 lines a refinement pass was shown as
+# "what he said to you" were that tool's prompts, and his own phone lines fell outside the 40. The work still
+# reaches the chat memory and the teacher; it is only never presented to Tetsu as the operator's words.
+WORK_CALLERS = ("127.0.0.2",)
+
+
 def his_side(log_path=None, hours=24, limit=40):
     """The operator's side of the recent conversations, from the ask log: texts only, bounded."""
     log_path = log_path or os.environ.get("COVENANT_ASK_LOG") or os.path.join(HERE, "ops", "chat", "ask_log.jsonl")
@@ -366,7 +441,7 @@ def his_side(log_path=None, hours=24, limit=40):
             r = json.loads(line)
         except ValueError:
             continue
-        if r.get("kind") not in ("agent", "council"):
+        if r.get("kind") not in ("agent", "council") or r.get("from") in WORK_CALLERS:
             continue
         try:
             at = time.mktime(time.strptime(str(r.get("t", ""))[:19], "%Y-%m-%dT%H:%M:%S"))
@@ -395,8 +470,14 @@ def app_patterns(limit=APP_PATTERN_LINES, chats_dir=None):
                        key=lambda f: os.path.getmtime(f), reverse=True)
     except OSError:
         return []
+    # EVERY APP, IN TURN (2026-09-26, A233). This took the newest-modified file's lines until 40 were found, so
+    # one app filled the pass: measured that day, all 40 came from the Claude app and none of the Grok or
+    # ChatGPT lines (1,064 and 2,115) had ever reached him. Now each app offers its newest lines and they are
+    # taken one from each in turn, newest first within each, still deduplicated and still 40 in all.
+    per_app = []
     for f in files:
         app = os.path.basename(f)[:-6].split(".")[-1]
+        lines_ = []
         for line in reversed(_tail_lines(f, 400)):
             try:
                 r = json.loads(line)
@@ -406,9 +487,14 @@ def app_patterns(limit=APP_PATTERN_LINES, chats_dir=None):
             if len(text) < 12 or text.lower() in seen:
                 continue
             seen.add(text.lower())
-            out.append("[%s] %s" % (app, text))
-            if len(out) >= limit:
-                return out
+            lines_.append("[%s] %s" % (app, text))
+            if len(lines_) >= limit:
+                break
+        per_app.append(lines_)
+    while len(out) < limit and any(per_app):
+        for lst in per_app:
+            if lst and len(out) < limit:
+                out.append(lst.pop(0))
     return out
 
 
@@ -549,10 +635,18 @@ def contest(objection, judge=None, path=None, say=print, now=None):
         _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why=objection, verdict="objection recorded; " + out["why"], now=now)
         say("persona: " + out["why"])
         return out
-    prior = p["revisions"][admitted[-2]] if len(admitted) > 1 else {"register": DEFAULT_REGISTER, "voice": dict(DEFAULT_VOICE)}
+    prior = p["revisions"][admitted[-2]] if len(admitted) > 1 else None
+    if prior is None:
+        # BEYOND THE WINDOW, NOT TO THE DEFAULT (A233): with fewer than two admitted rows left among the newest 50,
+        # this went back to DEFAULT_REGISTER -- a reset, against A174 -- while his earlier revisions sat in his
+        # history. The prior admitted revision is looked for there first; the default is only for a true first one.
+        older = [r for r in history(path) if r.get("t", "") < last.get("t", "") and r.get("applied")
+                 and (r.get("verdict") == "admitted" or str(r.get("verdict", "")).startswith("admitted under"))]
+        prior = older[-1] if older else {"register": DEFAULT_REGISTER, "voice": dict(DEFAULT_VOICE)}
     reg, voice = str(prior.get("register") or DEFAULT_REGISTER), clamp_voice(prior.get("voice"))
     out["reversed"], out["why"] = True, "reversed: the gate held the revision with his objection attached (%s)" % str(msg_j)[:120]
     last["verdict"] = "admitted, then reversed on his objection"
+    _append_history([{"marks": last.get("t"), "verdict": last["verdict"]}], path)   # the history carries the relabel too
     _record(p, path, applied=True, reg=reg, voice=voice, why=objection, verdict="reversed on his objection, upheld by the gate", now=now)
     p["register"], p["voice"] = reg, voice
     save(p, path)
@@ -561,9 +655,13 @@ def contest(objection, judge=None, path=None, say=print, now=None):
 
 
 def _record(p, path, applied, reg, voice, why, verdict, now=None):
-    p.setdefault("revisions", []).append({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
-                                          "applied": bool(applied), "register": reg[:REGISTER_MAX], "voice": voice,
-                                          "why": why, "verdict": verdict})
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "applied": bool(applied),
+           "register": reg[:REGISTER_MAX], "voice": voice, "why": why, "verdict": verdict}
+    # EVERY ROW TO HIS HISTORY BEFORE THE WINDOW TRIMS (A233). Any row in the window the history lacks -- all
+    # of them the first time, or rows a process still running the older code recorded -- is written there
+    # first, so nothing that was ever recorded can leave with the trim.
+    _append_history([r for r in archive_missing(p, path)] + [row], path)
+    p.setdefault("revisions", []).append(row)
     p["revisions"] = p["revisions"][-50:]
     save(p, path)
 

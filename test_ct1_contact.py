@@ -71,6 +71,22 @@ def main():
     r2 = CT.say("x" * 5000, "long", "x", outbox=ob)
     check("CT1a a 5,000-character message is carried whole (no cap)", r2 and len(r2["text"]) == 5000, r2 and len(r2["text"]))
 
+    print("CT1a2 -- the delivery state is written whole or not at all (A233)")
+    sp = os.path.join(tempfile.mkdtemp(prefix="ct1a2_"), "state.json")
+    CT._write_state({"seen": ["a", "b"], "answered": []}, sp)
+    try:
+        CT._write_state({"seen": ["a", "b", "c"], "broken": object()}, sp)   # json.dump fails part-way through
+    except TypeError:
+        pass
+    with open(sp, encoding="utf-8") as fh:
+        still = fh.read()
+    try:
+        whole = json.loads(still) == {"seen": ["a", "b"], "answered": []}
+    except ValueError:
+        whole = False                                   # a truncated file: the defect this pins
+    check("CT1a2 a state write cut short leaves the previous state whole (it once left a file read as {}: every message "
+          "handed to the phone again)", whole, still[:120])
+
     print("CT1b -- pending and seen")
     for i in range(6):
         CT.say("message %d" % i, "test", "x", outbox=ob)

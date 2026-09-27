@@ -97,6 +97,12 @@ def main():
         after_c = io.open(model_path, "rb").read()
         check("A170c the claims hold -> promoted, the student file changed, the candidate file is gone",
               ok_c is True and after_c != before and not os.path.exists(cand_path), (ok_c, os.path.exists(cand_path)))
+        # A233 (2026-09-26): the student a promotion replaces is kept, byte for byte, named by its digest, beside
+        # the model -- here in this suite's scratch folder, never the real ops/students/.
+        import hashlib as _hl
+        kept = os.path.join(td, "ops", "students", "student.%s.json" % _hl.sha256(before).hexdigest()[:12])
+        check("A170e the replaced student is kept beside it, byte for byte, under its digest (his lineage is not dropped)",
+              os.path.isfile(kept) and io.open(kept, "rb").read() == before, kept)
     finally:
         X.promotion, X.disposition_claims_hold, X.report = real_promotion, real_hold, real_report
         X.write_holdout, X.HOLDOUT_RECORD, X.RUN_WITHOUT = real_wh, real_hr, real_rw

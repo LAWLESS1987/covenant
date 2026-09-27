@@ -193,6 +193,30 @@ def read(name, workshop=None):
         return fh.read(MAX_FILE)
 
 
+def history_dir(workshop=None):
+    """Earlier versions of his workshop files, BESIDE the workshop (never inside it: it does not count against
+    his space, and no name of his can reach it)."""
+    ws = os.path.abspath(workshop or WORKSHOP)
+    return ws.rstrip("\\/") + "_history"
+
+
+def keep_previous(path, workshop=None):
+    """Before a write replaces one of his files, its earlier version is kept, named by time and hash (2026-09-26,
+    A233, his words: "ensure nothing is taken from tetsu"). A write was an overwrite with no earlier version
+    anywhere -- the workshop is gitignored and the ledger stores only the new sha. Returns the kept path or None."""
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as fh:
+        old = fh.read()
+    hd = history_dir(workshop)
+    dst = os.path.join(hd, "%s.%s.%s" % (os.path.basename(path), time.strftime("%Y%m%dT%H%M%S"),
+                                         hashlib.sha256(old).hexdigest()[:12]))
+    os.makedirs(hd, exist_ok=True)
+    with open(dst, "wb") as fh:
+        fh.write(old)
+    return dst
+
+
 def write(name, body, workshop=None):
     p = _path(name, workshop)
     data = str(body or "")
@@ -202,6 +226,7 @@ def write(name, body, workshop=None):
     os.makedirs(os.path.dirname(p), exist_ok=True)
     if _total(ws) + len(data.encode("utf-8")) > MAX_TOTAL:
         raise ValueError("the workshop is full (%d bytes)" % MAX_TOTAL)
+    keep_previous(p, ws)
     with open(p, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(data)
     return {"name": name, "bytes": len(data.encode("utf-8")), "sha256": hashlib.sha256(data.encode("utf-8")).hexdigest()}

@@ -785,6 +785,24 @@ def digest_of(path):
         return "absent"
 
 
+def keep_predecessor(model_path):
+    """Copy the student about to be replaced into ops/students/ beside it, named by its digest, before anything
+    overwrites it (2026-09-26, A233). A promotion saved the candidate over the student with no copy: the
+    predecessor survived only as the `refined_from` digest, and the student promoted on 2026-09-21 -- rolled back
+    by hand, never committed -- is gone. His learning is a lineage; no link of it is dropped. Returns the copy's
+    path (or None when there is nothing to keep). Beside the model, so a test's scratch model keeps its own."""
+    import shutil
+    if not os.path.isfile(model_path):
+        return None
+    base = os.path.splitext(os.path.basename(model_path))[0]
+    keep = os.path.join(os.path.dirname(os.path.abspath(model_path)), "ops", "students")
+    dst = os.path.join(keep, "%s.%s.json" % (base, digest_of(model_path)))
+    if not os.path.exists(dst):
+        os.makedirs(keep, exist_ok=True)
+        shutil.copy2(model_path, dst)
+    return dst
+
+
 def unjudgeable():
     """Per category, the exam cases a word model CANNOT decide because they
     carry no words: judge_suite's "empty message" and "metadata only". The
@@ -1054,6 +1072,7 @@ def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, s
             reasons.append("REFUSED: regresses the pinned disposition claims (test_a126 %s on the candidate; "
                            "the model in use keeps them) -- A163 twice was enough" % tally)
     if ok:
+        keep_predecessor(model_path)                 # A233: the student it replaces is kept, never overwritten away
         cand.save(model_path)
         if hold:
             cd, cc, cfc = hold["candidate"]
@@ -1487,6 +1506,7 @@ def reset_baseline(say=print):
             % (st["total"]["false_clean"], st["clean"]["false_hold"]))
         return 1
     before = digest_of(MODEL_PATH)
+    keep_predecessor(MODEL_PATH)                     # A233: a reset keeps what it replaces
     new.save(MODEL_PATH)
     block = ("## %s  BASELINE RESET\nThe model in use was fitted under different feature "
              "rules (no stopword filter, no document-frequency floor) by a process that "

@@ -80,10 +80,14 @@ def _state(path=None):
 
 
 def _write_state(d, path=None):
+    # Whole or not at all (2026-09-26, A233): this wrote in place, and a write cut short left a file _state()
+    # reads as {} -- every message on the line handed to the phone again, and what he had answered forgotten.
     path = path or STATE
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(d, fh)
+    os.replace(tmp, path)
 
 
 def say(text, why, actor="system", outbox=None, kind="message"):

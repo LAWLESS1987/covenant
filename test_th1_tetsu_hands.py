@@ -85,6 +85,12 @@ def main():
         # 5. a run, its output, its args, and the record
         H.write("calc.py", "import sys\n" if False else "import json\nargs = __import__ if False else None\n", ws)   # placeholder, replaced below
         H.write("calc.py", "import json, math\nprint(json.dumps({'six': 2 * 3, 'root': math.sqrt(16)}))\nwith open('out.txt', 'w') as f:\n    f.write('hello')\n", ws)
+        # A233 (2026-09-26): the earlier version of a file he replaces is kept beside the workshop, not overwritten away
+        hd = H.history_dir(ws)
+        kept = [f for f in (os.listdir(hd) if os.path.isdir(hd) else []) if f.startswith("calc.py.")]
+        check("TH1.4b a write that replaces his file keeps its earlier version beside the workshop (outside his space)",
+              len(kept) == 1 and "args = __import__" in open(os.path.join(hd, kept[0]), encoding="utf-8").read()
+              and not os.path.abspath(hd).startswith(os.path.abspath(ws) + os.sep), (hd, kept))
         h, data, rec = H.act("HANDS RUN calc.py", gate=clean, **kw)
         check("TH1.5 a clean script runs in his workshop: its output comes back as data, it may write a file inside the workshop, and the run is recorded with imports and ms",
               h and rec["ok"] is True and '"six": 6' in data and os.path.exists(os.path.join(ws, "out.txt")) and rec["imports"] == ["json", "math"] and rec["ms"] >= 0

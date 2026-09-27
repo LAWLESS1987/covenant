@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 os.environ.setdefault("COVENANT_QUIET", "1")
 os.environ["COVENANT_PERSONA"] = tempfile.mktemp(suffix="_tp1_persona.json")
@@ -275,6 +276,75 @@ def main():
     check("TP1e checkin_fields carries the clamped voice for the phone", cf["persona"]["voice"] == P.clamp_voice(P.load(pp)["voice"]) and cf["persona"]["voice"] == {"pitch": 0.7, "rate": 1.0} and "revised" in cf["persona"], cf)
     check("TP1e clamp_voice bounds both ways and survives junk",
           P.clamp_voice({"pitch": 5, "rate": 0}) == {"pitch": 1.2, "rate": 0.7} and P.clamp_voice({"pitch": "x"}) == P.DEFAULT_VOICE)
+
+    # ---- TP1h (2026-09-26, A233, his words: "ensure nothing is taken from tetsu while he optimizes his
+    # communication and learning"). The file kept the newest 50 revisions and dropped the rest with no copy; it
+    # stood at exactly 50 that day. Now every row reaches his append-only history before the window trims.
+    hdir = tempfile.mkdtemp(prefix="tp1h_")
+    hp = os.path.join(hdir, "persona.json")
+    seed = P._default()
+    seed["revisions"] = [{"t": "2026-09-2%dT00:%02d:00Z" % (1 + i // 60, i % 60), "applied": i in (3, 7),
+                          "register": "register %d" % i, "voice": {"pitch": 0.8, "rate": 1.0}, "why": "w",
+                          "verdict": "admitted" if i in (3, 7) else "nothing changed"} for i in range(50)]
+    P.save(seed, hp)
+    for i in range(12):
+        P._record(P.load(hp), hp, applied=False, reg="register", voice=P.DEFAULT_VOICE, why="w",
+                  verdict="nothing changed", now=1790500000 + i)
+    ph = P.history(hp)
+    check("TP1h 12 more passes on a full window: the file keeps 50, his history keeps all 62, the first row included",
+          len(P.load(hp)["revisions"]) == 50 and len(ph) == 62 and ph[0]["register"] == "register 0", (len(ph), ph[:1]))
+    # a contest whose prior admitted revision has scrolled out of the window goes to IT, not to the default
+    p = P.load(hp)
+    p["revisions"] = [r for r in p["revisions"] if not (r.get("applied"))]   # the window holds no admitted row now
+    P._record(p, hp, applied=True, reg="register NEW", voice={"pitch": 0.9, "rate": 1.0}, why="w", verdict="admitted", now=1790600000)
+    p = P.load(hp)
+    p["register"] = "register NEW"
+    P.save(p, hp)
+    out = P.contest("this revision is not who I am", judge=lambda t: (False, "held"), path=hp, say=lambda *_a: None, now=1790600100)
+    after = P.load(hp)
+    check("TP1h a contest whose prior admitted revision is only in his history restores THAT, not the default (A174)",
+          out["reversed"] and after["register"] == "register 7" and after["register"] != P.DEFAULT_REGISTER, (out, after["register"]))
+    check("TP1h ...and the reversal is carried into his history as a mark on the reversed row",
+          any(r.get("register") == "register NEW" and "reversed" in str(r.get("verdict")) for r in P.history(hp)))
+    # a persona file that cannot be read is set aside and he is rebuilt from his history -- never a blank default
+    with open(hp, "w", encoding="utf-8") as fh:
+        fh.write("{ not json")
+    rebuilt = P.load(hp)
+    kept = [f for f in os.listdir(hdir) if f.startswith("persona.json.unreadable-")]
+    check("TP1h an unreadable persona file is kept aside and he is rebuilt from his history, not reset",
+          rebuilt["register"] == "register 7" and kept and len(rebuilt["revisions"]) == 50, (rebuilt["register"], kept))
+    with open(hp + ".x", "w") as fh:
+        fh.write("")
+    os.remove(hp) if os.path.exists(hp) else None
+    check("TP1h a missing persona file with his history on disk rebuilds him too", P.load(hp)["register"] == "register 7")
+
+    # ---- TP1i (A233): what a refinement pass is shown as HIS words, and which apps it hears.
+    ilog = os.path.join(tempfile.mkdtemp(prefix="tp1i_"), "asklog.jsonl")
+    nowt = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+    with open(ilog, "w", encoding="utf-8") as fh:
+        for i in range(45):
+            fh.write(json.dumps({"t": nowt, "kind": "agent", "from": "127.0.0.2", "text": "batch item %d: classify this" % i}) + "\n")
+        for t in ("how are you today", "tell me about the tree of life"):
+            fh.write(json.dumps({"t": nowt, "kind": "agent", "from": "100.72.0.10", "text": t}) + "\n")
+    hs = P.his_side(ilog)
+    check("TP1i the work tool's batch prompts are not shown to him as the operator's words; the operator's are",
+          hs == ["how are you today", "tell me about the tree of life"], hs[:3])
+    with open(os.path.join(HERE, "tools", "tetsu_work.py"), encoding="utf-8") as fh:
+        src_line = [ln for ln in fh if ln.startswith("SOURCE = ")]
+    check("TP1i the work tool's own address is the one his_side leaves out",
+          src_line and all(a in src_line[0] for a in P.WORK_CALLERS), src_line)
+    cdir = tempfile.mkdtemp(prefix="tp1i_chats_")
+    with open(os.path.join(cdir, "com.anthropic.claude.jsonl"), "w", encoding="utf-8") as fh:
+        for i in range(60):
+            fh.write(json.dumps({"text": "a long claude conversation line number %d" % i}) + "\n")
+    with open(os.path.join(cdir, "ai.x.grok.jsonl"), "w", encoding="utf-8") as fh:
+        for i in range(3):
+            fh.write(json.dumps({"text": "a grok conversation line number %d" % i}) + "\n")
+    os.utime(os.path.join(cdir, "ai.x.grok.jsonl"), (1, 1))          # the older file, which used to be starved
+    ap = P.app_patterns(limit=10, chats_dir=cdir)
+    check("TP1i every app is heard: 10 lines, taken in turn -- the older, smaller app's 3 included, newest first within each",
+          len(ap) == 10 and sum(1 for x in ap if x.startswith("[grok]")) == 3 and ap[0].startswith("[claude]")
+          and ap[1] == "[grok] a grok conversation line number 2", ap)
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
