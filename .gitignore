@@ -59,6 +59,7 @@ LAUNCH_CHECK.json
 NODE_RESTART.txt
 launch/*/NODE_RESTART.txt
 ONE_RUN.txt
+ONE_RUN_ONLY.txt
 ONE_RUN_cloud.txt
 ONE_RUN_pc.txt
 ONE_RETEST.txt
