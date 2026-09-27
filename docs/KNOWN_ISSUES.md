@@ -7228,6 +7228,86 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A232. [the public CI: red since 2026-09-22 on two suites that could only pass on this PC, and an annotation that named no check] 2026-09-26. His words: "need to ensure green runs without you".
+
+**What was red.** `covenant_one.py --ci` on ubuntu (python 3.11 and 3.12) said `checks failed 6`:
+`test_pv1_provenance.py` 10/14 and `test_av1_immune.py` 18/20. The public annotations name the same two suites and
+the same count on every main commit read, from `fc551b5` (2026-09-22 00:22Z, where A217/A218 added both suites)
+through `7d3ac2f`, and on `595eb6d` (runs 36287752493 and 36287754969). Six commits in between were not read
+(the unauthenticated API's rate limit). The last green push on main was `bde6c2a`; every completed run on main from
+`cfa9335` (2026-09-22 00:05Z, `test_wb1_web.py`) on is a failure, scheduled runs included.
+
+**Reproduced on Linux before any change.** A fresh WSL clone of `595eb6d`, `python3 covenant_one.py --ci`
+(python 3.14.4, with a python shim): PV1 10/14, failing PV1.6, PV1.12, PV1.13 and PV1.14. The same clone with
+`--ci --only` the two suites: 10/14 and 18/20, failing AV1.12 and AV1.13 as well. These are the CI's numbers.
+
+**Four causes. None is in the modules.**
+- *AV1.12, AV1.13 and PV1.14 read the real Windows Defender through `powershell`.* Linux has neither
+  (*FileNotFoundError: 'powershell'*).
+- *PV1.12 and PV1.13 need the archive the registry names*, `tools/llama/llama-b11057-bin-win-cpu-x64.zip`. It is
+  gitignored, and the sweep never stages `tools/llama` (A201). So they failed in every sweep, this PC's included.
+  Staged by the runner's own `stage()` here: PV1 11/14 (PV1.12, 13, 14), AV1 20/20. A220 §6 records PV1.12-14 red in
+  the 2026-09-25 baseline, "not diagnosed". In the live folder, `covenant_provenance.py --registry` reads MATCHES
+  upstream and the 2026-09-21 detection settles. What they claim is true there.
+- *PV1.14 also failed on this PC for a second reason: time.* It needs a Defender detection in the last 24 h. On
+  2026-09-26 there was none, and the condition said `{'detections_24h': 0}`.
+- *PV1.6's foreign path, `C:\Users\Someone\Downloads\invoice.exe`, is foreign only on Windows.* On Linux it is a
+  relative name, so it resolves under the working directory, the staged `/tmp/covenant_one_<pid>`, and
+  `_under_our_tree` counts any path containing `covenant_one_` as ours. PV1.9 used the same path and passed on
+  Linux for the wrong reason: ours:unverified is also unsettled.
+
+**Fixed in the tests.**
+- *PV1.6 and PV1.9:* the foreign path is absolute on the running platform.
+- *AV1.12, AV1.13 and PV1.14 off Windows:* NOT RUN (`os.name != "nt"`), counted neither way. On Windows they run
+  unchanged.
+- *PV1.12 and PV1.13:* NOT RUN only when *none* of the registered archives is on disk in the tree, as G4.4b (A171).
+  If any is present they run unchanged, so a missing or altered archive still fails.
+- *PV1.14 on Windows:* NOT RUN when Defender recorded no detection in 24 h, or when there are detections but no
+  archive to judge them by. An unreadable Defender still fails.
+- *PV1.15 and PV1.16 (new)* drive the same detector on every platform, with a fixture detection on the fixture
+  tree. An `!ml` hit on a verified member gives ABSENT, all settled. A signature hit on the same file gives
+  PRESENT, needs_you 1.
+
+**Broken both ways, staged by the runner's `stage()`.**
+- *Linux:* before 10/14 and 18/20; after 13/13 (3 NOT RUN) and 18/18 (2 NOT RUN).
+- *This PC:* 13/13 (3 NOT RUN) and 20/20. With the live folder's `tools/llama` joined in by a directory junction:
+  15/15 (1 NOT RUN), PV1.12 and PV1.13 measured and passing.
+- *Red with each mutation:*
+  - `_under_our_tree` always true: PV1.6.
+  - The ML suffix never matching: PV1.7 and PV1.15.
+  - Every verified hit settling: PV1.8, PV1.10 and PV1.16.
+  - A registered archive present but altered: PV1.12 and PV1.13 measured and red, on both platforms.
+  - On Windows, Defender's history unreadable: PV1.14 red, not NOT RUN.
+  - On Windows, the posture or the history unreadable: AV1.12 and AV1.13 red.
+
+**The annotation named no check.** The workflow's summary step looks for FAIL lines "at any indent". The runner
+prints them as `        | FAIL  ...`, so every annotation of this red named the two suites and none of the six
+checks. The pattern now allows the `| `, and repeated lines are dropped. Tested on a real failing transcript (a
+fresh clone of `595eb6d`, `--ci --only` the two suites):
+- *Old pattern:* 5 lines, the 5 CI printed, 0 naming a check.
+- *New pattern:* 11 lines naming all 6 checks, 1366 characters.
+
+**Not changed:**
+- *Two provenance findings, and they are his.* A removed file is ours:verified by NAME alone when its bytes cannot
+  be re-read (PV1.3), and in that case its location is not checked. A file called `llama-gguf-split.exe`, removed
+  from anywhere with an `!ml` verdict, would settle. Separately, `_under_our_tree` counts any path containing
+  `covenant_one_` or `\covenant\` as ours. Both answers still reach him, so that one mislabels; it does not settle.
+- *At `595eb6d`, MANIFEST.sha256 pinned five `ops/` files at hashes that were not their committed content.*
+  `verify_bundle.py --write` on a clean checkout of `595eb6d` changes those five lines. The pre-commit hook hashes
+  tracked files as they are on disk, as its header says, and in the main checkout those files hold uncommitted
+  operator state. This commit came from a clean worktree, so the hook re-pinned the five to their committed
+  content, which is what the commit contains. A commit from a checkout whose disk differs pins them to that disk
+  again, by the same rule.
+- *NOT RUN shows only in the suite log.* The sweep's line reads `V1: 13/13 passed`.
+- *`test_pc1_sister_interface.py` failed 2 more checks on some runs and not others:* `dda7db3` (3.12), `52463b3`
+  (3.11), `f495307` (3.11) and `a26eeaa` (both). Not diagnosed here.
+- *The full WSL `--ci` left `run_node.py` running again*, as A172 recorded. Killed; 50xx and 60xx empty.
+
+**Pinned by** `test_pv1_provenance.py` (16: 13 counted, 3 NOT RUN on Linux) and `test_av1_immune.py` (20: 18
+counted, 2 NOT RUN on Linux).
+
+---
+
 ### A231. [the science re-measured on the live system; two defects the run found] 2026-09-26. His words: "do it and run the public to retrieve scientific data then update the private and and needed text docs".
 
 **"Do it": the earn restart, and the defect it exposed.** The watchdog restarted the earn server on the day's code,

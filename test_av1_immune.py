@@ -22,11 +22,18 @@ sys.path.insert(0, HERE)
 import covenant_immune as IM                                          # noqa: E402
 
 ok = []
+NOT_RUN = []
 
 
 def check(name, cond, note=""):
     ok.append(bool(cond))
     print("%s  %s%s" % ("ok  " if cond else "FAIL", name, ("  -- " + str(note)[:200]) if note and not cond else ""))
+
+
+def not_run(name, why):
+    """A232: said, and counted neither way. Only for a state this machine cannot hold."""
+    NOT_RUN.append(name)
+    print("NOT RUN  %s  -- %s" % (name, why))
 
 
 print("AV1 -- the defence, incorporated")
@@ -132,14 +139,27 @@ check("AV1.11 tree_integrity answers 'is this still the file we shipped' from th
       t["ok"] is True and "manifest" in t["says"], t)
 
 # ---- the real defence on this machine, read-only
-rp = IM.posture()
-check("AV1.12 the REAL defence on this machine is readable and its real-time state is known",
-      rp["ok"] is True and isinstance(rp["realtime"], bool), rp.get("says"))
-rf = IM.findings(24)
-check("AV1.13 the REAL detections are each judged, none left unclassified",
-      rf["ok"] is True and rf["total"] == len(rf["settled"]) + len(rf["needs_you"]), rf)
+# A232: Windows Defender exists only on Windows. On Linux there is no powershell to
+# ask and nothing to read, so both failed on every Linux CI run from fc551b5 on
+# (FileNotFoundError: 'powershell'). Off Windows they are said as NOT RUN; on
+# Windows they run unchanged, and an unreadable defence still fails.
+if os.name != "nt":
+    for n in ("AV1.12 the REAL defence on this machine is readable and its real-time state is known",
+              "AV1.13 the REAL detections are each judged, none left unclassified"):
+        not_run(n, "no Windows Defender on this platform (%s): the posture and the detections "
+                   "are read through powershell from Defender itself" % sys.platform)
+else:
+    rp = IM.posture()
+    check("AV1.12 the REAL defence on this machine is readable and its real-time state is known",
+          rp["ok"] is True and isinstance(rp["realtime"], bool), rp.get("says"))
+    rf = IM.findings(24)
+    check("AV1.13 the REAL detections are each judged, none left unclassified",
+          rf["ok"] is True and rf["total"] == len(rf["settled"]) + len(rf["needs_you"]), rf)
 
 print("\nnot measured here: watching a file as it EXECUTES. That is Defender's, it is why Defender stays, "
       "and nothing in this module pretends to replace it.")
-print("\nAV1: %d/%d passed" % (sum(ok), len(ok)))
+for n in NOT_RUN:
+    print("  NOT RUN  %s" % n)
+print("\nAV1: %d/%d passed%s" % (sum(ok), len(ok),
+                                 (" (%d NOT RUN, not counted)" % len(NOT_RUN)) if NOT_RUN else ""))
 sys.exit(0 if all(ok) else 1)
