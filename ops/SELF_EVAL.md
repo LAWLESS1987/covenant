@@ -5087,3 +5087,15 @@ repo      PASS  core e8a79ee502d8 matches MANIFEST.sha256 and every pin, compani
 git       PASS  HEAD 912fcec, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 9.8h ago; 0 file(s) not committed
 disk      PASS  289G free of 476G (39% used); logs/ 29M
 
+## 2026-09-27T19:40:48Z  overall WARN  (round 14100)
+nodes     PASS  3/3 up, height 52 (spread 0), source e8a79ee502d8
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  4 live -- first: node A: mesh is running more than one source: we are e8a79ee502d8, peers report ['2abd338eb13d'] (last heard 4
+trader    PASS  log 6.7h old; freshness exit 0: RAN: a cycle dated 2026-09-27 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-27T08:11:20Z REFUSED (11h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      PASS  core e8a79ee502d8 matches MANIFEST.sha256 and every pin, companion, version and line count verify_deploy.py checks. A substitution that rewrote both records would read clean here
+git       PASS  HEAD bdc5b1c, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 10.8h ago; 1 file(s) not committed
+disk      PASS  288G free of 476G (39% used); logs/ 29M
+

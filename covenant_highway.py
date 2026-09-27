@@ -2537,8 +2537,24 @@ def standing(ledger=None):
         b = r.get("benefit") or {}
         out[name] = {"verdict": verdict, "graded": len(graded), "fixed": fixed,
                      "did_not_fix": missed,
-                     "started_ungraded": sum(1 for x in mine
-                                             if x.get("outcome") == "started"),
+                     # STARTS THAT ARE STILL OPEN, not every start ever written
+                     # (2026-09-27). This counted the lot, and the moment
+                     # grade_started() existed that became a lie in the loudest
+                     # column: fetch_build read "177 started" when all 177 sit
+                     # BEFORE its recalibration barrier and will never be graded by
+                     # design, while the footer said "nothing checks what they
+                     # started". Something does now. Open means: after the last
+                     # recalibration, and not already answered by a later grading
+                     # for the same (remedy, detector) -- which is what a pass
+                     # will pick up next time it runs.
+                     "started_ungraded": sum(
+                         1 for i, x in enumerate(mine[cut + 1:], start=cut + 1)
+                         if x.get("outcome") == "started"
+                         and not any(y.get("outcome") in ("fixed", "did not fix")
+                                     and y.get("detector") == x.get("detector")
+                                     for y in mine[i + 1:])),
+                     "started_all": sum(1 for x in mine
+                                        if x.get("outcome") == "started"),
                      "refused": sum(1 for x in mine
                                     if x.get("outcome") == "refused"),
                      "claimed": list(b.get("gains") or []),
@@ -2631,8 +2647,12 @@ def main(argv=None):
                      (v["claimed"][0][:44] if v["claimed"] else "-")))
         print("\nUNPROVEN is not a failing grade. It means never graded, which")
         print("is the honest answer and the one a tool that resolves everything")
-        print("would hide. \"started\" counts runs of an asynchronous remedy that")
-        print("no pass has graded since: nothing checks what they started.")
+        print("would hide. \"started\" counts asynchronous runs that are still OPEN --")
+        print("waiting out the remedy's own window before grade_started() judges them.")
+        print("Until 2026-09-27 this column counted every start ever written and said")
+        print("\"nothing checks what they started\", which was true of the machine then")
+        print("and is not now: 252 such rows were graded in the first passes, and")
+        print("schedule_watchdog_restart went from UNPROVEN to EARNED because of it.")
         return 0
     if a.ledger:
         for row in read_ledger()[-40:]:
