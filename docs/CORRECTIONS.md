@@ -40,6 +40,7 @@ perfection is not the goal, mutual benefit and honesty is.*
 | Every emailed `git clone` line arrived wrapped by Gmail and clones an **empty repository**. Present in every letter until 2026-09-15, including the one whose notes claimed the links were safe | [A122](KNOWN_ISSUES.md) |
 | An affiliation verified against a page that was real and not current: Pedersen is at **DTU**, not KTH | [A121](KNOWN_ISSUES.md) |
 | **A third party's name was quoted verbatim into a file in the public repository** while writing up A122 — a bystander who never consented to any of this. Redacted; it remains in git history, which only a rewrite removes | [A129](KNOWN_ISSUES.md) |
+| **Misha Mahowald's age at death was wrong in the file that credits her.** `semantic/LINEAGE.md` said she died at 32 while `WHAT_WE_FOUND.md` said 33, and the two sat unreconciled. She was born 12 January 1963 and died 26 December 1996, so 33 is right. Found 2026-09-27 while preparing an outreach draft that quoted the credit; the 32 is corrected in place. A credit to a dead researcher is the one place a project gets no second chance to be careless | `semantic/LINEAGE.md` |
 | A privacy posture was **imposed on the operator who does not hold one** — the first fix for A128 refused to send anything under `private/` by default. Replaced within the hour: the tool announces, and he decides | [A128](KNOWN_ISSUES.md) |
 
 ## Green that checked nothing — 2026-09-27

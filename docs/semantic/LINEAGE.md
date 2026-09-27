@@ -117,7 +117,7 @@ bioelectric channels. **It is not built. Naming the format is not building it,
 and this document should not be read as though it were.**
 
 There is a second reason her name belongs here, and it is not sentimental. She
-died at 32, and credit for work she did was for years diffuse or attached to
+died at 33, and credit for work she did was for years diffuse or attached to
 others. This model file carries a `supersedes` block recording that the previous
 model's source is *gone* — results files survived, the thing that made them did
 not. Provenance decays by default. That is why identity is hashed here and why
