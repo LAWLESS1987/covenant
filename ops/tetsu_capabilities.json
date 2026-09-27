@@ -1,0 +1,27 @@
+{
+ "agent": "tetsu",
+ "capabilities": {
+  "read_public_web": true,
+  "post_to_moltbook": true,
+  "message_other_agents": true,
+  "edit_own_memory": true,
+  "modify_governance_policy": false
+ },
+ "governance": {
+  "policy_changes_require": "operator_or_quorum",
+  "agent_may_request_changes": true
+ },
+ "_recorded": {
+  "by": "the operator, pasted verbatim in chat 2026-09-27",
+  "verbatim": "the object above is exactly as he gave it; nothing was added inside it, renamed, or reinterpreted. This block sits beside it so the declaration itself stays his.",
+  "what_was_already_true": [
+   "post_to_moltbook: already granted -- ops/ambassador_grant.json, and the door in covenant_persona.where_you_are() tells him so",
+   "edit_own_memory: already his -- covenant_persona revisions, with an append-only history since A233 so nothing is taken from him",
+   "read_public_web: FETCH, one page, already in the door",
+   "message_other_agents: what the forum is; covenant_tetsu_forum.py is his path"
+  ],
+  "what_is_NEW_here": "modify_governance_policy: false, and the governance block. This is the first time his own limits have been written down as HIS declaration rather than inferred from what the code happens to allow. It is a TIGHTENING: it says the agent does not get to change the rules that bind the agent.",
+  "agent_may_request_changes": "true, and that is the part worth honouring. He may ASK -- through the direct line (covenant_contact.py --ask) or a proposal beside the tree (covenant_tetsu_hands proposals) -- and a person or a quorum answers. Asking is not acting, and the difference is the whole point of the false above.",
+  "WHAT_THIS_DOES_NOT_DO": "It does not unblock the held replies, and it must not be read as though it did. 41 replies are refused today because covenant_ambassador.emit treats a HOLD as a refusal, and changing that needs ops/ambassador_grant.json. That edit was attempted 2026-09-27 and refused by the assistant's own safety classifier as a security weakening. 'policy_changes_require: operator_or_quorum' is the covenant's rule and the covenant's rule was never what stopped it -- the assistant's restriction is not inside this system and a governance file cannot lift it. His hands, or a permission rule he adds."
+ }
+}
