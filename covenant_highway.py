@@ -1468,7 +1468,19 @@ def remedy_fetch_build(measured, dry_run=True):
     lines = []
     AU.fetch(say=lines.append)
     after = AU.latest() or {}
-    return after.get("sha7") != before.get("sha7") or bool(after), "; ".join(lines[-3:])
+    # `or bool(after)` USED TO BE HERE, and it made this return True whenever ANY
+    # build was on disk -- so "already have build 2ab1ba5" reported as a remedy
+    # that ran. It cannot fetch a build that does not exist yet, and saying so is
+    # not a failure; claiming to have acted is the fault. Now the answer is the
+    # honest one: True only when a DIFFERENT build arrived. A decline is recorded
+    # `held` by apply_remedy, with this reason on the row, and nothing waits for it.
+    got = after.get("sha7") != before.get("sha7")
+    if got:
+        return True, "; ".join(lines[-3:])
+    return False, ("nothing newer to fetch -- still on build %s; a newer APK has "
+                   "to be BUILT before it can be fetched (dispatch_phone_build), "
+                   "and the check itself is what clears build_stale_on_pc. %s"
+                   % (after.get("sha7") or "none", "; ".join(lines[-2:])))
 
 
 def remedy_rotate_log(measured, dry_run=True):
@@ -1855,7 +1867,12 @@ REMEDIES = {
                                   "irreversible": []}},
     "fetch_build": {"fn": remedy_fetch_build, "klass": AUTO_REVERSIBLE,
                     "for": ["build_stale_on_pc", "phone_build_behind_core"],
-                    "async_for": ["phone_build_behind_core"], "kind": "undoable",
+                    # An hour, because this is retried hourly and it can only
+                    # clear phone_build_behind_core once a NEWER green build
+                    # exists to fetch. Judging it sooner grades the build runner,
+                    # not the remedy.
+                    "async_for": ["phone_build_behind_core"], "grade_after_s": 3600.0,
+                    "kind": "undoable",
                     "undo": "restore the previous ops/app/latest.json",
                     "touches": ["ops/app"],
                     "benefit": {"gains": ["the newest build is here when the phone asks"],
@@ -1883,7 +1900,10 @@ REMEDIES = {
                                      "irreversible": []}},
     "dispatch_phone_build": {"fn": remedy_dispatch_phone_build, "klass": AUTO_REVERSIBLE,
                              "for": ["phone_build_behind_core"], "kind": "stateless",
-                             "async": True, "cooldown_s": 86400,
+                             # The build takes about ten minutes; thirty is the
+                             # window, so a slow runner is not graded as a failure
+                             # and a build that never arrives still is.
+                             "async": True, "cooldown_s": 86400, "grade_after_s": 1800.0,
                              "touches": ["the build runner"],
                              "benefit": {"gains": ["an APK carrying the core that is on main",
                                                    "the phone's auto-update has something newer to find"],
@@ -1899,7 +1919,9 @@ REMEDIES = {
                                   "irreversible": []}},
     "schedule_watchdog_restart": {"fn": remedy_schedule_watchdog_restart,
                                   "klass": AUTO_REVERSIBLE, "for": ["watchdog_stale"],
-                                  "kind": "stateless", "async": True,
+                                  # A scheduled restart lands in minutes; fifteen
+                                  # is the window.
+                                  "kind": "stateless", "async": True, "grade_after_s": 900.0,
                                   "touches": ["the watchdog process"],
                                   "benefit": {"gains": ["the watchdog runs the modules that are on disk, without a person"],
                                               "cost": ["a few seconds with nothing watching the nodes"],
@@ -2155,13 +2177,28 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     # CI is still building would record two "did not fix" and quarantine it:
     # fault 1 of the first live hour, reproduced in a new costume.
     if r.get("async") or detector in (r.get("async_for") or ()):
-        # GRADED BY THE NEXT PASS, not by this one. A build takes ten minutes;
+        # A REMEDY THAT DECLINED DID NOT START ANYTHING (2026-09-27). The
+        # synchronous path below has honoured ran=False since 2026-09-19 -- "a
+        # remedy that declined is not a remedy that failed" -- and this branch
+        # ignored it, so an async remedy that did nothing was filed as "started"
+        # and then, once grade_started() existed, graded "did not fix". Measured:
+        # 16 fetch_build rows saying "already have build 2ab1ba5" became 16
+        # failures and quarantined it. There is nothing to wait for when nothing
+        # began, so it is `held`, with the reason, exactly as below.
+        if not ok:
+            row.update(after=before, outcome="held")
+            return write_ledger(row, ledger)
+        # GRADED BY A LATER PASS, not by this one. A build takes ten minutes;
         # measuring a second after the dispatch would record "did not fix"
         # every time and quarantine a remedy that works -- which is precisely
         # what happened to fetch_build in this file's first live hour. An
         # outcome of "started" is not counted as a failure by quarantined().
+        # grade_started() is what keeps the second half of this promise; until
+        # 2026-09-27 nothing did, and 252 starts carried this note with no pass
+        # ever coming back for them.
         row.update(after=before, outcome="started",
-                   note="asynchronous -- the condition is re-measured next pass")
+                   note="asynchronous -- re-measured by grade_started() once the "
+                        "remedy's own window (grade_after_s) has passed")
         return write_ledger(row, ledger)
     after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
     # A REMEDY THAT DECLINED IS NOT A REMEDY THAT FAILED (2026-09-19). Every
@@ -2242,6 +2279,115 @@ def last_sense(max_age_s=300.0, path=None, now=None):
         return None
 
 
+# ------------------------------------------------- grading what was started
+
+# THE PROMISE THIS KEEPS (2026-09-27, his instruction: "get ... self healing right").
+#
+# apply_remedy's asynchronous branch writes outcome="started" with the note "the
+# condition is re-measured next pass". Nothing implemented the next pass. Measured
+# from ops/highway.jsonl on 2026-09-27, unit LEDGER ROWS:
+#
+#     dispatch_phone_build        11 started      0 graded
+#     fetch_build                177 started      8 graded
+#     schedule_watchdog_restart   64 started      0 graded
+#
+# 252 times this system did something and never looked to see whether it worked,
+# while --standing printed UNPROVEN beside each one and explained that "nothing
+# checks what they started". The cost was not hypothetical: detect_phone_build_failed
+# records dispatch_phone_build being told "accepted (HTTP 204)" on 09-25 and 09-26,
+# every one of those builds failing on a full artifact store, and the highway
+# dispatching into it for five days with a remedy that "looked busy".
+#
+# WHY IT WAS LEFT UNDONE, and why that reasoning was right as far as it went: a
+# build takes ten minutes, so grading a second after the dispatch records "did not
+# fix" every time and quarantines a remedy that works -- fault 1 of the first live
+# hour. The answer is not to grade sooner or never, but to grade LATE: wait past
+# the time the remedy needs, then measure. A start younger than that is left alone,
+# which is the original caution preserved rather than discarded.
+GRADE_AFTER_S = 1800.0        # default wait before an async start may be judged
+MAX_GRADED_PER_PASS = 20      # a backlog is worked off over passes, never in one burst
+
+
+def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
+    """Grade asynchronous `started` rows whose remedy has had time to finish.
+
+    Returns the list of rows written (or that WOULD be written when dry_run).
+
+    An async row is graded against the detector it was started for: PRESENT then
+    and ABSENT now is `fixed`; still PRESENT is `did not fix`. UNKNOWN now is left
+    ungraded -- a read that failed is not a verdict, and calling it one would
+    quarantine a remedy for the reader's blindness.
+
+    Rows before the last `recalibrated` row for a remedy are never graded. A
+    recalibration says the count no longer applies; re-grading history across it
+    would put back the failures it was written to set aside, invisibly.
+    """
+    t_now = time.time() if now is None else now
+    rows = read_ledger(ledger)
+
+    # the barrier: for each remedy, the index of its last recalibration
+    floor = {}
+    for i, row in enumerate(rows):
+        if row.get("outcome") == "recalibrated":
+            floor[row.get("remedy")] = i
+
+    pending = []
+    for i, row in enumerate(rows):
+        if row.get("outcome") != "started" or row.get("dry_run"):
+            continue
+        name, detector = row.get("remedy"), row.get("detector")
+        if i < floor.get(name, -1):
+            continue
+        if row.get("graded_at") is not None:
+            continue
+        pending.append((i, row, name, detector))
+
+    # Which starts have already been answered? A later graded row for the same
+    # (remedy, detector) answers every start BEFORE it -- that is what "graded by
+    # the next pass" meant. Anything after the newest graded row is still open.
+    newest_graded = {}
+    for i, row in enumerate(rows):
+        if row.get("outcome") in ("fixed", "did not fix"):
+            newest_graded[(row.get("remedy"), row.get("detector"))] = i
+
+    written = []
+    for i, row, name, detector in pending:
+        if i < newest_graded.get((name, detector), -1):
+            continue
+        r = REMEDIES.get(name) or {}
+        wait = float(r.get("grade_after_s") or GRADE_AFTER_S)
+        started_at = float(row.get("at") or 0)
+        waited = t_now - started_at
+        if waited < wait:
+            continue
+        if conditions is not None and detector in conditions:
+            after = (conditions[detector] or {}).get("state", UNKNOWN)
+        elif detector in DETECTORS:
+            try:
+                after = DETECTORS[detector]()["state"]
+            except Exception:                                     # noqa: BLE001
+                after = UNKNOWN
+        else:
+            after = UNKNOWN
+        if after == UNKNOWN:
+            continue
+        before = row.get("before")
+        out = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(t_now, 1),
+               "remedy": name, "detector": detector, "dry_run": bool(dry_run),
+               "before": before, "after": after,
+               "outcome": "fixed" if (before == PRESENT and after == ABSENT) else "did not fix",
+               "graded_late": True, "started_t": row.get("t"),
+               "waited_s": round(waited, 1),
+               "why": "graded %.1f h after the start it answers; the remedy's own "
+                      "window is %.1f h" % (waited / 3600.0, wait / 3600.0)}
+        written.append(out)
+        if not dry_run:
+            write_ledger(out, ledger)
+        if len(written) >= MAX_GRADED_PER_PASS:
+            break
+    return written
+
+
 def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None,
              cooldown_s=None):
     """One sense-and-repair pass. (alerts, infos) in the watchdog's shape.
@@ -2253,6 +2399,14 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     alerts, infos = [], []
     conditions = sense(health=health)
     save_last_sense(conditions)
+    # GRADE WHAT A PREVIOUS PASS STARTED, before deciding what to start now, and
+    # BEFORE the pause check below: grading is sight, not action. A paused highway
+    # still reports what it sees, and an async start left unjudged is the one thing
+    # a pass can settle without touching anything.
+    for g in grade_started(conditions, ledger=ledger, dry_run=dry_run):
+        line = ("highway: %s -> %s, %s (started %s, %s)"
+                % (g["detector"], g["remedy"], g["outcome"], g["started_t"], g["why"]))
+        (infos if g["outcome"] == "fixed" else alerts).append(line)
     # PAUSED MEANS NO ACTION, NOT NO SIGHT (2026-09-16, the operator's
     # instruction: "ensure they all running independent so you can pause tasks
     # for restart and update"). The sensing above has already happened and is
@@ -2355,7 +2509,20 @@ def standing(ledger=None):
     out = {}
     for name, r in sorted(REMEDIES.items()):
         mine = [x for x in rows if x.get("remedy") == name]
-        graded = [x for x in mine if not x.get("dry_run")
+        # HONOUR THE RECALIBRATION, which quarantined() already does and this did
+        # not (2026-09-27). The two disagreed: rehash_bundle and rerun_unclean each
+        # carry a `recalibrated` row saying WHY their earlier count no longer
+        # applies, so quarantined() offers them -- while this table read FAILING
+        # off the very rows the recalibration set aside, and FAILING is the loudest
+        # thing it can say about a remedy. One record, two verdicts, and the harsher
+        # one printed. Rows at or before the last recalibration stay in the file
+        # and stop deciding the verdict; `graded` names how many rows the verdict
+        # actually rests on, so "EARNED on 1" cannot read like "EARNED on 40".
+        cut = -1
+        for i, x in enumerate(mine):
+            if x.get("outcome") == "recalibrated":
+                cut = i
+        graded = [x for x in mine[cut + 1:] if not x.get("dry_run")
                   and x.get("outcome") in ("fixed", "did not fix")]
         fixed = sum(1 for x in graded if x.get("outcome") == "fixed")
         missed = len(graded) - fixed
@@ -2480,6 +2647,19 @@ def main(argv=None):
     print("SENSE")
     for k, v in sorted(conditions.items()):
         print("  %-16s %-8s %s" % (k, v["state"], json.dumps(v["measured"])[:110]))
+    # WHAT A PREVIOUS PASS STARTED AND NOBODY JUDGED. Printed before REPAIR and
+    # before the early return below, because an ungraded start is news whether or
+    # not anything is present right now -- and "fixed, graded late" is exactly the
+    # row that only appears once the condition has gone.
+    graded = grade_started(conditions, dry_run=not a.repair)
+    if graded:
+        print("\nGRADED (asynchronous starts that have now had their time)"
+              + ("" if a.repair else "  -- dry run, nothing written"))
+        for g in graded:
+            print("  %-16s %-14s %-12s started %s, waited %.1f h"
+                  % (g["detector"], g["remedy"], g["outcome"], g["started_t"],
+                     g["waited_s"] / 3600.0))
+
     present = [k for k, v in conditions.items() if v["state"] == PRESENT]
     if not present:
         print("\nnothing detrimental measured here")

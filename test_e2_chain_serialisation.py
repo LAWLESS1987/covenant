@@ -142,17 +142,52 @@ def main():
           slice_like_route({"from": "'; DROP TABLE"}) is None)
 
     # ---- S: the speedup is real, measured here ----------------------------
+    # BEST OF N, not one shot (2026-09-27). S1 timed each path ONCE and asserted
+    # on that single sample, while the comment below it said "the timing above is
+    # evidence, reported and not asserted" -- which was not true of the code. On
+    # 2026-09-27 it failed public CI at 0.6x (asdict 18.2 ms -> 28.8 ms) on a
+    # commit that changed one markdown file and MANIFEST.sha256, so the fast path
+    # had not moved at all: a shared runner descheduled the process inside the
+    # second measurement. Locally the same commit measured 1.5x.
+    #
+    # The estimator is the fix. Scheduler noise, page faults and a neighbouring
+    # job can only ever ADD time to a measurement, never remove it, so the
+    # MINIMUM of several runs is the closest available estimate of what the code
+    # actually costs, and it is the one statistic that noise cannot inflate.
+    #
+    # AND THE THRESHOLD HAD TO CHANGE TOO, which the first attempt at this fix
+    # got wrong and the mutation caught. `t_new < t_old` asks only that the fast
+    # path win by ANY margin. Driven both ways: with the fast path swapped for
+    # asdict so the two paths do identical work, it measured 18.5 ms -> 18.4 ms
+    # and PASSED -- 0.1 ms of nothing, and on a different ordering it would have
+    # been 0.1 ms the other way. An assertion that a coin lands heads is not an
+    # assertion. So the margin is asserted instead, and best-of-N is what makes a
+    # ratio safe here where it was not before: this file records S2 failing at
+    # 1.93x on ONE sample, while best-of-5 measures 7.6x on the same machine. The
+    # separation is not marginal -- real 7.6x against identical-work 1.0x -- so
+    # MIN_SPEEDUP sits between them with room on both sides, and a genuine
+    # regression cannot cross it by being unlucky.
+    REPS = 5
+    MIN_SPEEDUP = 2.0
     big = [mkblock(i) for i in range(2000)]
-    t = time.perf_counter()
-    [asdict(x) for x in big]
-    t_old = (time.perf_counter() - t) * 1000
-    t = time.perf_counter()
-    [C._block_dict(x) for x in big]
-    t_new = (time.perf_counter() - t) * 1000
-    check("S1 measurably faster on 2,000 blocks, measured in this run rather "
+
+    def best_ms(fn):
+        best = None
+        for _ in range(REPS):
+            t = time.perf_counter()
+            [fn(x) for x in big]
+            ms = (time.perf_counter() - t) * 1000
+            best = ms if best is None else min(best, ms)
+        return best
+
+    t_old = best_ms(asdict)
+    t_new = best_ms(C._block_dict)
+    ratio = (t_old / t_new) if t_new else 0.0
+    check("S1 at least %.1fx faster on 2,000 blocks, best of %d runs per path so "
+          "a descheduled sample cannot decide it, measured in this run rather "
           "than quoted from a commit message (asdict %.1f ms -> %.1f ms, %.1fx)"
-          % (t_old, t_new, t_old / t_new if t_new else 0),
-          t_new < t_old, (t_old, t_new))
+          % (MIN_SPEEDUP, REPS, t_old, t_new, ratio),
+          ratio >= MIN_SPEEDUP, (t_old, t_new, round(ratio, 2)))
     # S2 asserted `ratio >= 2.0` in its first version and failed at 1.93x --
     # while a full sweep and five other processes were running on this machine.
     # That was the same mistake test_a9_relay_race exhibits under sweep load,
@@ -161,9 +196,13 @@ def main():
     # suite that fails when the box is busy teaches its reader to re-run it
     # until it passes, which is worse than not asserting at all.
     #
-    # So the CAUSE is asserted instead, and it is load-independent: the fast
-    # path must not do the recursive deepcopy. The timing above is evidence,
-    # reported and not asserted.
+    # So the CAUSE is asserted HERE TOO, and it is load-independent: the fast
+    # path must not do the recursive deepcopy. S2 is the guarantee; S1's timing
+    # is corroboration, and S1 asserts on a best-of-N estimate rather than on one
+    # sample precisely so that the corroboration cannot fail on its own for a
+    # reason that has nothing to do with the code. (Until 2026-09-27 this comment
+    # said the timing was "reported and not asserted". It was asserted, on a
+    # single sample, and it failed CI.)
     # BY AST, not by grep. The first version of S2 searched the source TEXT and
     # its companion counted `dict(` in it -- which counts the docstring too,
     # and the docstring necessarily mentions asdict because it explains what

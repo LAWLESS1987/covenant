@@ -1380,6 +1380,113 @@ def main():
     check("H1v every detector has a path that says UNKNOWN rather than ABSENT",
           not unknown_capable, str(unknown_capable))
 
+    # ---- H1o2: what was STARTED is judged, and only when it can be -----------
+    # 2026-09-27, his instruction "get ... self healing right". apply_remedy's
+    # async branch wrote outcome="started" with the note "the condition is
+    # re-measured next pass" and nothing implemented the next pass: measured from
+    # the live ledger that morning, 252 starts with 0 outcomes, while --standing
+    # printed UNPROVEN and explained that nothing checks what they started. Each
+    # promise grade_started() now makes is driven BOTH ways below.
+    print("\nH1o2 -- an asynchronous start is graded, late, and only when it can be")
+    ASYNC = "dispatch_phone_build"          # async: True in the real table
+    WINDOW = float((H.REMEDIES[ASYNC].get("grade_after_s") or H.GRADE_AFTER_S))
+
+    def started_row(led, at, before=H.PRESENT, detector="phone_build_behind_core",
+                    remedy=ASYNC):
+        return H.write_ledger({"t": "fixture", "at": at, "remedy": remedy,
+                               "detector": detector, "dry_run": False,
+                               "before": before, "after": before,
+                               "outcome": "started"}, led)
+
+    NOW = 1_000_000.0
+    ABSENT_NOW = {"phone_build_behind_core": {"state": H.ABSENT, "measured": {}}}
+    PRESENT_NOW = {"phone_build_behind_core": present()}
+    UNKNOWN_NOW = {"phone_build_behind_core": {"state": H.UNKNOWN, "measured": {}}}
+
+    led = tmp_ledger()
+    started_row(led, NOW - WINDOW - 60)
+    got = H.grade_started(ABSENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 a start past its window, condition now ABSENT -> fixed",
+          len(got) == 1 and got[0]["outcome"] == "fixed" and got[0]["graded_late"],
+          str([(g["outcome"], g.get("graded_late")) for g in got]))
+
+    led = tmp_ledger()
+    started_row(led, NOW - WINDOW - 60)
+    got = H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 ...still PRESENT -> did not fix", len(got) == 1
+          and got[0]["outcome"] == "did not fix", str([g["outcome"] for g in got]))
+
+    # THE ORIGINAL CAUTION, KEPT. Grading a ten-minute build one second after the
+    # dispatch is what quarantined fetch_build in this file's first live hour.
+    led = tmp_ledger()
+    started_row(led, NOW - 5)
+    got = H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 a start INSIDE its window is not graded at all", got == [], str(got))
+
+    # mutation: shrink the window and the same row must now be graded, which
+    # proves the check above is the window and not an accident of the fixture.
+    _keep = H.REMEDIES[ASYNC].get("grade_after_s")
+    try:
+        H.REMEDIES[ASYNC]["grade_after_s"] = 1.0
+        got = H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+        check("H1o2 mutation: window shrunk -> that same row IS graded",
+              len(got) == 1 and got[0]["outcome"] == "did not fix", str(got))
+    finally:
+        H.REMEDIES[ASYNC]["grade_after_s"] = _keep
+
+    # A READ THAT FAILED IS NOT A VERDICT. Calling UNKNOWN "did not fix" would
+    # quarantine a remedy for the reader's blindness -- rule 9 in one branch.
+    led = tmp_ledger()
+    started_row(led, NOW - WINDOW - 60)
+    got = H.grade_started(UNKNOWN_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 the condition UNKNOWN now -> left ungraded, never a failure",
+          got == [], str(got))
+
+    # A RECALIBRATION IS A BARRIER. Re-grading history across it would put back
+    # the failures it was written to set aside, and invisibly.
+    led = tmp_ledger()
+    started_row(led, NOW - WINDOW - 600)
+    H.recalibrate(ASYNC, "fixture: the count no longer applies", led)
+    got = H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 a start BEFORE a recalibration is never graded", got == [], str(got))
+    started_row(led, NOW - WINDOW - 60)
+    got = H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 ...and a start AFTER it is", len(got) == 1, str(got))
+
+    # dry_run writes nothing: the grader must be safe to print before it acts.
+    led = tmp_ledger()
+    started_row(led, NOW - WINDOW - 60)
+    n_before = len(H.read_ledger(led))
+    H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o2 dry_run grades on screen and writes no row",
+          len(H.read_ledger(led)) == n_before, "%d rows" % len(H.read_ledger(led)))
+    H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=False)
+    check("H1o2 ...and with dry_run=False it does write one",
+          len(H.read_ledger(led)) == n_before + 1, "%d rows" % len(H.read_ledger(led)))
+
+    # AND THE DECLINE PATH: an async remedy that returned ran=False started
+    # nothing, so there is nothing to wait for. 16 fetch_build rows saying
+    # "already have build 2ab1ba5" were filed "started" and then graded failures.
+    led = tmp_ledger()
+    calls = []
+    H.REMEDIES["_spy_async"] = {"fn": spy_remedy(calls, ok=False), "klass": H.AUTO_REVERSIBLE,
+                                "for": ["phone_build_behind_core"], "kind": "stateless",
+                                "async": True, "benefit": {"gains": [], "cost": [], "irreversible": []}}
+    try:
+        row = H.apply_remedy("_spy_async", present(), "phone_build_behind_core",
+                             dry_run=False, ledger=led, cooldown_s=0)
+        check("H1o2 an async remedy that DECLINED is held, not 'started'",
+              row["outcome"] == "held", row["outcome"])
+        check("H1o2 ...so grade_started has nothing to judge for it",
+              H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True) == [], "")
+        H.REMEDIES["_spy_async"]["fn"] = spy_remedy(calls, ok=True)
+        row = H.apply_remedy("_spy_async", present(), "phone_build_behind_core",
+                             dry_run=False, ledger=led, cooldown_s=0)
+        check("H1o2 mutation: the same remedy returning ok -> 'started'",
+              row["outcome"] == "started", row["outcome"])
+    finally:
+        H.REMEDIES.pop("_spy_async", None)
+
     failed = [n for n, ok in results if not ok]
     print(f"\nH1: {len(results) - len(failed)}/{len(results)} passed")
     if failed:

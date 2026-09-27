@@ -145,7 +145,48 @@ running a thing rather than describing it.
    failures above it. Never by deleting history.
 2. **An asynchronous remedy cannot be graded a second after it starts.** A CI build takes
    ten minutes. Remedies marked `async` record `started`, and `quarantined()` does not count
-   that as a failure — the next pass measures the condition and tells the truth.
+   that as a failure — a later pass measures the condition and tells the truth.
+
+   **Corrected 2026-09-27, on his instruction "get … self healing right". The second half of
+   that sentence was not true for six weeks.** Nothing implemented the later pass. Measured
+   from `ops/highway.jsonl` that morning, unit LEDGER ROWS: `dispatch_phone_build` 11 started
+   / 0 graded, `fetch_build` 177 / 8, `schedule_watchdog_restart` 64 / 0 — **252 starts with
+   no outcome**, while `--standing` printed UNPROVEN beside each and explained, accurately,
+   that "nothing checks what they started". It cost five days of phone builds: dispatches were
+   told "accepted (HTTP 204)", every build failed on a full artifact store, and the highway
+   went on dispatching into it with a remedy that looked busy.
+
+   `grade_started()` now keeps it. It waits out each remedy's own declared window
+   (`grade_after_s` — 30 min for a build dispatch, 15 for a scheduled restart, an hour for a
+   fetch) and only then measures: PRESENT then and ABSENT now is `fixed`, still PRESENT is
+   `did not fix`. UNKNOWN now is left ungraded, because a read that failed is not a verdict
+   and calling it one would quarantine a remedy for the reader's blindness. Rows before a
+   `recalibrated` row are never graded, or a re-grade would silently put back the failures the
+   recalibration set aside. The original caution is kept rather than discarded: a start inside
+   its window is still not touched.
+
+   **What it found in its first pass, which is the argument for it.** 36 rows graded.
+   `schedule_watchdog_restart` went from UNPROVEN to **EARNED, 16 fixed / 0 missed** — it had
+   been working all along and nothing had ever said so. And two bugs surfaced that only
+   grading could expose: the async branch **ignored `ran=False`**, so a remedy that declined
+   was filed as `started` (the synchronous branch had honoured it since 2026-09-19); and
+   `remedy_fetch_build` returned true whenever *any* build was on disk (`or bool(after)`), so
+   "already have build 2ab1ba5" reported as a remedy that had acted. Together those turned 16
+   correct declines into 16 failures and quarantined it. Both fixed: a decline is now `held`
+   with its reason, and fetch reports true only when a different build actually arrived.
+   `fetch_build` and `dispatch_phone_build` were then recalibrated — the reasons are in the
+   ledger and the failures stay above them.
+
+   Fault 1 above is also why `standing()` changed: `quarantined()` has always honoured
+   `recalibrated`, and `standing()` did not, so the same record produced two verdicts and the
+   harsher one was printed. `rehash_bundle` read **FAILING** off two rows its own
+   recalibration had set aside; it now reads UNPROVEN, which is the honest answer.
+
+   Driven both ways in `test_h1_highway.py` as **H1o2**, twelve checks: graded past the window
+   in each direction, *not* graded inside it (and graded once the window is shrunk, so the
+   check is the window and not the fixture), UNKNOWN left alone, the recalibration barrier
+   honoured in both directions, `dry_run` writing nothing and then writing one, and a
+   declining async remedy recorded `held` where the same remedy returning ok records `started`.
 3. **A guard that measured itself.** The first `watchdog_stale` imported the watchdog and
    compared *that* to disk; a fresh import always matches, so it would have said ABSENT every
    time, including twice today when the running watchdog really was stale. It now asks the
