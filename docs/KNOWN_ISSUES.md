@@ -7351,6 +7351,12 @@ The round-3 object-model reviewer was stopped by a safety check before it ran an
 instead, and all came out right: notes, tags of a blob and of a tree, a shallow clone (value refused, clean control
 through), a mirror-shaped push, and a gpgsig header.
 
+*Linux.* The first Linux CI run, at `c3e8773`, had OS1 at 68/72 and AS1 at 0/2. The tests installed their hooks
+without the executable bit, and git on Linux skips such a hook silently; Windows runs it anyway. This was reproduced
+under WSL Ubuntu by staging the files as CI does, with the committed tests: 68/72 and 0/2, git saying "hook was
+ignored". With the fix: 72/72 and 2/2. The tests now install hooks as executables, the tracked hook files are
+100755, and every install line says `chmod +x`.
+
 *Pinned.* OS1 is 74/74, with sections OS1i, j, k and l added. Every fix was broken in memory or in a temporary copy:
 24 mutations across the rewrite's three versions. Each turned its own checks red, and nothing else apart from the
 hook-installed check while the new hook was not yet installed.

@@ -6,9 +6,16 @@ The working branch on this machine is now **main**. Claude pushes main directly 
 
 The hook is tracked here as `ops/post-commit.autosync` and is installed with one command, once, by the operator (Claude is not permitted to install standing auto-push automation):
 
-    cp ops/post-commit.autosync .git/hooks/post-commit
+    cp ops/post-commit.autosync .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+(On Linux, git silently skips a hook that is not executable; Windows runs it either way.)
 
 If a push fails the hook says so and the commit still stands; `git pull --rebase` and the next commit re-syncs. To stop auto-sync, delete `.git/hooks/post-commit`.
+
+_2026-09-26 (A231):_ the hook pushes and reports main and sentinel-witness each on its own. One push of both had
+printed "push FAILED" for a day while main had landed. Only sentinel-witness was refused: its remote copy predated
+a rebase of main. On his "I approve it", Claude replaced the already-installed hook with this version. It pushes
+nothing it did not push before, and only its report changed.
 
 ## The other hook: `pre-commit`, held-copy autosync
 

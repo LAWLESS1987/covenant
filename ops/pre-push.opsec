@@ -1,7 +1,8 @@
 #!/bin/sh
 # OPSEC GUARD at the push (2026-09-26, his words: "protect operation security in all
 # we do by default").
-# Install once:  cp ops/pre-push.opsec .git/hooks/pre-push
+# Install once:  cp ops/pre-push.opsec .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+# (git on Linux silently skips a hook that is not executable; Windows runs it either way)
 #
 # Every object the push would send that the remote does not already hold -- file
 # contents in every encoding a Windows tool writes, commit and tag text, file names --

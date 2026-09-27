@@ -78,6 +78,13 @@ def git(repo, *args, env=None):
     return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, env=env)
 
 
+def install_hook(src, dst):
+    """Copy a hook into place AS AN EXECUTABLE: git on Linux silently ignores a hook without the bit (Windows runs
+    it anyway), so the first Linux CI run of OS1k/OS1l pushed straight past a hook that never ran (2026-09-26)."""
+    shutil.copyfile(src, dst)
+    os.chmod(dst, 0o755)
+
+
 def main():
     print("OS1a -- Tailscale's status")
     d = cats(O.tokens_from_tailscale(STATUS))
@@ -483,7 +490,7 @@ def main():
                 fh.write("private/\n")
             git(hk, "add", "-A", env=env)
             git(hk, "commit", "-q", "-m", "the guard", env=env)
-            shutil.copyfile(os.path.join(HERE, "ops", "pre-push.opsec"), os.path.join(hk, ".git", "hooks", "pre-push"))
+            install_hook(os.path.join(HERE, "ops", "pre-push.opsec"), os.path.join(hk, ".git", "hooks", "pre-push"))
             wt = os.path.join(base, "wt")
             git(hk, "worktree", "add", "-q", wt, "old-line", env=env)
             with open(os.path.join(wt, "n.md"), "w") as fh:
@@ -573,7 +580,7 @@ def main():
                 fh.write("private/\n")
             git(hk, "add", "-A", env=env)
             git(hk, "commit", "-q", "-m", "the guard", env=env)
-            shutil.copyfile(os.path.join(HERE, "ops", "pre-push.opsec"), os.path.join(hk, ".git", "hooks", "pre-push"))
+            install_hook(os.path.join(HERE, "ops", "pre-push.opsec"), os.path.join(hk, ".git", "hooks", "pre-push"))
             git(hk, "remote", "add", "origin", bare, env=env)
             wt = os.path.join(base, "wt")
             git(hk, "worktree", "add", "-q", "-b", "side", wt, "main", env=env)
@@ -604,7 +611,7 @@ def main():
             git(sw, "add", "-A", env=env)
             git(sw, "commit", "-q", "-m", "the guard", env=env)
             git(sw, "branch", "-M", "main", env=env)
-            shutil.copyfile(os.path.join(HERE, "ops", "pre-push.opsec"), os.path.join(gd, "hooks", "pre-push"))
+            install_hook(os.path.join(HERE, "ops", "pre-push.opsec"), os.path.join(gd, "hooks", "pre-push"))
             git(sw, "remote", "add", "origin", bare, env=env)
             p3 = git(sw, "push", "origin", "main:sep-main", env=env)
             with open(os.path.join(sw, "n.md"), "w") as fh:

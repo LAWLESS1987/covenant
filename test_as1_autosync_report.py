@@ -57,7 +57,10 @@ def main():
         git(other, "add", "b.txt")
         git(other, "commit", "-q", "-m", "only on the remote branch")
         git(other, "push", "-q", "origin", "sentinel-witness")
+        # installed AS AN EXECUTABLE: git on Linux silently skips a hook without the bit (Windows runs it anyway), so
+        # the first Linux CI run found AS1 at 0/2 with the hook never having run (2026-09-26)
         shutil.copyfile(HOOK, os.path.join(wk, ".git", "hooks", "post-commit"))
+        os.chmod(os.path.join(wk, ".git", "hooks", "post-commit"), 0o755)
 
         def commit(name):
             open(os.path.join(wk, name), "w").write(name + "\n")
