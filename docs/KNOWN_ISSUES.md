@@ -7228,6 +7228,88 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A235. [the self-heal's blind spots: a stale restart gate read PASS, and rebuild requests nobody followed up] 2026-09-27. His words: "highway is red fix it it should of auto repaired. wheres the helpful swarm?", then "fix the blind spots"; earlier the same morning "Tetsu should do this and tell you about it if needed moving forward to stop my constant need of being present".
+
+**What was red, measured.** On this PC every node, the sweep and the public
+CI were clean. The Highway's three PRESENT conditions -- `mesh_source_split`,
+`phone_build_behind_core`, `app_build_gap` -- were one fault: the phone (on
+the tailnet) still ran the 09-21 core `2abd338eb13d` because the newest
+SUCCESSFUL covenant-phone build was 0.1.679 from 09-22. The highway had asked
+for rebuilds (`dispatch_phone_build`, 09-25 and 09-26, "accepted (HTTP
+204)"); all three builds since 09-25 failed at `actions/upload-artifact`:
+"Artifact storage quota has been hit". covenant-phone `11d0ec4` (09-26)
+shortened retention, which frees nothing already stored.
+
+**Blind spot 1: the restart gate.** The hourly block's repo row compared the
+core with MANIFEST.sha256 only, deliberately skipping `verify_deploy.py`'s
+pins because they had been stale since 09-12. So it could not see them go
+stale again: from 09-25 (four core commits, `60c17a2`, `06accd7`, `8f7b9ee`,
+`e3492e0` -- the M53 failure a fourth time) verify_deploy read FAIL and
+refused every restart it gates (`AM_VERIFY_AND_RESTART.bat`,
+`covenant_one.py --restart`) while the row read PASS. The watchdog's own node
+restarts do not go through verify_deploy; this gate is the operator's
+restart path. FIXED: the row now asks verify_deploy's questions from its
+text (ast, never imported): every pinned file, the companions,
+EXPECTED_VERSION, EXPECTED_LINES counted the way the node counts
+(`raw.count(b"\n")`), failures ahead of unknowns. It reads FAIL today on the
+core pin and on EXPECTED_LINES (12705 pinned, 12767 on disk). K1 20/20, K2
+25/25, P19 23/23 and A3s 51/51 passed on the current core; moving the pin was
+refused by this session's permission check, so **the pin move is his to
+approve**.
+
+**Blind spot 2: rebuilds nobody graded.** Asynchronous remedies write
+"started" and are "graded by the next pass"; no pass grades them. Ledger
+counts that day: `dispatch_phone_build` 11 started / 0 graded,
+`fetch_build` 167 / 0, `schedule_watchdog_restart` 62 / 0. FIXED for the
+phone build: detector `phone_build_failed` reads the build's runs (his
+credential, at most every 30 min, only in the watchdog daemon and only on the
+PC that fetched a build of the app repository -- UNKNOWN and unread on a
+clone, A142), names the failing step and the runner's reason, and says it on
+the direct line once per failing streak and once when a build succeeds.
+`--standing` now prints the started-but-ungraded count. The credential is
+read through `_phone_token()`, which restores the process's opt-in and cache
+(the node runs `sense()` on request threads, A21).
+
+**The hourly block tells him (his "tell you about it if needed").** An
+overall FAIL is said once on the direct line when it begins or its failing
+rows change, and once when it clears -- only from the watchdog daemon. A new
+`student` row reads ops/DISTILL.md and ops/RUN_WITHOUT.json (a REFUSED
+candidate is PASS; no cycle in 36 h is WARN).
+
+**Two messages reached his phone from tests, and are true.** 09:42Z "The
+phone build has failed 3 time(s)..." came from H1v driving the first version
+of the detector in the live tree; 10:09Z "Self-evaluation round 1: FAIL --
+repo" came from P20's E11c. Both are now impossible by construction
+(DAEMON_READS; `live` defaults to the daemon's `persist`) and pinned (H1pb,
+E11f, E13n). Because the told state already records both, the daemon will
+not repeat them.
+
+**Verified by breaking it.** Two independent mutation rounds in isolated
+worktrees: round 1, 31 of 39 went red; round 2, 26 of 28 (watchdog) and 13 of
+22 (highway). Every survivor was either an equivalent mutant or got a check:
+P20 79/79 (E11f, E12s-E12z, E12t2/t3, E12v2, E12w2/w3, E13a-E13t), H1 158/158
+(29 of them H1pb). G3 20/20, P21, H2 46/46, PB1 4/4, PC1 43/43, P23, P22,
+P25 28/28, P14 33/33 green.
+
+**What still needs him:** free covenant-phone's artifact storage (delete old
+build artifacts; GitHub recalculates usage every 6-12 h), then tap install on
+the phone; approve the verify_deploy re-pin (core `52d6503ffd00`,
+EXPECTED_LINES 12767).
+
+**Open, recorded rather than fixed:** no pass grades asynchronous remedies in
+general (the phone build is covered by its own detector; `fetch_build` and
+`schedule_watchdog_restart` are not). `dispatch_phone_build` keeps asking
+daily while `phone_build_failed` is PRESENT -- about ten minutes of his
+Actions account per day, and also the retry once storage frees. No sweep
+check fails when the core moves without its pin (M53); it would turn main red
+until the re-pin, so it lands with the re-pin. `public_ci_red` has the same
+cache-write and raising-line fragility the review found here. The hourly
+block still does not read the nodes' genesis/version/degraded agreement, the
+alert kinds since the last evaluation, or the gate's quorum from /health
+(docs/RUN_WITHOUT_CLAUDE_CODE.md says so).
+
+---
+
 ### A234. [Tetsu practises code, nightly and bounded] 2026-09-26. His words: "train tetsu to code at a high recursive level". Asked how, he chose the practice loop, nightly and bounded.
 
 **What "train" means here, said plainly.** Tetsu runs on the local model: the 7B coder when memory allows, else

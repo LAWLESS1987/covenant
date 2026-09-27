@@ -782,6 +782,316 @@ def main():
     check("H1ci public_ci_red has no remedy: the fix is a change to the code, and PRESENT reaches him as an alert",
           not [n for n, rr in H.REMEDIES.items() if "public_ci_red" in (rr.get("for") or [])])
 
+    # ---- H1pb: phone_build_failed (2026-09-27), the same stub API and clock --
+    # dispatch_phone_build was told "accepted (HTTP 204)" and nothing ever read
+    # whether the build it asked for arrived: three failed on a full artifact
+    # quota while the highway looked busy.
+    def _papi(runs, calls, steps=("Run actions/upload-artifact@v4",),
+              reason="Failed to CreateArtifact: Artifact storage quota has been hit."):
+        def get(path):
+            calls.append(path)
+            if "/actions/workflows/android.yml/runs" in path:
+                return {"workflow_runs": runs}
+            if path.endswith("/jobs"):
+                return {"jobs": [{"id": 21, "conclusion": "success", "steps": []},
+                                 {"id": 22, "conclusion": "failure",
+                                  "steps": [{"name": "Build APK", "conclusion": "success"}]
+                                  + [{"name": s, "conclusion": "failure"} for s in steps]}]}
+            if "/check-runs/22/annotations" in path:
+                return [{"annotation_level": "warning", "message": "Node.js 20 is deprecated"},
+                        {"annotation_level": "failure", "message": reason}]
+            return []
+        return get
+
+    _pbr = [_run(9, "cancelled", 0.1), _run(8, "failure", 0.5), _run(7, "failure", 24.5),
+            _run(6, "success", 110.0), _run(5, "failure", 120.0)]
+    _pc = []
+    _k = len(_told)
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, _pc), now=_t0, cache=os.path.join(_cdir, "pb.json"), tell=_tell)
+    m_pb = r_pb["measured"]
+    check("H1pb the newest FINISHED phone build failed -> PRESENT: the cancelled one skipped, the failing step and "
+          "the runner's own reason named, the failures counted back to the last success",
+          r_pb["state"] == H.PRESENT and m_pb["newest"]["sha"] == "0000008"
+          and m_pb["failing_steps"] == ["Run actions/upload-artifact@v4"]
+          and m_pb["reasons"] == ["Failed to CreateArtifact: Artifact storage quota has been hit."]
+          and m_pb["failed_runs"] == 2 and m_pb["failing_since_is"] == "exact"
+          and m_pb["last_success"] == _run(6, "success", 110.0)["created_at"], m_pb)
+    check("H1pb ...and it tells him once on the direct line, naming the reason and that rebuilds change nothing",
+          len(_told) == _k + 1 and "quota has been hit" in _told[-1] and "change nothing" in _told[-1], _told[_k:])
+    _n = len(_pc)
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, _pc), now=_t0 + 60, cache=os.path.join(_cdir, "pb.json"),
+                                       tell=_tell)
+    check("H1pb within its 30 minutes it asks the API nothing, and he is not told twice",
+          len(_pc) == _n and r_pb["state"] == H.PRESENT and len(_told) == _k + 1
+          and r_pb["measured"]["reasons"], (_pc[_n:], _told[_k:]))
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi([_run(12, "failure", 0.2)] + _pbr, _pc),
+                                       now=_t0 + H.CI_EVERY_S + 1, cache=os.path.join(_cdir, "pb.json"), tell=_tell)
+    check("H1pb another failure in the SAME streak is not a new episode: he is not told again",
+          r_pb["state"] == H.PRESENT and r_pb["measured"]["failed_runs"] == 3 and len(_told) == _k + 1, _told[_k:])
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi([_run(13, "success", 0.1), _run(12, "failure", 0.2)] + _pbr, _pc),
+                                       now=_t0 + 2 * H.CI_EVERY_S + 2, cache=os.path.join(_cdir, "pb.json"), tell=_tell)
+    check("H1pb broken the other way: a build succeeds -> ABSENT, and he is told once that it succeeded again",
+          r_pb["state"] == H.ABSENT and len(_told) == _k + 2 and "succeeded again" in _told[-1], _told[_k:])
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi([_run(4, "failure", 0.5), _run(3, "failure", 1.0)], []),
+                                       now=_t0, cache=os.path.join(_cdir, "pball.json"), tell=_tell)
+    check("H1pb no success in the page: the start of the failures is said as 'at least'",
+          r_pb["state"] == H.PRESENT and r_pb["measured"]["failing_since_is"] == "at least"
+          and "at least 2 time(s)" in _told[-1], (r_pb["measured"], _told[-1:]))
+    _k = len(_told)
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi([_run(10, "success", 0.5), _run(8, "failure", 1.0)], []),
+                                       now=_t0, cache=os.path.join(_cdir, "pbgreen.json"), tell=_tell)
+    check("H1pb broken the other way: the newest finished build succeeded -> ABSENT, and nothing said",
+          r_pb["state"] == H.ABSENT and len(_told) == _k, r_pb["measured"])
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_down, now=_t0, cache=os.path.join(_cdir, "pbnone.json"), tell=_tell)
+    check("H1pb an API that cannot be read (or no credential) -> UNKNOWN, never ABSENT",
+          r_pb["state"] == H.UNKNOWN and "offline" in str(r_pb["measured"].get("error")), r_pb["measured"])
+    H.detect_phone_build_failed(pipeline=True, get=_papi([_run(10, "success", 0.5)], []), now=_t0,
+                                cache=os.path.join(_cdir, "pbold.json"), tell=_tell)
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_down, now=_t0 + 3 * 3600, cache=os.path.join(_cdir, "pbold.json"),
+                                       tell=_tell)
+    check("H1pb broken the other way: a success read three hours old with the API down is UNKNOWN, not the cache",
+          r_pb["state"] == H.UNKNOWN, r_pb["measured"])
+    # The mutation review of 2026-09-27 found each of the following could be broken with H1pb still green.
+    _k = len(_told)
+    _pc = []
+    _seq = [_run(8, "failure", 0.5), _run(6, "success", 110.0)]
+    H.detect_phone_build_failed(pipeline=True, get=_papi(_seq, _pc), now=_t0, cache=os.path.join(_cdir, "pb2.json"),
+                                tell=_tell)
+    H.detect_phone_build_failed(pipeline=True, get=_papi([_run(13, "success", 0.1)] + _seq, _pc),
+                                now=_t0 + H.CI_EVERY_S + 1, cache=os.path.join(_cdir, "pb2.json"), tell=_tell)
+    H.detect_phone_build_failed(pipeline=True, get=_papi([_run(14, "success", 0.05), _run(13, "success", 0.1)] + _seq,
+                                _pc), now=_t0 + 2 * H.CI_EVERY_S + 2, cache=os.path.join(_cdir, "pb2.json"), tell=_tell)
+    check("H1pb after 'succeeded again' a second success says nothing more (told is reset, not left on the streak)",
+          len(_told) == _k + 2 and "succeeded again" in _told[-1], _told[_k:])
+    _refused = []
+
+    def _no(text, why):
+        _refused.append(text)
+        return None
+    for i in range(3):
+        H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, []), now=_t0 + i * (H.CI_EVERY_S + 1),
+                                    cache=os.path.join(_cdir, "pbref.json"), tell=_no)
+    check("H1pb a direct line that REFUSES is tried once per episode, not every round",
+          len(_refused) == 1, _refused)
+    _raised = []
+
+    def _boom(text, why):
+        _raised.append(text)
+        raise OSError("outbox unwritable")
+    r_pb = None
+    for i in range(3):
+        r_pb = H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, []), now=_t0 + i * (H.CI_EVERY_S + 1),
+                                           cache=os.path.join(_cdir, "pbboom.json"), tell=_boom)
+    check("H1pb a direct line that RAISES is caught, counted as a refusal, and not retried every round",
+          len(_raised) == 1 and r_pb["state"] == H.PRESENT, (_raised, r_pb and r_pb["measured"]))
+    _blocker = os.path.join(_cdir, "notadir")
+    with open(_blocker, "w") as _fh:
+        _fh.write("a file where the cache's directory should be")
+    _pc, _k = [], len(_told)
+    for i in range(4):
+        H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, _pc), now=_t0 + 60 * i,
+                                    cache=os.path.join(_blocker, "pb.json"), tell=_tell)
+    check("H1pb a cache that cannot be written: four rounds a minute apart still read the API once and tell once",
+          len([c for c in _pc if "/workflows/" in c]) == 1 and len(_told) == _k + 1, (_pc, _told[_k:]))
+    _long = [_run(100 - i, "failure", 0.1 + i) for i in range(25)]
+    _k = len(_told)
+    for i in range(3):
+        _page = ([_run(200 + j, "failure", 0.01 * (j + 1)) for j in range(i)] + _long)[:20]
+        H.detect_phone_build_failed(pipeline=True, get=_papi(_page, []), now=_t0 + i * (H.CI_EVERY_S + 1),
+                                    cache=os.path.join(_cdir, "pblong.json"), tell=_tell)
+    check("H1pb a failing streak longer than the page is ONE episode: new failures pushing the oldest off the page "
+          "do not tell him again", len(_told) == _k + 1, _told[_k:])
+    _jc = []
+
+    def _jobs_down(path):
+        _jc.append(path)
+        if "/actions/workflows/" in path:
+            return {"workflow_runs": _pbr}
+        raise OSError("jobs endpoint down")
+    for i in range(5):
+        H.detect_phone_build_failed(pipeline=True, get=_jobs_down, now=_t0 + 60 * i,
+                                    cache=os.path.join(_cdir, "pbjobs.json"), tell=_tell)
+    check("H1pb a jobs read that fails waits CI_RETRY_S: five rounds a minute apart ask the jobs endpoint once",
+          len([c for c in _jc if c.endswith("/jobs")]) == 1, _jc)
+    _pc = []
+    r_pb = H.detect_phone_build_failed(pipeline=False, get=_papi(_pbr, _pc), now=_t0,
+                                       cache=os.path.join(_cdir, "pbclone.json"), tell=_tell)
+    check("H1pb on a PC that never fetched a build of the app repo (a second operator's clone) -> UNKNOWN, and the "
+          "API and the credential are never touched (A142)",
+          r_pb["state"] == H.UNKNOWN and not _pc and "not this operator" in r_pb["measured"]["why"], r_pb["measured"])
+    import covenant_github_judge as _gj
+    import urllib.request as _ur
+    _seen = {}
+
+    class _Resp:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self.body
+
+    def _open(req, timeout=None):
+        _seen["auth"] = req.get_header("Authorization")
+        return _Resp(b'{"workflow_runs": []}')
+    _real = (_gj.token, _ur.urlopen, dict(_gj._CREDENTIAL_STORE_OK), dict(_gj._CACHE))
+    try:
+        _gj._CREDENTIAL_STORE_OK["allowed"] = False
+        _gj._CACHE.pop("token", None)
+
+        def _tok():
+            _seen["allowed_during"] = _gj._CREDENTIAL_STORE_OK["allowed"]
+            _gj._CACHE["token"] = "stubtok"
+            return "stubtok"
+        _gj.token, _ur.urlopen = _tok, _open
+        H._phone_get("/x")
+        check("H1pb the real _phone_get sends his credential as a Bearer header (a dropped header reads UNKNOWN "
+              "forever against a private repository)", _seen.get("auth") == "Bearer stubtok", _seen)
+        check("H1pb ...and leaves the process as it found it: the credential opt-in back to shut and nothing cached, "
+              "so the NODE, which also runs sense(), is not opened by a detector (A21)",
+              _seen.get("allowed_during") is True and _gj._CREDENTIAL_STORE_OK["allowed"] is False
+              and "token" not in _gj._CACHE, (_seen, _gj._CREDENTIAL_STORE_OK))
+        _gj.token = lambda: ""
+        try:
+            H._phone_get("/x")
+            _raised_nc = False
+        except RuntimeError as e:
+            _raised_nc = "no GitHub credential" in str(e)
+        check("H1pb broken the other way: with no credential _phone_get RAISES (so the reading is UNKNOWN), never "
+              "an empty answer taken as a good read", _raised_nc)
+    finally:
+        _gj.token, _ur.urlopen = _real[0], _real[1]
+        _gj._CREDENTIAL_STORE_OK.clear()
+        _gj._CREDENTIAL_STORE_OK.update(_real[2])
+        _gj._CACHE.clear()
+        _gj._CACHE.update(_real[3])
+    # ---- the second review (2026-09-27): each of these was a mutation that left H1 green ----
+    import covenant_app_update as _AU
+    _real_latest, _real_daemon = _AU.latest, H.DAEMON_READS
+    try:
+        _pc = []
+        H.DAEMON_READS = False
+        _AU.latest = lambda: {"run_url": "https://github.com/%s/actions/runs/1" % _AU.REPO}
+        r_pb = H.detect_phone_build_failed(get=_papi(_pbr, _pc), now=_t0, cache=os.path.join(_cdir, "pbd0.json"),
+                                           tell=_tell)
+        check("H1pb outside the watchdog daemon (DAEMON_READS off) -> UNKNOWN, the API and his credential untouched "
+              "-- so a node's request threads and every test (H1v too) never read it",
+              r_pb["state"] == H.UNKNOWN and not _pc and "not the watchdog daemon" in r_pb["measured"]["why"],
+              r_pb["measured"])
+        H.DAEMON_READS = True
+        r_pb = H.detect_phone_build_failed(get=_papi(_pbr, _pc), now=_t0, cache=os.path.join(_cdir, "pbd1.json"),
+                                           tell=lambda t, w: {"id": "stub"})
+        check("H1pb ...in the daemon, on the PC whose build record names the app repository, it reads",
+              r_pb["state"] == H.PRESENT and _pc, r_pb["measured"])
+        _pc = []
+        _AU.latest = lambda: {"run_url": "https://github.com/someone-else/app/actions/runs/1",
+                              "url": "https://github.com/%s" % _AU.REPO}
+        r_pb = H.detect_phone_build_failed(get=_papi(_pbr, _pc), now=_t0, cache=os.path.join(_cdir, "pbd2.json"),
+                                           tell=_tell)
+        check("H1pb ...and in the daemon on a PC whose build came from another repository -> UNKNOWN, unread "
+              "(the gate reads run_url, the field the fetch writes)",
+              r_pb["state"] == H.UNKNOWN and not _pc, r_pb["measured"])
+    finally:
+        _AU.latest, H.DAEMON_READS = _real_latest, _real_daemon
+
+    # Two processes share one cache (the watchdog and, before DAEMON_READS, a node): a memo that always
+    # wins would replay a stale "told" over what the other process wrote.
+    _k = len(_told)
+    _p2 = os.path.join(_cdir, "pb2proc.json")
+    _seqf = [_run(8, "failure", 0.5), _run(6, "success", 110.0)]
+    _seqg = [_run(13, "success", 0.1)] + _seqf
+    H.detect_phone_build_failed(pipeline=True, get=_papi(_seqf, []), now=_t0, cache=_p2, tell=_tell)
+    _memo_a = dict(H._PHONE_MEMO[os.path.abspath(_p2)])
+    H._PHONE_MEMO.pop(os.path.abspath(_p2))                        # process B: no memo of its own
+    H.detect_phone_build_failed(pipeline=True, get=_papi(_seqg, []), now=_t0 + H.CI_EVERY_S + 1, cache=_p2,
+                                tell=_tell)
+    H._PHONE_MEMO[os.path.abspath(_p2)] = _memo_a                   # process A again, with its older memo
+    H.detect_phone_build_failed(pipeline=True, get=_papi(_seqg, []), now=_t0 + 2 * H.CI_EVERY_S + 2, cache=_p2,
+                                tell=_tell)
+    check("H1pb two processes on one cache: after B said 'succeeded again', A's older memo does not say it again "
+          "(the file wins unless this process failed to write it)",
+          len(_told) == _k + 2 and "succeeded again" in _told[-1], _told[_k:])
+
+    import stat as _stat
+    _ro = os.path.join(_cdir, "pbro.json")
+    with open(_ro, "w", encoding="utf-8") as _fh:
+        json.dump({"runs": [{"id": 6, "sha": "0000006", "status": "completed", "conclusion": "success",
+                             "created": _run(6, "success", 110.0)["created_at"]}],
+                   "ok_at": _t0 - 10, "next_at": 0, "told": None}, _fh)
+    os.chmod(_ro, _stat.S_IREAD)
+    _k = len(_told)
+    try:
+        for i in range(121):
+            H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, []), now=_t0 + 60 * i, cache=_ro, tell=_tell)
+    finally:
+        os.chmod(_ro, _stat.S_IREAD | _stat.S_IWRITE)
+    check("H1pb a cache that can be READ but not written (a stale success in it): two hours of rounds tell him "
+          "once, never alternating 'failed' and a false 'succeeded again'", len(_told) == _k + 1, _told[_k:])
+    _k = len(_told)
+    _bl2 = os.path.join(_cdir, "notadir2")
+    with open(_bl2, "w") as _fh:
+        _fh.write("x")
+    for i in range(121):
+        H.detect_phone_build_failed(pipeline=True, get=_papi(_pbr, []), now=_t0 + 60 * i,
+                                    cache=os.path.join(_bl2, "pb.json"), tell=_tell)
+    check("H1pb a cache that cannot be written at all: two hours of rounds (four API reads) still tell him once",
+          len(_told) == _k + 1, _told[_k:])
+
+    _jup = {"down": True}
+
+    def _jobs_flaky(path):
+        if "/actions/workflows/" in path:
+            return {"workflow_runs": _pbr}
+        if _jup["down"] and path.endswith("/jobs"):
+            raise OSError("jobs endpoint down")
+        return _papi(_pbr, [])(path)
+    H.detect_phone_build_failed(pipeline=True, get=_jobs_flaky, now=_t0, cache=os.path.join(_cdir, "pbflaky.json"),
+                                tell=lambda t, w: {"id": "stub"})
+    _jup["down"] = False
+    r_pb = H.detect_phone_build_failed(pipeline=True, get=_jobs_flaky, now=_t0 + H.CI_RETRY_S + 1,
+                                       cache=os.path.join(_cdir, "pbflaky.json"), tell=lambda t, w: {"id": "stub"})
+    check("H1pb broken the other way: after CI_RETRY_S a failed jobs read IS retried, and the step and reason arrive",
+          r_pb["measured"]["failing_steps"] == ["Run actions/upload-artifact@v4"] and r_pb["measured"]["reasons"],
+          r_pb["measured"])
+
+    _k = len(_told)
+    _ns = os.path.join(_cdir, "pbnew.json")
+    H.detect_phone_build_failed(pipeline=True, get=_papi([_run(8, "failure", 5.0), _run(6, "success", 110.0)], []),
+                                now=_t0, cache=_ns, tell=_tell)
+    H.detect_phone_build_failed(pipeline=True, get=_papi([_run(10, "failure", 0.2), _run(9, "success", 1.0),
+                                                          _run(8, "failure", 5.0), _run(6, "success", 110.0)], []),
+                                now=_t0 + H.CI_EVERY_S + 1, cache=_ns, tell=_tell)
+    check("H1pb a success BETWEEN two reads ends the streak: the next failure is a new episode and is told",
+          len(_told) == _k + 2 and "failed 1 time(s)" in _told[-1], _told[_k:])
+
+    _real2 = (_gj.token, _ur.urlopen, dict(_gj._CREDENTIAL_STORE_OK), dict(_gj._CACHE))
+    try:
+        _gj._CREDENTIAL_STORE_OK["allowed"] = True
+        _gj._CREDENTIAL_STORE_OK["why"] = "an earlier opt-in of someone else's"
+        _gj._CACHE["token"] = "pre"
+        _gj.token = lambda: _gj._CACHE.get("token", "")
+        _ur.urlopen = _open
+        H._phone_get("/x")
+        check("H1pb _phone_token restores what it FOUND, not a fixed state: an opt-in already open stays open with "
+              "its reason, and a token cached before it stays cached",
+              _gj._CREDENTIAL_STORE_OK == {"allowed": True, "why": "an earlier opt-in of someone else's"}
+              and _gj._CACHE.get("token") == "pre", (_gj._CREDENTIAL_STORE_OK, _gj._CACHE))
+    finally:
+        _gj.token, _ur.urlopen = _real2[0], _real2[1]
+        _gj._CREDENTIAL_STORE_OK.clear()
+        _gj._CREDENTIAL_STORE_OK.update(_real2[2])
+        _gj._CACHE.clear()
+        _gj._CACHE.update(_real2[3])
+
+    check("H1pb phone_build_failed is registered, and has no remedy: the fix is in his repository and account",
+          H.DETECTORS.get("phone_build_failed") is H.detect_phone_build_failed
+          and not [n for n, rr in H.REMEDIES.items() if "phone_build_failed" in (rr.get("for") or [])])
+
     # mesh_source_split arrived 2026-09-18 and H1v caught it with no coverage
     # here, which is again exactly what H1v is for. Its behaviour is pinned in
     # test_h2_update_witness.py (S1-S6, R1-R3); what is driven HERE is the one

@@ -935,6 +935,212 @@ def detect_public_ci_red(health=None, get=None, now=None, cache=None, tell=None)
     return {"state": state, "measured": measured}
 
 
+PHONE_CI = os.path.join(HERE, "ops", "phone_ci.json")         # gitignored: this PC's last reading of the phone build's runs
+PHONE_WORKFLOW = "android.yml"
+_PHONE_MEMO = {}          # per cache path: the reading and what was told survive a cache file that cannot be written
+_PHONE_KEYS = ("next_at", "told", "red_key", "why", "runs", "ok_at", "error")
+DAEMON_READS = False      # set True only by the watchdog daemon (single-threaded): nothing else reads his credential here
+import threading as _threading
+_PHONE_TOKEN_LOCK = _threading.Lock()
+
+
+def _phone_token():
+    """His credential for ONE read, leaving the process exactly as it was found.
+
+    allow_credential_store() is process-wide and token() caches what it reads, so a detector that simply
+    called them would open the credential store for everything else in the process -- and sense() also runs
+    inside the NODE (/hwy/state, a peer's report, /m/heal), where A21 keeps it shut. So the opt-in and the
+    cache are put back after the read, whatever happens. A token already cached, or set in the environment by
+    an explicit act, is used as it is."""
+    import covenant_github_judge as gh
+    with _PHONE_TOKEN_LOCK:
+        prev = dict(gh._CREDENTIAL_STORE_OK)
+        had = "token" in gh._CACHE
+        gh.allow_credential_store("covenant_highway.phone_build_failed -- the result of the "
+                                  "operator's own app build, read on the operator's own PC")
+        try:
+            return gh.token()
+        finally:
+            for k, v in prev.items():                  # key by key: no moment with the keys missing
+                gh._CREDENTIAL_STORE_OK[k] = v
+            if not had:
+                gh._CACHE.pop("token", None)
+
+
+def _phone_get(path, timeout=15):
+    """GET api.github.com<path> as JSON with his credential -- the app repository is private. Raises on any failure.
+
+    The same credential, repository and reason as dispatch_phone_build and covenant_app_update.fetch: his own
+    app's build, read on his own PC. It only READS the runs of the build the highway already asks for."""
+    tok = _phone_token()
+    if not tok:
+        raise RuntimeError("no GitHub credential on this PC")
+    req = urllib.request.Request("https://api.github.com" + path, headers={
+        "Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "User-Agent": "covenant-highway"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def detect_phone_build_failed(health=None, get=None, now=None, cache=None, tell=None, pipeline=None):
+    """The newest FINISHED phone build on main failed -- the build dispatch_phone_build asks for never arrives.
+
+    2026-09-27, his words: "highway is red fix it it should of auto repaired." It had tried. dispatch_phone_build
+    asked covenant-phone for a build on 09-25 and 09-26 and was told "accepted (HTTP 204)" both times; its row
+    says "started" and "graded by the next pass", and no pass ever graded it (--standing: UNPROVEN, 0 graded).
+    Every one of those builds failed -- covenant-phone 11d0ec4 says why: the artifact storage quota was full and
+    every upload since 09-25 failed. fetch_build collects only SUCCESSFUL runs, so it kept saying "already have
+    build 2ab1ba5" (09-22), the phone kept the 09-21 core, and mesh_source_split, phone_build_behind_core and
+    app_build_gap stood PRESENT with a remedy that looked busy. An accepted request is not a delivered build.
+
+    This reads the build's runs (at most once per CI_EVERY_S) and names the failing step and the runner's own
+    reason from the failing job's annotations, fetched once per failing run. A cancelled or skipped run is
+    neither. A read that fails is UNKNOWN, never the cached verdict. No remedy: the fixes (storage, the workflow)
+    are in his repository and his account. It says it on the direct line once when a failing streak begins and
+    once when a build succeeds again, like public_ci_red (A232).
+
+    WHOSE BUILD. It reads only where this PC has itself fetched a build of AU.REPO (ops/app/latest.json, never
+    tracked). AU.REPO is hardcoded (A142), so on a second operator's clone an unconditional read would spend
+    THEIR credential on the owner's private repository every few minutes; there it is UNKNOWN and the
+    credential store is never touched. The credential is read through _phone_token(), which leaves the process
+    as it found it.
+
+    WHAT HOLDS IF A WRITE FAILS (found by the mutation review the same day). The throttle and the "said once"
+    both live in the cache file, and the watchdog calls this every ~60 s: with the file unwritable, every round
+    repeated three authenticated reads and one message to his phone. So the process keeps its own floor
+    (_PHONE_MEMO) for next_at, told and the failure reasons, a direct line that raises is caught and counted as
+    told, and a failing jobs/annotations read waits CI_RETRY_S instead of being retried every round.
+    """
+    import covenant_app_update as AU
+    get = get or _phone_get
+    tell = tell or _tell_him
+    now = time.time() if now is None else float(now)
+    cache = cache or PHONE_CI
+    if pipeline is None:
+        if not DAEMON_READS:
+            return {"state": UNKNOWN, "measured": {
+                "repo": AU.REPO, "why": "not the watchdog daemon -- only it reads his credential for this "
+                                        "(a node's request threads and every test leave it unread)"}}
+        pipeline = AU.REPO in str((AU.latest() or {}).get("run_url") or "")
+    if not pipeline:
+        return {"state": UNKNOWN, "measured": {
+            "repo": AU.REPO, "why": "this PC has never fetched a build of %s -- not this operator's app pipeline, "
+                                    "so his credential is not read" % AU.REPO}}
+    try:
+        with io.open(cache, encoding="utf-8") as fh:
+            st = json.load(fh)
+    except (OSError, ValueError):
+        st = {}
+    memo = _PHONE_MEMO.setdefault(os.path.abspath(cache), {})
+    for k in _PHONE_KEYS:                                        # the process floor: a failed save cannot undo these
+        if k in memo and (k not in st or memo.get("unsaved")):    # a file this process could not write is older than its memo
+            st[k] = memo[k]
+    if "next_at" in memo:
+        st["next_at"] = max(float(st.get("next_at") or 0), float(memo["next_at"]))
+    dirty = False
+    if now >= float(st.get("next_at") or 0):
+        dirty = True
+        try:
+            d = get("/repos/%s/actions/workflows/%s/runs?branch=main&per_page=20" % (AU.REPO, PHONE_WORKFLOW))
+            st["runs"] = [{"id": r.get("id"), "sha": str(r.get("head_sha") or "")[:7], "event": r.get("event"),
+                           "created": r.get("created_at"), "status": r.get("status"),
+                           "conclusion": r.get("conclusion")}
+                          for r in (d.get("workflow_runs") or [])]
+            st.update(ok_at=now, next_at=now + CI_EVERY_S, error=None)
+        except Exception as e:                                   # noqa: BLE001 -- any failure is "could not read"
+            st.update(next_at=now + CI_RETRY_S, error="%s: %s" % (type(e).__name__, str(e)[:120]))
+
+    def _save():
+        memo.update({k: st[k] for k in _PHONE_KEYS if k in st})
+        try:
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            with io.open(cache, "w", encoding="utf-8") as fh:
+                json.dump(st, fh, indent=1)
+            memo["unsaved"] = False
+        except OSError:
+            memo["unsaved"] = True
+
+    ok_at = float(st.get("ok_at") or 0)
+    if now - ok_at > CI_STALE_S:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {
+            "repo": AU.REPO, "error": st.get("error") or "never read",
+            "last_good_read_h": round((now - ok_at) / 3600.0, 1) if ok_at else None}}
+    done = sorted((r for r in (st.get("runs") or [])
+                   if r.get("status") == "completed" and r.get("conclusion") in ("success", "failure")),
+                  key=lambda r: str(r.get("created") or ""), reverse=True)
+    if not done:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {"repo": AU.REPO, "why": "no finished build on main in the newest 20"}}
+    newest = done[0]
+    streak = done[:next((i for i, r in enumerate(done) if r["conclusion"] == "success"), len(done))]
+    green = next((r for r in done if r["conclusion"] == "success"), None)
+    measured = {"repo": AU.REPO, "newest": {k: newest.get(k) for k in ("id", "sha", "conclusion", "event", "created")},
+                "last_success": green and green.get("created"),
+                "read_h_ago": round((now - ok_at) / 3600.0, 2)}
+    if newest["conclusion"] == "failure":
+        key = str(newest.get("id"))
+        why = st.get("why") or {}
+        got = why.get(key) or {}
+        if not got or (got.get("error") and now >= float(got.get("retry_at") or 0)):
+            dirty = True
+            steps, reasons = [], []
+            try:
+                for j in get("/repos/%s/actions/runs/%s/jobs" % (AU.REPO, key)).get("jobs") or []:
+                    if j.get("conclusion") != "failure":
+                        continue
+                    steps += [str(s.get("name")) for s in (j.get("steps") or []) if s.get("conclusion") == "failure"]
+                    for a in get("/repos/%s/check-runs/%s/annotations" % (AU.REPO, j.get("id"))) or []:
+                        if a.get("annotation_level") == "failure" and a.get("message"):
+                            reasons.append(" ".join(str(a["message"]).split())[:200])
+                got = {"steps": steps[:4], "reasons": reasons[:3]}
+            except Exception as e:                               # noqa: BLE001
+                got = {"steps": [], "reasons": [], "retry_at": now + CI_RETRY_S,
+                       "error": "%s: %s" % (type(e).__name__, str(e)[:80])}
+                measured["why_error"] = got["error"]
+            st["why"] = {key: got}                               # only the newest failing run is kept
+        # THE EPISODE IS THE STREAK, NOT THE PAGE. Keyed on the first failure this reader saw after a success,
+        # kept until a success: a streak longer than the page would otherwise move its oldest visible run every
+        # read and be told again each time.
+        # A success between two reads ends the old streak even if it was never the newest at a read: the
+        # red_key is then not among this streak's runs while a success is on the page.
+        if (not st.get("red_key") or (green is not None
+                                      and st["red_key"] not in {str(r.get("id")) for r in streak})):
+            st["red_key"] = str(streak[-1].get("id"))
+            dirty = True
+        measured.update(failing_steps=got.get("steps") or [], reasons=got.get("reasons") or [],
+                        failed_runs=len(streak), failing_since=streak[-1].get("created"),
+                        failing_since_is=("at least" if len(streak) == len(done) else "exact"))
+        episode = "red:%s" % st["red_key"]
+        text = ("The phone build has failed %s%d time(s) since %s. The newest (%s) failed at step \"%s\": %s. The "
+                "phone keeps the build from %s until one succeeds, so the highway's rebuild requests change nothing "
+                "until this is fixed."
+                % ("at least " if measured["failing_since_is"] == "at least" else "", len(streak),
+                   measured["failing_since"], newest.get("created"),
+                   ", ".join(measured["failing_steps"]) or "not named",
+                   "; ".join(measured["reasons"]) or "the runner gave no reason", measured["last_success"] or "before"))
+        state = PRESENT
+    else:
+        if st.get("red_key"):
+            st["red_key"] = None
+            dirty = True
+        episode, text, state = None, "The phone build succeeded again (%s)." % newest.get("created"), ABSENT
+    if episode != st.get("told"):
+        if episode or st.get("told"):
+            try:
+                said = tell(text[:600], "highway: the phone build (phone_build_failed)")
+            except Exception as e:                               # noqa: BLE001 -- a direct line that raises is a refusal
+                said = None
+                measured["tell_error"] = "%s: %s" % (type(e).__name__, str(e)[:80])
+            measured["told"] = "said" if said else "refused by the direct line"
+        st["told"] = episode                  # said once, refused or not: a refusal is not retried every round
+        dirty = True
+    if dirty:
+        _save()
+    return {"state": state, "measured": measured}
+
+
 def _sweep_running():
     """Is a covenant_one.py sweep in flight on this machine? Read from the process list, never guessed."""
     import subprocess
@@ -1192,6 +1398,7 @@ DETECTORS = {
     "defense_lapse": detect_defense_lapse,
     "sweep_red": detect_sweep_red,
     "public_ci_red": detect_public_ci_red,
+    "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,
     "mesh_source_split": detect_mesh_source_split,
     "height_lag": detect_height_lag,
@@ -2246,15 +2453,19 @@ def main(argv=None):
         print("What this system claimed for itself, and what the record says.")
         print("Evidence for the operator's ratification. It is not authority,")
         print("and nothing here changes a single decision the loop makes.\n")
-        print("%-26s %-9s %6s %7s  %s"
-              % ("remedy", "verdict", "fixed", "missed", "claimed gain"))
+        # "started" is printed (2026-09-27): three asynchronous remedies had 11, 62 and 167 started rows and 0
+        # graded, and this table showed only fixed and missed -- so fetch_build read "MIXED 3/5" and the 167
+        # never-graded starts, and dispatch_phone_build's builds that all failed, did not appear at all.
+        print("%-26s %-9s %6s %7s %8s  %s"
+              % ("remedy", "verdict", "fixed", "missed", "started", "claimed gain"))
         for k, v in st.items():
-            print("%-26s %-9s %6d %7d  %s"
-                  % (k, v["verdict"], v["fixed"], v["did_not_fix"],
+            print("%-26s %-9s %6d %7d %8d  %s"
+                  % (k, v["verdict"], v["fixed"], v["did_not_fix"], v["started_ungraded"],
                      (v["claimed"][0][:44] if v["claimed"] else "-")))
         print("\nUNPROVEN is not a failing grade. It means never graded, which")
         print("is the honest answer and the one a tool that resolves everything")
-        print("would hide.")
+        print("would hide. \"started\" counts runs of an asynchronous remedy that")
+        print("no pass has graded since: nothing checks what they started.")
         return 0
     if a.ledger:
         for row in read_ledger()[-40:]:

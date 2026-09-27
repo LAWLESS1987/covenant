@@ -47,9 +47,17 @@ midnight, all inside the runners above and all pinned by suites in the sweep:
 
 ## 2. What stops when the seat lapses
 
-- The app's daily self-evaluation routine (04:43). Its measurement half is
-  already done by the watchdog, which writes the same ledger; what stops is
-  the judgment half: a model reading the block and deciding what it means.
+- The app's daily self-evaluation routine (04:43). Most of its measurement
+  half is done by the watchdog's hourly block in the same ledger: the nodes'
+  source and height, the trader, the learning loop (A235), all of
+  verify_deploy's pins (A235), git and disk -- and since A235 an hourly FAIL
+  is said once on the direct line, and once when it clears. What the hourly
+  block still does not read (measured 2026-09-27): the nodes' genesis and
+  version agreement and their degraded flags, the watchdog's own freshness
+  (a dead watchdog writes no block -- the guard task watches that), the alert
+  kinds since the last evaluation, and the ethics gate's quorum as /health
+  reports it. What stops is those, and the judgment half: a model reading
+  the block and deciding what it means.
 - Diagnosis, structural fixes, audits, write-ups: the work this file's memory
   calls "Claude only". With a free chat this work still happens, but you
   carry the evidence in and the fix out by hand.

@@ -776,9 +776,18 @@ _RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
 # the row says how old that is rather than pretending it is live. It does not
 # run the trader, read a key, or touch funds. It compares the core against
 # MANIFEST.sha256, which is the record that has been telling the truth, and
-# NOT against verify_deploy.py's in-source pins, which have been stale since
-# 2026-09-12 -- so this row can miss a substitution that also rewrote the
-# manifest, and it says so in its own detail line.
+# -- since 2026-09-27 -- ALSO against verify_deploy.py's pins (all five
+# files, the companions, EXPECTED_VERSION and EXPECTED_LINES), read from its
+# text and never imported or run. The first version left those pins out
+# because they had been stale since 2026-09-12, and so the row could not see
+# them go stale again: from 2026-09-25 (four core commits, 60c17a2, 06accd7,
+# 8f7b9ee, e3492e0) the pin named the 09-21 core, verify_deploy read FAIL and
+# refused every restart it gates (AM_VERIFY_AND_RESTART, covenant_one
+# --restart), and this row read PASS every hour for two days. His words on
+# 2026-09-27: "it should of auto repaired". A reader that skips a check
+# because the check is usually wrong cannot tell when it is right.
+# This row still cannot see a substitution that rewrote BOTH records, and it
+# says so in its own detail line.
 #
 # It is separate from self_evaluation(), which stays pure (everything arrives
 # as arguments), and every reading fails to None rather than raising: the
@@ -787,6 +796,7 @@ _RANK = {"PASS": 0, "WARN": 1, "FAIL": 2}
 TRADER_LOG = os.path.join(HERE, "trader_log.txt")
 CORE_FILE = os.path.join(HERE, "covenant_unified_v8.py")
 MANIFEST_FILE = os.path.join(HERE, "MANIFEST.sha256")
+VERIFY_DEPLOY_FILE = os.path.join(HERE, "verify_deploy.py")
 
 
 def _read_text(path, tail_bytes=0):
@@ -861,7 +871,8 @@ def _trader_reading(now=None):
 
 
 def _repo_reading():
-    """(verdict, detail) comparing the core on disk to MANIFEST.sha256."""
+    """(verdict, detail) comparing the core on disk to MANIFEST.sha256 and to
+    verify_deploy.py's pin -- the two records a restart is checked against."""
     blob = _read_text(MANIFEST_FILE)
     if blob is None or not os.path.exists(CORE_FILE):
         return None
@@ -884,9 +895,134 @@ def _repo_reading():
         return "FAIL", (f"core on disk {disk[:12]} but MANIFEST.sha256 pins "
                         f"{want[:12]} -- an old copy, a partial copy or a "
                         f"hand edit. Re-pin in the SAME change as the file")
-    return "PASS", (f"core {disk[:12]} matches MANIFEST.sha256. This compares "
-                    f"the manifest only; a substitution that also rewrote the "
-                    f"manifest would read clean here")
+    # THE SAME QUESTIONS verify_deploy ASKS, from its own pins (2026-09-27).
+    # The first version of this compared only the core's entry, and the review
+    # the same day showed what that leaves: verify_deploy pins five files,
+    # needs each file's companion beside it, refuses a version it was not
+    # pinned for, and after a restart compares the node's line count with
+    # EXPECTED_LINES -- so re-pinning the hash alone would still fail, after
+    # the nodes had been stopped, while this row read PASS.
+    pins = _verify_deploy_pin()
+    if pins is None:
+        return "WARN", (f"core {disk[:12]} matches MANIFEST.sha256, but "
+                        f"verify_deploy.py's pins could not be read -- the "
+                        f"restart gate is UNMEASURED this pass")
+    base = os.path.dirname(os.path.abspath(VERIFY_DEPLOY_FILE))
+    declared = None
+    n_lines = None
+    try:
+        with open(CORE_FILE, "rb") as fh:
+            raw_core = fh.read()
+        # Counted the way the node counts CORE_SOURCE_LINES (raw newlines),
+        # which is what verify_deploy compares with EXPECTED_LINES after a
+        # restart. splitlines() disagrees on a missing final newline, a lone
+        # CR and form feeds (measured by the review the same day).
+        n_lines = raw_core.count(b"\n")
+        for raw in raw_core.decode("utf-8", "replace").split("\n"):
+            if raw.startswith("COVENANT_VERSION"):
+                declared = raw.split("=", 1)[1].strip().strip("\"'")
+                break
+    except OSError:
+        pass
+    problems = []
+    core_pin = pins["manifest"].get("covenant_unified_v8.py")
+    if core_pin is None:
+        return "WARN", ("verify_deploy.py pins no covenant_unified_v8.py -- "
+                        "the restart gate does not look at the core")
+    if core_pin != disk:
+        problems.append(f"it pins the core at {core_pin[:12]}, the core is "
+                        f"{disk[:12]}")
+    for name, want in sorted(pins["manifest"].items()):
+        if name == "covenant_unified_v8.py":
+            continue
+        path = os.path.join(base, name)
+        try:
+            with open(path, "rb") as fh:
+                got = hashlib.sha256(fh.read()).hexdigest()
+        except OSError:
+            problems.append(f"{name} is missing")
+            continue
+        if got != want:
+            problems.append(f"it pins {name} at {want[:12]}, the file is "
+                            f"{got[:12]}")
+    for name, comp in sorted((pins["companions"] or {}).items()):
+        if (os.path.exists(os.path.join(base, name))
+                and not os.path.exists(os.path.join(base, comp))):
+            problems.append(f"{comp} (needed by {name}) is missing")
+    # A failure found is reported even when something else is unmeasured:
+    # verify_deploy's finish() puts failures ahead of unknowns, and so does this.
+    if declared is not None and pins["version"] != declared:
+        problems.append(f"it is pinned to {pins['version']}, the core "
+                        f"declares {declared}")
+    if declared is None and not problems:
+        return "WARN", (f"core {disk[:12]} declares no COVENANT_VERSION, which "
+                        f"verify_deploy reports as UNKNOWN -- the restart gate "
+                        f"is UNMEASURED this pass")
+    if declared is None:
+        problems.append("the core declares no COVENANT_VERSION")
+    if pins["lines"] != n_lines:
+        problems.append(f"EXPECTED_LINES is {pins['lines']}, the core has "
+                        f"{n_lines} lines (checked after a restart)")
+    if problems:
+        return "FAIL", (f"core {disk[:12]} ({declared}) matches "
+                        f"MANIFEST.sha256, but verify_deploy.py disagrees with "
+                        f"the tree: " + "; ".join(problems[:4])
+                        + (f" (+{len(problems) - 4} more)" if len(problems) > 4
+                           else "")
+                        + " -- stale pins (M53) or a changed file; "
+                          "verify_deploy reads FAIL and refuses every restart "
+                          "it gates. For the core: run K1/K2/P19/A3s on these "
+                          "bytes, then move the pin")
+    return "PASS", (f"core {disk[:12]} matches MANIFEST.sha256 and every pin, "
+                    f"companion, version and line count verify_deploy.py "
+                    f"checks. A substitution that rewrote both records would "
+                    f"read clean here")
+
+
+def _verify_deploy_pin():
+    """verify_deploy.py's pins, read from its text, or None when unreadable.
+
+    {"manifest": {file: sha256}, "companions": {file: module} or None,
+     "version": EXPECTED_VERSION, "lines": EXPECTED_LINES}. Parsed with ast,
+    never imported: importing would run the verifier's module level, and this
+    must not be able to do anything but read. A pin that is not a literal is
+    None -- unreadable, never a guess."""
+    import ast
+    src = _read_text(VERIFY_DEPLOY_FILE)
+    if src is None:
+        return None
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return None
+    found = {}
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign):
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        else:
+            continue
+        for t in targets:
+            name = getattr(t, "id", None)
+            if name in ("MANIFEST", "COMPANIONS", "EXPECTED_VERSION",
+                        "EXPECTED_LINES"):
+                try:
+                    found[name] = ast.literal_eval(value)
+                except (ValueError, TypeError, SyntaxError):
+                    return None
+    manifest = found.get("MANIFEST")
+    if not isinstance(manifest, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) and len(v) == 64
+            for k, v in manifest.items()):
+        return None
+    version = found.get("EXPECTED_VERSION")
+    lines = found.get("EXPECTED_LINES")
+    if not isinstance(version, str) or not isinstance(lines, int):
+        return None
+    comps = found.get("COMPANIONS")
+    return {"manifest": manifest, "version": version, "lines": lines,
+            "companions": comps if isinstance(comps, dict) else None}
 
 
 def _git_reading():
@@ -943,12 +1079,153 @@ def _disk_reading():
     return "PASS", detail
 
 
+DISTILL_LOG = os.path.join(HERE, "ops", "DISTILL.md")
+RUN_WITHOUT_FILE = os.path.join(HERE, "ops", "RUN_WITHOUT.json")
+DISTILL_LATE_H = 36.0     # the distiller runs daily at 03:30; a day and a half without an entry is a missed night
+
+
+def _student_reading(now=None):
+    """(verdict, detail) for the learning loop, or None when neither file is here.
+
+    2026-09-27: the daily Claude evaluation read this and the hourly block did
+    not. It is two files the nightly cycle already writes -- the last
+    PROMOTED/REFUSED heading in ops/DISTILL.md and the conditions in
+    ops/RUN_WITHOUT.json -- so no model is loaded and nothing is run. A REFUSED
+    candidate is the loop working (it would have cleared a violation, got
+    vaguer or more trigger-happy), so it is a PASS; the loop NOT running is
+    the failure worth a row, so a missing night is a WARN."""
+    now = time.time() if now is None else float(now)
+    text = _read_text(DISTILL_LOG, tail_bytes=40_000)
+    rw_text = _read_text(RUN_WITHOUT_FILE)
+    if text is None and rw_text is None:
+        return None
+    last = None
+    for m in re.finditer(r"^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s+(\S+)",
+                         text or "", re.M):
+        last = (m.group(1), m.group(2))
+    parts = []
+    verdict = "PASS"
+    if last is None:
+        verdict = "WARN"
+        parts.append("no cycle recorded in ops/DISTILL.md")
+    else:
+        try:
+            age_h = (now - datetime.strptime(last[0], "%Y-%m-%dT%H:%M:%SZ")
+                     .replace(tzinfo=timezone.utc).timestamp()) / 3600.0
+        except ValueError:
+            age_h = None
+        parts.append(f"last cycle {last[0]} {last[1]}"
+                     + ("" if age_h is None else f" ({age_h:.0f}h ago)"))
+        if age_h is not None and age_h < -1.0:
+            verdict = "WARN"
+            parts.append("that heading is in the future -- the clock or the "
+                         "log is wrong")
+        elif age_h is None or age_h > DISTILL_LATE_H:
+            verdict = "WARN"
+            parts.append(f"no cycle in over {DISTILL_LATE_H:.0f}h -- the "
+                         f"nightly distill did not run")
+    try:
+        rw = json.loads(rw_text) if rw_text else None
+    except ValueError:
+        rw = None
+    if isinstance(rw, dict):
+        unmet = [k for k, v in (rw.get("conditions") or {}).items()
+                 if isinstance(v, dict) and not v.get("met")]
+        parts.append(f"run-without {rw.get('met_count')}/{rw.get('of')} met, "
+                     f"exam streak {rw.get('exam_streak')}"
+                     + (f"; unmet: {', '.join(unmet[:3])}" if unmet else ""))
+    return verdict, "; ".join(parts)
+
+
+# THE DIRECT LINE FOR THE HOURLY VERDICT (2026-09-27, his words: "Tetsu should
+# do this and tell you about it if needed moving forward to stop my constant
+# need of being present"). Until today an overall FAIL reached ops/SELF_EVAL.md
+# and one INFO log line, and alert push is off on this PC -- so a FAIL reached
+# him only when someone opened the file. Now it is said once when a FAIL
+# begins (or the set of failing rows changes) and once when it clears, like
+# public_ci_red; the hours in between say nothing. The last thing told is kept
+# in logs/ (never tracked) and in memory, so a file that cannot be written
+# does not make it repeat every hour. The outbox is under HERE, so a staged
+# sweep's copy writes its own and is never delivered.
+SELF_EVAL_TOLD = os.path.join(HERE, "logs", "self_eval_told.json")
+_self_eval_told_memo = {}
+
+
+def _self_eval_tell(block, overall, round_no, tell=None, path=None, live=None):
+    """Say the hourly verdict on the direct line when it changes into or out
+    of FAIL. Returns what was said, or None. Never raises.
+
+    ONLY THE DAEMON SPEAKS (the review of 2026-09-27 found the first version
+    speaking from a test: P20's E11c ran one_pass() in the live tree and put
+    "Self-evaluation round 1: FAIL" on his phone). live defaults to
+    _self_eval["persist"], which only the daemon's main loop sets -- a --once
+    run, a test or an import never reaches it. Tests pass live=True with a
+    stub line and a temp path."""
+    if live is None:
+        live = _self_eval.get("persist", False)
+    if not live:
+        return None
+    path = path or SELF_EVAL_TOLD
+    try:
+        rows = []
+        for line in block.splitlines()[1:]:
+            bits = line.split(None, 2)
+            if len(bits) >= 2 and bits[1] in _RANK:
+                rows.append((bits[0], bits[1],
+                             bits[2] if len(bits) > 2 else ""))
+        failing = [(n, d) for n, v, d in rows if v == "FAIL"]
+        key = ""
+        if overall == "FAIL":
+            key = ",".join(n for n, _ in failing) or "FAIL"
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                d = json.load(fh)
+            told = d.get("told", "") if isinstance(d, dict) else None
+        except (OSError, ValueError):
+            told = None
+        memo = _self_eval_told_memo.get(os.path.abspath(path))
+        if memo is not None and (told is None or memo.get("unsaved")):
+            told = memo.get("told", "")
+        told = told or ""
+        if key == told:
+            return None
+        if key:
+            text = (f"Self-evaluation round {round_no}: FAIL -- "
+                    + " | ".join(f"{n}: {d[:220]}" for n, d in failing[:3]))
+        else:
+            text = (f"Self-evaluation round {round_no}: out of FAIL again "
+                    f"(overall {overall}).")
+        text = _mask_addresses(text)
+        try:
+            if tell is None:
+                import covenant_contact
+                said = covenant_contact.say(text, "watchdog: the hourly "
+                                            "self-evaluation", actor="watchdog")
+            else:
+                said = tell(text, "watchdog: the hourly self-evaluation")
+        except Exception:                               # a line that raises is a refusal
+            said = None
+        memo = {"told": key, "unsaved": False}
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"told": key, "round": round_no,
+                           "said": bool(said)}, fh)
+        except OSError:
+            memo["unsaved"] = True
+        _self_eval_told_memo[os.path.abspath(path)] = memo
+        return text if said else None
+    except Exception:                                   # never fatal
+        return None
+
+
 def offline_readings(now=None):
     """{layer: (verdict, detail)} for everything this PC can check without the
     chain. Any reading that cannot be taken is ABSENT from the dict rather
     than guessed, so self_evaluation() omits the row instead of asserting."""
     out = {}
     for name, fn in (("trader", lambda: _trader_reading(now)),
+                     ("student", lambda: _student_reading(now)),
                      ("repo", _repo_reading),
                      ("git", _git_reading),
                      ("disk", _disk_reading)):
@@ -1044,14 +1321,17 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
 
     # The offline layers, in a fixed order so the ledger is greppable. Only
     # what was actually read appears.
-    for name in ("trader", "repo", "git", "disk"):
+    for name in ("trader", "student", "repo", "git", "disk"):
         r = (offline or {}).get(name)
         if r:
             layer(name, r[0], r[1])
 
     overall = max((v for _, v, _ in layers), key=lambda v: _RANK[v])
     block = [f"## {now_iso}  overall {overall}  (round {round_no})"]
-    block += [f"{n:9s} {v:4s}  {d}" for n, v, d in layers]
+    # One line per layer, always: a newline inside a detail would read as a
+    # layer of its own to anything that parses the block.
+    block += [f"{n:9s} {v:4s}  {' '.join(str(d).splitlines())}"
+              for n, v, d in layers]
     return "\n".join(block) + "\n\n", overall
 
 
@@ -1628,6 +1908,9 @@ def one_pass(strict=False):
         if _self_eval_write(block):
             log("INFO", f"self-evaluation: {overall} "
                         f"(round {_self_eval['round']}) -> {SELF_EVAL_PATH}")
+        if _self_eval_tell(block, overall, _self_eval["round"]):
+            log("INFO", f"self-evaluation: said on the direct line "
+                        f"(overall {overall})")
     return alerts
 
 
@@ -1869,6 +2152,14 @@ def main():
     # Daemon only, and only here: --once exits at the branch above without
     # ever reaching this, so a one-shot run neither resumes nor persists.
     _self_eval["persist"] = True
+    # The same rule for the highway's one credentialed read (phone_build_failed):
+    # only this daemon -- single-threaded -- may make it. The node, which runs
+    # sense() on request threads, and every test leave it off.
+    try:
+        import covenant_highway as _hw_daemon
+        _hw_daemon.DAEMON_READS = True
+    except Exception:                                    # never fatal
+        pass
     _resumed = _self_eval_resume()
     if _resumed:
         _next = ((_resumed // SELF_EVAL_EVERY) + 1) * SELF_EVAL_EVERY \
