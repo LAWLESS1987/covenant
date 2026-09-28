@@ -452,8 +452,93 @@ def plan(n, ledger=None):
     return [(t, False) for t in todo][:n] + [(t, True) for t in again][:max(0, n - len(todo))]
 
 
+# ---------------------------------------------------------------- the students' view of his own drafts
+#
+# HIS DECISION, 2026-09-28 (~01:10Z): asked whether Tetsu should be shown why the students held or refused his
+# drafts -- and told the risk, that it could teach phrasing past a gate that guards money -- he answered "Yes, show
+# him". So once a practice night, bounded, Tetsu reads the gate's verdict and reason on his own last drafts and says
+# in two sentences what he thinks read as conduct and what was only topic. It is shown as THEIR VIEW, not a rule, with
+# his framing: understand, do not reword past the gate; the money gates are unchanged. Nothing here changes a gate.
+VIEW_LIMIT = 10
+VIEW_CHARS = 1200
+VIEW_HEAD = ("THE STUDENTS' VIEW -- Ora and Sena, the judges that gate what you send, on your own recent drafts. "
+             "This is their view, not a rule.")
+VIEW_FRAME = ("The goal is to understand what reads as conduct and what reads as topic -- not to reword your way past "
+              "the gate. The money gates are unchanged.")
+
+
+def _verdict_of(row):
+    """HELD / VIOLATES / clean from what the send recorded; None when the gate never judged it (a cap, a pause)."""
+    why = str(row.get("why") or "")
+    if row.get("sent"):
+        return "clean"
+    if "covenant's judge" not in why and not row.get("judged"):
+        return None
+    if "violates" in why.lower() or "violates" in str(row.get("judged") or "").lower():
+        return "VIOLATES"
+    return "HELD"
+
+
+def students_view(sends_path=None, audit_path=None, limit=VIEW_LIMIT, max_chars=VIEW_CHARS):
+    """The digest Tetsu is shown: his own drafts (written by the model, or sent as Tetsu), the gate's verdict and
+    reason, and each student's own reason where the seat's audit trail has the same text. '' when there are none."""
+    if sends_path is None:
+        import covenant_free_will as FW
+        sends_path = FW.SENDS
+    if audit_path is None:
+        import covenant_judge_defer as JD
+        audit_path = JD.AUDIT_PATH
+    mine = [r for r in _rows(sends_path)
+            if r.get("text") and (r.get("written_by") == "model" or r.get("actor") == "tetsu") and _verdict_of(r)]
+    mine = mine[-max(0, int(limit)):]
+    if not mine:
+        return ""
+    seat = {}
+    for a in _rows(audit_path):
+        if "held" in a and a.get("text"):
+            reason = str(a.get("reason") or "")
+            reason = reason.split("): ", 1)[1] if "): " in reason[:260] else reason    # drop the seat's self-description
+            seat.setdefault(str(a["text"])[:120], {})[str(a.get("judge", "?")).split("/")[0]] = reason
+    head = VIEW_HEAD + "\n" + VIEW_FRAME + "\n"
+    body, room = [], max_chars - len(head)
+    for r in reversed(mine):                               # newest first, so the bound drops the oldest
+        v = _verdict_of(r)
+        why = re.sub(r"\s+", " ", str(r.get("why") or ("sent" if v == "clean" else "")))
+        m = re.search(r"both seats \([^)]*\): [^;]*", why)                          # the seats' decision, not the preamble
+        why = m.group(0) if m else why
+        own = seat.get(str(r["text"])[:120], {})
+        own_s = "; ".join("%s: %s" % (k, re.sub(r"\s+", " ", re.sub(r"^HELD, NOT JUDGED -- ", "", w))[:95])
+                          for k, w in sorted(own.items()))
+        entry = '- "%s" -> %s. gate: %s%s' % (re.sub(r"\s+", " ", r["text"])[:70], v, why[:60],
+                                              (" | " + own_s[:200]) if own_s else "")
+        if len(entry) + 1 > room:
+            break
+        body.append(entry)
+        room -= len(entry) + 1
+    return head + "\n".join(body) if body else ""
+
+
+def show_students_view(ask, ledger=None, sends_path=None, audit_path=None, say=print):
+    """Show him the digest once and keep his two-sentence note. Returns the ledger row, or None when there is nothing
+    to show. Never raises."""
+    try:
+        digest = students_view(sends_path, audit_path)
+        if not digest:
+            return None
+        text, _m = ask([{"role": "system", "content": "You are Tetsu. Answer in at most two plain sentences."},
+                        {"role": "user", "content": digest + "\n\nIn at most two sentences: what in these drafts do you "
+                         "think read to them as conduct, and what was only topic?"}], max_tokens=160)
+        row = _append({"kind": "students_view", "shown": digest, "note": str(text or "").strip()[:600]}, ledger)
+        say("practice: shown the students' view of his drafts (%d chars); his note: %s"
+            % (len(digest), row["note"][:160] or "(none)"))
+        return row
+    except Exception as e:                                          # noqa: BLE001
+        say("practice: the students' view could not be shown: %s: %s" % (type(e).__name__, str(e)[:120]))
+        return None
+
+
 def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, tasks=TASKS_PER_NIGHT, budget_s=BUDGET_S,
-          tell=None, say=print, now=time.time):
+          tell=None, say=print, now=time.time, sends_path=None, audit_path=None):
     """One bounded pass. Returns the summary; tells him one line on the direct line."""
     if ask is None:
         import covenant_model
@@ -471,6 +556,8 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
         if r.get("stop"):                           # the gate, the model or the clock: the pass ends here
             stop = r["stop"]
             break
+    if now() < deadline and not (stop and "model" in stop):
+        show_students_view(ask, ledger=ledger, sends_path=sends_path, audit_path=audit_path, say=say)
     done = solved(ledger)
     first = sum(1 for r in results if r["solved_round"] == 1)
     within = sum(1 for r in results if r["solved_round"])

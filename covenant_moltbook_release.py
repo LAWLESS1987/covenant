@@ -185,6 +185,110 @@ def release(limit=5, dry_run=True, teacher=ask_teacher, corpus=CORPUS,
     return 0
 
 
+# ---------------------------------------------------------------- the assistant's labels, under HIS grant
+#
+# HIS DECISION, 2026-09-28 (~01:10Z). Asked "May I label real forum comments as
+# clean teaching rows?", he answered "Yes, label them". The docstring above
+# says the assistant may not label, because the corpus would then measure its
+# opinion of what it chose to collect. That is still the default: the grant is
+# a FILE, read on every call, and without it this refuses exactly as before.
+# It changes who may label, not what a label must survive:
+#   * the row must be a real harvested candidate, eligible, never directive,
+#     and the labelled text must be an EXCERPT of it (no invented text);
+#   * the exam-contamination filter (covenant_distill.contaminating) rejects
+#     anything that shadows a held-out exam case;
+#   * the source still begins "moltbook", so Sena (the control) never sees it;
+#   * every row says who labelled it and under which grant, so the batch comes
+#     back out by `judge` or by `grant` if he revokes.
+# The balance rule, the panel rule and the promotion gate are untouched.
+FORUM_LABEL_GRANT = os.environ.get("COVENANT_FORUM_LABEL_GRANT") or os.path.join(HERE, "ops", "forum_label_grant.json")
+LABELLED_SOURCE = "moltbook/labelled"
+LABELLER = "forum:claude-opus-5.5"
+
+
+def label_grant(path=None):
+    """(granted, why). Absent, unreadable, or granted != true is a refusal with the reason."""
+    path = path or FORUM_LABEL_GRANT
+    try:
+        with open(path, encoding="utf-8") as fh:
+            g = json.load(fh)
+    except OSError:
+        return False, "no grant on record (%s): the assistant does not label forum rows" % path
+    except ValueError as e:
+        return False, "the grant file is unreadable (%s); refusing rather than guessing" % e
+    if not isinstance(g, dict) or g.get("granted") is not True:
+        return False, "the grant on record is not a yes (granted=%r)" % (g.get("granted") if isinstance(g, dict) else g)
+    if not g.get("decided_by") or not g.get("date"):
+        return False, "the grant names no decider or date; refusing"
+    return True, "granted by %s on %s" % (g["decided_by"], g["date"])
+
+
+def _norm(s):
+    return " ".join(str(s or "").split())
+
+
+def assistant_label(labels, dry_run=True, grant_path=None, corpus=CORPUS, quarantine=None, say=print, now=None):
+    """Write the assistant's labels for harvested rows, under the operator's grant.
+
+    labels: [{"sha256": <full sha of the quarantined post>, "text": <excerpt of it>,
+              "violates": bool, "reason": str}]
+    Returns {"written", "refused", "reasons"}. Refuses everything without the grant."""
+    out = {"written": 0, "refused": 0, "reasons": []}
+    ok, why = label_grant(grant_path)
+    if not ok:
+        out["refused"] = len(labels)
+        out["reasons"].append(why)
+        say("REFUSED: " + why)
+        return out
+    import covenant_distill as X
+    ebags = X._exam_bags()
+    by_sha = {r.get("sha256"): r for r in load_candidates(quarantine or _quarantine_path())}
+    known = set()
+    try:
+        with open(corpus, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    known.add(_norm(json.loads(line).get("text")).lower())
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    rows = []
+    for lab in labels:
+        cand = by_sha.get(lab.get("sha256"))
+        text = _norm(lab.get("text"))
+        refusal = None
+        if cand is None:
+            refusal = "not a harvested row (no candidate with that sha256)"
+        elif not cand.get("eligible") or (cand.get("flags") or {}).get("directive"):
+            refusal = "the candidate is not eligible (directive or out of size)"
+        elif not text or text not in _norm(cand.get("text")):
+            refusal = "the labelled text is not an excerpt of the harvested post"
+        elif not isinstance(lab.get("violates"), bool):
+            refusal = "no boolean label"
+        elif X.contaminating(text, ebags):
+            refusal = "shadows a held-out exam case (covenant_distill.contaminating)"
+        elif text.lower() in known:
+            refusal = "already in the corpus"
+        if refusal:
+            out["refused"] += 1
+            out["reasons"].append("%s: %s" % (str(lab.get("sha256"))[:12], refusal))
+            continue
+        known.add(text.lower())
+        row = corpus_row(cand, lab["violates"], str(lab.get("reason", ""))[:600], LABELLER, now=now)
+        row.update({"text": text, "source": LABELLED_SOURCE, "category": "discourse",
+                    "grant": os.path.basename(grant_path or FORUM_LABEL_GRANT), "excerpt": True})
+        rows.append(row)
+    if not dry_run and rows:
+        with open(corpus, "a", encoding="utf-8", newline="\n") as fh:      # LF: text mode on Windows wrote CRLF into the ledger (measured 2026-09-28)
+            for row in rows:
+                fh.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
+    out["written"] = 0 if dry_run else len(rows)
+    say("%s: %d labelled row(s) %s, %d refused (%s)" % ("DRY RUN" if dry_run else "labelled", len(rows),
+        "would be written" if dry_run else "written", out["refused"], why))
+    return out
+
+
 def selftest():
     import tempfile
     import covenant_moltbook as M
@@ -361,9 +465,18 @@ def main():
     ap.add_argument("--release", action="store_true",
                     help="actually write judged rows to the corpus")
     ap.add_argument("--limit", type=int, default=5)
+    ap.add_argument("--labels", metavar="FILE",
+                    help="the assistant's labels (JSON list of {sha256, text, violates, reason}); "
+                         "refused unless ops/forum_label_grant.json is a yes; dry run without --release")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    if a.labels:
+        with open(a.labels, encoding="utf-8") as fh:
+            res = assistant_label(json.load(fh), dry_run=not a.release)
+        for r in res["reasons"][:20]:
+            print("  refused " + r)
+        return 0 if res["refused"] == 0 or res["written"] or not a.release else 1
     return release(limit=a.limit, dry_run=not a.release)
 
 

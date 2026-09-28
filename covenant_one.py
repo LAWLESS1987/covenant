@@ -611,6 +611,14 @@ SUITES = [
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
     ("test_pp1_tetsu_practice.py", 240, "JUDGE"),
+    # FL1 (2026-09-28, his words: "Yes, label them"): the assistant labels harvested forum rows only under
+    # ops/forum_label_grant.json, through covenant_moltbook_release's one door -- excerpts of real eligible posts,
+    # the exam-contamination filter applied, once each; without the grant it refuses as before.
+    ("test_fl1_forum_labels.py", 180, "JUDGE"),
+    # SV1 (2026-09-28, his words: "Yes, show him"): at his practice Tetsu is shown the students' verdicts on his
+    # own recent drafts, bounded, labelled as their view and not a rule, with the framing that the money gates are
+    # unchanged; his note is kept. Model stubbed; real sends/audit files in a temp dir.
+    ("test_sv1_students_view.py", 120, "JUDGE"),
     # TC1 (2026-09-27, A237, his words: "create a fire crawl like system for tetsu also"): Tetsu's crawler -- search
     # parsed from a results page, a same-host crawl bounded per page, per answer and per day, every page through the
     # one web door and a refusal reported rather than raised; the door is a stub, no network.
