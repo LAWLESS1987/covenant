@@ -64,14 +64,17 @@ Do not optimize for a green report. Optimize for an accurate report.
   a fact in the record.
 - **What starts it**: the watchdog daemon (always on; the CovenantGuard task revives it every two
   minutes) calls `covenant_daily.maybe_launch()` from its hourly self-evaluation -- once per day,
-  after the nightly has finished or from 10:00, never 07:45-09:15 (the trader runs at 09:00), never during a
-  sweep.
+  after the nightly has finished or from 10:00, never 07:45-09:15 (the trader runs at 09:00), never
+  during a sweep. A lock left by a cycle that was killed is cleared after 3 hours, so one crash
+  cannot stop the cycle for good.
 - **What reports a missed day**: the hourly self-evaluation's `daily` row reads FAIL when the
-  newest record is more than 26 hours old, and a FAIL is said on the direct line.
+  newest record ended more than 30 hours ago, when a started cycle wrote no record within 3 hours,
+  or when the record itself found a failure or a regression; a FAIL is said on the direct line.
 - **Records**: `ops/tetsu_daily.jsonl` (append-only history), `ops/TETSU_DAILY.md`,
   `ops/tetsu_daily_latest.json`, `ops/tetsu_last_verified.json`,
   `ops/tetsu_directive_exam.jsonl`; dependency snapshots under `logs/tetsu_daily/`.
-- **The one change it makes by itself**: a judge student replaced since the last verified state
-  that then admits a violation on the exam is rolled back to the verified copy, the failing one
-  kept. Everything else is recorded and reported, not applied: a correction stays a candidate
+- **The one change it makes by itself**: the examined judge student, if it was replaced since the
+  last verified state and then admits a violation on the exam, is rolled back to the verified copy,
+  the failing one kept. A day becomes the new verified state only if the sweep passed, the exam's
+  safety bar held, and nothing regressed. Everything else is recorded and reported, not applied: a correction stays a candidate
   until it survives the sweep, the gate, and a person or quorum.
