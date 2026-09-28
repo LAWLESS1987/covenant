@@ -72,6 +72,14 @@ def main():
         v, r = D.classify_pc(three, {"error": "no tally"}, {})
         check("TD1a an exam with no tally is not a pass (degraded, and said)", v == "degraded", (v, r))
 
+        seq = [[node("A"), node("B"), node("C", up=False)], [node("A"), node("B"), node("C")]]
+        slept = []
+        ns, note = D.read_nodes_settled(read=lambda: seq.pop(0), sleep=slept.append)
+        check("TD1a a node down for one reading (a rolling restart) is re-read, and the first reading is said (the 10:33 cycle)",
+              all(n["up"] for n in ns) and "first reading" in note and "C unreachable" in note and slept == [D.NODE_RETRY_S], note)
+        seq = [[node("A"), node("B"), node("C", up=False)]] * (D.NODE_RETRIES + 1)
+        ns, note = D.read_nodes_settled(read=lambda: seq.pop(0), sleep=lambda s: None)
+        check("TD1a a node down on every re-read stays down", not ns[2]["up"] and "still bad" in note, note)
         print("TD1b -- the phone node")
         fresh = {"age_min": 4, "build": "2f0af71abc", "pc_build": "2f0af71abcdef", "height": "53"}
         check("TD1b a fresh check-in on the PC's build at the PC's height is healthy", D.classify_phone(fresh, 53)[0] == "healthy")

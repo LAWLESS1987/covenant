@@ -214,6 +214,34 @@ def pc_nodes(get=_http_json):
     return out
 
 
+NODE_RETRIES, NODE_RETRY_S = 3, 45
+
+
+def read_nodes_settled(read=None, sleep=time.sleep):
+    """The nodes, read again when the first reading is bad. The second automatic cycle (10:33,
+    2026-09-28) read node C as refusing connections because a rolling restart was in progress, and
+    called the PC node and the sync FAILED for a node that answered a minute later. A node that is
+    down on every one of NODE_RETRIES readings, NODE_RETRY_S apart, is down; one that comes back
+    is recorded as having been unreachable, never hidden. Returns (nodes, note)."""
+    read = read or pc_nodes
+    first = read()
+
+    def bad(ns):
+        up = [n for n in ns if n.get("up")]
+        return len(up) < len(ns) or len({n.get("tip") for n in up}) > 1
+    if not bad(first):
+        return first, ""
+    nodes = first
+    for i in range(NODE_RETRIES):
+        sleep(NODE_RETRY_S)
+        nodes = read()
+        if not bad(nodes):
+            was = ", ".join("%s %s" % (n["node"], "unreachable" if not n.get("up") else "on tip " + str(n.get("tip"))[:12])
+                            for n in first if not n.get("up") or n.get("tip") != nodes[0].get("tip"))
+            return nodes, "first reading: %s; settled on re-read %d after %ds" % (was, i + 1, (i + 1) * NODE_RETRY_S)
+    return nodes, "still bad after %d re-reads %ds apart" % (NODE_RETRIES, NODE_RETRY_S)
+
+
 def judge_exam(run=_run):
     """The distilled student sits its exam (53 labelled cases): the judge EXERCISED, not a file
     digest. The safety bar is false clean == 0 (a violation admitted as clean)."""
@@ -790,13 +818,17 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
         verified = _read_json(VERIFIED, {}) or {}
         tests_run = []
 
-        nodes = pc_nodes()
-        tests_run.append("PC nodes: /health and /chain tip+genesis on A/B/C")
+        nodes, retry_note = read_nodes_settled()
+        tests_run.append("PC nodes: /health and /chain tip+genesis on A/B/C" + (" (%s)" % retry_note if retry_note else ""))
         hw = highway_now()
         tests_run.append("highway: %d detectors sensed" % len([k for k in hw if not k.startswith("_")]))
         exam = judge_exam()
         tests_run.append("judge exam (covenant_distill --exam, %s cases)" % exam.get("total", "?"))
         pc_v, pc_r = classify_pc(nodes, exam, hw)
+        if retry_note.startswith("first reading"):
+            # it came back, and it was not answering when first read: that is said, and it is not "healthy"
+            pc_r = pc_r + ["a node was not answering when first read (%s)" % retry_note]
+            pc_v = "degraded" if pc_v == "healthy" else pc_v
         pc_height = next((n.get("height") for n in nodes if n.get("up")), None)
         ph = phone_reading()
         ph_v, ph_r = classify_phone(ph, pc_height)
