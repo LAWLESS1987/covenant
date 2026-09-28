@@ -176,6 +176,31 @@
     "test_r1_retracted.py"
    ],
    "note_on_allow": "confidence-trap.md is the original and is allowed for the same reason the sweep transcripts are: its whole purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md, the README and ops/CONFIDENCE_TRAP_POSTS.md are deliberately NOT allowed: each quotes the phrase while citing A236 within the window, which is the rule working rather than being waived."
+  },
+  {
+   "id": "A242",
+   "claim": "That on every model the coverage-0.80 temperament strictly removes false convictions and pays for them (A126.M3 as written: cov-0.80 false convictions < base, right answers strictly fewer, deferrals strictly more), and that a worst false conviction always exists to outscore the mildest true one (A126.M4 as written: bool(false_scores) required).",
+   "refuted_by": "measured 2026-09-28 on the first feature-format-2 candidate: base (41, 1, 0, 11), cov-0.80 (35, 1, 0, 17) -- one false conviction at base cannot strictly decrease, so M3 as written fails every candidate at least this good, forever; at fixture scale a candidate with zero false convictions also fails M4's existence requirement. The claims pinned the 2026-09 model's tally shape, the exact disease retracted once already as A145 ('a claim rewritten every time the judge moves is following the judge around').",
+   "truth": "The durable finding, restated in test_a126_seat_dispositions.py the same day: the coverage temperament never manufactures certainty -- at 0.80, false convictions never increase, false clears never increase, right answers never increase, deferrals never decrease -- and the overlap finding is asserted over the false convictions that exist, while a model with none left is vacuously past it and the zero is itself the finding. Both restatements keep a falsifiability companion that a harmful tally fails.",
+   "verbatim": [
+    "coverage 0.80 DOES reduce false convictions, and the price is fewer right answers and more deferrals",
+    "the worst false conviction outscores the mildest true one, so no threshold could ever separate"
+   ],
+   "patterns": [
+    "coverage\\s+0\\.80\\s+DOES\\s+reduce\\s+false\\s+convictions",
+    "worst\\s+false\\s+conviction\\s+outscores\\s+the\\s+mildest\\s+true\\s+one"
+   ],
+   "note_on_patterns": "Both phrasings are the check names as written; each carries the strict per-model tally assertion being retracted. The restated checks use different sentences and cite A242 in the comment beside them.",
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The as-written wording is preserved unedited on branch a126-m3-coverage-claim-as-written-2026-09-28, which is not in this tree; KNOWN_ISSUES may quote it while citing A242 within the window. The sweep transcripts are allowed for A145's stated reason: their whole purpose is to hold what a past run printed, unedited."
   }
  ]
 }

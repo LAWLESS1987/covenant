@@ -5306,3 +5306,55 @@ git       PASS  HEAD 5510406, 0 ahead / 0 behind origin/main as of the last fetc
 disk      PASS  291G free of 476G (38% used); logs/ 31M
 daily     WARN  no daily cycle has run yet (the first starts after the nightly, or at 10:00)
 
+## 2026-09-28T15:17:03Z  overall FAIL  (round 15180)
+nodes     PASS  3/3 up, height 54 (spread 0), source b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are b708204ff11b, peers report ['e8a79ee502d8'] (last heard 2
+trader    PASS  log 2.3h old; freshness exit 0: RAN: a cycle dated 2026-09-28 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-28T08:53:18Z REFUSED (6h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core b708204ff11b (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at e8a79ee502d8, the core is b708204ff11b; EXPECTED_LINES is 12783, the core has 12799 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 9dacdd5, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 0.4h ago; 0 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 31M
+daily     FAIL  0.4h ago: PC node failed | phone node healthy | sync failed | tests PASS | regressions PASS | new failures 9 | rolled back 0
+
+## 2026-09-28T16:22:27Z  overall FAIL  (round 15240)
+nodes     PASS  3/3 up, height 54 (spread 0), source b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are b708204ff11b, peers report ['e8a79ee502d8'] (last heard 1
+trader    PASS  log 3.4h old; freshness exit 0: RAN: a cycle dated 2026-09-28 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-28T08:53:18Z REFUSED (7h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core b708204ff11b (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at e8a79ee502d8, the core is b708204ff11b; EXPECTED_LINES is 12783, the core has 12799 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 9dacdd5, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 1.5h ago; 1 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 32M
+daily     FAIL  1.5h ago: PC node failed | phone node healthy | sync failed | tests PASS | regressions PASS | new failures 9 | rolled back 0
+
+## 2026-09-28T17:28:04Z  overall FAIL  (round 15300)
+nodes     PASS  3/3 up, height 54 (spread 0), source b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  3 live -- first: node A: mesh is running more than one source: we are b708204ff11b, peers report ['e8a79ee502d8'] (last heard 5
+trader    PASS  log 4.5h old; freshness exit 0: RAN: a cycle dated 2026-09-28 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-28T08:53:18Z REFUSED (9h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core b708204ff11b (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at e8a79ee502d8, the core is b708204ff11b; EXPECTED_LINES is 12783, the core has 12799 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 9dacdd5, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 2.6h ago; 2 file(s) not committed
+disk      PASS  289G free of 476G (39% used); logs/ 32M
+daily     FAIL  2.6h ago: PC node failed | phone node healthy | sync failed | tests PASS | regressions PASS | new failures 9 | rolled back 0
+
+## 2026-09-28T18:33:14Z  overall FAIL  (round 15360)
+nodes     PASS  3/3 up, height 54 (spread 0), source b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@9a2bbf97a69, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  2 live -- first: node A: mesh is running more than one source: we are b708204ff11b, peers report ['e8a79ee502d8'] (last heard 7
+trader    PASS  log 5.6h old; freshness exit 0: RAN: a cycle dated 2026-09-28 COMPLETED -- the trader printed it, not the launcher.
+student   PASS  last cycle 2026-09-28T08:53:18Z REFUSED (10h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core b708204ff11b (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at e8a79ee502d8, the core is b708204ff11b; EXPECTED_LINES is 12783, the core has 12799 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       PASS  HEAD 9dacdd5, 0 ahead / 0 behind origin/main as of the last fetch; last fetch 3.7h ago; 6 file(s) not committed
+disk      PASS  288G free of 476G (39% used); logs/ 32M
+daily     FAIL  3.6h ago: PC node failed | phone node healthy | sync failed | tests PASS | regressions PASS | new failures 9 | rolled back 0
+

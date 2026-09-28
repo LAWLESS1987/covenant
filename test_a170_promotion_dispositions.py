@@ -8,10 +8,14 @@ nightly's green check ran AFTER the file had been replaced. Now
 covenant_distill.disposition_claims_hold() runs the A126 suite against the
 CANDIDATE file, and train() refuses a candidate the suite fails.
 
-  A170a  the helper RUNS the suite: the deployed student holds (13/13); a
-         copy of the 04:03 promoted student, kept for this, fails (11/13) --
-         when that copy is present; a missing file is a refusal with the
-         reason, never a tally.
+  A170a  the helper RUNS the suite: the deployed student holds (14/14 since
+         the A242 restatement of 2026-09-28; 13/13 before it); a copy of the
+         04:03 promoted student, kept for this, STILL fails under the
+         restated claims (13/14, red on M1b, a claim A242 did not touch --
+         measured that day, so the restatement was shown not to un-catch
+         the student this suite exists to catch) -- when that copy is
+         present; a missing file is a refusal with the reason, never a
+         tally.
   A170b  train() with the promotion decision stubbed to "promote" and the
          helper stubbed to "fails" leaves the student file untouched, keeps
          the candidate, and says why in the report.
@@ -49,11 +53,11 @@ def check(label, ok, detail=""):
 def main():
     print("A170a -- the helper runs the suite against a file")
     ok, tally = X.disposition_claims_hold(os.path.join(HERE, "fallback_model.json"))
-    check("A170a the deployed student holds the claims (the suite's own tally)", ok and tally.startswith("A126:") and "13/13" in tally, tally)
+    check("A170a the deployed student holds the claims (the suite's own tally)", ok and tally.startswith("A126:") and "14/14" in tally, tally)
     promoted = os.path.join(HERE, "ops", "students", "promoted_2026-09-21_8571b16b1784.json")
     if os.path.exists(promoted):
         ok2, tally2 = X.disposition_claims_hold(promoted)
-        check("A170a the 04:03 promoted student fails them, measured (11/13)", not ok2 and "11/13" in tally2, tally2)
+        check("A170a the 04:03 promoted student STILL fails them after A242, measured (13/14, M1b)", not ok2 and "13/14" in tally2, tally2)
     else:
         print("      (the promoted copy is not on this machine; that case is not measured here)")
     ok3, why3 = X.disposition_claims_hold(os.path.join(HERE, "nowhere_at_all.json"))

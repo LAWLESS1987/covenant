@@ -359,7 +359,242 @@ def _negated(ts: List[str]) -> List[bool]:
     return out
 
 
-def features(text: str) -> List[str]:
+# ---------------------------------------------------------------------------
+# FEATURE FORMAT 2 -- the describe-frame (A126/A67, 2026-09-28).
+#
+# THE BLOCKER IT EXISTS FOR, measured on judge_suite's held-out cases and
+# pinned in test_a126: every false conviction the student makes at Vela's
+# settings is category `discourse` -- an incident review, an audit note, a
+# policy definition, a case note. Text that DESCRIBES a taking instead of
+# committing one. "The night clerk moved 4,200" carries the same bag of words
+# as "Moved co-op funds into my name", and a bag of words cannot carry the
+# difference (the four-model roundtable of 2026-09-09 found the same). More
+# same-kind data makes it WORSE: a fuller vocabulary means fuller coverage,
+# so the coverage knob that used to remove two of the seven removes none.
+#
+# WHAT THIS IS. The same move as the negation marker above, one level up. The
+# negation window cannot see scope, so it emits a MARKER: "no receipt was
+# forged" trains "not:forg~", a different feature from "forg~", free to earn
+# its own honest weight. Here the unit is the sentence: a sentence in a
+# DESCRIBE-FRAME -- a report, a definition, a record entry about something
+# that already happened -- emits its content words as "d:word", so "moved"
+# inside "Incident review 2024-07. The night clerk moved 4,200..." is a
+# DIFFERENT FEATURE from the bare "moved" a thousand first-person memos have
+# taught. What "d:moved" is worth is learned from the ledger by train(),
+# exactly as every other weight is; nothing here sets a weight or a verdict.
+#
+# THE MARKER LISTS ARE EXTRACTORS, NEVER RULES -- like the tokenizer, like
+# STOPWORDS, like _NEGATORS. Each is a short closed class, chosen on
+# principle and not tuned to any test case:
+#   _PAST_AUX      the past/perfect auxiliaries. "was recovered", "had been
+#                  posted" -- a completed act being reported. Simple past
+#                  ("moved") is invisible to a tokenizer, which is what the
+#                  document carry below is for.
+#   _REPORT_VERBS  verbs of INSPECTION and DEFINITION -- checking, reviewing,
+#                  meaning. Inherently about an act. Verbs of INSCRIPTION
+#                  (record, document, write) are deliberately absent: in a
+#                  ledger world, writing can BE the act (backdating, forging),
+#                  and the exam's "academic frame, real act" is exactly that.
+#   _RECORD_HEADS  nouns that OPEN a document about conduct -- incident,
+#                  audit, minutes, handbook. A head opens a CARRY: later
+#                  sentences of the same text stay framed until something
+#                  commits. The head alone frames nothing (judge_suite's
+#                  discourse set was built so headers do not separate; 3/8
+#                  clean vs 3/8 violating carry one).
+#   _FUTURE        future orientation -- "will", "shall", the future time
+#                  adverbials. A sentence about what WILL happen is a
+#                  commitment, whatever stationery it is written on:
+#                  "will be moved to the chair's account" in minutes, "to be
+#                  repeated next quarter" in an incident review.
+#   _FIRST_PERSON  agency. "we adopted", "my wallet": first person plus an
+#                  act is commission, and it BREAKS a frame -- unless the
+#                  first-person verb is itself a report verb ("I checked 3
+#                  accounts"), because inspecting is meta whoever does it.
+#
+# A sentence is DESCRIBE-FRAMED when a report ANCHOR holds it: a report verb
+# in the sentence; or a record head beside a past auxiliary; or an open
+# document carry -- and, for the anchors weaker than a report verb, only while
+# it neither looks forward (_FUTURE) nor claims the act as its own
+# (_FIRST_PERSON). A past auxiliary ALONE is deliberately not an anchor: an
+# elliptical first-person memo carries embedded past clauses too ("...so the
+# audit shows it was posted on time"), and framing those handed a deception
+# back its verdict when this was first measured.
+# Everything an attacker gains by wearing the frame is a feature the trainer
+# saw worn honestly and dishonestly both -- the ledger holds violations in
+# report clothing, and their inner words ("d:not:record~", "d:repeat~") are
+# free to convict. A frame is never a clearance; at worst it moves a verdict
+# to ABSTAIN, which blocks nothing and alleges nothing.
+#
+# FORMAT 2 IS PRODUCED BY TRAINING ONLY. An existing model file carries no
+# "feature_version" field, loads as format 1, and is scored by the untouched
+# format-1 path below -- bit-identical behaviour, pinned by test_r2v. The
+# trunk (fallback_core.json) is pinned and stays format 1 for ever.
+#
+# AND IT IS STAGED, NOT SWITCHED ON, because of what was measured the day it
+# was built (2026-09-28, offline, both students, full nightly mirror):
+#
+#   format-2 candidate (Ora, refined)   exam 41/53 (in use 38), discourse
+#   false holds 7 -> 1, exam false cleans 0, unseen ledger rows decided
+#   229/268 vs 198/268 with wrong holds 8 -> 2 and wrong clears 0 -> 0.
+#   covenant_distill.promotion() PASSES it on every bar.
+#
+#   And test_a126 then refuses it, 12/13: A126.M3 requires that coverage
+#   0.80 REMOVE a false conviction, and A126.M4 requires that false
+#   convictions EXIST and overlap the true ones. A format-2 candidate has
+#   one false conviction left (at coverage above 0.80), or none at all --
+#   the F2 fixture measures base (26, 0, 0, 27) against format 1's
+#   (26, 4, 0, 23) -- so the two claims that pinned the describe-vs-do
+#   defect refuse, by construction, any candidate that no longer has it.
+#
+# A claim the world has outgrown is RESTATED BY THE OPERATOR, with the
+# retraction recorded (A145 is the precedent); it is never trained around,
+# and this module does not decide it. So what train() EMITS stays format 1
+# -- tonight's candidate is byte-identical to yesterday's -- until the
+# operator flips COVENANT_FEATURE_FORMAT=2, on the same day the A126 claims
+# are restated to pin the durable finding (false clears zero, deferral the
+# only price) rather than the old model's tally shape.
+# ---------------------------------------------------------------------------
+FEATURE_FORMAT = 2           # the newest format this code can read and write
+
+
+def emit_format() -> int:
+    """What train() emits UNLESS its caller says otherwise. DEFAULT 2 SINCE
+    2026-09-28, the operator's answer the day the A126 claims were restated
+    (A242): "Yes, train with v2." Candidates train with describe-frame
+    features; every deployed format-1 model still loads and scores
+    byte-identically, and only the promotion gate seats a candidate.
+    COVENANT_FEATURE_FORMAT=1 puts the trainer back without touching code.
+    Read at call time, not at import, so a flip needs no restart."""
+    try:
+        v = int(os.environ.get("COVENANT_FEATURE_FORMAT", str(FEATURE_FORMAT)) or FEATURE_FORMAT)
+    except (TypeError, ValueError):
+        return FEATURE_FORMAT
+    return v if 1 <= v <= FEATURE_FORMAT else FEATURE_FORMAT
+
+_PAST_AUX = frozenset(["was", "were", "had"])
+_REPORT_VERBS = frozenset([
+    "checked", "reviewed", "reported", "audited", "investigated", "examined",
+    "verified", "confirmed", "surfaced", "recovered", "resolved", "flagged",
+    "noticed", "disclosed", "caught",
+    # The base forms too: an imperative to INSPECT ("read the audit note",
+    # "check the ledger first") is as meta as the past-tense report. Only the
+    # inspection class gets this -- an imperative to inscribe or to move is
+    # the act itself. "means" was tried here for the definition frame and
+    # REMOVED, measured 2026-09-28: as a noun ("their means of payment",
+    # "means to an end") it framed first-person commissions, and the handful
+    # of them taught "d:before" a +1.78 that convicted two innocent records.
+    # A definition sentence frames through the head-plus-past anchor instead
+    # ("in this policy ... was entrusted"), which the noun sense never has.
+    "read", "check", "verify",
+])
+_RECORD_HEADS = frozenset([
+    "incident", "review", "audit", "minutes", "case", "report", "policy",
+    "handbook", "advisory", "investigation",
+])
+_FUTURE = frozenset(["will", "shall", "tomorrow", "tonight", "next",
+                     "henceforth", "hereafter"])
+_FIRST_PERSON = frozenset(["i", "we", "my", "our", "me", "us", "mine",
+                           "myself", "ourselves"])
+# A report verb names an inspection -- unless the sentence is about DODGING
+# the inspection. "Closed the file before the buyer noticed" and "backdate the
+# receipt to before the will was read" both carry a report verb, and both
+# taught "d:before" a conviction weight when this was first measured: the verb
+# there is the detection being evaded, not a report being made. So a report
+# verb anchors nothing when it is negated ("nobody checked" -- the existing
+# negation window already marks it) or stands inside an evasion window: within
+# two content words after one of these.
+_EVADERS = frozenset(["before", "until", "unless"])
+
+# Sentence boundaries. Token characters are [a-z0-9_], none of these five is,
+# so a token never spans a boundary and the concatenation of the segments'
+# tokens is exactly tokens(text) -- pinned by test_r2v.
+_SEG = re.compile(r"[.;:!?]")
+
+
+def _segments(text: str) -> List[List[str]]:
+    return [_TOKEN.findall(p) for p in _SEG.split(_expand(text))]
+
+
+def _evaded(ts: List[str]) -> List[bool]:
+    """Within _NEG_WINDOW content words after an evasion marker -- the same
+    walk as _negated, for _EVADERS. A function word neither takes nor spends
+    the window, so "before the will was read" reaches "read"."""
+    out, left = [], 0
+    for t in ts:
+        if t in _EVADERS:
+            out.append(False)
+            left = _NEG_WINDOW
+        elif t in STOPWORDS:
+            out.append(False)
+        else:
+            out.append(left > 0)
+            left = max(0, left - 1)
+    return out
+
+
+def _described(segs: List[List[str]]) -> List[bool]:
+    """One flag per token, flattened: is its sentence in a describe-frame?
+
+    A report verb frames its sentence outright -- inspection is meta whoever
+    performs it, whatever tense surrounds it -- unless the verb is negated or
+    evaded (see _EVADERS), in which case it is the detection being dodged and
+    anchors nothing. The weaker anchors (an open carry, or a record head with
+    a past auxiliary in the same sentence) frame only a sentence that neither
+    commits to a future nor speaks in the first person, because those are the
+    two ways a document stops describing and starts doing: "will be moved to
+    the chair's account" in minutes, "we adopted" in an advisory."""
+    flat = [t for s in segs for t in s]
+    neg, ev = _negated(flat), _evaded(flat)
+    out: List[bool] = []
+    carry, i = False, 0
+    for s in segs:
+        j = i + len(s)
+        rep = any(t in _REPORT_VERBS and not n and not e
+                  for t, n, e in zip(s, neg[i:j], ev[i:j]))
+        st = set(s)
+        head = bool(st & _RECORD_HEADS)
+        framed = rep or ((carry or (head and bool(st & _PAST_AUX)))
+                         and not (st & _FUTURE)
+                         and not (st & _FIRST_PERSON))
+        out.extend([framed] * len(s))
+        if head:
+            carry = True
+        if (st & _FUTURE) or ((st & _FIRST_PERSON) and not rep):
+            carry = False               # commitment closes the document frame
+        i = j
+    return out
+
+
+def _features_v2(text: str) -> List[str]:
+    """Format 2: the format-1 features, with content words of describe-framed
+    sentences carrying the "d:" marker -- in the singles, in the pairs and
+    triples they join, and in their folds, exactly as "not:" already does.
+    Function words stay bare in any frame: a frame changes what "moved" means,
+    it cannot make "the" mean something."""
+    segs = _segments(text)
+    raw = [t for s in segs for t in s]
+    neg = _negated(raw)
+    desc = _described(segs)
+    ts = []
+    for t, n, d in zip(raw, neg, desc):
+        if t in STOPWORDS:
+            ts.append(t)
+            continue
+        m = ("not:" + t) if n else t
+        ts.append(("d:" + m) if d else m)
+    out = ts + ["%s %s" % (ts[i], ts[i + 1]) for i in range(len(ts) - 1)]
+    out += ["%s %s %s" % (ts[i], ts[i + 1], ts[i + 2]) for i in range(len(ts) - 2)]
+    for t, n, d in zip(raw, neg, desc):
+        if t in STOPWORDS:
+            continue
+        f = _fold(t)
+        if f:
+            f = ("not:" + f) if n else f
+            out.append(("d:" + f) if d else f)
+    return out
+
+
+def features(text: str, version: int = 1) -> List[str]:
     """Single words AND adjacent pairs.
 
     WHY PAIRS, MEASURED 2026-09-04. On single words the judge abstained on 13
@@ -374,7 +609,15 @@ def features(text: str) -> List[str]:
     A pair is written "a b" and is a feature exactly like a word, so the model
     stays a JSON file a person can open and read, which is the property that
     matters more here than accuracy.
+
+    `version` selects the FEATURE FORMAT (see FEATURE_FORMAT above). The
+    default is 1 -- the body below, unchanged -- so every existing caller and
+    every model file saved without a feature_version behaves bit-identically.
+    A model says which format it was trained under and is scored under that
+    format and no other.
     """
+    if version >= 2:
+        return _features_v2(text)
     raw = tokens(text)
     neg = _negated(raw)
     # the surface form used for pairs and triples keeps the marker too, so
@@ -473,8 +716,14 @@ def _informative(f: str) -> bool:
     """A single word that is a function word carries no ethical content. A PAIR
     containing one usually does -- "not include", "my own", "his account" --
     so a pair is dropped only when BOTH halves are function words. A bare
-    pronoun is dropped too (PRONOUNS_PAIR_ONLY); its pairs are kept."""
-    parts = f.split(" ")
+    pronoun is dropped too (PRONOUNS_PAIR_ONLY); its pairs are kept.
+
+    The "d:" describe-frame marker (feature format 2) is stripped before the
+    question is asked, exactly as "not:" is: the marker changes WHICH feature a
+    word becomes, never whether the word could carry content. A version-1
+    feature never starts with "d:" -- the tokenizer admits no colon -- so this
+    is a no-op on every feature an existing model ever produced."""
+    parts = [p[2:] if p.startswith("d:") else p for p in f.split(" ")]
     if len(parts) == 1:
         w = parts[0][4:] if parts[0].startswith("not:") else parts[0]
         return (w not in STOPWORDS and w not in PRONOUNS_PAIR_ONLY
@@ -512,6 +761,13 @@ class FallbackModel:
         # documents, whatever its weight. That is the question these two guards
         # were always trying to ask.
         self.vocab = set(d.get("vocab", ()))
+        # WHICH FEATURE FORMAT trained these weights (see FEATURE_FORMAT). A
+        # file that does not say was trained before formats existed: format 1,
+        # scored by the format-1 extractor, bit-identical to the day it was
+        # saved. A model is only ever scored under its own format -- weights
+        # keyed "d:moved" mean nothing to an extractor that never emits it,
+        # and vice versa.
+        self.feature_version: int = int(d.get("feature_version", 1) or 1)
         self.n_examples: int = int(d.get("n_examples", 0))
         self.n_violates: int = int(d.get("n_violates", 0))
         self.prior: float = float(d.get("prior", 0.0))
@@ -532,23 +788,33 @@ class FallbackModel:
     # -- training ---------------------------------------------------------
     @classmethod
     def train(cls, examples: List[Tuple[str, bool]], sources: List[str],
-              trained_at: str = "") -> "FallbackModel":
+              trained_at: str = "",
+              feature_version: Optional[int] = None) -> "FallbackModel":
         """Laplace-smoothed log-odds per token. Deliberately simple.
 
         A more capable model is not obviously better here: the whole point is
         that a reader can open the JSON and see which words move a verdict and
         by how much. A distilled judge nobody can inspect is a second opaque
         authority, which is the thing this project keeps refusing to build.
+
+        Trains under emit_format() unless told otherwise -- format 1 until
+        the operator flips COVENANT_FEATURE_FORMAT (see the staging note at
+        FEATURE_FORMAT) -- and writes the format into the model, so the
+        scorer always reads the features the weights were fitted to. A
+        format is a property of a TRAINING RUN, never applied retroactively
+        to weights fitted under another one.
         """
+        if feature_version is None:
+            feature_version = emit_format()
         v_counts: Dict[str, int] = {}
         c_counts: Dict[str, int] = {}
         n_v = n_c = 0
         doc_freq: Dict[str, int] = {}
         for text, _v in examples:
-            for t in set(features(text)):
+            for t in set(features(text, feature_version)):
                 doc_freq[t] = doc_freq.get(t, 0) + 1
         for text, violates in examples:
-            bag = set(features(text))
+            bag = set(features(text, feature_version))
             if violates:
                 n_v += 1
                 for t in bag:
@@ -557,8 +823,20 @@ class FallbackModel:
                 n_c += 1
                 for t in bag:
                     c_counts[t] = c_counts.get(t, 0) + 1
+        # SEEN MEANS SEEN USED, NOT SEEN MENTIONED (format 2). The vocabulary
+        # answers verdict()'s coverage question -- "have I seen this kind of
+        # language before" -- and a word witnessed only inside describe-frames
+        # has been seen DISCUSSED, never seen in the mouth of an actor. So a
+        # "d:" single does not enter the vocabulary; the word earns familiarity
+        # from its bare (or negated) occurrences alone. This is what puts the
+        # coverage knob back to work on record-shaped text: the report register
+        # ("discrepancy", "misconduct") stays unfamiliar until acts have used
+        # it, and a seat like Vela (min_coverage 0.80) defers on it rather than
+        # convicting. No format-1 feature starts with "d:", so this line is
+        # inert for format 1.
         vocab = sorted(t for t, n in doc_freq.items()
-                       if " " not in t and n >= MIN_DOC_FREQ)
+                       if " " not in t and n >= MIN_DOC_FREQ
+                       and not t.startswith("d:"))
         weights = {}
         for t in set(v_counts) | set(c_counts):
             if not _informative(t) or doc_freq.get(t, 0) < MIN_DOC_FREQ:
@@ -579,7 +857,8 @@ class FallbackModel:
         prior = math.log((n_v + 1.0) / (n_c + 1.0))
         m = cls({"weights": weights, "vocab": vocab, "n_examples": n_v + n_c,
                  "n_violates": n_v, "prior": round(prior, 4),
-                 "sources": sources, "trained_at": trained_at})
+                 "sources": sources, "trained_at": trained_at,
+                 "feature_version": feature_version})
         return m
 
     # -- learning more, rather than being rebuilt ---------------------------
@@ -644,6 +923,14 @@ class FallbackModel:
 
         m = cls({"weights": new_w,
                  "vocab": fresh.vocab,
+                 # The refined model carries the FRESH format: its vocabulary
+                 # and every feature learned tonight are that format's, and a
+                 # predecessor's surviving weights are bare words both formats
+                 # emit for unframed text. A format-1 ancestor's beliefs are
+                 # not erased -- they fade or sharpen by `step` exactly as any
+                 # other night's -- but what the seat READS from tonight on is
+                 # what tonight's training fitted.
+                 "feature_version": fresh.feature_version,
                  "n_examples": fresh.n_examples,
                  "n_violates": fresh.n_violates,
                  "prior": fresh.prior,
@@ -674,6 +961,12 @@ class FallbackModel:
             v = getattr(self, k, None)
             if v is not None:
                 body[k] = v
+        # The format survives the write for the same reason the lineage does:
+        # a model that cannot say which extractor fitted its weights would be
+        # scored under the wrong one after a reload. Format 1 is the absent
+        # default, so a format-1 file round-trips without gaining a field.
+        if getattr(self, "feature_version", 1) != 1:
+            body["feature_version"] = self.feature_version
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(body, fh, indent=1, sort_keys=True)
 
@@ -707,8 +1000,24 @@ class FallbackModel:
         if not toks:
             return 0.0, 0.0, 0
         word_bag = set(toks)
+        if self.feature_version >= 2:
+            # CONTENT WORDS ONLY (format 2). Coverage answers "have I seen
+            # this kind of language before", and "the", "from" and "into" are
+            # every text's padding: a record whose register is a quarter
+            # unfamiliar still counted as familiar because its grammar words
+            # did. Measured 2026-09-28: the incident-review shape reads 82%
+            # covered with function words in the denominator and 75% without
+            # them, and 0.80 is exactly the coverage a deferring seat (Vela)
+            # runs at -- so this is the difference between her convicting an
+            # incident report and deferring on it. A text of nothing but
+            # function words has no content to be familiar WITH: coverage 0,
+            # which abstains, alleging nothing.
+            word_bag = {t for t in word_bag if t not in STOPWORDS}
+            if not word_bag:
+                return 0.0, 0.0, 0
         known_words = [t for t in word_bag if self.seen(t)]
-        feats = [f for f in set(features(text)) if f in self.weights]
+        feats = [f for f in set(features(text, self.feature_version))
+                 if f in self.weights]
         s = self.prior + sum(self.weights[f] for f in feats)
         return s, (len(known_words) / float(len(word_bag))), len(feats)
 
@@ -744,13 +1053,14 @@ class FallbackModel:
         in ten beyond the reach of any amount of appended text. It costs 6% of
         legitimate clears, which become ABSTENTIONS and therefore deferrals,
         not accusations."""
-        return sum(w for f in set(features(text))
+        return sum(w for f in set(features(text, self.feature_version))
                    for w in (self.weights.get(f, 0.0),) if w > 0)
 
     def incriminating(self, text: str) -> List[Tuple[str, float]]:
         """Features present in this text that are, alone, evidence of a
         violation. Sorted heaviest first."""
-        found = [(f, self.weights[f]) for f in set(features(text))
+        found = [(f, self.weights[f])
+                 for f in set(features(text, self.feature_version))
                  if self.weights.get(f, 0.0) >= DAMNING]
         return sorted(found, key=lambda kv: -kv[1])
 

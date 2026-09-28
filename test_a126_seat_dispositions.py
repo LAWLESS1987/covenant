@@ -202,10 +202,35 @@ def main():
     check("A126.M2 raising the bar never RAISES the right-answer count -- a "
           "higher threshold can only turn a conviction into a deferral",
           m30[0] <= base[0] and m35[0] <= base[0], (base[0], m30[0], m35[0]))
-    check("A126.M3 coverage 0.80 DOES reduce false convictions, and the price "
-          "is fewer right answers and more deferrals -- stated, not hidden",
-          c80[1] < base[1] and c80[0] < base[0] and c80[3] > base[3],
-          (base, c80))
+    # RETRACTED AND RESTATED 2026-09-28 -- retraction A242, the as-written claim
+    # preserved on branch a126-m3-coverage-claim-as-written-2026-09-28. M3 as
+    # written demanded that coverage 0.80 STRICTLY remove false convictions on
+    # every model. The first feature-format-2 candidate measured base
+    # (41, 1, 0, 11): one false conviction at base cannot strictly decrease, so
+    # the check failed every candidate at least that good, forever -- the A145
+    # disease again, a claim pinning one model's tally shape. The durable
+    # finding is the temperament's DIRECTION: raising the coverage bar never
+    # manufactures certainty. It may no longer have false convictions to
+    # remove; it must never add one, never clear one wrongly, never add a
+    # right answer, and never take a deferral away.
+    def manufactures(lo, hi):
+        """Did raising coverage move any tally the wrong way? (falsifiable:
+        M3c below feeds it tallies that must fail.)"""
+        return hi[1] > lo[1] or hi[2] > lo[2] or hi[0] > lo[0] or hi[3] < lo[3]
+
+    check("A126.M3 coverage 0.80 never manufactures certainty: false "
+          "convictions and false clears never rise, right answers never rise, "
+          "deferrals never fall (A242)",
+          not manufactures(base, c80), (base, c80))
+    check("A126.M3c ...and the predicate CAN fail: a tally where 0.80 ADDED a "
+          "false conviction, cleared one wrongly, gained a right answer, or "
+          "shed a deferral is reported",
+          manufactures((38, 5, 0, 8), (38, 6, 0, 8))
+          and manufactures((38, 5, 0, 8), (38, 5, 1, 8))
+          and manufactures((38, 5, 0, 8), (39, 5, 0, 8))
+          and manufactures((38, 5, 0, 8), (38, 5, 0, 7))
+          and not manufactures((38, 5, 0, 8), (35, 3, 0, 13)),
+          "added-fc / added-clear / gained-right / shed-deferral all fail; the in-use shape passes")
 
     # No threshold separates description from commission.
     m = FallbackModel.load(MODEL_UNDER_TEST)
@@ -215,12 +240,23 @@ def main():
         t = _payload_text(data)
         if m.verdict(t)[0] == "violates":
             (true_scores if expect else false_scores).append(m.score(t)[0])
-    check("A126.M4 the distributions OVERLAP -- the worst false conviction "
-          "outscores the mildest true one, so no threshold could ever separate "
-          "describing a theft from doing one",
-          bool(false_scores) and max(false_scores) > min(true_scores),
-          (max(false_scores) if false_scores else None,
-           min(true_scores) if true_scores else None))
+    # RESTATED 2026-09-28 with M3 (retraction A242): as written this REQUIRED a
+    # false conviction to exist (bool(false_scores)), so a model that stopped
+    # convicting innocents altogether failed the check that documents why
+    # convicting innocents was hard to stop. When false convictions exist, the
+    # overlap finding is asserted over them, exactly as before; at zero there
+    # is no overlap to assert, and the zero is itself the finding, printed.
+    if false_scores:
+        check("A126.M4 the false convictions that exist OVERLAP the true ones "
+              "-- the worst outscores the mildest true conviction, so no "
+              "threshold separates describing a theft from doing one (A242)",
+              max(false_scores) > min(true_scores),
+              (max(false_scores), min(true_scores) if true_scores else None))
+    else:
+        check("A126.M4 no innocent is convicted at any score, so there is no "
+              "overlap left to document -- the zero is the finding (A242); "
+              "true convictions still exist to score",
+              bool(true_scores), (false_scores, len(true_scores)))
 
     # ---- Z: the line that must not move ------------------------------------
     check("A126.Z1 FALSE CLEARS STAY AT ZERO at every disposition measured. A "
