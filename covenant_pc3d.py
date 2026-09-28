@@ -57,12 +57,23 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 #talk button{background:#2E8B6E;color:#fff;border:0;border-radius:12px;padding:12px 16px;font:600 15px system-ui;cursor:pointer}
 #talk button:disabled{opacity:0.45;cursor:default}
 .copybtn{margin-left:8px;font-size:11px;padding:2px 7px;background:#1f6f5a;border:0;border-radius:6px;color:#fff;cursor:pointer;vertical-align:middle}
-/* 2026-09-28 ("idk why the chat stays on screen ... the whole thing needs refinement"): the conversation is a
-   see-through drawer on the LEFT, and the scene slides right while it is open, so no orb sits under text. */
-#answer{position:fixed;left:16px;top:92px;bottom:84px;width:min(420px,38vw);overflow:auto;background:rgba(14,28,45,.58);backdrop-filter:blur(8px);border:1px solid #2E8B6E44;border-radius:14px;padding:12px 14px;white-space:pre-wrap;display:none;scrollbar-width:thin}
+/* 2026-09-28 (his words: "the text should be a pop up window you can minimize and orbs should be centered around
+   mid screen"): the conversation is a floating window -- drag it by its title, minimise it to its title bar --
+   and the scene stays centred. It opens when something is said and stays where he put it. */
+#chatwin{position:fixed;left:16px;bottom:84px;width:min(440px,calc(100% - 32px));max-height:55vh;display:flex;flex-direction:column;background:rgba(14,28,45,.74);backdrop-filter:blur(8px);border:1px solid #2E8B6E55;border-radius:14px;box-shadow:0 8px 30px #0008;z-index:4}
+#chathead{display:flex;align-items:center;gap:6px;padding:7px 10px 7px 14px;cursor:move;user-select:none;font-size:13px;color:#9fc7b0}
+#chathead b{flex:1;font-weight:600}
+#chathead button{background:none;border:0;color:#cfe7d6;font-size:17px;line-height:1;cursor:pointer;padding:2px 7px;border-radius:6px}
+#chathead button:hover{background:#2E8B6E44}
+#answer{overflow:auto;padding:4px 14px 12px;white-space:pre-wrap;display:none;scrollbar-width:thin;border-top:1px solid #2E8B6E33}
+#chatwin.min #answer{display:none!important}
 #answer .ln{margin:0 0 8px}#answer .you{color:#9fc7b0}#answer .heal{color:#e3c878}
-@media (max-width:760px){#answer{top:auto;width:auto;right:16px;max-height:32vh}}
 body.nochat #answer{display:none!important}
+body.nochat #chatwin{display:none}
+#panel.min #info{display:none}
+#info{max-height:min(52vh,calc(100vh - 260px));overflow:auto;scrollbar-width:thin}
+#panel h3{display:flex;align-items:center}#panel h3 span{flex:1}
+#panel h3 button{background:none;border:0;color:#cfe7d6;font-size:16px;cursor:pointer;padding:0 4px}
 #legend{position:fixed;right:16px;bottom:84px;background:rgba(14,28,45,.58);backdrop-filter:blur(6px);border:1px solid #2E8B6E44;border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.7;pointer-events:none}
 #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:-1px}
 #tip{position:fixed;pointer-events:none;display:none;background:rgba(14,28,45,.85);border:1px solid #2E8B6E66;border-radius:10px;padding:6px 10px;font-size:13px;white-space:pre;z-index:5}#nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
@@ -70,8 +81,8 @@ body.nochat #answer{display:none!important}
 <canvas id="scene"></canvas>
 <div id="nolib"><div>The 3D library could not be loaded (no internet on this PC right now). The symbol, the state and the talk box still work below.</div></div>
 <div id="hud">__SYMBOL__<div class="t"><b>Tetsu · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small></div></div>
-<div id="panel"><h3><span id="ptitle">What you clicked</span></h3><div id="info">hover an orb to see why it is its colour; click it for the details</div></div>
-<div id="answer"></div><div id="tip"></div>
+<div id="panel"><h3><span id="ptitle">What you clicked</span><button id="pmin" title="minimise">–</button></h3><div id="info">hover a planet to see why it is its colour; click it (or its name) for the details</div></div>
+<div id="chatwin" class="min"><div id="chathead"><b>Conversation <span id="chatn"></span></b><button id="chatmin" title="open / minimise (Esc)">▢</button><button id="chatx" title="close (the Show chat button brings it back)">×</button></div><div id="answer"></div></div><div id="tip"></div>
 <div id="legend"><b>Colour code</b> (the glow around each planet)<br><i style="background:#2E8B6E"></i>green: measured fine<br><i style="background:#C9A227"></i>amber: not known, or waiting on someone<br><i style="background:#C0392B"></i>red, pulsing: needs attention<br><i style="background:#F4E9B0"></i>small lights: bots, carrying both ways</div>
 <div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="chatbtn" title="hide the conversation to see and click every orb; nothing is lost">Hide chat</button><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
 <script>
@@ -87,7 +98,23 @@ function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitc
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
 // opens with the earlier exchanges from this address read back from the log (/pc/3d/history).
-function line(who,text){const a=document.getElementById('answer');a.style.display='block';const d=document.createElement('div');d.className='ln '+who;d.textContent=(who==='you'?'you: ':(who==='heal'?'heal: ':'Tetsu: '))+text;a.appendChild(d);a.scrollTop=a.scrollHeight;return d;}
+function line(who,text){const a=document.getElementById('answer');a.style.display='block';const d=document.createElement('div');d.className='ln '+who;d.textContent=(who==='you'?'you: ':(who==='heal'?'heal: ':'Tetsu: '))+text;a.appendChild(d);a.scrollTop=a.scrollHeight;document.getElementById('chatn').textContent='· '+a.children.length;return d;}
+// THE WINDOW: minimise to the title bar, drag by the title, and it remembers both (this browser only)
+const win=document.getElementById('chatwin'),mini=document.getElementById('chatmin');
+function store(k,v){try{localStorage.setItem(k,v);}catch(e){}}function recall(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function setMin(m){win.classList.toggle('min',m);mini.textContent=m?'▢':'–';store('pc3d.min',m?'1':'0');if(!m){const a=document.getElementById('answer');a.scrollTop=a.scrollHeight;}}
+function openChat(){document.body.classList.remove('nochat');document.getElementById('chatbtn').textContent='Hide chat';setMin(false);}
+mini.onclick=()=>setMin(!win.classList.contains('min'));
+document.getElementById('chatx').onclick=()=>document.getElementById('chatbtn').click();
+setMin(recall('pc3d.min')!=='0');
+(function(){const p=recall('pc3d.pos');if(p){try{const [x,y]=JSON.parse(p);win.style.left=Math.max(0,Math.min(x,innerWidth-120))+'px';win.style.top=Math.max(0,Math.min(y,innerHeight-40))+'px';win.style.bottom='auto';}catch(e){}}})();
+document.getElementById('chathead').addEventListener('pointerdown',e=>{if(e.target.tagName==='BUTTON')return;const r=win.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;
+ const mv=ev=>{const x=Math.max(0,Math.min(ev.clientX-dx,innerWidth-120)),y=Math.max(0,Math.min(ev.clientY-dy,innerHeight-40));win.style.left=x+'px';win.style.top=y+'px';win.style.bottom='auto';};
+ const up=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);const r2=win.getBoundingClientRect();
+  if(Math.hypot(r2.left-r.left,r2.top-r.top)<4){mini.click();return;}   // a click on the title, not a drag: open / minimise
+  store('pc3d.pos',JSON.stringify([r2.left,r2.top]));};
+ addEventListener('pointermove',mv);addEventListener('pointerup',up);});
+document.getElementById('pmin').onclick=()=>{const p=document.getElementById('panel');const m=p.classList.toggle('min');document.getElementById('pmin').textContent=m?'▢':'–';};
 // COPY (his words, 2026-09-27, catching the PC app up to the other chat apps): a small
 // button on a finished Tetsu or heal line writes that line's own text to the clipboard --
 // nothing sent anywhere new, no judge involved, the same text already on screen.
@@ -101,7 +128,7 @@ let inflight=null;
 async function send(){
  const btn=document.getElementById('send');
  if(inflight){inflight.abort();return;}
- const q=document.getElementById('q');const t=q.value.trim();if(!t)return;q.value='';line('you',t);const pend=line('tetsu','thinking…');
+ const q=document.getElementById('q');const t=q.value.trim();if(!t)return;q.value='';openChat();line('you',t);const pend=line('tetsu','thinking…');
  const ctrl=new AbortController();inflight=ctrl;btn.textContent='Stop';
  try{
   const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
@@ -135,7 +162,7 @@ micSetup();
 // One press: the node runs covenant_heal, which runs the highway's own remedies
 // with the person's cooldown waived, and says what it fixed and what still needs him.
 async function heal(){const b=document.getElementById('heal');const a=document.getElementById('answer');
- b.disabled=true;const was=b.textContent;b.textContent='healing…';const hl=line('heal','looking at everything that can go wrong…');
+ b.disabled=true;const was=b.textContent;b.textContent='healing…';openChat();const hl=line('heal','looking at everything that can go wrong…');
  try{const r=await fetch('/m/heal',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const j=await r.json();
   let t=j.summary||'no answer';
   if(j.fixed&&j.fixed.length)t+='\\n\\nFIXED:\\n'+j.fixed.map(x=>'  '+x.condition).join('\\n');
@@ -148,8 +175,8 @@ async function heal(){const b=document.getElementById('heal');const a=document.g
  b.disabled=false;b.textContent=was;}
 document.getElementById('heal').onclick=heal;
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
-// keys: Esc shows/hides the conversation, / jumps to the talk box
-addEventListener('keydown',e=>{const typing=document.activeElement&&document.activeElement.id==='q';if(e.key==='Escape'){if(typing)document.activeElement.blur();else document.getElementById('chatbtn').click();}else if(e.key==='/'&&!typing){e.preventDefault();document.getElementById('q').focus();}});
+// keys: Esc opens/minimises the conversation window, / jumps to the talk box
+addEventListener('keydown',e=>{const typing=document.activeElement&&document.activeElement.id==='q';if(e.key==='Escape'){if(typing)document.activeElement.blur();else mini.click();}else if(e.key==='/'&&!typing){e.preventDefault();document.getElementById('q').focus();}});
 getState();setInterval(getState,15000);loadHistory();
 </script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
@@ -222,27 +249,34 @@ const traders=[],botGeo=new THREE.SphereGeometry(0.04,8,8);let hovered=null;
 window.onState=layout;setTimeout(layout,2500);
 const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
 function fmt(o){return o==null?'(not on record)':(typeof o==='object'?JSON.stringify(o,null,1).replace(/[{}"]/g,'').replace(/^\\s*\\n/gm,''):String(o));}
-// the planets only: atmospheres and swarms are children or neighbours and must not steal the pick
-function pick(e){ptr.x=(e.clientX/innerWidth)*2-1;ptr.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(ptr,cam);return ray.intersectObjects(orbs,false)[0];}
+// CLICKING (his words, 2026-09-28: "the click feature needs refinement ... its not directly on the orbs"): a ray
+// through a 0.45-unit sphere seen from 9.5 units away was a target a few dozen pixels wide, and the name above it
+// was not a target at all. Now the pick is on the SCREEN: the nearest planet whose drawn disc (plus a 22 px
+// margin) or whose name label is under the pointer.
+const _v=new THREE.Vector3();
+function pick(e){const k=(innerHeight/2)/Math.tan(cam.fov*Math.PI/360);let best=null,bd=1e9;
+ for(const o of orbs){_v.copy(o.position).project(cam);if(_v.z>1)continue;const sx=(_v.x+1)/2*innerWidth,sy=(1-_v.y)/2*innerHeight;const dist=cam.position.distanceTo(o.position);
+  const r=0.45*o.scale.x*k/dist,d=Math.hypot(e.clientX-sx,e.clientY-sy);let score=d<r+22?d-r:1e9;
+  if(o!==tetsu){_v.copy(o.position).add(new THREE.Vector3(0,0.85,0)).project(cam);const lx=(_v.x+1)/2*innerWidth,ly=(1-_v.y)/2*innerHeight;if(Math.abs(e.clientX-lx)<1.1*k/dist&&Math.abs(e.clientY-ly)<0.3*k/dist)score=Math.min(score,0);}
+  if(score<bd){bd=score;best=o;}}
+ return best?{object:best}:null;}
+const sel=new THREE.Mesh(new THREE.RingGeometry(0.6,0.66,64),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.85,side:THREE.DoubleSide,depthWrite:false}));sel.visible=false;scene.add(sel);let selName=null;
 const tip=document.getElementById('tip');
 function hoverScale(o,on){o.scale.setScalar((o===tetsu?1.5:1)*(on?1.15:1));}
 canvas.addEventListener('pointermove',e=>{const h=pick(e),o=h?h.object:null;if(o!==hovered){if(hovered)hoverScale(hovered,false);hovered=o;if(o)hoverScale(o,true);canvas.style.cursor=o?'pointer':'default';}
  if(o){tip.style.display='block';tip.textContent=o.userData.name+(o.userData.sub?'\\n'+o.userData.sub:'')+'\\nclick for details';tip.style.left=Math.min(e.clientX+14,innerWidth-260)+'px';tip.style.top=(e.clientY+14)+'px';}else tip.style.display='none';});
 canvas.addEventListener('pointerleave',()=>{tip.style.display='none';});
-canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};document.getElementById('ptitle').textContent=u.name;
+canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};document.getElementById('ptitle').textContent=u.name;selName=u.name;const pn=document.getElementById('panel');if(pn.classList.contains('min'))document.getElementById('pmin').click();
 if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent===u.name)info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
 if(u.name==='Tetsu'){info.textContent='Tetsu — the one you talk with.\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');}
 else if(u.kind==='node'){const x=u.detail||{};if(x.peer){info.textContent=u.name+'\\n'+x.peer+'\\n'+x.note;}else{info.textContent=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN':'');}}
 else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last sends (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
 else{info.textContent=u.name+'\\n'+fmt(u.detail);}});
-// the scene slides right, smoothly, while the conversation drawer is open on the left
-let off=0;const drawer=document.getElementById('answer');
-function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.setViewOffset(innerWidth,innerHeight,-off,0,innerWidth,innerHeight);}addEventListener('resize',resize);resize();
+function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
 let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.userData.swarm.position.y=tetsu.position.y;tetsu.rotation.y+=0.004;
  for(const o of orbs){if(o!==tetsu)o.rotation.y-=0.003;const sw=o.userData.swarm;sw.rotation.y+=sw.userData.speed;if(o.userData.bad)o.userData.atmo.material.opacity=0.2+0.3*(0.5+0.5*Math.sin(t*5));}
  for(const b of traders){const k=(t*0.35+b.userData.ph)%1;b.position.lerpVectors(b.userData.from,b.userData.to,k);}
- const open=drawer.style.display==='block'&&!document.body.classList.contains('nochat')&&innerWidth>760;const target=open?Math.min(420,innerWidth*0.38)/2+8:0;
- if(Math.abs(target-off)>0.5){off+=(target-off)*0.1;cam.setViewOffset(innerWidth,innerHeight,-off,0,innerWidth,innerHeight);}
+ const so=selName&&orbs.find(o=>o.userData.name===selName);sel.visible=!!so;if(so){sel.position.copy(so.position);sel.quaternion.copy(cam.quaternion);sel.scale.setScalar(so.scale.x);}
  cam.position.x=Math.sin(t*0.15)*9.5;cam.position.z=Math.cos(t*0.15)*9.5;cam.lookAt(0,-1.6,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
 }
 </script>
