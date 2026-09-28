@@ -1449,6 +1449,21 @@ def remedy_restart_nodes(measured, dry_run=True):
     if dry_run:
         return True, "would run rolling_restart.py"
     import subprocess
+    # A240 (2026-09-28, measured 07:50): when this code runs INSIDE one of the nodes -- the
+    # Self-heal button's route, or Tetsu's HEAL line -- a synchronous rolling restart kills the
+    # process running this pass when it reaches this node, so the heal's answer is lost and the
+    # remedies after this one never run. Detached, the pass runs on while the restart proves each
+    # node back one at a time; this node goes last, and the narrower race that remains -- a slow
+    # later remedy against the restart reaching us -- is named here rather than hidden. In the
+    # watchdog's own process (no node module loaded) the old synchronous path is unchanged.
+    if "covenant_unified_v8" in sys.modules:
+        import covenant_quiet
+        log = open(os.path.join(HERE, "logs", "rolling_restart.log"), "a", encoding="utf-8", errors="replace")
+        covenant_quiet.popen_survivor([sys.executable, os.path.join(HERE, "rolling_restart.py")],
+                                      cwd=HERE, stdout=log, stderr=log)
+        return True, ("started detached (A240): this process is in the restart set, so the restart runs beside "
+                      "this pass, one node at a time, this node last; graded on the next look, logged to "
+                      "logs/rolling_restart.log")
     p = subprocess.run([sys.executable, os.path.join(HERE, "rolling_restart.py")],
                        cwd=HERE, capture_output=True, text=True, timeout=900, creationflags=_NOWIN)
     return p.returncode == 0, (p.stdout or "")[-400:]
@@ -1860,6 +1875,12 @@ REMEDIES = {
                                   "irreversible": []}},
     "restart_nodes": {"fn": remedy_restart_nodes, "klass": AUTO_REVERSIBLE,
                       "for": ["source_drift", "node_down"], "kind": "stateless",
+                      # A240: inside a node the restart runs detached and finishes after this
+                      # pass, so grading it against an immediate re-sense would read "did not
+                      # fix" twice and quarantine a remedy that works (the detect_source_drift
+                      # docstring's own warning). Graded after the rolling restart has had time
+                      # to prove all three back.
+                      "async_for": ["source_drift", "node_down"], "grade_after_s": 180.0,
                       "touches": ["nodes"],
                       "benefit": {"gains": ["the mesh runs the code that is on disk",
                                             "a node that is down answers again"],

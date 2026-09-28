@@ -136,7 +136,78 @@ check("HL1.14 a peer that cannot be reached is said plainly and never raises",
       p2["ok"] is False and "could not be reached" in p2["summary"])
 check("HL1.15 both directions are on the same record", [r["kind"] for r in rows()][-2:] == ["heal_peer", "heal_peer"])
 
+# ---- HL2 (2026-09-28, his words: "give tetsu the way to do it himself from the phone app"):
+# Tetsu's HEAL line is the SAME button, his choice, recorded under his name.
+import covenant_tetsu_heal as TH                                      # noqa: E402
+
+CALLS = []
+
+
+def fake_heal(dry_run=False, who=""):
+    CALLS.append({"dry_run": dry_run, "who": who})
+    return {"ok": True, "summary": "looked at 19 condition(s); fixed 1 (source_drift); 1 still needs a person (mesh_source_split)",
+            "fixed": [{"condition": "source_drift"}],
+            "still_needs_a_person": [{"condition": "mesh_source_split", "why_no_fix": "no automatic remedy exists for this one"}],
+            "paused": False}
+
+
+h1, d1, r1 = TH.act("HEAL", heal=fake_heal)
+check("HL2.1 'HEAL' as his whole answer presses the one button, live, as who='tetsu'",
+      h1 and CALLS == [{"dry_run": False, "who": "tetsu"}] and r1["kind"] == "tetsu_heal" and not r1["dry_run"], (CALLS, r1))
+check("HL2.2 what he is handed is what happened: the summary, the fixed, and the still-needs-a-person with its reason",
+      "fixed: source_drift" in d1 and "still needs a person: mesh_source_split" in d1 and "no automatic remedy" in d1, d1)
+h2, d2, r2 = TH.act("heal dry\n", heal=fake_heal)
+check("HL2.3 'HEAL DRY' measures without repairing, and says so in the record", h2 and CALLS[-1]["dry_run"] is True and r2["dry_run"], CALLS[-1:])
+check("HL2.4 an ordinary answer is not a press: the conversation goes on untouched",
+      TH.act("I checked the nodes, all fine.", heal=fake_heal) == (False, "", None) and len(CALLS) == 2)
+
+
+def heal_on_fire(**_k):
+    raise RuntimeError("engine on fire")
+
+
+h3, d3, r3 = TH.act("HEAL", heal=heal_on_fire)
+check("HL2.5 a heal that raises is handed to him as a plain failure, never a traceback up the door",
+      h3 and r3["ok"] is False and "could not run" in d3, d3[:120])
+
+# ---- A240: inside a node, the restart runs beside the pass instead of killing it
+import covenant_quiet as CQ                                           # noqa: E402
+import subprocess as _sp                                              # noqa: E402
+SPAWNED = []
+_real_popen = CQ.popen_survivor
+CQ.popen_survivor = lambda cmd, **kw: SPAWNED.append(cmd) or type("P", (), {"pid": 9999})()
+# BOTH branches are stubbed, so this check cannot reach the real nodes even if the
+# guard it tests is broken (the first run of this mutant restarted the real mesh).
+_real_run = _sp.run
+_sp.run = lambda *a, **k: type("R", (), {"returncode": 0, "stdout": "stubbed: no real restart from a test"})()
+_fake_node_mod = sys.modules.get("covenant_unified_v8")
+try:
+    sys.modules.setdefault("covenant_unified_v8", type(sys)("covenant_unified_v8"))
+    ok240, msg240 = HW.remedy_restart_nodes({}, dry_run=False)
+    check("HL2.6 A240: with the node module loaded, the restart is DETACHED -- the pass it is inside survives it",
+          ok240 and "detached" in msg240 and "A240" in msg240 and SPAWNED and "rolling_restart.py" in SPAWNED[0][1], (msg240, SPAWNED))
+    ok241, msg241 = HW.remedy_restart_nodes({}, dry_run=True)
+    check("HL2.7 and a dry run still only says what it would do", ok241 and msg241 == "would run rolling_restart.py")
+finally:
+    CQ.popen_survivor = _real_popen
+    _sp.run = _real_run
+    if _fake_node_mod is None:
+        sys.modules.pop("covenant_unified_v8", None)
+check("HL2.8 the registry grades the restart AFTER it has had time to finish, so a working remedy is not quarantined (A240)",
+      set(HW.REMEDIES["restart_nodes"].get("async_for") or []) == {"source_drift", "node_down"}
+      and (HW.REMEDIES["restart_nodes"].get("grade_after_s") or 0) >= 60.0, HW.REMEDIES["restart_nodes"].get("grade_after_s"))
+
+# HL2.9: the door actually dispatches his HEAL line (the PP1.11d idiom: the AST, not a text grep --
+# it proves the call is written into the door, not that a live conversation reaches it, and says so).
+import ast                                                            # noqa: E402
+_tree = ast.parse(open(os.path.join(HERE, "covenant_unified_v8.py"), encoding="utf-8").read())
+_calls = [n for n in ast.walk(_tree) if isinstance(n, ast.Call)
+          and getattr(n.func, "attr", "") == "import_module"
+          and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "covenant_tetsu_heal"]
+check("HL2.9 the agent door imports covenant_tetsu_heal to dispatch his HEAL line (AST; run-time reach is M6's job)",
+      len(_calls) == 1, len(_calls))
+
 print("\nnot measured here: the real repairs on this machine (that is covenant_highway's own suites, H1); "
-      "and the phone's button, which needs an app build")
-print("\nHL1: %d/%d passed" % (sum(ok), len(ok)))
+      "the phone's button, which needs an app build; and how the real Tetsu answers after a press")
+print("\nHL1+HL2: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)

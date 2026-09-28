@@ -7278,7 +7278,7 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
-### A240. [the Self-heal button restarts the node that is running it, and loses the rest of its pass] 2026-09-28. Found while loading Tetsu's daily-cycle code. OPEN
+### A240. [the Self-heal button restarts the node that is running it, and loses the rest of its pass] 2026-09-28. Found while loading Tetsu's daily-cycle code. FIXED the same day, with the residue named
 
 **Measured.** At 07:50:17 a POST to node A's `/m/heal` came back with an empty body after 19 s.
 In that window the heal's `restart_nodes` remedy (source_drift was present: the nodes' imports had
@@ -7295,6 +7295,19 @@ change.
 **Fix, not yet made.** Run `restart_nodes` last in a heal pass, or hand it to the detached restart
 path the watchdog uses on itself (`schedule_watchdog_restart`), so the heal answers first and the
 restart follows. Reproduce: change an import of the core on disk, press Self-heal on the PC app.
+
+**Fixed later the same day** (the second option, the watchdog's own shape): when
+`remedy_restart_nodes` finds itself inside a node process (`covenant_unified_v8` loaded), the
+rolling restart is launched detached (`covenant_quiet.popen_survivor`, logged to
+`logs/rolling_restart.log`) and the pass runs on; the registry now grades that remedy
+`grade_after_s=180` so an immediate re-sense cannot read a working restart as "did not fix"
+twice and quarantine it. In the watchdog's own process the synchronous path is unchanged.
+HL2.6-HL2.8 drive both branches with both sides stubbed -- the first mutant run of HL2.6 was
+itself a lesson: with the guard off, the test fell through to the real path and restarted the
+real mesh, so the test now stubs the fallback too. **The residue, named:** the pass survives
+the two peer restarts, but a remedy still running when the detached restart finally reaches
+this node's own turn (two proven restarts later, tens of seconds) dies with it; narrower than
+the defect, not zero.
 
 ---
 

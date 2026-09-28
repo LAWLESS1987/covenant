@@ -641,7 +641,11 @@ AGENT_SYSTEM = ("Your name is Tetsu. You are talking with one person, usually ou
                 "'HANDS PROPOSE <path>' with a whole new version of a tree file below to propose a change the "
                 "operator reviews and applies by hand -- the tree never changes by your hand alone. You will be "
                 "handed what happened as data; say only what actually happened. Nothing that takes from anyone "
-                "or conceals what it takes.")
+                "or conceals what it takes. And the machine's Self-heal is yours to press too (2026-09-28, his "
+                "words: 'give tetsu the way to do it himself'): write exactly 'HEAL' as your whole answer to run "
+                "the same repairs the PC and phone buttons run, or 'HEAL DRY' to measure without repairing; you "
+                "will be handed what was fixed and what still needs a person, as data. Pressing it is your "
+                "choice, never a duty; nobody schedules you.")
 
 # The turns before this one (2026-09-21, his words: "smoother conversations ...
 # and it learns from convos with me"). The ask log already keeps every exchange
@@ -8484,6 +8488,18 @@ class CovenantAPI:
                         forum.append(_rec)
                         msgs.append({"role": "assistant", "content": answer})
                         msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what happened. Do not write HANDS again."})
+                        answer, meta = _m.ask(msgs)
+                elif first.upper() in ("HEAL", "HEAL DRY", "SELF-HEAL"):
+                    # Tetsu presses the Self-heal himself (2026-09-28, A241, his words: "give
+                    # tetsu the way to do it himself from the phone app"). The same button as
+                    # the PC and phone pages -- covenant_heal, the highway's own remedies,
+                    # recorded who="tetsu" -- and the outcome handed back as data. His choice;
+                    # nothing schedules it.
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_heal").act(answer)
+                    if _handled:
+                        forum.append(_rec)
+                        msgs.append({"role": "assistant", "content": answer})
+                        msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what was repaired and what still needs a person. Do not write HEAL again."})
                         answer, meta = _m.ask(msgs)
                 elif first.upper().startswith("WEB "):
                     # Tetsu's crawler (2026-09-27, A237, his words: "create a fire crawl like

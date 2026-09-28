@@ -79,6 +79,18 @@ def main():
               and "covenant_unrelated" in W.runtime_import_set(td))
         check("A153.4 an empty tree answers None, never a hash of nothing", W.disk_imports_sha12(os.path.join(td, "nope")) is None)
 
+    # A153.7 (2026-09-28): a module the node reaches only THROUGH a named module (covenant_council ->
+    # covenant_pc3d) is in the population, and its change moves the fingerprint.
+    with tempfile.TemporaryDirectory() as td:
+        tree(td, "import covenant_council\n", "", {"covenant_council": 'importlib.import_module("covenant_pc3d")\n',
+                                                     "covenant_pc3d": "PAGE = 1\n", "covenant_unrelated": "E = 1\n"})
+        names7 = W.runtime_import_set(td)
+        h7 = W.disk_imports_sha12(td)
+        with open(os.path.join(td, "covenant_pc3d.py"), "w", encoding="utf-8") as fh:
+            fh.write("PAGE = 2\n")
+        check("A153.7 a module reached through a named module is in the set, and its change is drift",
+              names7 == ["covenant_council", "covenant_pc3d"] and W.disk_imports_sha12(td) != h7, names7)
+
     # THE VERDICT LINE, both ways.
     src, imp = "abc123abc123", "def456def456"
     check("A153.5 source stale is still reported first, in the words rolling_restart always used",
@@ -95,6 +107,7 @@ def main():
     # LIVE, if a tree is here: the real node file names at least the module that bit.
     names = W.runtime_import_set()
     check("A153.6 the real tree's named set includes covenant_daily_plan (the module that bit on 2026-09-19)", "covenant_daily_plan" in names, names)
+    check("A153.6b ...and covenant_pc3d, the PC app page that went stale unseen on 2026-09-28", "covenant_pc3d" in names, len(names))
 
     n, good = len(results), sum(results)
     print("\nA153: %d/%d passed" % (good, n))

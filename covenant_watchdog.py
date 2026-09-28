@@ -515,6 +515,24 @@ def runtime_import_set(root=None):
             n = a or b
             if n and n != "covenant_unified_v8":
                 names.add(n)
+    # AND WHAT THOSE IMPORT (2026-09-28, his words: "Get everything running ... add it to the self heal
+    # button"). Measured that morning: the node served the PC app page it imported at start after the
+    # page changed on disk, and nothing saw it -- covenant_pc3d is imported by covenant_council, which
+    # the node names, not by the node file itself. So the population is the closure: every covenant_
+    # module reachable from the node file and the launcher that exists here, bounded.
+    todo = sorted(names)
+    while todo and len(names) < 400:
+        n = todo.pop()
+        try:
+            with open(os.path.join(root, n + ".py"), "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        for a, b in _IMPORT_PAT.findall(text):
+            m = a or b
+            if m and m != "covenant_unified_v8" and m not in names and os.path.exists(os.path.join(root, m + ".py")):
+                names.add(m)
+                todo.append(m)
     return sorted(names)
 
 
