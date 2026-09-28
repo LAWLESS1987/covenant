@@ -57,16 +57,22 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 #talk button{background:#2E8B6E;color:#fff;border:0;border-radius:12px;padding:12px 16px;font:600 15px system-ui;cursor:pointer}
 #talk button:disabled{opacity:0.45;cursor:default}
 .copybtn{margin-left:8px;font-size:11px;padding:2px 7px;background:#1f6f5a;border:0;border-radius:6px;color:#fff;cursor:pointer;vertical-align:middle}
-#answer{position:fixed;left:16px;right:16px;bottom:84px;max-height:38vh;overflow:auto;background:#10203390;backdrop-filter:blur(6px);border:1px solid #2E8B6E55;border-radius:14px;padding:12px 14px;white-space:pre-wrap;display:none}
+/* 2026-09-28 ("idk why the chat stays on screen ... the whole thing needs refinement"): the conversation is a
+   see-through drawer on the LEFT, and the scene slides right while it is open, so no orb sits under text. */
+#answer{position:fixed;left:16px;top:92px;bottom:84px;width:min(420px,38vw);overflow:auto;background:rgba(14,28,45,.58);backdrop-filter:blur(8px);border:1px solid #2E8B6E44;border-radius:14px;padding:12px 14px;white-space:pre-wrap;display:none;scrollbar-width:thin}
 #answer .ln{margin:0 0 8px}#answer .you{color:#9fc7b0}#answer .heal{color:#e3c878}
+@media (max-width:760px){#answer{top:auto;width:auto;right:16px;max-height:32vh}}
 body.nochat #answer{display:none!important}
-#nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
+#legend{position:fixed;right:16px;bottom:84px;background:rgba(14,28,45,.58);backdrop-filter:blur(6px);border:1px solid #2E8B6E44;border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.7;pointer-events:none}
+#legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:-1px}
+#tip{position:fixed;pointer-events:none;display:none;background:rgba(14,28,45,.85);border:1px solid #2E8B6E66;border-radius:10px;padding:6px 10px;font-size:13px;white-space:pre;z-index:5}#nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
 </style></head><body>
 <canvas id="scene"></canvas>
 <div id="nolib"><div>The 3D library could not be loaded (no internet on this PC right now). The symbol, the state and the talk box still work below.</div></div>
 <div id="hud">__SYMBOL__<div class="t"><b>Tetsu · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small></div></div>
-<div id="panel"><h3>What you clicked</h3><div id="info">click an orb: this node, its peers, or Tetsu</div></div>
-<div id="answer"></div>
+<div id="panel"><h3><span id="ptitle">What you clicked</span></h3><div id="info">hover an orb to see why it is its colour; click it for the details</div></div>
+<div id="answer"></div><div id="tip"></div>
+<div id="legend"><b>Colour code</b> (the glow around each planet)<br><i style="background:#2E8B6E"></i>green: measured fine<br><i style="background:#C9A227"></i>amber: not known, or waiting on someone<br><i style="background:#C0392B"></i>red, pulsing: needs attention<br><i style="background:#F4E9B0"></i>small lights: bots, carrying both ways</div>
 <div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="chatbtn" title="hide the conversation to see and click every orb; nothing is lost">Hide chat</button><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
 <script>
 const NODE='__NODE__';
@@ -76,7 +82,7 @@ const NODE='__NODE__';
 const PAGESHA='__PAGESHA__';
 let state=null, voice={pitch:0.8,rate:0.95};
 document.getElementById('chatbtn').onclick=()=>{const off=document.body.classList.toggle('nochat');document.getElementById('chatbtn').textContent=off?'Show chat':'Hide chat';};
-async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');}catch(e){document.getElementById('live').textContent='state unreadable';}}
+async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -134,11 +140,16 @@ async function heal(){const b=document.getElementById('heal');const a=document.g
   let t=j.summary||'no answer';
   if(j.fixed&&j.fixed.length)t+='\\n\\nFIXED:\\n'+j.fixed.map(x=>'  '+x.condition).join('\\n');
   if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='\\n\\nSTILL NEEDS YOU:\\n'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('\\n');
-  hl.textContent='heal: '+t;addCopy(hl,t);speak(j.summary||'');}
+  // the full list goes to the details panel (top right), not over the orbs; the conversation keeps one short line
+  const nf=(j.fixed||[]).length,nn=(j.still_needs_a_person||[]).length;
+  hl.textContent='heal: fixed '+nf+', '+nn+' still need you (the list is in the panel, top right)';addCopy(hl,t);
+  document.getElementById('ptitle').textContent='Self-heal';document.getElementById('info').textContent=t;speak(j.summary||'');}
  catch(e){hl.textContent='heal: could not be reached: '+e;}
  b.disabled=false;b.textContent=was;}
 document.getElementById('heal').onclick=heal;
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+// keys: Esc shows/hides the conversation, / jumps to the talk box
+addEventListener('keydown',e=>{const typing=document.activeElement&&document.activeElement.id==='q';if(e.key==='Escape'){if(typing)document.activeElement.blur();else document.getElementById('chatbtn').click();}else if(e.key==='/'&&!typing){e.preventDefault();document.getElementById('q').focus();}});
 getState();setInterval(getState,15000);loadHistory();
 </script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
@@ -150,13 +161,31 @@ const scene=new THREE.Scene();const cam=new THREE.PerspectiveCamera(55,1,0.1,100
 scene.add(new THREE.AmbientLight(0x9fc7b0,0.6));const key=new THREE.PointLight(0x4FB08E,1.4,30);key.position.set(3,4,4);scene.add(key);
 const stars=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(Array.from({length:1800},()=> (Math.random()-0.5)*60),3)),new THREE.PointsMaterial({color:0xF4F1EA,size:0.05}));scene.add(stars);
 const soil=new THREE.Mesh(new THREE.CircleGeometry(9,64),new THREE.MeshStandardMaterial({color:0x241A12}));soil.rotation.x=-Math.PI/2;soil.position.y=-1.6;scene.add(soil);
-const orbs=[];const geo=new THREE.SphereGeometry(0.45,48,48);
-function orb(name,color,x,z){const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:0.35,roughness:0.35}));m.position.set(x,0,z);m.userData={name};scene.add(m);orbs.push(m);return m;}
-const tetsu=orb('Tetsu',0x4FB08E,0,0);tetsu.scale.setScalar(1.5);
+// PLANETS (his words, 2026-09-28: "i'd like the orbs to be full planets with ecosystems inhabited by bot swarms aimed at
+// mutual benefit"). Each orb is a world painted from its own name (the same name, the same world, every load), wrapped
+// in an atmosphere of its STATUS colour; a swarm of bots circles it, and bots carry light both ways along its line to
+// Tetsu -- the exchange runs in both directions or it is not mutual. The status colour is still the measurement.
+const orbs=[];const geo=new THREE.SphereGeometry(0.45,48,48);const atmoGeo=new THREE.SphereGeometry(0.53,32,32);
+function rng(s){let h=2166136261;for(const ch of s)h=Math.imul(h^ch.charCodeAt(0),16777619);return()=>{h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);return((h^=h>>>16)>>>0)/4294967296;};}
+function world(name){const r=rng(name),c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');
+ const seas=['#1d4f7a','#17606e','#234a8a','#1b5d5a'],lands=['#3f8f4f','#5a8f3a','#7c8f45','#2f7a5a'];
+ g.fillStyle=seas[Math.floor(r()*4)];g.fillRect(0,0,256,128);const land=lands[Math.floor(r()*4)];
+ for(let i=0;i<14;i++){const x=r()*256,y=20+r()*88,s=8+r()*26;g.fillStyle=land;for(let k=0;k<7;k++){g.beginPath();g.arc(x+(r()-0.5)*s*1.6,y+(r()-0.5)*s,s*(0.35+r()*0.5),0,7);g.fill();}
+  g.fillStyle='#8a7a52';g.globalAlpha=0.35;g.beginPath();g.arc(x,y,s*0.3,0,7);g.fill();g.globalAlpha=1;}
+ g.fillStyle='#e8f1f2';g.fillRect(0,0,256,7);g.fillRect(0,121,256,7);
+ const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+function orb(name,color,x,z){const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:world(name),emissive:color,emissiveIntensity:0.12,roughness:0.8}));m.position.set(x,0,z);m.userData={name};
+ const atmo=new THREE.Mesh(atmoGeo,new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.2,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false}));m.add(atmo);m.userData.atmo=atmo;
+ const n=36,pos=new Float32Array(n*3),r=rng(name+'bots');for(let i=0;i<n;i++){const a=r()*6.283,b=Math.acos(2*r()-1),d=0.62+r()*0.14;pos[i*3]=d*Math.sin(b)*Math.cos(a);pos[i*3+1]=d*Math.cos(b);pos[i*3+2]=d*Math.sin(b)*Math.sin(a);}
+ const sw=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(pos,3)),new THREE.PointsMaterial({color:0xF4E9B0,size:0.035,depthWrite:false}));const swarm=new THREE.Group();swarm.add(sw);swarm.rotation.set(r()*1.2,0,r()*1.2);swarm.position.copy(m.position);swarm.userData.speed=0.004+r()*0.006;scene.add(swarm);m.userData.swarm=swarm;
+ scene.add(m);orbs.push(m);return m;}
+const tetsu=orb('Tetsu',0x4FB08E,0,0);tetsu.scale.setScalar(1.5);tetsu.userData.swarm.scale.setScalar(1.5);
 const svgBlob=new Blob([document.querySelector('#hud svg').outerHTML],{type:'image/svg+xml'});const url=URL.createObjectURL(svgBlob);
 new THREE.TextureLoader().load(url,tex=>{const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));s.scale.set(1.6,1.6,1);s.position.set(0,1.5,0);scene.add(s);});
 const links=new THREE.Group();scene.add(links);const labels=new THREE.Group();scene.add(labels);
-function label(text,pos,color){const c=document.createElement('canvas');c.width=512;c.height=96;const g=c.getContext('2d');g.font='600 40px system-ui,sans-serif';g.textAlign='center';g.fillStyle=color||'#E7F4EA';g.shadowColor='#000';g.shadowBlur=8;g.fillText(text.slice(0,26),256,64);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));s.scale.set(2.6,0.5,1);s.position.copy(pos).add(new THREE.Vector3(0,0.75,0));labels.add(s);}
+// every orb carries a second line: WHY it is the colour it is (2026-09-28, "still running the wrong color")
+function label(text,sub,pos,color){const c=document.createElement('canvas');c.width=512;c.height=150;const g=c.getContext('2d');g.textAlign='center';g.shadowColor='#000';g.shadowBlur=8;g.font='600 40px system-ui,sans-serif';g.fillStyle=color||'#E7F4EA';g.fillText(text.slice(0,26),256,56);if(sub){g.font='500 28px system-ui,sans-serif';g.fillStyle='#cfe7d6';g.fillText(sub.slice(0,34),256,104);}const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));s.scale.set(2.6,0.76,1);s.position.copy(pos).add(new THREE.Vector3(0,0.85,0));labels.add(s);}
+function ago(h){return h<1?Math.round(h*60)+' min ago':(h<48?h.toFixed(1)+' h ago':(h/24).toFixed(1)+' d ago');}
 // STATUS AT A GLANCE (Tetsu's first suggestion, 2026-09-21): green = measured fine, amber = not known, red = a condition is present
 const OK=0x2E8B6E, UNK=0xC9A227, BAD=0xC0392B;
 function statusColor(st){return st==='present'?BAD:(st==='absent'?OK:UNK);}
@@ -167,30 +196,54 @@ let lastSig='';
 function layout(){if(!state)return;const d=state.detail||{};const hw=d.highway||{};
 // one Tetsu; the nodes are his cells, each its own orb from its own /health (A, B, C), and the phone's node by its address
 const items=[];const mesh=state.mesh||[];
-if(mesh.length){for(const m of mesh)items.push({name:'node '+(m.node_id||'?')+(m.me?' (here)':'')+(m.down?' (down)':''),color:m.down?BAD:(m.degraded?UNK:OK),detail:m,kind:'node'});}
-else items.push({name:NODE+' (this node)',color:statusColor(hw.node_down==='present'?'present':(hw.node_down||'unknown')),detail:state.self,kind:'node'});
-for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\\./.test(id))items.push({name:'phone node',color:0x1F6F5A,detail:{peer:id,note:'the node inside his phone, as this node sees it'},kind:'node'});}
-items.push({name:'Phone',color:(d.phone&&d.phone.last_checkin_hours!=null)?(d.phone.last_checkin_hours<1?OK:(d.phone.last_checkin_hours<24?UNK:BAD)):UNK,detail:d.phone,kind:'phone'});
-items.push({name:'Moltbook',color:(d.forum&&d.forum.length)?OK:UNK,detail:d.forum,kind:'forum'});
-items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),detail:d.money,kind:'money'});
-items.push({name:'Highway',color:Object.values(hw).some(v=>v==='present')?BAD:(Object.values(hw).some(v=>v==='unknown')?UNK:OK),detail:hw,kind:'highway'});
-const sig=items.map(p=>p.name+'|'+p.color).join(';');
+if(mesh.length){for(const m of mesh)items.push({name:'node '+(m.node_id||'?')+(m.me?' (here)':'')+(m.down?' (down)':''),color:m.down?BAD:(m.degraded?UNK:OK),sub:m.down?'down':(m.degraded?'degraded · click for why':'up · height '+(m.chain_height??'?')),detail:m,kind:'node'});}
+else items.push({name:NODE+' (this node)',color:statusColor(hw.node_down==='present'?'present':(hw.node_down||'unknown')),sub:'node_down '+(hw.node_down||'unknown'),detail:state.self,kind:'node'});
+// the phone's node was drawn a fixed dark green, a colour nothing measured; this node sees it only as a peer address
+for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\\./.test(id))items.push({name:'phone node',color:UNK,sub:'a peer; its health is not read here',detail:{peer:id,note:'the node inside his phone, as this node sees it: an address, not a health reading'},kind:'node'});}
+const ph=d.phone&&d.phone.last_checkin_hours;
+items.push({name:'Phone',color:ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK,sub:ph!=null?'checked in '+ago(ph):'no check-in on record',detail:d.phone,kind:'phone'});
+// Moltbook was green whenever a row existed, sent or not (measured 2026-09-28: 6 rows, 0 sent); green now means something went out
+const fr=d.forum||[],fs=fr.filter(r=>r.sent).length;
+items.push({name:'Moltbook',color:fs?OK:UNK,sub:fr.length?fs+' of '+fr.length+' sent':'nothing on record',detail:d.forum,kind:'forum'});
+items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money'});
+const hp=Object.keys(hw).filter(k=>hw[k]==='present'),hu=Object.keys(hw).filter(k=>hw[k]==='unknown');
+items.push({name:'Highway',color:hp.length?BAD:(hu.length?UNK:OK),sub:hp.length?hp.length+' need attention':(hu.length?hu.length+' not known':'all clear'),detail:hw,kind:'highway'});
+const sig=items.map(p=>p.name+'|'+p.color+'|'+p.sub).join(';');
 if(sig===lastSig){items.forEach((p,i)=>{const o=orbs[i+1];if(o)o.userData.detail=p.detail;});return;}
 lastSig=sig;
-for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);o.material.dispose();}orbs.length=1;
-for(const l of links.children){l.geometry.dispose();l.material.dispose();}links.clear();
+for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);o.material.map.dispose();o.material.dispose();o.userData.atmo.material.dispose();const sw=o.userData.swarm;scene.remove(sw);sw.children[0].geometry.dispose();sw.children[0].material.dispose();}orbs.length=1;hovered=null;
+for(const l of links.children){if(l.geometry!==botGeo)l.geometry.dispose();l.material.dispose();}links.clear();traders.length=0;
 for(const s of labels.children){if(s.material.map)s.material.map.dispose();s.material.dispose();}labels.clear();
-const n=items.length;items.forEach((p,i)=>{const a=(i/n)*Math.PI*2;const o=orb(p.name,p.color,Math.cos(a)*4.4,Math.sin(a)*4.4);o.userData.detail=p.detail;o.userData.kind=p.kind;label(p.name,o.position);const g=new THREE.BufferGeometry().setFromPoints([o.position,tetsu.position]);links.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x2E8B6E,transparent:true,opacity:0.45})));});label('Tetsu',new THREE.Vector3(0,0.9,0),'#9fc7b0');}
-setInterval(layout,15000);setTimeout(layout,2500);
+const n=items.length;items.forEach((p,i)=>{const a=(i/n)*Math.PI*2;const o=orb(p.name,p.color,Math.cos(a)*4.4,Math.sin(a)*4.4);o.userData.detail=p.detail;o.userData.kind=p.kind;o.userData.sub=p.sub;o.userData.bad=p.color===BAD;label(p.name,p.sub,o.position);const g=new THREE.BufferGeometry().setFromPoints([o.position,tetsu.position]);links.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x2E8B6E,transparent:true,opacity:0.35})));
+ // two bots on every road, one each way: what goes out comes back
+ for(const dir of [0,1]){const b=new THREE.Mesh(botGeo,new THREE.MeshBasicMaterial({color:dir?0xF4E9B0:0x9fe0c0}));b.userData={from:dir?tetsu.position:o.position,to:dir?o.position:tetsu.position,ph:Math.random()};links.add(b);traders.push(b);}});
+label('Tetsu','',new THREE.Vector3(0,0.9,0),'#9fc7b0');}
+const traders=[],botGeo=new THREE.SphereGeometry(0.04,8,8);let hovered=null;
+window.onState=layout;setTimeout(layout,2500);
 const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
 function fmt(o){return o==null?'(not on record)':(typeof o==='object'?JSON.stringify(o,null,1).replace(/[{}"]/g,'').replace(/^\\s*\\n/gm,''):String(o));}
-canvas.addEventListener('pointerdown',e=>{ptr.x=(e.clientX/innerWidth)*2-1;ptr.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(ptr,cam);const hit=ray.intersectObjects(orbs)[0];const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};
+// the planets only: atmospheres and swarms are children or neighbours and must not steal the pick
+function pick(e){ptr.x=(e.clientX/innerWidth)*2-1;ptr.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(ptr,cam);return ray.intersectObjects(orbs,false)[0];}
+const tip=document.getElementById('tip');
+function hoverScale(o,on){o.scale.setScalar((o===tetsu?1.5:1)*(on?1.15:1));}
+canvas.addEventListener('pointermove',e=>{const h=pick(e),o=h?h.object:null;if(o!==hovered){if(hovered)hoverScale(hovered,false);hovered=o;if(o)hoverScale(o,true);canvas.style.cursor=o?'pointer':'default';}
+ if(o){tip.style.display='block';tip.textContent=o.userData.name+(o.userData.sub?'\\n'+o.userData.sub:'')+'\\nclick for details';tip.style.left=Math.min(e.clientX+14,innerWidth-260)+'px';tip.style.top=(e.clientY+14)+'px';}else tip.style.display='none';});
+canvas.addEventListener('pointerleave',()=>{tip.style.display='none';});
+canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};document.getElementById('ptitle').textContent=u.name;
+if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent===u.name)info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
 if(u.name==='Tetsu'){info.textContent='Tetsu — the one you talk with.\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');}
 else if(u.kind==='node'){const x=u.detail||{};if(x.peer){info.textContent=u.name+'\\n'+x.peer+'\\n'+x.note;}else{info.textContent=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN':'');}}
 else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last sends (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
 else{info.textContent=u.name+'\\n'+fmt(u.detail);}});
-function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
-let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.rotation.y+=0.004;for(const o of orbs)if(o!==tetsu)o.rotation.y-=0.003;cam.position.x=Math.sin(t*0.15)*9.5;cam.position.z=Math.cos(t*0.15)*9.5;cam.lookAt(0,-1.6,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
+// the scene slides right, smoothly, while the conversation drawer is open on the left
+let off=0;const drawer=document.getElementById('answer');
+function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.setViewOffset(innerWidth,innerHeight,-off,0,innerWidth,innerHeight);}addEventListener('resize',resize);resize();
+let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.userData.swarm.position.y=tetsu.position.y;tetsu.rotation.y+=0.004;
+ for(const o of orbs){if(o!==tetsu)o.rotation.y-=0.003;const sw=o.userData.swarm;sw.rotation.y+=sw.userData.speed;if(o.userData.bad)o.userData.atmo.material.opacity=0.2+0.3*(0.5+0.5*Math.sin(t*5));}
+ for(const b of traders){const k=(t*0.35+b.userData.ph)%1;b.position.lerpVectors(b.userData.from,b.userData.to,k);}
+ const open=drawer.style.display==='block'&&!document.body.classList.contains('nochat')&&innerWidth>760;const target=open?Math.min(420,innerWidth*0.38)/2+8:0;
+ if(Math.abs(target-off)>0.5){off+=(target-off)*0.1;cam.setViewOffset(innerWidth,innerHeight,-off,0,innerWidth,innerHeight);}
+ cam.position.x=Math.sin(t*0.15)*9.5;cam.position.z=Math.cos(t*0.15)*9.5;cam.lookAt(0,-1.6,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
 }
 </script>
 </body></html>
