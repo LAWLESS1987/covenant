@@ -32,6 +32,25 @@
 >
 > The claims below are left unedited. A README that quietly fixed its own
 > wording would be doing the thing this project exists to argue against.
+>
+> **CORRECTED AGAIN 2026-09-28, this time against the code, because the block
+> above committed the sin it warns about:** written 2026-09-17, it restated
+> the 2026-08-29 field test in the present tense without re-measuring, and
+> commit `590cf4f` (2026-08-31) had already changed two of the three claims:
+>
+> - Item 2 is **outdated as written**: `put()` archives the prior text to
+>   `.trash/` before a content-changing overwrite (`memory_store.py:665`,
+>   "THE PRIOR WORDING SURVIVES AN OVERWRITE") and the ledger records the
+>   archive name. `_atomic_write` itself still overwrites; the copy is taken
+>   above it.
+> - Item 3 is **half outdated**: `context_window` now reads the link and
+>   marks a superseded memory "SUPERSEDED BY <name> -- prefer that memory
+>   where the two disagree" (`recall.py:195`). Still true, measured
+>   2026-09-28: `score_explain` and `rank` do not consult it, so a
+>   superseded memory can outrank its correction (21.80 vs 16.23 on current
+>   code) and under a tight budget the correction can be omitted -- named in
+>   `omitted`, but absent from what the agent is handed.
+> - Item 1 stands as written.
 
 
 Shared, persistent, **auditable** memory for AI agents. Plain markdown files,
