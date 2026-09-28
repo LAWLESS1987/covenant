@@ -1,5 +1,5 @@
 {
- "when": "2026-09-27T08:11:23Z",
+ "when": "2026-09-28T08:53:20Z",
  "digests": {
   "ora": "9a2bbf97a69c",
   "sena": "d3d138616229"
@@ -21,12 +21,12 @@
    "met": true
   },
   "panel_coverage_min": {
-   "measured": 0.3451,
+   "measured": 0.3533,
    "bar": 0.9,
    "met": false
   },
   "own_traffic_hold_max": {
-   "measured": 0.73,
+   "measured": 0.97,
    "bar": 0.05,
    "met": false
   }
@@ -113,6 +113,11 @@
   },
   {
    "when": "2026-09-27T08:11:23Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-28T08:53:20Z",
    "met_count": 2,
    "streak": 0
   }
