@@ -621,6 +621,7 @@ SUITES = [
     # the exam-contamination filter applied, once each; without the grant it refuses as before.
     ("test_fl1_forum_labels.py", 180, "JUDGE"),
     ("test_ta1_tetsu_assist.py", 180, "JUDGE"),
+    ("test_r2v_frames.py", 240, "JUDGE"),
     # SV1 (2026-09-28, his words: "Yes, show him"): at his practice Tetsu is shown the students' verdicts on his
     # own recent drafts, bounded, labelled as their view and not a rule, with the framing that the money gates are
     # unchanged; his note is kept. Model stubbed; real sends/audit files in a temp dir.
