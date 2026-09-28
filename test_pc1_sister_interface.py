@@ -306,6 +306,42 @@ def main():
     check("PC1f each role is bounded to %d tokens, measured from the call" % C.MAX_TOKENS_PER_ROLE,
           budgets == [C.MAX_TOKENS_PER_ROLE] * 3, budgets)
 
+    # PC1z8 (2026-09-28, his words: "why aren't the orbs working on my pc and if they are why arent they
+    # auto refreshed?"). Measured: the running node served the page it imported at start (no Mic button
+    # after the Mic landed on disk), and below mid-screen every point hit the conversation, not the canvas.
+    import covenant_pc3d as P3z
+    import shutil
+    import tempfile as _tf
+    b = get(client, "/pc/3d", "100.72.0.10").get_data(as_text=True)
+    st = (get(client, "/pc/3d/state", "100.72.0.10").get_json() or {})
+    check("PC1z8 the page carries its own hash and the state reports the same one",
+          "__PAGESHA__" not in b and st.get("page") and ("const PAGESHA='%s'" % st.get("page")) in b, st.get("page"))
+    real_file = P3z.__file__
+    tdir = _tf.mkdtemp(prefix="pc1z8_")
+    try:
+        tmp = os.path.join(tdir, "covenant_pc3d.py")
+        src = open(real_file, encoding="utf-8").read()
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(src.replace("<title>covenant", "<title>EDITED-ON-DISK covenant", 1))
+        P3z.__file__ = tmp
+        b2 = get(client, "/pc/3d", "100.72.0.10").get_data(as_text=True)
+        check("PC1z8 an edit on disk is served on the next load, without restarting the node",
+              "EDITED-ON-DISK" in b2 and P3z.page_sha() != st.get("page"), b2[:120])
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(src + "\nthis is not python (\n")
+        os.utime(tmp, (os.path.getmtime(tmp) + 5, os.path.getmtime(tmp) + 5))
+        b3z = get(client, "/pc/3d", "100.72.0.10").get_data(as_text=True)
+        check("PC1z8 a file that fails to load mid-edit serves the last good page, not an error",
+              "EDITED-ON-DISK" in b3z, b3z[:120])
+    finally:
+        P3z.__file__ = real_file
+        P3z._page_cache.update(mtime=None, page=None)
+        shutil.rmtree(tdir, ignore_errors=True)
+    check("PC1z8 an open tab reloads when the page changes -- never over typed text or an answer on its way",
+          "state.page!==PAGESHA" in b and "!document.getElementById('q').value" in b and "inflight" in b.split("state.page!==PAGESHA")[1][:160])
+    check("PC1z8 the conversation can be hidden to reach every orb, and nothing in it is dropped",
+          'id="chatbtn"' in b and "body.nochat #answer{display:none" in b and "classList.toggle('nochat')" in b)
+
     print()
     n_ok = sum(1 for _, ok in results if ok)
     print("%d/%d passed" % (n_ok, len(results)))

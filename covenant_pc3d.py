@@ -59,6 +59,7 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 .copybtn{margin-left:8px;font-size:11px;padding:2px 7px;background:#1f6f5a;border:0;border-radius:6px;color:#fff;cursor:pointer;vertical-align:middle}
 #answer{position:fixed;left:16px;right:16px;bottom:84px;max-height:38vh;overflow:auto;background:#10203390;backdrop-filter:blur(6px);border:1px solid #2E8B6E55;border-radius:14px;padding:12px 14px;white-space:pre-wrap;display:none}
 #answer .ln{margin:0 0 8px}#answer .you{color:#9fc7b0}#answer .heal{color:#e3c878}
+body.nochat #answer{display:none!important}
 #nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
 </style></head><body>
 <canvas id="scene"></canvas>
@@ -66,11 +67,16 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 <div id="hud">__SYMBOL__<div class="t"><b>Tetsu · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small></div></div>
 <div id="panel"><h3>What you clicked</h3><div id="info">click an orb: this node, its peers, or Tetsu</div></div>
 <div id="answer"></div>
-<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
+<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="chatbtn" title="hide the conversation to see and click every orb; nothing is lost">Hide chat</button><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
 <script>
 const NODE='__NODE__';
+// 2026-09-28 ("why aren't the orbs working on my pc and if they are why arent they auto refreshed"):
+// the node now serves this page as it is on disk, and the state carries its hash; an open tab whose
+// page is older reloads itself -- only while nothing is typed and no answer is on its way.
+const PAGESHA='__PAGESHA__';
 let state=null, voice={pitch:0.8,rate:0.95};
-async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');}catch(e){document.getElementById('live').textContent='state unreadable';}}
+document.getElementById('chatbtn').onclick=()=>{const off=document.body.classList.toggle('nochat');document.getElementById('chatbtn').textContent=off?'Show chat':'Hide chat';};
+async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');}catch(e){document.getElementById('live').textContent='state unreadable';}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -184,11 +190,36 @@ else if(u.kind==='node'){const x=u.detail||{};if(x.peer){info.textContent=u.name
 else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last sends (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
 else{info.textContent=u.name+'\\n'+fmt(u.detail);}});
 function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
-let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.rotation.y+=0.004;for(const o of orbs)if(o!==tetsu)o.rotation.y-=0.003;cam.position.x=Math.sin(t*0.15)*9.5;cam.position.z=Math.cos(t*0.15)*9.5;cam.lookAt(0,0,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
+let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.rotation.y+=0.004;for(const o of orbs)if(o!==tetsu)o.rotation.y-=0.003;cam.position.x=Math.sin(t*0.15)*9.5;cam.position.z=Math.cos(t*0.15)*9.5;cam.lookAt(0,-1.6,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
 }
 </script>
 </body></html>
 """
+
+
+_page_cache = {"mtime": None, "page": None}
+
+
+def current_page():
+    """PAGE as this file says it NOW, not as it said when the node started (2026-09-28: the app's Mic,
+    Stop and Copy landed on disk and the running node kept serving the page it had imported). Re-read
+    only when the file's mtime moves; a file that fails to load mid-edit serves the last good page."""
+    try:
+        mt = os.stat(__file__).st_mtime
+        if _page_cache["mtime"] != mt:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("_covenant_pc3d_page", __file__)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _page_cache.update(mtime=mt, page=mod.PAGE)
+    except Exception:                                            # noqa: BLE001
+        pass
+    return _page_cache["page"] or PAGE
+
+
+def page_sha(page=None):
+    import hashlib
+    return hashlib.sha256((page or current_page()).encode("utf-8")).hexdigest()[:12]
 
 
 def register(api, caller, refused, cov):
@@ -201,7 +232,9 @@ def register(api, caller, refused, cov):
         if not ok:
             return ("this door answers the tailnet only -- you are %s" % (addr or "unknown"), 403,
                     {"Content-Type": "text/plain; charset=utf-8"})
-        html = (PAGE.replace("__SYMBOL__", symbol_svg())
+        page = current_page()
+        html = (page.replace("__SYMBOL__", symbol_svg())
+                    .replace("__PAGESHA__", page_sha(page))
                     .replace("__NODE__", str(getattr(api.node, "node_id", "") or "node"))
                     .replace("__VERSION__", str(getattr(cov, "COVENANT_VERSION", "")))
                     .replace("__SOURCE__", str(getattr(cov, "CORE_SOURCE_SHA12", "") or "unreadable")))
@@ -256,7 +289,8 @@ def register(api, caller, refused, cov):
         except Exception:                                        # noqa: BLE001
             peers = []
         self_h["peers"] = peers
-        out = {"self": self_h, "peers": peers, "peer_health": {}, "voice": None, "register": None, "immunity": None, "mesh": []}
+        out = {"self": self_h, "peers": peers, "peer_health": {}, "voice": None, "register": None, "immunity": None, "mesh": [],
+               "page": page_sha()}
         # THE MESH AS DISTINCT ORBS (his words the same evening: "why 3 identical tetsus? the nodes
         # should be different orbs in the one"): every node of the local mesh read from its own
         # /health -- A, B, C with their own height, peers and source -- and the phone's node by
