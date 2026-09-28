@@ -52,9 +52,11 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 #panel{position:fixed;right:16px;top:16px;width:min(340px,calc(100% - 32px));background:#10203390;backdrop-filter:blur(6px);border:1px solid #2E8B6E55;border-radius:14px;padding:12px 14px}
 #panel h3{margin:0 0 6px;font-size:14px;color:#9fc7b0;letter-spacing:.06em;text-transform:uppercase}
 #info{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;color:#cfe7d6;min-height:60px}
-#talk{position:fixed;left:16px;right:16px;bottom:16px;display:flex;gap:8px;align-items:flex-end}
-#talk textarea{flex:1;min-height:44px;max-height:160px;resize:vertical;background:#0f1d2e;color:#E7F4EA;border:1px solid #2E8B6E66;border-radius:12px;padding:10px 12px;font:15px system-ui}
+#talk{position:fixed;left:16px;right:16px;bottom:16px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+#talk textarea{flex:1;min-width:140px;min-height:44px;max-height:160px;resize:vertical;background:#0f1d2e;color:#E7F4EA;border:1px solid #2E8B6E66;border-radius:12px;padding:10px 12px;font:15px system-ui}
 #talk button{background:#2E8B6E;color:#fff;border:0;border-radius:12px;padding:12px 16px;font:600 15px system-ui;cursor:pointer}
+#talk button:disabled{opacity:0.45;cursor:default}
+.copybtn{margin-left:8px;font-size:11px;padding:2px 7px;background:#1f6f5a;border:0;border-radius:6px;color:#fff;cursor:pointer;vertical-align:middle}
 #answer{position:fixed;left:16px;right:16px;bottom:84px;max-height:38vh;overflow:auto;background:#10203390;backdrop-filter:blur(6px);border:1px solid #2E8B6E55;border-radius:14px;padding:12px 14px;white-space:pre-wrap;display:none}
 #answer .ln{margin:0 0 8px}#answer .you{color:#9fc7b0}#answer .heal{color:#e3c878}
 #nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
@@ -64,7 +66,7 @@ html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 sy
 <div id="hud">__SYMBOL__<div class="t"><b>Tetsu · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small></div></div>
 <div id="panel"><h3>What you clicked</h3><div id="info">click an orb: this node, its peers, or Tetsu</div></div>
 <div id="answer"></div>
-<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
+<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
 <script>
 const NODE='__NODE__';
 let state=null, voice={pitch:0.8,rate:0.95};
@@ -74,9 +76,49 @@ function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitc
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
 // opens with the earlier exchanges from this address read back from the log (/pc/3d/history).
 function line(who,text){const a=document.getElementById('answer');a.style.display='block';const d=document.createElement('div');d.className='ln '+who;d.textContent=(who==='you'?'you: ':(who==='heal'?'heal: ':'Tetsu: '))+text;a.appendChild(d);a.scrollTop=a.scrollHeight;return d;}
-async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');line('tetsu',x.withheld?'(withheld: '+(x.why||'')+')':(x.a||''));}}catch(e){}}
-async function send(){const q=document.getElementById('q');const t=q.value.trim();if(!t)return;q.value='';line('you',t);const pend=line('tetsu','thinking…');try{const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});const j=await r.json();const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');pend.textContent='Tetsu: '+txt;speak(txt);}catch(e){pend.textContent='Tetsu: no answer: '+e;}document.getElementById('answer').scrollTop=1e9;}
+// COPY (his words, 2026-09-27, catching the PC app up to the other chat apps): a small
+// button on a finished Tetsu or heal line writes that line's own text to the clipboard --
+// nothing sent anywhere new, no judge involved, the same text already on screen.
+function addCopy(el,text){if(!text)return;const b=document.createElement('button');b.className='copybtn';b.textContent='copy';b.onclick=()=>{try{navigator.clipboard.writeText(text);}catch(e){}b.textContent='copied';setTimeout(()=>{b.textContent='copy';},1200);};el.appendChild(b);}
+async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');const a=x.withheld?'(withheld: '+(x.why||'')+')':(x.a||'');const el=line('tetsu',a);if(!x.withheld)addCopy(el,a);}}catch(e){}}
+// STOP (his words, 2026-09-27): Send becomes Stop while a council call is in flight, and a
+// second press aborts the fetch in the browser -- the council on the PC still finishes its
+// own run (there is no reaching into it mid-judge), but nothing it returns is shown or
+// spoken once he has said stop, exactly as the phone's own Stop now works.
+let inflight=null;
+async function send(){
+ const btn=document.getElementById('send');
+ if(inflight){inflight.abort();return;}
+ const q=document.getElementById('q');const t=q.value.trim();if(!t)return;q.value='';line('you',t);const pend=line('tetsu','thinking…');
+ const ctrl=new AbortController();inflight=ctrl;btn.textContent='Stop';
+ try{
+  const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
+  const j=await r.json();
+  const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');
+  pend.textContent='Tetsu: '+txt;addCopy(pend,txt);speak(txt);
+ }catch(e){
+  pend.textContent=(e&&e.name==='AbortError')?'Tetsu: (stopped)':('Tetsu: no answer: '+e);
+ }
+ inflight=null;btn.textContent='Send';
+ document.getElementById('answer').scrollTop=1e9;
+}
 document.getElementById('send').onclick=send;
+// MIC (his words, 2026-09-27, parity with the phone's own mic): the browser's own speech
+// recognizer, when the browser has one -- nothing installed, nothing sent anywhere except
+// the same /pc/council road typing already takes. Missing entirely on a browser without
+// one (Firefox has none as of this writing): the button says so and stays harmless.
+let recog=null;
+function micSetup(){
+ const m=document.getElementById('mic');
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){m.disabled=true;m.title='this browser has no speech recognition';return;}
+ recog=new SR();recog.lang='en-US';recog.interimResults=false;
+ recog.onresult=e=>{const t=e.results[0][0].transcript;document.getElementById('q').value=t;send();};
+ recog.onerror=()=>{m.textContent='Mic';};
+ recog.onend=()=>{m.textContent='Mic';};
+ m.onclick=()=>{if(!recog)return;try{m.textContent='...';recog.start();}catch(e){m.textContent='Mic';}};
+}
+micSetup();
 // A215 (his words: "Give me a one click self heal button on the pc and phone apps").
 // One press: the node runs covenant_heal, which runs the highway's own remedies
 // with the person's cooldown waived, and says what it fixed and what still needs him.
@@ -86,7 +128,7 @@ async function heal(){const b=document.getElementById('heal');const a=document.g
   let t=j.summary||'no answer';
   if(j.fixed&&j.fixed.length)t+='\\n\\nFIXED:\\n'+j.fixed.map(x=>'  '+x.condition).join('\\n');
   if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='\\n\\nSTILL NEEDS YOU:\\n'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('\\n');
-  hl.textContent='heal: '+t;speak(j.summary||'');}
+  hl.textContent='heal: '+t;addCopy(hl,t);speak(j.summary||'');}
  catch(e){hl.textContent='heal: could not be reached: '+e;}
  b.disabled=false;b.textContent=was;}
 document.getElementById('heal').onclick=heal;

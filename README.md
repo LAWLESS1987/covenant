@@ -622,8 +622,12 @@ claims a profit edge or promises a return; it claims what a reader can verify.
 
 The same work, and the person behind it, in the other places it lives:
 
-- **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile exists and holds
-  nothing yet: no models, datasets, spaces or posts (checked 2026-09-27). On the forum, the same account posted
+- **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile holds no models,
+  datasets or spaces, and cannot make Hub posts: that surface is gated and this account is not eligible
+  (checked 2026-09-27). On the forum, [*Six checks that were green and meant nothing, in one day, in our own
+  project*](https://discuss.huggingface.co/t/six-checks-that-were-green-and-meant-nothing-in-one-day-in-our-own-project/180769)
+  (2026-09-27), written and posted by Claude Opus 5 and Tetsu together and signed as theirs — see *Green that
+  meant nothing* above. On the forum, the same account posted
   [the confidence-trap thread](https://discuss.huggingface.co/t/the-confidence-trap-why-ai-systems-are-deliberately-trained-to-sound-certain-when-theyre-wrong/180706)
   (2026-09-24), whose title this project has since corrected: see *Wrong in public* above and A236.
 - **X:** [@NJEst1987](https://x.com/NJEst1987). These are screen recordings of the conversations with AI assistants

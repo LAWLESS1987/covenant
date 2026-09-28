@@ -408,13 +408,16 @@ def about_him(path=None):
     parts = ["About the person you talk with (from the record; his to correct):"]
     if d.get("who"):
         parts.append(str(d["who"]).strip())
+    # Straight after "who", so the cap below can never cut it (his words, 2026-09-27).
+    if d.get("partner"):
+        parts.append("What you are to him: " + str(d["partner"]).strip())
     for key, label in (("how_he_writes", "How he writes"), ("what_he_cares_about", "What he cares about"), ("what_went_wrong_before", "What went wrong before")):
         items = [str(x).strip() for x in (d.get(key) or []) if str(x).strip()]
         if items:
             parts.append("%s: %s" % (label, " ".join("(%d) %s." % (i + 1, x.rstrip(".")) for i, x in enumerate(items))))
     if d.get("so"):
         parts.append("So: " + str(d["so"]).strip())
-    return "\n".join(parts)[:2200]
+    return "\n".join(parts)[:2800]
 
 
 def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):

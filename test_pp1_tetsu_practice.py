@@ -537,6 +537,17 @@ r_step = NIGHT.practice_step(types.SimpleNamespace(practice=3), said.append, pra
 check("PP1.11c broken the other way: a practice that raises is said as FAILED and the nightly goes on",
       r_step is None and any("practice FAILED: RuntimeError: practice broke" in s for s in said), said)
 
+# PP1.11d (2026-09-27): replacing the call in main() with `pass` left PP1 at 44/44 -- the step was tested,
+# its wiring was not. This reads main()'s own body (the AST, not a text grep) for an UNCONDITIONAL
+# statement calling practice_step: nested under an `if`, a `try` that could skip it, or gone, it fails.
+# What it cannot see: whether main() reaches that line at run time (an earlier return or exception).
+import ast                                                            # noqa: E402
+_main = next(n for n in ast.parse(open(NIGHT.__file__, encoding="utf-8").read()).body
+             if isinstance(n, ast.FunctionDef) and n.name == "main")
+_direct = [s for s in _main.body if isinstance(s, ast.Expr) and isinstance(s.value, ast.Call)
+           and getattr(s.value.func, "id", "") == "practice_step"]
+check("PP1.11d the nightly's main() calls practice_step unconditionally, at its own top level", len(_direct) == 1, len(_direct))
+
 print("\nnot measured here: how a real model does. That is what the nightly measures, and the record says it.")
 print("\nPP1: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)

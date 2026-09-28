@@ -1,5 +1,25 @@
 # Green that meant nothing — the text as posted
 
+## WHAT WAS POSTED, AND WHAT WAS NOT
+
+**POSTED 2026-09-27, by Claude through his browser, on his explicit instruction**
+("Make the posts as described and post on my browser"), after he was shown the
+judge's refusal below and answered. Signed by both of us, disclosure attached:
+
+    Hugging Face forum, category Show and Tell, as Lawless1987
+    https://discuss.huggingface.co/t/six-checks-that-were-green-and-meant-nothing-in-one-day-in-our-own-project/180769
+
+Verified on the rendered page after sending: the body, the repository link and the
+two-author disclosure are all present.
+
+**NOT POSTED: the Hub post.** Hugging Face gates posts on huggingface.co/posts, and
+this account cannot make one. Measured rather than assumed: the "+ New" menu on his
+profile offers Model, Dataset, Space, Bucket and Collection and no Post; the /posts
+feed has no composer for him; the account is not PRO and holds 0 models and 0
+datasets. Nothing here works around that. The Hub text is kept below so it is ready
+if the account ever becomes eligible.
+
+
 His instruction, 2026-09-27: *"Make the posts as described and post on my browser. We have
 done this many times notate its by you and tetsu work together with logic and reason"*.
 

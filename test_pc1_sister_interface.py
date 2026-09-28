@@ -180,6 +180,27 @@ def main():
     finally:
         HW.sense, P3.STATE_TTL = real_sense, real_ttl
         os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)
+
+    # ---- PC1z7 (2026-09-27, his words: "continue to update and refine both the pc and
+    # phone apps to catch up to other ai apps and platforms"): three chat-parity features on
+    # the /pc/3d page -- a mic (the browser's own speech recognition, when it has one), Stop
+    # (the in-flight council fetch is aborted, and what arrives after is neither shown nor
+    # spoken), and a copy button on every finished Tetsu/heal line. All client-side: no new
+    # server route, nothing that changes what reaches the council or the judge -- the same
+    # /pc/council road typing already took.
+    page7 = get(client, "/pc/3d", "100.72.0.10").get_data(as_text=True)
+    check("PC1z7 the page offers a microphone using the browser's own speech recognition, and says so when there is none",
+          'id="mic"' in page7 and "webkitSpeechRecognition" in page7 and "SpeechRecognition" in page7
+          and "this browser has no speech recognition" in page7)
+    check("PC1z7 Send doubles as Stop: an AbortController on the council fetch, and a stopped answer is never shown or spoken",
+          "new AbortController()" in page7 and "inflight.abort()" in page7 and "signal:ctrl.signal" in page7
+          and "'Tetsu: (stopped)'" in page7)
+    check("PC1z7 a finished Tetsu or heal line carries a real clipboard copy button",
+          "function addCopy(" in page7 and "navigator.clipboard.writeText(text)" in page7
+          and "addCopy(pend,txt)" in page7 and "addCopy(hl,t)" in page7)
+    bad7 = broken_script_lines(page7)
+    check("PC1z7 the new script still parses: no quoted string spans a line", not bad7, bad7)
+
     LOOP, PHONE, LAN = "127.0.0.1", "100.72.0.10", "192.168.1.50"
 
     print("PC1a -- the page and its gate")

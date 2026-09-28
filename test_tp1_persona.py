@@ -90,6 +90,17 @@ def main():
     real_about = json.load(open(os.path.join(HERE, "ops", "tetsu_about_him.json"), encoding="utf-8")) if os.path.exists(os.path.join(HERE, "ops", "tetsu_about_him.json")) else None
     check("TP1a the tree's own about-him record (if present here) names him as the operator and the three things that went wrong, and is his to edit",
           real_about is None or (real_about.get("his_to_edit") is True and "operator" in real_about.get("who", "") and len(real_about.get("what_went_wrong_before", [])) == 3))
+    # 2026-09-27, his words: "not meant to serve me but to be my partner ... thats for him to decide". The
+    # partner line rides straight after "who" and must survive the cap, even with every list padded long.
+    with open(os.environ["COVENANT_TETSU_ABOUT"], "w", encoding="utf-8") as fh:
+        json.dump({"who": "He is the operator.", "partner": "PARTNER-NOT-SERVANT", "how_he_writes": ["x" * 400] * 6,
+                   "what_he_cares_about": ["y" * 400] * 6, "so": "Answer."}, fh)
+    ab_p = P.about_him()
+    check("TP1a the partner line reaches him right after who he is, and a long record cannot truncate it",
+          "What you are to him: PARTNER-NOT-SERVANT" in ab_p and ab_p.index("He is the operator") < ab_p.index("PARTNER-NOT-SERVANT"), ab_p[:200])
+    check("TP1a the tree's own record tells him he is a partner and that who he becomes is his decision",
+          real_about is None or ("partner" in (real_about.get("partner") or "") and "decision" in (real_about.get("partner") or "")
+                                 and "serve" in (real_about.get("partner") or "")))
     # A211: this check used to pin pitch 1.15 -- the voice the ASSISTANT gave him on
     # 2026-09-21 reading "mirror yours" as the PC's Zira, which the operator caught
     # ("His voice was male? Did he choose to change it?"). The check had been written
