@@ -52,10 +52,13 @@ def _get_json(path, tok):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
-def _download(url, tok):
-    """An artifact archive: a 302 to blob storage that rejects the token, so follow it bare."""
+def _download(url, tok, accept=None):
+    """An artifact archive or a release asset: a 302 to blob storage that rejects the token, so follow it bare."""
     opener = urllib.request.build_opener(_NoRedirect)
-    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + tok, "User-Agent": "covenant-app-update"})
+    hdr = {"Authorization": "Bearer " + tok, "User-Agent": "covenant-app-update"}
+    if accept:
+        hdr["Accept"] = accept
+    req = urllib.request.Request(url, headers=hdr)
     try:
         return opener.open(req, timeout=60).read()
     except urllib.error.HTTPError as e:
@@ -557,6 +560,27 @@ def mark_checked(cur, path=None):
     return cur
 
 
+RELEASE_ASSET = "covenant-node.apk"
+
+
+def release_asset(run, tok):
+    """The phone APK a green run published as its own release (tag build-r<run id>), or None.
+
+    2026-09-28 (his words: "3 with the same mechanism of last 2"): the build hands its APK
+    to a release instead of an artifact, because the artifact quota blocked every upload
+    from 09-22 on. A PRERELEASE is not taken -- it is a build the emulator has not passed,
+    or a branch build -- and neither is a release without the phone APK on it."""
+    try:
+        rel = _get_json("/repos/%s/releases/tags/build-r%d" % (REPO, run["id"]), tok)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+    if rel.get("prerelease") or rel.get("draft"):
+        return None
+    return next((a for a in rel.get("assets", []) if a.get("name") == RELEASE_ASSET), None)
+
+
 def fetch(say=print):
     """The newest green build's APK from the private repository, kept under ops/app/.
     Returns the latest.json dict, or None with the reason said."""
@@ -583,7 +607,8 @@ def fetch(say=print):
     runs = _get_json("/repos/%s/actions/runs?status=success&branch=main&per_page=5" % REPO, tok).get("workflow_runs", [])
     for run in runs:
         arts = [a for a in _get_json("/repos/%s/actions/runs/%d/artifacts" % (REPO, run["id"]), tok).get("artifacts", []) if a["name"] == ARTIFACT and not a.get("expired")]
-        if not arts:
+        asset = None if arts else release_asset(run, tok)
+        if not arts and not asset:
             continue
         sha7 = run["head_sha"][:7]
         cur = latest()
@@ -598,9 +623,12 @@ def fetch(say=print):
         # are two builds.
         if not is_new_build(cur, run):
             say("app update: already have build %s from run %d" % (sha7, run["id"])); return mark_checked(cur)
-        blob = _download(arts[0]["archive_download_url"], tok)
-        with zipfile.ZipFile(io.BytesIO(blob)) as z:
-            apk = z.read("covenant-node.apk")
+        if arts:
+            blob = _download(arts[0]["archive_download_url"], tok)
+            with zipfile.ZipFile(io.BytesIO(blob)) as z:
+                apk = z.read("covenant-node.apk")
+        else:
+            apk = _download(asset["url"], tok, accept="application/octet-stream")
         os.makedirs(DIR, exist_ok=True)
         # The name carries the run as well, for the same reason.
         fname = "covenant-node-%s-r%d.apk" % (sha7, run["id"])
@@ -618,7 +646,7 @@ def fetch(say=print):
             os.remove(os.path.join(DIR, old))
         say("app update: fetched build %s (%d bytes, sha256 %s)" % (sha7, len(apk), d["sha256"][:12]))
         return d
-    say("app update: no green build with an artifact in the last five runs"); return None
+    say("app update: no green build with an artifact or a release in the last five runs"); return None
 
 
 def main():

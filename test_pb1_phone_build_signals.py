@@ -78,6 +78,38 @@ def main():
               bool(on_disk.get("checked")) and on_disk.get("fetched") == rec["fetched"] and out and out.get("checked")
               and any("already have" in s for s in said), (said, on_disk))
 
+        # ---- PB1e (2026-09-28, his words: "3 with the same mechanism of last 2"): the build now hands its APK
+        # to a release of its own run; a green run with no artifact is fetched from that release as the raw
+        # APK, and a PRERELEASE (a build the emulator has not passed, or a branch build) is not taken.
+        real_dl, real_ver = AU._download, AU.apk_version
+        gh.token, gh.allow_credential_store = (lambda *a, **k: "t0ken"), (lambda *a, **k: None)
+        AU.is_new_build = lambda cur, run: True
+        AU.apk_version = lambda p: "1.0+abcdef1"
+        AU._download = lambda url, tok, accept=None: (b"RAWAPK" if accept == "application/octet-stream" and url.endswith("/asset/1") else b"")
+        got = {}
+        try:
+            for pre in (False, True):
+                def gj(path, tok, pre=pre):
+                    if "/runs?" in path:
+                        return {"workflow_runs": [{"id": 7, "head_sha": "b" * 40, "html_url": "u", "updated_at": "x"}]}
+                    if "/artifacts" in path:
+                        return {"artifacts": []}
+                    if path.endswith("/releases/tags/build-r7"):
+                        return {"prerelease": pre, "assets": [{"name": AU.RELEASE_ASSET, "url": "https://api/asset/1"}]}
+                    raise AssertionError(path)
+                AU._get_json = gj
+                said = []
+                got[pre] = (AU.fetch(say=said.append), said)
+        finally:
+            gh.token, gh.allow_credential_store = real_tok, real_allow
+            AU._download, AU.apk_version = real_dl, real_ver
+        ok_rel = got[False][0]
+        body = open(os.path.join(tmp, ok_rel["file"]), "rb").read() if ok_rel else b""
+        check("PB1e a green run with no artifact is fetched from its own release, as the raw APK",
+              bool(ok_rel) and ok_rel.get("run_id") == 7 and body == b"RAWAPK", got[False])
+        check("PB1e a prerelease is never taken: a build the emulator has not passed does not reach the phone",
+              got[True][0] is None and any("no green build" in s for s in got[True][1]), got[True])
+
         # ---- PB1b: the staleness detector counts the look
         AU.latest = lambda: dict(rec, checked=stamp(1))
         r_look = H.detect_build_stale_on_pc()
