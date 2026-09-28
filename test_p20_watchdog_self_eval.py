@@ -561,7 +561,9 @@ def main():
     o = wd.offline_readings()
     check("E12m offline_readings() runs against the REAL tree and returns "
           "only layers it could take", isinstance(o, dict)
-          and set(o) <= {"trader", "student", "repo", "git", "disk"}, str(sorted(o)))
+          # "daily" (2026-09-28): Tetsu's daily maintenance cycle, his directive -- a known layer, so the
+          # set stays closed: an unknown layer still fails this check
+          and set(o) <= {"trader", "student", "repo", "git", "disk", "daily"}, str(sorted(o)))
     check("E12n every returned layer carries a real verdict word",
           all(v[0] in ("PASS", "WARN", "FAIL") and v[1] for v in o.values()),
           str(o))

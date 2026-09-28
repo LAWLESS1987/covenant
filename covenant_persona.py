@@ -428,6 +428,13 @@ def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):
     ab = about_him()
     if ab:
         parts.append(ab)
+    # HIS STANDING DIRECTIVE (2026-09-28: "Convey it to TETSU in the form TETSU can act on"): the daily
+    # maintenance duty and his latest daily record, read from files at call time (covenant_daily).
+    try:
+        import covenant_daily
+        parts.append(covenant_daily.standing_directive())
+    except Exception:                                            # noqa: BLE001
+        pass
     if with_brief:
         b = brief()
         if b:

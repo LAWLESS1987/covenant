@@ -413,6 +413,12 @@ ops/sweep_heal_last.txt
 # operational ledgers: what the mesh did and what Tetsu read are his, not public
 ops/highway.jsonl
 ops/web_reads.jsonl
+# covenant_daily (his directive, 2026-09-28): Tetsu's daily maintenance records -- operational, his
+ops/tetsu_daily.jsonl
+ops/TETSU_DAILY.md
+ops/tetsu_daily_latest.json
+ops/tetsu_last_verified.json
+ops/tetsu_directive_exam.jsonl
 # covenant_tetsu_crawl (A237, 2026-09-27): what he searched and crawled, per day, for the cap and the record.
 ops/tetsu_crawl.jsonl
 ops/ambassador_rate.json

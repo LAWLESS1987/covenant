@@ -453,6 +453,14 @@ def record_checkin(body_bytes, who, path=None):
     # prediction gets checked against the phone instead of against a comment.
     if "installer" in data:
         row["installer"] = str(data["installer"])[:80]
+    # tip / genesis (2026-09-28, his directive: "Verify the nodes can communicate and synchronize
+    # correctly"): the phone node's last block hash and first block hash, so the daily cycle can say
+    # "synchronization verified" by comparing hashes, not heights. Hex only, 64 at most; anything
+    # else is dropped, never stored.
+    for k in ("tip", "genesis"):
+        v = data.get(k)
+        if isinstance(v, str) and re.fullmatch(r"[0-9a-f]{8,64}", v):
+            row[k] = v
     # cpu_ms / up_ms (2026-09-26): the app's own CPU time and uptime, so its share of the
     # battery can be measured before anything on the phone is cut. Integers only.
     for k in ("cpu_ms", "up_ms"):

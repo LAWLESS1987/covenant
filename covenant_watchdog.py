@@ -1079,6 +1079,30 @@ def _disk_reading():
     return "PASS", detail
 
 
+def _daily_reading():
+    """Tetsu's daily maintenance cycle (covenant_daily; his directive of 2026-09-28): FAIL when the
+    newest record is more than 26 h old or failed its own verdict, so a cycle that stops
+    happening is itself reported, hourly, and told on the direct line through _self_eval_tell."""
+    try:
+        import covenant_daily
+        return covenant_daily.watchdog_reading()
+    except Exception as e:                                       # never fatal
+        return ("WARN", f"daily reading unavailable: {type(e).__name__}: {e}"[:160])
+
+
+def _daily_launch():
+    """Start the daily cycle once a day from the hourly self-evaluation -- the daemon is the one
+    process that is always on (the guard revives it every 2 min). Only the daemon launches: a
+    --once run, a test or an import never reaches this (the same `persist` boundary as the tell)."""
+    if not _self_eval.get("persist", False):
+        return None
+    try:
+        import covenant_daily
+        return covenant_daily.maybe_launch()
+    except Exception as e:                                       # never fatal
+        return f"daily launch unavailable: {type(e).__name__}: {e}"
+
+
 DISTILL_LOG = os.path.join(HERE, "ops", "DISTILL.md")
 RUN_WITHOUT_FILE = os.path.join(HERE, "ops", "RUN_WITHOUT.json")
 DISTILL_LATE_H = 36.0     # the distiller runs daily at 03:30; a day and a half without an entry is a missed night
@@ -1228,7 +1252,8 @@ def offline_readings(now=None):
                      ("student", lambda: _student_reading(now)),
                      ("repo", _repo_reading),
                      ("git", _git_reading),
-                     ("disk", _disk_reading)):
+                     ("disk", _disk_reading),
+                     ("daily", _daily_reading)):
         try:
             r = fn()
         except Exception as e:                               # never fatal
@@ -1321,7 +1346,7 @@ def self_evaluation(states, topo, judge, self_drift, alerts, now_iso,
 
     # The offline layers, in a fixed order so the ledger is greppable. Only
     # what was actually read appears.
-    for name in ("trader", "student", "repo", "git", "disk"):
+    for name in ("trader", "student", "repo", "git", "disk", "daily"):
         r = (offline or {}).get(name)
         if r:
             layer(name, r[0], r[1])
@@ -1911,6 +1936,9 @@ def one_pass(strict=False):
         if _self_eval_tell(block, overall, _self_eval["round"]):
             log("INFO", f"self-evaluation: said on the direct line "
                         f"(overall {overall})")
+        _dl = _daily_launch()
+        if _dl:
+            log("INFO", f"self-evaluation: {_dl}")
     return alerts
 
 

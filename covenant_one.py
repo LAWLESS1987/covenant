@@ -492,6 +492,11 @@ SUITES = [
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.
     ("test_pb1_phone_build_signals.py", 120, "DAILY + GUARDS"),
+    # TD1 (2026-09-28, his directive to Tetsu): the daily maintenance cycle's verdicts, driven both
+    # ways with stubbed readings -- a disagreeing tip is failed, a height-only phone is unverified, stale
+    # sweep results are never a pass, an old failure back is "reappeared", the one automatic rollback
+    # needs a verified copy and keeps the failing one, and only the watchdog daemon starts the cycle.
+    ("test_td1_tetsu_daily.py", 300, "DAILY + GUARDS"),
     # MF (2026-09-19): the two federation rules, adopted at his instruction --
     # most favoured peer, and unilateral exit. Driven both ways, including the
     # direction that would break the federation if it were wrong: a peer
