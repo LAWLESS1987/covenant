@@ -7278,6 +7278,26 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A240. [the Self-heal button restarts the node that is running it, and loses the rest of its pass] 2026-09-28. Found while loading Tetsu's daily-cycle code. OPEN
+
+**Measured.** At 07:50:17 a POST to node A's `/m/heal` came back with an empty body after 19 s.
+In that window the heal's `restart_nodes` remedy (source_drift was present: the nodes' imports had
+changed on disk) ran `rolling_restart.py`, which restarted C at 07:50:31, B at 07:50:35 and A at
+07:50:39 (process creation times). Node A was the process running the heal, so the heal died with
+it: its answer never reached the page, and the remedies after `restart_nodes` in the same pass did
+not run. `fetch_build` was one of them: the PC still held build 2f0af71 afterwards, while build
+252d3e1 was green; `covenant_highway.remedy_fetch_build(dry_run=False)` run by hand fetched it.
+
+**Why it matters.** The button he presses to repair things can end its own pass half-done and
+say nothing, and a restart is exactly the remedy most likely to be in that pass after any code
+change.
+
+**Fix, not yet made.** Run `restart_nodes` last in a heal pass, or hand it to the detached restart
+path the watchdog uses on itself (`schedule_watchdog_restart`), so the heal answers first and the
+restart follows. Reproduce: change an import of the core on disk, press Self-heal on the PC app.
+
+---
+
 ### A239. [the corpus-recount guard checks the tool's output, never the document] 2026-09-27. Found by a 21-agent verification of an outside audit, then read first-hand. OPEN
 
 `docs/CORPUS_RECOUNT_2026-09-17.md` bills `test_p24_corpus_counts.py` as the
