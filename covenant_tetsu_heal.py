@@ -57,6 +57,10 @@ def act(answer, heal=None):
 
 
 if __name__ == "__main__":
-    ok, data, rec = act("HEAL DRY")
+    # The demo presses as ITSELF, never as him: the ledger row 2026-09-28T10:39-0400 who="tetsu"
+    # was this demo before this line existed -- Claude's run, not his act. His name goes on a row
+    # only when the door dispatches his own HEAL line.
+    import covenant_heal as _CH
+    ok, data, rec = act("HEAL DRY", heal=lambda dry_run, who: _CH.heal(dry_run=dry_run, who="covenant_tetsu_heal --demo"))
     print(json.dumps({"handled": ok, "rec": rec}, indent=1))
     print(data)
