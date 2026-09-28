@@ -82,7 +82,9 @@ def _log(row, path=None):
 def _default_ask(prompt):
     from tools import tetsu_work as TW
     status, body = TW.ask(prompt, timeout=600)
-    return (body or {}).get("answer", "") if status == 200 else ""
+    if status != 200:
+        raise RuntimeError("door answered HTTP %s: %s" % (status, str((body or {}).get("message", ""))[:160]))
+    return (body or {}).get("answer", "")
 
 
 def _teach(text, decision):
@@ -117,17 +119,17 @@ def review(text, verdict, crypto=None, dry_run=True, ask=None, grant_path=None, 
     if _used["n"] >= cap:
         return {"decision": "SKIP", "why": "reviews_per_run (%d) spent" % cap}
     _used["n"] += 1
-    raw = ""
+    raw, err = "", ""
     try:
         raw = (ask or _default_ask)(PROMPT % (str(verdict)[:400], str(text)[:3000])) or ""
     except Exception as e:                                        # noqa: BLE001
-        raw = ""
-        why = "no answer: %s" % type(e).__name__
+        err = "%s: %s" % (type(e).__name__, str(e)[:200])
     m = _ANSWER.match(raw.strip())
     if m:
         decision, why = m.group(1).upper(), (m.group(2).strip()[:300] or "(no reason given)")
     else:
-        decision, why = "NONE", "no SEND/REFUSE/PAUSE in his answer -- the hold stands: %r" % raw[:120]
+        decision, why = "NONE", "no SEND/REFUSE/PAUSE in his answer -- the hold stands: %s" % (
+            "asking him failed (%s)" % err if err else repr(raw[:120]))
     if decision == "PAUSE":
         _pause(why)
     if teach and decision in ("SEND", "REFUSE", "PAUSE"):
