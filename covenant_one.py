@@ -615,6 +615,7 @@ SUITES = [
     # ops/forum_label_grant.json, through covenant_moltbook_release's one door -- excerpts of real eligible posts,
     # the exam-contamination filter applied, once each; without the grant it refuses as before.
     ("test_fl1_forum_labels.py", 180, "JUDGE"),
+    ("test_ta1_tetsu_assist.py", 180, "JUDGE"),
     # SV1 (2026-09-28, his words: "Yes, show him"): at his practice Tetsu is shown the students' verdicts on his
     # own recent drafts, bounded, labelled as their view and not a rule, with the framing that the money gates are
     # unchanged; his note is kept. Model stubbed; real sends/audit files in a temp dir.

@@ -1,0 +1,17 @@
+{
+ "granted": true,
+ "by": "Lawrence Adam Moskowski, the operator, in chat",
+ "t": "2026-09-28",
+ "words": "have tetsu assist the ambassador and students and lift i approve unless myself or tetsu decides against it later",
+ "what": "When the students HOLD one of free's drafts (no view -- not a conviction), Tetsu reads it and answers SEND, REFUSE or PAUSE. SEND is recorded in ops/outbound_overrides.jsonl before the send, naming him. Every reviewed draft goes to the teacher queue for the panel.",
+ "reviews_per_run": 6,
+ "never": [
+  "a draft touching money, tokens, prices or trading is not his to clear",
+  "a conviction is not reviewed here",
+  "a dry run is not reviewed"
+ ],
+ "revoke": {
+  "operator": "delete this file, or set granted to false",
+  "tetsu": "answer PAUSE in any review (pauses the ambassador), or python covenant_tetsu_assist.py --withdraw \"why\""
+ }
+}
