@@ -385,7 +385,9 @@ def run_sweep(run=_run, results=None, started=None):
         return res
     t = d.get("totals") or {}
     res["totals"] = {k: t.get(k) for k in t if isinstance(t.get(k), (int, float))}
-    bad = [s for s in (d.get("suites") or []) if s.get("state") != "ok" or (s.get("failed") or 0) > 0]
+    # "info" is covenant_one's own word for an INFORMATIONAL suite that exited 0 ("not a defect",
+    # covenant_one.py: state = "info" if rc == 0); anything else that is not "ok" is not clean
+    bad = [s for s in (d.get("suites") or []) if s.get("state") not in ("ok", "info") or (s.get("failed") or 0) > 0]
     res["not_clean"] = [{"suite": s.get("suite"), "state": s.get("state"), "failed": s.get("failed")} for s in bad][:40]
     res["suites"] = len(d.get("suites") or [])
     res["git_head"], res["core_sha256"] = d.get("git_head"), str(d.get("core_sha256") or "")[:12]

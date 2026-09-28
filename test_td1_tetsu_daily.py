@@ -122,11 +122,15 @@ def main():
         check("TD1e a PASS printed over STALE results is UNDETERMINED, never PASS", s["result"] == D.UNDET, s)
         with open(res, "w") as fh:
             json.dump({"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0 + 60)),
-                       "suites": [{"suite": "a.py", "state": "ok", "failed": 0}, {"suite": "b.py", "state": "ok", "failed": 2}],
+                       "suites": [{"suite": "a.py", "state": "ok", "failed": 0}, {"suite": "b.py", "state": "ok", "failed": 2},
+                                  # the sweep's own "info" (an INFORMATIONAL suite, rc 0) is not a failure -- the
+                                  # first automatic cycle counted sim_yield_safety.py as one
+                                  {"suite": "i.py", "state": "info", "failed": None},
+                                  {"suite": "e.py", "state": "ERROR rc=2", "failed": None}],
                        "totals": {"checks_passed": 10, "checks_failed": 2}}, fh)
         s = D.run_sweep(run=lambda *a, **k: (1, "RESULT: FAIL. named above"), results=res, started=t0)
-        check("TD1e fresh results: FAIL is FAIL, and the suite with failures is named",
-              s["result"] == "FAIL" and [x["suite"] for x in s["not_clean"]] == ["b.py"], s)
+        check("TD1e fresh results: FAIL is FAIL; the suite with failures and the one that ERRORED are named, the info suite is not",
+              s["result"] == "FAIL" and [x["suite"] for x in s["not_clean"]] == ["b.py", "e.py"], s)
 
         print("TD1f -- when the cycle is due")
         lt = time.localtime()
@@ -314,6 +318,9 @@ def main():
             "in_trader_window": lambda now=None: False,   # the suite's verdict must not depend on the hour it runs
         }
         rp = []
+        # the sweep runs this suite in a staged copy with no .venv (the first automatic cycle's TD1m
+        # failure): the cycle's interpreter paths point at files that exist wherever the suite runs
+        stubs["VENV_PY"] = sys.executable
         realf = {k: getattr(D, k) for k in stubs}
         for k, f in stubs.items():
             setattr(D, k, f)
