@@ -8,6 +8,14 @@ than that optimize"*; *"green light"*.
 
 ## What is here
 
+**Source correction, 2026-10-02:** the dated descriptions below are retained.
+The keeper currently budgets 7.0 GiB for the 7B and an estimated 2.6 GiB for
+the 3B, with 2.0 GiB default headroom for larger models. Conversation defaults
+are twenty complete exchanges, 2,000 characters per side, and 12,000 total.
+The proposed v8.41 changes add carried phone context and optional Muse support;
+see [the verification record](RECOVERY_CONVERSATION_2026-10-02.md) for scope
+and hardware limits.
+
 | Piece | Where | What it is |
 |---|---|---|
 | Runtime | `tools/llama/llama-server.exe` (untracked) | llama.cpp's server, build b11057, CPU. The same 18 MB runtime the judge workflow uses on the GitHub runner. |

@@ -31,6 +31,18 @@ class AnalysisTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 scenarios.validate_weights({'weights':{'f':{'p':p,'moved_by':'x','would_move_it':'y'}}},[{'name':'f'}])
 
+    def test_unreadable_table_and_failed_replace_preserve_previous_record(self):
+        with tempfile.TemporaryDirectory() as td,patch.object(scenarios,'PRIV',td),patch.object(scenarios,'TABLE',str(Path(td)/'SCENARIOS.json')):
+            table=Path(td)/'SCENARIOS.json';table.write_text('corrupt fixture')
+            with self.assertRaises(ValueError):scenarios.load_table()
+            self.assertEqual(table.read_text(),'corrupt fixture')
+            table.write_text('{"scenarios":[],"history":[]}')
+            previous=table.read_bytes()
+            with patch.object(scenarios.os,'replace',side_effect=OSError('fixture write failure')):
+                with self.assertRaises(OSError):scenarios.save_table({'new':'fixture'})
+            self.assertEqual(table.read_bytes(),previous)
+            self.assertEqual([p.name for p in Path(td).iterdir()],['SCENARIOS.json'])
+
     def test_thesis_retains_findings_and_previous_record(self):
         with tempfile.TemporaryDirectory() as td,contextlib.redirect_stdout(io.StringIO()),patch.object(thesis,'HERE',td):
             memory=Path(td)/'ops/chat/MEMORY.md';memory.parent.mkdir(parents=True)

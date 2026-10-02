@@ -124,13 +124,25 @@ def knowledge():
 def load_table():
     try:
         return json.load(io.open(TABLE, encoding="utf-8"))
-    except Exception:                                            # noqa: BLE001
+    except FileNotFoundError:
         return {"scenarios": [dict(s) for s in DEFAULT_SCENARIOS], "history": []}
 
 
 def save_table(t):
+    import tempfile
     os.makedirs(PRIV, exist_ok=True)
-    io.open(TABLE, "w", encoding="utf-8").write(json.dumps(t, indent=1, ensure_ascii=False))
+    body = json.dumps(t, indent=1, ensure_ascii=False)
+    scratch = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=PRIV, delete=False) as fh:
+            scratch = fh.name
+            fh.write(body)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(scratch, TABLE)
+    finally:
+        if scratch and os.path.exists(scratch):
+            os.remove(scratch)
 
 
 def main(argv=None):
