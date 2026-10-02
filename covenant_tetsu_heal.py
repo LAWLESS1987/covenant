@@ -49,6 +49,8 @@ def act(answer, heal=None):
         lines.append("fixed: %s" % x.get("condition"))
     for x in (out.get("still_needs_a_person") or [])[:6]:
         lines.append("still needs a person: %s -- %s" % (x.get("condition"), str(x.get("why_no_fix", ""))[:200]))
+    for x in (out.get("unverified") or [])[:6]:
+        lines.append("could not verify: %s -- %s" % (x.get("condition"), str(x.get("why", ""))[:200]))
     if out.get("paused"):
         lines.append("the highway is PAUSED, so nothing was repaired; resuming it is the operator's line to say.")
     if not out.get("ok"):

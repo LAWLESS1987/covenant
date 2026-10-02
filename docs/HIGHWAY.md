@@ -1,5 +1,9 @@
 # The mycelial highway
 
+**2026-10-02 correction:** an unavailable post-repair measurement is now
+reported as unverified. One remedy exception does not stop unrelated repairs.
+See [the unattended-recovery verification record](RECOVERY_CONVERSATION_2026-10-02.md).
+
 **Asked 2026-09-16:** *"create a program like tailscale but better and use tailscale to
 implement it on both devices ... the start of our mycelial highway for mutual benefit bots
 that repair anything overly detrimental, that leaves free will intact as growing will

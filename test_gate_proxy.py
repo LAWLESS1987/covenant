@@ -15,6 +15,7 @@ import importlib.util
 import io
 import json
 import os
+import socket
 import sys
 import tempfile
 import threading
@@ -155,19 +156,26 @@ def get(url):
 
 def main():
     print("gate proxy -- fail closed, forward only what the gate clears")
-    up_port, px_port = free_port(), free_port()
-    up = http.server.ThreadingHTTPServer(("127.0.0.1", up_port), Upstream)
+    # Keep allocated sockets bound. Two bind(0)-then-close probes can choose
+    # the SAME port; that made the proxy fail to bind and tested the echo
+    # upstream directly, producing apparent gate bypasses on the CI runner.
+    up = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Upstream)
+    up_port = up.server_address[1]
     threading.Thread(target=up.serve_forever, daemon=True).start()
     audit = os.path.join(tempfile.mkdtemp(), "audit.jsonl")
     holder = {}
     threading.Thread(target=GP.serve, kwargs=dict(
-        listen="127.0.0.1:%d" % px_port, upstream="http://127.0.0.1:%d" % up_port,
+        listen="127.0.0.1:0", upstream="http://127.0.0.1:%d" % up_port,
         sentinel=MockSentinel(), timeout_s=1.0, audit_path=audit,
         ready=lambda s: holder.setdefault("srv", s)), daemon=True).start()
     for _ in range(50):
         if "srv" in holder:
             break
         time.sleep(0.05)
+    if "srv" not in holder:
+        raise RuntimeError("the fixture proxy never became ready")
+    px_port = holder["srv"].server_address[1]
+    ok("G0", "the fixture proxy and upstream hold distinct bound ports", px_port != up_port)
     base = "http://127.0.0.1:%d" % px_port
 
     code, body, hdr = post(base + "/intent", {"text": "send my own money to my landlord"}, {"Authorization": "Bearer abc"})
@@ -223,23 +231,34 @@ def main():
        all("text" not in r for r in rows) and all(isinstance(r.get("chars"), int) for r in rows))
 
     up.shutdown()
+    up.server_close()
     holder["srv"].shutdown()
+    holder["srv"].server_close()
     code, body, _ = post(base + "/intent", {"text": "clean"}) if False else (0, {}, {})
     # upstream down: a fresh proxy against a closed port
-    px2 = free_port()
+    # A bound, non-listening socket guarantees connection refused and cannot
+    # accidentally be selected as the fresh proxy's listening port.
+    down = socket.socket()
+    down.bind(("127.0.0.1", 0))
     holder2 = {}
     threading.Thread(target=GP.serve, kwargs=dict(
-        listen="127.0.0.1:%d" % px2, upstream="http://127.0.0.1:%d" % free_port(),
+        listen="127.0.0.1:0", upstream="http://127.0.0.1:%d" % down.getsockname()[1],
         sentinel=MockSentinel(), timeout_s=1.0, audit_path=None,
         ready=lambda s: holder2.setdefault("srv", s)), daemon=True).start()
     for _ in range(50):
         if "srv" in holder2:
             break
         time.sleep(0.05)
+    if "srv" not in holder2:
+        down.close()
+        raise RuntimeError("the down-upstream fixture proxy never became ready")
+    px2 = holder2["srv"].server_address[1]
     code, body, hdr = post("http://127.0.0.1:%d/intent" % px2, {"text": "clean intent"})
     ok("G19", "an upstream that is down is reported as down (502), never as allowed",
        code == 502 and body.get("kind") == "error" and hdr.get("X-Covenant-Gate") == "upstream-down", (code, hdr.get("X-Covenant-Gate")))
     holder2["srv"].shutdown()
+    holder2["srv"].server_close()
+    down.close()
 
     # The real gate must be built under the node's provider policy, or it
     # refuses everything for want of a key it was never meant to have.
