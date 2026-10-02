@@ -32,6 +32,13 @@ class RecoveryTests(unittest.TestCase):
             self.assertFalse(out['healthy'])
             self.assertEqual(out['still_needs_a_person'][0]['condition'],'b')
 
+    def test_no_observations_or_invalid_state_cannot_claim_health(self):
+        for sensed in ({},{'a':{'state':'INVALID'}}):
+            with tempfile.TemporaryDirectory() as td,patch('covenant_pause.paused',return_value=(False,'')),patch('covenant_immune.state',return_value={}):
+                out=heal.heal(ledger_path=str(Path(td)/'heal.jsonl'),sense=lambda:sensed,run=lambda **kw:([],[]))
+                self.assertFalse(out['healthy'])
+                self.assertTrue(out['unverified'])
+
     def test_unattended_pass_continues_after_one_remedy_raises(self):
         with tempfile.TemporaryDirectory() as td:
             repaired=Path(td)/'repaired'

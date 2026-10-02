@@ -63,7 +63,7 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
     {"ok", "fixed": [...], "still_needs_a_person": [...], "looked_at": n,
      "paused": bool, "summary": str}. Never raises: a button that throws is
     not a button."""
-    out = {"ok": False, "fixed": [], "still_needs_a_person": [], "unverified": [], "looked_at": 0,
+    out = {"ok": False, "healthy": False, "fixed": [], "still_needs_a_person": [], "unverified": [], "looked_at": 0,
            "paused": False, "dry_run": bool(dry_run), "who": str(who)[:40]}
     try:
         import covenant_highway as HW
@@ -90,7 +90,7 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
         after = (sense or HW.sense)()
         for name in sorted(present):
             state = after.get(name, {}).get("state", HW.UNKNOWN)
-            if state == HW.UNKNOWN:
+            if state not in (HW.PRESENT, HW.ABSENT):
                 out["unverified"].append({"condition": name, "measured": after.get(name, {}).get("measured"),
                                           "why": "follow-up measurement unavailable; repair not confirmed"})
                 continue
@@ -105,16 +105,20 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
             condition = after.get(name, {"state": HW.UNKNOWN})
             if name in present:
                 continue
-            if condition.get("state") == HW.UNKNOWN:
+            if condition.get("state") not in (HW.PRESENT, HW.ABSENT):
                 out["unverified"].append({"condition": name, "measured": condition.get("measured"),
                                           "why": "condition could not be measured"})
             elif condition.get("state") == HW.PRESENT:
                 out["still_needs_a_person"].append({"condition": name, "measured": condition.get("measured"),
                                                    "why_no_fix": "newly detected after the repair pass; next pass will reassess"})
+        if not conditions and not after:
+            out["unverified"].append({"condition": "detectors", "why": "no condition measurements were returned"})
         out["healthy"] = not out["still_needs_a_person"] and not out["unverified"] and not out["paused"]
         out["ok"] = True
         out["lines"] = [str(x)[:300] for x in (list(alerts) + list(infos))][:40]
     except Exception as e:                                        # noqa: BLE001
+        out["ok"] = False
+        out["healthy"] = False
         out["error"] = "%s: %s" % (type(e).__name__, str(e)[:200])
     # A218 (his words: "Incorporate the antvirus take it over and use it to
     # protect the entire system"): one press also says what the defence is
