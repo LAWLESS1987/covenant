@@ -1815,13 +1815,13 @@ def one_pass(strict=False):
         except Exception as e:                                   # noqa: BLE001
             c_infos.append("highway pass unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
         # TETSU REFINES HIMSELF CONSTANTLY (2026-09-21, A198, his words: "refine both
-        # constantly"): once an hour at most, only after new conversation, through
-        # covenant_persona.refine with every bound it already has. Most rounds are a
-        # no-op costing one file read; a pass that ran is one info line.
+        # constantly"): new conversation through covenant_persona.refine with
+        # every bound it already has. Unavailable attempts retain their feedback
+        # and retry with backoff; a voluntary no-change choice ends that round.
         try:
             import covenant_refine_loop as _rl
             _r = _rl.tick(say=lambda *_a: None)
-            if _r.get("ran"):
+            if _r.get("ran") or _r.get("attempted"):
                 c_infos.append("refine loop: %s -- %s" % (_r.get("why"), (_r.get("result") or {}).get("why", "")))
         except Exception as e:                                   # noqa: BLE001
             c_infos.append("refine loop unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))

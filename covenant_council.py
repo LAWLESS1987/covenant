@@ -274,17 +274,26 @@ async function share(){if(navigator.share){try{await navigator.share({title:'Han
 def register(api):
     """Mount /pc, /pc/council, /pc/training and /pc/handshake on the node's Flask app. `api` has .app and .node."""
     from flask import jsonify, request
+    from covenant_conversation import ConversationReplies
     cov = importlib.import_module("covenant_unified_v8")
+    replies = ConversationReplies()
 
-    def caller():
+    def caller(with_identity=False):
         addr = (request.remote_addr or "").strip()
         if cov.tailnet_ok(addr):
+            if with_identity:
+                from covenant_conversation import authenticated_reply_key
+                return True, addr, authenticated_reply_key(addr, request)
             return True, addr
         try:                                                      # A200: a signed request off the tailnet is the same caller
             ok, addr2, _who, _how = importlib.import_module("covenant_mycelium").admit(request, request.get_data() or b"", cov.tailnet_ok)
+            if with_identity:
+                from covenant_conversation import authenticated_reply_key
+                identity = authenticated_reply_key(addr2 or addr, request, _who, _how) if ok else None
+                return bool(ok), addr2 or addr, identity
             return bool(ok), addr2 or addr
         except Exception:                                         # noqa: BLE001
-            return False, addr
+            return (False, addr, None) if with_identity else (False, addr)
 
     def refused(addr):
         try:
@@ -327,15 +336,20 @@ def register(api):
 
     @api.app.route("/pc/council", methods=["POST"])
     def pc_council():
-        ok, addr = caller()
+        ok, addr, identity = caller(with_identity=True)
         if not ok:
             return refused(addr)
+        if identity is None:
+            return jsonify({"status": "error", "message": "conversation signature did not verify; send a fresh signed request"}), 403
+        body = request.get_json(silent=True)
+        return replies.reply(identity, "council", body, lambda: _council_answer(body, addr))
+
+    def _council_answer(body, addr):
         now = time.time()
         recent = [t for t in _asks.get(addr, []) if now - t < 600]
         if len(recent) >= ASKS_PER_10_MIN:
             _asks[addr] = recent
             return jsonify({"status": "error", "message": "%d councils in 10 minutes -- wait" % ASKS_PER_10_MIN}), 429
-        body = request.get_json(silent=True)
         text = str(body.get("text", "") if isinstance(body, dict) else "")[:4000]
         if not text.strip():
             return jsonify({"status": "error", "message": "nothing to ask"}), 400
@@ -349,6 +363,9 @@ def register(api):
         except Exception as e:                                    # noqa: BLE001
             return jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503
         history = cov.agent_history(_log_path(), addr)
+        carried = cov.conversation_context(body.get("history"))
+        if carried:
+            history = carried
         # A210 ("Free browser access"): a URL in the question is read through the
         # web door, read-only and on record, and handed to the council as data.
         try:
