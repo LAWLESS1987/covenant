@@ -6,6 +6,17 @@
 
 > This page also opens by saying private keys sit in a folder that
 > leaves your machine. That was never true of the current layout.
+>
+> **Verification correction, 2026-10-01 (A33).** Neither that historical denial
+> nor the warning below establishes the state of an operator's filesystem.
+> The inspected GitHub checkout contains none of the three named key files,
+> and its tracked tree contains no `*.key` files. The fetched repository history
+> also contains no `*.key` paths. This audit did not inspect the original
+> operator folder, backups, or cloud-sync configuration. The operator reports
+> that there are no keys; that report is not a filesystem measurement.
+> The old filenames and relocation commands are historical text, not evidence
+> that keys exist or instructions to move anything. See A33 in
+> [KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for the scope of the check.
 
 # What's in this folder, and what to actually run
 

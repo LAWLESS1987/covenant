@@ -28,6 +28,12 @@ downstream reads balance files. Both scripts **refuse to run** if they find the
 credential file inside `covenant\` — that folder syncs to the cloud, and the
 check is in the code, not just in this document.
 
+> **Correction, 2026-10-01 (A33).** The repository-location refusal is a
+> credential-placement rule in the scripts. It does not detect cloud syncing.
+> The source cannot establish that every folder named `covenant` syncs to the
+> cloud, or that credentials exist there. The original explanation above is
+> retained as history; the credential-placement check remains applicable.
+
 `daily.py` needs **no credential at all**. Prices are public on both venues.
 
 ---
