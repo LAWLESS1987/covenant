@@ -56,6 +56,32 @@ CANDIDATES = [
     ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
     ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),     # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
 ]
+MUSE_FILE = "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf"
+MUSE_NEEDS_GB = 19.0  # estimate including a larger working context; measure after first load
+_runtime_build_cache = {}
+
+
+def _runtime_supports_muse():
+    """Check the executable before choosing weights its architecture cannot load."""
+    try:
+        stat = os.stat(BIN)
+        key = (BIN, stat.st_mtime_ns, stat.st_size)
+        if key not in _runtime_build_cache:
+            import re
+            result = subprocess.run([BIN, "--version"], capture_output=True, text=True, timeout=5)
+            match = re.search(r'(?:version:\s*|build:\s*|\bb)(\d{4,})', (result.stdout or '') + (result.stderr or ''), re.I)
+            _runtime_build_cache[key] = bool(result.returncode == 0 and match and int(match.group(1)) >= 10353)
+        return _runtime_build_cache[key]
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def available_candidates():
+    """Add Muse when installed and compatible; existing smaller models remain available."""
+    muse = os.path.join(MODELS, MUSE_FILE)
+    if os.path.isfile(muse) and _runtime_supports_muse():
+        return [(MUSE_FILE, MUSE_NEEDS_GB)] + list(CANDIDATES)
+    return list(CANDIDATES)
 
 # KEEP THE PC FUNCTIONAL (2026-09-25, his words: "have to constantly optimize to keep the pc
 # functional also", and his choice between two of his own goals: "2" -- load the big model
@@ -106,7 +132,9 @@ def free_gb():
 def pick_model():
     """(path, name, needs_gb) of the largest candidate present that fits, or None."""
     free = free_gb()
-    for name, need in CANDIDATES:
+    for name, need in available_candidates():
+        if name == MUSE_FILE and free is None:
+            continue
         p = os.path.join(MODELS, name)
         if os.path.isfile(p) and (free is None or free >= _bar(name, need)):
             return p, name, need
@@ -144,13 +172,14 @@ def step_up(say=print):
     steps DOWN; never restarts mid-answer (the caller runs it idle: the nightly, or by hand)."""
     st = _read_state()
     cur = str(st.get("model") or "")
-    cur_need = next((need for name, need in CANDIDATES if name == cur), 0.0)
+    candidates = available_candidates()
+    cur_need = next((need for name, need in candidates if name == cur), 0.0)
     free = free_gb()
     if free is None:
         return False, "free memory unreadable; nothing changed"
     budget = free + (cur_need if alive() else 0.0)
     best = None
-    for name, need in CANDIDATES:                     # CANDIDATES is largest first
+    for name, need in candidates:                     # largest first
         if os.path.isfile(os.path.join(MODELS, name)) and budget >= _bar(name, need):
             best = (name, need)
             break
@@ -182,9 +211,11 @@ def start(say=print):
     # 8k for both (2026-09-26): his longer conversation memory (up to 12,000 characters of
     # history, agent_history) must fit beside the rules and the answer. The 3B's bar in
     # CANDIDATES carries the larger cache.
-    ctx = "8192"
+    ctx = "16384" if name == MUSE_FILE else "8192"
     args = [BIN, "-m", path, "--host", HOST, "--port", str(PORT), "-c", ctx, "-t", str(threads),
             "--no-webui", "--log-disable"]
+    if name == MUSE_FILE:
+        args += ["--jinja", "-np", "1"]
     creation = 0x08000000 if os.name == "nt" else 0               # CREATE_NO_WINDOW
     with open(LOG, "a", encoding="utf-8") as lf:
         lf.write("%s start %s (free %s GB, needs %s GB, %d threads)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), name, free_gb(), need, threads))
@@ -291,14 +322,20 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
         # long-lived node process is the one that will put the model away.
         _last_used[0] = time.time()
         _watch_idle()
-    body = json.dumps({"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature)}).encode("utf-8")
+    options = {"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature)}
+    if _read_state().get("model") == MUSE_FILE:
+        options.update(max_tokens=int(max_tokens) + 2048, temperature=1.0, top_p=0.95, top_k=64,
+                       chat_template_kwargs={"reasoning_strength": "low"})
+    body = json.dumps(options).encode("utf-8")
     req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (HOST, PORT), data=body,
                                  headers={"Content-Type": "application/json"})
     t0 = time.time()
     with urllib.request.urlopen(req, timeout=timeout) as r:
         d = json.loads(r.read().decode("utf-8", "replace"))
     _last_used[0] = time.time()
-    text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
+    text = d.get("choices", [{}])[0].get("message", {}).get("content")
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError("The model returned no visible answer; retry with a shorter context or more output tokens")
     usage = d.get("usage", {}) or {}
     return text, {"model": _read_state().get("model", "?"), "tokens": int(usage.get("completion_tokens", 0) or 0),
                   "ms": int((time.time() - t0) * 1000)}

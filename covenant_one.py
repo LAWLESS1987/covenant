@@ -448,6 +448,7 @@ SUITES = [
     ("test_ow1_own_work.py",              120,  "JUDGE"),
     ("test_wb1_web.py",                   120,  "JUDGE"),
     ("test_hl1_heal.py",                  120,  "JUDGE"),
+    ("test_recovery_conversation.py",      120,  "JUDGE"),
     ("test_pv1_provenance.py",            120,  "JUDGE"),
     ("test_av1_immune.py",                180,  "JUDGE"),
     ("test_oa1_open_access.py",           120,  "JUDGE"),

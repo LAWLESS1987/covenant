@@ -63,7 +63,7 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
     {"ok", "fixed": [...], "still_needs_a_person": [...], "looked_at": n,
      "paused": bool, "summary": str}. Never raises: a button that throws is
     not a button."""
-    out = {"ok": False, "fixed": [], "still_needs_a_person": [], "looked_at": 0,
+    out = {"ok": False, "fixed": [], "still_needs_a_person": [], "unverified": [], "looked_at": 0,
            "paused": False, "dry_run": bool(dry_run), "who": str(who)[:40]}
     try:
         import covenant_highway as HW
@@ -89,13 +89,29 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
         # gone on a second look is what "fixed" means, not what a remedy claimed.
         after = (sense or HW.sense)()
         for name in sorted(present):
-            gone = after.get(name, {}).get("state") != HW.PRESENT
+            state = after.get(name, {}).get("state", HW.UNKNOWN)
+            if state == HW.UNKNOWN:
+                out["unverified"].append({"condition": name, "measured": after.get(name, {}).get("measured"),
+                                          "why": "follow-up measurement unavailable; repair not confirmed"})
+                continue
+            gone = state == HW.ABSENT and not dry_run and not out["paused"]
             (out["fixed"] if gone else out["still_needs_a_person"]).append({
                 "condition": name,
                 "measured": present[name].get("measured"),
                 "why_no_fix": "" if gone else ("dry run: nothing was repaired, this is what a real press would face"
                                                if dry_run else (present[name].get("note") or _no_remedy_reason(HW, name))),
             })
+        for name in sorted(set(conditions) | set(after)):
+            condition = after.get(name, {"state": HW.UNKNOWN})
+            if name in present:
+                continue
+            if condition.get("state") == HW.UNKNOWN:
+                out["unverified"].append({"condition": name, "measured": condition.get("measured"),
+                                          "why": "condition could not be measured"})
+            elif condition.get("state") == HW.PRESENT:
+                out["still_needs_a_person"].append({"condition": name, "measured": condition.get("measured"),
+                                                   "why_no_fix": "newly detected after the repair pass; next pass will reassess"})
+        out["healthy"] = not out["still_needs_a_person"] and not out["unverified"] and not out["paused"]
         out["ok"] = True
         out["lines"] = [str(x)[:300] for x in (list(alerts) + list(infos))][:40]
     except Exception as e:                                        # noqa: BLE001
@@ -144,7 +160,8 @@ def summary(out):
         return ("looked at %d condition(s); the highway is PAUSED so nothing was repaired -- "
                 "resume it with: python covenant_pause.py --resume highway" % out.get("looked_at", 0))
     f, n = len(out.get("fixed", [])), len(out.get("still_needs_a_person", []))
-    if not f and not n:
+    unknown = out.get("unverified", [])
+    if not f and not n and not unknown:
         base = "looked at %d condition(s); nothing was wrong" % out.get("looked_at", 0)
         d0 = out.get("defence") or {}
         return base + (". Defence: " + d0["says"] if d0.get("says") else "")
@@ -153,6 +170,8 @@ def summary(out):
         bits.append("fixed %d (%s)" % (f, ", ".join(x["condition"] for x in out["fixed"][:4])))
     if n:
         bits.append("%d still needs a person (%s)" % (n, ", ".join(x["condition"] for x in out["still_needs_a_person"][:4])))
+    if unknown:
+        bits.append("%d could not be verified (%s)" % (len(unknown), ", ".join(x["condition"] for x in unknown[:4])))
     line = "looked at %d condition(s); %s" % (out.get("looked_at", 0), "; ".join(bits))
     d = out.get("defence") or {}
     if d.get("says"):

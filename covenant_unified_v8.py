@@ -442,7 +442,7 @@ def verify_stake_action_signature(pubkey_pem: str, action: str, timestamp: float
 # not a second parallel one).
 # ---------------------------------------------------------------------------
 
-COVENANT_VERSION = "v8.40"
+COVENANT_VERSION = "v8.41"
 
 # ---------------------------------------------------------------------------
 # P11 (v8.31) -- SAY WHAT YOU ARE RUNNING.
@@ -669,6 +669,41 @@ AGENT_HISTORY_BUDGET = 12000
 AGENT_HISTORY_KINDS = ("agent", "council")
 
 
+def conversation_context(messages, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET):
+    """Bound client-carried context to complete user/assistant pairs, never system/tool roles."""
+    if not isinstance(messages, list):
+        return []
+    pairs = []
+    for i in range(0, len(messages) - 1, 2):
+        q, a = messages[i:i + 2]
+        if not isinstance(q, dict) or not isinstance(a, dict):
+            return []
+        if q.get("role") != "user" or a.get("role") != "assistant":
+            return []
+        if not isinstance(q.get("content"), str) or not isinstance(a.get("content"), str):
+            return []
+        pairs.append((_conversation_excerpt(q["content"], chars), _conversation_excerpt(a["content"], chars)))
+    kept, used = [], 0
+    for q, a in reversed(pairs[-turns:]):
+        if used + len(q) + len(a) > budget:
+            break
+        kept.append((q, a)); used += len(q) + len(a)
+    return [dict(role=role, content=text) for q, a in reversed(kept)
+            for role, text in (("user", q), ("assistant", a))]
+
+
+def _conversation_excerpt(text, limit):
+    """Keep the opening and latest correction when a long turn exceeds the window."""
+    text = str(text)
+    if len(text) <= limit:
+        return text
+    if limit < 30:
+        return text[:limit]
+    marker = "\n[earlier text omitted]\n"
+    head = (limit - len(marker)) // 3
+    return text[:head] + marker + text[-(limit - head - len(marker)):]
+
+
 def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET):
     """The last answered exchanges from `addr` (agent and council), as chat messages, oldest first:
     at most `turns`, each side cut at `chars`, newest kept first until `budget` characters."""
@@ -686,12 +721,12 @@ def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY
             r = json.loads(line)
         except ValueError:
             continue
-        if r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
+        if not isinstance(r, dict) or r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
             continue
         rows.append(r)
     kept, used = [], 0
     for r in reversed(rows[-turns:]):
-        q, a = str(r.get("text", ""))[:chars], str(r.get("answer", ""))[:chars]
+        q, a = _conversation_excerpt(r.get("text", ""), chars), _conversation_excerpt(r.get("answer", ""), chars)
         if kept and used + len(q) + len(a) > budget:
             break
         kept.append((q, a))
@@ -8442,6 +8477,11 @@ class CovenantAPI:
                 return (jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503)
             _log_path = os.environ.get("COVENANT_ASK_LOG") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "chat", "ask_log.jsonl")
             history = agent_history(_log_path, addr)
+            # Phone-carried context survives a route/address change. It is
+            # conversation data only; it cannot replace the composed system.
+            carried = conversation_context(body.get("history"))
+            if carried:
+                history = carried
             # The system message is composed (2026-09-21, A174): the fixed rules above,
             # then the register Tetsu may revise, then a short TRUE brief of the day, so
             # "recap updates" is answered from records. One message, so the turn count

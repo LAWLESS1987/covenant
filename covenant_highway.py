@@ -1458,9 +1458,10 @@ def remedy_restart_nodes(measured, dry_run=True):
     # watchdog's own process (no node module loaded) the old synchronous path is unchanged.
     if "covenant_unified_v8" in sys.modules:
         import covenant_quiet
-        log = open(os.path.join(HERE, "logs", "rolling_restart.log"), "a", encoding="utf-8", errors="replace")
-        covenant_quiet.popen_survivor([sys.executable, os.path.join(HERE, "rolling_restart.py")],
-                                      cwd=HERE, stdout=log, stderr=log)
+        os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)
+        with open(os.path.join(HERE, "logs", "rolling_restart.log"), "a", encoding="utf-8", errors="replace") as log:
+            covenant_quiet.popen_survivor([sys.executable, os.path.join(HERE, "rolling_restart.py")],
+                                          cwd=HERE, stdout=log, stderr=log)
         return True, ("started detached (A240): this process is in the restart set, so the restart runs beside "
                       "this pass, one node at a time, this node last; graded on the next look, logged to "
                       "logs/rolling_restart.log")
@@ -2185,7 +2186,12 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         return write_ledger(row, ledger)
 
     before = (condition or {}).get("state")
-    ok, detail = r["fn"]((condition or {}).get("measured"), dry_run=dry_run)
+    try:
+        ok, detail = r["fn"]((condition or {}).get("measured"), dry_run=dry_run)
+    except Exception as exc:                                    # one broken remedy must not stop other repairs
+        row.update(outcome="error", before=before, after=UNKNOWN,
+                   why="remedy raised %s: %s; outcome unverified" % (type(exc).__name__, str(exc)[:200]))
+        return write_ledger(row, ledger)
     row.update(ran=bool(ok), detail=str(detail)[:400], before=before)
     if dry_run:
         row.update(outcome="dry run", after=before)
@@ -2221,7 +2227,15 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
                    note="asynchronous -- re-measured by grade_started() once the "
                         "remedy's own window (grade_after_s) has passed")
         return write_ledger(row, ledger)
-    after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
+    try:
+        after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
+    except Exception as exc:
+        row.update(after=UNKNOWN, outcome="unverified",
+                   why="follow-up detector raised %s: %s" % (type(exc).__name__, str(exc)[:200]))
+        return write_ledger(row, ledger)
+    if after == UNKNOWN:
+        row.update(after=UNKNOWN, outcome="unverified", why="follow-up detector could not measure the condition")
+        return write_ledger(row, ledger)
     # A REMEDY THAT DECLINED IS NOT A REMEDY THAT FAILED (2026-09-19). Every
     # quarantine in the ledger on this date was earned by a correct refusal:
     # rehash_bundle twice said "the tree has uncommitted tracked changes" and
