@@ -58,6 +58,11 @@ History at `eb892c047229` removed `covenant_scenarios.py` and
   `private/THESIS_<date>.md`. Missing inputs or failed analysis return nonzero.
   Later runs append rather than overwrite the earlier record.
 
+Those private output files are not published; a reader cannot verify their
+actual contents from this repository. Regression tests use temporary fixtures
+to verify retained findings and append behavior, not any private corpus's
+analysis or conclusions. This audit did not read the private corpus.
+
 Scenario tables use atomic replacement. Corrupt existing tables are reported
 instead of silently reset. A CLI puts away a server it started for analysis
 and leaves an already-running server alone. Actual inference requires local
