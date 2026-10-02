@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import covenant_heal as heal
 import covenant_highway as highway
@@ -72,6 +72,17 @@ class RecoveryTests(unittest.TestCase):
                 self.assertEqual(model.pick_model()[1],model.CANDIDATES[-1][0])
             with patch.object(model,'_runtime_supports_muse',return_value=True),patch.object(model,'free_gb',return_value=None):
                 self.assertNotEqual(model.pick_model()[1],model.MUSE_FILE)
+
+    def test_muse_start_failure_falls_back_to_existing_small_model(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);runtime=root/'llama-server.exe';runtime.write_bytes(b'fixture')
+            for name in (model.MUSE_FILE,model.CANDIDATES[-1][0]):(root/name).write_bytes(b'fixture')
+            proc=Mock(pid=123456)
+            with patch.object(model,'MODELS',td),patch.object(model,'BIN',str(runtime)),patch.object(model,'LOG',str(root/'logs/server.log')),patch.object(model,'STATE',str(root/'ops/state.json')),patch.object(model,'_muse_failed_identity',[None]),patch.object(model,'_runtime_supports_muse',return_value=True),patch.object(model,'free_gb',return_value=25),patch.object(model,'alive',side_effect=[False,False,True]),patch.object(model,'_watch_idle'),patch.object(model.subprocess,'Popen',side_effect=[OSError('fixture unsupported load'),proc]) as launch,patch.dict(os.environ,{},clear=True):
+                ok,why=model.start(say=lambda *_:None)
+                self.assertTrue(ok,why)
+                self.assertEqual(launch.call_count,2)
+                self.assertIn(model.CANDIDATES[-1][0],str(launch.call_args))
 
 
 if __name__ == '__main__':

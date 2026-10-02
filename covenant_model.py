@@ -59,6 +59,20 @@ CANDIDATES = [
 MUSE_FILE = "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf"
 MUSE_NEEDS_GB = 19.0  # estimate including a larger working context; measure after first load
 _runtime_build_cache = {}
+_muse_failed_identity = [None]
+
+
+def _muse_identity():
+    try:
+        s = os.stat(os.path.join(MODELS, MUSE_FILE))
+        try:
+            r = os.stat(BIN)
+            runtime = (r.st_size, r.st_mtime_ns)
+        except OSError:
+            runtime = (None, None)
+        return (MODELS, s.st_size, s.st_mtime_ns) + runtime
+    except OSError:
+        return None
 
 
 def _runtime_supports_muse():
@@ -79,7 +93,7 @@ def _runtime_supports_muse():
 def available_candidates():
     """Add Muse when installed and compatible; existing smaller models remain available."""
     muse = os.path.join(MODELS, MUSE_FILE)
-    if os.path.isfile(muse) and _runtime_supports_muse():
+    if os.path.isfile(muse) and _runtime_supports_muse() and _muse_identity() != _muse_failed_identity[0]:
         return [(MUSE_FILE, MUSE_NEEDS_GB)] + list(CANDIDATES)
     return list(CANDIDATES)
 
@@ -219,7 +233,14 @@ def start(say=print):
     creation = 0x08000000 if os.name == "nt" else 0               # CREATE_NO_WINDOW
     with open(LOG, "a", encoding="utf-8") as lf:
         lf.write("%s start %s (free %s GB, needs %s GB, %d threads)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), name, free_gb(), need, threads))
-        p = subprocess.Popen(args, stdout=lf, stderr=subprocess.STDOUT, creationflags=creation, cwd=os.path.dirname(BIN))
+        try:
+            p = subprocess.Popen(args, stdout=lf, stderr=subprocess.STDOUT, creationflags=creation, cwd=os.path.dirname(BIN))
+        except OSError as e:
+            if name == MUSE_FILE:
+                _muse_failed_identity[0] = _muse_identity()
+                say("Muse could not start; trying an existing smaller model: %s" % e)
+                return start(say=say)
+            return False, "llama-server could not start: %s" % e
     _write_state({"pid": p.pid, "model": name, "started": time.time(), "needs_gb": need, "threads": threads})
     for _ in range(120):                                          # a 4 GB file from a cold disk can take a minute
         if alive():
@@ -228,8 +249,21 @@ def start(say=print):
             say("model server: up, %s, pid %d" % (name, p.pid))
             return True, "up: %s" % name
         if p.poll() is not None:
+            if name == MUSE_FILE:
+                _muse_failed_identity[0] = _muse_identity()
+                say("Muse exited before becoming ready; trying an existing smaller model")
+                return start(say=say)
             return False, "llama-server exited %s -- see %s" % (p.returncode, LOG)
         time.sleep(1)
+    if name == MUSE_FILE:
+        try:
+            p.terminate()
+            p.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            return False, "Muse did not become ready and could not be stopped; see %s" % LOG
+        _muse_failed_identity[0] = _muse_identity()
+        say("Muse timed out; trying an existing smaller model")
+        return start(say=say)
     return False, "llama-server did not answer within 120 s -- see %s" % LOG
 
 
