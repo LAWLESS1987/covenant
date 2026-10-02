@@ -772,6 +772,26 @@ The Fix was followed for the operator's PHONE on 2026-09-14 (see A111): `<tailne
 
 **Status:** open
 
+**Verification correction, 2026-10-01 (A33).** The evidence above mixes a
+tracked-file query with a claim about local files. `git ls-files` can establish
+what Git tracks; it cannot establish whether ignored files exist on a machine,
+whether a folder syncs, or whether a file ever left that machine.
+
+At public commit `36344c9a638b0af16d3b98e076ae1ce85cf44cf5`, the audit checkout
+contains none of the three key files named in INDEX.md. Both the tracked-tree
+listing and `git log --all -- '*.key'` over the fetched references return no
+key paths/commits. The operator reports no keys. The original operator folder,
+backups, historical file locations and sync configuration were not inspected,
+so claims that keys are still present, were never moved, have a backup copy,
+or were exposed are not verified by this audit.
+
+The phone-document part is separate: INDEX.md and phone/PHONE_SETUP.md are
+marked historical; the old PHONE_NODE.md content is under docs/history/.
+Current entry points are mobile/TERMUX_SETUP.md and docs/PARTNER_NODE.md.
+The historical heading/status mismatch above does not certify a key exposure.
+**Current disposition:** historical navigation is marked; a current key
+exposure is not established. No key relocation is called for by this evidence.
+
 ### A34. [minor / docs] /health, which DEPLOYMENT.md calls 'the single status signal naming exactly what is wrong', prints two warnings on the owner's own nodes that do not describe their state -- UNDETERMINED, re-tested 2026-09-16 by tools/audit_a1_a46_status.py
 
 **Evidence:** DEPLOYMENT.md:21-22. Live :5000, :5020, :5060 all warn 'ethics gate has no provider key and is failing CLOSED -- this node will reject every transaction' while configured seat is deferring (student -> GitHub -> fallback) and chain_height is 3; the same warning appears on the working fresh-clone probe. Node A (:5000) also warns 'node minted its OWN genesis -- it cannot converge' while its genesis field equals the shipped genesis.json hash 00009b31c6c654d7... and matches B and C.

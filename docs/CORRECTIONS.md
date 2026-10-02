@@ -16,6 +16,19 @@ perfection is not the goal, mutual benefit and honesty is.*
 
 ---
 
+## Verified documentation corrections, 2026-10-01
+
+- **A33:** the historical file names and an empty tracked-key listing do not
+  establish a local key exposure. INDEX.md and the A33 record now state exactly
+  what the isolated checkout/history check established and what was not read.
+- **Exchange setup:** a repository-location refusal does not measure cloud sync.
+  The existing placement rule remains in force.
+- **README:** the universal verification claim is qualified, and the displayed
+  sweep totals are identified as a published measurement requiring its transcript
+  or a new sweep to reproduce. The missing date is explicitly identified.
+- **Navigation:** the historical phone and local-judge pages now link to existing
+  current setup pages using paths relative to their own directories.
+
 ## The refutations that cost the most
 
 | What was claimed | What is true | Where |

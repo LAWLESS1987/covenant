@@ -4,7 +4,21 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
+> **Verification correction, 2026-10-01.** That opening sentence states the
+> project's intended method, not a guarantee that every published claim is
+> current or correct. The A33 key-file claims, for example, do not establish
+> the state of an operator's filesystem. Consult the dated evidence and limits
+> beside each finding; a passing documentation check does not verify the
+> real-world truth of every sentence.
+
 **v8.40** · source `b708204ff11b` · 12,799 lines · **170 suites, 4,633 checks, 0 failed** on win32 <!--TOTALS-->
+> **Reproduction scope, 2026-10-01.** The totals above are the last published
+> measurement, not the result of this audit or a guarantee about current CI.
+> The sweep transcripts consumed by `readme_totals.py` are not shipped in this
+> checkout; without one, that command reports no transcript and exits 2.
+> The displayed totals line has no measurement date, despite the older prose
+> below describing one. A fresh full sweep is needed to re-measure its counts.
+
 Every field above is re-measured together by `python readme_totals.py --write`:
 the version, hash and line count from the core module itself, the suite and
 check counts from the newest `covenant_one.py --all` transcript. The date on

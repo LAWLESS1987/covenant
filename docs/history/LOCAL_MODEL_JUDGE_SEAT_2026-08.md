@@ -7,7 +7,7 @@
 > **You do not need any of this to run a node.** What judges is the distilled
 > student — a 130 KB JSON model tracked in this repo, read into the node's own
 > process, no socket and no model server (see KNOWN_ISSUES A37). For the current
-> setup, follow the quick start in [README.md](README.md).
+> setup, follow the quick start in [README.md](../../README.md).
 >
 > This page is left in place because it documents how the tuned Ollama seat was
 > built and measured, and deleting the method because the component was retired
