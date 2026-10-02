@@ -91,7 +91,7 @@ class OrbInventoryTests(unittest.TestCase):
                 self.assertEqual(self.row(snapshot, "node:5000:0")["status"], "unknown")
 
     def test_phone_age_and_declared_records_have_strict_types(self):
-        for age in (-1, float("nan"), float("inf"), True, "0.1"):
+        for age in (-1, float("nan"), float("inf"), True, "0.1", 10**1000):
             with self.subTest(age=age):
                 snapshot = healthy()
                 snapshot["detail"]["phone"]["last_checkin_hours"] = age

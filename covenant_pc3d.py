@@ -84,8 +84,11 @@ def orb_inventory(state):
                 {"peer": address, "note": "A peer address does not establish device identity or health."})
     phone = detail.get("phone") if isinstance(detail.get("phone"), dict) else {}
     hours = phone.get("last_checkin_hours")
-    valid_age = (isinstance(hours, (int, float)) and not isinstance(hours, bool)
-                 and math.isfinite(hours) and hours >= 0)
+    try:
+        valid_age = (isinstance(hours, (int, float)) and not isinstance(hours, bool)
+                     and math.isfinite(hours) and hours >= 0)
+    except OverflowError:
+        valid_age = False
     add("phone", "Phone", "ok" if valid_age and hours < 1 else (
         "attention" if valid_age and hours >= 24 else "unknown"),
         "checked in %.1f h ago" % hours if valid_age else "check-in age is not known", "phone", detail.get("phone"))

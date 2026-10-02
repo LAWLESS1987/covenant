@@ -48,6 +48,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import covenant_watchdog as wd
+from watchdog_test_fixture import offline_watchdog_pass
 
 results = []
 
@@ -290,16 +291,21 @@ def main():
     # know the monitor is still watching. A guard on it that cannot tell a live
     # call from a dead one is guarding the sentence, not the thing.
     #
-    # Everything below is stubbed the way test_watchdog_outage.py already
-    # stubs it: no node is probed, none started, nothing real is written.
+    # The actual ledger hook runs, while the pass's unrelated autonomous
+    # maintenance uses shared offline fixtures. Stubbing only health and
+    # start_node leaves Highway and service tending able to start real work.
     import tempfile as _tf
     import covenant_contact as _cc
     _saved_se = (wd.SELF_EVAL_PATH, wd.SELF_EVAL_EVERY, wd.health,
                  wd.start_node, wd.log, dict(wd._self_eval), wd.SELF_EVAL_TOLD,
                  _cc.say)
     _spoke = []
+    _isolation = offline_watchdog_pass(wd)
+    _edges = _isolation.__enter__()
+    _eval_dir = None
     try:
-        _dir = _tf.mkdtemp()
+        _eval_dir = _tf.TemporaryDirectory()
+        _dir = _eval_dir.name
         wd.SELF_EVAL_PATH = os.path.join(_dir, "SELF_EVAL.md")
         # 2026-09-27: the first version of the direct line spoke from HERE --
         # this block put "Self-evaluation round 1: FAIL" on his phone. The told
@@ -341,12 +347,20 @@ def main():
         check("E11e ...and SELF_EVAL_EVERY=0 genuinely silences it, so E11c is "
               "measuring the gate and not just a write that always happens",
               not os.path.exists(wd.SELF_EVAL_PATH))
+        check("E11g both real passes reach Highway and refinement fixtures, "
+              "without starting unrelated maintenance or reaching a socket",
+              _edges["calls"].count("covenant_highway.run_once") == 2
+              and _edges["calls"].count("covenant_refine_loop.tick") == 2
+              and not _edges["external"], _edges)
     finally:
         (wd.SELF_EVAL_PATH, wd.SELF_EVAL_EVERY, wd.health,
          wd.start_node, wd.log) = _saved_se[:5]
         wd._self_eval.clear()
         wd._self_eval.update(_saved_se[5])
         wd.SELF_EVAL_TOLD, _cc.say = _saved_se[6], _saved_se[7]
+        if _eval_dir is not None:
+            _eval_dir.cleanup()
+        _isolation.__exit__(*sys.exc_info())
 
     # E12 -- THE OFFLINE LAYERS (2026-09-19) ------------------------------
     # Added because on 2026-09-19 both of the day's real failures were in

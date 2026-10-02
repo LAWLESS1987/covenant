@@ -20,6 +20,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import covenant_watchdog as W          # noqa: E402
+from watchdog_test_fixture import offline_watchdog_pass
 
 FAILS = []
 RAN = []
@@ -41,7 +42,11 @@ OK = {"warnings": [], "chain_height": 9, "peers": 1, "version": "v8.40", "judge"
 def run(health):
     W.health = health
     _started.clear()
-    W.one_pass()
+    with offline_watchdog_pass(W) as edges:
+        W.one_pass()
+        if (edges["calls"].count("covenant_highway.run_once") != 1
+                or edges["calls"].count("covenant_refine_loop.tick") != 1):
+            raise AssertionError("pass did not exercise the maintenance fixtures")
     return sorted(_started)
 
 
