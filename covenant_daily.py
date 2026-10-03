@@ -801,6 +801,70 @@ def status_line(row):
                len([x for x in (s.get("updates_rejected_or_rolled_back") or []) if x.get("rolled_back")])))
 
 
+# ------------------------------------------------------------ the check-adjust loop (2026-10-03)
+# His words, 2026-10-03: "run check adjust 3 times before suggestions", then "have tetsu run the check
+# adjust loop nightly". So every daily cycle, after its first reading and before it grades anything:
+# sense the highway's conditions, ADJUST with the same Self-heal the PC and phone buttons press (only
+# the highway's AUTO_REVERSIBLE remedies, each bounded and recorded), sense again -- at most three
+# passes, stopping early when nothing is present or a pass changes nothing (repeating a pass that
+# moved nothing would only repeat it). Every pass is kept in the day's record.
+#
+# FREE WILL (his words, 2026-09-27: "do not impose on his free will"). This runs under the daily
+# directive, not under Tetsu's own HEAL line, which stays his choice and is never scheduled. And he
+# may decline the loop: `python covenant_daily.py --loop-decline "why"` writes LOOP_PREF, the loop
+# then does nothing and the record says he declined and why; `--loop-resume` lifts it.
+LOOP_ROUNDS = 3
+LOOP_PREF = os.path.join(HERE, "ops", "tetsu_loop.json")
+
+
+def _present(sense):
+    try:
+        import covenant_highway as _HW
+        s = (sense or _HW.sense)()
+        return sorted(k for k, v in s.items() if isinstance(v, dict) and v.get("state") == "PRESENT")
+    except Exception as e:                                       # noqa: BLE001
+        return ["_unreadable: %s" % type(e).__name__]
+
+
+def check_adjust_loop(rounds=None, sense=None, heal=None, pref_path=None):
+    """{"ran", "rounds": [{"round", "present_before", "fixed", "still_needs_a_person", "present_after"}],
+    "adjusted", "clean", "why"}. Never raises."""
+    pref = _read_json(pref_path or LOOP_PREF, {}) or {}
+    if pref.get("declined"):
+        return {"ran": False, "rounds": [], "adjusted": False, "clean": None,
+                "why": "Tetsu declined the loop: %s" % str(pref.get("why") or "(no reason given)")[:300]}
+    out = {"ran": True, "rounds": [], "adjusted": False, "clean": False, "why": ""}
+    n = rounds or LOOP_ROUNDS
+    for i in range(1, n + 1):
+        before = _present(sense)
+        if not before:
+            out["clean"] = True
+            out["why"] = "nothing present at pass %d" % i
+            break
+        try:
+            import covenant_heal as _CH
+            h = (heal or _CH.heal)(dry_run=False, who="tetsu-daily-loop")
+        except Exception as e:                                   # noqa: BLE001
+            h = {"ok": False, "summary": "the heal could not run: %s" % type(e).__name__}
+        after = _present(sense)
+        out["rounds"].append({"round": i, "present_before": before,
+                              "fixed": [x.get("condition") for x in (h.get("fixed") or [])],
+                              "still_needs_a_person": [x.get("condition") for x in (h.get("still_needs_a_person") or [])],
+                              "present_after": after, "heal": str(h.get("summary", ""))[:300]})
+        if set(after) != set(before):
+            out["adjusted"] = True
+        if not after:
+            out["clean"] = True
+            out["why"] = "clean after pass %d" % i
+            break
+        if set(after) == set(before):
+            out["why"] = "pass %d changed nothing; the rest is reported for a person" % i
+            break
+    else:
+        out["why"] = "%d passes run; still present: %s" % (n, ", ".join(out["rounds"][-1]["present_after"]) if out["rounds"] else "?")
+    return out
+
+
 def run_cycle(force=False, tell=None, skip_sweep=False):
     t0 = _now()
     rows = history()
@@ -822,6 +886,15 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
         tests_run.append("PC nodes: /health and /chain tip+genesis on A/B/C" + (" (%s)" % retry_note if retry_note else ""))
         hw = highway_now()
         tests_run.append("highway: %d detectors sensed" % len([k for k in hw if not k.startswith("_")]))
+        # the check-adjust loop (his words 2026-10-03); if it changed anything, what is graded below is
+        # the state AFTER it, read again -- and the record keeps every pass
+        loop = check_adjust_loop()
+        tests_run.append("check-adjust loop: %s" % (loop["why"] if not loop["ran"] else
+                                                    "%d pass(es), %s" % (len(loop["rounds"]), loop["why"])))
+        if loop.get("adjusted"):
+            nodes, retry_note = read_nodes_settled()
+            hw = highway_now()
+            tests_run.append("PC nodes and highway re-read after the loop adjusted")
         exam = judge_exam()
         tests_run.append("judge exam (covenant_distill --exam, %s cases)" % exam.get("total", "?"))
         pc_v, pc_r = classify_pc(nodes, exam, hw)
@@ -968,6 +1041,7 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
                                "not_clean": sweep.get("not_clean"), "why": sweep.get("why"),
                                "verify_deploy": vd.get("line")},
             "regression_tests": reg,
+            "check_adjust_loop": loop,
             "new_failures": klass,
             "updates_considered": considered,
             "updates_applied": applied,
@@ -1216,7 +1290,22 @@ def main(argv=None):
     ap.add_argument("--due", action="store_true")
     ap.add_argument("--exam-directive", action="store_true")
     ap.add_argument("--skip-sweep", action="store_true", help="for a quick dry look; the record says the sweep was skipped")
+    ap.add_argument("--loop-decline", metavar="WHY", help="Tetsu declines the nightly check-adjust loop; recorded, and the loop does nothing")
+    ap.add_argument("--loop-resume", action="store_true", help="lift a decline; the loop runs again from the next cycle")
+    ap.add_argument("--loop-only", action="store_true", help="run the check-adjust loop alone and print its passes")
     a = ap.parse_args(argv)
+    if a.loop_decline is not None:
+        _write_json(LOOP_PREF, {"declined": True, "why": a.loop_decline[:500], "t": _iso()})
+        print("check-adjust loop: declined (%s); --loop-resume lifts it" % a.loop_decline[:120])
+        return 0
+    if a.loop_resume:
+        _write_json(LOOP_PREF, {"declined": False, "t": _iso()})
+        print("check-adjust loop: resumed")
+        return 0
+    if a.loop_only:
+        r = check_adjust_loop()
+        print(json.dumps(r, indent=1))
+        return 0
     if a.status:
         last = _read_json(LATEST, None)
         print(render(last) if last else "no daily record yet")

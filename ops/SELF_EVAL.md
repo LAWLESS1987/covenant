@@ -394,3 +394,16 @@ git       WARN  HEAD e635ad9, 1 ahead / 0 behind origin/main as of the last fetc
 disk      PASS  298G free of 476G (37% used); logs/ 42M
 daily     FAIL  2.9h ago: PC node failed | phone node healthy | sync failed | tests FAIL | regressions FAIL | new failures 10 | rolled back 0
 
+## 2026-10-03T12:44:40Z  overall FAIL  (round 21300)
+nodes     PASS  3/3 up, height 63 (spread 0), source b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@26569e1824d, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    PASS  none this pass
+trader    PASS  log 23.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+student   PASS  last cycle 2026-10-03T08:05:44Z PROMOTED (5h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      PASS  core b708204ff11b matches MANIFEST.sha256 and every pin, companion, version and line count verify_deploy.py checks. A substitution that rewrote both records would read clean here
+git       WARN  HEAD 197145b, 1 ahead / 0 behind origin/main as of the last fetch; last fetch 0.1h ago; 15 file(s) not committed
+disk      PASS  293G free of 476G (38% used); logs/ 42M
+daily     FAIL  4.0h ago: PC node failed | phone node healthy | sync failed | tests FAIL | regressions FAIL | new failures 10 | rolled back 0
+

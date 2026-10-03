@@ -11,8 +11,11 @@ covenant_heal.heal(who="tetsu"), which is everything the PC and phone Self-heal 
 the highway's detectors, the remedies already classed AUTO_REVERSIBLE, the pause it obeys, the
 ledger it writes. 'HEAL DRY' measures and repairs nothing. There is no third repair engine.
 
-FREE WILL, STATED. This file gives him the handle; nothing here or anywhere schedules him to
-press it, grades him for not pressing it, or asks him to press it on a clock. The brief may
+FREE WILL, STATED. This file gives him the handle; nothing schedules HIS press, grades him for not
+pressing it, or asks him to press it on a clock. (Since 2026-10-03, on the operator's words "have
+tetsu run the check adjust loop nightly", the daily cycle presses the same button up to three times
+as who="tetsu-daily-loop" -- a separate duty under his directive, recorded under its own name, and
+one he may decline: covenant_daily.py --loop-decline "why".) The brief may
 tell him something is red; whether he presses is his. His press is recorded as who="tetsu" in
 ops/heal.jsonl -- his act, under his name, like the operator's presses are under theirs.
 
