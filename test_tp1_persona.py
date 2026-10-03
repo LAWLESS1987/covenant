@@ -198,12 +198,12 @@ def main():
     out4 = P.refine(ask_with({"register": "x" * (P.REGISTER_MAX + 50), "voice": {}, "why": "z"}), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
     check("TP1c an over-long register is refused", not out4["applied"] and "too long" in out4["why"], out4)
     out5 = P.refine(ask_with("I would rather not say."), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
-    check("TP1c a model that answers no JSON changes nothing", not out5["proposed"] and not out5["applied"] and P.load(pp)["register"] == before["register"], out5)
+    check("TP1c a model that answers no JSON changes nothing and leaves feedback retryable", not out5["proposed"] and not out5["applied"] and out5["retryable"] and not out5["feedback_inspected"] and P.load(pp)["register"] == before["register"], out5)
 
     def boom(msgs, max_tokens=0):
         raise RuntimeError("no model")
     out6 = P.refine(boom, judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
-    check("TP1c a model that raises is said, never raised", not out6["proposed"] and "did not answer" in out6["why"], out6)
+    check("TP1c a model that raises is said, never raised, with feedback still pending", not out6["proposed"] and out6["retryable"] and not out6["feedback_inspected"] and "did not answer" in out6["why"], out6)
 
     print("TP1d -- contest: neither side reverses the other alone")
     p = P.load(pp)

@@ -132,10 +132,21 @@ def main():
                   or n == "MANIFEST.sha256" for n in walked),
           sorted(n for n in walked
                  if n.startswith(("PROOF_", "SEAL_")))[:4])
+    first, second = cs.build_manifest(), cs.build_manifest()
+    stable = cs.merkle_root(first) == cs.merkle_root(second)
+    if not stable:
+        # Keep the assertion strict. Diagnose mutation using only relative
+        # paths and sizes; never disclose file contents or their digests.
+        before = {name: (size, digest) for name, size, digest in first}
+        after = {name: (size, digest) for name, size, digest in second}
+        changed = sorted(name for name in before.keys() | after.keys()
+                         if before.get(name) != after.get(name))
+        for name in changed:
+            print("manifest changed: %s size %s -> %s" % (
+                name, before[name][0] if name in before else "absent",
+                after[name][0] if name in after else "absent"), flush=True)
     check("S4 the merkle root is STABLE across two builds -- the property "
-          "S1-S3 exist to protect",
-          cs.merkle_root(cs.build_manifest())
-          == cs.merkle_root(cs.build_manifest()), "")
+          "S1-S3 exist to protect", stable, "manifest changed; see paths above")
 
     p = sum(results)
     print(f"\nM2: {p}/{len(results)} passed")

@@ -8,8 +8,8 @@ Pins covenant_refine_loop (2026-09-21, his words: "refine both constantly"):
   RL1b  new rows: one pass runs, the state records the time and the row count; the same
         rows a minute later: no pass (nothing new); new rows a minute later: no pass (the
         hour); new rows an hour later: a pass.
-  RL1c  a pass that raises is recorded as could-not-run and does not raise; the count
-        moves on so it is not retried every round.
+  RL1c  an unavailable pass preserves the feedback and retries after backoff,
+        never every round; recovery can inspect it without another conversation.
 """
 import json
 import os
@@ -20,6 +20,7 @@ os.environ.setdefault("COVENANT_QUIET", "1")
 TMP = tempfile.mkdtemp(prefix="rl1_")
 os.environ["COVENANT_REFINE_LOOP_STATE"] = os.path.join(TMP, "state.json")
 os.environ["COVENANT_ASK_LOG"] = os.path.join(TMP, "ask.jsonl")
+os.environ["COVENANT_TETSU_BLOCKS"] = os.path.join(TMP, "blocks.json")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -77,9 +78,12 @@ def main():
         raise RuntimeError("no model")
     r = RL.tick(NOW + 11000, refine=boom, ask=None, say=quiet)
     st = json.load(open(os.environ["COVENANT_REFINE_LOOP_STATE"], encoding="utf-8"))
-    check("RL1c a raising pass is recorded as could-not-run, never raised, and the rows move on", not r["ran"] and "could not run" in r["why"] and st["last_rows"] == 6 and "no model" in st["last_why"], (r, st))
-    r = RL.tick(NOW + 15000, refine=boom, ask=None, say=quiet)
-    check("RL1c it is not retried on the same rows", not r["ran"] and "no new conversation" in r["why"], r)
+    check("RL1c a raising pass keeps the unseen row pending with a measured retry time", not r["ran"] and r["attempted"] and "could not run" in r["why"] and st["last_rows"] == 5 and st["pending_retry"] and st["retry_at"] == NOW + 11300 and "no model" in st["last_why"], (r, st))
+    r = RL.tick(NOW + 11060, refine=boom, ask=None, say=quiet)
+    check("RL1c it is not retried on every watcher round", not r["ran"] and not r["attempted"] and "retry delayed" in r["why"], r)
+    r = RL.tick(NOW + 11300, refine=refine, ask=lambda *a, **k: ("", {}), say=quiet)
+    st = json.load(open(os.environ["COVENANT_REFINE_LOOP_STATE"], encoding="utf-8"))
+    check("RL1c recovery inspects the same pending feedback without a new chat", r["ran"] and st["last_rows"] == 6 and not st["pending_retry"] and st["retry_failures"] == 0, (r, st))
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

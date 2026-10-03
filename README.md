@@ -1,5 +1,10 @@
 # Covenant
 
+**2026-10-02 app improvements, prepared for review:** Talk/Council conversation,
+accessible PC and native phone orbs, authenticated retry protection, and
+feedback-preserving persona refinement. See the
+[verified behavior and limits](docs/APP_CONVERSATION_ORBS_2026-10-02.md).
+
 A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.

@@ -442,6 +442,9 @@ SUITES = [
     ("test_im1_immunity.py",              120,  "JUDGE"),
     ("test_mk1_model_keeper.py",          120,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
+    ("test_refinement_feedback.py",       120,  "JUDGE"),
+    ("test_conversation_replay.py",       120,  "SECURITY"),
+    ("test_pc3d_orbs.py",                 120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
     ("test_my1_mycelium.py",              120,  "JUDGE"),
@@ -894,6 +897,7 @@ def stage(say):
                                   or name.endswith(".json")
                                   or name.endswith(".md")
                                   or name.endswith(".sh")
+                                  or (name.startswith("test_") and name.endswith(".cjs"))
                                   or name == "MANIFEST.sha256"):
             try:
                 shutil.copy2(p, work)

@@ -32,6 +32,7 @@ tell a fix from a comment about a fix.
 Run:  python test_a115_rate_limited_is_not_down.py
 """
 import http.server
+from contextlib import contextmanager
 import json
 import os
 import socket
@@ -41,6 +42,7 @@ import time
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from watchdog_test_fixture import offline_watchdog_pass
 
 # A214 (2026-09-21, his word: "Optimize"). Every fixture below answers on
 # loopback in milliseconds or is deliberately silent, so the watchdog's real
@@ -54,6 +56,7 @@ os.environ.setdefault("COVENANT_HEALTH_TIMEOUT", "0.6")
 SLOW_ANSWER_S = float(os.environ.get("COVENANT_HEALTH_TIMEOUT", "0.6")) * 3.5
 
 RESULTS = []
+FIXTURE_PORTS = set()
 
 
 def check(label, ok, detail=""):
@@ -127,6 +130,7 @@ def serve(code, body=None, handler=Stub):
     srv.body = body if body is not None else {"status": "error", "message": "rate limited"}
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
+    FIXTURE_PORTS.add(srv.server_address[1])
     return srv, srv.server_address[1]
 
 
@@ -136,7 +140,40 @@ def closed_port():
     s.bind(("127.0.0.1", 0))
     p = s.getsockname()[1]
     s.close()
+    FIXTURE_PORTS.add(p)
     return p
+
+
+@contextmanager
+def listening_triple():
+    """Own all three ports G7 measures, independent of any installed nodes."""
+    listeners = []
+    for _ in range(32):
+        try:
+            first = socket.socket()
+            listeners.append(first)
+            first.bind(("127.0.0.1", 0))
+            base = first.getsockname()[1]
+            if base + 11 > 65535:
+                raise OSError("fixture triple exceeds port range")
+            for port in (base + 1, base + 11):
+                peer = socket.socket()
+                listeners.append(peer)
+                peer.bind(("127.0.0.1", port))
+            for listener in listeners:
+                listener.listen(32)
+            break
+        except OSError:
+            for listener in listeners:
+                listener.close()
+            listeners = []
+    else:
+        raise RuntimeError("could not reserve a loopback fixture port triple")
+    try:
+        yield base
+    finally:
+        for listener in listeners:
+            listener.close()
 
 
 def main():
@@ -181,9 +218,10 @@ def main():
             srvT.shutdown()
 
         # -------------------------------------------- the restart decision
-        # Drive the real one_pass. Only the two tending helpers are stubbed --
-        # they mine the pending pool and tend a service, which is not what is
-        # being measured and does touch real state.
+        # Drive real health against this suite's ephemeral HTTP fixtures, then
+        # pass the fresh observations to the real restart-decision code. The
+        # unrelated service/Highway/refinement edges use offline fixtures so
+        # the test cannot start maintenance from the staged delivery tree.
         started = []
         orig = (W.NODES, W.start_node, W.tend_seal_service, W.tend_pending,
                 W.log, dict(W._fail_counts))
@@ -194,12 +232,31 @@ def main():
             W.tend_pending = lambda: (tended.append("pool"), "nothing pending")[1]
             W.log = lambda *a, **k: None
 
+            def isolated_pass():
+                ports = {node["port"] for node in W.NODES}
+                if not ports <= FIXTURE_PORTS:
+                    raise AssertionError("health probe outside this suite's fixture ports")
+                # W.health is REAL here, over loopback to only fixtures created
+                # above. Its direct HTTP/error assertions remain unchanged.
+                observed = {port: W.health(port) for port in ports}
+                fixtures = {
+                    "health": lambda port, **kwargs: observed[port],
+                    "tend_seal_service": W.tend_seal_service,
+                    "tend_pending": W.tend_pending,
+                }
+                with offline_watchdog_pass(W, overrides=fixtures) as edges:
+                    result = W.one_pass(strict=False)
+                    if (edges["calls"].count("covenant_highway.run_once") != 1
+                            or edges["calls"].count("covenant_refine_loop.tick") != 1):
+                        raise AssertionError("pass did not exercise maintenance fixtures")
+                    return result
+
             # One node, rate-limited, probed more times than the strike count.
             W.NODES = [{"id": "RL", "port": p429, "db": "unused.db",
                         "key": "unused.db.key", "peers": ""}]
             W._fail_counts = {"RL": 0}
             for _ in range(W.FAIL_BEFORE_RESTART + 2):
-                W.one_pass(strict=False)
+                isolated_pass()
             check("A115.4a a rate-limited node is never restarted",
                   started == [], "start_node called for %s" % (started or "nobody"))
             check("A115.4b and it accrues no strikes",
@@ -216,7 +273,7 @@ def main():
                        {"id": "DEAD", "port": dead, "db": "u.db", "key": "u.key", "peers": ""}]
             W._fail_counts = {"UP": 0, "DEAD": 0}
             for i in range(1, W.FAIL_BEFORE_RESTART + 1):
-                W.one_pass(strict=False)
+                isolated_pass()
                 if i < W.FAIL_BEFORE_RESTART:
                     check("A115.5%s strike %d of %d does not restart yet"
                           % ("abcdef"[i - 1], i, W.FAIL_BEFORE_RESTART),
@@ -236,7 +293,7 @@ def main():
                            {"id": "Z", "port": p429c, "db": "u.db", "key": "u.key", "peers": ""}]
                 W._fail_counts = {"X": 0, "Y": 0, "Z": 0}
                 tended.clear()
-                W.one_pass(strict=False)
+                isolated_pass()
                 check("A115.6a three nodes all rate-limited is NOT 'whole mesh down'",
                       started == [], "restarted %s on the first pass" % (started or "nobody"))
                 # ...and the pass must go on doing its work. `all_down` gates the
@@ -267,7 +324,7 @@ def main():
                            {"id": "R2", "port": p8a, "db": "u.db", "key": "u.key", "peers": ""},
                            {"id": "R3", "port": p8b, "db": "u.db", "key": "u.key", "peers": ""}]
                 W._fail_counts = {"R1": 0, "R2": 0, "R3": 0}
-                alerts = W.one_pass(strict=False) or []
+                alerts = isolated_pass() or []
                 bad = [a for a in alerts if "chain is not running" in a]
                 check("A115.8a an all-429 mesh is NOT reported as 'the chain is not running'",
                       bad == [], "; ".join(bad) or "no such alert")
@@ -284,7 +341,7 @@ def main():
                        {"id": "D2", "port": d9b, "db": "u.db", "key": "u.key", "peers": ""},
                        {"id": "D3", "port": d9c, "db": "u.db", "key": "u.key", "peers": ""}]
             W._fail_counts = {"D1": 0, "D2": 0, "D3": 0}
-            alerts9 = W.one_pass(strict=False) or []
+            alerts9 = isolated_pass() or []
             check("A115.9 a really-dead mesh still reports the chain not running",
                   any("chain is not running" in a for a in alerts9),
                   "; ".join(a for a in alerts9 if "chain" in a)[:90] or "NO SUCH ALERT")
@@ -296,7 +353,7 @@ def main():
                        {"id": "Q", "port": d2, "db": "u.db", "key": "u.key", "peers": ""},
                        {"id": "R", "port": d3, "db": "u.db", "key": "u.key", "peers": ""}]
             W._fail_counts = {"P": 0, "Q": 0, "R": 0}
-            W.one_pass(strict=False)
+            isolated_pass()
             check("A115.7 a really-unreachable mesh still restarts on the first strike",
                   sorted(started) == ["P", "Q", "R"], "restarted %s" % sorted(started))
         finally:
@@ -359,19 +416,29 @@ def main():
     # BLOCKS. Only the accusation against a node defending itself is gone.
     try:
         import launch_check as LC
-        real_answer = LC.node_answer
+        real_nodes, real_answer, real_results = LC.NODES, LC.node_answer, list(LC.results)
         seen = {}
-        for forced, want in (("rate_limited", LC.UNKNOWN),
-                             ("silent", LC.BLOCKED),
-                             ("foreign_http", LC.BLOCKED),
-                             ("ours_limited", LC.PASS),
-                             ("ours", LC.PASS)):
-            LC.node_answer = lambda _p, _f=forced, **_k: (_f, None)
-            LC.results.clear()
-            LC.g7()
-            seen[forced] = LC.results[0]["state"] if LC.results else None
-        LC.node_answer = real_answer
-        LC.results.clear()
+        # Production ports may all be cold in CI or occupied on an installed
+        # PC. G7 must measure our own real sockets, or its correct cold-start
+        # PASS bypasses all the forced holder-classification cases below.
+        with listening_triple() as base:
+            try:
+                LC.NODES = [("FIXTURE", base)]
+                check("A115.13fixture G7 measures its own live port triple",
+                      all(LC.port_busy(port) for port in (base, base + 1, base + 11)),
+                      "real loopback listener, no production ports")
+                for forced, want in (("rate_limited", LC.UNKNOWN),
+                                     ("silent", LC.BLOCKED),
+                                     ("foreign_http", LC.BLOCKED),
+                                     ("ours_limited", LC.PASS),
+                                     ("ours", LC.PASS)):
+                    LC.node_answer = lambda _p, _f=forced, **_k: (_f, None)
+                    LC.results.clear()
+                    LC.g7()
+                    seen[forced] = LC.results[0]["state"] if LC.results else None
+            finally:
+                LC.NODES, LC.node_answer = real_nodes, real_answer
+                LC.results[:] = real_results
         check("A115.13a a RATE-LIMITED node is UNKNOWN to G7, never foreign -- "
               "the launch gate no longer says DO NOT LAUNCH over a node that "
               "is merely protecting itself",

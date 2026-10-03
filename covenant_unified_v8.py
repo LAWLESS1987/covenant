@@ -8335,7 +8335,7 @@ class CovenantAPI:
         # (/health, /mycelium, /anomalies) the dashboard reads -- in the browser,
         # so a stale page cannot pretend to be a calm system.
         # ------------------------------------------------------------------
-        def _tailnet_caller():
+        def _tailnet_caller(with_identity=False):
             """(ok, addr) for the calling request. The gate is `tailnet_ok` first; off the tailnet, a
             request SIGNED by a registered key is the same caller (2026-09-21, A200, his words:
             "create our own native tailnet like mycellium connection incase tail net goes down"):
@@ -8344,12 +8344,19 @@ class CovenantAPI:
             module cannot be read, the address gate alone stands, as before."""
             addr = (request.remote_addr or "").strip()
             if tailnet_ok(addr):
+                if with_identity:
+                    from covenant_conversation import authenticated_reply_key
+                    return True, addr, authenticated_reply_key(addr, request)
                 return True, addr
             try:
                 ok, addr2, _who, _how = importlib.import_module("covenant_mycelium").admit(request, request.get_data() or b"", tailnet_ok)
+                if with_identity:
+                    from covenant_conversation import authenticated_reply_key
+                    identity = authenticated_reply_key(addr2 or addr, request, _who, _how) if ok else None
+                    return bool(ok), addr2 or addr, identity
                 return bool(ok), addr2 or addr
             except Exception:                                     # noqa: BLE001 -- the address gate alone
-                return False, addr
+                return (False, addr, None) if with_identity else (False, addr)
 
         @self.app.route("/m", methods=["GET"])
         def mobile_page():
@@ -8392,6 +8399,8 @@ class CovenantAPI:
         # characters and 30 asks per 10 minutes per caller, answered in the
         # JSON the phone's entry.judge_text returns. M6j-M6o.
         _ask_log = {}
+        from covenant_conversation import ConversationReplies
+        _conversation_replies = ConversationReplies()
 
         @self.app.route("/m/judge", methods=["POST"])
         def mobile_judge():
@@ -8453,16 +8462,21 @@ class CovenantAPI:
         # how they grow toward agents.
         @self.app.route("/m/agent", methods=["POST"])
         def mobile_agent():
-            ok, addr = _tailnet_caller()
+            ok, addr, identity = _tailnet_caller(with_identity=True)
             if not ok:
                 self.node.anomaly_monitor.record("mobile_page_refused", addr or "unknown")
                 return (jsonify({"status": "error", "message": "this door answers the tailnet only -- you are %s" % (addr or "unknown")}), 403)
+            if identity is None:
+                return jsonify({"status": "error", "message": "conversation signature did not verify; send a fresh signed request"}), 403
+            body = request.get_json(silent=True)
+            return _conversation_replies.reply(identity, "agent", body, lambda: _mobile_agent_answer(body, addr))
+
+        def _mobile_agent_answer(body, addr):
             now_ = time.time()
             recent = [t for t in _ask_log.get(addr, []) if now_ - t < 600]
             if len(recent) >= 30:
                 _ask_log[addr] = recent
                 return (jsonify({"status": "error", "message": "30 asks in 10 minutes -- wait"}), 429)
-            body = request.get_json(silent=True)
             text = str(body.get("text", "") if isinstance(body, dict) else "")[:4000]
             if not text.strip():
                 return (jsonify({"status": "error", "message": "nothing to ask"}), 400)
