@@ -7340,6 +7340,14 @@ direct push, the post-commit hook's and the nightly's included, so results now l
 pull request he merges (PR #5 and the PR carrying this entry). And whether the Codex sandbox
 should keep read access to this folder.
 
+**Same day, after his merge: the post-commit hook named the wrong cause.** Under the ruleset every
+commit printed "push of main FAILED -- offline, refused by the opsec guard, or the remote is
+ahead", none of which was true: A231's defect ("a report that names the wrong thing") in a new
+form. `ops/post-commit.autosync` now reads the refusal; when it is the PR rule it says so, pushes
+the commit as a new branch `pending/<sha>` (creation is allowed) and prints the link to open its
+pull request. AS1d drives it against a bare remote that refuses `main` with GitHub's own words;
+with the rule branch removed, AS1d is red.
+
 ---
 
 ### A240. [the Self-heal button restarts the node that is running it, and loses the rest of its pass] 2026-09-28. Found while loading Tetsu's daily-cycle code. FIXED the same day, with the residue named

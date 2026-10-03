@@ -128,6 +128,38 @@ guards were fake because they grepped source text instead of running the code.
 `UNDETERMINED` is a real answer. A tool that resolves everything is lying about
 the part that needs a running node, a second machine, or a decision.
 
+## 10. Everything uses the tombstone system.
+
+The operator's words, 2026-10-03: *"you should use our tombstone system to not
+keep making the same errors"*, then *"everything always uses the tombstone
+system."* Nothing is erased, nothing is quietly restated, and an error that has
+happened once gets a guard so it cannot happen silently again.
+
+- **A claim or a check that was wrong** is never edited in place. It gets
+  **a branch** holding it exactly as written and still runnable
+  (`a126-margin-claim-as-written-2026-09-19`, `x1-ja3-claim-as-written-2026-10-03`),
+  **a tombstone** in `docs/RETRACTED.json` carrying the wording verbatim and a
+  narrow pattern, so `test_r1_retracted.py` fails the build if it returns
+  without citing the retraction, and the tombstone is **driven both ways**: a
+  probe file with the old wording turns R1 red, removing it restores green.
+  Then the restated form, with the reason, beside the old one.
+- **A mistake that is a forgotten step**, not a sentence, cannot be tombstoned
+  by pattern. Its tombstone is a guard at the place the step is forgotten, which
+  runs every time, and is tested both ways (`tools/pin_core.py`, moved by the
+  pre-commit hook after M53 broke six times by hand).
+- **Anything retired** -- a file, a memory, a record, a model, a process's
+  state -- is moved aside with a record of who retired it and why, never
+  deleted (`.trash/`, `ops/students/`, the record kept whole).
+- **Before fixing anything, search the tombstones and the record** for the
+  same shape (`docs/RETRACTED.json`, `docs/KNOWN_ISSUES.md`). If it is there,
+  this is a recurrence: say which instance it is, and ask why the earlier
+  tombstone did not stop it.
+
+*2026-10-03:* the deploy pin was stale for the sixth time and a test pinned one
+judge's behaviour for the third time, both after earlier fixes of the same
+shape -- because those fixes repaired the instance and left nothing behind to
+stop the next one.
+
 ---
 
 **Re-runnable, not remembered:** `python tools/corpus_reconcile.py`,

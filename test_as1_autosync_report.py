@@ -77,6 +77,21 @@ def main():
         landed2, said2 = commit("d.txt")
         check("AS1b aligned remote branch: main lands and no failure is reported",
               landed2 and "pushed main" in said2 and "NOT pushed" not in said2 and "FAILED" not in said2, (landed2, said2))
+        # AS1d (2026-10-03, A243): the remote refuses main the way GitHub's ruleset does, with its words.
+        pre = os.path.join(bare, "hooks", "pre-receive")
+        with open(pre, "w", newline="\n") as fh:
+            fh.write("#!/bin/sh\nwhile read old new ref; do\n  case \"$ref\" in refs/heads/main|refs/heads/sentinel-witness)\n"
+                     "    echo \"- Changes must be made through a pull request.\" >&2\n    exit 1;;\n  esac\ndone\nexit 0\n")
+        os.chmod(pre, 0o755)
+        landed3, said3 = commit("e.txt")
+        sha3 = git(wk, "rev-parse", "--short", "HEAD").stdout.strip()
+        on_branch = git(bare, "rev-parse", "refs/heads/pending/" + sha3).stdout.strip() == git(wk, "rev-parse", "HEAD").stdout.strip()
+        check("AS1d main refused by the PR rule: the report names the rule, not 'offline', and the commit lands as pending/<sha>",
+              not landed3 and on_branch and "PR rule" in said3 and "pending/" + sha3 in said3 and "offline" not in said3,
+              (landed3, on_branch, said3))
+        check("AS1e sentinel-witness refused by the same rule: the report names the rule, never 'what only the remote holds'",
+              "PR rule protects every branch" in said3 and "only the remote copy holds" not in said3, said3)
+        os.remove(pre)
     hooks = os.path.join(HERE, ".git", "hooks")
     inst = os.path.join(hooks, "post-commit")
     # As A117.8b: a checkout with only git's samples (a fresh clone, a CI runner) has no hooks in use and nothing

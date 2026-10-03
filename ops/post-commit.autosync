@@ -27,12 +27,31 @@ git branch -f sentinel-witness main >/dev/null 2>&1
 # Each ref is pushed and reported on its own (2026-09-26, A231). One push of both returned non-zero when only
 # sentinel-witness was refused -- its remote copy predated a rebase of main -- so for a day every commit said
 # "push FAILED" while main had landed. A report that names the wrong thing is the quiet-sync defect again.
-if git push -q origin main >/dev/null 2>&1; then
-  echo "post-commit: pushed main ($(git rev-parse --short HEAD))"
+#
+# THE PR RULE (2026-10-03, A243). From 2026-10-02 the repository's ruleset refuses every direct
+# push ("Changes must be made through a pull request") and this line went on saying "offline,
+# refused by the opsec guard, or the remote is ahead" -- none of which was true. The refusal is
+# read now, and when it is the rule, the commit is put where the rule allows (a NEW branch,
+# pending/<sha>; creation is not refused) and the line to open its pull request is printed, so
+# the work reaches GitHub and the report names the real cause. Merging stays the operator's.
+sha=$(git rev-parse --short HEAD)
+if out=$(git push -q origin main 2>&1); then
+  echo "post-commit: pushed main ($sha)"
+elif echo "$out" | grep -qiE "through a pull request|repository rule violations"; then
+  if git push -q origin "HEAD:refs/heads/pending/$sha" >/dev/null 2>&1; then
+    echo "post-commit: main is protected by the repository's PR rule -- pushed this commit as branch pending/$sha instead." >&2
+    echo "post-commit: open its pull request: https://github.com/LAWLESS1987/covenant/compare/main...pending/$sha?expand=1" >&2
+  else
+    echo "post-commit: main is protected by the repository's PR rule, and pushing branch pending/$sha also FAILED -- nothing of this commit is on GitHub yet" >&2
+  fi
 else
   echo "post-commit: push of main FAILED -- offline, refused by the opsec guard, or the remote is ahead (git pull --rebase, then commit again)" >&2
 fi
-if ! git push -q origin sentinel-witness >/dev/null 2>&1; then
-  echo "post-commit: sentinel-witness NOT pushed (main is unaffected) -- see what only the remote copy holds: git fetch origin sentinel-witness, then git log main..FETCH_HEAD" >&2
+if ! sw=$(git push -q origin sentinel-witness 2>&1); then
+  if echo "$sw" | grep -qiE "through a pull request|repository rule violations"; then
+    echo "post-commit: sentinel-witness not moved -- the repository's PR rule protects every branch, so it follows main only through a pull request (main is unaffected)" >&2
+  else
+    echo "post-commit: sentinel-witness NOT pushed (main is unaffected) -- see what only the remote copy holds: git fetch origin sentinel-witness, then git log main..FETCH_HEAD" >&2
+  fi
 fi
 exit 0
