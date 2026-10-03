@@ -47,7 +47,11 @@ elif echo "$out" | grep -qiE "through a pull request|repository rule violations"
 else
   echo "post-commit: push of main FAILED -- offline, refused by the opsec guard, or the remote is ahead (git pull --rebase, then commit again)" >&2
 fi
-if ! git push -q origin sentinel-witness >/dev/null 2>&1; then
-  echo "post-commit: sentinel-witness NOT pushed (main is unaffected) -- see what only the remote copy holds: git fetch origin sentinel-witness, then git log main..FETCH_HEAD" >&2
+if ! sw=$(git push -q origin sentinel-witness 2>&1); then
+  if echo "$sw" | grep -qiE "through a pull request|repository rule violations"; then
+    echo "post-commit: sentinel-witness not moved -- the repository's PR rule protects every branch, so it follows main only through a pull request (main is unaffected)" >&2
+  else
+    echo "post-commit: sentinel-witness NOT pushed (main is unaffected) -- see what only the remote copy holds: git fetch origin sentinel-witness, then git log main..FETCH_HEAD" >&2
+  fi
 fi
 exit 0
