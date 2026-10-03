@@ -1,5 +1,19 @@
 # realdata/ -- which price files to trust
 
+> **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
+> request ("reflect the scientific method while leaving the substance"). A map
+> onto this page; nothing else on it was changed.*
+>
+> - **Question.** Which price series are sound enough to test a strategy on?
+> - **Method.** Each series checked for daily contiguity, duplicate
+>   timestamps, OHLC sanity and UTC alignment; interior windows re-fetched and
+>   diffed byte for byte; every file's sha256 recorded.
+> - **What was refuted.** The older, shorter series were too short to detect
+>   anything below a very large edge, and one series that looked normal was 70
+>   days stale ([SUPERSEDED](#superseded----do-not-run-a-backtest-on-these)).
+>   They are kept so a result quoted from them can be traced.
+> - **Use.** `realdata/deep/` only.
+
 **Use `realdata/deep/` for everything.** Twelve Kraken daily series,
 2025-01-01 -> 2026-08-21 (or the pair's listing date), each verified for
 86 400 s contiguity, no duplicate timestamps, OHLC sanity and 00:00 UTC

@@ -53,6 +53,26 @@
 > - Item 1 stands as written.
 
 
+> **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
+> request ("reflect the scientific method while leaving the substance"). A map
+> onto this page; nothing else on it was changed.*
+>
+> - **Question.** Can memory shared by several AI agents keep every change
+>   auditable, and keep disagreements visible instead of resolving them away?
+> - **Claim under test.** Nothing is silently discarded: supersede, demote,
+>   re-order, disclose; never erase, never overwrite, never quietly truncate
+>   ([The rule underneath](#the-rule-underneath)).
+> - **Method.** A field test against the source with empirical runs
+>   (`docs/FIELD_TEST_2026-08-29_memory_provenance.md`, section 4), and a test
+>   suite that executes the store, the chain and the HTTP surface.
+> - **What refuted parts of it.** The two corrected blocks above: the claim was
+>   partly true, and the correction itself went stale once and was corrected
+>   again against the code.
+> - **Known limits, measured 2026-10-03.** Ranking does not read supersession,
+>   so a superseded memory can outrank its correction; a direct `put()` does no
+>   overlap detection.
+> - **Reproduce.** `python test_memory_system.py`.
+
 Shared, persistent, **auditable** memory for AI agents. Plain markdown files,
 a hash-chained ledger, and an HTTP API small enough that an agent can learn it
 from `/openapi.json` without being told.

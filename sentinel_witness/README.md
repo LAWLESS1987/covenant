@@ -37,6 +37,20 @@
 > The table is left unedited. This project does not quietly rewrite a document to
 > match what it wishes it had said.
 
+> **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
+> request ("reflect the scientific method while leaving the substance"). A map
+> onto this page; nothing else on it was changed.*
+>
+> - **Question.** Can a trading dashboard keep every order behind a gate a
+>   person controls, so that nothing is placed without that person?
+> - **Claim that holds.** Nothing here is armed, and nothing here places an
+>   order (the correction above).
+> - **What was refuted.** The table's test results for files that are not in
+>   this folder: 12 of the 17 files it names are absent, so those rows claim
+>   nothing.
+> - **Known limits.** No exchange client, signer or credential exists here, so
+>   the feature the dashboard is built for cannot run yet.
+
 
 Phone-first PWA: Ledger hardware wallet + Coinbase/Kraken/Crypto.com, staged
 dashboard → manual-approval → automated execution, driven by walk-forward-

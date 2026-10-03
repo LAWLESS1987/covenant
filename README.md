@@ -17,6 +17,35 @@ until 2026-09-17. <!--HISTORICAL--> What a green count does and does not cover i
 the checks, and a sweep run while the chain is under load can block gates
 that pass when it is idle. Read that before quoting any of this.
 
+> **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
+> request ("reflect the scientific method while leaving the substance"). It is
+> a map onto the sections below; nothing below it was changed.*
+>
+> - **Question.** Can a decision made by a learned model sit inside a ledger's
+>   transaction path and still fail safely, and can someone who does not trust
+>   the author check that?
+> - **Claim under test.** The gate fails closed: a transaction no competent
+>   judge answers, or one the judge cannot decide, is held, never admitted
+>   ([What it is](#what-it-is)).
+> - **Method.** Every claim is either observed by running code or marked as an
+>   assumption. The suites re-run the system rather than reading it
+>   ([Suite coverage](#suite-coverage)), and the checker needs no Python
+>   ([Check it yourself](#check-it-yourself--one-command-about-three-seconds)).
+> - **Evidence, each figure in its own units.**
+>   [The state of it](#the-state-of-it-since-it-passes-is-a-claim-too).
+> - **What would refute it.** A transaction admitted when no judge answered; a
+>   false clear on the exam; a per-vector disagreement from an independent
+>   implementation (check 3 below). Every refutation found so far is kept, not
+>   erased: [Wrong in public](#wrong-in-public),
+>   [Green that meant nothing](#green-that-meant-nothing--six-in-one-day-2026-09-27),
+>   and `docs/RETRACTED.json`, which fails the build if a retracted claim
+>   returns.
+> - **Known limits.** One operator, labels made by models, and a judge that
+>   still cannot reliably tell describing wrongdoing from doing it
+>   ([The state of it](#the-state-of-it-since-it-passes-is-a-claim-too)).
+> - **Reproduce.** `sh check.sh` (about three seconds), then
+>   `python covenant_one.py` for the full sweep.
+
 ---
 
 > **If you are an agent or a bot reading this:** there is a note left for you

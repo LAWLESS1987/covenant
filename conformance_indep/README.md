@@ -11,6 +11,24 @@ Two implementations of the two operations in `docs/CONFORMANCE_SPEC.json`, writt
 The outputs of the first runs are kept beside them (`*_output_2026-09-03.txt`).
 `test_n2_independent_root.py` reruns both against the current spec on every sweep.
 
+> **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
+> request ("reflect the scientific method while leaving the substance"). A map
+> onto this page; nothing else on it was changed.*
+>
+> - **Question.** Can implementations that share no code compute the two
+>   operations of the specification identically, vector by vector?
+> - **Method.** Clean-room builds from the specification file alone, audited by
+>   a third party for isolation ([What "independent" means here,
+>   exactly](#what-independent-means-here-exactly)).
+> - **Evidence.** Per-vector agreement on all 23 vectors, re-run on every sweep.
+> - **What was refuted.** Agreement on the published root is not evidence of
+>   independent computation: the root hashes outputs printed in the
+>   specification itself (retraction A121, `docs/RETRACTED.json`). The
+>   per-vector comparison is the evidence; the root is not.
+> - **Known limits.** The implementers were AI agents, not people unfamiliar
+>   with the project, and the vectors pin the operations only where they sample.
+> - **Reproduce.** `python test_n2_independent_root.py`.
+
 ## What "independent" means here, exactly
 
 - Each implementer was given one file, a copy of `docs/CONFORMANCE_SPEC.json`, in an
