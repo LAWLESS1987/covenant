@@ -103,3 +103,13 @@ ledger still run. The Merkle assertion still compares two complete roots and
 reports changed paths and sizes on failure. These are test-only boundaries;
 the application's independent watchdog capabilities remain enabled. Consult
 the final review checks for the full rerun result.
+
+The intermediate Windows sweep at `d8f5959` passed 176 suites and 4,700
+checks. Linux runs at that head exposed three A115 launch-gate assertions
+whose fixture depended on production ports being occupied. A115 now owns a
+real listening port triple and restores the launch-gate state before its
+unchanged shared-deadline checks. Three focused rounds passed P20 80/80,
+outage 10/10, A115 33/33 and Merkle 21/21; six planted faults were detected.
+The final full runs must verify the corrected head on each platform. Funded
+XRP submission, stopped-chain app integration and database-backed new-node
+joining remain outside this offline sweep.

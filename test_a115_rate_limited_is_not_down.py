@@ -32,6 +32,7 @@ tell a fix from a comment about a fix.
 Run:  python test_a115_rate_limited_is_not_down.py
 """
 import http.server
+from contextlib import contextmanager
 import json
 import os
 import socket
@@ -141,6 +142,38 @@ def closed_port():
     s.close()
     FIXTURE_PORTS.add(p)
     return p
+
+
+@contextmanager
+def listening_triple():
+    """Own all three ports G7 measures, independent of any installed nodes."""
+    listeners = []
+    for _ in range(32):
+        try:
+            first = socket.socket()
+            listeners.append(first)
+            first.bind(("127.0.0.1", 0))
+            base = first.getsockname()[1]
+            if base + 11 > 65535:
+                raise OSError("fixture triple exceeds port range")
+            for port in (base + 1, base + 11):
+                peer = socket.socket()
+                listeners.append(peer)
+                peer.bind(("127.0.0.1", port))
+            for listener in listeners:
+                listener.listen(32)
+            break
+        except OSError:
+            for listener in listeners:
+                listener.close()
+            listeners = []
+    else:
+        raise RuntimeError("could not reserve a loopback fixture port triple")
+    try:
+        yield base
+    finally:
+        for listener in listeners:
+            listener.close()
 
 
 def main():
@@ -383,19 +416,29 @@ def main():
     # BLOCKS. Only the accusation against a node defending itself is gone.
     try:
         import launch_check as LC
-        real_answer = LC.node_answer
+        real_nodes, real_answer, real_results = LC.NODES, LC.node_answer, list(LC.results)
         seen = {}
-        for forced, want in (("rate_limited", LC.UNKNOWN),
-                             ("silent", LC.BLOCKED),
-                             ("foreign_http", LC.BLOCKED),
-                             ("ours_limited", LC.PASS),
-                             ("ours", LC.PASS)):
-            LC.node_answer = lambda _p, _f=forced, **_k: (_f, None)
-            LC.results.clear()
-            LC.g7()
-            seen[forced] = LC.results[0]["state"] if LC.results else None
-        LC.node_answer = real_answer
-        LC.results.clear()
+        # Production ports may all be cold in CI or occupied on an installed
+        # PC. G7 must measure our own real sockets, or its correct cold-start
+        # PASS bypasses all the forced holder-classification cases below.
+        with listening_triple() as base:
+            try:
+                LC.NODES = [("FIXTURE", base)]
+                check("A115.13fixture G7 measures its own live port triple",
+                      all(LC.port_busy(port) for port in (base, base + 1, base + 11)),
+                      "real loopback listener, no production ports")
+                for forced, want in (("rate_limited", LC.UNKNOWN),
+                                     ("silent", LC.BLOCKED),
+                                     ("foreign_http", LC.BLOCKED),
+                                     ("ours_limited", LC.PASS),
+                                     ("ours", LC.PASS)):
+                    LC.node_answer = lambda _p, _f=forced, **_k: (_f, None)
+                    LC.results.clear()
+                    LC.g7()
+                    seen[forced] = LC.results[0]["state"] if LC.results else None
+            finally:
+                LC.NODES, LC.node_answer = real_nodes, real_answer
+                LC.results[:] = real_results
         check("A115.13a a RATE-LIMITED node is UNKNOWN to G7, never foreign -- "
               "the launch gate no longer says DO NOT LAUNCH over a node that "
               "is merely protecting itself",
