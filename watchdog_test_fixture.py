@@ -14,12 +14,15 @@ from unittest.mock import patch
 
 
 @contextmanager
-def offline_watchdog_pass(watchdog):
+def offline_watchdog_pass(watchdog, overrides=None):
     calls, external = [], []
+    overrides = {} if overrides is None else dict(overrides)
 
     def fixture(name, value):
         def invoke(*args, **kwargs):
             calls.append(name)
+            if name in overrides:
+                return overrides[name](*args, **kwargs)
             return value
         return invoke
 
@@ -33,7 +36,7 @@ def offline_watchdog_pass(watchdog):
         directory = stack.enter_context(tempfile.TemporaryDirectory())
         stack.enter_context(patch.object(watchdog, "HERE", directory))
         stack.enter_context(patch.dict(watchdog._self_eval, {"persist": False}))
-        for name, value in (
+        edges = (
             ("tend_seal_service", "up"),
             ("tend_earn_service", "no grant"),
             ("tend_pending", "nothing pending"),
@@ -42,8 +45,13 @@ def offline_watchdog_pass(watchdog):
             ("push_alert", ("disabled", "offline fixture")),
             ("_student_state", {"digest": "fixture", "served": {}, "loaded": []}),
             ("offline_readings", {"repo": ("PASS", "offline fixture")}),
-        ):
+        )
+        if not set(overrides) <= {name for name, _ in edges} | {"health"}:
+            raise ValueError("unknown offline watchdog fixture override")
+        for name, value in edges:
             stack.enter_context(patch.object(watchdog, name, fixture(name, value)))
+        if "health" in overrides:
+            stack.enter_context(patch.object(watchdog, "health", fixture("health", None)))
         for module, name, value in (
             ("covenant_daily_plan", "checkin_report", ([], [])),
             ("covenant_daily_plan", "build_report", ([], [])),
