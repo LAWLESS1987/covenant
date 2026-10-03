@@ -64,6 +64,12 @@ if git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"
   fi
 fi
 
+# ---- 2c. every test file in this commit, run where the runner runs it (2026-10-03: E12r was checked
+# only with .git present and CI went red twice; "run it in the staged copy" had been a note since
+# 09-10). tools/stage_check.py stages the tree as covenant_one does and runs each committed suite
+# there. It reports; like everything here it never blocks.
+python tools/stage_check.py 2>&1 | sed 's/^/pre-commit: /'
+
 # ---- 3. the manifest, on every full commit
 staged=$(git diff --cached --name-only 2>/dev/null)
 if [ -n "$staged" ]; then
