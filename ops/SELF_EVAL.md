@@ -368,3 +368,29 @@ git       PASS  HEAD 36344c9, 0 ahead / 0 behind origin/main as of the last fetc
 disk      PASS  298G free of 476G (37% used); logs/ 42M
 daily     FAIL  0.7h ago: PC node failed | phone node healthy | sync failed | tests FAIL | regressions FAIL | new failures 10 | rolled back 0
 
+## 2026-10-03T10:35:10Z  overall FAIL  (round 21180)
+nodes     WARN  3/3 up, height 63 (spread 62), source 315371e53709/b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@26569e1824d, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  6 live -- first: node A: mesh is running more than one source: we are b708204ff11b, peers report ['315371e53709'] (last heard 3
+trader    PASS  log 21.6h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+student   PASS  last cycle 2026-10-03T08:05:44Z PROMOTED (2h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core b708204ff11b (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at e8a79ee502d8, the core is b708204ff11b; EXPECTED_LINES is 12783, the core has 12799 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       WARN  HEAD e635ad9, 1 ahead / 0 behind origin/main as of the last fetch; last fetch 0.3h ago; 12 file(s) not committed
+disk      PASS  298G free of 476G (37% used); logs/ 42M
+daily     FAIL  1.8h ago: PC node failed | phone node healthy | sync failed | tests FAIL | regressions FAIL | new failures 10 | rolled back 0
+
+## 2026-10-03T11:39:39Z  overall FAIL  (round 21240)
+nodes     WARN  3/3 up, height 63 (spread 62), source 315371e53709/b708204ff11b
+mycelium  PASS  3/3 reporting; links held: A=2, B=2, C=1
+judge     PASS  baseline digest student@26569e1824d, 1 model(s)
+self      PASS  running watchdog matches its file on disk (P14)
+alerts    WARN  7 live -- first: node A: mesh is running more than one source: we are b708204ff11b, peers report ['315371e53709'] (last heard 1
+trader    PASS  log 22.7h old; freshness exit 0: NOT YET DUE: trigger 09:00 plus 5 min grace has not passed.
+student   PASS  last cycle 2026-10-03T08:05:44Z PROMOTED (4h ago); run-without 2/5 met, exam streak 0; unmet: exam_met_streak, panel_coverage_min, own_traffic_hold_max
+repo      FAIL  core b708204ff11b (v8.40) matches MANIFEST.sha256, but verify_deploy.py disagrees with the tree: it pins the core at e8a79ee502d8, the core is b708204ff11b; EXPECTED_LINES is 12783, the core has 12799 lines (checked after a restart) -- stale pins (M53) or a changed file; verify_deploy reads FAIL and refuses every restart it gates. For the core: run K1/K2/P19/A3s on these bytes, then move the pin
+git       WARN  HEAD e635ad9, 1 ahead / 0 behind origin/main as of the last fetch; last fetch 1.4h ago; 13 file(s) not committed
+disk      PASS  298G free of 476G (37% used); logs/ 42M
+daily     FAIL  2.9h ago: PC node failed | phone node healthy | sync failed | tests FAIL | regressions FAIL | new failures 10 | rolled back 0
+

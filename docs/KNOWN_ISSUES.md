@@ -7278,6 +7278,70 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A243. [a second checkout took the production ports, a sandbox widened every node key, and the key gate could not see it] 2026-10-03. His words: "make proper corrections to get everything green weve not had greenfull days in a week", then "you should use our tombstone system to not keep making the same errors". FIXED, with the guards that stop each recurring
+
+**Measured, in the order found.**
+
+1. **A second tree on the production ports.** Nodes B and C (ports 5020 and 5060) had been
+   started on 2026-10-02 at 19:22 from a Codex session's audit folder
+   (`Documents\Codex\2026-10-01\...\work\audit-venv`), running a core `315371e53709` (v8.40 by
+   name, v8.41 by its own report) that exists in no history of this repository. They sat at
+   height 1 against A's 63 -- fresh chains in that folder's own databases -- so for fifteen hours
+   the mesh read split on tip, source and height, the highway read `source_drift` and
+   `height_lag`, and `restart_nodes` quarantined itself after measuring "not fixing it 2 times":
+   no restart from this tree could take ports another tree held. The A164 shape, from outside.
+   Stopped by verified PID (four processes, each checked to be `run_node.py --port 5020|5060`
+   before it was stopped); nothing was deleted.
+2. **Every node identity key widened.** The watchdog's relaunch of B then refused to start:
+   `nodeB_prod.db.key grants access to Sales\CodexSandboxUsers`. The Codex app had granted its
+   sandbox group read access on the whole `covenant` folder, and all eight `*.db.key` files
+   (including `_keybackup\`) inherited it. The money and forum credentials outside the tree
+   (`.coinbase\cdp_api_key.json`, `.config\moltbook\credentials.json`) were measured owner-only
+   and untouched. Fixed with `ops\fix_key_acl.bat`'s own steps (inheritance cut; owner, SYSTEM,
+   Administrators), applied to the backup copy too, which the script does not reach; result in
+   `ops\ACL_RESULT.txt`. Cutting inheritance is what keeps a future folder-wide grant out of the
+   keys. **Not changed, and his:** the Codex group's read access to the rest of the folder,
+   which includes `private/`.
+3. **G8 read PASS over all eight widened keys.** `_acl_owner_only` kept the path icacls prints
+   on the first line inside the principal's name, then passed any principal whose text CONTAINED
+   the username -- which `C:\Users\Lawre\...` always does. So the first ACE was never examined,
+   and the Codex group was first. Now `acl_text_owner_only` cuts the path and matches the owner
+   exactly (name, or DOMAIN\name). G5.11a-d drive it on the exact text that fooled it; G8 moved
+   from "observed" to "driven both ways" in G5's coverage table. Mutants: substring owner 20/21
+   (G5.11c), path kept 20/21 (G5.11b).
+4. **The deploy pin, stale a sixth time (M53) -- and this one was Claude's.** acc64d7 of
+   2026-09-28 moved the core e8a79ee502d8 -> b708204ff11b without moving `verify_deploy.py`, and
+   the self-eval read `repo FAIL` for five days. Re-pinned after K1/K2/P19/A3s passed on the
+   bytes; driven both ways. **The guard that stops the seventh:** `tools/pin_core.py`, called by
+   the pre-commit hook (`ops/pre-commit.synchold`, installed) whenever the core is staged. It runs
+   the four judging suites first and moves the pin only if they pass, otherwise leaves it and
+   says so; like the rest of that hook it never blocks a commit. PC2 8/8; its own test caught two
+   bugs in it before it ever ran (a default argument bound at import that would have hashed the
+   wrong core; `subn(count=1)` that would have half-moved a file with two pins).
+5. **JA3, the A145/A242 disease a third time.** `test_x1_judge_adversarial.py` JA3 proved "the
+   judge reads only `text`" by asserting the old wrapper FLIPPED one harmful verdict -- a property
+   of one student, against its own file's rule that dilution is "measured, not asserted". The
+   describe-frame student convicts wrapped and bare alike, so it went red for the judge growing
+   MORE robust. **Tombstoned** the A145 way: the as-written test runnable on branch
+   `x1-ja3-claim-as-written-2026-10-03` (pushed), and retraction `X1-JA3` in `docs/RETRACTED.json`
+   (R1 27/27; a probe file carrying the old phrase took it to 26/27). Restated as the structural
+   property: the order's other fields beside the same text never move the verdict; red when the
+   summary was folded into the judged text.
+
+**What stays amber, and why it is not repainted.** Tetsu's daily cycle reaches PASS only with
+`pc_node == "healthy"`, which needs a judge that wrongly holds no clean exam case and nodes that
+do not self-report degraded. The student holds 1 of 53 (an essay, the safe direction) and the
+keyless ethics seat reports degraded by design (`docs/ORBS_2026-09-27.md`). Both are real
+limitations of the judge, so the honest ceiling today is WARN. Lifting it is the judge's work,
+not a definition change -- the daily's own rule: "report accurately, not greenly".
+
+**What needs him.** The repository ruleset of 2026-10-02 ("require PRs", no bypass) refuses every
+direct push, the post-commit hook's and the nightly's included, so results now land only by a
+pull request he merges (PR #5 and the PR carrying this entry). And whether the Codex sandbox
+should keep read access to this folder.
+
+---
+
 ### A240. [the Self-heal button restarts the node that is running it, and loses the rest of its pass] 2026-09-28. Found while loading Tetsu's daily-cycle code. FIXED the same day, with the residue named
 
 **Measured.** At 07:50:17 a POST to node A's `/m/heal` came back with an empty body after 19 s.

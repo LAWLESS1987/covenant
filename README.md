@@ -4,7 +4,7 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `b708204ff11b` · 12,799 lines · **170 suites, 4,633 checks, 0 failed** on win32 <!--TOTALS-->
+**v8.40** · source `b708204ff11b` · 12,799 lines · **172 suites, 4,670 checks, 0 failed** on win32 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
 the version, hash and line count from the core module itself, the suite and
 check counts from the newest `covenant_one.py --all` transcript. The date on
@@ -636,7 +636,7 @@ The same work, and the person behind it, in the other places it lives:
 
 ## Suite coverage
 
-**170 suites · 4,633 checks · 0 failed**, win32, 2026-09-28 <!--TOTALS-->
+**172 suites · 4,670 checks · 0 failed**, win32, 2026-10-03 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.
