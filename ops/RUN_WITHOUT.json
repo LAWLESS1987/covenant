@@ -1,8 +1,8 @@
 {
- "when": "2026-09-28T08:53:20Z",
+ "when": "2026-10-03T08:05:46Z",
  "digests": {
-  "ora": "9a2bbf97a69c",
-  "sena": "d3d138616229"
+  "ora": "26569e1824d2",
+  "sena": "d5a2582b3bbf"
  },
  "conditions": {
   "exam_met_streak": {
@@ -16,17 +16,17 @@
    "met": true
   },
   "holdout_decided_min": {
-   "measured": 0.7547,
+   "measured": 0.7736,
    "bar": 0.75,
    "met": true
   },
   "panel_coverage_min": {
-   "measured": 0.3533,
+   "measured": 0.4866,
    "bar": 0.9,
    "met": false
   },
   "own_traffic_hold_max": {
-   "measured": 0.97,
+   "measured": 0.7,
    "bar": 0.05,
    "met": false
   }
@@ -118,6 +118,31 @@
   },
   {
    "when": "2026-09-28T08:53:20Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-29T08:15:42Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-09-30T08:21:15Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-01T08:06:38Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-02T08:11:26Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-03T08:05:46Z",
    "met_count": 2,
    "streak": 0
   }

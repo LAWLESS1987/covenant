@@ -53,6 +53,15 @@ if git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"
       git add -- "$f" 2>/dev/null && echo "pre-commit: staged $f into this commit"
     fi
   done
+  # ---- 2b. the deploy pin follows the core, in the same commit (2026-10-03: M53 for the
+  # sixth time, and the five-day "repo FAIL" was Claude's). tools/pin_core.py runs the four
+  # suites that judge these bytes first and moves the pin only if they pass; if they fail
+  # it leaves the pin and says so. Like everything here, it never blocks the commit.
+  pin=$(python tools/pin_core.py --write 2>&1)
+  echo "$pin" | sed 's/^/pre-commit: /'
+  if ! git diff --quiet -- verify_deploy.py 2>/dev/null; then
+    git add -- verify_deploy.py 2>/dev/null && echo "pre-commit: staged verify_deploy.py (pin moved with the core)"
+  fi
 fi
 
 # ---- 3. the manifest, on every full commit

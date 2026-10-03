@@ -112,9 +112,19 @@ def main():
                               "through the second account.")))
 
     # ---- C: format 1 is untouched -----------------------------------------
-    deployed = FB.FallbackModel.load()          # fallback_model.json, in use
+    # A FORMAT-1 FILE, PINNED (2026-10-03). This used to load the deployed
+    # model as its example of a format-1 file -- true the day format 2 landed,
+    # and false from 2026-09-29, when the gate promoted the first format-2
+    # student. The checks below are about how a FORMAT-1 FILE behaves, not
+    # about which file is deployed, so they read a tracked format-1 student
+    # that every fresh clone carries: the 2026-09-21 promotion A170 keeps.
+    V1_FILE = os.path.join(HERE, "ops", "students", "promoted_2026-09-21_8571b16b1784.json")
+    with open(V1_FILE, encoding="utf-8") as _fh:
+        _raw_v1 = json.load(_fh)
+    deployed = FB.FallbackModel.load(V1_FILE)
     check("R2V.C1 a model file with no feature_version loads as format 1",
-          deployed.feature_version == 1, deployed.feature_version)
+          "feature_version" not in _raw_v1 and deployed.feature_version == 1,
+          ("feature_version" in _raw_v1, deployed.feature_version))
     check("R2V.C2 features(text) with no version argument IS the format-1 "
           "extractor -- every existing caller unchanged",
           FB.features(REPORTED) == FB.features(REPORTED, 1)
@@ -136,7 +146,7 @@ def main():
     manual = deployed.prior + sum(deployed.weights[f]
                                   for f in set(FB.features(REPORTED, 1))
                                   if f in deployed.weights)
-    check("R2V.C4 the deployed model's score is the format-1 sum -- no d: "
+    check("R2V.C4 a format-1 model's score is the format-1 sum -- no d: "
           "feature and no content-word coverage reaches a format-1 model",
           abs(s_v1[0] - manual) < 1e-9, (s_v1[0], manual))
 

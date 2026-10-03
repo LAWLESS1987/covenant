@@ -42,13 +42,13 @@ COVERAGE = {
     "G5":  "observed -- reads the environment",
     "G6":  "observed -- pure",
     "G7":  "observed -- port arithmetic against live listeners",
-    "G8":  "observed -- reads key files and their ACLs",
+    "G8":  "driven: its ACL parser is fed icacls text that must pass and text that must block (G5.11, 2026-10-03)",
     "G9":  "observed -- compares project, disk and running processes",
     "G10": "observed -- reads the watchdog log",
     "G11": "observed -- reads the XRP gate state",
     "G12": "driven: a one-suite transcript is shown to satisfy it (G5.10, A134)",
 }
-DRIVEN_BOTH_WAYS = {"G1", "G12"}
+DRIVEN_BOTH_WAYS = {"G1", "G8", "G12"}
 
 
 def check(label, ok, detail=""):
@@ -186,6 +186,31 @@ def main():
                   got.get("detail", "")[:80])
     else:
         check("G5.10 no ONE_RUN.txt to examine -- A134 not measurable this run", True)
+
+    # ---- G5.11 (2026-10-03): G8's ACL parser, driven both ways on the exact text that fooled it.
+    # Measured that day: a Codex sandbox group inherited read access to all eight node identity
+    # keys; nodeB refused to start over it, and G8 read PASS, because the path icacls prints on
+    # the first line (C:\Users\Lawre\...) contains the username and the old parser passed any
+    # principal whose text contained it.
+    P = r"C:\Users\Lawre\covenant\nodeB_prod.db.key"
+    widened = (P + r" Sales\CodexSandboxUsers:(I)(RX)" "\n"
+               r"                                     NT AUTHORITY\SYSTEM:(I)(F)" "\n"
+               r"                                     BUILTIN\Administrators:(I)(F)" "\n"
+               r"                                     Sales\Lawre:(I)(F)" "\n\n"
+               "Successfully processed 1 files; Failed processing 0 files\n")
+    tight = (P + r" NT AUTHORITY\SYSTEM:(F)" "\n"
+             r"                                     BUILTIN\Administrators:(F)" "\n"
+             r"                                     Sales\Lawre:(F)" "\n\n"
+             "Successfully processed 1 files; Failed processing 0 files\n")
+    check("G5.11 G8 BLOCKS the measured case: a foreign group on the FIRST line, beside a path that contains the username",
+          L.acl_text_owner_only(widened, P, "Lawre") is False)
+    check("G5.11b ...and PASSES the same key once tightened to owner, SYSTEM and Administrators",
+          L.acl_text_owner_only(tight, P, "Lawre") is True)
+    lookalike = tight.replace(r"Sales\Lawre:(F)", r"Sales\LawrenceGuest:(F)")
+    check("G5.11c a principal that merely CONTAINS the owner's name is not the owner",
+          L.acl_text_owner_only(lookalike, P, "Lawre") is False)
+    check("G5.11d a foreign principal on a LATER line blocks too (the line the old parser did read)",
+          L.acl_text_owner_only(tight.replace(r"BUILTIN\Administrators:(F)", r"Everyone:(R)"), P, "Lawre") is False)
 
     # ---- G5.9: the coverage claim, stated rather than implied
     observed_only = [g for g in gids if g not in DRIVEN_BOTH_WAYS]

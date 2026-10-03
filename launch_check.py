@@ -516,20 +516,37 @@ def _acl_owner_only(path):
             return None
     except Exception:
         return None
-    allowed = re.compile(r"(NT AUTHORITY\\SYSTEM|BUILTIN\\Administrators|"
-                         r"OWNER RIGHTS|CREATOR OWNER)", re.I)
-    me = (os.environ.get("USERNAME") or "").lower()
-    for raw in out.stdout.splitlines():
+    return acl_text_owner_only(out.stdout, path, os.environ.get("USERNAME") or "")
+
+
+_ALLOWED_PRINCIPALS = {"nt authority\\system", "builtin\\administrators", "owner rights", "creator owner"}
+
+
+def acl_text_owner_only(text, path, me):
+    """Pure: does this icacls output grant access to nobody but the owner and the system?
+
+    A BLIND SPOT FIXED 2026-10-03. icacls prints the file's own path at the start of its first
+    permission line ("C:\\Users\\Lawre\\...\\nodeB_prod.db.key Sales\\CodexSandboxUsers:(I)(RX)").
+    The old parser kept that path inside the principal's name and then passed any principal whose
+    text CONTAINED the username -- which the path always does. So the first entry was never really
+    examined: a Codex sandbox group inherited read access to all eight node identity keys and G8
+    read PASS while nodeB refused to start over the same file. Now the path is cut off before
+    parsing and the owner must match exactly, by name or as DOMAIN\\name -- never as a substring."""
+    me = (me or "").strip().lower()
+    for raw in (text or "").splitlines():
         line = raw.strip()
-        if not line or line.startswith("Successfully") or path in line and ":(" not in line:
+        if not line or line.startswith("Successfully"):
             continue
-        m = re.match(r"^(?:.*?)([^:]+):\(", line) if ":(" in line else None
-        who = (m.group(1).strip() if m else "").lower()
+        if path and line.lower().startswith(path.lower()):
+            line = line[len(path):].strip()
+        if ":(" not in line:
+            continue
+        who = line.split(":(", 1)[0].strip().lower()
         if not who:
             continue
-        if allowed.search(who):
+        if who in _ALLOWED_PRINCIPALS:
             continue
-        if me and me in who:
+        if me and (who == me or who.endswith("\\" + me)):
             continue
         return False
     return True

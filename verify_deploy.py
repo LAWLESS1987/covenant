@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12783   # 2026-09-27 (stale pins, M53 again: five commits of 09-25..09-27 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12705 at the A210 re-pin of 2026-09-21
+EXPECTED_LINES = 12799   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -114,8 +114,17 @@ MANIFEST = {
     # the self-eval, reading the live nodes after a restart, that caught this
     # one. The constant is right (all three nodes report source_lines 12783),
     # but it is pinned by a check that one common invocation skips.
+    # 2026-10-03: re-pinned, late -- the M53 failure a sixth time, and this one
+    # was Claude's: acc64d7 (2026-09-28: Tetsu's HEAL line in the agent door,
+    # A240's detached restart) moved the core e8a79ee502d8 -> b708204ff11b and
+    # 12783 -> 12799 lines without moving these pins, and the hourly self-eval
+    # read "repo FAIL" for five days. Stale pin, not a bad delivery: the file
+    # is identical to HEAD (git diff empty; the digest differs from git's only
+    # by CRLF), and all three nodes report this digest. K1 20/20, K2 25/25,
+    # P19 23/23 and A3s 51/51 were run against THESE bytes BEFORE this line
+    # moved, the order the b969 lesson below requires.
     "covenant_unified_v8.py":
-        "e8a79ee502d8f6a3c8279d55ca143dca06b0cfd9fc9e3704badcd66a0bf6e507",
+        "b708204ff11ba8ae5d4dce3c1c254f1e3fa9dc653709d235c054d7a9991763e7",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
