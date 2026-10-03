@@ -582,8 +582,14 @@ def main():
     # and the thresholds bite -- driven with the size stubbed both ways, the real one read once.
     real_mb = wd.repo_packed_mb()
     d_now = wd._disk_reading()
-    check("E12r the disk row reports the repository's stored size, read from .git/objects",
-          real_mb is not None and real_mb > 0 and "repository" in d_now[1], (real_mb, d_now))
+    # BOTH TRUTHS (2026-10-03): with a .git here the row reports the stored size; in a tree WITHOUT one
+    # -- the sweep's staged copy, the CI runner's -- there is no repository to measure and the row must
+    # say nothing about size. The first draft demanded a size everywhere and failed CI on both pushes
+    # after it landed (9a1ff52, bb227ca), which a local run with .git present could not show.
+    has_git = os.path.isdir(os.path.join(wd.HERE, ".git", "objects"))
+    check("E12r the disk row reports the repository's stored size where a .git exists, and says nothing about it where none does",
+          (real_mb is not None and real_mb > 0 and "repository" in d_now[1]) if has_git
+          else (real_mb is None and "repository" not in d_now[1]), (has_git, real_mb, d_now))
     _rp = wd.repo_packed_mb
     try:
         wd.repo_packed_mb = lambda root=None: wd.REPO_WARN_MB + 1
