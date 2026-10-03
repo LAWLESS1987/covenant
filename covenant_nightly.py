@@ -39,6 +39,7 @@ import argparse
 import importlib
 import io
 import os
+import subprocess
 import sys
 import time
 
@@ -99,6 +100,32 @@ def tell_him_not_green(lines, say=print):
                                     "nightly: not green", "nightly")
     except Exception as e:                                        # noqa: BLE001
         say("contact: could not tell him: %s" % type(e).__name__)
+        return None
+
+
+COMPACT_ARGV = ["git", "gc", "--prune=never", "--quiet"]
+
+
+def compact_step(say, run=None, measure=None):
+    """THE REPOSITORY STAYS COMPACT (2026-10-03, his words: "efficency is important as is compactness").
+    Measured that day: 4,733 loose objects held this PC's copy at 133.0 MB; one `git gc` made it 17.4 MB,
+    and git's own housekeeping waits for ~6,700 loose objects, which ~600 commits a month reach again.
+    So the nightly packs every night. --prune=never: it compacts and DELETES NOTHING, unreachable objects
+    included (rule 10, tombstones). Reports before -> after; never raises; a failure is said, not fatal."""
+    try:
+        import covenant_watchdog as _W
+        measure = measure or _W.repo_packed_mb
+        before = measure()
+        rc = (run or (lambda argv: subprocess.run(argv, cwd=HERE, capture_output=True, timeout=1800).returncode))(COMPACT_ARGV)
+        after = measure()
+        if rc != 0:
+            say("compact FAILED: git gc exited %s; the repository is unchanged at %s MB" % (rc, before))
+            return None
+        say("compact: repository %.1f MB -> %.1f MB (git gc --prune=never: packed, nothing deleted)"
+            % (before or 0.0, after or 0.0))
+        return before, after
+    except Exception as e:                                       # noqa: BLE001
+        say("compact FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
         return None
 
 
@@ -572,6 +599,8 @@ def main():
             say("live settle FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     practice_step(a, say)
+
+    compact_step(say)
 
     # ARTIFACT STORAGE, EVERY NIGHT. His words 2026-09-27: "optimization has to
     # always happen to keep continuity", after "only keep the 2 most recent at

@@ -578,6 +578,27 @@ def main():
     finally:
         wd._disk_reading = _boom
 
+    # E12r (2026-10-03, compactness watched): the disk row carries the repository's stored size,
+    # and the thresholds bite -- driven with the size stubbed both ways, the real one read once.
+    real_mb = wd.repo_packed_mb()
+    d_now = wd._disk_reading()
+    check("E12r the disk row reports the repository's stored size, read from .git/objects",
+          real_mb is not None and real_mb > 0 and "repository" in d_now[1], (real_mb, d_now))
+    _rp = wd.repo_packed_mb
+    try:
+        wd.repo_packed_mb = lambda root=None: wd.REPO_WARN_MB + 1
+        w = wd._disk_reading()
+        wd.repo_packed_mb = lambda root=None: wd.REPO_FAIL_MB + 1
+        f = wd._disk_reading()
+        wd.repo_packed_mb = lambda root=None: None
+        n = wd._disk_reading()
+    finally:
+        wd.repo_packed_mb = _rp
+    check("E12r ...and turns WARN past %dM and FAIL past %dM; with no .git it says nothing about size"
+          % (wd.REPO_WARN_MB, wd.REPO_FAIL_MB),
+          w[0] == "WARN" and "repository is past" in w[1] and f[0] == "FAIL" and "repository" not in n[1]
+          or (d_now[0] != "PASS"), (w, f, n))
+
     # E12p -- NO NETWORK, pinned by RUNNING it, not by grepping the source.
     # A source grep would fail on the word "fetch" in FETCH_HEAD, which is a
     # local file read; and it would pass a watchdog that reached the network

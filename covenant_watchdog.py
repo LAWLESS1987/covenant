@@ -1074,6 +1074,32 @@ def _git_reading():
     return "PASS", detail
 
 
+# COMPACTNESS, WATCHED (2026-10-03, his words: "efficency is important as is compactness").
+# Measured that day: the repository was 13.7 MB packed after 603 commits in 30 days, and GitHub
+# grows uncomfortable near 1 GB. A cleanup would buy fractions of a megabyte; a reading every hour
+# keeps it compact without anyone remembering to look. The packed size is what a clone and GitHub
+# carry: the sum of git's pack files plus loose objects, read from disk with no subprocess.
+REPO_WARN_MB = 500.0
+REPO_FAIL_MB = 900.0
+
+
+def repo_packed_mb(root=None):
+    """Bytes git stores for this repository, in MB: pack files plus loose objects. None if no .git."""
+    objects = os.path.join(root or HERE, ".git", "objects")
+    if not os.path.isdir(objects):
+        return None
+    total = 0
+    for dirpath, _dirs, files in os.walk(objects):
+        for f in files:
+            if dirpath.endswith("info"):
+                continue
+            try:
+                total += os.path.getsize(os.path.join(dirpath, f))
+            except OSError:
+                pass
+    return total / (1024.0 ** 2)
+
+
 def _disk_reading():
     try:
         du = shutil.disk_usage(HERE)
@@ -1087,13 +1113,19 @@ def _disk_reading():
                 logs += os.path.getsize(os.path.join(root, f))
             except OSError:
                 pass
+    repo = repo_packed_mb()
     detail = (f"{free_g:.0f}G free of {du.total / (1024.0 ** 3):.0f}G "
               f"({du.used * 100 // du.total}% used); logs/ "
-              f"{logs / (1024.0 ** 2):.0f}M")
+              f"{logs / (1024.0 ** 2):.0f}M"
+              + ("" if repo is None else f"; repository {repo:.1f}M stored"))
     if free_g < 5:
         return "FAIL", detail + " -- under 5G free"
+    if repo is not None and repo >= REPO_FAIL_MB:
+        return "FAIL", detail + f" -- the repository is past {REPO_FAIL_MB:.0f}M; GitHub's limit is near"
     if free_g < 20:
         return "WARN", detail + " -- under 20G free"
+    if repo is not None and repo >= REPO_WARN_MB:
+        return "WARN", detail + f" -- the repository is past {REPO_WARN_MB:.0f}M; time to move large outputs out of git"
     return "PASS", detail
 
 
