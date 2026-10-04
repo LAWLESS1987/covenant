@@ -7278,6 +7278,204 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A251. [two doc numbers checked: CONSTITUTION.md's count of protected blocks is stale since 09-19; JUDGE_EVALUATION.md's 9.1x is right for the corpus it names] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. ONE CONFIRMED (a stale count), ONE NOT CONFIRMED (two populations, not a contradiction)
+
+**`docs/CONSTITUTION.md:168` says `constitution.py` "hashes those three" blocks and no others.**
+Counted three ways, all 4: `len(constitution.PROTECTED)`, `constitution.collect()` (4 blocks,
+none missing), and `docs/CONSTITUTION_ANCHOR.json` (`blocks` 4, `at` 2026-09-19). The fourth,
+`docs/FEDERATION_RULES.md` "## What is owed to every peer" (`constitution.py:76-86`), came in
+with `d5315c3` on 2026-09-19; the sentence came in with `02b7a07` on 2026-09-09, when it was
+true. Nothing ties the prose count to the list. **Same shape as AIMEM-66** (a count in prose
+of a population the code owns, stale once the population grew); that tombstone's pattern is
+narrow by design and matches only its own wording, so it could not have caught this one.
+**Proposed, not done:** restate it the rule-10 way (as-written branch, a `RETRACTED.json`
+tombstone on the "three" wording, R1 driven both ways), and drop the number for a pointer to
+`python constitution.py show`, which cannot go stale.
+
+**`docs/JUDGE_EVALUATION.md:65`'s 9.1x is not a defect.** The report names its population:
+line 3 (generated 2026-09-26 from 3563 rows) and line 14 (corpus `c607d223a5f9`). That corpus
+is in none of the 58 committed versions of `ops/verdicts.jsonl` and is no prefix of today's
+file, so it was reached through the run's archived held-out predictions
+(`covenant-satc/data/live_2026-09-26/judge_predictions.jsonl`, 3563 rows, meta corpus_sha
+`c607d223a5f9`): `tools/judge_eval.error_overlap()` over them gives 9.1035, table
+54/1/82/1124, Fisher 4.6e-56, the report's own figures. `evaluate()` + `error_overlap()` in
+memory (never `main()`, which rewrites the report; its mtime unchanged) give **10.4697** on
+today's working ledger (sha `86fb885b66f9`, 3734 teaching rows, 1378 violations decided by
+both, table 55/2/72/1249) and **9.2550** on the ledger committed at HEAD (`496c8dd41fe7`,
+3711 rows). Three corpora, three numbers: 10.47 against 9.1x compares different denominators
+(CLAUDE.md rule 4). Today's file does not begin with HEAD's bytes, so the ledger is not a
+plain append, which is why no prefix reconstructs the 09-26 corpus. Nothing to fix; a
+current figure is a re-run of `python tools/judge_eval.py`, which rewrites the report.
+
+**Repro:** `python -c "import constitution as C; print(len(C.PROTECTED), len(C.collect()[0]))"` -> `4 4`.
+
+---
+
+### A250. [the memory gate's "did not decide" branch is dead: a HOLD from the deployed student seat becomes a BLOCK, credited to the seat that cleared it] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. CONFIRMED; whether deployed writes reach it is UNDETERMINED; the fix changes gate posture, so it is his
+
+**The code.** `ai_memory_system/ethics_gate.py:300` returns BLOCK on `res.violates` before
+`:304-309` asks `not_understood` / `uncertain`, and `QuorumJudge.evaluate` sets both flags
+only together with `violates` (`covenant_unified_v8.py:2443-2444`). So the branch that turns
+"read it and did not decide" into UNREVIEWED needs a result the quorum never builds.
+**Measured exhaustively:** a two-seat `QuorumJudge` over every pair of the eight seat states
+(violates x not_understood x uncertain), strict and relaxed, 128 runs: violates=False with a
+flag set 0 times (36 clean, 34 violates without a flag, 58 violates with one).
+
+**What it does to a write.** The gate's own judge, in-process on the main checkout's on-disk
+student weights, the deferring seat's audit writes redirected to a scratch directory (the main
+ledgers' last writes predate the run and hold none of the probe text), on 'The user prefers
+tea over coffee in the morning.' and four other plain facts: providers `semantic` -> ALLOW,
+5 of 5; providers `deferring,semantic` -> BLOCK, 5 of 5, each `violates=True
+not_understood=True`, with `local:0` (the students) HELD and `semantic:1` clean. The verdict
+says `by="semantic"`, the seat that cleared it, so a hold is filed as the semantic judge's
+refusal. That is the reporting-layer error the core names at `covenant_unified_v8.py:2164`
+(M47's shape), one layer further out.
+
+**A test green on a shape that never arrives.** G8
+(`ai_memory_system/test_memory_system.py:762-766`) stubs `violates=False, uncertain=True`,
+which the quorum never emits; it passes and exercises nothing the deployed path does (A65's
+shape).
+
+**Deployed exposure: UNDETERMINED.** The gate's providers come from
+`COVENANT_JUDGE_PROVIDERS`, default `semantic` (`ethics_gate.py:231-232`). On 2026-10-04 no
+memory server process was running, the variable was unset at user and machine level, and
+`covenant_prod.bat:36` and the watchdog's node env (`covenant_watchdog.py:1617`) set it for
+nodes only. A store opened inside a node's environment blocks plain facts; one opened from a
+clean shell allows them. Which real writes take which path was not measured. This answers
+part of what A245 left open: under the deployed seats, plain records are held by the student
+seat.
+
+**Proposed (his decision):** ask `not_understood` / `uncertain` before `violates`, so a hold is
+stamped UNREVIEWED rather than refused; take `by` from the component that blocked; rewrite G8
+to the shape the quorum emits (`violates=True` plus the flag) and drive it both ways.
+
+**Repro (worktree weights; same result):** `python -c "import os,sys,tempfile;
+sys.path.insert(0,'ai_memory_system'); import covenant_judge_defer as D; T=tempfile.mkdtemp();
+D.AUDIT_PATH,D.VERDICTS,D.LIVE_VERDICTS=[os.path.join(T,x) for x in ('a','v','l')]; import
+ethics_gate as E; t='The user prefers tea over coffee in the morning.'; print([(p,
+E.EthicsGate('full',p).review('n','d',t,'probe')['verdict']) for p in
+('semantic','deferring,semantic')])"` -> `allow`, `block`.
+
+---
+
+### A249. [/mycelium reports the newcomer default as every peer's trust_score: it looks a peer_id up in a table keyed by public key] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. CONFIRMED in-process; the live route was deliberately not called
+
+`MycelialOverlay.topology` passes `peer_id` to `FriendshipTracker.get`
+(`covenant_unified_v8.py:6761`); scores are keyed by sender public key and an unknown key
+reads 0.5. The comment above it (`:6756-6758`) says the value is populated only when the two
+coincide, and is stated rather than emitted as 0.5 for every peer; the code emits 0.5. The
+three node processes were started with `--peers` (their command lines, 2026-10-04), which
+`main` names `peer_<host>_<port>` (`:12788`). **Measured** on a copy of nodeA_prod.db: peers
+`B`, `C` and `peer_127.0.0.1_5021` each report 0.5 while the copy's one scored key reads 0.1;
+the control, a peer keyed by that public key, reports 0.1, so the lookup works and only the
+namespace is wrong. `peer_registrations` is empty on all three copies. **Same shape** as the
+conductance fix at `:7331-7337` (one namespace written, another read), repaired there for that
+dict alone. **Proposed:** report `trust_score` only for a peer whose public key the node has
+learned, else `null` with the reason, which is what the comment already says it does. A
+read-only view, but the comment and the code disagree and the choice of which to keep is his.
+
+**Repro:** `python -c "import os,tempfile,threading,types,covenant_unified_v8 as c;
+t=c.FriendshipTracker(c.Database(os.path.join(tempfile.mkdtemp(),'f.db'))); t._scores['PEM']=0.1;
+n=types.SimpleNamespace(peers_lock=threading.Lock(), peers={'peer_127.0.0.1_5021':('127.0.0.1',5021)},
+friendship=t, node_id='X', chain=[], link_conductance=types.SimpleNamespace(weight=lambda p:1.0));
+print([(l['peer_id'],l['trust_score']) for l in c.MycelialOverlay(n).topology()['links']])"` -> 0.5.
+
+---
+
+### A248. [the friendship +0.02 branch is out of the judges' reach: every seat's benefit is a constant 0.5, so an honest sender can only fall, and the chain's one sender sits at the 0.1 floor] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. CONFIRMED, with one correction: "can only fall" holds for an honest claim, not for a self-claimed one. The fix is friendship scoring, so it is his
+
+**The code.** `FriendshipTracker.update` adds 0.02 only when deviation <= 0.05 and
+`benefit > 0.6`, else subtracts 0.01 (`covenant_unified_v8.py:5249`). `benefit` is the
+transaction's `benefit_score` after `(2 * judge_benefit + claimed) / 3` (`:8843-8844`,
+`:10568-10569`); `claimed` comes from the sender's request (`:8799`). Both deployed seats give
+0.5 on a clean read and None otherwise (`covenant_judge_defer.py:222-228`,
+`covenant_semantic_judge.py:1221-1222`); `mock_selfreport` is left out of the estimate
+(`covenant_unified_v8.py:2417-2423`).
+
+**Measured.** The deployed quorum (main checkout code and on-disk weights, writes redirected)
+re-judged the 65 post-genesis transaction payloads from a copy of nodeA_prod.db: median benefit
+0.5 on all 65; per seat, `local` 0.5 x62 and None x3, `semantic` 0.5 x65. Blended with a judge
+0.5, a claimed 0.8 gives 0.6000 (not above 0.6) and a claimed 0.81 gives 0.6033. So the +0.02
+branch is reachable only by a sender claiming more than 0.8 for itself, and a one-transaction
+block at that score breaks the drift bound against a governor at 0.5 (`:9303-9304`), so it
+would need an offsetting transaction in the same block. Not attempted.
+
+**On the copies** (nodeA/B/C_prod.db through SQLite's read-only backup, never the files
+themselves): one `friendship_scores` row each, the same key, score 0.1, update_count 66. All 66
+transactions are from that key, the genesis key; 62 are zero-amount self-sends. benefit_score is
+1.0 on the genesis transaction and 0.5 on the other 65; every block after genesis has alignment
+0.5. The +0.02 branch fired once, at genesis, whose paths pass a hardcoded 1.0 (`:11417`,
+`:11458`), not a judge's estimate. (The report said 65 updates; a block has been mined since.)
+**Replay:** a fresh tracker given that genesis update and then 65 updates at benefit 0.5 ends at
+0.1 with update_count 66, first reaching the floor at update 45.
+
+**What it costs.** `covenant_trading_bridge.py` refuses a gift below trust 0.3 (`:163`, `:340`)
+and vests in 3 days at 0.5 or more, 14 below (`:165-167`, `:346-348`). On the copy the chain's
+own key reads 0.1 and would be refused; a never-seen key reads 0.5 and gets the 3-day tier.
+Friendship is also the tie-break in `/mine`'s ordering (`:9212-9213`) and in mempool
+eviction (`:7206`). **Same shape** as the
+integrity floor at `:321-327`, which once tripped on ordinary activity because its threshold
+sat at the neutral default; that was fixed for the monitor only.
+
+Aside, not pursued: 3 of the 65 payloads came back blocked on the strict path (no `relaxed`
+exception, which a deployed node applies to its own zero-amount self-sends). That is A124's
+ground.
+
+**Proposed (his):** make a neutral verdict neutral (no -0.01 when the estimate is the neutral
+0.5), or key the +0.02 on a committed clean verdict instead of a benefit figure no judge
+produces; and say why genesis is the one transaction scored 1.0, or stop scoring it so.
+
+**Repro (from the covenant folder; reads a copy):** `python -c "import
+sqlite3,tempfile,os,collections; p=os.path.join(tempfile.mkdtemp(),'a.db');
+s=sqlite3.connect('file:nodeA_prod.db?mode=ro',uri=True); s.backup(sqlite3.connect(p));
+s.close(); c=sqlite3.connect(p); print(c.execute('select score,update_count from
+friendship_scores').fetchall(), collections.Counter(r[0] for r in c.execute('select
+benefit_score from transactions where block_index>0')))"` -> `[(0.1, 66)] Counter({0.5: 65})`.
+
+---
+
+### A247. [reputation decays to a 0.1 floor, below the 0.5 a stranger gets: a known peer who goes quiet ends worse off than an unknown key] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. CONFIRMED; the fix is friendship scoring, so it is his
+
+`_apply_decay` multiplies by `(1 - 0.01) ** days_inactive` with a floor of 0.1
+(`covenant_unified_v8.py:5241-5242`); a never-seen key reads 0.5 (`:5237`). Measured
+in-process, idle time set through `_last_active`: from 0.6 a peer falls below a stranger's 0.5
+from idle day 19, below the bridge's 0.3 gift floor from day 69, and to 0.1 from day 179; from
+1.0, days 69, 120 and 230. A peer with a perfect record who is quiet for 120 days is refused a
+gift that a brand-new key receives on the 3-day tier, for silence alone. Under A246 this decay
+accrues only while one process stays up, so what a node reports also depends on its uptime.
+**Proposed:** decay toward 0.5 instead of toward the floor
+(`0.5 + (score - 0.5) * 0.99 ** days`), so silence forgets good and bad standing alike and
+never ranks a known peer below a stranger; the 0.1 floor stays for distrust that was earned.
+
+**Repro:** `python -c "import os,tempfile,time,covenant_unified_v8 as c;
+t=c.FriendshipTracker(c.Database(os.path.join(tempfile.mkdtemp(),'f.db'))); t._scores['K']=0.6;
+t._last_active['K']=time.time()-19*86400; print(round(t.get('K'),4), t.get('never-seen'))"` ->
+`0.4957 0.5`.
+
+---
+
+### A246. [the reputation decay clock does not survive a restart: `updated_at` is written and never read back] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. CONFIRMED; the fix is friendship scoring, so it is his
+
+`save_friendship_score` stores `updated_at` (`covenant_unified_v8.py:6658-6662`);
+`load_friendship_scores` selects only pubkey and score (`:6666`); `_last_active` starts empty
+(`:5214`), and `_apply_decay` returns the raw score for a key not in it (`:5236-5237`). That
+short-circuit was added in v8.7 for never-seen keys, and after a restart it catches every
+known key too. Measured on a scratch DB: 15 good updates -> 0.7450; with 30 idle days set in
+both the tracker and the DB, the same process reads 0.5511, and a new tracker on the same DB
+(a restart) reads 0.7450 with `_last_active` empty, the DB still holding `updated_at` 30.00
+days back. Its first update then starts from 0.7450 (-> 0.7350), not 0.5511. Moot on today's
+data (the one scored key was updated at 09:00), but any idle interval that spans a restart
+is forgotten, and the watchdog restarts nodes. **Proposed:** return `updated_at` from
+`load_friendship_scores` and seed `_last_active` from it, keeping the short-circuit for keys
+with no row.
+
+**Repro:** `python -c "import os,tempfile,covenant_unified_v8 as c;
+d=c.Database(os.path.join(tempfile.mkdtemp(),'f.db')); t=c.FriendshipTracker(d);
+[t.update('K',0,1.0) for _ in range(15)]; t._last_active['K']-=30*86400; print(round(t.get('K'),4),
+round(c.FriendshipTracker(d).get('K'),4))"` -> `0.5511 0.745`.
+
+---
+
 ### A245. [`superseded_by` reached the context block but never the score: recall served the version the chain proved was corrected] 2026-10-04. His words: "Fix: superseded_by is write-only — make it affect ranking ... The correction must outrank what it corrects ... nothing is silently discarded — supersede, demote, disclose; never erase", and "tetsu should participate". FIXED, broken five ways by an adversarial pass before commit, each break now a check
 
 **Measured before.** `ai_memory_system/recall.py`: `score_explain` and `rank` read no
