@@ -113,6 +113,41 @@ def pick_model():
     return None
 
 
+def readiness():
+    """Could Tetsu answer right now? A READ: it starts nothing and stops nothing.
+
+    WHY (2026-10-04, his words: "find a way to safely ensure tetsus operation"). Measured that
+    morning: 1.44 GB free of 15.3 and the smallest weights need 2.6, so pick_model() returned None
+    and any question to Tetsu would have failed at /m/agent with a 503 that the ask log never
+    records. Nothing said so: the daily cycle's model_state() read {"file": None} and its exam
+    read "not measured", neither of them a failure. The refusal to load is right -- his rule is
+    that the PC stays usable -- but a refusal nobody hears is the silence this project keeps
+    finding. This names it, so the daily cycle can carry it as a failure.
+
+    Returns {"verdict": PASS | FAIL | UNDETERMINED, "why": text, "free_gb": float|None, ...}."""
+    if alive():
+        return {"verdict": "PASS", "why": "up: %s" % (_read_state().get("model") or "?"), "free_gb": free_gb()}
+    if os.environ.get("COVENANT_MODEL_STUB"):
+        return {"verdict": "PASS", "why": "stub", "free_gb": None}
+    if not os.path.isfile(BIN):
+        return {"verdict": "FAIL", "why": "no runtime at %s" % BIN, "free_gb": free_gb()}
+    present = [(n, need) for n, need in CANDIDATES if os.path.isfile(os.path.join(MODELS, n))]
+    if not present:
+        return {"verdict": "FAIL", "why": "no weights under %s" % MODELS, "free_gb": free_gb()}
+    free = free_gb()
+    if free is None:
+        return {"verdict": "UNDETERMINED", "why": "free memory unreadable", "free_gb": None}
+    pick = pick_model()
+    if pick:
+        return {"verdict": "PASS", "why": "would load %s (free %.2f GB, its bar %.1f GB)"
+                % (pick[1], free, _bar(pick[1], pick[2])), "free_gb": free}
+    small, need = present[-1]                     # CANDIDATES is largest first; the last present is the smallest
+    return {"verdict": "FAIL", "free_gb": free, "needs_gb": _bar(small, need), "smallest": small,
+            "why": "Tetsu cannot answer: free %.2f GB, the smallest weights (%s) need %.1f GB -- "
+                   "nothing is loaded and nothing is freed for him; he answers again once that much "
+                   "memory is free" % (free, small, _bar(small, need))}
+
+
 def _read_state():
     try:
         with open(STATE, "r", encoding="utf-8") as fh:

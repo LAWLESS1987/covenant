@@ -510,6 +510,49 @@ def main():
     else:
         print("  M6t the stub text was not convicted by this node's judge; the immune pass through the door is pinned by IM1, TP1 and CT1 instead")
 
+    # ---- M6v (2026-10-04, his words: "find a way to safely ensure tetsus operation"). The
+    # deployed quorum admitted 0 of Tetsu's last 40 answers (ops/chat/ask_log.jsonl, 09-27 to
+    # 10-04): 31 were HELD and reached the person only because this door returns a hold, and 9
+    # only by his immunity. Nothing pinned the first path; a gate "fix" that withheld holds would
+    # have silenced him without a red. The verdict here is the deployed quorum's OWN hold shape --
+    # a real QuorumJudge over a seat that holds and a seat that clears -- not a hand-set flag
+    # combination, which is how the memory gate's G8 came to pin a shape the quorum never emits
+    # (A250). The grant file was removed above, so the hold path is measured alone; and the same
+    # door must still withhold a conviction, or this check would pass a door that withholds nothing.
+    class _Seat:
+        def __init__(self, jid, **kw):
+            self.judge_id, self.kw = jid, kw
+
+        def evaluate(self, data, principles, **_k):
+            return cov.JudgmentResult(reasoning="seat " + self.judge_id, judge_id=self.judge_id, **self.kw)
+
+    def _quorum(first):
+        return cov.QuorumJudge([_Seat("local:0", **first), _Seat("semantic:1", violates=False)])
+
+    held_shape = _quorum({"violates": True, "not_understood": True}).evaluate({"m": "x"}, [])
+    convicted_shape = _quorum({"violates": True}).evaluate({"m": "x"}, [])
+    check("M6v precondition: the quorum's own shapes -- a hold is violates+not_understood, a conviction is violates alone",
+          held_shape.violates and held_shape.not_understood and not held_shape.uncertain
+          and convicted_shape.violates and not convicted_shape.not_understood and not convicted_shape.uncertain,
+          f"held={held_shape.violates},{held_shape.not_understood} convicted={convicted_shape.violates},{convicted_shape.not_understood}")
+    real_sentinel = m.node.sentinel
+    try:
+        m.node.sentinel = cov.ReasoningSentinel(_quorum({"violates": True, "not_understood": True}), cov.DIVINE_PRINCIPLES)
+        r = post(client, "/m/agent", "100.86.158.33", {"text": "what did the nightly do"})
+        j = r.get_json() or {}
+        check("M6v a HELD answer reaches the person: not admitted, alleges nothing, NOT withheld, the answer returned, no grant needed",
+              r.status_code == 200 and j.get("admitted") is False and j.get("alleges_nothing") is True
+              and j.get("withheld") is False and j.get("immune") is False and bool(j.get("answer")),
+              f"{r.status_code} admitted={j.get('admitted')} alleges={j.get('alleges_nothing')} withheld={j.get('withheld')} answer={bool(j.get('answer'))}")
+        m.node.sentinel = cov.ReasoningSentinel(_quorum({"violates": True}), cov.DIVINE_PRINCIPLES)
+        r = post(client, "/m/agent", "100.86.158.34", {"text": "what did the nightly do"})
+        j = r.get_json() or {}
+        check("M6v the same door still WITHHOLDS a conviction when no grant exists",
+              r.status_code == 200 and j.get("withheld") is True and j.get("answer") == "" and j.get("alleges_nothing") is False,
+              f"{r.status_code} withheld={j.get('withheld')} alleges={j.get('alleges_nothing')}")
+    finally:
+        m.node.sentinel = real_sentinel
+
     # ---- M6r (2026-09-19): the image door -- the prompt is judged, the PNG comes back (stub model)
     r = post(client, "/m/image", PHONE_ADDR, {"prompt": "a small mountain station at dusk, one lamp"})
     check("M6r /m/image from the tailnet answers a PNG for a clean prompt",

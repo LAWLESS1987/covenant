@@ -537,6 +537,17 @@ def model_state():
     return {"file": os.path.basename(p), "bytes": st.st_size, "mtime": _iso(st.st_mtime)}
 
 
+def tetsu_readiness():
+    """covenant_model.readiness(), or UNDETERMINED with the reason if the keeper cannot be read.
+    Never a PASS by default: a check that cannot run says so."""
+    try:
+        import covenant_model as M
+        r = M.readiness()
+        return r if isinstance(r, dict) and r.get("verdict") else {"verdict": UNDET, "why": "readiness returned %r" % (r,)}
+    except Exception as e:                                       # noqa: BLE001
+        return {"verdict": UNDET, "why": "readiness unavailable: %s: %s" % (type(e).__name__, str(e)[:160])}
+
+
 def students_state():
     return {s: _sha(os.path.join(HERE, s)) for s in STUDENTS}
 
@@ -928,6 +939,10 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
         git = git_state()
         students = students_state()
         model = model_state()
+        # Can Tetsu answer at all (2026-10-04, his words: "find a way to safely ensure tetsus
+        # operation")? Read BEFORE the exam below loads a model, so it reports the state a person
+        # asking him would meet, not the one the exam just made. covenant_model.readiness().
+        tetsu = tetsu_readiness()
 
         # understanding: one rotating question a day
         qi = int(time.strftime("%j", time.localtime(t0))) % len(QUESTIONS)
@@ -958,6 +973,12 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
             measured.append("highway:")
         if not nightly.get("error"):
             measured.append("nightly:")
+        # A fixed key, so a standing day reads "standing" and a return reads "reappeared"; only a
+        # PASS or FAIL counts as measured -- an unreadable memory carries yesterday's state.
+        if tetsu.get("verdict") == "FAIL":
+            fails["tetsu:cannot_answer"] = tetsu.get("why")
+        if tetsu.get("verdict") in ("PASS", "FAIL"):
+            measured.append("tetsu:")
         klass, cleared, carried = classify_failures(fails, rows, measured=measured)
         fails = dict(fails, **carried)
 
@@ -1041,6 +1062,7 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
                                "not_clean": sweep.get("not_clean"), "why": sweep.get("why"),
                                "verify_deploy": vd.get("line")},
             "regression_tests": reg,
+            "tetsu": tetsu,
             "check_adjust_loop": loop,
             "new_failures": klass,
             "updates_considered": considered,
@@ -1252,8 +1274,11 @@ def watchdog_reading(now=None, rows=None):
         or any(k.startswith(REGRESSION_KINDS) for k in (nf.get("new") or []) + (nf.get("reappeared") or []))
     # PASS only on the exact good values; anything else -- degraded, unverified, UNDETERMINED,
     # INCOMPLETE, a value this code never expected -- is WARN (review, 2026-09-28)
+    # Tetsu unable to answer (2026-10-04) keeps the row off PASS -- WARN, not FAIL: free memory
+    # moves by the hour, and a phone alert each time the PC is busy would be noise he did not ask for.
     good = (s.get("pc_node") == "healthy" and s.get("phone_node") == "healthy" and s.get("synchronization") == "verified"
-            and (s.get("covenant_tests") or {}).get("result") == "PASS" and (s.get("regression_tests") or {}).get("verdict") == "PASS")
+            and (s.get("covenant_tests") or {}).get("result") == "PASS" and (s.get("regression_tests") or {}).get("verdict") == "PASS"
+            and (s.get("tetsu") or {}).get("verdict") != "FAIL")
     return ("FAIL" if bad else ("PASS" if good else "WARN"), "%.1fh ago: %s" % (age_h, line))
 
 

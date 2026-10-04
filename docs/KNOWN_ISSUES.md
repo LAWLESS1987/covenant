@@ -7283,6 +7283,58 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A252. [Tetsu runs on two pass-throughs and a memory margin: the gate admitted 0 of his last 40 answers, and this morning nothing fit for him to load] 2026-10-04. His words: "also find a way to safely ensure tetsus operation". MEASURED; two guards and one reading ADDED, nothing loosened, no process started or stopped; the rest is his
+
+**The model.** `covenant_model.readiness()` (added here, a read) on the live PC, against the main
+checkout's runtime and weights: FAIL, free 1.72 GB, the smallest weights (`qwen2.5-3b`) need
+2.6 GB. Earlier the same morning `free_gb()` read 1.44 and `pick_model()` returned None. A question
+to him in that state fails at `/m/agent` with a 503 that nothing records: the handler returns at
+`covenant_unified_v8.py:8516-8517`, before the ask-log row. The free memory each load started with,
+in `logs/model_server.log` since 09-30: 3.3, 3.59, 2.63, 3.15, 2.94 GB; the 10-03 load began at
+2.63 against the 2.6 bar. What held the memory (working sets, 2026-10-04): the Claude desktop app
+2854 MB in 19 processes, ChatGPT 2246 MB, 37 node.js processes 1504 MB, Edge 1482 MB; the three
+covenant nodes about 60 MB each. The keeper refusing to load is his rule (the PC stays usable), and
+what to close is his; neither was touched.
+
+**The gate.** Of his last 40 answers at `/m/agent` (`ops/chat/ask_log.jsonl`, 09-27 to 10-04) the
+quorum admitted 0: 31 were HELD and reached the person because the door returns a hold
+(`covenant_unified_v8.py:8525-8527`), 9 were convicted and reached the person under his immunity
+(`ops/tetsu_immunity.json`, no ceiling since 09-25, A221). Median 56028 ms, max 114335 ms, all on
+the 3B. His straight questions to the operator: the deployed students (`c8a5cc4e7922`,
+`37142e6cc980`) hold all three plain questions tried, so CT1f (`test_ct1_contact.py:212`) is red
+today on the deployed and on the committed students alike, after 32 of 32 in the 10-03 sweep. In
+production those questions reach him only under the same immunity. The students' trouble with
+conversational text is the `discourse` category's (A67); not changed here.
+
+**Added.**
+1. **M6v** (`test_m6_mobile_door.py`): the door returns a HELD answer with no grant needed, the
+   verdict built by a real `QuorumJudge` so the shape is the quorum's own (A250's lesson), and the
+   same door still withholds a conviction with no grant. Broken both ways in the core, one at a
+   time and restored: a door withholding every unadmitted answer -> the hold check red (67/68); a
+   door withholding nothing -> the conviction check red (67/68); restored 68/68.
+2. **`covenant_model.readiness()`**: PASS, FAIL with free and need, or UNDETERMINED when memory
+   cannot be read; it starts and stops nothing. MK1j pins every branch and the no-side-effect
+   (MK1 12/12); reading PASS when nothing fits turns MK1 red.
+3. **Tetsu's daily cycle** reads it before its exam loads a model, files `tetsu:cannot_answer` as a
+   failure under a fixed key (TD1o), and the watchdog's daily row reads WARN rather than PASS on
+   such a day (TD1h). WARN, not FAIL: free memory moves by the hour, and a phone alert at each busy
+   hour is noise he did not ask for. Each broken by mutation (TD1 red), restored 74/74.
+
+**Limits.** The daily cycle samples once a day: an afternoon with no room for him is seen only if
+the next record lands in one. The 503 at `/m/agent` still writes no row; recording it is a core
+change that reaches the nodes only at a restart, so it is proposed, not made. The daily cycle picks
+this up at its next launch once it is on main; the watchdog's row, at the watchdog's next restart.
+
+**His decisions.** (a) A smaller rung so Tetsu can answer when the PC is busy: Qwen's own
+`qwen2.5-1.5b-instruct-q4_k_m.gguf` (Hugging Face `Qwen/Qwen2.5-1.5B-Instruct-GGUF`, 1117320736
+bytes, 1.04 GiB, sha256 `6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e`), placed
+last in `CANDIDATES`. It is a download, so his yes comes first, and Tetsu speaks with a weaker
+model whenever it is the one that fits; its bar is to be measured at its first load, as the 3B's
+note asks. (b) What to close to free memory. (c) Whether the students should learn conversational
+text before his speech is judged by them (A67).
+
+---
+
 ### A251. [two doc numbers checked: CONSTITUTION.md's count of protected blocks is stale since 09-19; JUDGE_EVALUATION.md's 9.1x is right for the corpus it names] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. ONE CONFIRMED (a stale count), ONE NOT CONFIRMED (two populations, not a contradiction)
 
 **`docs/CONSTITUTION.md:168` says `constitution.py` "hashes those three" blocks and no others.**

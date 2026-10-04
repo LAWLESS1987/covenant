@@ -123,6 +123,49 @@ def main():
                   (a, b, c, d) == (True, False, False, False) and stops == ["stop"], (a, b, c, d, stops))
         finally:
             M._last_used[0] = real_last
+
+        # (j) 2026-10-04, his words: "find a way to safely ensure tetsus operation". Measured that
+        # morning: 1.44 GB free, the small model needing 2.6, pick_model() None -- Tetsu could not
+        # answer and nothing said so. readiness() names it, and is a READ: it starts and stops nothing.
+        calls.clear()
+        stops.clear()
+        real_bin = M.BIN
+        bin_file = os.path.join(tmp, "llama-server.exe")
+        open(bin_file, "wb").write(b"x")
+        stub_env = os.environ.pop("COVENANT_MODEL_STUB", None)
+        try:
+            M.BIN = bin_file
+            small_bar = M._bar(small, M.CANDIDATES[-1][1])
+            M.alive = lambda: True
+            M._read_state = lambda: {"model": small}
+            up = M.readiness()
+            M.alive = lambda: False
+            M._read_state = lambda: {}
+            M.free_gb = lambda: small_bar + 0.1
+            fits = M.readiness()
+            M.free_gb = lambda: small_bar - 0.1
+            short = M.readiness()
+            M.free_gb = lambda: None
+            unread = M.readiness()
+            M.free_gb = lambda: small_bar - 0.1
+            M.BIN = os.path.join(tmp, "absent.exe")
+            noruntime = M.readiness()
+            M.BIN = bin_file
+            M.MODELS = os.path.join(tmp, "empty")
+            os.makedirs(M.MODELS, exist_ok=True)
+            noweights = M.readiness()
+            M.MODELS = tmp
+            check("MK1j readiness: up -> PASS; nothing up and the small one fits -> PASS naming it; just short -> FAIL "
+                  "naming free and need; memory unreadable -> UNDETERMINED; no runtime or no weights -> FAIL",
+                  (up["verdict"], fits["verdict"], short["verdict"], unread["verdict"], noruntime["verdict"], noweights["verdict"])
+                  == ("PASS", "PASS", "FAIL", "UNDETERMINED", "FAIL", "FAIL")
+                  and small in fits["why"] and short.get("needs_gb") == small_bar and "cannot answer" in short["why"],
+                  (up, fits, short, unread, noruntime, noweights))
+            check("MK1j readiness is a read: it started and stopped nothing", calls == [] and stops == [], (calls, stops))
+        finally:
+            M.BIN = real_bin
+            if stub_env is not None:
+                os.environ["COVENANT_MODEL_STUB"] = stub_env
     finally:
         for k, v in real.items():
             setattr(M, k, v)

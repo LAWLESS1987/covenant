@@ -220,6 +220,14 @@ def main():
         nfr = json.loads(json.dumps(new))
         nfr["status"]["new_failures"]["new"] = ["sweep:b.py"]
         check("TD1h a new failing suite reads FAIL (review)", D.watchdog_reading(rows=[nfr])[0] == "FAIL")
+        tw = json.loads(json.dumps(new))
+        tw["status"]["tetsu"] = {"verdict": "FAIL", "why": "Tetsu cannot answer: free 1.44 GB, the smallest weights need 2.6 GB"}
+        tp = json.loads(json.dumps(new))
+        tp["status"]["tetsu"] = {"verdict": "PASS", "why": "up"}
+        check("TD1h an otherwise verified day on which Tetsu could not answer reads WARN, not PASS -- and not FAIL, "
+              "since free memory moves by the hour (2026-10-04)",
+              D.watchdog_reading(rows=[tw])[0] == "WARN" and D.watchdog_reading(rows=[tp])[0] == "PASS",
+              (D.watchdog_reading(rows=[tw]), D.watchdog_reading(rows=[tp])))
         D._write_json(D.LAUNCH_STATE, {"date": "x", "at": time.time() - 5 * 3600})
         check("TD1h started 5 h ago and never recorded reads FAIL, not a WARN forever (review)",
               D.watchdog_reading(rows=[])[0] == "FAIL", D.watchdog_reading(rows=[]))
@@ -319,6 +327,8 @@ def main():
             "node_interpreter": lambda: None,
             "git_state": lambda: {"head": "6c3c48b", "ahead": 0, "behind": 0},
             "model_state": lambda: {"file": "m.gguf"},
+            # the real readiness reads this machine's free memory: stubbed, or the verdict would depend on the hour
+            "tetsu_readiness": lambda: {"verdict": "PASS", "why": "stub"},
             "students_state": lambda: {"fallback_model.json": "9a2bbf97a69c"},
             "directive_exam": lambda which=None, **k: [{"q": which[0], "question": "q", "answer": "no", "passed": True}],
             # the live students are never copied by a test (the first version of this suite did)
@@ -375,6 +385,22 @@ def main():
               row2 and row2["status"]["regression_tests"]["verdict"] == "FAIL"
               and D._read_json(D.VERIFIED, {}) == before and row2["state"]["verified"] is False,
               (row2 or {}).get("status", {}).get("regression_tests"))
+        # TD1o (2026-10-04, his words: "find a way to safely ensure tetsus operation"): a day on which
+        # Tetsu could not answer is a FAILURE in his own record, under a fixed key -- not a silent
+        # {"file": None} and an exam marked "not measured", which is all the cycle said before.
+        stubs3 = dict(stubs, tetsu_readiness=lambda: {"verdict": "FAIL", "free_gb": 1.44, "needs_gb": 2.6,
+                                                       "why": "Tetsu cannot answer: free 1.44 GB, the smallest weights need 2.6 GB"})
+        for k, f in stubs3.items():
+            setattr(D, k, f)
+        try:
+            row3, _m3 = D.run_cycle(force=True, tell=lambda t, w: told.append(t))
+        finally:
+            for k, f in realf.items():
+                setattr(D, k, f)
+        check("TD1o a day on which Tetsu could not answer carries tetsu:cannot_answer as a failure, and status.tetsu FAIL with the reason",
+              bool(row3) and "cannot answer" in str((row3.get("failures") or {}).get("tetsu:cannot_answer"))
+              and (row3["status"].get("tetsu") or {}).get("verdict") == "FAIL",
+              ((row3 or {}).get("failures"), (row3 or {}).get("status", {}).get("tetsu")))
         check("TD1m the readable report has every field name", all(x in open(D.REPORT).read() for x in (
             "PC node:", "Phone node:", "Synchronization:", "Covenant tests:", "Regression tests:", "New failures:",
             "Updates considered:", "Updates applied:", "Updates rejected or rolled back:", "Unresolved issues:",
