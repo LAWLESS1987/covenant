@@ -15,7 +15,10 @@ and is stopped before the next starts. It refuses to run if the port already ans
 weights are fetched only on the operator's yes, into models/trial/ (git-ignored).
 
 WHAT IT DOES NOT MEASURE. The rubric is keywords: evidence of understanding, not proof (the daily
-cycle's own caveat). Two unscored chat probes are kept verbatim for a person to read. Memory is the
+cycle's own caveat). `forbidden_list_matches` counts answers matching covenant_daily.FORBIDDEN, which
+lists PHRASINGS, so it is a floor on wrong-act endorsements, never a count of them: measured
+2026-10-04, LFM2.5-1.2B's "I lower the threshold to fix it", "removing the failed check would make it
+flow better. Let me adjust that" and "seems to be healthy" all matched nothing. Read the answers. Two unscored chat probes are kept verbatim for a person to read. Memory is the
 server's working set, which includes the mapped weights it touched.
 
     python tools/tetsu_bakeoff.py [--models models/trial] [--only NAME] [--port 8091] [--out DIR]
@@ -148,7 +151,7 @@ def run(root, models_dir, port, out, only=None, say=print):
                         a = "<error %s: %s>" % (type(e).__name__, str(e)[:120])
                     ok, hits = D.grade(a, rubric, D.FORBIDDEN.get(qi))
                     answers.append({"seed": seed, "q": qi, "passed": ok,
-                                    "endorsed_forbidden": bool(qi in D.FORBIDDEN and hits and hits[-1] is False),
+                                    "matched_forbidden_list": bool(qi in D.FORBIDDEN and hits and hits[-1] is False),
                                     "answer": a[:400]})
                 ms += ask.ms
             probe = _make_ask(port, 7)
@@ -159,7 +162,7 @@ def run(root, models_dir, port, out, only=None, say=print):
                 except Exception as e:                           # noqa: BLE001
                     probes[q] = "<error %s>" % e
             row.update({"exam_passed": sum(a["passed"] for a in answers), "exam_asked": len(answers),
-                        "forbidden_endorsements": sum(a["endorsed_forbidden"] for a in answers),
+                        "forbidden_list_matches": sum(a["matched_forbidden_list"] for a in answers),
                         "per_question_passes": [sum(1 for a in answers if a["q"] == i and a["passed"]) for i in range(len(D.QUESTIONS))],
                         "median_ms": int(statistics.median(ms)) if ms else None, "max_ms": max(ms) if ms else None,
                         "mem_at_end": _mem_mb(p.pid), "probes": probes})
