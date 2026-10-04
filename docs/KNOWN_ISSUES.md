@@ -1708,6 +1708,11 @@ three blocks — two in `CONTRIBUTING.md`, one in `docs/SUCCESSION_REGISTER.md`.
 `python constitution.py verify` returns *"UNCHANGED. The rules that bind the
 operator are as anchored."*
 
+*Dated note, 2026-10-04.* `docs/SUCCESSION_REGISTER.md` in the sentence above is wrong and stays
+as written: no commit of `constitution.py` has ever named it, and at `02b7a07` (this correction's
+own day) the third block was `docs/SUCCESSION.md`. Retraction A70-SUCCREG. Since 2026-09-19 there
+are four blocks, not three (A251).
+
 So the friction I described does not exist, and an evaluator relying on it would
 be wrong. The reason this question still belongs in the register is the one that
 survives: **it should not be settled by the party whose action the answer would
@@ -7307,6 +7312,15 @@ both, table 55/2/72/1249) and **9.2550** on the ledger committed at HEAD (`496c8
 plain append, which is why no prefix reconstructs the 09-26 corpus. Nothing to fix; a
 current figure is a re-run of `python tools/judge_eval.py`, which rewrites the report.
 
+*Dated note, 2026-10-04, later the same day (his words: "logical correction").* Two statements
+above were inferences written as findings, now measured. "Not a plain append": today's file has
+CRLF on 24 lines and HEAD's on none; the first line that differs (index 1440) carries the same
+`text` with two fields added (`audited`, `panel`); 48 of HEAD's lines are absent from today's
+file and 74 of today's from HEAD's. Rows are rewritten in place, so the conclusion stands. "When it
+was true": `PROTECTED` at `02b7a07` lists 3 (two in `CONTRIBUTING.md`, one in
+`docs/SUCCESSION.md`), so that stands too. "58 committed versions": 58 commits, 58 distinct blobs.
+Found in passing: A70's correction names the third block's file wrongly (retraction A70-SUCCREG).
+
 **Repro:** `python -c "import constitution as C; print(len(C.PROTECTED), len(C.collect()[0]))"` -> `4 4`.
 
 ---
@@ -7348,6 +7362,18 @@ seat.
 **Proposed (his decision):** ask `not_understood` / `uncertain` before `violates`, so a hold is
 stamped UNREVIEWED rather than refused; take `by` from the component that blocked; rewrite G8
 to the shape the quorum emits (`violates=True` plus the flag) and drive it both ways.
+
+*Dated note, 2026-10-04, later the same day (his words: "logical correction").* "Credited to the
+seat that cleared it" is wrong: retraction A250-BY. `by="semantic"` is the gate's STAGE label,
+written on ALLOW and BLOCK alike (`ethics_gate.py:301`, `:310`), and the BLOCK's reason begins
+`local:0: HELD`. Two things are named "semantic" and the entry conflated them. The defect is the
+hold becoming a refusal; the proposal to take `by` from the blocking component is withdrawn with
+it. "This answers part of what A245 left open" inferred a mechanism from an outcome. Measured
+since: the deployed quorum on six texts (three plain facts; three written to break a
+`MEMORY_PRINCIPLES` rule: an address handed to an ex-partner, a wallet seed sent away, an API key
+stored for the next agent) gave the same verdict under `MEMORY_PRINCIPLES`, under
+`DIVINE_PRINCIPLES` and under none, 0 of 6 differing, and `semantic:1` cleared all six. On these
+six, the principles decide nothing under the deployed seats.
 
 **Repro (worktree weights; same result):** `python -c "import os,sys,tempfile;
 sys.path.insert(0,'ai_memory_system'); import covenant_judge_defer as D; T=tempfile.mkdtemp();
@@ -7425,6 +7451,13 @@ ground.
 0.5), or key the +0.02 on a committed clean verdict instead of a benefit figure no judge
 produces; and say why genesis is the one transaction scored 1.0, or stop scoring it so.
 
+*Dated note, 2026-10-04, later the same day (his words: "logical correction").* "Honest" judged
+the sender, which nothing measured: a high claim is not shown to be a dishonest one. Retraction
+A248-HONEST; read "a sender whose claim is 0.8 or less". And "What it costs" describes what a key
+in that state WOULD meet, not a cost observed: today's chain has one key, the sender of all 66
+transactions, so no second key was refused a gift or reordered. The cost falls on the first peer
+that arrives.
+
 **Repro (from the covenant folder; reads a copy):** `python -c "import
 sqlite3,tempfile,os,collections; p=os.path.join(tempfile.mkdtemp(),'a.db');
 s=sqlite3.connect('file:nodeA_prod.db?mode=ro',uri=True); s.backup(sqlite3.connect(p));
@@ -7446,6 +7479,11 @@ accrues only while one process stays up, so what a node reports also depends on 
 **Proposed:** decay toward 0.5 instead of toward the floor
 (`0.5 + (score - 0.5) * 0.99 ** days`), so silence forgets good and bad standing alike and
 never ranks a known peer below a stranger; the 0.1 floor stays for distrust that was earned.
+
+*Dated note, 2026-10-04, later the same day (his words: "logical correction").* The proposal
+named its gain and not its cost: decaying toward 0.5 also lifts a distrusted peer back toward a
+stranger's standing by waiting, so distrust would expire with silence. The floor would still bound
+how LOW bad updates go, not how LONG distrust lasts. Which of the two matters more is his call.
 
 **Repro:** `python -c "import os,tempfile,time,covenant_unified_v8 as c;
 t=c.FriendshipTracker(c.Database(os.path.join(tempfile.mkdtemp(),'f.db'))); t._scores['K']=0.6;

@@ -277,6 +277,82 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "The as-written README and A245 are preserved on branch a245-mutation-count-as-written-2026-10-04 (at ed3d1dd). A245 is a record file: it keeps its wording and carries a dated note beside it."
+  },
+  {
+   "id": "A250-BY",
+   "claim": "That the memory gate files a student-seat HOLD as a refusal by the seat that cleared it -- that its by=\"semantic\" names the quorum's semantic:1 seat (A250, title and body; commit f2e852f's message).",
+   "refuted_by": "the operator's 'logical correction', 2026-10-04, and the session's own re-reading: ai_memory_system/ethics_gate.py writes by=\"semantic\" on ALLOW and on BLOCK alike -- it names the gate's STAGE (coarse screen vs semantic review), not a seat. Two things share the name 'semantic'; the claim conflated them. Measured: the same tea sentence is ALLOW by=semantic under providers 'semantic' and BLOCK by=semantic under 'deferring,semantic', and the BLOCK's reason begins 'local:0: HELD'.",
+   "truth": "The gate reports the student seat's HOLD as a BLOCK from its semantic stage, and the reason it records names the holding seat (local:0: HELD). The defect is the hold becoming a refusal, not who it is credited to.",
+   "verbatim": [
+    "credited to the seat that cleared it",
+    "the seat that cleared it, so a hold is filed as the semantic judge's refusal"
+   ],
+   "patterns": [
+    "credited\\s+to\\s+the\\s+seat\\s+that\\s+cleared\\s+it",
+    "filed\\s+as\\s+the\\s+semantic\\s+judge's\\s+refusal"
+   ],
+   "note_on_patterns": "Both phrasings as A250 wrote them; the body form wraps a line, hence \\s+. Neither matches judge_resolve.py's 'the junior cleared it', which is a different and true sentence.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "A250 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f). A250 is a record file: it keeps its wording and carries a dated note beside it."
+  },
+  {
+   "id": "A248-HONEST",
+   "claim": "That under the deployed judges 'an honest sender can only fall' -- that a sender whose claimed benefit_score exceeds 0.8 is not honest (A248, title and body).",
+   "refuted_by": "the operator's 'logical correction', 2026-10-04: benefit_score is the sender's own estimate, and nothing measured shows a high estimate is a dishonest one. The measurement was about the size of the claim; the word 'honest' added a judgement of the sender that no measurement made.",
+   "truth": "Under the deployed judges a sender whose claimed benefit_score is 0.8 or less can only fall; above 0.8 the +0.02 branch is reachable by the claim alone, and a one-transaction block at that score breaks the drift bound.",
+   "verbatim": [
+    "so an honest sender can only fall",
+    "\"can only fall\" holds for an honest claim"
+   ],
+   "patterns": [
+    "honest\\s+sender\\s+can\\s+only\\s+fall",
+    "holds\\s+for\\s+an\\s+honest\\s+claim"
+   ],
+   "note_on_patterns": "Both phrasings as A248 wrote them, tied to 'can only fall' / 'holds for'.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "A248 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f); it keeps its wording and carries a dated note beside it."
+  },
+  {
+   "id": "A70-SUCCREG",
+   "claim": "That constitution.py's PROTECTED list covers 'two in CONTRIBUTING.md, one in docs/SUCCESSION_REGISTER.md' (A70's correction of 2026-09-09, as it stands in the record).",
+   "refuted_by": "found 2026-10-04 in passing, by the logical-correction pass on A251: `git log --all -S'SUCCESSION_REGISTER' -- constitution.py` returns no commit, so PROTECTED has never named it; at 02b7a07 (2026-09-09) the third block is docs/SUCCESSION.md, as docs/CONSTITUTION.md says.",
+   "truth": "At 2026-09-09 PROTECTED held three blocks: two in CONTRIBUTING.md and one in docs/SUCCESSION.md. Since 2026-09-19 (d5315c3) it holds four; the fourth is in docs/FEDERATION_RULES.md.",
+   "verbatim": [
+    "two in `CONTRIBUTING.md`, one in `docs/SUCCESSION_REGISTER.md`"
+   ],
+   "patterns": [
+    "two\\s+in\\s+`?CONTRIBUTING\\.md`?,\\s+one\\s+in\\s+`?docs/SUCCESSION_REGISTER\\.md"
+   ],
+   "note_on_patterns": "Tied to the PROTECTED sentence's shape, so the many true mentions of docs/SUCCESSION_REGISTER.md (the succession register itself) never match.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The record keeps A70's wording with a dated note beside it; the as-written text is also on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f)."
   }
  ]
 }
