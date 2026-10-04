@@ -72,8 +72,10 @@
 > superseded by another has no newer side, so none is demoted
 > (`supersede_cycle`). Checks SR1-SR12 in `test_memory_system.py` (14 checks;
 > the suite reads 154/154). An adversarial pass broke the first version five
-> ways before it was committed; each break is now a check, and 13 mutations of
-> `recall.py` are each caught. Record: A245 in `docs/KNOWN_ISSUES.md`.
+> ways before it was committed; each break is now a check, and twelve mutations
+> of `recall.py` are each caught. Record: A245 in `docs/KNOWN_ISSUES.md`.
+> *(This block first said thirteen; the count had included the unmutated
+> baseline. Retraction A245-MUT13.)*
 
 
 > **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's

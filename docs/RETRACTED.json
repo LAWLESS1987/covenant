@@ -251,6 +251,32 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "Both files as written are preserved on branch aimem-66-count-as-written-2026-10-04 (at e4f17d6). The sweep transcripts hold what past runs printed, unedited."
+  },
+  {
+   "id": "A245-MUT13",
+   "claim": "That thirteen mutations of the fixed recall.py were each caught (ai_memory_system/README.md, the FIXED block: '13 mutations of `recall.py` are each caught'; A245; commit 0fdf6bb's message).",
+   "refuted_by": "re-counted 2026-10-04 by the session that wrote it, in its end pass: the drive script ran thirteen CASES, and one of them was HEAD's unmutated recall.py -- the baseline, not a mutation. The mutations were twelve, and A245's own list names twelve. The unit was wrong (rule 4): cases counted as mutations.",
+   "truth": "Twelve mutations of the fixed recall.py, each caught by a named check (A245 lists them); plus the baseline, HEAD's recall.py, on which the SR section fails from SR1.",
+   "verbatim": [
+    "13 mutations of",
+    "Thirteen mutations of the fixed `recall.py`"
+   ],
+   "patterns": [
+    "13\\s+mutations\\s+of[\\s>]+`?recall\\.py",
+    "[Tt]hirteen\\s+mutations\\s+of\\s+the\\s+fixed\\s+`?recall\\.py"
+   ],
+   "note_on_patterns": "Both written forms, tied to recall.py; the README's form wraps across a quoted line, hence [\\s>]+.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The as-written README and A245 are preserved on branch a245-mutation-count-as-written-2026-10-04 (at ed3d1dd). A245 is a record file: it keeps its wording and carries a dated note beside it."
   }
  ]
 }

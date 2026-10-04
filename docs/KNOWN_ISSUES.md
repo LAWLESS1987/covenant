@@ -7329,6 +7329,11 @@ SR6, SR9, SR10), a fixed step instead of the factor (SR10), cycle penalty kept (
 (SR2, SR3), review case-sensitive (SR12), strength-only context order (SR7), `with_successors`
 pulling nothing (SR8).
 
+*Dated note, 2026-10-04, same day.* "Thirteen" above is wrong, and stays as written: the drive
+ran thirteen cases, one of them HEAD's unmutated `recall.py`. The mutations are the twelve this
+paragraph lists. Retraction A245-MUT13; the as-written text is on branch
+`a245-mutation-count-as-written-2026-10-04`.
+
 **What it does not do.** "Checked" means the gate ran on the write and allowed it; whether
 `MEMORY_PRINCIPLES` decide verdicts under the deployed seats was reported doubtful by the
 2026-10-04 verification workflow and is not re-measured here. `review` is node-local, so two
