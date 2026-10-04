@@ -106,7 +106,7 @@ def baseline(root):
     return out
 
 
-def run(root, models_dir, port, out, only=None, say=print):
+def run(root, models_dir, port, out, only=None, say=print, system_kind="exam"):
     sys.path.insert(0, root)
     os.environ.setdefault("COVENANT_QUIET", "1")
     import covenant_unified_v8 as cov      # noqa: E402
@@ -115,11 +115,13 @@ def run(root, models_dir, port, out, only=None, say=print):
     import covenant_model as M             # noqa: E402
     if _alive(port):
         raise SystemExit("port %d already answers -- refusing to test against an unknown server" % port)
-    system = P.compose_system(cov.AGENT_SYSTEM, with_method=True)
+    # "exam": what the daily cycle's exam asks under (with the method brief). "door": what /m/agent
+    # composes for every real conversation (covenant_unified_v8 mobile_agent: compose_system(AGENT_SYSTEM)).
+    system = P.compose_system(cov.AGENT_SYSTEM, with_method=(system_kind == "exam"))
     binary = os.path.join(root, "tools", "llama", "llama-server.exe" if os.name == "nt" else "llama-server")
     names = sorted((f for f in os.listdir(models_dir) if f.endswith(".gguf") and (not only or only in f)),
                    key=lambda f: os.path.getsize(os.path.join(models_dir, f)))
-    say("system message %d chars; %d model(s); answers to %s" % (len(system), len(names), out))
+    say("system message (%s) %d chars; %d model(s); answers to %s" % (system_kind, len(system), len(names), out))
     results = []
     for name in names:
         path = os.path.join(models_dir, name)
@@ -190,10 +192,12 @@ def main(argv=None):
     ap.add_argument("--only", default=None, help="run only the files whose name contains this")
     ap.add_argument("--port", type=int, default=8091)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--system", choices=("exam", "door"), default="exam",
+                    help="exam: the daily exam's system message; door: the one /m/agent gives real conversations")
     a = ap.parse_args(argv)
     out = a.out or tempfile.mkdtemp(prefix="tetsu_bakeoff_")
     os.makedirs(out, exist_ok=True)
-    run(a.root, a.models or os.path.join(a.root, "models", "trial"), a.port, out, only=a.only)
+    run(a.root, a.models or os.path.join(a.root, "models", "trial"), a.port, out, only=a.only, system_kind=a.system)
     return 0
 
 
