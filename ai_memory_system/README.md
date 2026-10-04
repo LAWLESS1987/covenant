@@ -51,6 +51,29 @@
 >   code) and under a tight budget the correction can be omitted -- named in
 >   `omitted`, but absent from what the agent is handed.
 > - Item 1 stands as written.
+>
+> **FIXED 2026-10-04 -- item 3's ranking half, measured against the code:**
+> `score_explain` now halves a superseded memory's score (`supersede_penalty`,
+> shown in `because`) and `rank` places it strictly below its correction, even
+> after a million uses (`placed_below`, `score_before_placement`). It stays in
+> the results, above zero, naming its successor. `context_window` fills newest
+> versions first, so under a tight budget the superseded memory is the one
+> named in `omitted`. `/recall` brings each candidate's correction into the
+> candidates (`recall.with_successors`), so the shortlist cannot hand back
+> only the stale version. (The context mark cited as `recall.py:195` above is
+> at `recall.py:367` since this change.)
+>
+> Limits added on purpose, each stated in `because` as `supersede_withheld`:
+> only a write the ethics gate ALLOWED counts as checked, and a link from a
+> less-checked write does not demote a checked memory -- otherwise copying a
+> stored rule and adding an exception would bury the rule. A successor that
+> cannot be read (tombstoned, or not among the candidates) is not applied
+> either; a memory cannot supersede itself; a loop of memories each marked
+> superseded by another has no newer side, so none is demoted
+> (`supersede_cycle`). Checks SR1-SR12 in `test_memory_system.py` (14 checks;
+> the suite reads 154/154). An adversarial pass broke the first version five
+> ways before it was committed; each break is now a check, and 13 mutations of
+> `recall.py` are each caught. Record: A245 in `docs/KNOWN_ISSUES.md`.
 
 
 > **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
@@ -67,10 +90,12 @@
 >   suite that executes the store, the chain and the HTTP surface.
 > - **What refuted parts of it.** The two corrected blocks above: the claim was
 >   partly true, and the correction itself went stale once and was corrected
->   again against the code.
+>   again against the code. *2026-10-04: a third block, FIXED, records the
+>   ranking repair.*
 > - **Known limits, measured 2026-10-03.** Ranking does not read supersession,
 >   so a superseded memory can outrank its correction; a direct `put()` does no
->   overlap detection.
+>   overlap detection. *2026-10-04: the ranking limit is fixed -- see the FIXED
+>   block above; the `put()` limit stands.*
 > - **Reproduce.** `python test_memory_system.py`.
 
 Shared, persistent, **auditable** memory for AI agents. Plain markdown files,
@@ -187,8 +212,12 @@ believes, and anyone who can write it can change what every reader concludes.
 ## Tests
 
 ```bash
-python test_memory_system.py     # 66/66
+python test_memory_system.py     # last line: M1: N/N passed (154/154 on 2026-10-04)
 ```
+
+*This line said 66/66 until 2026-10-04: a count that went stale as checks were
+added, and reached a fix request as fact. Retraction AIMEM-66 in
+`docs/RETRACTED.json`; the suite's own last line is the count.*
 
 Covers the store, the chain (including a real tamper detection and the
 last-record limitation above), tombstones, the live HTTP surface on a loopback

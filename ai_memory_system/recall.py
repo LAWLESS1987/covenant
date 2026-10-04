@@ -53,6 +53,13 @@ CORE, ARCHIVAL = "core", "archival"
 HALF_LIFE_DAYS = 30.0          # Engram-style decay, gentle and stated
 DEFAULT_BUDGET = 8000          # characters, ~2k tokens of core context
 CONTESTED_MIN = 0.35           # see reconcile(): asymmetric on purpose
+SUPERSEDED_FACTOR = 0.5        # see score_explain(): demoted, never zeroed
+PLACE_FACTOR = 0.999           # see rank(): just under its correction, never 0
+
+# Only a write the ethics gate ALLOWED counts as checked. "unreviewed" (the
+# gate was down), no `review` at all (a store without a gate) and anything
+# unrecognised count the same: unchecked. See _honoured().
+_REVIEW_LEVEL = {"block": -1, "allow": 1}
 
 _WORD = re.compile(r"[a-z0-9]+")
 
@@ -110,13 +117,39 @@ def strength(uses: int, last_used_epoch: float, now: Optional[float] = None
     return round(0.15 + math.log1p(max(0, uses)) * (0.4 + 0.6 * recency), 4)
 
 
+def _review_level(meta: Dict[str, Any]) -> int:
+    return _REVIEW_LEVEL.get(str(meta.get("review") or "").strip().lower(), 0)
+
+
+def _honoured(old_meta: Dict[str, Any], succ_meta: Dict[str, Any]) -> bool:
+    """Does a supersede link get to demote the memory it points away from?
+
+    Only toward a successor the ethics gate checked AT LEAST as well. The
+    link is written automatically when a new memory overlaps an old one
+    (reconcile -> SUPERSEDE), so without this a write the gate never saw
+    could bury one it passed: copy a stored rule, add an exception, and the
+    exception now outranks the rule. Who is worse off if that works? The
+    author of the checked memory, who never agreed -- so the link does not
+    get that power. It is still recorded, still marked, still visible.
+    """
+    return _review_level(succ_meta) >= _review_level(old_meta)
+
+
 def score_explain(memory: Dict[str, Any], query: str,
-                  now: Optional[float] = None) -> Dict[str, Any]:
+                  now: Optional[float] = None,
+                  successors: Optional[Dict[str, Dict[str, Any]]] = None
+                  ) -> Dict[str, Any]:
     """Every component of a recall score, returned. No opaque ranker.
 
     An agent that cannot say WHY it recalled something cannot be argued
     with, and a memory system you cannot argue with is one you must simply
     trust -- which is the property this whole repository refuses to ship.
+
+    `successors` (name -> memory): given a map, as rank() gives one, a
+    supersede link is applied only when its successor is IN the map and was
+    checked at least as well -- a successor that cannot be read cannot be
+    weighed, so it is not applied. Without a map the link is taken at face
+    value.
     """
     meta = memory.get("metadata") or {}
     q = set(_tokens(query))
@@ -133,29 +166,153 @@ def score_explain(memory: Dict[str, Any], query: str,
     # explanation changes with them -- that is the point.
     total = (3.0 * name_hits + 2.0 * desc_hits + 1.0 * body_hits
              + 2.0 * exact + 1.5 * st + tier_bonus)
-    return {"name": memory.get("name"), "score": round(total, 4),
-            "because": {"name_hits": name_hits, "description_hits": desc_hits,
-                        "body_hits": body_hits, "exact_phrase": exact,
-                        "strength": st, "tier_bonus": tier_bonus,
-                        "uses": int(meta.get("uses", 0) or 0)}}
+    # SUPERSEDE, DEMOTE, DISCLOSE (2026-10-04). `superseded_by` reached the
+    # context block on 2026-08-30 but never the score, so a corrected memory
+    # carrying its old use count outranked its own correction -- 21.80 vs
+    # 16.23 measured 2026-09-28, 9.8197 vs 6.225 on 2026-10-04. The audit
+    # chain proved the correction; recall served the stale version. Halving
+    # keeps the score above zero, so the old memory stays in the results.
+    succ = meta.get("superseded_by")
+    withheld = None
+    if succ and succ == memory.get("name"):
+        withheld = "a memory cannot supersede itself"
+    elif succ and successors is not None:
+        if succ not in successors:
+            # Fail closed (found 2026-10-04 by an adversarial pass): /recall
+            # ranks a shortlist, and the longer copy of a rule is the one the
+            # shortlist drops first -- so "not here" must not mean "unchecked
+            # is fine". The link stays recorded; it is not applied.
+            withheld = ("its successor is not among the memories being "
+                        "ranked, so the successor's review cannot be read; the "
+                        "link is recorded, not applied")
+        elif not _honoured(meta, successors[succ].get("metadata") or {}):
+            withheld = ("the successor was checked less by the ethics gate "
+                        "than this memory; an unchecked write may not bury a "
+                        "checked one")
+    honoured = bool(succ) and withheld is None
+    penalty = round(total * SUPERSEDED_FACTOR, 4) if honoured else 0.0
+    because = {"name_hits": name_hits, "description_hits": desc_hits,
+               "body_hits": body_hits, "exact_phrase": exact,
+               "strength": st, "tier_bonus": tier_bonus,
+               "uses": int(meta.get("uses", 0) or 0),
+               "supersede_penalty": penalty}
+    if succ:
+        because["superseded_by"] = succ
+        if withheld:
+            because["supersede_withheld"] = withheld
+    return {"name": memory.get("name"), "score": round(total - penalty, 4),
+            "because": because}
+
+
+def _depths(items: List[Any], nxt) -> Tuple[Dict[int, int], set]:
+    """Hops from each item to the newest version along `nxt`, and the items
+    standing in a cycle (depth 0). Each item is walked once: linear."""
+    depth: Dict[int, int] = {}
+    in_cycle: set = set()
+    for it in items:
+        path, pos, cur = [], {}, it
+        while cur is not None and id(cur) not in depth and id(cur) not in pos:
+            pos[id(cur)] = len(path)
+            path.append(cur)
+            cur = nxt(cur)
+        if cur is not None and id(cur) in pos:        # this walk closed a loop
+            for c in path[pos[id(cur)]:]:
+                depth[id(c)] = 0
+                in_cycle.add(id(c))
+            path = path[:pos[id(cur)]]
+        d = depth[id(cur)] if cur is not None else -1
+        for c in reversed(path):
+            d += 1
+            depth[id(c)] = d
+    return depth, in_cycle
+
+
+def _place_below_successors(scored: List[Dict[str, Any]]) -> None:
+    """A demoted memory sorts strictly below its own correction.
+
+    The penalty alone cannot promise that: strength grows without bound in
+    log(uses), so a memory recalled often enough out-scores any fixed cut.
+    Only along honoured links whose successor is among the results. Newest
+    versions are settled first, so each memory is placed once, against a
+    successor already final -- one pass, any chain length, and a factor
+    rather than a step, so no score ever reaches zero (rank() drops zeroes,
+    and dropping is hiding). A cycle (memories each marked superseded by
+    another, see docs/CLUSTER_DEF.md) has no newer side: its members get
+    their penalty back and say why.
+    """
+    by_name = {s["name"]: s for s in scored if s["name"]}
+
+    def nxt(s):
+        b = s["because"]
+        if not b.get("superseded_by") or b.get("supersede_withheld"):
+            return None
+        return by_name.get(b["superseded_by"])
+
+    depth, in_cycle = _depths(scored, nxt)
+    for s in sorted(scored, key=lambda s: depth[id(s)]):
+        b = s["because"]
+        if id(s) in in_cycle:
+            if b.get("supersede_penalty"):
+                s["score"] = round(s["score"] + b["supersede_penalty"], 4)
+                b["supersede_penalty"] = 0.0
+            b["supersede_cycle"] = ("these memories are each marked superseded "
+                                    "by another: no newer side, none demoted")
+            continue
+        succ = nxt(s)
+        if succ is not None and s["score"] >= succ["score"]:
+            b["score_before_placement"] = s["score"]
+            b["placed_below"] = succ["name"]
+            s["score"] = succ["score"] * PLACE_FACTOR
 
 
 def rank(memories: List[Dict[str, Any]], query: str, limit: int = 10,
          now: Optional[float] = None) -> List[Dict[str, Any]]:
     """Score every memory, drop the zeroes, best first. Ties break by name
     so the same query twice gives the same order -- a recall that reorders
-    under you is a recall you cannot reproduce in a bug report."""
-    scored = [score_explain(m, query, now) for m in memories]
+    under you is a recall you cannot reproduce in a bug report.
+
+    A superseded memory is demoted below its correction, and stays in the
+    list saying so (see score_explain and _place_below_successors)."""
+    by_name = {m.get("name"): m for m in memories if m.get("name")}
+    scored = [score_explain(m, query, now, by_name) for m in memories]
     scored = [s for s in scored if s["score"] > 0]
+    _place_below_successors(scored)
     scored.sort(key=lambda s: (-s["score"], s["name"] or ""))
     return scored[:limit]
+
+
+def with_successors(memories: List[Dict[str, Any]], fetch,
+                    cap: int = 50) -> List[Dict[str, Any]]:
+    """The candidates, plus each one's successor (and theirs), by name.
+
+    /recall shortlists by text before it ranks, so a superseded memory could
+    arrive without its correction -- and then the reader gets the stale
+    version, the exact failure this file's supersession exists to stop.
+    `fetch(name)` returns a memory or None (tombstoned); at most `cap` are
+    added, and a successor that cannot be fetched is simply not added, which
+    leaves its link unapplied (score_explain fails closed on it).
+    """
+    out = list(memories)
+    have = {m.get("name") for m in out}
+    i = added = 0
+    while i < len(out) and added < cap:
+        link = (out[i].get("metadata") or {}).get("superseded_by")
+        if link and link not in have:
+            have.add(link)
+            got = fetch(link)
+            if got:
+                out.append(got)
+                added += 1
+        i += 1
+    return out
 
 
 def context_window(memories: List[Dict[str, Any]], budget: int = DEFAULT_BUDGET
                    ) -> Dict[str, Any]:
     """Letta's core/archival split, with the omission made explicit.
 
-    Fills `budget` characters with CORE memories first, strongest first.
+    Fills `budget` characters with CORE memories first -- newest version
+    first (since 2026-10-04), then strongest.
     Whatever does not fit is NAMED in `omitted` rather than dropped in
     silence: an agent that knows it is missing three core memories can go
     and fetch them; an agent handed a truncated context cannot tell.
@@ -164,9 +321,22 @@ def context_window(memories: List[Dict[str, Any]], budget: int = DEFAULT_BUDGET
     for m in memories:
         ((core if (m.get("metadata") or {}).get("tier") == CORE else arch)
          .append(m))
-    core.sort(key=lambda m: -strength(
+    # Newest version first, then strength (2026-10-04): under a tight budget
+    # the CORRECTION is included and the memory it superseded is the one
+    # NAMED in `omitted`. Strength alone did the reverse.
+    by_name = {m.get("name"): m for m in core if m.get("name")}
+
+    def nxt(m):
+        meta = m.get("metadata") or {}
+        link = meta.get("superseded_by")
+        n = by_name.get(link) if link and link != m.get("name") else None
+        return n if n is not None and _honoured(meta, n.get("metadata") or {}) \
+            else None
+
+    depth, _ = _depths(core, nxt)
+    core.sort(key=lambda m: (depth[id(m)], -strength(
         int((m.get("metadata") or {}).get("uses", 0) or 0),
-        float((m.get("metadata") or {}).get("last_used", 0) or 0)))
+        float((m.get("metadata") or {}).get("last_used", 0) or 0))))
     # FRAME THE BLOCK AS A RECORD, and count the frame against the budget.
     #
     # This used to emit a bare `## name` plus body. That put stored text into
@@ -190,7 +360,8 @@ def context_window(memories: List[Dict[str, Any]], budget: int = DEFAULT_BUDGET
         # never read by rank(), score_explain() or this function, so a
         # superseded memory reached the agent with nothing saying it had been
         # corrected -- and, carrying its old use count forward, could outrank
-        # its own correction. This is the missing read path.
+        # its own correction. This is the missing read path. (The score kept
+        # ignoring it until 2026-10-04 -- see score_explain.)
         marks = []
         if meta.get("superseded_by"):
             marks.append(f"SUPERSEDED BY {meta['superseded_by']} -- prefer "

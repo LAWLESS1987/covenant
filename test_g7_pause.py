@@ -97,8 +97,17 @@ def main():
         spawned = []
         real_popen = W.subprocess.Popen
         real_wlog = W.LOGDIR
-        node = {"id": "ZZ", "port": 5990, "db": "nodeZZ_test.db",
-                "key": "nodeZZ_test.db.key", "peers": ""}
+        real_wfile = W.LOGFILE
+        # A stand-in database and key, in the temp dir: since A244 a relaunch
+        # refuses a node whose files are not there or are empty (G7.6r/s/u),
+        # so a node that should launch must have them. Absolute paths, so
+        # nothing is created in the real tree.
+        zz_db = os.path.join(tmp, "nodeZZ_test.db")
+        for _f in (zz_db, zz_db + ".key"):
+            with open(_f, "w") as _fh:
+                _fh.write("stand-in")
+        node = {"id": "ZZ", "port": 5990, "db": zz_db,
+                "key": zz_db + ".key", "peers": ""}
         try:
             # The watchdog's own log and the node log it opens both go to a
             # temp directory: the first run of this suite left an empty
@@ -106,6 +115,10 @@ def main():
             # watchdog log about a node that does not exist. A test that
             # litters the thing it measures is measuring its own litter.
             W.LOGDIR = os.path.join(tmp, "logs")
+            # LOGFILE too (2026-10-04): log() writes there, not under LOGDIR, so
+            # this block's PAUSED and A244 lines landed in the REAL watchdog log,
+            # which the self-eval and Tetsu's daily read for alerts.
+            W.LOGFILE = os.path.join(W.LOGDIR, "watchdog.log")
             os.makedirs(W.LOGDIR, exist_ok=True)
             W.subprocess.Popen = lambda *a, **k: spawned.append(a) or _FakeProc()
 
@@ -118,9 +131,72 @@ def main():
             W.start_node(node)
             check("G7.6 mutation: unpaused, it launches",
                   len(spawned) == 1, "spawned %d" % len(spawned))
+
+            # A244: what a sweep's staged copy looks like from inside -- this
+            # tree's ports, no database, no key. On 2026-10-03 the relaunch
+            # minted identities there and served all three ports at height 1.
+            ghost = {"id": "ZZ", "port": 5990, "db": "nodeZZ_absent.db",
+                     "key": "nodeZZ_absent.db.key", "peers": ""}
+            out = W.start_node(ghost)
+            check("G7.6r A RELAUNCH NEVER CREATES (A244): no database and no key in "
+                  "the launching tree -- nothing launched, and it says so",
+                  out is False and len(spawned) == 1,
+                  "returned %r, spawned %d" % (out, len(spawned)))
+            os.unlink(zz_db + ".key")
+            out = W.start_node(node)
+            check("G7.6s ...and a database whose key is missing is refused too: the "
+                  "identity is the thing a staged copy mints",
+                  out is False and len(spawned) == 1,
+                  "returned %r, spawned %d" % (out, len(spawned)))
+
+            # rolling_restart, the path that did it: stop and health are stubbed,
+            # so no process is touched even if the guard is gone.
+            import rolling_restart as RR
+            stops, said = [], []
+            real_stop, real_health = RR.stop, RR.health
+            RR.stop = lambda *a, **k: stops.append(a)
+            RR.health = lambda port: None
+            try:
+                ok_rr = RR.restart_one(ghost, "x", said.append)
+            finally:
+                RR.stop, RR.health = real_stop, real_health
+            check("G7.6t ...and rolling_restart does not STOP a node its tree cannot "
+                  "relaunch -- on 2026-10-03 the copy took each node down first",
+                  ok_rr is False and not stops and any("A244" in s for s in said),
+                  "returned %r, stops %d, said %s" % (ok_rr, len(stops), said[-1:]))
+
+            # An empty database beside a real key: the staged copy of 10-03 now
+            # holds 0-byte databases, and a relaunch over one boots at height 1.
+            with open(zz_db + ".key", "w") as _fh:
+                _fh.write("stand-in")
+            open(zz_db, "w").close()
+            out = W.start_node(node)
+            check("G7.6u ...and an EMPTY database is not a chain: refused",
+                  out is False and len(spawned) == 1,
+                  "returned %r, spawned %d" % (out, len(spawned)))
+
+            # The leak's own door: one_pass runs the highway, and in a tree that
+            # cannot relaunch its nodes it must run it DRY. HERE and NODES point
+            # at the temp dir, both ways.
+            real_here, real_nodes = W.HERE, W.NODES
+            try:
+                W.HERE = tmp
+                W.NODES = [{"id": "ZZ", "port": 5990, "db": "nodeZZ_test.db",
+                            "key": "nodeZZ_test.db.key", "peers": ""}]
+                staged = W.highway_may_act()                  # empty db: a copy
+                with open(zz_db, "w") as _fh:
+                    _fh.write("stand-in")
+                production = W.highway_may_act()
+            finally:
+                W.HERE, W.NODES = real_here, real_nodes
+            check("G7.6v the highway may ACT only from a tree that can relaunch its "
+                  "nodes -- a staged copy's watchdog pass runs it dry (A244)",
+                  staged is False and production is True,
+                  "staged copy -> %r, production -> %r" % (staged, production))
         finally:
             W.subprocess.Popen = real_popen
             W.LOGDIR = real_wlog
+            W.LOGFILE = real_wfile
             P.resume("watchdog-restarts")
 
         # ---- G7.7: independence

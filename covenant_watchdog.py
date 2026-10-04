@@ -1542,6 +1542,43 @@ def balance(db, of_key, timeout=45):
         return None
 
 
+def relaunch_missing(node):
+    """The files a relaunch of `node` from THIS tree needs and does not find.
+
+    A RELAUNCH RESUMES A NODE; IT NEVER CREATES ONE (2026-10-04, A244). On
+    2026-10-03 a sweep's staged copy (Temp\\covenant_one_<pid>: no databases,
+    no keys) ran start_node from ITS tree, through its rolling_restart: all
+    three production ports came back at height 1 under identity keys minted
+    in a folder that was then deleted, and ran that way for a day. A164's
+    port match could not see it -- a copy of this tree has this tree's ports.
+    A node whose database or key is not HERE is not a node this tree can
+    revive; the operator's launchers start fresh ones. rolling_restart asks
+    this BEFORE it stops anything, so a copy cannot take a node down either.
+
+    The key checked is <db>.key, the file the node itself opens
+    (covenant_unified_v8 derives it from the database path), not NODES' "key"
+    entry, which could drift from it. An empty file or a directory is not a
+    chain and not an identity, so both must be non-empty files.
+    """
+    db = node.get("db") or ""
+    out = []
+    for p in (db, db + ".key" if db else ""):
+        full = p if os.path.isabs(p) else os.path.join(HERE, p)
+        if not p or not os.path.isfile(full) or os.path.getsize(full) == 0:
+            out.append(p or "(no database configured)")
+    return out
+
+
+def highway_may_act():
+    """True only in a tree that can relaunch every one of its nodes -- the
+    production tree. A sweep's staged copy or a fresh clone fails this, and its
+    watchdog pass runs the highway DRY: it senses and reports, it repairs
+    nothing. A244: on 2026-10-03 test_p20, test_watchdog_outage and test_a115
+    each called one_pass() in a staged copy, and the highway there ran
+    restart_nodes for real (its own ledger: 09:56:57, 09:58:58, 10:04:08)."""
+    return not any(relaunch_missing(n) for n in NODES)
+
+
 def start_node(node):
     """Relaunch a dead node. Does NOT delete or recreate its database --
     production resumes a chain, it does not rebuild one.
@@ -1561,6 +1598,12 @@ def start_node(node):
     if is_paused:
         log("WARN", "node %s is down and restarts are PAUSED (%s) -- not starting it"
             % (node.get("id", "?"), why))
+        return False
+    missing = relaunch_missing(node)
+    if missing:
+        log("ALERT", "node %s: NOT relaunched from %s -- %s not here. A relaunch resumes a "
+            "chain and an identity; it never creates them (A244)"
+            % (node.get("id", "?"), HERE, ", ".join(str(m) for m in missing)))
         return False
     env = dict(os.environ)
     env["COVENANT_DB_PATH"] = node["db"]
@@ -1842,7 +1885,12 @@ def one_pass(strict=False):
         # reading and the cost beside the gain, not as a silent skip.
         try:
             import covenant_highway as _hw
-            h_alerts, h_infos = _hw.run_once(dry_run=False, exclude=("restart_watchdog",))
+            # DRY outside the production tree (A244) -- see highway_may_act().
+            _act = highway_may_act()
+            h_alerts, h_infos = _hw.run_once(dry_run=not _act, exclude=("restart_watchdog",))
+            if not _act:
+                c_infos.append("highway ran DRY: this tree (%s) cannot relaunch its own "
+                               "nodes, so it is not the production tree (A244)" % HERE)
             c_alerts, c_infos = c_alerts + h_alerts, c_infos + h_infos
         except Exception as e:                                   # noqa: BLE001
             c_infos.append("highway pass unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))

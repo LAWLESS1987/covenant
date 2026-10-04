@@ -29,7 +29,12 @@ WHAT IT WILL NOT DO.
     watchdogs once came to be running at once.
   * It stops if a node does not come back. Two nodes down at once is the
     outage this exists to avoid, so a failure ends the run rather than
-    continuing to the next one.
+    continuing to the next one. (The stop does not persist between runs: a
+    regressed node then reads as current. A244.)
+  * It never stops a node its own tree cannot relaunch (A244, 2026-10-04):
+    covenant_watchdog.relaunch_missing must find the node's database and key,
+    non-empty, in THIS tree first. Run it from the production tree; a copy of
+    this tree has the same ports and none of the files.
 
 ORDER. B is the hub -- A and C each peer only with B, so while B is down those
 two cannot reach each other. Nothing can avoid that; it is done in the middle,
@@ -235,14 +240,23 @@ def restart_one(node, want_sha, say):
     before_height = before.get("chain_height") if before else None
     say("    before: %s" % ("height %s, source %s" % (before_height, str(before.get("source_sha256", ""))[:12])
                             if before else "not answering"))
+    # A244: a tree that cannot relaunch this node must not stop it. On
+    # 2026-10-03 a sweep's staged copy stopped all three production nodes
+    # from here and brought them back empty.
+    missing = W.relaunch_missing(node)
+    if missing:
+        say("    NOT stopped -- this tree (%s) cannot relaunch it: %s not here. A relaunch "
+            "resumes a node; it never creates one (A244)" % (HERE, ", ".join(map(str, missing))))
+        return False
     stop(node["id"], say, node.get("port"))
     if not port_free(node["port"], time.time() + PORT_FREE_TIMEOUT_S, say):
         return False
     if W.start_node(node) is False:
-        # start_node refuses while ops/pause/watchdog-restarts is present. Say
-        # that, rather than "started" followed by a puzzling timeout: the node
-        # is down because someone asked for it to stay down.
-        say("    NOT started -- restarts are paused (covenant_pause.py --list)")
+        # start_node refuses while ops/pause/watchdog-restarts is present, or
+        # (A244) when this tree lacks the node's files. Say that, rather than
+        # "started" followed by a puzzling timeout.
+        say("    NOT started -- restarts are paused (covenant_pause.py --list), or this "
+            "tree lacks the node's files (see the watchdog log)")
         return False
     say("    started; waiting for it to answer")
     ok, problems = wait_up(node, want_sha, before_height, say)

@@ -52,7 +52,8 @@ either by hand or by Claude once the Chrome extension is connected.
 > Recall is explainable — every result carries the components that produced its
 > score. No opaque ranker.
 >
-> 66/66 tests, including the security boundary and the one limitation of a hash
+> 154 checks on 2026-10-04 (this draft said 66/66 until then; retraction
+> AIMEM-66), including the security boundary and the one limitation of a hash
 > chain, measured rather than hidden.
 >
 > github.com/LAWLESS1987/covenant

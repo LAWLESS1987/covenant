@@ -1,6 +1,11 @@
 # Field test: what production AI memory actually stores — and what ours actually does
 
 **Date:** 2026-08-29.
+
+> *Dated note, 2026-10-04: this document describes the tree as it stood on 08-29 and is kept as
+> written. Its finding that `superseded_by` is write-only, and the open work "make
+> `superseded_by` affect ranking", are fixed: see the FIXED block in `../README.md` and A245 in
+> `docs/KNOWN_ISSUES.md`.*
 **Method:** live probing of two consumer assistants on real accounts, then verification of our own
 claims against our own source before writing any of it down.
 

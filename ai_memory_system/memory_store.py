@@ -244,7 +244,10 @@ class MemoryStore:
                 from ethics_gate import EthicsGate
                 gate = EthicsGate()
             except Exception:            # noqa: BLE001
-                gate = None              # writes stamp themselves unreviewed
+                gate = None              # writes then carry NO review field
+                # (this comment said they stamp themselves unreviewed; they do
+                # not -- see put(). recall.py counts a missing review as
+                # unchecked, the same as unreviewed. Corrected 2026-10-04.)
         self.gate = gate
         self.root = os.path.abspath(root)
         self.trash = os.path.join(self.root, ".trash")

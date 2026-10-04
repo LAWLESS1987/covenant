@@ -69,6 +69,13 @@ node holding an *unreviewed* copy of a memory that other nodes reviewed still
 agrees on the root. That divergence is real and is visible only in each node's
 own report. Surfacing it separately is open work.
 
+*Dated note, 2026-10-04 (A245): the gap now also changes what recall RETURNS.
+Ranking honours a supersede link only when the successor was checked at least
+as well as the memory it would demote, and `review` is node-local -- so two
+nodes that agree on the root can order `/recall` and `/context` differently
+for the same pair. Measured by an adversarial pass the same day: successor
+review `allow` on one node and `unreviewed` on another gave opposite orders.*
+
 ---
 
 ## What this is, and what it is not

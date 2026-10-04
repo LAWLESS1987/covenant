@@ -225,6 +225,32 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "The as-written test is preserved, runnable, on branch x1-ja3-claim-as-written-2026-10-03 (pushed). The sweep transcripts hold what past runs printed, unedited, for A145's reason."
+  },
+  {
+   "id": "AIMEM-66",
+   "claim": "That the memory system's suite is 66/66 (ai_memory_system/README.md, the Tests block: `python test_memory_system.py     # 66/66`; ai_memory_system/ANNOUNCE_DRAFT.md: '66/66 tests, including the security boundary').",
+   "refuted_by": "measured 2026-10-04: `python test_memory_system.py` printed M1: 140/140 before that day's supersession fix and 148/148 after it. The count went stale as checks were added and nothing re-read it -- and it travelled: the operator's fix request of 2026-10-04 asked to 'confirm 66/66 plus the new case', carrying the stale number in as fact.",
+   "truth": "The suite prints its own tally on its last line (M1: N/N passed); 148/148 on 2026-10-04 (A245). The README now names the command and points at that line rather than pinning a number that goes stale.",
+   "verbatim": [
+    "python test_memory_system.py     # 66/66",
+    "66/66 tests, including the security boundary"
+   ],
+   "patterns": [
+    "test_memory_system\\.py\\s+#\\s*66/66",
+    "66/66\\s+tests,\\s+including\\s+the\\s+security\\s+boundary"
+   ],
+   "note_on_patterns": "Both as-written forms, tied to this suite's own wording; a bare '66/66' would catch unrelated suites' tallies in the sweep record.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "Both files as written are preserved on branch aimem-66-count-as-written-2026-10-04 (at e4f17d6). The sweep transcripts hold what past runs printed, unedited."
   }
  ]
 }

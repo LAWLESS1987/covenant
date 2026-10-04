@@ -322,7 +322,11 @@ class Handler(BaseHTTPRequestHandler):
                                       limit=max(25, limit * 3)):
                     names.setdefault(row["name"], row["activation"])
             full = [self.store.index.get_body(n) for n in names]
-            ranked = recall.rank([f for f in full if f], q, limit)
+            # A superseded candidate brings its correction (2026-10-04, A245):
+            # without it the shortlist can hand back only the stale version.
+            full = recall.with_successors([f for f in full if f],
+                                          self.store.index.get_body)
+            ranked = recall.rank(full, q, limit)
             # Only the top few are reinforced -- see TOUCH_PER_RECALL. A
             # read path that writes once per result is a write amplifier
             # pointed at the operator's disk.

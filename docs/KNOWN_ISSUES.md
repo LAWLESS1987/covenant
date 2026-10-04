@@ -7278,6 +7278,138 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A245. [`superseded_by` reached the context block but never the score: recall served the version the chain proved was corrected] 2026-10-04. His words: "Fix: superseded_by is write-only — make it affect ranking ... The correction must outrank what it corrects ... nothing is silently discarded — supersede, demote, disclose; never erase", and "tetsu should participate". FIXED, broken five ways by an adversarial pass before commit, each break now a check
+
+**Measured before.** `ai_memory_system/recall.py`: `score_explain` and `rank` read no
+`superseded_by`. On the suite's own pair (`core-fact` with ten uses, marked superseded by
+`core-fact-v2` with none) the old memory scored 9.8197 against its correction's 6.225;
+2026-09-28 measured 21.80 vs 16.23 on other inputs. The gap had never been entered here: it
+lived only in `ai_memory_system/README.md` and its 08-29 field test.
+
+**Fixed.** `score_explain` halves a superseded memory's score and shows it
+(`supersede_penalty`, `superseded_by` in `because`). `rank` then places it strictly below its
+correction when both are present (`placed_below`, `score_before_placement`), because a fixed
+penalty cannot promise that on its own: strength grows with log(uses), and a memory recalled a
+million times out-scores any fixed cut. It stays in the results, above zero. Placement settles
+newest versions first, one pass, by a factor rather than a step, so a chain of any length stays
+strictly ordered and never reaches zero (3,000 hops in a test). `context_window` fills newest
+versions first, so under a tight budget the superseded memory is the one named in `omitted` --
+the field test's omitted-correction case, which a fix in `rank` alone would have left in place.
+`/recall` now brings each candidate's correction into the candidates (`recall.with_successors`,
+`server.py`), so its shortlist cannot hand back only the stale version.
+
+**Limits added on purpose, for his test "who is worse off if this works".** Supersede links are
+written automatically when a new memory overlaps an old one (reconcile -> SUPERSEDE). Given
+ranking power, that is a lever: copy a stored rule, add an exception, and the exception
+outranks the rule. So only a write the ethics gate ALLOWED counts as checked ("unreviewed", no
+review at all, and anything unrecognised count alike, read case-blind), and a link from a
+less-checked write does not demote a checked memory. A successor that cannot be read --
+tombstoned, or not among the memories being ranked -- is not applied either. A memory cannot
+supersede itself. A loop of memories each marked superseded by another (the order-dependent
+cluster links of `docs/CLUSTER_DEF.md`) has no newer side: its members get their penalty back
+(`supersede_cycle`). Every withheld link says why (`supersede_withheld`).
+
+**Broken before commit, by a three-agent adversarial pass the same day, each with a
+reproducer.** (1) Blocking: a successor missing from `rank()`'s input was honoured at face
+value, skipping the review check -- reproduced over HTTP with the unchecked copy pushed out of
+the eight-seed shortlist, which halved the checked rule. (2) A one-sided loop (one link
+honoured, the return link withheld) skipped placement, so the old memory outranked its
+correction. (3) A memory with no name captured every un-superseded memory below it. (4) Long
+chains reached the old 0.0001 floor and tied, at O(n^3): 103.7 s for 1,130 memories. (5) "No
+review" ranked above "unreviewed", so a write that passed no screen could bury one that passed
+the coarse screen. Also: cycle members kept the penalty the docstring said they did not, review
+values were matched by exact case, and three mechanisms had no check that pinned them.
+
+**Driven both ways.** SR1-SR12, fourteen checks, in `test_memory_system.py`; the suite reads
+M1: 154/154 (140/140 before). Against HEAD's `recall.py` the section fails from SR1 and stops
+at SR8 (no `with_successors`). Thirteen mutations of the fixed `recall.py`, each caught by name:
+absent successor applied (SR8), review ignored (SR4, SR8, SR9, SR12), self-link allowed (SR11),
+withheld hops followed (SR4, SR8, SR9), nameless link followed (SR11), no placement (SR1b, SR5,
+SR6, SR9, SR10), a fixed step instead of the factor (SR10), cycle penalty kept (SR6), no penalty
+(SR2, SR3), review case-sensitive (SR12), strength-only context order (SR7), `with_successors`
+pulling nothing (SR8).
+
+**What it does not do.** "Checked" means the gate ran on the write and allowed it; whether
+`MEMORY_PRINCIPLES` decide verdicts under the deployed seats was reported doubtful by the
+2026-10-04 verification workflow and is not re-measured here. `review` is node-local, so two
+nodes that agree on the claim root can now order the same pair differently (dated note in
+`docs/CLUSTER_DEF.md`). Duplicate names still resolve to whichever copy comes last. A store's
+memories with no `review` reach agents unmarked in the context block (only "unreviewed" is
+marked); not changed here. The README's suite count "66/66" was stale and is retracted
+(AIMEM-66, `docs/RETRACTED.json`, branch `aimem-66-count-as-written-2026-10-04`; R1 30/30,
+29/30 with a probe, 30/30 again).
+
+**Tetsu's part**, asked through his own door (`tools/tetsu_work.py --door agent`, so each
+exchange is gated, in his chat memory and in the teacher queue). The first, long question timed
+out at the door (503 after 180 s). The shortened one got "CHANGE" with a reason that said
+neither side is worse off and named no change; asked which change, he answered "AGREE -- I
+would change nothing" (qwen2.5-3b, about 80 s each). The gate HELD both answers, both student
+seats unsure, the semantic seat clean. Said plainly: neither answer engaged the
+unchecked-write limit, and he was asked before the adversarial pass changed the design, so
+this is his participation and his recorded agreement with the first version, not an
+independent review of the final one.
+
+---
+
+### A244. [the sweep's staged copy relaunched all three production nodes, empty, under throwaway keys -- A164 again, through the door A164's fix could not see] 2026-10-03, found 2026-10-04 by a verification pass. His words: "restart them". RESTORED; leak LOCATED; GUARDED at the leak and at both launch paths, driven both ways
+
+**Measured 2026-10-04.** Node C read height 1 against A's and B's 64 (`peer_ahead_failed`,
+674 sightings). All three production ports were held by processes created 2026-10-03 at
+09:57:01 (C), 09:59:01 (B) and 10:04:12 (A), writing to
+`AppData\Local\Temp\covenant_one_5420\logs\` -- a `covenant_one.py` staged copy, whose own
+`rolling_restart.log` records each: before height 64, up at height 1, "height went backwards",
+STOPPED. Each node logged "node identity created" there: three new identity keys, gone from
+disk with the folder's cleanup, and the temp databases are 0 bytes. A and B resynced to 64
+from each other; C never did. This tree's databases (last tip index 63) and keys were
+untouched, and no block was lost. The source sha was this tree's own (`b708204ff11b`), so G9
+and verify_deploy could not see it; the highway read `node_down` and `source_drift`, and its
+`restart_nodes` sat quarantined.
+
+**The leak, located** (first by an adversarial pass, then read first-hand). `test_p20` (lines
+319 and 340), `test_watchdog_outage` (line 44) and `test_a115` call the real
+`covenant_watchdog.one_pass()`, stubbing health and start_node but not the highway; `one_pass`
+runs `covenant_highway.run_once(dry_run=False)` (`covenant_watchdog.py`). In the staged copy
+that highway read the production mesh as `source_drift` and `node_down` and started
+`restart_nodes` for real -- its own ledger there, `ops/highway.jsonl`, has the rows at
+09:56:57, 09:58:58 and 10:04:08 -- which ran the staged `rolling_restart.py`, which imports the
+staged `covenant_watchdog`. A164's fix (`pids_for` matches `--port N --node-id X`) stops a tree
+with OTHER ports; a copy of this tree has THESE ports. And `rolling_restart`'s STOPPED does not
+persist: a regressed node then runs this tree's source and imports, so the next run reads it as
+current and moves on -- one sweep, three runs, three nodes.
+
+**Restored**, on his instruction: each temp-origin PID checked by port and node id, then
+stopped -- C, then B, then A, each confirmed back before the next. The watchdog relaunched each
+from this tree, and each booted at tip index 63 into this tree's `logs/`: height 64, its own
+key. The first stop attempt had been refused by the session's auto-mode classifier and was made
+only after his "restart them".
+
+**The guards** (rule 10: a forgotten step gets a guard where it happens). One predicate,
+`covenant_watchdog.relaunch_missing(node)`: a relaunch resumes a node, it never creates one, so
+the node's database and the key it actually opens (`<db>.key`) must be non-empty files in the
+launching tree. Used three ways: `start_node` refuses; `rolling_restart.restart_one` asks BEFORE
+it stops anything, so a copy cannot take a node down; and `one_pass` runs the highway DRY unless
+`highway_may_act()` -- every node relaunchable from HERE -- so a staged copy or a fresh clone
+senses and reports and repairs nothing. In this tree all three nodes pass and the highway acts
+as before. G7.6r/s/t/u/v in `test_g7_pause.py`, G7 21/21; driven both ways in memory: start_node
+guard removed -> G7.6r, G7.6s, G7.6u red; pre-stop guard removed -> G7.6t red; size check
+removed -> G7.6u, G7.6v red; highway always acting -> G7.6v red. G7 had also been writing its
+lines into the REAL `logs/watchdog.log` -- it redirected `LOGDIR`, but `log()` writes `LOGFILE`
+-- which the self-eval and Tetsu's daily read for alerts; fixed, a run now adds 0 lines there.
+The ZZ lines already in that log from this day's runs are labelled by an INFO line beside them.
+The running watchdog takes up each edit on its own: the highway reads `watchdog_stale` and
+restarts it (12:44:07Z for the first).
+
+**Not fixed, and said.** The three suites still drive a real `one_pass`; in this tree, run by
+hand, their highway still acts for real. Only the staged and fresh-clone cases are closed.
+`rolling_restart`'s STOPPED still does not persist across runs. `AB_RESTART_NODES.bat` still
+force-stops whatever holds 5000, 5020 and 5060 from any tree (refused on a healthy mesh; from a
+copy with no keys, `covenant_prod.bat` then aborts: a stop with no start). A guard in this tree
+cannot protect against older copies of the code in other checkouts on this machine, which do
+not carry it; `pids_for` requiring this tree's path in the command line (the A160 pattern) would,
+and is not done here, since the nodes now running were launched by relative path.
+
+---
+
 ### A243. [a second checkout took the production ports, a sandbox widened every node key, and the key gate could not see it] 2026-10-03. His words: "make proper corrections to get everything green weve not had greenfull days in a week", then "you should use our tombstone system to not keep making the same errors". FIXED, with the guards that stop each recurring
 
 **Measured, in the order found.**

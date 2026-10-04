@@ -29,7 +29,10 @@ After 24 hours of them it shows one notification a day with the steps below.
    Tailscale name and port? Is Tailscale up on both? A check-in every ten
    minutes is the heartbeat; `python covenant_reconnect.py --status` on the
    PC says when the last one arrived.
-2. **PC next.** `python rolling_restart.py` restarts the nodes one at a time.
+2. **PC next.** `python rolling_restart.py` restarts the nodes one at a time,
+   run from the production tree (`C:\Users\Lawre\covenant`): since 2026-10-04 it
+   refuses to stop a node whose database and key are not in the tree it runs
+   from (A244).
    `python covenant_watchdog.py --status` says whether they are on the source
    that is on disk. The API answers on 5000, 5020 and 5060; 5001 is peer
    traffic and swallows HTTP.
