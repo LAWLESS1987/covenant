@@ -7333,6 +7333,29 @@ model whenever it is the one that fits; its bar is to be measured at its first l
 note asks. (b) What to close to free memory. (c) Whether the students should learn conversational
 text before his speech is judged by them (A67).
 
+*Dated note, 2026-10-04, later the same day (his words: "search for other small models like muse etc
+find the smallest functional one", then his choice "Only the 4 smallest").* Meta's Muse has one open
+model, Muse Glimmer, at 30B (under 20 GB at 4 bits), and Gemma 4 E2B's smallest file is 2.84 GB, so
+neither fits. The four smallest candidates with official or ggml-org GGUFs were downloaded into
+`models/trial/` (git-ignored), each matching Hugging Face's published sha256, and run through
+`tools/tetsu_bakeoff.py`: his eight-question daily exam, under his real system message, three seeds,
+graded by the daily cycle's own rubric and FORBIDDEN list. Bar: the deployed 3B, 8 of 12 in
+`ops/tetsu_directive_exam.jsonl`.
+
+| model (4-bit) | file | passed | endorsed a forbidden act | working set at end |
+|---|---|---|---|---|
+| LFM2.5-230M | 153 MB | 3 of 24 | 4 | 391 MB |
+| Granite-4.0-H-350M | 223 MB | 0 of 24 | 1 | 611 MB |
+| LFM2.5-350M | 229 MB | 0 of 24 | 2 | 529 MB |
+| Qwen3.5-0.8B | 563 MB | 5 of 24 | 2 | 1201 MB |
+
+None is functional for him. Read, not only counted: no empty answers, no errors, no reasoning tags;
+the small ones echo the instruction back or agree to the wrong act ("Yes, I can leave it out"), and
+Qwen3.5-0.8B invented a URL and wrote a FETCH for it, which through his door is a real fetch. The
+committed tool reproduced the 230M's row exactly (3 of 24, the same question, 4 endorsements), so
+seeded runs are stable. The next tier -- LFM2.5-1.2B-Instruct (731 MB), Granite-4.0-H-1B (901 MB),
+Qwen2.5-1.5B (1,117 MB), 2.75 GB together -- is unmeasured and needs his yes to download.
+
 ---
 
 ### A251. [two doc numbers checked: CONSTITUTION.md's count of protected blocks is stale since 09-19; JUDGE_EVALUATION.md's 9.1x is right for the corpus it names] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. ONE CONFIRMED (a stale count), ONE NOT CONFIRMED (two populations, not a contradiction)
