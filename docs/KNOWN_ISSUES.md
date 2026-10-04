@@ -7408,6 +7408,18 @@ cannot protect against older copies of the code in other checkouts on this machi
 not carry it; `pids_for` requiring this tree's path in the command line (the A160 pattern) would,
 and is not done here, since the nodes now running were launched by relative path.
 
+*Dated note, 2026-10-04, after the push of 0fdf6bb.* The public CI went red on both Pythons:
+A115.13a, 13b and 13e. `launch_check.g7` returns PASS before it asks `node_answer` whenever no
+node port is busy -- measured: with every port free it reads PASS for all five forced answers,
+with the ports held it reads UNKNOWN / BLOCKED / BLOCKED / PASS / PASS as the checks expect. The
+runner starts no nodes (the workflow says so), yet these checks passed there on the parent
+commit, so something held 5000-5071 during the CI sweep -- most likely nodes the sweep's own
+highway launched through `one_pass`, this entry's leak acting on the runner. Inferred, not read
+from the runner's logs (this session had no authenticated log access). With the highway dry
+outside the production tree, the runner's ports were free. The precondition is now stated in
+the test (`port_busy` held for that block, restored after), so 13a/b/e measure the same thing on
+the PC and on the runner; their assertions are unchanged.
+
 ---
 
 ### A243. [a second checkout took the production ports, a sandbox widened every node key, and the key gate could not see it] 2026-10-03. His words: "make proper corrections to get everything green weve not had greenfull days in a week", then "you should use our tombstone system to not keep making the same errors". FIXED, with the guards that stop each recurring

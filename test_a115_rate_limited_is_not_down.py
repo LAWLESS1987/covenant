@@ -360,6 +360,17 @@ def main():
     try:
         import launch_check as LC
         real_answer = LC.node_answer
+        # THE PORTS ARE HELD, said rather than assumed (2026-10-04, A244). g7
+        # returns PASS ("a cold start is clean") before it asks node_answer
+        # when no node port is busy, so these checks only ever measured
+        # anything while something held 5000-5071: the production nodes on
+        # the PC, and on the CI runner -- which has no nodes -- most likely
+        # nodes this sweep's own highway launched through one_pass. Once the
+        # highway ran dry outside the production tree, the runner's ports
+        # were free and 13a/b/e read PASS for everything. The question is how
+        # g7 classifies a held port, so the ports are held here.
+        real_busy = LC.port_busy
+        LC.port_busy = lambda _p, **_k: True
         seen = {}
         for forced, want in (("rate_limited", LC.UNKNOWN),
                              ("silent", LC.BLOCKED),
@@ -371,6 +382,7 @@ def main():
             LC.g7()
             seen[forced] = LC.results[0]["state"] if LC.results else None
         LC.node_answer = real_answer
+        LC.port_busy = real_busy
         LC.results.clear()
         check("A115.13a a RATE-LIMITED node is UNKNOWN to G7, never foreign -- "
               "the launch gate no longer says DO NOT LAUNCH over a node that "
