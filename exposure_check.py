@@ -84,6 +84,9 @@ BASE_PORTS = [5000, 5020, 5040, 5060, 5100, 5120, 5140]
 # the server itself binds to loopback since the same day (Tailscale Funnel proxies
 # to 127.0.0.1:5090), so this tool reports it as "loopback" unless someone passes
 # --host 0.0.0.0, in which case it is reported as WILDCARD like any other.
+# A258-EARNHOST (2026-10-05): it was not so -- the CLI's --host defaulted to 0.0.0.0, so every
+# launch bound the wildcard and this tool reported WILDCARD on 5090 for eight days with nothing
+# acting on it. Loopback since A258; EA1.44/EA1.45 run the launch path.
 EARN_PORTS = [5090]
 PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 1, b + 11)} | set(EARN_PORTS))
 
@@ -147,6 +150,23 @@ def listeners() -> Optional[List[Dict[str, object]]]:
             found.append({"addr": addr, "port": port, "pid": pid,
                           "wildcard": addr in ("0.0.0.0", "[::]", "*", "::")})
     return found
+
+
+def owner_name(pid: str) -> Optional[str]:
+    """The listening process's name, or None when it cannot be read."""
+    out = _run(["powershell", "-NoProfile", "-Command",
+                "(Get-Process -Id %s -ErrorAction SilentlyContinue).ProcessName" % pid])
+    out = (out or "").strip()
+    return out or None
+
+
+def is_ours(name: Optional[str]) -> bool:
+    """A258 (2026-10-05): a covenant PORT held by a process that is not Python is not covenant
+    exposure. Measured that night: 0.0.0.0:5040 was CDPSvc (Windows' Connected Devices Platform,
+    svchost), and this tool had counted it as a node socket since BASE_PORTS took in a 5040 slot --
+    the 2026-09-10 note above lists it as 'actually open'. An owner that cannot be read still counts:
+    unknown is never rounded down to safe (A82)."""
+    return name is None or "python" in name.lower()
 
 
 def program_for(pid: str) -> Optional[str]:
@@ -218,9 +238,13 @@ def main() -> int:
     print("  Listening:")
     wildcard_ports = []
     for L in live:
-        flag = "WILDCARD" if L["wildcard"] else "loopback"
+        owner = owner_name(str(L["pid"]))
+        ours = is_ours(owner)
+        flag = ("WILDCARD" if L["wildcard"] else "loopback") if ours else "NOT COVENANT (%s)" % owner
         print("    %-16s port %-6s pid %-8s %s"
               % (L["addr"], L["port"], L["pid"], flag))
+        if not ours:
+            continue
         if L["wildcard"]:
             wildcard_ports.append(int(L["port"]))
         p = program_for(str(L["pid"]))

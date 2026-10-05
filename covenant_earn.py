@@ -1870,7 +1870,13 @@ def serve(port=DEFAULT_PORT, host="127.0.0.1", app=None, block=True):
     wildcard-bound on 0.0.0.0:5090 and outside the exposure checker's scope. Buyers reach it through
     Tailscale Funnel, which proxies to 127.0.0.1:5090 on this PC; nothing on the LAN or the public profile
     of the firewall needs the socket. So the listener binds to loopback: the Funnel, the watchdog's port
-    check and a local client see it, the network does not. --host 0.0.0.0 is still his to pass."""
+    check and a local client see it, the network does not. --host 0.0.0.0 is still his to pass.
+
+    A258-EARNHOST (2026-10-05): true of this function, not of the server as launched. main()'s --host
+    defaulted to "0.0.0.0" and every launch goes through main(), so the server stayed wildcard-bound
+    for eight days after this was written: the process started 2026-09-26 23:04:28 was still on
+    0.0.0.0:5090 on 2026-10-05. The command-line default is loopback now, and EA1.44/EA1.45 run main()
+    to pin it both ways."""
     try:
         import covenant_quiet
         covenant_quiet.install()
@@ -1929,7 +1935,11 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="covenant earn -- checks for a price, every job through the gate, running on its own")
     ap.add_argument("--serve", action="store_true")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
-    ap.add_argument("--host", default="0.0.0.0")
+    # A258-EARNHOST (2026-10-05): this default was "0.0.0.0" after A230 made serve() default to
+    # loopback, so every real launch -- the watchdog's `covenant_earn.py --serve`, and his -- passed the
+    # wildcard straight through and the loopback default never ran. Every consumer is loopback (Tailscale
+    # Funnel proxies to 127.0.0.1:5090; the watchdog probes 127.0.0.1). --host 0.0.0.0 is still his to pass.
+    ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--design", action="store_true", help="put the offers' declaration to the node's gate now")
     ap.add_argument("--allow-design", metavar="WHY", help="his yes for the offers themselves when the gate HELD them; never overrides a refusal")
     ap.add_argument("--status", action="store_true")

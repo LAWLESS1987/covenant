@@ -650,6 +650,22 @@ def main():
         check("EA1.43 with no stderr and no stdout (pythonw, as the watchdog launches it) a GET /health still gets a 200 and its body",
               st_bare == 200 and "source_sha256" in body_bare, (st_bare, body_bare[:160]))
 
+    # A258-EARNHOST (2026-10-05). A230 made serve() default to loopback and left main()'s --host at
+    # "0.0.0.0", so every real launch bound the wildcard; the checks then read serve()'s default, not
+    # the path a launch takes. These run main() itself with serve captured, both ways.
+    seen_hosts = []
+    real_serve = E.serve
+    try:
+        E.serve = lambda port=None, host=None, *a, **k: (seen_hosts.append(host) or object())
+        E.main(["--serve"])
+        E.main(["--serve", "--host", "0.0.0.0"])
+    finally:
+        E.serve = real_serve
+    check("EA1.44 `covenant_earn.py --serve` with no --host -- the watchdog's launch -- binds loopback (main() run, serve captured)",
+          seen_hosts[:1] == ["127.0.0.1"], seen_hosts)
+    check("EA1.45 ...and --host 0.0.0.0, his to pass, still reaches serve() unchanged",
+          seen_hosts[1:2] == ["0.0.0.0"], seen_hosts)
+
     n_ok, n = sum(results), len(results)
     print("EA1: %d/%d passed" % (n_ok, n))
     return 0 if n_ok == n else 1

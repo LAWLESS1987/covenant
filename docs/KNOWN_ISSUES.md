@@ -7293,6 +7293,61 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A258. [back doors and ghosts, audited: the earn server's loopback fix never reached its launch path, a ghost identity key, a check counting a Windows service as a node, and firewall rules that open every Python listener on the Public Wi-Fi] 2026-10-05. His words: "ensure no back doors or ghost ones after update docs following what i said earlier". MEASURED; three fixed with guards driven both ways, one ghost retired, the firewall is his
+
+**Populations read, by discovery.** Every listening socket and its owning process; every process running
+covenant code; enabled inbound firewall Allow rules touching 5000-5100, 8081, 8433 or a Python program;
+the active network profiles; every scheduled task whose action names covenant; `.git/hooks`, git config
+at every level, `.gitattributes`; every `*.key` in the folder, its ACL and its references; temp copies;
+worktrees; the sync tool; the one remote peer; and each exclusion I added on 2026-10-04 (A255/A257)
+against every consumer.
+
+**Fixed.**
+- A258-EARNHOST: the earn server listened on 0.0.0.0:5090. A230 made `serve()` default to loopback but
+  `main()`'s `--host` defaulted to 0.0.0.0, and every launch goes through `main()`. Every consumer is
+  loopback (Funnel proxies to 127.0.0.1:5090; the watchdog probes 127.0.0.1), so the default is
+  loopback now; EA1.44/EA1.45 run `main()` both ways (HEAD's code: `--serve` reaches `serve()` as
+  0.0.0.0). Editing covenant_earn.py made the running server step down on its own keeper and the
+  watchdog relaunched it (watchdog.log 2026-10-05T04:35:45Z "earn service: started") -- a restart caused
+  by the edit, not by a stop. After: loopback 200, the public Funnel 200, the Wi-Fi LAN address refused.
+- exposure_check counted 0.0.0.0:5040 as a node socket; its owner is CDPSvc (svchost, Windows' Connected
+  Devices Platform). It now names each listener's owner and does not count a non-Python one; an owner it
+  cannot read still counts. A82 O1/O2/O2m, red on HEAD's file, green after.
+- A ghost identity: `w2_probe.db` + `.key` (2026-09-26), referenced by no file and no history, held by no
+  process. Retired to `.trash/2026-10-05_w2_probe_identity/` with RETIRED.md; the key was not opened, its
+  bytes hashed before and after the move, its owner-only ACL intact. Whether it ever joined the chain was
+  not determined.
+
+**My own exclusions, against their consumers (A255).** Of the six files moved out of the manifest, two
+are written and never read back (outbound_overrides, tetsu_assist), one is read for a report line
+(RUN_WITHOUT.json), and three are read and acted on: moltbook_candidates feeds `find_allies`, whose
+ally ledger `covenant_free_will` replies to; oa_sources chooses what the study reads. What guards the
+outward path is `emit()` -- the covenant's judge (a hold refuses), the disclosure block, his key, rate
+limits -- not the manifest: those files are rewritten every round, so a change between commits was
+indistinguishable from the system's own writes. That trade is the one verdicts.jsonl has carried since
+2026-09-04, said here rather than assumed.
+
+**His, not changed by me (security settings).** Enabled inbound Allow rules for the Store Python
+(`python3.12.exe`, `pythonw3.12.exe`), any port, any remote address, on the Public and Private profiles;
+"cvports" (5000, 5001) and "node" (5001), any remote. The Wi-Fi network is categorized Public, so those
+apply now: the node API, P2P and bridge sockets (all 0.0.0.0) are reachable from the Wi-Fi LAN.
+exposure_check's own finding (tested 2026-08-30, not re-tested tonight) is that the write surface refuses
+without operator headers or a signature, so what is exposed is reading: /health internals and /peers
+topology. It prints the one-line block rule. Also two Allow-any rules for the Codex runtime's python.exe
+(`.cache\codex-runtimes`), left from the other tool's run of 2026-10-03 (A243). And the founder/genesis
+key's only backup (`_keybackup/`) is on the same disk; its README's warning about run_all_tests.sh is
+stale (fixed 2026-08-27, pinned by K1) and carries a dated note saying so.
+
+**Clean, measured:** three hooks, each identical to its tracked copy; no hooksPath, fsmonitor, alias,
+include or URL rewrite in any git config; no filter in .gitattributes; four scheduled tasks, every target
+on disk; every key owner-only with inheritance cut; no keys in temp copies; Syncthing not running; no
+process from another tree or worktree; the one remote peer (a tailnet address) runs b708204ff11b, which is the core at
+f6406a1, the phone build's commit.
+
+**Repro:** `python exposure_check.py`; `python test_ea1_earn.py`; `python test_a82_exposure_unknown.py`.
+
+---
+
 ### A257. [README docs measured against the system: ten claims refuted and tombstoned, three dated statements re-pointed, one promised check that nothing ran] 2026-10-04. His words: "using the tombstone system and the scientific method thoroughly and honestly update the read me docs", then "get the nodes green following our tombstones and then re do the docs", "remember edit run fix 3 times". MEASURED; every refuted site keeps its wording with the restated form and its tombstone beside it
 
 **Population, by discovery.** Tracked files whose name contains "readme": seven -- README.md,
@@ -8961,6 +9016,12 @@ moment of the run and now inside the scope; EA1 43/43.
 posture on any other port.
 
 **Repro:** `python test_a82_exposure_unknown.py`; `python exposure_check.py`.
+
+*Accuracy note, 2026-10-05 (A258-EARNHOST; the entry above is kept as written).* The fix did not
+reach the server as launched. The watchdog starts it with `covenant_earn.py --serve`, and `main()`'s
+`--host` still defaulted to 0.0.0.0, so neither a step-down nor a restart brought it up on loopback:
+the process started 2026-09-26 23:04:28 was on 0.0.0.0:5090 on 2026-10-05, and exposure_check reported
+it WILDCARD every time it ran, with nothing acting on that. Fixed in A258; EA1.44/EA1.45 run `main()`.
 
 
 ### A229. [earn: a mutual-benefit check that fails closed] 2026-09-26. His words: "Add a gate check that asks whether this transaction serves the builder as much as the user, and fail closed if it can't answer." To "who is the builder", he answered "all 3": the operator, Tetsu, and whoever made what is sold.

@@ -144,6 +144,11 @@ server itself binds to loopback, 127.0.0.1:5090: the Funnel proxies to that
 address, the LAN cannot reach the socket, and the exposure checker
 (`exposure_check.py`) knows the port. The evening sweep had found it
 wildcard-bound and outside the checker's scope (A82's A2 check, 17/18).
+*(A258-EARNHOST, 2026-10-05: not so until tonight. `serve()` defaulted to loopback,
+but `--host` on the command line still defaulted to 0.0.0.0, and every launch goes
+through the command line -- so the server stayed wildcard-bound, reachable from the
+Wi-Fi LAN, for eight days. The command-line default is loopback now (EA1.44/EA1.45
+run it); measured after: loopback and the Funnel answer 200, the LAN address does not.)*
 
 ## Bringing buyers: advertising (2026-09-26, his words: "start an online advertisment program to generate revenue")
 

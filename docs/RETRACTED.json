@@ -658,6 +658,34 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A258-EARNHOST",
+   "claim": "That since 2026-09-26 (A230) the earn server binds to loopback by default -- the listener binds to loopback, the server itself binds to loopback, and the watchdog starts it on loopback (covenant_earn.serve's docstring; docs/EARN.md; exposure_check.py's EARN_PORTS comment; KNOWN_ISSUES A230).",
+   "refuted_by": "Measured 2026-10-05: the live process (started 2026-09-26 23:04:28) listened on 0.0.0.0:5090. serve() defaulted to 127.0.0.1, but main()'s --host defaulted to '0.0.0.0', and every launch -- the watchdog's `covenant_earn.py --serve` included -- goes through main(). Run against that code with serve captured, `--serve` reaches serve() as host 0.0.0.0. exposure_check reported it WILDCARD each time it ran.",
+   "truth": "Loopback since 2026-10-05 (A258): main()'s --host defaults to 127.0.0.1, EA1.44/EA1.45 run main() both ways, and after the change loopback and the Funnel answered 200 while the Wi-Fi LAN address did not. False from 2026-09-26 to 2026-10-05.",
+   "verbatim": [
+    "So the listener binds to loopback",
+    "the server itself binds to loopback, 127.0.0.1:5090",
+    "the server itself binds to loopback since the same day",
+    "the server binds to loopback by default"
+   ],
+   "patterns": [
+    "listener\\s+binds\\s+to\\s+loopback",
+    "server\\s+itself\\s+binds\\s+to\\s+loopback",
+    "server\\s+binds\\s+to\\s+loopback\\s+by\\s+default"
+   ],
+   "note_on_patterns": "Narrow to the earn server's wording. The seal service ('binds to loopback only') and the memory server ('unauthenticated on loopback by default') are different services and match none of these.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch a258-earn-host-claim-as-written-2026-10-05 (at c06a502). Each keeps its wording with the restated form and this id beside it."
   }
  ]
 }

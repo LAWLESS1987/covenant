@@ -163,6 +163,30 @@ def main():
             check("E8 a firewall that genuinely names no rule still reports "
                   "'Probably not reachable' and exits 0",
                   rc == 0 and "Probably not reachable" in out, "rc=%s" % rc)
+            # O* -- A258 (2026-10-05): a covenant port held by a non-Python process is not ours.
+            check("O1 ownership: python and pythonw count, a Windows service host does not, an unreadable owner still counts",
+                  X.is_ours("python3.12") and X.is_ours("pythonw3.12") and not X.is_ours("svchost")
+                  and X.is_ours(None), "")
+            NETSTAT_SERVICE_ONLY = ("\n  TCP    0.0.0.0:5040           0.0.0.0:0              LISTENING       11136\n")
+
+            def service_owned(owner):
+                def fake(cmd):
+                    if cmd and cmd[0] == "netstat":
+                        return NETSTAT_SERVICE_ONLY
+                    if cmd and cmd[0] == "netsh":
+                        return "Rule Name:  unrelated\nEnabled: Yes\n"
+                    if cmd and "ProcessName" in " ".join(cmd):
+                        return owner
+                    return "C:\\fake\\python.exe"
+                return fake
+            X._run = service_owned("svchost")
+            rc, out = run_main()
+            check("O2 a wildcard 5040 held by svchost (CDPSvc) is reported NOT COVENANT and not counted as exposure",
+                  "NOT COVENANT (svchost)" in out and "WILDCARD" not in out and rc == 0, out.strip()[-90:])
+            X._run = service_owned("python3.12")
+            rc, out = run_main()
+            check("O2m ...and the same socket held by Python IS counted -- the rule names the owner, it does not drop the port",
+                  "WILDCARD" in out and "NOT COVENANT" not in out, out.strip()[-90:])
         else:
             rc, out = run_main()
             check("E9 on a non-Windows host main() refuses rather than guessing",
