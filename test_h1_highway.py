@@ -746,8 +746,18 @@ def main():
     _ann = ["RESULT: FAIL. Something is wrong and it is named above.",
             "suites not clean    1  -> test_pv1_provenance.py",
             "      | FAIL  PV1.6 a file outside the tree entirely is foreign"]
+    # A260, second cycle (2026-10-05): a change of verdict is told only when a SECOND read, CI_RETRY_S later,
+    # agrees. Every check below that expects him to be told now takes two reads; the first read alone is pinned.
+    _R = H.CI_RETRY_S + 1
     _calls = []
-    r_ci = H.detect_public_ci_red(get=_api(_red, _ann, _calls), now=_t0,
+    r_one = H.detect_public_ci_red(get=_api(_red, _ann, _calls), now=_t0,
+                                   cache=os.path.join(_cdir, "red.json"), tell=_tell)
+    check("H1ci A260 ONE read of red tells him nothing: the confirmed state (green, none told) stands, the change "
+          "is pending and the next read is brought forward",
+          r_one["state"] == H.ABSENT and "unconfirmed" in r_one["measured"] and not _told
+          and json.load(open(os.path.join(_cdir, "red.json")))["next_at"] <= _t0 + H.CI_RETRY_S,
+          (r_one["state"], r_one["measured"].get("unconfirmed"), _told))
+    r_ci = H.detect_public_ci_red(get=_api(_red, _ann, _calls), now=_t0 + _R,
                                   cache=os.path.join(_cdir, "red.json"), tell=_tell)
     m_ci = r_ci["measured"]
     check("H1ci the newest FINISHED run on main failed -> PRESENT: the cancelled one skipped, the failing check named "
@@ -758,17 +768,20 @@ def main():
     check("H1ci ...and it tells him on the direct line, naming the check",
           len(_told) == 1 and "red on main" in _told[0] and "PV1.6" in _told[0], _told)
     _n = len(_calls)
-    r_ci2 = H.detect_public_ci_red(get=_api(_red, [], _calls), now=_t0 + 60,
+    r_ci2 = H.detect_public_ci_red(get=_api(_red, [], _calls), now=_t0 + _R + 60,
                                    cache=os.path.join(_cdir, "red.json"), tell=_tell)
     check("H1ci within its 30 minutes it asks the API nothing, the annotation was fetched once, and he is not told twice",
           len(_calls) == _n and r_ci2["state"] == H.PRESENT and len(_told) == 1
+          and sum(1 for c in _calls if "/annotations" in c) == 1
           and any("PV1.6" in x for x in r_ci2["measured"]["failing"]), (_calls, _told))
-    r_ci = H.detect_public_ci_red(get=_api([_run(11, "success", 0.1)] + _red, [], _calls), now=_t0 + H.CI_EVERY_S + 1,
-                                  cache=os.path.join(_cdir, "red.json"), tell=_tell)
-    check("H1ci broken the other way: when main turns green he is told once that it is green again",
+    for _dt in (_R + H.CI_EVERY_S + 1, 2 * _R + H.CI_EVERY_S + 1):
+        r_ci = H.detect_public_ci_red(get=_api([_run(11, "success", 0.1)] + _red, [], _calls), now=_t0 + _dt,
+                                      cache=os.path.join(_cdir, "red.json"), tell=_tell)
+    check("H1ci broken the other way: when main turns green (and the next read agrees) he is told once that it is green again",
           r_ci["state"] == H.ABSENT and len(_told) == 2 and "green again" in _told[1], _told)
-    r_ci = H.detect_public_ci_red(get=_api([_run(4, "failure", 0.5), _run(3, "failure", 1.0)], [], []),
-                                  now=_t0, cache=os.path.join(_cdir, "allred.json"), tell=_tell)
+    for _dt in (0, _R):
+        r_ci = H.detect_public_ci_red(get=_api([_run(4, "failure", 0.5), _run(3, "failure", 1.0)], [], []),
+                                      now=_t0 + _dt, cache=os.path.join(_cdir, "allred.json"), tell=_tell)
     check("H1ci no green run in the page: the start of the red is said as 'at least', not as exact -- to him too",
           r_ci["state"] == H.PRESENT and r_ci["measured"]["red_since_is"] == "at least"
           and any("at least 2 finished run(s) since 0000003 or earlier" in t for t in _told[-1:]),
@@ -779,8 +792,9 @@ def main():
                                   tell=_tell)
     check("H1ci broken the other way: the newest finished run green -> ABSENT, whatever came before it, and nothing said",
           r_ci["state"] == H.ABSENT and len(_told) == _k, r_ci["measured"])
-    r_ci = H.detect_public_ci_red(get=_api([_run(10, "success", 7.0)], [], []), now=_t0,
-                                  cache=os.path.join(_cdir, "silent.json"), tell=_tell)
+    for _dt in (0, _R):
+        r_ci = H.detect_public_ci_red(get=_api([_run(10, "success", 7.0)], [], []), now=_t0 + _dt,
+                                      cache=os.path.join(_cdir, "silent.json"), tell=_tell)
     check("H1ci green, but nothing on main finished for over 6 h -> PRESENT: a missing run is not a passing run",
           r_ci["state"] == H.PRESENT and "missing run" in r_ci["measured"].get("why", ""), r_ci["measured"])
     r_ci = H.detect_public_ci_red(get=_down, now=_t0, cache=os.path.join(_cdir, "none.json"), tell=_tell)
@@ -802,12 +816,26 @@ def main():
           r_ci["state"] == H.ABSENT and r_ci["measured"]["newest"]["sha"] == "0000015" and len(_told) == _k
           and "stale page" in str(json.load(open(os.path.join(_cdir, "stale.json"))).get("error")),
           (r_ci["state"], r_ci["measured"].get("newest"), _told[_k:]))
-    r_ci = H.detect_public_ci_red(get=_api([_run(22, "failure", 0.1), _run(21, "success", 0.5)], [], []),
-                                  now=_t0 + 2 * (H.CI_EVERY_S + H.CI_RETRY_S), cache=os.path.join(_cdir, "stale.json"),
-                                  tell=_tell)
-    check("H1ci A260 broken the other way: a NEWER red is not stale -- PRESENT, and he is told",
+    for _dt in (2 * (H.CI_EVERY_S + H.CI_RETRY_S), 2 * (H.CI_EVERY_S + H.CI_RETRY_S) + _R):
+        r_ci = H.detect_public_ci_red(get=_api([_run(22, "failure", 0.1), _run(21, "success", 0.5)], [], []),
+                                      now=_t0 + _dt, cache=os.path.join(_cdir, "stale.json"), tell=_tell)
+    check("H1ci A260 broken the other way: a NEWER red is not stale -- PRESENT once the next read agrees, and he is told",
           r_ci["state"] == H.PRESENT and r_ci["measured"]["newest"]["sha"] == "0000016" and len(_told) == _k + 1,
           (r_ci["state"], r_ci["measured"].get("newest"), _told[_k:]))
+    # THE 09:28Z CASE: the guard's seed was itself a stale page, so a second stale page that was NEWER than the
+    # seed -- but still a day old -- passed it, and "nothing has finished" was told. Each stale page now stays
+    # pending; the fresh read that follows agrees with what he was told, and nothing is said.
+    _k = len(_told)
+    _s = os.path.join(_cdir, "seed.json")
+    _seen_states = []
+    for _dt, _page in ((0, [_run(30, "success", 216.0)]), (_R, [_run(31, "success", 31.0)]),
+                       (2 * _R, [_run(32, "success", 0.2), _run(31, "success", 31.0)])):
+        _seen_states.append(H.detect_public_ci_red(get=_api(_page, [], []), now=_t0 + _dt, cache=_s,
+                                                   tell=_tell)["state"])
+    check("H1ci A260 two stale pages in a row, each a different 'nothing finished', then a fresh green: never told, "
+          "never PRESENT, and nothing left pending",
+          len(_told) == _k and _seen_states == [H.ABSENT, H.ABSENT, H.ABSENT]
+          and not json.load(open(_s)).get("pending"), (_seen_states, _told[_k:]))
     check("H1ci public_ci_red has no remedy: the fix is a change to the code, and PRESENT reaches him as an alert",
           not [n for n, rr in H.REMEDIES.items() if "public_ci_red" in (rr.get("for") or [])])
 

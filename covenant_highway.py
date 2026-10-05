@@ -942,11 +942,31 @@ def detect_public_ci_red(health=None, get=None, now=None, cache=None, tell=None)
         state = PRESENT
     else:
         episode, text, state = None, "The public CI is green again on main at %s." % newest.get("sha"), ABSENT
+    # A260, second cycle (2026-10-05): ONE READ DOES NOT CHANGE WHAT HE IS TOLD. The first cycle refused a
+    # page older than one already read, and at 09:28Z a page from 2026-10-04 -- newer than the stale one the
+    # guard had been seeded from, older than that morning's runs -- passed it, and he was told "Nothing on the
+    # public CI's main has finished". Stale pages come and go; a real verdict does not. So a change of verdict
+    # is held as pending, the next read is brought forward to CI_RETRY_S, and it is told -- and stands -- only
+    # when that later read agrees. Until then the last confirmed state stands.
     if episode != st.get("told"):
-        if episode or st.get("told"):
-            said = tell(text[:600], "highway: the public CI (A232)")
-            measured["told"] = "said" if said else "refused by the direct line"
-        st["told"] = episode                  # said once, refused or not: a refusal is not retried every round
+        pend = st.get("pending") or {}
+        if pend.get("episode") == (episode or "") and pend.get("ok_at") is not None and pend.get("ok_at") != ok_at:
+            if episode or st.get("told"):
+                said = tell(text[:600], "highway: the public CI (A232)")
+                measured["told"] = "said" if said else "refused by the direct line"
+            st["told"] = episode              # said once, refused or not: a refusal is not retried every round
+            st.pop("pending", None)
+            dirty = True
+        else:
+            if pend.get("episode") != (episode or ""):
+                st["pending"] = {"episode": episode or "", "ok_at": ok_at}
+                st["next_at"] = min(float(st.get("next_at") or (now + CI_RETRY_S)), now + CI_RETRY_S)
+                dirty = True
+            measured["unconfirmed"] = ("%s on one read; told, and standing, only when the next read agrees"
+                                       % (episode or "green"))
+            state = PRESENT if st.get("told") else ABSENT
+    elif st.get("pending"):
+        st.pop("pending", None)               # the next read went back to what he was told: nothing to say
         dirty = True
     if dirty:
         _save()

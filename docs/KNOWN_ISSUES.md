@@ -7317,7 +7317,16 @@ Once the watchdog runs this code, the next fresh read finds main green and tells
 did move backwards, every read would be refused, and after two hours the state reads UNKNOWN -- visible,
 not silent.
 
-**Repro:** `python test_h1_highway.py` (H1ci A260).
+*Accuracy note, 2026-10-05 (the entry above is kept as written): "FIXED" was not so.* The guard's first
+reference was the cached page itself -- the nine-day-old one -- so at 09:28Z a second stale page, a day old
+and newer than that seed, passed it, and he was told "Nothing on the public CI's main has finished". Three
+requests minutes later, with the detector's exact headers and without, all returned that morning's runs:
+the stale pages come and go. Second cycle, the guard that does not depend on a reference: one read does not
+change what he is told. A change of verdict is held pending, the next read is brought forward to
+CI_RETRY_S, and only a later read that agrees tells him; until then the last confirmed state stands. H1ci
+now pins one read of red (nothing told, pending, next read brought forward), and the 09:28Z case (two stale
+pages then a fresh green: never told, never PRESENT); the checks that expect a tell take two reads. HEAD's
+detector on the 09:28Z case told him twice. H1 180/180.
 
 ---
 
