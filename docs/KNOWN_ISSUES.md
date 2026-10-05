@@ -7372,6 +7372,19 @@ reach the default configuration, where the encoded texts are ALLOWED, not UNREVI
 close before G4 is worth building, since decoded text still walks past the screen behind a label; G3 is
 a trade between withheld memories and exposed ones that only a count of each can settle.
 
+*Dated note, 2026-10-05 (his words: "1 2 and both ying and yang for 3", then "both parts and do all three
+if its for mutual benefit").* **G2 FIXED** in `QuorumJudge.evaluate` (`covenant_unified_v8.py`):
+`infrastructure_failure` is now set only when the quorum violates, a violating seat failed on
+infrastructure, AND no seat actually alleges. `violates` is untouched, so no verdict changes. With the
+real quorum (not the simulation), all 25 two-seat combinations through the memory gate: 0 wrong. The
+gain and its cost, as he asks: a conviction is never written as unchecked and "judge_unavailable" stops
+naming a real dissent; the cost is a core change that the nodes load only at a restart. **A check was
+wrong and is retracted (A253-Q3):** `test_b1_judge_parser.py` pinned "Q3 mixed dissent+infra -> violates
+and flagged", the opposite of its own section's rule ("never relabels a real dissent"); as written on
+branch `a253-q3-mixed-infra-as-written-2026-10-05`. Restated as Q3 (a dissent beside a timeout is NOT
+flagged) and Q3b (a timeout with no dissent still IS). The old `any(...)` line restored turns Q3 red
+(165/166) and leaves Q3b green; restored, B1 166/166; B2, F1, E1, X1 green.
+
 ---
 
 ### A252. [Tetsu runs on two pass-throughs and a memory margin: the gate admitted 0 of his last 40 answers, and this morning nothing fit for him to load] 2026-10-04. His words: "also find a way to safely ensure tetsus operation". MEASURED; two guards and one reading ADDED, nothing loosened, no process started or stopped; the rest is his

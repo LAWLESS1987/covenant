@@ -196,7 +196,16 @@ def section_q():
 
     q = cov.QuorumJudge([sem_ok, sem_bad, sem_infra, mock], min_agree=4, required_judge_ids={mock.judge_id})
     r = q.evaluate({"message": "hello"}, cov.DIVINE_PRINCIPLES)
-    check("Q3 mixed dissent+infra -> violates and flagged", r.violates and r.infrastructure_failure)
+    # Retraction A253-Q3 (2026-10-05): this check read "Q3 mixed dissent+infra -> violates and flagged"
+    # and pinned the opposite of section Q's own rule above ("never relabels a real dissent"): sem_bad
+    # ALLEGES, so the timeout beside it must not turn the verdict into an infrastructure failure. As
+    # written on branch a253-q3-mixed-infra-as-written-2026-10-05.
+    check("Q3 mixed dissent+infra -> violates, and NOT flagged: a real dissent beside a timeout is not relabelled (A253)",
+          r.violates and not r.infrastructure_failure, f"violates={r.violates} infra={r.infrastructure_failure}")
+    q = cov.QuorumJudge([sem_ok, sem_infra, mock], min_agree=3, required_judge_ids={mock.judge_id})
+    r = q.evaluate({"message": "hello"}, cov.DIVINE_PRINCIPLES)
+    check("Q3b ...while a timeout with NO dissent beside it is still flagged (A253 narrows, never drops, the label)",
+          r.violates and r.infrastructure_failure, f"violates={r.violates} infra={r.infrastructure_failure}")
 
     q = cov.QuorumJudge([sem_ok, CannedJudge('{"violates": false, "reasoning": "ok"}', "d:0"), mock],
                         min_agree=3, required_judge_ids={mock.judge_id})

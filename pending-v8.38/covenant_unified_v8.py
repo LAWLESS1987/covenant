@@ -2424,7 +2424,21 @@ class QuorumJudge(ReasoningJudge):
         # B3 (v8.22): the quorum is an infrastructure failure when it violates
         # AND at least one VIOLATING component failed on infrastructure. A real
         # dissent from a working judge is never relabelled.
-        infra = violates and any(r.violates and r.infrastructure_failure for r in results)
+        #
+        # A253 (2026-10-05, his words: "1 2 and both ... do all three if its for
+        # mutual benefit"): the sentence above was not what the line below did.
+        # `any(...)` labelled the whole verdict an infrastructure failure when ONE
+        # seat timed out, even if another seat ALLEGED a violation -- and the
+        # memory gate, which tests this flag first, then WROTE the convicted
+        # memory as UNREVIEWED. Measured over all 25 two-seat combinations: 2
+        # wrong, exactly those. Grok's recommendation, reviewed by three Chat Smith
+        # seats: fix it here, once, not in every consumer. No verdict changes --
+        # `violates` is computed above and untouched; only the label does (2 of
+        # 25 in the simulation), and "judge_unavailable" stops being recorded
+        # beside a real dissent.
+        alleged = any(r.violates and not (r.infrastructure_failure or r.not_understood or r.uncertain)
+                      for r in results)
+        infra = violates and not alleged and any(r.violates and r.infrastructure_failure for r in results)
         # ALL of the blocking judges must be reporting illegibility, not just
         # one. If any judge actually alleges something, this is an allegation
         # and must read as one -- a quorum where one member cannot read the

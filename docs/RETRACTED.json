@@ -353,6 +353,30 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "The record keeps A70's wording with a dated note beside it; the as-written text is also on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f)."
+  },
+  {
+   "id": "A253-Q3",
+   "claim": "That a quorum where one seat ALLEGES a violation and another fails on infrastructure is an infrastructure failure -- pinned as test_b1_judge_parser.py's Q3, \"mixed dissent+infra -> violates and flagged\", against its own section's rule that QuorumJudge \"never relabels a real dissent\".",
+   "refuted_by": "A253, 2026-10-05: over all 25 two-seat combinations the label sent the memory gate down its infrastructure branch, writing a convicted memory UNREVIEWED (2 of 25 wrong). Grok recommended the fix at the quorum; three Chat Smith seats agreed; the operator approved it (\"1 2 and both ... do all three if its for mutual benefit\").",
+   "truth": "infrastructure_failure is set only when the quorum violates, at least one violating seat failed on infrastructure, AND no seat actually alleges a violation. A real dissent beside a timeout is a dissent; a timeout with no dissent beside it is still flagged (Q3b).",
+   "verbatim": [
+    "Q3 mixed dissent+infra -> violates and flagged"
+   ],
+   "patterns": [
+    "Q3\\s+mixed\\s+dissent\\+infra\\s+->\\s+violates\\s+and\\s+flagged"
+   ],
+   "note_on_patterns": "The check's own label, which is how the claim was written down.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The check as written is on branch a253-q3-mixed-infra-as-written-2026-10-05 (at e2c53c7); test_b1_judge_parser.py keeps the old label in a comment that cites A253-Q3 beside the restated Q3 and Q3b."
   }
  ]
 }
