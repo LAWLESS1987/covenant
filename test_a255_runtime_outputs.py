@@ -188,6 +188,11 @@ def scratch_repo_checks(vb):
         hook_src = os.path.join(HERE, "ops", "pre-commit.synchold")
         hook_dst = os.path.join(root, ".git", "hooks", "pre-commit")
         shutil.copy2(hook_src, hook_dst)
+        # Git on Linux silently IGNORES a hook without the executable bit; Git for Windows does not
+        # check it. ops/pre-commit.synchold was tracked 100644, so on CI's fresh clone the copy was
+        # ignored and K1/K3 failed while K2/K4 passed on nothing (2026-10-04, 379315b, both
+        # interpreters). Installing a hook means making it executable.
+        os.chmod(hook_dst, 0o755)
         env = dict(os.environ)
         env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
         c = _git(root, "commit", "-m", "b only", env=env)
@@ -196,6 +201,9 @@ def scratch_repo_checks(vb):
             print("  not measured: the scratch commit failed (rc=%s) -- K* did not run: %s"
                   % (c.returncode, said[-200:]))
             return
+        check("K0 the installed hook actually ran -- its 'pre-commit:' lines are in the commit's output. "
+              "Without it K2 and K4 would pass on a manifest nothing wrote",
+              "pre-commit:" in said, said[-240:])
         ok, bad = _manifest_matches_head(root)
         check("K1 the hook, committing b.py over an unstaged a.py, leaves the manifest alone and says why",
               "left alone" in said and "a.py" in said, said[-240:])

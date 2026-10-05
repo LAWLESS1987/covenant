@@ -7443,6 +7443,14 @@ S1/S2 pin it, driven both ways: HEAD's stage_check handed the leaked GIT_DIR to 
 IN_PLACE one (red), the fix did neither (green); an unscrubbed init on a throwaway repository with a linked
 worktree turned it bare (L2), the scrubbed one did not (L1).
 
+**Public CI red on the next pushes, read from the remote run (379315b, both interpreters).** K1 and K3
+failed on ubuntu: git on Linux silently ignores a hook without the executable bit, Git for Windows does
+not check it, and `ops/pre-commit.synchold` was tracked 100644 (its two sibling hooks are 100755), so the
+copied hook never ran. K2 and K4 passed on a manifest nothing wrote; K3, the regenerate-the-other-way
+check, is what failed. Fixed: the test makes the installed hook executable, K0 now requires the hook's own
+output before K2/K4 can count, and the tracked mode is 100755. Not reproducible on this machine (Windows
+ignores the bit; WSL here has no git), so the remote run after the push is the measurement.
+
 **Repro:** `python test_a255_runtime_outputs.py`; `python verify_bundle.py --write-if-clean=HEAD --dry`.
 
 ---
