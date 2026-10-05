@@ -33,6 +33,31 @@ def staged_tests(run=None):
     return [p for p in run().split() if os.path.basename(p).startswith("test_") and p.endswith(".py") and "/" not in p]
 
 
+def suite_env(base=None):
+    """The environment a suite runs under: the hook's, WITHOUT git's repository-pinning variables.
+
+    A255, 2026-10-04. Git exports GIT_DIR, GIT_INDEX_FILE ... to the hook, and this passed them to
+    every suite. "Where the runner runs it" was then false for any suite that calls git: in the
+    .git-less staged copy, `git ls-files` answered about the repository being committed, and a
+    suite's scratch `git init` re-initialized that repository's linked-worktree gitdir -- the
+    shared config read core.bare = true and the main working tree stopped working. The runner
+    (covenant_one) never has those variables; now neither does a suite run from here."""
+    try:
+        import verify_bundle as VB
+        return VB.repo_env(base)
+    except Exception:                                            # noqa: BLE001 -- stricter fallback
+        return {k: v for k, v in (os.environ if base is None else base).items() if not k.startswith("GIT_")}
+
+
+def in_place_names():
+    """Suites covenant_one runs IN THE FOLDER (IN_PLACE), never in the staged copy."""
+    try:
+        import covenant_one as C1
+        return {n for n, _, _ in C1.IN_PLACE}
+    except Exception:                                            # noqa: BLE001
+        return set()
+
+
 def check(tests, stage=None, clean=None, run=None, say=print, timeout=300):
     """{test: (ok, last_line)}. Never raises."""
     out = {}
@@ -43,16 +68,23 @@ def check(tests, stage=None, clean=None, run=None, say=print, timeout=300):
         import covenant_one as C1
         work = (stage or C1.stage)(lambda m: None)
         (clean or C1.clean_dbs)(work)
+        in_place = in_place_names()
         for t in tests:
+            # A255: an IN_PLACE suite measures THE FOLDER (git, the manifest, the hook), so the
+            # runner runs it there; staging it produced a false "CI will be red".
+            where = HERE if t in in_place else work
             try:
                 p = (run or (lambda t, w: subprocess.run([sys.executable, t], cwd=w, capture_output=True,
-                                                         text=True, timeout=timeout)))(t, work)
+                                                         text=True, timeout=timeout,
+                                                         env=suite_env())))(t, where)
                 last = ((p.stdout or "").strip().splitlines() or [""])[-1][:160]
                 out[t] = (p.returncode == 0, last)
             except Exception as e:                               # noqa: BLE001
                 out[t] = (False, "did not run: %s" % type(e).__name__)
             ok, last = out[t]
-            say("stage-check: %s %s -- %s" % ("ok  " if ok else "FAIL", t, last))
+            say("stage-check: %s %s%s -- %s" % ("ok  " if ok else "FAIL", t,
+                                               " (in place, as the runner runs it)" if where == HERE else "",
+                                               last))
         if any(not ok for ok, _ in out.values()):
             say("stage-check: a suite FAILS where the runner runs it (no .git, no databases). CI will be red "
                 "on this push unless it is fixed. The commit is NOT blocked.")

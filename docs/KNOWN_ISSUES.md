@@ -7371,6 +7371,23 @@ session whose transcript is 66e8ecd5; the two live sessions asked both showed by
 theirs. It is in the nodes' import set, so until it is committed or set aside the manifest cannot be
 rewritten cleanly, the nodes cannot restart onto committed imports, and G1 names it. That is his call.
 
+**My own incident, committing this (2026-10-04 23:23).** Committed from a clean linked worktree so the
+hook would write an honest manifest, the hook's stage_check ran this suite with the variables git exports
+to a hook (GIT_DIR = `.git/worktrees/wt_a255`) still set. Its scratch `git init` re-initialized THAT
+gitdir instead of the scratch directory, and init guesses "bare" for a GIT_DIR not ending in /.git: the
+shared `.git/config` read `core.bare = true` from 23:23:27, and `git status` in the main folder failed
+until I restored it, before 23:27:05. The one peer session committing tonight confirmed by its reflog that
+nothing of its fell in the window. Reproduced on a throwaway repository before it was fixed. The new
+hook's manifest step refused in that state ("git could not say what the commit holds"); the old one would
+have written a manifest from the raw disk. It is A117's and E12r's shape again -- a suite run "where the
+runner runs it" that was not: in the .git-less staged copy, P1 passed because git answered about the
+repository being committed. Fixed where it enters: `tools/stage_check.py` runs every suite without git's
+repository-pinning variables (`verify_bundle.LOCAL_GIT_ENV`, git's own `--local-env-vars` list) and runs
+IN_PLACE suites in the folder, where the runner does; scratch git calls here use `repo_env()`. L1/L2 and
+S1/S2 pin it, driven both ways: HEAD's stage_check handed the leaked GIT_DIR to a probe suite and staged an
+IN_PLACE one (red), the fix did neither (green); an unscrubbed init on a throwaway repository with a linked
+worktree turned it bare (L2), the scrubbed one did not (L1).
+
 **Repro:** `python test_a255_runtime_outputs.py`; `python verify_bundle.py --write-if-clean=HEAD --dry`.
 
 ---

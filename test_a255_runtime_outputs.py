@@ -36,6 +36,14 @@ WHAT IT PINS.
       reads what the gate actually does with them, so the two can disagree.
   M*  the checker is not vacuous: with one real ledger removed from OUTPUTS
       it flags that ledger, and it flags a planted unclassified one.
+  U*  verify_bundle.uncommitted_inputs() against real git in a scratch repo.
+  K*  the real pre-commit hook, installed in a scratch repo, both ways.
+  L*  this suite's own incident (2026-10-04): run by stage_check from a
+      commit in a linked worktree, its scratch `git init` inherited the hook's
+      GIT_DIR and re-initialized the SHARED repository as bare. L1: through
+      _git() it cannot; L2: without the scrub it does, on a throwaway repo.
+  S*  stage_check strips git's repository-pinning variables from every suite
+      it runs, and runs IN_PLACE suites in the folder as the runner does.
 
 WHAT IT CANNOT SEE, said so it is not quoted as more. Only .jsonl is
 classified, because every tracked .jsonl here was measured to be a ledger the
@@ -105,9 +113,13 @@ def gate_flags(cmd):
 
 
 def _git(root, *args, env=None):
+    # repo_env(): never inherit a hook's GIT_DIR into a scratch repository (A255's own incident,
+    # 2026-10-04: this helper, run by stage_check from a linked worktree, re-initialized the shared
+    # repository as bare).
+    import verify_bundle as vb
     return subprocess.run(["git", "-c", "user.name=a255", "-c", "user.email=a255@invalid",
                            "-c", "core.autocrlf=false", "-c", "core.hooksPath=.git/hooks"] + list(args),
-                          cwd=root, capture_output=True, text=True, timeout=180, env=env)
+                          cwd=root, capture_output=True, text=True, timeout=180, env=vb.repo_env(env))
 
 
 def _manifest_matches_head(root):
@@ -203,6 +215,70 @@ def scratch_repo_checks(vb):
         shutil.rmtree(root, ignore_errors=True)
 
 
+def leak_checks(vb):
+    """L*: a hook's GIT_DIR cannot reach a scratch repository through _git(); S*: stage_check strips it
+    and runs IN_PLACE suites in the folder. Every repository here is a throwaway under the temp dir."""
+    import importlib.util
+    import shutil
+    import tempfile
+    base = tempfile.mkdtemp(prefix="a255_leak_")
+    try:
+        real = os.path.join(base, "real")
+        other = os.path.join(base, "other")
+        os.makedirs(other)
+        raw = dict(vb.repo_env())
+        g = lambda *a, cwd=None, env=None: subprocess.run(["git", "-c", "user.name=a255", "-c", "user.email=a255@invalid"]
+                                                          + list(a), cwd=cwd, capture_output=True, text=True,
+                                                          timeout=120, env=env or raw)
+        g("init", "-q", real)
+        with open(os.path.join(real, "f"), "w") as fh:
+            fh.write("x\n")
+        g("add", "f", cwd=real)
+        g("commit", "-qm", "base", cwd=real)
+        if g("worktree", "add", "-q", os.path.join(base, "wt"), "-b", "w", cwd=real).returncode != 0:
+            print("  not measured: git worktree add failed -- L* did not run")
+            return
+        leaked = dict(raw)
+        leaked["GIT_DIR"] = os.path.join(real, ".git", "worktrees", "wt")   # what a hook in wt exports
+
+        def bare():
+            return g("config", "--get", "core.bare", cwd=real).stdout.strip()
+
+        _git(other, "init", "-q", env=leaked)
+        check("L1 a scratch `git init` through _git() with a hook's linked-worktree GIT_DIR leaked leaves "
+              "that repository non-bare", bare() == "false", "core.bare=%r" % bare())
+        subprocess.run(["git", "init", "-q"], cwd=other, capture_output=True, env=leaked, timeout=60)
+        check("L2 mutation: the same init WITHOUT the scrub turns it bare -- the incident, so L1 can fire",
+              bare() == "true", "core.bare=%r: the leak no longer reproduces, so L1 proves nothing" % bare())
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+
+    spec = importlib.util.spec_from_file_location("a255_stage_check", os.path.join(HERE, "tools", "stage_check.py"))
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    env = sc.suite_env({"GIT_DIR": "x", "GIT_INDEX_FILE": "y", "GIT_COMMON_DIR": "z", "PATH": "p"})
+    check("S1 stage_check runs suites without GIT_DIR, GIT_INDEX_FILE or GIT_COMMON_DIR, and keeps the rest",
+          not ({"GIT_DIR", "GIT_INDEX_FILE", "GIT_COMMON_DIR"} & set(env)) and env.get("PATH") == "p", repr(env))
+    seen = {}
+
+    class P:
+        returncode, stdout = 0, "x: 1/1 passed"
+
+    def fake_run(t, w):
+        seen[t] = w
+        return P()
+
+    staged = tempfile.mkdtemp(prefix="a255_staged_")
+    try:
+        sc.check(["test_a255_runtime_outputs.py", "test_h1_highway.py"], stage=lambda say: staged,
+                 clean=lambda w: None, run=fake_run, say=lambda m: None)
+    finally:
+        shutil.rmtree(staged, ignore_errors=True)
+    check("S2 stage_check runs an IN_PLACE suite in the folder and an ordinary one in the staged copy",
+          seen.get("test_a255_runtime_outputs.py") == sc.HERE and seen.get("test_h1_highway.py") == staged,
+          repr(seen))
+
+
 def main():
     import verify_bundle as vb
 
@@ -263,6 +339,7 @@ def main():
           "logs/ is in SKIP_DIR, so the manifest never hashes it")
 
     scratch_repo_checks(vb)
+    leak_checks(vb)
 
     print("\n  not measured: generated files that are not .jsonl (RUN_WITHOUT.json was one). "
           "They still need a hand entry in OUTPUTS; see the docstring.")

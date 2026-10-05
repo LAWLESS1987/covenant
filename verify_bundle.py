@@ -156,6 +156,28 @@ def shipped():
                 yield os.path.relpath(os.path.join(dp, fn), HERE).replace("\\", "/")
 
 
+# The variables git exports to a hook that pin every git call to ONE repository
+# (`git rev-parse --local-env-vars`, git 2.x). A255, 2026-10-04: a suite run by
+# the pre-commit hook's stage_check inherited them from a commit in a linked
+# worktree; its scratch `git init` re-initialized .git/worktrees/<name> instead
+# of the scratch directory, and init guesses "bare" for a GIT_DIR that does not
+# end in /.git -- so the SHARED config read core.bare = true and the main
+# working tree stopped working (23:23:27 until restored before 23:27:05).
+LOCAL_GIT_ENV = ("GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS",
+                 "GIT_CONFIG_COUNT", "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE",
+                 "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS",
+                 "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE", "GIT_COMMON_DIR")
+
+
+def repo_env(base=None):
+    """A copy of the environment with git's repository-pinning variables removed,
+    for any git call aimed at a DIFFERENT directory than the one a hook is for."""
+    env = dict(os.environ if base is None else base)
+    for k in LOCAL_GIT_ENV:
+        env.pop(k, None)
+    return env
+
+
 def uncommitted_inputs(against="index", root=None):
     """Tracked files the manifest hashes whose bytes on disk are NOT what is
     being committed: against "index" (a commit in progress -- what the
@@ -174,7 +196,10 @@ def uncommitted_inputs(against="index", root=None):
     import subprocess
     cmd = ["git", "diff", "--name-only", "-z"] + (["HEAD"] if against == "HEAD" else [])
     try:
-        r = subprocess.run(cmd, cwd=root or HERE, capture_output=True, timeout=60)
+        # In THIS folder the hook's GIT_INDEX_FILE is the index being committed, and
+        # is exactly what to ask; another root must not inherit it.
+        r = subprocess.run(cmd, cwd=root or HERE, capture_output=True, timeout=60,
+                           env=repo_env() if root else None)
     except Exception:                                        # noqa: BLE001
         return None
     if r.returncode != 0:
