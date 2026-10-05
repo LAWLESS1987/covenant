@@ -821,9 +821,10 @@
     "private/",
     "test_r1_retracted.py",
     "ONE_RUN.txt",
-    "ONE_SWEEP.txt"
+    "ONE_SWEEP.txt",
+    "ops/public_ci.json"
    ],
-   "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151)."
+   "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151). ops/public_ci.json is allowed: the public-CI listener's own gitignored cache, which records the failing check's annotation verbatim -- a record of what CI said, not a claim."
   }
  ]
 }
