@@ -7414,6 +7414,17 @@ broken by its own mutation and restored, MK1 16/16; TD1, M6 73/73, A153, AL2, DP
 move from `models/trial/` to `models/` on main. `/m/agent` imports the keeper once per node process, so
 his chat door uses the fallback after the nodes' next restart; his daily cycle, at its next launch.
 
+*Dated note, 2026-10-04, late (his words: "1 2 and 3" -- push, restart the nodes, retire the trial
+models).* **Restarted** with the repository's own `rolling_restart.py` from the production tree, which
+had reported all three nodes "IMPORTS STALE" (A153) once `covenant_model.py` changed: C, then B, then A,
+each proved back before the next, all at height 65 on genesis `00009b31`, "imports current" after.
+Before running it from this session, measured that a child started the way `start_node()` starts one
+(`covenant_quiet.popen_survivor`) outlives the tool call that started it -- the hazard in the memory
+note "long-lived processes never from my shell" -- and after the run the nodes were still listening
+with their parent exited. **Retired**, not deleted: the ten trial models (8.61 GB) moved to
+`models/.trash/2026-10-04_trial_models/` with a `RETIRED.md` naming who, why and how to restore one
+(git-ignored, like all of `models/`). The fallback stays in `models/`.
+
 ---
 
 ### A251. [two doc numbers checked: CONSTITUTION.md's count of protected blocks is stale since 09-19; JUDGE_EVALUATION.md's 9.1x is right for the corpus it names] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. ONE CONFIRMED (a stale count), ONE NOT CONFIRMED (two populations, not a contradiction)
