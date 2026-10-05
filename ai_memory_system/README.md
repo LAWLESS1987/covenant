@@ -214,7 +214,7 @@ believes, and anyone who can write it can change what every reader concludes.
 ## Tests
 
 ```bash
-python test_memory_system.py     # last line: M1: N/N passed (154/154 on 2026-10-04)
+python test_memory_system.py     # last line: M1: N/N passed (154/154 on 2026-10-04; 155/155 the same night, G8b added for A250)
 ```
 
 *This line said 66/66 until 2026-10-04: a count that went stale as checks were

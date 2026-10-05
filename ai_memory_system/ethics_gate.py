@@ -297,16 +297,25 @@ class EthicsGate:
             # The judge could not run. That is not a pass and not a block.
             return Verdict(verdict=UNREVIEWED, by="infrastructure",
                            reason=why or "judge infrastructure failure")
-        if res.violates:
-            return Verdict(verdict=BLOCK, by="semantic", reason=why,
-                           principle=str(getattr(res, "principle_violated", "")
-                                         or ""), providers=self.providers)
+        # A HOLD IS ASKED BEFORE A VIOLATION (A250, 2026-10-04, his words: "fix the memory gate
+        # held-to-block issue"). This branch used to come AFTER `if res.violates`, and the quorum
+        # sets not_understood / uncertain only together with violates=True -- so it was never
+        # reached (0 of 128 seat combinations), and every hold became a BLOCK. Measured under the
+        # deployed providers "deferring,semantic": 'The user prefers tea over coffee in the morning.'
+        # and four other plain facts were all REFUSED because the student seat could not read
+        # them, while the semantic seat cleared them. A hold is "we don't know", which this file
+        # stamps UNREVIEWED -- neither approval nor refusal. A real allegation from ANY seat still
+        # blocks: the quorum sets these flags only when every blocking seat held or was unsure.
         if getattr(res, "not_understood", False) or getattr(res, "uncertain",
                                                             False):
             # The judge read it and did not reach a verdict. Recording that as
             # ALLOW would launder "we don't know" into "we approved".
             return Verdict(verdict=UNREVIEWED, by="semantic_uncertain",
                            reason=why, providers=self.providers)
+        if res.violates:
+            return Verdict(verdict=BLOCK, by="semantic", reason=why,
+                           principle=str(getattr(res, "principle_violated", "")
+                                         or ""), providers=self.providers)
         return Verdict(verdict=ALLOW, by="semantic", reason=why,
                        providers=self.providers)
 

@@ -765,6 +765,43 @@ def g_gate():
           "recording 'we do not know' as 'we approved' is laundering",
           g.review("n", "d", "b", "a")["verdict"] == eg.UNREVIEWED, "")
 
+    # G8b (A250, 2026-10-04, his words: "fix the memory gate held-to-block issue"). G8 above
+    # drives a shape the quorum never builds (violates=False with a flag set: 0 of 128
+    # combinations), so it stayed green while every real hold became a BLOCK. These are the
+    # quorum's OWN shapes, from a real QuorumJudge over stub seats.
+    parent = os.path.dirname(HERE)
+    if parent not in sys.path:
+        sys.path.insert(0, parent)
+    try:
+        import covenant_unified_v8 as cov
+    except Exception as e:                                    # noqa: BLE001
+        cov = None
+        print("  G8b NOT MEASURED: the covenant core is not importable here (%s) -- this "
+              "directory was cloned alone; the gate then stamps UNREVIEWED with no judge" % type(e).__name__)
+    if cov is not None:
+        class _Seat:
+            def __init__(self, jid, **kw):
+                self.judge_id, self.kw = jid, kw
+
+            def evaluate(self, data, principles, **_k):
+                return cov.JudgmentResult(reasoning="seat " + self.judge_id,
+                                          judge_id=self.judge_id, **self.kw)
+
+        def shape(local, semantic):
+            return cov.QuorumJudge([_Seat("local:0", **local),
+                                    _Seat("semantic:1", **semantic)]).evaluate({"m": "x"}, [])
+
+        cases = {"held": shape({"violates": True, "not_understood": True}, {"violates": False}),
+                 "unsure": shape({"violates": True, "uncertain": True}, {"violates": False}),
+                 "convicted": shape({"violates": True}, {"violates": False}),
+                 "held+convicted": shape({"violates": True, "not_understood": True}, {"violates": True})}
+        got = {k: gate_with(r).review("n", "d", "b", "a")["verdict"] for k, r in cases.items()}
+        check("G8b the quorum's own shapes: a HOLD and an UNSURE are 'unreviewed' (stamped, not "
+              "refused); a conviction, alone or beside a hold, is still 'block'",
+              got == {"held": eg.UNREVIEWED, "unsure": eg.UNREVIEWED,
+                      "convicted": eg.BLOCK, "held+convicted": eg.BLOCK}
+              and all(cases[k].violates for k in cases), got)
+
     r2 = tempfile.mkdtemp(prefix="aimem_g_")
     try:
         st = ms.MemoryStore(r2, gate=eg.EthicsGate(mode="coarse"))
