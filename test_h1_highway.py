@@ -790,6 +790,24 @@ def main():
     r_ci = H.detect_public_ci_red(get=_down, now=_t0 + 3 * 3600, cache=os.path.join(_cdir, "old.json"), tell=_tell)
     check("H1ci broken the other way: a green read three hours old with the API down is UNKNOWN, not the cached green",
           r_ci["state"] == H.UNKNOWN, r_ci["measured"])
+    # A260 (2026-10-05): the API answered this query with a page from nine days earlier, twice in two hours,
+    # and he was told "red on main" on a run 215.8 h old. Time on main only moves forward.
+    _k = len(_told)
+    H.detect_public_ci_red(get=_api([_run(21, "success", 0.5), _run(20, "failure", 1.0)], [], []), now=_t0,
+                           cache=os.path.join(_cdir, "stale.json"), tell=_tell)
+    r_ci = H.detect_public_ci_red(get=_api([_run(5, "failure", 215.8), _run(4, "success", 216.0)], [], []),
+                                  now=_t0 + H.CI_EVERY_S + 1, cache=os.path.join(_cdir, "stale.json"), tell=_tell)
+    check("H1ci A260 a page whose newest finished run is OLDER than one already read is refused: the fresher green "
+          "stands, the read is named stale, and he is told nothing",
+          r_ci["state"] == H.ABSENT and r_ci["measured"]["newest"]["sha"] == "0000015" and len(_told) == _k
+          and "stale page" in str(json.load(open(os.path.join(_cdir, "stale.json"))).get("error")),
+          (r_ci["state"], r_ci["measured"].get("newest"), _told[_k:]))
+    r_ci = H.detect_public_ci_red(get=_api([_run(22, "failure", 0.1), _run(21, "success", 0.5)], [], []),
+                                  now=_t0 + 2 * (H.CI_EVERY_S + H.CI_RETRY_S), cache=os.path.join(_cdir, "stale.json"),
+                                  tell=_tell)
+    check("H1ci A260 broken the other way: a NEWER red is not stale -- PRESENT, and he is told",
+          r_ci["state"] == H.PRESENT and r_ci["measured"]["newest"]["sha"] == "0000016" and len(_told) == _k + 1,
+          (r_ci["state"], r_ci["measured"].get("newest"), _told[_k:]))
     check("H1ci public_ci_red has no remedy: the fix is a change to the code, and PRESENT reaches him as an alert",
           not [n for n, rr in H.REMEDIES.items() if "public_ci_red" in (rr.get("for") or [])])
 

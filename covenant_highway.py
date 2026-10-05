@@ -845,10 +845,28 @@ def detect_public_ci_red(health=None, get=None, now=None, cache=None, tell=None)
         dirty = True
         try:
             d = get("/repos/%s/actions/workflows/%s/runs?branch=main&per_page=30" % (CI_REPO, CI_WORKFLOW))
-            st["runs"] = [{"id": r.get("id"), "sha": str(r.get("head_sha") or "")[:7], "event": r.get("event"),
-                           "created": r.get("created_at"), "status": r.get("status"),
-                           "conclusion": r.get("conclusion"), "url": r.get("html_url")}
-                          for r in (d.get("workflow_runs") or [])]
+            runs = [{"id": r.get("id"), "sha": str(r.get("head_sha") or "")[:7], "event": r.get("event"),
+                     "created": r.get("created_at"), "status": r.get("status"),
+                     "conclusion": r.get("conclusion"), "url": r.get("html_url")}
+                    for r in (d.get("workflow_runs") or [])]
+            # A260 (2026-10-05): THE API CAN ANSWER WITH AN OLD PAGE. At 06:53Z and 08:56Z it returned, for this
+            # exact query, thirty runs from 2026-09-26 while finished green runs from that morning existed; the
+            # same query minutes later was right. This trusted it, said PRESENT on a run 215.8 h old, and told
+            # him "red on main" twice and "green again at e2c53c7" -- a commit of the night before -- in two
+            # hours. Time on main only moves forward: a page whose newest finished run is OLDER than one already
+            # read is a stale answer, refused as a read that failed, and the fresher runs stand.
+            def _top(rs):
+                ts = [str(r.get("created") or "") for r in rs if r.get("status") == "completed"
+                      and r.get("conclusion") in ("success", "failure")]
+                return max(ts) if ts else None
+            seen = st.get("newest_seen") or _top(st.get("runs") or [])
+            top = _top(runs)
+            if seen and top and top < seen:
+                raise ValueError("stale page: its newest finished run (%s) is older than one already read (%s)"
+                                 % (top, seen))
+            st["runs"] = runs
+            if top and (not seen or top > seen):
+                st["newest_seen"] = top
             st.update(ok_at=now, next_at=now + CI_EVERY_S, error=None)
         except Exception as e:                                   # noqa: BLE001 -- any failure is "could not read"
             st.update(next_at=now + CI_RETRY_S, error="%s: %s" % (type(e).__name__, str(e)[:120]))

@@ -7293,6 +7293,34 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A260. [the public-CI listener told him "red on main" twice on a nine-day-old page] 2026-10-05. Found while verifying A259's fixes: the highway read public_ci_red PRESENT while every recent run was green. FIXED, the guard driven both ways
+
+**Measured.** The detector's cache, refreshed 08:56:47Z, held thirty runs all from 2026-09-26 and called a
+run 215.8 h old the newest finished one -- failure, so PRESENT. Asked directly minutes later, the same
+query (`/actions/workflows/covenant.yml/runs?branch=main&per_page=30`, no token) returned that morning's
+runs, newest finished green. The fetcher is a plain GET with no conditional request, so the stale page
+was the API's answer. The direct line's outbox (ops/contact_outbox.jsonl) holds what reached him: 06:53Z
+"The public CI is red on main", 07:24Z "green again on main at e2c53c7" -- a commit of the night before --
+and 08:56Z "red on main" again. Two false reds in two hours, on the channel he reads first.
+
+**Fixed, at the read.** Time on main only moves forward. Each page's newest finished run is compared
+with the newest already read (`newest_seen`); a page that goes backwards is refused as a read that failed,
+the fresher runs stand, and a refusal that persists past CI_STALE_S becomes UNKNOWN -- never a verdict.
+H1ci A260 runs the real detector: a stale page after a green one -> ABSENT, named stale, nothing told; a
+NEWER red -> PRESENT and told, so the guard cannot hide a real failure. HEAD's detector on the same two
+reads: PRESENT and "red on main" told.
+
+**The correction goes back the way the claim went.** The three messages stay in the outbox, the record.
+Once the watchdog runs this code, the next fresh read finds main green and tells him so on the same line.
+
+**What it cannot see.** If runs were ever deleted from the history so that the newest finished run really
+did move backwards, every read would be refused, and after two hours the state reads UNKNOWN -- visible,
+not silent.
+
+**Repro:** `python test_h1_highway.py` (H1ci A260).
+
+---
+
 ### A259. [the two flaws A258 recorded, fixed: a grader that retired a remedy which had worked twice, and a dashboard that wrote his tailnet address into a tracked file] 2026-10-05. His words: "fix the two recorded flaws using the tombstone system". FIXED, each guard driven both ways
 
 **A259-GRADE, a claim that was wrong.** `grade_started()` graded an async remedy "did not fix" whenever its
