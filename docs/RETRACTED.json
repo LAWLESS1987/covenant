@@ -733,6 +733,51 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "As written on branch a261-dispatch-budget-as-written-2026-10-05 (at 26d327f). Both sites keep their wording with the correction and this id beside it."
+  },
+  {
+   "id": "A262-DATE",
+   "claim": "That the README header's totals line carries the measurement's date ('The date on that line is the measurement's date').",
+   "refuted_by": "The header line had no date from the commit that wrote this sentence (8bcf195, 2026-09-17: '... 2 failed** on win32 <!--TOTALS-->') to 2026-10-05; readme_totals.rewrite_line replaced the FIRST date on a line, so it could not have added one, and would have stamped the sweep date over any earlier date on the line.",
+   "truth": "True since 2026-10-05 (A262): the line carries the sweep's date after the platform, written by readme_totals.py, which now anchors the measurement date after the platform. G1 T5/T5b run it.",
+   "verbatim": [
+    "The date on that line is the measurement's date",
+    "The date on\nthat line is the measurement's date"
+   ],
+   "patterns": [
+    "The\\s+date\\s+on\\s+that\\s+line\\s+is\\s+the\\s+measurement's\\s+date"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it."
+  },
+  {
+   "id": "A262-VERSION",
+   "claim": "That every field on the README header line is re-measured together by readme_totals.py --write, the version among them.",
+   "refuted_by": "The version is copied from COVENANT_VERSION, a label introduced 2026-08-29 (3695236) and unchanged across 60 commits to the core since (git rev-list --count 3695236..HEAD -- covenant_unified_v8.py, 2026-10-05); the PC ran ee4e0db9047d and the phone b708204ff11b under the one label.",
+   "truth": "The counts, hash and line count are measured; the version is the code's label, and the line now states when it was set and how many core changes it spans, measured from git each run. The source hash is the identity.",
+   "verbatim": [
+    "Every field above is re-measured together by `python readme_totals.py --write`"
+   ],
+   "patterns": [
+    "Every\\s+field\\s+above\\s+is\\s+re-measured\\s+together"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it."
   }
  ]
 }

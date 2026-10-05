@@ -7293,6 +7293,29 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A262. [the README header showed one version for sixty cores and promised a date it never carried] 2026-10-05. His words: "the version and test notes are wrong"; asked which, he chose the README header line. FIXED, both tombstoned, the generator guarded both ways
+
+**Measured.** Every number on the line matched its source (v8.40 = COVENANT_VERSION, source ee4e0db9047d,
+12,813 lines, 176 suites / 4,790 checks / 0 failed from that morning's sweep) and GitHub showed the same
+line. What was wrong was what the line and its notes told a reader. (1) A262-VERSION: "every field above is
+re-measured", the version among them -- but the version is copied from a label introduced 2026-08-29
+(3695236) and unchanged across 60 commits to the core since; the PC ran ee4e0db9047d and the phone
+b708204ff11b under the one label. (2) A262-DATE: "the date on that line is the measurement's date" -- the
+line had no date from the commit that wrote the sentence (8bcf195, 2026-09-17) until this one, and the
+generator replaced the FIRST date on a line, so it could not have added one honestly.
+
+**Fixed.** `readme_totals.version_age()` measures from git when the label was set and how many core
+changes it spans, and the line now says it: "**v8.40** (label since 2026-08-29, 60 core changes ago)". The
+measurement date is written after the platform, so the label's date can never be overwritten. The core's
+version was NOT bumped: offered, not chosen. G1 T5 runs the generator (HEAD's stamped the sweep date over
+the label's), T5b holds the live header to what git says now and reports "not measured" on a clone without
+that history. Both claims tombstoned (docs/RETRACTED.json; branch a262-readme-header-as-written-2026-10-05);
+the README keeps the paragraph with a marker and the restated form beside it; probe red, removed green.
+
+**Repro:** `python readme_totals.py`; `python test_g1_doc_consistency.py` (T5, T5b).
+
+---
+
 ### A261. [the phone's only route to a new core was quarantined by two builds that worked, and a refusal held the build budget] 2026-10-05. His words: "get the phone updated to the new core ... also fix everything". FIXED, each guard driven both ways; the build itself is the daemon's, within its budget
 
 **Measured.** The phone runs app 0.1.774+f6406a1 (core b708204ff11b), built 2026-10-04 15:01Z -- before

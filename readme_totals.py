@@ -71,16 +71,44 @@ def core_identity():
     return cov.COVENANT_VERSION, cov.CORE_SOURCE_SHA12, lines
 
 
-def rewrite_line(line, version, src, nlines, suites, checks, failed, platform, date):
+def version_age(version):
+    """(date the label was set, commits that changed the core since), measured from git; (None, None) without it.
+
+    A262 (2026-10-05): the header printed **v8.40** as this core's version and the paragraph under it called
+    every field "re-measured". The label is COPIED, and it had not moved since 2026-08-29 while the core
+    changed 60 times -- the PC and the phone ran different cores under the one label. So the line says how old
+    the label is and how many cores it now spans, measured here each time, and the source hash stays the identity."""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "log", "--format=%h %ad", "--date=short", "-S",
+                            'COVENANT_VERSION = "%s"' % version, "--", "covenant_unified_v8.py"],
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        rows = [x.split() for x in (r.stdout or "").splitlines() if x.strip()]
+        if r.returncode != 0 or not rows:
+            return None, None
+        sha, since = rows[-1]                      # the oldest commit: where the label was introduced
+        n = subprocess.run(["git", "rev-list", "--count", "%s..HEAD" % sha, "--", "covenant_unified_v8.py"],
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        return since, int((n.stdout or "").strip())
+    except Exception:                                            # noqa: BLE001 -- no git, no claim
+        return None, None
+
+
+def rewrite_line(line, version, src, nlines, suites, checks, failed, platform, date, since=None, changes=None):
     """Replace the numbers on one marked line, keeping its shape."""
     line = re.sub(r"source `[0-9a-f]{12}`", "source `%s`" % src, line)
     line = re.sub(r"\d[\d,]* lines", "{:,} lines".format(nlines), line)
-    line = re.sub(r"\*\*v\d+\.\d+\*\*", "**%s**" % version, line)
+    note = (" (label since %s, %d core change%s ago)" % (since, changes, "" if changes == 1 else "s")
+            if since and changes is not None else "")
+    line = re.sub(r"\*\*v\d+\.\d+\*\*(?: \(label since [^)]*\))?", lambda m: "**%s**%s" % (version, note), line)
     line = re.sub(r"\d[\d,]*\s+suites?", "%d suites" % suites, line, count=1)
     line = re.sub(r"\d[\d,]*\s+checks?", "{:,} checks".format(checks), line, count=1)
     line = re.sub(r"\d+\s+failed", "%d failed" % failed, line, count=1)
     line = re.sub(r"\b(win32|linux|darwin)\b", platform, line, count=1)
-    line = re.sub(r"\d{4}-\d{2}-\d{2}", date, line, count=1)
+    # A262: the measurement date is the one AFTER the platform. The first date on a line is no longer
+    # necessarily it -- the version's own "label since" date comes earlier -- and replacing the first
+    # date would have stamped the sweep's date onto the label.
+    line = re.sub(r"\b(win32|linux|darwin)(,\s*)\d{4}-\d{2}-\d{2}", lambda m: m.group(1) + m.group(2) + date, line, count=1)
     return line
 
 
@@ -96,6 +124,7 @@ def main():
     if suites is None or passed is None:
         print("transcript %s has no 'suites run' / 'checks passed' lines" % os.path.basename(tr)); return 2
     version, src, nlines = core_identity()
+    since, changes = version_age(version)
     print("transcript %s (%s): %d suites, %s checks, %d failed, %s" % (os.path.basename(tr), date, suites, "{:,}".format(passed), failed or 0, platform))
     print("core: %s source %s, %s lines" % (version, src, "{:,}".format(nlines)))
     changed, differs = 0, 0
@@ -106,7 +135,8 @@ def main():
         out = []
         for line in io.open(p, encoding="utf-8").read().splitlines(True):
             if MARK in line:
-                new = rewrite_line(line, version, src, nlines, suites, passed, failed or 0, platform, date)
+                new = rewrite_line(line, version, src, nlines, suites, passed, failed or 0, platform, date,
+                                   since=since, changes=changes)
                 if new != line:
                     differs += 1
                     print("%s: %s" % (rel, line.strip()[:110]))

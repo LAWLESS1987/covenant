@@ -4,8 +4,9 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `ee4e0db9047d` · 12,813 lines · **176 suites, 4,790 checks, 0 failed** on win32 <!--TOTALS-->
+**v8.40** (label since 2026-08-29, 60 core changes ago) · source `ee4e0db9047d` · 12,813 lines · **176 suites, 4,790 checks, 0 failed** on win32, 2026-10-05 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
+*[A262-VERSION: not the version -- it is copied; see the note under this paragraph]*
 the version, hash and line count from the core module itself, the suite and
 check counts from the newest `covenant_one.py --all` transcript. The date on
 that line is the measurement's date — there is no second, older date to track,
@@ -16,6 +17,12 @@ until 2026-09-17. <!--HISTORICAL--> What a green count does and does not cover i
 [Suite coverage](#suite-coverage): the gates are a separate question from
 the checks, and a sweep run while the chain is under load can block gates
 that pass when it is idle. Read that before quoting any of this.
+*(A262-VERSION, A262-DATE, 2026-10-05: two things this paragraph said were not so. The version is
+not re-measured, it is copied: the label has said v8.40 since 2026-08-29 while the core changed again
+and again, so it named the phone's older core and this one alike -- the source hash is the identity,
+and the line now says how old the label is and how many core changes it spans, measured from git each
+time. And the line carried no date at all, from the day this sentence was written (2026-09-17) until
+today; the tool now writes the sweep's date onto it, after the platform.)*
 
 > **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
 > request ("reflect the scientific method while leaving the substance"). It is

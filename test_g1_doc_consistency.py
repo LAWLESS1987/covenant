@@ -257,6 +257,33 @@ def main():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
+    # T5 (2026-10-05, A262). The header called every field "re-measured" while the version was a label
+    # copied unchanged since 2026-08-29 across 60 core changes, and promised a date the line never carried.
+    # The line now says the label's age and carries the sweep's date after the platform; the generator
+    # must keep the two dates apart.
+    sys.path.insert(0, HERE)
+    import readme_totals as RT
+    _hdr = ("**v8.40** (label since 2026-08-29, 60 core changes ago) · source `aaaaaaaaaaaa` · 1 lines · "
+            "**1 suites, 1 checks, 0 failed** on win32, 2026-10-01 <!--TOTALS-->")
+    _new = RT.rewrite_line(_hdr, "v8.40", "bbbbbbbbbbbb", 2, 3, 4, 0, "win32", "2026-10-05",
+                           since="2026-08-29", changes=61)
+    check("T5 the generator moves the measurement date and keeps the label's date: "
+          "'label since 2026-08-29, 61 core changes ago' ... 'win32, 2026-10-05'",
+          "(label since 2026-08-29, 61 core changes ago)" in _new and "win32, 2026-10-05" in _new
+          and "2026-10-01" not in _new, _new)
+    _since, _changes = RT.version_age(RT.core_identity()[0])
+    _top = next((l for l in open(os.path.join(HERE, "README.md"), encoding="utf-8")
+                 if "<!--TOTALS-->" in l and "source `" in l), "")
+    if _since is None:
+        print("  not measured: T5b -- git cannot say when the version label was set here "
+              "(no git, or a shallow clone without that history)")
+    else:
+        check("T5b the README header's version note is what git measures now -- the label's date and the "
+              "number of core changes since -- and the line carries a date after the platform",
+              ("(label since %s, %d core change" % (_since, _changes)) in _top
+              and re.search(r"\b(win32|linux|darwin),\s*\d{4}-\d{2}-\d{2}", _top) is not None,
+              (_since, _changes, _top.strip()[:160]))
+
     n, ok = len(results), sum(results)
     print(f"\nG1: {ok}/{n} passed")
     return 0 if ok == n else 1
