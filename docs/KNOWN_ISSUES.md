@@ -7354,6 +7354,10 @@ his identifiers, where it had found 1.
 **Not changed:** the one-hour cooldown (ROW_COOLDOWN_S) after any row, which still delays a retry on a
 new instance; the synchronous grading path (it re-measures at once, leaving no window).
 
+**Measured live after the fix.** With the quarantine recalibrated (05:05:50), the watchdog's own pass ran
+schedule_watchdog_restart at 05:17:57 and a watchdog running this code started at 05:18:05 -- the remedy
+back in service without a person.
+
 **Repro:** `python test_h1_highway.py` (H1o3); `python test_a259_dashboard_redact.py`.
 
 ---
