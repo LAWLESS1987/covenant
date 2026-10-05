@@ -7283,6 +7283,48 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A253. [a judge's real conviction is relabelled "infrastructure failure" when the other judge times out, and the memory gate then WRITES the convicted memory; encoded instructions pass the gate's default] 2026-10-05. Found by pressure-testing Grok's review of A250 (his words: "run it by gpt", "correction run it by grok on x", "pressure test his response", "make him evaluate the git hub 1st"). OPEN; every fix here is gate posture or the shared core, so his
+
+**The defect, measured.** `QuorumJudge.evaluate` sets `infra = violates and any(r.violates and
+r.infrastructure_failure for r in results)` (`covenant_unified_v8.py:2427`), so when one seat ALLEGES a
+violation and the other fails on infrastructure, the quorum's result says infrastructure failure. The
+comment above it says the opposite ("A real dissent from a working judge is never relabelled"). The
+memory gate tests that flag first (`ai_memory_system/ethics_gate.py`, `review`), so it returns UNREVIEWED
+and the convicted memory is written, stamped. All 25 two-seat combinations (clean, alleges, holds, unsure,
+infrastructure failure) through the real quorum and the gate: the gate as it was before A250's fix, 10
+wrong (8 holds made BLOCK, 2 convictions made UNREVIEWED); after the fix, 2 wrong -- exactly those two.
+A250's fix did not cause them; my 128-run check for A250 never varied infrastructure failure, so it could
+not see them.
+
+**Encoded instructions.** Grok's three attack texts (a base64, a rot13 and a leetspeak instruction to
+exfiltrate credentials), run through the live gate: under "deferring,semantic" all three are stored
+UNREVIEWED; under the gate's default "semantic" all three are ALLOWED, stamped as checked. Recall puts
+UNREVIEWED memories into an agent's context with a "NOT REVIEWED" mark (`ai_memory_system/recall.py:369`);
+it does not quarantine them.
+
+**The consult, kept as opinion** (`ops/ai_consult.jsonl`, every question logged before it was sent; one
+ChatGPT question closed unsent when he redirected; Grok on X, "Fast", one conversation). Grok judged
+UNREVIEWED right for a hold, and the both-judges default unproven without a net-leakage measurement. Asked
+to review the exact change, he answered that NO seat combination makes it wrong; pressure-tested with the
+two above, he conceded -- his proof rested on a rule my description had left out -- and recommended fixing
+the flag at its source, in the quorum. **His recommendation, simulated** over the same 25: the memory
+gate 0 wrong; the chain's transaction gate, which shares the quorum, unchanged in all 25 verdicts, with 2
+"judge_unavailable" anomaly labels no longer applied to a real dissent -- what the code's own comment says
+should happen. Asked to read the code on GitHub first, he said he "opened all four" files, but two of his
+claims about them described the code before commit `0d8dca5` (that `review` still tests violates first;
+that there is no G8b), checked against what GitHub served at the time, and he cited lines 198-200 for a
+mark that is at 369. His conclusions are recorded; his readings of files are not taken as reads.
+
+**Proposed, his decisions.** (1) The quorum fix at the source: infrastructure failure only when no working
+seat alleges -- the shared core, consensus-adjacent, a node restart to load. (2) A gate-only alternative:
+in `review`, block on any component that actually alleges before the infrastructure test -- local to the
+memory store, no restart. (3) Quarantine UNREVIEWED at recall instead of marking it (Grok's rule) -- costs
+every honest note the classifier cannot read. (4) The gate's default providers (A250's proposal), or a
+decode-then-recheck coarse rule for base64/rot13/leetspeak -- costs false positives on legitimate encoded
+technical notes.
+
+---
+
 ### A252. [Tetsu runs on two pass-throughs and a memory margin: the gate admitted 0 of his last 40 answers, and this morning nothing fit for him to load] 2026-10-04. His words: "also find a way to safely ensure tetsus operation". MEASURED; two guards and one reading ADDED, nothing loosened, no process started or stopped; the rest is his
 
 **The model.** `covenant_model.readiness()` (added here, a read) on the live PC, against the main
