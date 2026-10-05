@@ -61,7 +61,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEDGER = os.path.join(HERE, "docs", "RETRACTED.json")
-SCAN_EXT = {".md", ".py", ".sh", ".ps1", ".json", ".txt", ".bat", ".html"}
+SCAN_EXT = {".md", ".py", ".sh", ".ps1", ".json", ".txt", ".bat", ".html",
+            # A255 (2026-10-04): the tracked git hooks (ops/pre-commit.synchold,
+            # ops/post-commit.autosync, ops/pre-push.opsec) carry claims too, and
+            # the first claim retracted FROM a hook was invisible to this scan.
+            ".synchold", ".autosync", ".opsec"}
 SKIP_DIR = {".git", "__pycache__", "node_modules", "logs", ".pytest_cache",
             "venv", ".venv", "realdata"}
 

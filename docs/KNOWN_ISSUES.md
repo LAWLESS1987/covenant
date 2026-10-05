@@ -6334,6 +6334,16 @@ describes the disk rather than any commit for those, exactly as the hand-run
 did all day. Either they get a nightly state commit or they stop being
 tracked; both change what "tracked" means here.
 
+*Accuracy note, 2026-10-04 (A255; the paragraph above is kept as written).*
+Two things in it were not so. The "full commit" rule let through a tracked
+file modified and NOT staged at all -- driven in a scratch worktree, its
+uncommitted bytes went into the manifest the commit carried (A255-HOOK in
+docs/RETRACTED.json). And the four files it names have been verify_bundle
+OUTPUTS since 2026-09-04/05, so the manifest never hashed them; what it did
+hash as on disk were five tracked ledgers and ops/RUN_WITHOUT.json, now
+OUTPUTS too. The decision named above -- a nightly state commit, or stop
+tracking them -- is untouched and still his.
+
 **Repro:** `python test_h1_highway.py` (H1x); `git log --oneline -3` after
 any full commit shows no separate "Manifest:" commit.
 
@@ -7310,6 +7320,58 @@ conversations: keep refusing (the screen's posture now); or excuse directive lin
 (clears at most 4 of the 17, and widens A254's crafted-transcript limit from label lines to every line of
 a turn); or have the importer mark conversation parts as records the screen does not re-read. Each trades
 refused records against exposed orders, and the counts above are that trade.
+
+---
+
+### A255. [G1 BLOCKED by the system's own ledger writes, and a pre-commit hook that wrote uncommitted bytes into the manifest] 2026-10-04. Found getting the nodes green (his words: "get the nodes green following our tombstones"). FIXED, with a guard driven both ways; the restart that clears the rest waits on a file nobody here owns. A RECURRENCE of A56 (2026-09-06) and of de33671 (2026-09-28)
+
+**Measured first.** All three nodes up at height 65 and agreeing; `launch_check.py` 11 of 12 gates PASS,
+G1 (bundle integrity) BLOCKED; the highway reads `manifest_stale`, `source_drift` and `sweep_red` PRESENT.
+The morning sweep (ONE_RUN.txt) read `RESULT: FAIL` with 0 checks failed, on G1 alone.
+
+**Cause 1, a forgotten step for at least the third time.** verify_bundle.py's OUTPUTS rule says a
+manifest holds only inputs, and that a new writer's file must be added "always". Five tracked ledgers the
+running system appends -- `ops/ambassador_allies.jsonl`, `ops/moltbook_candidates.jsonl`,
+`ops/outbound_overrides.jsonl`, `ops/tetsu_assist.jsonl`, `ops/study/oa_sources.jsonl` -- and
+`ops/RUN_WITHOUT.json` (written whole by covenant_distill.py nightly) were hashed. All 8 tracked .jsonl
+files were measured to be system-written; 3 were classified. A56 added names and left nothing to catch the
+next; de33671 committed nightly outputs by hand "so the manifest repair can run".
+
+**Cause 2, the highway could never repair it.** `remedy_rehash_bundle` refused over ANY dirty tracked
+file, including the outputs the manifest never hashes, so with the nightly models modified it never ran.
+
+**Cause 3, found by testing the repair path before using it.** The pre-commit hook regenerated the
+manifest on a "full" commit -- no staged file with unstaged changes -- and said that meant never describing
+content the commit does not contain. Driven in a scratch worktree at 93f7136 (docs/GATES.md staged,
+covenant_model.py modified and not staged): the hook's partial list was empty and the manifest it wrote
+carried 876e926b5d8c for covenant_model.py while the commit held 94fa05d5f15f. It had not bitten yet only
+because the other session committing today commits from a clean worktree. Retracted as A255-HOOK.
+
+**Fixed.** The six files are OUTPUTS; `INPUT_LEDGERS` (empty) is the explicit escape for a ledger hashed on
+purpose. One question, `verify_bundle.uncommitted_inputs()`: is every file the manifest HASHES on disk
+exactly as the commit (`index`) or HEAD holds it? `--write-if-clean[=HEAD]` answers it, the hook and the
+highway both ask it, and each leaves the manifest alone by naming the files when the answer is no.
+
+**The guard (rule 10: a forgotten step's tombstone runs every time).** `test_a255_runtime_outputs.py`, IN
+PLACE in covenant_one and in run_all_tests.sh: C* every tracked .jsonl classified; E* the live gate flags
+no .jsonl; U* the predicate against real git in a scratch repository; K* the real hook, installed in a
+scratch repository, both ways. Driven against the code as it was: C1 red on HEAD's OUTPUTS (5
+unclassified), K1 and K2 red on HEAD's hook (the manifest carried a.py's uncommitted bytes). H1r now pins
+that the highway obeys verify_bundle's answer. R1 did not scan the hook files at all -- a probe of the old
+wording in a .synchold file was invisible to it -- and now does; the probe turned R1 red and its removal
+restored green.
+
+**What it cannot see.** Only .jsonl is classified by the guard. A generated report in another format, as
+RUN_WITHOUT.json was, still needs its name added to OUTPUTS by hand, and E* will show it only once it
+blocks G1.
+
+**Still standing, and not mine.** `covenant_model.py` carries an uncommitted edit (a `_stop_origin()`
+log helper, its comment dated 2026-10-05 and quoting his "covenant logging green light") written by a
+session whose transcript is 66e8ecd5; the two live sessions asked both showed by transcript it was not
+theirs. It is in the nodes' import set, so until it is committed or set aside the manifest cannot be
+rewritten cleanly, the nodes cannot restart onto committed imports, and G1 names it. That is his call.
+
+**Repro:** `python test_a255_runtime_outputs.py`; `python verify_bundle.py --write-if-clean=HEAD --dry`.
 
 ---
 

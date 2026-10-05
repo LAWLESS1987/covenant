@@ -105,25 +105,88 @@ OUTPUTS = {
     # input and IS tracked; these two are created by the operator and by a
     # live testnet submission, and are the XRP gate's own state.
     "xrp_testnet_proof.json", "xrp_mainnet_policy.json",
+    # A255 (2026-10-04) -- A56's shape for at least the third time (A56 on
+    # 09-06, de33671 on 09-28, this). Ledgers the running system appends
+    # between commits, tracked and absent from this list: every ambassador
+    # pass, moltbook scan, Tetsu assist or open-access fetch turned G1
+    # BLOCKED, the highway's rehash_bundle refused (correctly: the tree was
+    # dirty), and the sweep read RESULT: FAIL on zero failed checks. Each
+    # fix before this added names and left nothing to catch the next one;
+    # test_a255_runtime_outputs.py now fails while any tracked .jsonl is in
+    # neither this set nor INPUT_LEDGERS below.
+    "ambassador_allies.jsonl",     # covenant_ambassador.py, the ally ledger
+    "moltbook_candidates.jsonl",   # covenant_moltbook.py, covenant_security_probe.py
+    "outbound_overrides.jsonl",    # covenant_ambassador.py / covenant_ai_consult.py, before each override
+    "tetsu_assist.jsonl",          # covenant_tetsu_assist.py
+    "oa_sources.jsonl",            # covenant_study.py appends each open-access article it caches
+    # covenant_distill.py writes this whole every night (nights every bar
+    # was met). A .json, so the .jsonl test above cannot see the next one.
+    "RUN_WITHOUT.json",
 }
 SKIP_NAME = {n.lower() for n in OUTPUTS}
+
+# A tracked .jsonl that IS an input -- hashed as delivery on purpose -- is
+# named here with the reason, so test_a255_runtime_outputs.py can tell a
+# deliberate choice from a forgotten one. Empty on 2026-10-04: all eight
+# tracked .jsonl files were measured to be written by the running system.
+INPUT_LEDGERS = {}
+
+
+def hashed_name(fn):
+    """Whether a file of this NAME is ever hashed. One rule, used by the walk
+    below and by uncommitted_inputs(), so the two cannot drift apart."""
+    if fn.lower() in SKIP_NAME:
+        return False
+    # holdings.txt and its timestamped backups are L's actual
+    # positions (gitignored). A public manifest must not list them.
+    if fn.lower().startswith("holdings.txt"):
+        return False
+    if os.path.splitext(fn)[1] in SKIP_EXT:
+        return False
+    if fn.endswith(".db-shm") or fn.endswith(".db-wal"):
+        return False
+    return True
 
 
 def shipped():
     for dp, dns, fns in os.walk(HERE):
         dns[:] = [d for d in dns if d not in SKIP_DIR]
         for fn in sorted(fns):
-            if fn.lower() in SKIP_NAME:
-                continue
-            # holdings.txt and its timestamped backups are L's actual
-            # positions (gitignored). A public manifest must not list them.
-            if fn.lower().startswith("holdings.txt"):
-                continue
-            if os.path.splitext(fn)[1] in SKIP_EXT:
-                continue
-            if fn.endswith(".db-shm") or fn.endswith(".db-wal"):
-                continue
-            yield os.path.relpath(os.path.join(dp, fn), HERE).replace("\\", "/")
+            if hashed_name(fn):
+                yield os.path.relpath(os.path.join(dp, fn), HERE).replace("\\", "/")
+
+
+def uncommitted_inputs(against="index", root=None):
+    """Tracked files the manifest hashes whose bytes on disk are NOT what is
+    being committed: against "index" (a commit in progress -- what the
+    pre-commit hook asks) or "HEAD" (no commit in progress -- what the
+    highway's rehash asks). None if git cannot answer.
+
+    A255 (2026-10-04). The hook regenerated the manifest on any commit where no
+    STAGED file also had unstaged changes, and called that never describing
+    content the commit does not contain. A tracked file modified and not
+    staged at all passed straight through: driven in a scratch worktree, a
+    probe line in an unstaged covenant_model.py went into the manifest the
+    commit carried (876e926b5d8c on disk, 94fa05d5f15f committed). The highway
+    erred the other way: it refused over ANY dirty tracked file, including the
+    outputs this manifest never hashes, so with the nightly models modified it
+    could never run. Both now ask this one question."""
+    import subprocess
+    cmd = ["git", "diff", "--name-only", "-z"] + (["HEAD"] if against == "HEAD" else [])
+    try:
+        r = subprocess.run(cmd, cwd=root or HERE, capture_output=True, timeout=60)
+    except Exception:                                        # noqa: BLE001
+        return None
+    if r.returncode != 0:
+        return None
+    out = []
+    for rel in r.stdout.decode("utf-8", "replace").split("\0"):
+        parts = rel.split("/")
+        if not rel or rel == "MANIFEST.sha256" or any(d in SKIP_DIR for d in parts[:-1]):
+            continue
+        if hashed_name(parts[-1]):
+            out.append(rel)
+    return sorted(out)
 
 
 # Files whose bytes are the content, and must never be touched. Everything
@@ -177,6 +240,28 @@ def tracked():
 
 
 def main():
+    # --write-if-clean[=HEAD]  write only if every hashed file on disk is what
+    # the commit contains (index, for the pre-commit hook) or what HEAD holds
+    # (=HEAD, for the highway). Exit 3 = left alone, and it says which files.
+    # --dry with it reports the decision and writes nothing.
+    clean_arg = next((a for a in sys.argv if a.startswith("--write-if-clean")), None)
+    if clean_arg:
+        against = "HEAD" if clean_arg.endswith("=HEAD") else "index"
+        dirty = uncommitted_inputs(against)
+        if dirty is None:
+            print("left alone: git could not say what %s holds, so a manifest written now could "
+                  "describe content no commit contains" % ("HEAD" if against == "HEAD" else "the commit"))
+            return 3
+        if dirty:
+            print("left alone: %d hashed file(s) on disk differ from %s (%s) -- a manifest written now "
+                  "would describe content no commit contains"
+                  % (len(dirty), "HEAD" if against == "HEAD" else "what is being committed",
+                     ", ".join(dirty[:6]) + (" ..." if len(dirty) > 6 else "")))
+            return 3
+        if "--dry" in sys.argv:
+            print("would write: every hashed file on disk matches %s" % against)
+            return 0
+        sys.argv.append("--write")
     files = sorted(shipped())
     if "--write" in sys.argv:
         t = tracked()

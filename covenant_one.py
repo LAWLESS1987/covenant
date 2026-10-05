@@ -1185,6 +1185,12 @@ IN_PLACE = [
     ("test_v1_verifier_agreement.py", 180,
      "runs constitution.py, verify.sh and verify.ps1 and compares their roots "
      "-- a claim nothing checked until now"),
+    # A255 (2026-10-04), registered in the change that created it. In place for
+    # verify_bundle's reason: it measures what git ships from THIS folder and
+    # what G1 does with it, and the scratch copy has no .git.
+    ("test_a255_runtime_outputs.py", 300,
+     "every tracked ledger is classified, G1 cannot be blocked by a ledger write, and the "
+     "pre-commit hook never writes uncommitted bytes into the manifest -- a claim about the FOLDER"),
 ]
 
 

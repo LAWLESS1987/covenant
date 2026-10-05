@@ -1610,23 +1610,30 @@ def remedy_rehash_bundle(measured, dry_run=True):
     tracked modification is the manifest itself. On a dirty tree it says so and
     leaves the condition standing, which is the honest outcome -- a person is
     mid-change and the manifest is theirs to settle.
+
+    A255 (2026-10-04): "the only tracked modification" became "no file the
+    manifest HASHES differs from HEAD" -- outputs it never hashes no longer
+    count, and verify_bundle.py --write-if-clean=HEAD answers, by name.
     """
     import subprocess
-    p_ = subprocess.run(["git", "status", "--porcelain"], cwd=HERE,
-                        capture_output=True, text=True, timeout=120, creationflags=_NOWIN)
-    dirty = [l[3:].strip() for l in (p_.stdout or "").splitlines()
-             if l[:2].strip() and not l.startswith("??")]
-    # ops/SELF_EVAL.md is appended hourly by the watchdog and is excluded from
-    # the manifest for exactly that reason; it is not a change in flight.
-    dirty = [f for f in dirty if f not in ("MANIFEST.sha256", "ops/SELF_EVAL.md")]
-    if dirty:
-        return False, ("the tree has uncommitted tracked changes (%s) -- a manifest written "
-                       "now would describe content no commit contains" % ", ".join(dirty[:4]))
+    # A255 (2026-10-04): "clean" now means what the manifest needs, asked of
+    # verify_bundle itself -- every file it HASHES is on disk as HEAD holds it.
+    # The `git status` test that stood here counted every dirty tracked file,
+    # including the outputs the manifest never hashes (the nightly models, the
+    # ledgers), so with those modified -- most of every day -- this remedy
+    # could never run and manifest_stale stood until a person committed by hand
+    # (de33671, 2026-09-28: "so the manifest repair can run"). A change in
+    # flight to a hashed file still refuses, by name, exactly as before.
+    args = [sys.executable, os.path.join(HERE, "verify_bundle.py"), "--write-if-clean=HEAD"]
+    r = subprocess.run(args + (["--dry"] if dry_run else []), cwd=HERE, capture_output=True,
+                       text=True, timeout=300, creationflags=_NOWIN)
+    said = ((r.stdout or "") + (r.stderr or "")).strip()
+    if r.returncode == 3:
+        return False, said.splitlines()[-1][:240] if said else "left alone"
     if dry_run:
-        return True, "would run verify_bundle.py --write over a clean tree"
-    r = subprocess.run([sys.executable, os.path.join(HERE, "verify_bundle.py"), "--write"],
-                       cwd=HERE, capture_output=True, text=True, timeout=300, creationflags=_NOWIN)
-    return r.returncode == 0, ((r.stdout or "") + (r.stderr or "")).strip()[-160:]
+        return r.returncode == 0, ("would run verify_bundle.py --write: every hashed file is as HEAD holds it"
+                                   if r.returncode == 0 else said[-160:])
+    return r.returncode == 0, said[-160:]
 
 
 def remedy_schedule_watchdog_restart(measured, dry_run=True):

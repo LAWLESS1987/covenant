@@ -663,6 +663,10 @@ run test_y2_supply_conservation.py 300
 # LIVE folder: the protected text lives in CONTRIBUTING.md at the root, and a
 # scratch copy that omits root .md files makes G1 pass vacuously.
 run test_g1_doc_consistency.py 60
+# A255 (2026-10-04) pins that a ledger the running system writes is never hashed
+# as delivery, and that the pre-commit hook never writes uncommitted bytes into
+# the manifest. Run from the LIVE folder: it asks git what this folder ships.
+run test_a255_runtime_outputs.py 300
 # V1 (2026-08-30) actually compares the three verifiers. The claim that they
 # agree was made all day on the strength of one manual check.
 run test_v1_verifier_agreement.py 120

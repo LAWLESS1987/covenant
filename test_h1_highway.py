@@ -493,30 +493,41 @@ def main():
         _sp.Popen = real_popen
 
     # ---- H1r: the manifest is rewritten only over a clean tree
+    # A255 (2026-10-04): "clean" is now verify_bundle's own answer
+    # (--write-if-clean=HEAD: every HASHED file as HEAD holds it), not a
+    # `git status` count that included the outputs it never hashes. H1r pins
+    # that the highway OBEYS that answer; test_a255_runtime_outputs.py U*
+    # pins that the answer is right, against real git in a scratch repository.
     import subprocess
     real_run = subprocess.run
     seen = {}
 
     def fake_run(cmd, *a, **k):
-        if cmd[:2] == ["git", "status"]:
-            class R:
-                returncode, stdout, stderr = 0, seen.get("status", ""), ""
-            return R()
-        seen["wrote"] = seen.get("wrote", 0) + 1
-        class R2:
-            returncode, stdout, stderr = 0, "wrote MANIFEST.sha256", ""
-        return R2()
+        seen.setdefault("calls", []).append(list(cmd))
+        rc, out = seen.get("answer", (0, "wrote MANIFEST.sha256"))
+        if rc == 0 and "--dry" not in cmd:
+            seen["wrote"] = seen.get("wrote", 0) + 1
+        class R:
+            returncode, stdout, stderr = rc, out, ""
+        return R()
 
     try:
         subprocess.run = fake_run
-        seen["status"] = " M covenant_highway.py" + chr(10) + " M docs/HIGHWAY.md"
+        seen["answer"] = (3, "left alone: 2 hashed file(s) on disk differ from HEAD (covenant_highway.py, "
+                             "docs/HIGHWAY.md) -- a manifest written now would describe content no commit contains")
         ok, why = H.remedy_rehash_bundle({}, dry_run=False)
         check("H1r a dirty tree refuses the rehash -- a manifest would describe nothing that exists",
-              not ok and "uncommitted" in why and not seen.get("wrote"), why[:90])
-        seen["status"] = " M MANIFEST.sha256" + chr(10) + " M ops/SELF_EVAL.md" + chr(10) + "?? SWEEP_END.txt"
+              not ok and "left alone" in why and "covenant_highway.py" in why and not seen.get("wrote"), why[:90])
+        check("H1r ...and it asks verify_bundle against HEAD, not against an index no commit is using",
+              any("--write-if-clean=HEAD" in c for c in seen["calls"]), str(seen["calls"][-1:])[:120])
+        seen["answer"] = (0, "wrote MANIFEST.sha256 over 900 files")
         ok, why = H.remedy_rehash_bundle({}, dry_run=False)
-        check("H1r mutation: a clean tree (bar the manifest and the hourly self-eval) -> it writes",
+        check("H1r mutation: a clean tree -> it writes, exactly once",
               ok and seen.get("wrote") == 1, why[:90])
+        seen["calls"] = []
+        ok, why = H.remedy_rehash_bundle({}, dry_run=True)
+        check("H1r a dry run passes --dry and writes nothing",
+              ok and seen.get("wrote") == 1 and all("--dry" in c for c in seen["calls"]), str(seen["calls"])[:120])
     finally:
         subprocess.run = real_run
 

@@ -34,9 +34,24 @@
 #      the highway's manifest_stale fired after each, and a person ran
 #      `verify_bundle.py --write` by hand and committed "Manifest: ..." after
 #      every change (A155).
+#      [A255-HOOK: the definition of FULL above let an unstaged file through;
+#      kept as written, restated in the A255 note below]
 #   Not measured here and said so: tracked files the running system rewrites
 #   (fallback_model.json, ops/verdicts.jsonl ...) are hashed as they are on
 #   disk, exactly as the hand-run did.
+#
+#   A255, 2026-10-04 -- BOTH PARAGRAPHS ABOVE WERE WRONG, kept as written
+#   (branch a255-hook-manifest-claim-as-written-2026-10-04; docs/RETRACTED.json
+#   A255-HOOK). "Full" only excluded a STAGED file with unstaged changes; a
+#   tracked file modified and not staged at all passed, and its uncommitted
+#   bytes went into the manifest the commit carried -- driven in a scratch
+#   worktree: 876e926b5d8c in the manifest, 94fa05d5f15f committed. And the two
+#   files named as hashed have been OUTPUTS, never hashed, since 2026-09-04.
+#   Restated: step 3 asks verify_bundle.py --write-if-clean, which writes only
+#   when every file the manifest hashes is on disk exactly as this commit holds
+#   it, and otherwise leaves the manifest alone and names the files. Files the
+#   running system rewrites are OUTPUTS and never hashed; A255's suite fails
+#   while a tracked .jsonl is unclassified.
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root" 2>/dev/null || exit 0
@@ -73,20 +88,18 @@ python tools/stage_check.py 2>&1 | sed 's/^/pre-commit: /'
 # ---- 3. the manifest, on every full commit
 staged=$(git diff --cached --name-only 2>/dev/null)
 if [ -n "$staged" ]; then
-  partial=""
-  for f in $(git diff --name-only 2>/dev/null); do
-    for g in $staged; do
-      [ "$f" = "$g" ] && partial="$partial $f"
-    done
-  done
-  if [ -n "$partial" ]; then
-    echo "pre-commit: manifest left alone -- partially staged:$partial (run 'python verify_bundle.py --write' after the commit)"
-  elif python verify_bundle.py --write >/dev/null 2>&1; then
+  # A255: one question, asked of verify_bundle itself -- is every file the
+  # manifest hashes on disk exactly as this commit holds it? (The partial-
+  # staging loop that stood here could not see an unstaged-only file.)
+  vout=$(python verify_bundle.py --write-if-clean 2>&1); vrc=$?
+  if [ "$vrc" -eq 0 ]; then
     if ! git diff --quiet -- MANIFEST.sha256 2>/dev/null; then
-      git add -- MANIFEST.sha256 2>/dev/null && echo "pre-commit: MANIFEST.sha256 regenerated and staged (full commit)"
+      git add -- MANIFEST.sha256 2>/dev/null && echo "pre-commit: MANIFEST.sha256 regenerated and staged (every hashed file is as committed)"
     fi
+  elif [ "$vrc" -eq 3 ]; then
+    echo "pre-commit: manifest $(echo "$vout" | tail -1)"
   else
-    echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write' yourself" >&2
+    echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write-if-clean' yourself" >&2
   fi
 fi
 

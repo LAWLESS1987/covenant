@@ -403,6 +403,32 @@
     "ops/_sweep4.txt"
    ],
    "note_on_allow": "A254 as written is on branch a254-cause-as-written-2026-10-05 (at e2c53c7); the record keeps its wording with a dated note beside it."
+  },
+  {
+   "id": "A255-HOOK",
+   "claim": "That the pre-commit hook's manifest step never describes content the commit does not contain, because it regenerates MANIFEST.sha256 only on a FULL commit, defined as one where no staged file also has unstaged changes (ops/pre-commit.synchold step 3; KNOWN_ISSUES A155) -- and that the tracked files the running system rewrites, naming fallback_model.json and ops/verdicts.jsonl, are hashed as they are on disk.",
+   "refuted_by": "driven 2026-10-04 in a scratch worktree at 93f7136: docs/GATES.md staged, covenant_model.py modified and NOT staged. The hook's partial list was empty, so it called the commit full, and the manifest it wrote carried the uncommitted bytes (876e926b5d8c in the manifest, 94fa05d5f15f committed). test_a255_runtime_outputs.py K1/K2 go red on the hook as written. And fallback_model.json and ops/verdicts.jsonl have been in verify_bundle.py OUTPUTS since 2026-09-04: never hashed at all.",
+   "truth": "A commit with no partially staged file can still carry the uncommitted bytes of any tracked file that was modified and not staged. Since A255 the hook asks verify_bundle.py --write-if-clean, which writes only when every file the manifest hashes is on disk exactly as the commit holds it, and otherwise leaves the manifest alone and names the files. Files the running system rewrites are OUTPUTS and never hashed.",
+   "verbatim": [
+    "regenerate MANIFEST.sha256 on every FULL commit -- one where no staged\n#      file also has unstaged changes -- under the rule this hook always had:\n#      never describe content the commit does not contain.",
+    "regenerates `MANIFEST.sha256` on every *full* commit — one where no staged file also has\nunstaged changes — under the same rule it always had (never describe content\nthe commit does not contain)",
+    "tracked files the running system rewrites\n#   (fallback_model.json, ops/verdicts.jsonl ...) are hashed as they are on\n#   disk"
+   ],
+   "patterns": [
+    "\\*?full\\*?\\s+commit\\s*(?:--|—)\\s*one\\s+where\\s+no\\s+staged[\\s#]+file\\s+also\\s+has[\\s#]+unstaged\\s+changes",
+    "running\\s+system\\s+rewrites[\\s#]*\\(`?fallback_model\\.json`?,[\\s#]*`?ops/verdicts\\.jsonl"
+   ],
+   "note_on_patterns": "Both written forms of each claim: the hook's comment wraps across '#' lines, A155's uses an em dash and backticks, hence [\\s#] and the alternations. R1 compiles with re.I, so FULL and *full* are one pattern. ops/*.synchold was outside R1's scan until this entry; SCAN_EXT now carries the three hook suffixes.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The hook and A155 as written are preserved on branch a255-hook-manifest-claim-as-written-2026-10-04 (at 93f7136). The hook keeps both paragraphs beside the A255 note that restates them; A155 is a record file and carries a dated note beside the paragraph."
   }
  ]
 }
