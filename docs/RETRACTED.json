@@ -686,6 +686,29 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Every site as written is preserved on branch a258-earn-host-claim-as-written-2026-10-05 (at c06a502). Each keeps its wording with the restated form and this id beside it."
+  },
+  {
+   "id": "A259-GRADE",
+   "claim": "That an asynchronous remedy whose condition is still PRESENT after its window did not fix it (covenant_highway.grade_started's docstring and rule: 'PRESENT then and ABSENT now is fixed; still PRESENT is did not fix').",
+   "refuted_by": "The live ledger, 2026-10-04/05: schedule_watchdog_restart started at 23:06:51 and 00:34:26; the watchdog processes running afterwards were created at 23:06:59 and 00:34:34 (Win32_Process CreationDate), so both restarts happened. A watched file was written inside each 15-minute window (covenant_highway.py, then covenant_earn.py), the condition was PRESENT again as a new instance, both were graded 'did not fix', and QUARANTINE_AFTER = 2 retired the remedy (quarantined() True; 'refused' at 00:57:13). HEAD's grader, given a restart then a newer write, returns 'did not fix'.",
+   "truth": "Still PRESENT after the remedy measurably worked is a new instance, not a failure. For watchdog_stale the oldest running watchdog having started after the remedy did is that measurement; such a row is graded fixed and marked recurred (A259-GRADE, H1o3). Detectors with no recurrence test keep the old rule.",
+   "verbatim": [
+    "still PRESENT is `did not fix`"
+   ],
+   "patterns": [
+    "still\\s+PRESENT\\s+is\\s+`did\\s+not\\s+fix`"
+   ],
+   "note_on_patterns": "Backticks required: the sync path's H1x check ('ran=True with the condition still PRESENT is 'did not fix'') describes apply_remedy, where an immediate re-measure leaves no window for a new instance, and is not this claim.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The grader as written is preserved on branch a259-grade-and-dashboard-as-written-2026-10-05 (at b0d3ea2). The docstring keeps the sentence, with the restated rule and this id beside it."
   }
  ]
 }

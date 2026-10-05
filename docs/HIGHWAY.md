@@ -165,6 +165,14 @@ running a thing rather than describing it.
    recalibration set aside. The original caution is kept rather than discarded: a start inside
    its window is still not touched.
 
+   *A259-GRADE, 2026-10-05: "still PRESENT is did not fix" was wrong for a condition that came
+   back.* The scheduled restart worked twice that night -- the watchdogs running afterwards were
+   created eight seconds after each start -- and a file written inside each window made the
+   condition PRESENT again; both were graded "did not fix" and the remedy was quarantined. Where a
+   detector can tell a new instance from the old (`RECURRED`; for watchdog_stale, the oldest
+   running watchdog started after the remedy did), PRESENT-again after the remedy worked is graded
+   `fixed`, marked `recurred`. Detectors without such a test keep the old rule.
+
    **What it found in its first pass, which is the argument for it.** 36 rows graded.
    `schedule_watchdog_restart` went from UNPROVEN to **EARNED, 16 fixed / 0 missed** — it had
    been working all along and nothing had ever said so. And two bugs surfaced that only

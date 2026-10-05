@@ -569,9 +569,39 @@ def arg_int(flag, default):
     return default
 
 
+# A259 (2026-10-05): dashboard.html is TRACKED, and the watchdog ALERT lines this copies in
+# carry what the highway measured -- on 2026-10-05 a peer's tailnet address
+# ("peer_<address>_5001"), which only the opsec pre-push guard kept unpublished. Redaction
+# happens here, at the one place the page becomes a file: his identifiers by their labels when
+# tools/opsec_scan can read them, and EVERY IPv4 address that is not loopback or the wildcard,
+# always -- a fresh clone has no private list, but an address still looks like an address.
+_IPV4 = re.compile(r"(?<![\d.])((?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})(?![\d]|\.\d)")
+
+
+def redact(html, toks=None):
+    """The page with his identifiers labelled and non-local IPv4 addresses replaced by <ip>."""
+    tools = os.path.join(HERE, "tools")
+    if tools not in sys.path:
+        sys.path.insert(0, tools)              # for given tokens too: found by R3, which failed without it
+    if toks is None:
+        try:
+            import opsec_scan
+            toks = opsec_scan.gather()
+        except Exception:                                    # noqa: BLE001 -- the pattern below still runs
+            toks = []
+    if toks:
+        try:
+            import opsec_scan
+            html = opsec_scan.fix_text(html, toks)
+        except Exception:                                    # noqa: BLE001
+            pass
+    return _IPV4.sub(lambda m: m.group(1) if (m.group(1).startswith("127.") or m.group(1) == "0.0.0.0")
+                     else "<ip>", html)
+
+
 def write_once(refresh):
     data = demo() if "--demo" in sys.argv else collect()
-    html = render(data, refresh=refresh)
+    html = redact(render(data, refresh=refresh))
     with open(OUT, "w", encoding="utf8") as f:
         f.write(html)
     return data, html

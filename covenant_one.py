@@ -476,6 +476,9 @@ SUITES = [
     ("test_d3_daily_guards.py",          180,  "DAILY + GUARDS"),
     ("test_backtest_guardrails.py",      180,  "DAILY + GUARDS"),
     ("test_3node_config.py",             120,  "DEPLOYMENT"),
+    # A259 (2026-10-05), registered in the change that created it: the dashboard never writes
+    # an address of his into a tracked file. Synthetic values only; runs anywhere.
+    ("test_a259_dashboard_redact.py",    120,  "SECURITY"),
     ("test_y1_stake_divergence.py",      120,  "LEDGER"),
     ("sim_order_independence.py",        600,  "LEDGER"),
     ("sim_yield_safety.py",              240,  "LEDGER"),

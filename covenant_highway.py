@@ -2336,6 +2336,21 @@ GRADE_AFTER_S = 1800.0        # default wait before an async start may be judged
 MAX_GRADED_PER_PASS = 20      # a backlog is worked off over passes, never in one burst
 
 
+def _watchdog_restarted_since(measured, started_at):
+    """watchdog_stale: the remedy worked when the OLDEST running watchdog started after it did.
+
+    detect_watchdog_stale reports the oldest creation time among the watchdog's processes,
+    so this is true only when every process that was running is gone and a new one started
+    -- a restart that left an old process alive does not count."""
+    ps = (measured or {}).get("process_started")
+    return isinstance(ps, (int, float)) and float(ps) >= float(started_at)
+
+
+# A259-GRADE: per detector, "PRESENT now, but the remedy measurably worked and this is a new
+# instance". Only detectors whose measurement can show that are listed; the rest keep the old rule.
+RECURRED = {"watchdog_stale": _watchdog_restarted_since}
+
+
 def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
     """Grade asynchronous `started` rows whose remedy has had time to finish.
 
@@ -2345,6 +2360,17 @@ def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
     and ABSENT now is `fixed`; still PRESENT is `did not fix`. UNKNOWN now is left
     ungraded -- a read that failed is not a verdict, and calling it one would
     quarantine a remedy for the reader's blindness.
+
+    A259-GRADE (2026-10-05): "still PRESENT" was read as "did not fix", and it is
+    not the same thing. schedule_watchdog_restart restarted the watchdog at
+    23:06:59 and 00:34:34; each time a watched file was written a few minutes
+    later, inside the grading window, and the condition was PRESENT again as a NEW
+    instance. Both were graded "did not fix", two of those quarantine a remedy,
+    and a remedy that worked twice was retired. Where a detector can tell a new
+    instance from the old one (RECURRED below), PRESENT-again after the remedy
+    measurably worked is graded `fixed`, marked `recurred`; the next pass meets
+    the new instance as a new condition. Detectors without such a test keep the
+    old rule, and that is a limit, not a verdict.
 
     Rows before the last `recalibrated` row for a remedy are never graded. A
     recalibration says the count no longer applies; re-grading history across it
@@ -2388,11 +2414,14 @@ def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
         waited = t_now - started_at
         if waited < wait:
             continue
+        after_m = None
         if conditions is not None and detector in conditions:
             after = (conditions[detector] or {}).get("state", UNKNOWN)
+            after_m = (conditions[detector] or {}).get("measured")
         elif detector in DETECTORS:
             try:
-                after = DETECTORS[detector]()["state"]
+                res = DETECTORS[detector]()
+                after, after_m = res["state"], res.get("measured")
             except Exception:                                     # noqa: BLE001
                 after = UNKNOWN
         else:
@@ -2400,14 +2429,24 @@ def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
         if after == UNKNOWN:
             continue
         before = row.get("before")
+        recurred = False
+        if before == PRESENT and after == PRESENT and detector in RECURRED:
+            try:
+                recurred = bool(RECURRED[detector](after_m, started_at))
+            except Exception:                                     # noqa: BLE001
+                recurred = False
         out = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(t_now, 1),
                "remedy": name, "detector": detector, "dry_run": bool(dry_run),
                "before": before, "after": after,
-               "outcome": "fixed" if (before == PRESENT and after == ABSENT) else "did not fix",
+               "outcome": "fixed" if (before == PRESENT and (after == ABSENT or recurred)) else "did not fix",
                "graded_late": True, "started_t": row.get("t"),
                "waited_s": round(waited, 1),
                "why": "graded %.1f h after the start it answers; the remedy's own "
                       "window is %.1f h" % (waited / 3600.0, wait / 3600.0)}
+        if recurred:
+            out["recurred"] = True
+            out["why"] += ("; PRESENT again as a NEW instance -- the remedy measurably worked "
+                           "(A259-GRADE): %s" % json.dumps(after_m)[:160])
         written.append(out)
         if not dry_run:
             write_ledger(out, ledger)

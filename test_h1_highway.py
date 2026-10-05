@@ -1453,6 +1453,44 @@ def main():
     check("H1o2 the condition UNKNOWN now -> left ungraded, never a failure",
           got == [], str(got))
 
+    # A259-GRADE (2026-10-05). schedule_watchdog_restart restarted the watchdog twice
+    # that night, a watched file was written inside each grading window, the condition
+    # was PRESENT again as a new instance, both were graded "did not fix", and two of
+    # those quarantined a remedy that had worked. Driven both ways with the real table.
+    WREM = "schedule_watchdog_restart"
+    WWIN = float(H.REMEDIES[WREM].get("grade_after_s") or H.GRADE_AFTER_S)
+    t0 = NOW - WWIN - 60
+
+    def wd_now(process_started, written):
+        return {"watchdog_stale": {"state": H.PRESENT, "measured": {
+            "newest_file": "covenant_earn.py", "written": written,
+            "process_started": process_started, "running": 2}}}
+
+    led = tmp_ledger()
+    started_row(led, t0, detector="watchdog_stale", remedy=WREM)
+    got = H.grade_started(wd_now(t0 + 8, t0 + 200), ledger=led, now=NOW, dry_run=True)
+    check("H1o3 PRESENT again but the watchdog restarted after the remedy started -> fixed, marked recurred",
+          len(got) == 1 and got[0]["outcome"] == "fixed" and got[0].get("recurred") is True,
+          str([(g["outcome"], g.get("recurred")) for g in got]))
+    led = tmp_ledger()
+    started_row(led, t0, detector="watchdog_stale", remedy=WREM)
+    got = H.grade_started(wd_now(t0 - 500, t0 + 200), ledger=led, now=NOW, dry_run=True)
+    check("H1o3 mutation: the old watchdog is still the oldest running -> did not fix (the remedy did not work)",
+          len(got) == 1 and got[0]["outcome"] == "did not fix" and not got[0].get("recurred"),
+          str([(g["outcome"], g.get("recurred")) for g in got]))
+    led = tmp_ledger()
+    for k in range(2):
+        started_row(led, t0 - 7200 * (1 - k), detector="watchdog_stale", remedy=WREM)
+        for g in H.grade_started(wd_now(t0 - 7200 * (1 - k) + 8, t0 + 200), ledger=led, now=NOW):
+            pass
+    check("H1o3 two recurrences in a row do not quarantine the remedy (two misgrades did, 2026-10-05)",
+          not H.quarantined(WREM, led), [r.get("outcome") for r in H.read_ledger(led)])
+    led = tmp_ledger()
+    started_row(led, NOW - WINDOW - 60, detector="phone_build_behind_core", remedy=ASYNC)   # ITS window, not WWIN
+    got = H.grade_started(PRESENT_NOW, ledger=led, now=NOW, dry_run=True)
+    check("H1o3 a detector with no recurrence test keeps the old rule (still PRESENT -> did not fix)",
+          len(got) == 1 and got[0]["outcome"] == "did not fix", str([g["outcome"] for g in got]))
+
     # A RECALIBRATION IS A BARRIER. Re-grading history across it would put back
     # the failures it was written to set aside, and invisibly.
     led = tmp_ledger()

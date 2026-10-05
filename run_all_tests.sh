@@ -605,6 +605,9 @@ echo "=== THE DEPLOYMENT ITSELF, AND THE RADIO BEARER ==="
 run test_r1_lora_frame.py 120
 run test_backtest_guardrails.py 180
 run test_3node_config.py 120
+# A259 (2026-10-05): the dashboard redacts his identifiers and non-local addresses before
+# writing dashboard.html, a tracked file.
+run test_a259_dashboard_redact.py 120
 echo "=== THIS RUNNER'S OWN CLEANUP (K1) ==="
 # Added 2026-08-27 with the key-preservation fix at the top of this file.
 # It is registered HERE, in the same change that introduced it, because an

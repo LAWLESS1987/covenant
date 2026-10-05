@@ -7293,6 +7293,43 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A259. [the two flaws A258 recorded, fixed: a grader that retired a remedy which had worked twice, and a dashboard that wrote his tailnet address into a tracked file] 2026-10-05. His words: "fix the two recorded flaws using the tombstone system". FIXED, each guard driven both ways
+
+**A259-GRADE, a claim that was wrong.** `grade_started()` graded an async remedy "did not fix" whenever its
+condition was still PRESENT after the window. schedule_watchdog_restart started at 23:06:51 and 00:34:26 on
+2026-10-04/05, and the watchdogs running afterwards were created at 23:06:59 and 00:34:34 -- both restarts
+happened. A watched file was written inside each window (my own edits to covenant_highway.py, then
+covenant_earn.py), the condition came back as a new instance, both were graded "did not fix", and two of
+those (QUARANTINE_AFTER = 2) retired the remedy: `quarantined()` True, "refused" at 00:57:13, and the
+watchdog was left stale until a person stopped it. Fixed: a detector may say how to tell a new instance
+from the old (`RECURRED`); for watchdog_stale it is the oldest running watchdog having started after the
+remedy did, so a restart that left an old process alive still fails. PRESENT-again after that is `fixed`,
+marked `recurred`. Detectors with no such test keep the old rule -- named here as the limit. H1o3 runs the
+real grader: recurred -> fixed; the old process still oldest -> did not fix; two recurrences do not
+quarantine; a detector without a test unchanged. HEAD's grader on the same row: "did not fix". Tombstoned
+(docs/RETRACTED.json; branch a259-grade-and-dashboard-as-written-2026-10-05); the docstring keeps its
+sentence with the restated rule beside it. The two misgraded rows stay in the ledger; a `recalibrated` row
+says why they no longer count, which is what recalibrate() exists for.
+
+**A259 dashboard, a forgotten step.** dashboard.html is tracked and dashboard_render.py copied the
+watchdog's ALERT lines into it verbatim; one carried a peer's tailnet address. The tombstone for a
+forgotten step is a guard where it is forgotten: `redact()` runs inside `write_once()`, labelling his
+identifiers through tools/opsec_scan when it can read them and replacing every IPv4 address that is not
+loopback or the wildcard always, because a fresh clone has no private list. `test_a259_dashboard_redact.py`
+(registered in covenant_one and run_all_tests.sh) uses synthetic values only: R1-R4 green, M1 shows the
+planted address DOES reach the file with redaction bypassed, M2 leaves versions and heights alone, and
+HEAD's renderer writes the planted address. Its first run failed R3 on my own bug -- given tokens, the
+tools path was never added and the import failed silently -- fixed before anything else. Live after:
+`python dashboard_render.py` wrote 3/3 nodes up and `tools/opsec_scan.py --scan` found 0 files carrying
+his identifiers, where it had found 1.
+
+**Not changed:** the one-hour cooldown (ROW_COOLDOWN_S) after any row, which still delays a retry on a
+new instance; the synchronous grading path (it re-measures at once, leaving no window).
+
+**Repro:** `python test_h1_highway.py` (H1o3); `python test_a259_dashboard_redact.py`.
+
+---
+
 ### A258. [back doors and ghosts, audited: the earn server's loopback fix never reached its launch path, a ghost identity key, a check counting a Windows service as a node, and firewall rules that open every Python listener on the Public Wi-Fi] 2026-10-05. His words: "ensure no back doors or ghost ones after update docs following what i said earlier". MEASURED; three fixed with guards driven both ways, one ghost retired, the firewall is his
 
 **Populations read, by discovery.** Every listening socket and its owning process; every process running
@@ -7352,6 +7389,7 @@ tell a remedy that failed from a condition that came back. (2) The sweep's dashb
 address into `dashboard.html`, a tracked file: the committed copy holds none, the regenerated one held one
 on 2026-10-05, and the opsec pre-push guard is what keeps it unpublished -- it refused this entry's first
 draft for the same reason (a peer's tailnet address, removed before it left the machine).
+*(2026-10-05, later the same night: both are changed now -- A259.)*
 
 **Repro:** `python exposure_check.py`; `python test_ea1_earn.py`; `python test_a82_exposure_unknown.py`.
 
