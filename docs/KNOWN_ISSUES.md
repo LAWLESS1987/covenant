@@ -5393,6 +5393,11 @@ transcript. Only the SUMMARY step travelled.
 of `--file` carries no path, so nothing can classify it. The notice cannot fire
 there.
 
+*2026-10-05: this residual recurred through the teacher queue, which carries text
+with no path and never passes through covenant_route.py. See A263, which marks
+private material at the door it enters by, and A263-DOCSTRING (the module docstring
+here outlived the withdrawn first fix).*
+
 ---
 
 ### A129. [CRITICAL / a third party] A bystander's name was quoted into a public file. REDACTED and GUARDED 2026-09-16
@@ -7290,6 +7295,98 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 **What still needs him:** a full scan has never run on this machine
 (`Start-MpScan -ScanType FullScan`), and it is his to start.
+
+---
+
+### A263. [Tetsu's doors queued every exchange for a teacher panel on the PUBLIC runner, so a private transcript handed to him would have been published; and a docstring said the opposite guard existed] 2026-10-05. Found by the X-video session (tools/tetsu_work.py on private transcripts); his words, relayed by that session: "go ahead and add the guard to tetsus door". FIXED with an opt-in marker, the guard driven both ways; the live nodes take it at their next restart. A RECURRENCE of A128's stated residual
+
+**The route, read end to end.** `/m/agent` (covenant_unified_v8.py:8458) and `/pc/council`
+(covenant_council.py:328) both called `covenant_daily_plan.teacher_queue_append` with the asker's text
+and the answer, unconditionally. The nightly's `covenant_teacher_queue.consume` hands each queued row's
+text to `covenant_distill.panel_rows` -> `covenant_teacher_panel.panel_judge` -> `gh.ask_many`, a
+`workflow_dispatch` on the repository's origin -- the public LAWLESS1987/covenant -- whose judge.yml
+writes the model's answer (`content[:4000]`) to `GITHUB_STEP_SUMMARY` (.github/workflows/judge.yml:240),
+which a public repository renders publicly. A128 measured that page publishing a video summary (run
+35064624218). Nothing was dispatched to measure it again.
+
+**A recurrence, and why the earlier tombstone did not stop it.** A128's own entry names this residual:
+"a caller passing `--prompt` instead of `--file` carries no path, so nothing can classify it". The
+queue is that case at scale: it carries text and no path, and it never passes through
+`covenant_route.py`, where A128's notice lives. A128's R1 tombstone polices only the wording "local
+Ollama judge". So the earlier fix repaired the instance and left nothing at the next door.
+
+**And a claim that was wrong (A263-DOCSTRING).** The task brief said `x_video_text.summarize()` "now
+refuses private/ paths unless COVENANT_ALLOW_PUBLIC_JUDGE=1". It took that from x_video_text.py's module
+docstring. The function itself announces and sends, with COVENANT_HOLD_PRIVATE=1 to hold; no code reads
+that variable. The sentence described A128's first fix, withdrawn the same hour, and outlived it by
+nineteen days. It is tombstoned (docs/RETRACTED.json; probe red 98/99, removed 99/99), and the whole file
+as written is kept in convo_ocr/.trash/2026-10-05_x_video_text_docstring/ (convo_ocr has no git, so no
+branch). The docstring now says what the function does.
+
+**Counted first (units are call sites).** Writers through `teacher_queue_append`: 7 non-test call
+sites in 7 files (council, daily_plan's phone chat lines, earn_business, feed, own_work, tetsu_assist,
+the /m/agent door) plus the held copy in pending-v8.38 (synced by the pre-commit hook). Readers of
+ops/teacher_queue.jsonl: 4, of which ONE sends text anywhere (`consume`); council's training panel,
+the persona brief and /pc/3d only count rows. Callers of the panel: 4 call sites (consume, two in
+covenant_distill, covenant_study); only consume carries words said to Tetsu, and the other three carry
+text a writer model generated. Readers of ops/chat/ask_log.jsonl besides the doors: 7 modules, none of
+which dispatches off this PC (persona refinement uses covenant_model.ask, which posts to 127.0.0.1, and
+already skips 127.0.0.2).
+
+**Fixed.** A row marked `{"private": True}` (exactly True; `covenant_daily_plan.is_private`) is never
+written to the queue. `teacher_queue_append` records it in the queue's twin,
+`ops/teacher_queue.withheld.jsonl` (gitignored), with the reason, so it is never silently dropped.
+Releasing one to the teacher is a person moving that line into the queue. `consume` withholds a
+private row that reached the queue by any other route, counts it, and consumes it. At both doors,
+`{"private": true}`:
+
+* marks both rows and the memory row;
+* says `teacher: withheld: private (A263) ...` in the reply;
+* is replayed only into another private ask (`agent_history(include_private=)`), because replayed
+  into an ordinary ask its text could reach an answer that IS queued;
+* makes no FETCH, WEB or MOLTBOOK act and no council page read. A held-act notice is handed back as
+  data instead, so what Tetsu says is what happened. HANDS and HEAL are unchanged, since both act on
+  this PC only.
+
+The empty-text refusal now carries `honours_private: true`. `tools/tetsu_work.py` takes `--private`, a
+per-line `"private": true`, and treats a private/ input (or an item's private/ `"file"`) as private by
+default, with `--teach` to override; COVENANT_HOLD_PRIVATE=1 wins over `--teach`. Before sending
+anything private it asks the door for `honours_private` and sends nothing to a core that lacks it. A
+private reply without the withheld note stops the batch.
+
+**What did not change, and is his.** His phone and his PC page never send the marker, so his own
+conversations ride the queue exactly as before (A166, "so it actually learns from me"). Whether any of
+them should be withheld is his decision, and no code here makes it. The private/-input default in
+tetsu_work.py differs from A128's announce-and-send posture on purpose: there the refusal blocked the
+work, while here the work is done either way and only the teaching copy is held. A withheld line can be
+released; a published summary cannot be taken back. This also follows his 2026-09-26 words quoted in
+covenant_teacher_queue.py, "protect operation security in all we do by default". To flip it for a run,
+pass `--teach`.
+
+**Residual, named.**
+* **The live nodes** run the core they started with, and honour the marker only after their next
+  restart onto this one. Until then `tetsu_work.py --private` refuses with nothing sent (T2). The
+  restart is not made from a session shell.
+* **The gate** sees a private question and answer in `sentinel.evaluate_transaction`. With
+  ops/quorum_policy.json `github_when_local_down: false` (as of 2026-10-05), nothing leaves the PC.
+  Set true, a payload the students hold goes to the runner, private or not. That is gate posture, so
+  it is his.
+* **Local copies.** A private exchange stays in ops/chat/ask_log.jsonl and the withheld twin, both
+  gitignored and on this PC only.
+* **What the path marker cannot see.** It reads only the `--in` path and an item's `"file"`. Text
+  pasted from a transcript into a scratch JSONL needs `--private`.
+* **The other writers.** The queue's other six writers never mark a row private, and none carries a
+  transcript today.
+
+**Pinned by** `test_a263_private_teacher.py`, registered in covenant_one.py and run_all_tests.sh. It
+drives the real handlers with the stub model; none of its checks greps. It was broken both ways in
+source: the door marker and `is_private` reverted gave 21/38 (17 red, the right 17, and tetsu_work's
+per-reply stop fired against the reverted door); restored, 38/38. Four in-suite mutations (M1-M4) each
+turn one guard off and watch its check go red. G1 asks git whether the twin is ignored, and is a SKIP,
+counted apart, in the sweep's staged copy, which has neither .git nor .gitignore. These stayed green:
+M6 68/68, DP1 33/33, TA1 14/14, OW1 12/12, PC1, TQ1, CC1, TP1, TF1.
+
+**Repro:** `python test_a263_private_teacher.py`; `python tools/tetsu_work.py --in q.jsonl --out a.jsonl --private`.
 
 ---
 

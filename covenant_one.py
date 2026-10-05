@@ -428,6 +428,10 @@ SUITES = [
     ("test_a119_stopword_stems.py",      120,  "JUDGE"),
     ("test_teacher_panel.py",            120,  "JUDGE"),
     ("test_tq1_teacher_queue.py",        120,  "JUDGE"),
+    # A263 (2026-10-05), registered in the change that created it: an ask marked private is answered
+    # on this PC and never queued for the teacher panel, which runs on the PUBLIC repo's runner. It
+    # drives the real /m/agent and /pc/council handlers with the stub model; every path is redirected.
+    ("test_a263_private_teacher.py",     180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),

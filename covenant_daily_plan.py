@@ -326,13 +326,60 @@ AI_CHATS_MAX_LINES, AI_CHATS_LINE_CAP = 200, 600
 # by the size of what is said to Tetsu; nothing here drops a row.
 
 
+# WHERE THE TEACHER IS (A263, 2026-10-05). The queue is read by covenant_teacher_queue.consume,
+# which hands each row's text to covenant_teacher_panel.panel_judge -> covenant_github_judge: a
+# workflow_dispatch input on the PUBLIC repository, whose judge.yml writes the model's answer to
+# the job summary, which a public repository renders publicly. That is the A128 route. A row a
+# caller marks private ({"private": True}, exactly True) is therefore never written to the queue:
+# it goes to the queue's local twin, <queue>.withheld.jsonl -- gitignored, read by nothing that
+# sends -- with the reason, so it is recorded and never silently dropped. Releasing one to the
+# teacher is a person moving that line into the queue by hand. Unmarked rows are untouched: his
+# own conversations ride the queue by design (A166, "so it actually learns from me").
+PRIVATE_REASON = "private: answered on this machine; withheld from the teacher panel, which runs on the public repository's runner (A263)"
+
+
+def is_private(row):
+    """A row is private only when it says so with an explicit True. One predicate for the writer and the consumer."""
+    return isinstance(row, dict) and row.get("private") is True
+
+
+def teacher_withheld_path(queue_path=None):
+    """The withheld twin of a queue path: beside it, so a suite that redirects the queue redirects this too."""
+    q = queue_path or os.environ.get("COVENANT_TEACHER_QUEUE") or TEACHER_QUEUE
+    return os.path.splitext(q)[0] + ".withheld.jsonl"
+
+
+def teacher_withhold(rows, reason=PRIVATE_REASON, queue_path=None):
+    """Record rows that are NOT carried to the teacher, each with the reason. Returns how many."""
+    path = teacher_withheld_path(queue_path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    n = 0
+    with open(path, "a", encoding="utf-8") as fh:
+        for r in rows:
+            text = str(r.get("text", ""))[:4000].strip()
+            if not text:
+                continue
+            fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "text": text,
+                                 "source": str(r.get("source", ""))[:80], "withheld": str(reason)[:240]},
+                                ensure_ascii=False) + "\n")
+            n += 1
+    return n
+
+
 def teacher_queue_append(rows, path=None):
-    """Append (text, source) rows for the teacher. Every row is kept; none is dropped."""
+    """Append (text, source) rows for the teacher. Every row is kept; none is dropped.
+    A row marked {"private": True} is recorded in the withheld twin instead (A263).
+    Returns the number QUEUED."""
     path = path or os.environ.get("COVENANT_TEACHER_QUEUE") or TEACHER_QUEUE
+    held = [r for r in rows if is_private(r)]
+    if held:
+        teacher_withhold(held, queue_path=path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     kept = 0
     with open(path, "a", encoding="utf-8") as fh:
         for r in rows:
+            if is_private(r):
+                continue
             text = str(r.get("text", ""))[:4000].strip()
             if not text:
                 continue

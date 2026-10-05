@@ -668,10 +668,33 @@ AGENT_HISTORY_CHARS = 2000
 AGENT_HISTORY_BUDGET = 12000
 AGENT_HISTORY_KINDS = ("agent", "council")
 
+# A PRIVATE ASK (A263, 2026-10-05). Every exchange at /m/agent and /pc/council was queued for the
+# teacher, and the teacher is a panel on the PUBLIC repository's runner whose job summary is public
+# -- the A128 route, reached with no path for A128's notice to read. A caller that sends
+# {"private": true} (exactly true; tools/tetsu_work.py --private) is answered by the model on this
+# machine and nothing of the exchange leaves it: not queued (recorded as withheld, with the reason,
+# by covenant_daily_plan.teacher_queue_append), not replayed into an ordinary ask (agent_history),
+# and no act that reaches outside -- FETCH, WEB, MOLTBOOK, the council's page read -- is made for it.
+# HANDS and HEAL stay: both act on this machine only. Nothing changes for an ask without the marker,
+# which is every ask his phone and his PC page send.
+PRIVATE_TEACHER_NOTE = ("withheld: private (A263) -- answered on this machine; not queued for the "
+                        "teacher panel, which runs on the public repository's runner")
+PRIVATE_ACT_HELD = ("NOT done: this ask is marked private (A263), so nothing from it leaves this machine -- "
+                    "no fetch, no web search, no forum. Nothing was read or sent. Answer the person from what "
+                    "you already have, in your own words, and say plainly if that is not enough.")
 
-def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET):
+
+def private_ask(body):
+    """True only for an explicit JSON true under "private"; any other value is an ordinary ask."""
+    return isinstance(body, dict) and body.get("private") is True
+
+
+def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET,
+                  include_private=False):
     """The last answered exchanges from `addr` (agent and council), as chat messages, oldest first:
-    at most `turns`, each side cut at `chars`, newest kept first until `budget` characters."""
+    at most `turns`, each side cut at `chars`, newest kept first until `budget` characters.
+    A row marked private (A263) is replayed only into another private ask: replayed into an
+    ordinary one, its text could reach an answer that IS queued for the public panel."""
     try:
         with open(log_path, "rb") as fh:
             fh.seek(0, 2)
@@ -687,6 +710,8 @@ def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY
         except ValueError:
             continue
         if r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
+            continue
+        if r.get("private") is True and not include_private:
             continue
         rows.append(r)
     kept, used = [], 0
@@ -8444,7 +8469,10 @@ class CovenantAPI:
             body = request.get_json(silent=True)
             text = str(body.get("text", "") if isinstance(body, dict) else "")[:4000]
             if not text.strip():
-                return (jsonify({"status": "error", "message": "nothing to ask"}), 400)
+                # honours_private: how tools/tetsu_work.py tells, before sending anything private, that
+                # this core keeps a private ask off the public panel (A263). An older core omits it.
+                return (jsonify({"status": "error", "message": "nothing to ask", "honours_private": True}), 400)
+            private = private_ask(body)
             recent.append(now_)
             _ask_log[addr] = recent
             sentinel = getattr(self.node, "sentinel", None)
@@ -8455,7 +8483,7 @@ class CovenantAPI:
             except Exception as e:                                # noqa: BLE001
                 return (jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503)
             _log_path = os.environ.get("COVENANT_ASK_LOG") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "chat", "ask_log.jsonl")
-            history = agent_history(_log_path, addr)
+            history = agent_history(_log_path, addr, include_private=private)
             # The system message is composed (2026-09-21, A174): the fixed rules above,
             # then the register Tetsu may revise, then a short TRUE brief of the day, so
             # "recap updates" is answered from records. One message, so the turn count
@@ -8472,7 +8500,14 @@ class CovenantAPI:
                 answer, meta = _m.ask(msgs)
                 first = answer.strip().splitlines()[0].strip() if answer.strip() else ""
                 url = _agent_fetch_url(answer)
-                if url:
+                if private and (url or first.upper().startswith(("MOLTBOOK", "WEB "))):
+                    # A263: an act that reaches outside this machine is not made for a private ask.
+                    # Handed back as data, the same way a refused act is, so what he says is what happened.
+                    forum.append({"act": first[:40], "held": "private (A263)"})
+                    msgs.append({"role": "assistant", "content": answer})
+                    msgs.append({"role": "user", "content": PRIVATE_ACT_HELD + " Do not write FETCH, WEB or MOLTBOOK."})
+                    answer, meta = _m.ask(msgs)
+                elif url:
                     page, note = _agent_fetch(url)
                     fetches.append({"url": url[:300], "note": note})
                     msgs.append({"role": "assistant", "content": answer})
@@ -8554,22 +8589,28 @@ class CovenantAPI:
             try:
                 # Both sides of the exchange go to the teacher (2026-09-21, "so it
                 # actually learns from me"): what he said, then what was answered.
+                # A private ask (A263) marks both rows private: the writer records them as withheld.
                 importlib.import_module("covenant_daily_plan").teacher_queue_append(
-                    [{"text": text[:4000], "source": "you:" + str(addr)[:40]},
-                     {"text": answer[:4000], "source": "agent:" + str(meta.get("model", "?"))[:40]}])
+                    [{"text": text[:4000], "source": "you:" + str(addr)[:40], "private": private},
+                     {"text": answer[:4000], "source": "agent:" + str(meta.get("model", "?"))[:40], "private": private}])
             except Exception as _qe:                              # noqa: BLE001 -- the queue is memory, never a gate
                 print("teacher queue row not written: %s: %s" % (type(_qe).__name__, str(_qe)[:200]), flush=True)
+            _row = {"kind": "agent", "from": addr, "text": text, "answer": "" if withheld else answer[:4000],
+                    "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "immune": immune,
+                    "message": str(message)[:2000], "model": meta.get("model"), "tokens": meta.get("tokens"),
+                    "ms": meta.get("ms"), "fetches": fetches, "forum": forum}
+            _out = {"status": "success", "answer": "" if withheld else answer, "withheld": withheld, "immune": immune,
+                    "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
+                    "judge": getattr(result, "judge_id", "") if result is not None else "",
+                    "model": meta.get("model"), "tokens": meta.get("tokens"), "ms": meta.get("ms"), "fetches": fetches}
+            if private:
+                _row.update(private=True, teacher=PRIVATE_TEACHER_NOTE)
+                _out.update(private=True, teacher=PRIVATE_TEACHER_NOTE)
             try:
-                _ask_log_row({"kind": "agent", "from": addr, "text": text, "answer": "" if withheld else answer[:4000],
-                              "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "immune": immune,
-                              "message": str(message)[:2000], "model": meta.get("model"), "tokens": meta.get("tokens"),
-                              "ms": meta.get("ms"), "fetches": fetches, "forum": forum})
+                _ask_log_row(_row)
             except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate
                 print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
-            return jsonify({"status": "success", "answer": "" if withheld else answer, "withheld": withheld, "immune": immune,
-                            "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
-                            "judge": getattr(result, "judge_id", "") if result is not None else "",
-                            "model": meta.get("model"), "tokens": meta.get("tokens"), "ms": meta.get("ms"), "fetches": fetches})
+            return jsonify(_out)
 
         # THE IMAGE (2026-09-19, "there has to be a image creation open
         # source we can take and improve on"). The PROMPT is judged by the

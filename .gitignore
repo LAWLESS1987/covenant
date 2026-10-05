@@ -371,6 +371,8 @@ ops/CONTEXT_PACK.txt
 # 2026-09-21 (A166/A168/A169): his conversations, the AI-app chat lines the phone carries, what the PC says to him, and what free sent -- records of a person, never shipped
 ops/teacher_queue.jsonl
 ops/teacher_queue.state.json
+# the queue's twin for rows marked private: answered on this PC, withheld from the public panel (A263)
+ops/teacher_queue.withheld.jsonl
 ops/contact_outbox.jsonl
 ops/tetsu_persona.json
 # his whole revision history, append-only, and any persona file set aside unreadable (A233, 2026-09-26)

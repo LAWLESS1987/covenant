@@ -101,13 +101,21 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
     verdicts_path = verdicts_path or X.LIVE_VERDICTS
     rejected_path = rejected_path or X.LIVE_REJECTED
     stats = {"seen": 0, "judged": 0, "kept": 0, "kept_violates": 0, "kept_clean": 0,
-             "rejected": 0, "duplicates": 0, "consumed": _read_state(state_path)}
+             "rejected": 0, "duplicates": 0, "private": 0, "consumed": _read_state(state_path)}
     rows, offsets = pending(queue_path, state_path)
     if not rows:
         say("queue: nothing waiting for the teacher")
         return stats
     rows, offsets = rows[:max(0, int(limit))], offsets[:max(0, int(limit))]
     stats["seen"] = len(rows)
+    # A263: the panel is a public runner. covenant_daily_plan.teacher_queue_append never writes a
+    # row marked private; one that reached the queue anyway (a hand edit, another writer) is
+    # recorded in the withheld twin with the reason and consumed -- carried nowhere.
+    import covenant_daily_plan as DP
+    private = [d for d in rows if DP.is_private(d)]
+    if private:
+        stats["private"] = DP.teacher_withhold(private, reason="private: arrived in the queue marked private; "
+                                               "not carried to the public panel (A263)", queue_path=queue_path)
 
     # what the ledger already holds, so nothing is judged twice
     known = set()
@@ -116,6 +124,8 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
             known.add(_norm(d.get("text")))
     cases, meta = [], []
     for d, off in zip(rows, offsets):
+        if DP.is_private(d):
+            continue
         text = str(d.get("text", "")).strip()[:4000]
         words = len(text.split())
         if not (MIN_WORDS <= words <= MAX_WORDS) or _norm(text) in known:
@@ -128,7 +138,8 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
     if not cases:
         _write_state(state_path, last_offset + 1, "nothing new to judge")
         stats["consumed"] = last_offset + 1
-        say("queue: %d row(s) seen, none new (duplicates or out of size); consumed" % stats["seen"])
+        say("queue: %d row(s) seen, none new (duplicates or out of size; %d private, withheld); consumed"
+            % (stats["seen"], stats["private"]))
         return stats
 
     if principles is None:
@@ -168,9 +179,9 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
             stats["rejected"] += 1
     _write_state(state_path, last_offset + 1, "kept %d, rejected %d" % (stats["kept"], stats["rejected"]))
     stats["consumed"] = last_offset + 1
-    say("queue: %d seen, %d judged by the panel, %d kept (%d violating, %d clean), %d rejected, %d duplicate/out of size"
+    say("queue: %d seen, %d judged by the panel, %d kept (%d violating, %d clean), %d rejected, %d duplicate/out of size, %d private (withheld)"
         % (stats["seen"], stats["judged"], stats["kept"], stats["kept_violates"], stats["kept_clean"],
-           stats["rejected"], stats["duplicates"]))
+           stats["rejected"], stats["duplicates"], stats["private"]))
     return stats
 
 

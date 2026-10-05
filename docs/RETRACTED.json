@@ -778,6 +778,30 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it."
+  },
+  {
+   "id": "A263-DOCSTRING",
+   "claim": "That x_video_text.summarize() refuses to send anything under private/ to the public-repo judge unless COVENANT_ALLOW_PUBLIC_JUDGE=1.",
+   "refuted_by": "summarize() itself (convo_ocr/x_video_text.py, outside this repository), read 2026-10-05: under private/ it prints the A128 destination notice and sends; only COVENANT_HOLD_PRIVATE=1 holds the file back. No code anywhere reads COVENANT_ALLOW_PUBLIC_JUDGE. The module docstring described A128's first fix, withdrawn within the hour on 2026-09-16, and outlived it; on 2026-10-05 the A263 task brief repeated it as fact.",
+   "truth": "summarize() announces the public destination for private/ input and sends it -- the operator is not aiming for private (A128) -- and COVENANT_HOLD_PRIVATE=1 refuses instead. Material that must stay off the public runner is marked private at the door it enters by (A263); it is not refused by default.",
+   "verbatim": [
+    "summarize() now refuses to send anything under private/ to a public-repo judge; pass COVENANT_ALLOW_PUBLIC_JUDGE=1 to override deliberately."
+   ],
+   "patterns": [
+    "COVENANT_ALLOW_PUBLIC_JUDGE",
+    "summarize\\(\\)\\s+now\\s+refuses"
+   ],
+   "note_on_patterns": "COVENANT_ALLOW_PUBLIC_JUDGE is read by no code, so any appearance is this claim or a description of it -- the description must carry the id.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The file is outside this repository and convo_ocr is not a git repository, so there is no as-written branch: the whole file as written is kept at convo_ocr/.trash/2026-10-05_x_video_text_docstring/ (sha256 41c06a6f194d9bfc..., 11692 bytes) with RETIRED.md. This guard keeps the claim from re-entering THIS tree; it cannot see convo_ocr."
   }
  ]
 }
