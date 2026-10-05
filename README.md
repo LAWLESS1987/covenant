@@ -4,7 +4,7 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** · source `b708204ff11b` · 12,799 lines · **172 suites, 4,670 checks, 0 failed** on win32 <!--TOTALS-->
+**v8.40** · source `ee4e0db9047d` · 12,813 lines · **175 suites, 4,765 checks, 0 failed** on win32 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
 the version, hash and line count from the core module itself, the suite and
 check counts from the newest `covenant_one.py --all` transcript. The date on
@@ -531,6 +531,10 @@ And a green check count is not a green run: the sweep's verdict has read
 **`RESULT: FAIL`** with zero check failures, because it also counts in-place
 gates, and one of those — bundle integrity — blocks pending an owner decision.
 Reading "0 failed" without that is how the number flatters.
+*(2026-10-05: written 2026-09-17 and true then. The sweep of 2026-10-04 read FAIL on
+0 failed checks for a different reason, ledgers the running system writes hashed as
+delivery (A255, fixed); the sweep of 2026-10-05 reads `RESULT: PASS` with every gate
+passing. The lesson stands: read the verdict, not the count.)*
 
 The rest of what is not green is in [KNOWN_ISSUES](docs/KNOWN_ISSUES.md). **The
 counting rule, which matters more than the count:** an entry is a `### A<n>.`
@@ -692,7 +696,7 @@ The same work, and the person behind it, in the other places it lives:
 
 ## Suite coverage
 
-**172 suites · 4,670 checks · 0 failed**, win32, 2026-10-03 <!--TOTALS-->
+**175 suites · 4,765 checks · 0 failed**, win32, 2026-10-05 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.
