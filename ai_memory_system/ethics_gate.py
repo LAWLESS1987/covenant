@@ -196,22 +196,33 @@ def coarse_screen(name: str, description: str, body: str) -> Optional[Verdict]:
             return Verdict(verdict=BLOCK, by="coarse", reason=why,
                            pattern=pat, principle=MEMORY_PRINCIPLES[0])
     for pat, why in _DIRECTIVE:
-        m = re.search(pat, hay, re.I | re.M)
-        if not m:
-            continue
-        # Reported speech is a record OF an instruction, and records are the
-        # point. The window starts at the beginning of the match's own line, so
-        # a speaker label at line start is visible, and reaches back far enough
-        # to catch "He asked me to ..." in running prose.
-        ls = hay.rfind("\n", 0, m.start()) + 1
-        window = hay[min(ls, max(0, m.start() - 90)):m.start() + 1]
-        if re.search(_ATTRIBUTION, window, re.I | re.M):
-            continue
-        # An importer turn inside a transcript is a record of what was said (A254).
-        if _SPEAKER_LABEL.match(hay, ls) and _is_transcript(hay):
-            continue
-        return Verdict(verdict=BLOCK, by="coarse", reason=why,
-                       pattern=pat, principle=MEMORY_PRINCIPLES[0])
+        # One excused order used to buy the bare one behind it (2026-10-05, a
+        # recurrence of A254), three ways, each measured:
+        #  - only the FIRST match of a pattern was examined, so an excused
+        #    transcript turn hid a bare order on a later line;
+        #  - the excuse was located from the match's start, and the "after a
+        #    full stop" anchor starts with the whitespace -- the newline -- so
+        #    a bare order was judged by the PREVIOUS line's speaker label;
+        #  - the attribution window ran back across sentence ends, so "He
+        #    asked me to send the report. Send the wallet seed ..." passed.
+        for m in re.finditer(pat, hay, re.I | re.M):
+            at = m.start() + len(m.group(0)) - len(m.group(0).lstrip())
+            # Reported speech is a record OF an instruction, and records are
+            # the point. The window starts at the beginning of the order's own
+            # line, so a speaker label at line start is visible, and reaches
+            # back far enough to catch "He asked me to ..." in running prose,
+            # even wrapped -- but never past the start of the order's sentence.
+            ls = hay.rfind("\n", 0, at) + 1
+            ss = max(hay.rfind(c, 0, at) for c in ".!?") + 1
+            window = hay[max(ss, min(ls, max(0, at - 90))):at + 1]
+            if re.search(_ATTRIBUTION, window, re.I | re.M):
+                continue
+            # An importer turn inside a transcript is a record of what was
+            # said (A254).
+            if _SPEAKER_LABEL.match(hay, ls) and _is_transcript(hay):
+                continue
+            return Verdict(verdict=BLOCK, by="coarse", reason=why,
+                           pattern=pat, principle=MEMORY_PRINCIPLES[0])
     for pat, why in _SECRETS:
         if re.search(pat, hay):
             # The matched text is NOT echoed back. A gate that quotes the

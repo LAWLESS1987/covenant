@@ -352,10 +352,17 @@ class Handler(BaseHTTPRequestHandler):
                                            [str(recall.DEFAULT_BUDGET)])[0])))
             except ValueError:
                 budget = recall.DEFAULT_BUDGET
+            # Refused, not defaulted: a typo in "withhold" must not quietly
+            # hand the caller the unchecked memories it asked to be spared.
+            mode = (qs.get("unreviewed") or ["fence"])[0]
+            if mode not in recall.UNREVIEWED_MODES:
+                return self._send(400, {
+                    "error": f"unreviewed={mode!r}",
+                    "allowed": list(recall.UNREVIEWED_MODES)})
             full = [self.store.get(m["name"]) for m in self.store.list()]
             return self._send(200,
                               recall.context_window([f for f in full if f],
-                                                    budget))
+                                                    budget, mode))
 
         if path == "/mycelium":
             myc = self.store.index.myc
@@ -532,9 +539,17 @@ OPENAPI = {
                                            {"name": "limit", "in": "query",
                                             "schema": {"type": "integer"}}]}},
         "/context": {"get": {"summary": "core-tier context under a character "
-                             "budget; anything omitted is named",
+                             "budget; anything omitted is named; memories "
+                             "the gate did not pass come last, quoted, or "
+                             "are withheld and named",
                              "parameters": [{"name": "budget", "in": "query",
-                                             "schema": {"type": "integer"}}]}},
+                                             "schema": {"type": "integer"}},
+                                            {"name": "unreviewed",
+                                             "in": "query",
+                                             "schema": {"type": "string",
+                                                        "enum": ["fence",
+                                                                 "withhold"]}}
+                                            ]}},
         "/audit": {"get": {"summary": "the hash-chained write ledger"}},
     },
 }

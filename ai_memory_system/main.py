@@ -68,6 +68,12 @@ def main(argv=None) -> int:
     q = sub.add_parser("search", help="substring recall")
     q.add_argument("query")
 
+    rr = sub.add_parser("rereview", help="put memories the ethics gate never "
+                        "passed back in front of it")
+    rr.add_argument("name", nargs="?", default="",
+                    help="one memory; omit for every unchecked memory")
+    rr.add_argument("--agent", default="cli")
+
     sub.add_parser("verify", help="walk the audit chain")
 
     i = sub.add_parser("import", help="adopt an existing memory directory")
@@ -108,6 +114,17 @@ def main(argv=None) -> int:
         for h in hits:
             print(f"{h['name']:40s} {h.get('description', '')[:80]}")
         print(f"\n{len(hits)} hit(s) for {a.query!r}")
+        return 0
+
+    if a.cmd == "rereview":
+        if a.name:
+            res = store.rereview(a.name, a.agent)
+            if res is None:
+                print(f"no such memory: {a.name}", file=sys.stderr)
+                return 1
+        else:
+            res = store.rereview_unchecked(a.agent)
+        print(json.dumps(res, indent=1, sort_keys=True))
         return 0
 
     if a.cmd == "verify":

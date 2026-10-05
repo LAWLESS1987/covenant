@@ -107,6 +107,8 @@ from `/openapi.json` without being told.
 ```bash
 python main.py server --host 127.0.0.1 --port 8000
 python main.py server --host 0.0.0.0 --port 8000 --token "$AI_MEMORY_TOKEN"
+python main.py rereview [name]   # 2026-10-05: put unchecked memories back in front of the gate; BLOCK retires to .trash.
+                                 # Run it on a COPY first: on the live store it would retire 16-26 imported conversations (A256).
 ```
 
 The second form is required off loopback — see [Trust boundary](#trust-boundary).
@@ -152,6 +154,7 @@ who retired it and why. What one agent writes, another may retire — never eras
 | `GET /search?q=` | Substring recall. |
 | `GET /recall?q=` | Scored recall — every score carries its components. Counts as a use. |
 | `GET /context?budget=` | Core-tier context under a character budget; omissions named. |
+| `GET /context?unreviewed=withhold` | Since 2026-10-05 (A253 G3): core memories the gate did not ALLOW come after every checked one, quoted line by line under a never-act rule (`fenced` counts them), or with `withhold` are left out and named in `withheld`. Any other value is refused with 400. |
 | `GET /audit` | The hash-chained write ledger. |
 | `GET /openapi.json` | The machine-readable contract. |
 
@@ -214,7 +217,7 @@ believes, and anyone who can write it can change what every reader concludes.
 ## Tests
 
 ```bash
-python test_memory_system.py     # last line: M1: N/N passed (154/154 on 2026-10-04; 155/155 the same night, G8b added for A250; 162/162 on 2026-10-05, M1b/M1c/M2b added for A254)
+python test_memory_system.py     # last line: M1: N/N passed (154/154 on 2026-10-04; 155/155 the same night, G8b added for A250; 162/162 on 2026-10-05, M1b/M1c/M2b added for A254; 182/182 the same night, U1-U7, RV1-RV6, RV2b, R6b and C4 added for A253's G3, M1d and M2c for an A254 recurrence)
 ```
 
 *This line said 66/66 until 2026-10-04: a count that went stale as checks were

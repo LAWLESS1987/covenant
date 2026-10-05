@@ -755,6 +755,86 @@ class MemoryStore:
             self.index.upsert(rec, len(text.encode("utf-8")))
         return True
 
+    def rereview(self, name: str, agent: str) -> Optional[Dict[str, Any]]:
+        """Put a memory the gate never passed back in front of it.
+
+        The path out of the fence (2026-10-04, A253 G3). recall fences every
+        core memory without an ALLOW, and nothing used to move one out: a
+        memory stamped while the judge was down stayed unchecked for good.
+          ALLOW       stamped allow; the ledger records the new digest and
+                      the stamp it replaced, so verify_integrity agrees.
+          BLOCK       retired through delete(): moved to .trash, never
+                      erased, with the verdict on the ledger first. If the
+                      move fails it stays put, still fenced, and the result
+                      says "blocked_not_moved" with the error.
+          UNREVIEWED  left exactly as it is, still fenced.
+        A memory already allowed is not judged again, and a store with no
+        gate changes nothing. Returns None for a name that does not exist.
+        """
+        with self._lock:
+            m = self.get(name)
+            if m is None:
+                return None
+            meta = dict(m.get("metadata") or {})
+            was = str(meta.get("review") or "")
+            out: Dict[str, Any] = {"name": name, "was": was or None}
+            if was == "allow":
+                return dict(out, outcome="already_allowed")
+            if self.gate is None:
+                return dict(out, outcome="no_gate")
+            verdict = self.gate.review(name, m.get("description", ""),
+                                       m.get("body", ""), agent)
+            out["verdict"] = dict(verdict)
+            from ethics_gate import ALLOW, BLOCK
+            if verdict["verdict"] == ALLOW:
+                old = content_digest(m)
+                meta["review"] = ALLOW
+                meta["review_by"] = verdict.get("by", "")
+                text = render_memory(m["name"], m.get("description", ""),
+                                     meta.get("type", "reference"), m["body"],
+                                     meta.get("agent", "unknown"), meta)
+                self._atomic_write(self._path(name), text,
+                                   fsync=not self._bulk)
+                rec = parse_memory(text)
+                self._audit("rereview", name, agent, _sha(text),
+                            {"content_sha": content_digest(rec),
+                             "prev_content_sha": old, "was": was or None,
+                             "verdict": dict(verdict)})
+                self.index.upsert(rec, len(text.encode("utf-8")))
+                return dict(out, outcome="allowed")
+            if verdict["verdict"] == BLOCK:
+                # No content_sha here: the tombstone below closes the name.
+                # And no "retired" claim: this line records the VERDICT, which
+                # is true whether or not the move succeeds; delete()'s own
+                # tombstone line is the record of the retirement. (A move past
+                # Windows' 260-character path limit raised after a line that
+                # said "retired" -- measured on a deep copy, 2026-10-05.)
+                self._audit("rereview", name, agent,
+                            _sha(str(verdict.get("reason", ""))),
+                            {"was": was or None, "verdict": dict(verdict)})
+                try:
+                    moved = self.delete(name, agent, why="rereview: the ethics "
+                                        "gate blocked it -- "
+                                        + str(verdict.get("reason", "")))
+                except OSError as exc:
+                    moved, out["error"] = False, str(exc)
+                return dict(out, outcome="retired" if moved
+                            else "blocked_not_moved")
+            return dict(out, outcome="still_unreviewed")
+
+    def rereview_unchecked(self, agent: str) -> Dict[str, List[str]]:
+        """rereview() every memory without an ALLOW, tallied by outcome."""
+        tally: Dict[str, List[str]] = {}
+        for row in self.list():
+            got = self.get(row["name"])
+            if got is None or (got.get("metadata") or {}).get(
+                    "review") == "allow":
+                continue
+            res = self.rereview(row["name"], agent)
+            if res is not None:
+                tally.setdefault(res["outcome"], []).append(row["name"])
+        return tally
+
     def get(self, name: str) -> Optional[Dict[str, Any]]:
         path = self._path(name)
         if not os.path.exists(path):
