@@ -274,15 +274,28 @@ def main():
     _since, _changes = RT.version_age(RT.core_identity()[0])
     _top = next((l for l in open(os.path.join(HERE, "README.md"), encoding="utf-8")
                  if "<!--TOTALS-->" in l and "source `" in l), "")
+    # A264-T5B (2026-10-05): as first written, T5b required the count to EQUAL git's at every commit, so the
+    # next core commit -- 8bf4d56's run, by another session -- turned public CI red until someone re-ran
+    # readme_totals --write. The note is a measurement made with the totals, and like the suite count it lags
+    # until the next write. What it may never do is name the wrong date or claim more changes than git has.
+    def _note_ok(line, since, changes):
+        m = re.search(r"\(label since (\d{4}-\d{2}-\d{2}), (\d+) core changes? ago\)", line)
+        return (m is not None and m.group(1) == since and int(m.group(2)) <= changes
+                and re.search(r"\b(win32|linux|darwin),\s*\d{4}-\d{2}-\d{2}", line) is not None)
     if _since is None:
         print("  not measured: T5b -- git cannot say when the version label was set here "
               "(no git, or a shallow clone without that history)")
     else:
-        check("T5b the README header's version note is what git measures now -- the label's date and the "
-              "number of core changes since -- and the line carries a date after the platform",
-              ("(label since %s, %d core change" % (_since, _changes)) in _top
-              and re.search(r"\b(win32|linux|darwin),\s*\d{4}-\d{2}-\d{2}", _top) is not None,
+        check("T5b the README header's version note names the label's date git measures, a count of core "
+              "changes no greater than git's (it may lag until the next readme_totals --write, as the totals "
+              "do), and a date after the platform", _note_ok(_top, _since, _changes),
               (_since, _changes, _top.strip()[:160]))
+        _lag = "(label since %s, %d core changes ago) · x · on win32, 2026-10-05" % (_since, max(0, _changes - 1))
+        _over = "(label since %s, %d core changes ago) · x · on win32, 2026-10-05" % (_since, _changes + 1)
+        _wrong = "(label since 2026-01-01, %d core changes ago) · x · on win32, 2026-10-05" % _changes
+        check("T5bm the rule both ways: a lagging count passes; a count above git's, or a wrong label date, fails",
+              _note_ok(_lag, _since, _changes) and not _note_ok(_over, _since, _changes)
+              and not _note_ok(_wrong, _since, _changes), (_lag, _over, _wrong))
 
     n, ok = len(results), sum(results)
     print(f"\nG1: {ok}/{n} passed")

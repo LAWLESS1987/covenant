@@ -802,6 +802,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "The file is outside this repository and convo_ocr is not a git repository, so there is no as-written branch: the whole file as written is kept at convo_ocr/.trash/2026-10-05_x_video_text_docstring/ (sha256 41c06a6f194d9bfc..., 11692 bytes) with RETIRED.md. This guard keeps the claim from re-entering THIS tree; it cannot see convo_ocr."
+  },
+  {
+   "id": "A264-T5B",
+   "claim": "That the README header's version note must be what git measures NOW -- its count of core changes equal to git's at every commit (G1 T5b as first written, 2026-10-05).",
+   "refuted_by": "The next core commit, by another session (0dd9a23, then 8bf4d56's CI run), made git's count 61 while the header written from the last sweep said 60, and public CI went red on T5b: a check that fails on every core commit until someone re-runs readme_totals --write. The note is a measurement made with the totals and lags with them.",
+   "truth": "The note must name the label's date exactly and a count no greater than git's; it may lag until the next readme_totals --write, as the totals do. T5b/T5bm (A264) drive it both ways.",
+   "verbatim": [
+    "T5b the README header's version note is what git measures now"
+   ],
+   "patterns": [
+    "version\\s+note\\s+is\\s+what\\s+git\\s+measures\\s+now"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151)."
   }
  ]
 }

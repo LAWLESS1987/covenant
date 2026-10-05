@@ -7390,6 +7390,25 @@ M6 68/68, DP1 33/33, TA1 14/14, OW1 12/12, PC1, TQ1, CC1, TP1, TF1.
 
 ---
 
+### A264. [my G1 T5b turned public CI red on the next core commit: it pinned a count that moves with every core change] 2026-10-05. Found checking the phone ("installed it on the phone, check it"): public_ci_red PRESENT, and the failing line was mine. FIXED, the check tombstoned and driven both ways
+
+**Measured.** The phone was fine: its check-ins report 0.1.804+dfddf6d, the PC's nodes see it running
+ee4e0db9047d like themselves, heights agree, and app_install_futile reads "installed". Then public CI red:
+8bf4d56's run (covenant_one --ci) failed on G1 T5b, which demanded the header's "N core changes ago" EQUAL
+git's count at every commit. Another session's core commit (0dd9a23) made git's count 61; the header,
+written with the last sweep's totals, said 60. Every core commit would turn CI red until someone re-ran
+readme_totals --write -- the copied-number rot A257 named, built into a guard. (0dd9a23's own run never
+got a runner: "The job was not acquired by Runner of type hosted".)
+
+**Fixed.** The note must name the label's date exactly, a count no greater than git's, and a date after the
+platform; the count may lag, as the totals do, until the next write. T5bm drives the rule both ways in the
+suite: a lagging count passes; a count above git's or a wrong label date fails. HEAD's T5b on the same tree
+fails, as CI showed. Tombstoned (docs/RETRACTED.json A264-T5B; branch a264-t5b-check-as-written-2026-10-05).
+
+**Repro:** `python test_g1_doc_consistency.py` (T5b, T5bm).
+
+---
+
 ### A262. [the README header showed one version for sixty cores and promised a date it never carried] 2026-10-05. His words: "the version and test notes are wrong"; asked which, he chose the README header line. FIXED, both tombstoned, the generator guarded both ways
 
 **Measured.** Every number on the line matched its source (v8.40 = COVENANT_VERSION, source ee4e0db9047d,
