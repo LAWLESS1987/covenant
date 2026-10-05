@@ -7401,6 +7401,19 @@ normally with it), and restart the nodes so `/m/agent` loads the new keeper. Lim
 asks per model per message, a keyword rubric, and wrong-act counts that are this session's reading with
 the quotes above.
 
+*Dated note, 2026-10-04, night (his words: "add it as the fallback and merge").* DONE in
+`covenant_model.py`: `Qwen3.5-2B-Q4_K_M.gguf` is the last rung of `CANDIDATES` with a measured bar of
+2.1 (2116 MB working set), and `ask()` sends `enable_thinking: false` -- measured both ways first: without
+it the 2B returned an empty answer (all 160 tokens reasoning, finish=length), with it an answer in 2.8 s.
+Rule 6 found the two consumers that keyed on "the last candidate" (`_bar`'s no-headroom rule and
+`_pressure_check`'s never-put-away rule); appending the 2B would have moved both off the 3B, raising its
+bar from 2.6 to 4.6 and letting an idle 3B be stopped under pressure. Both now read `ALWAYS_ANSWER`
+(the 3B and the 2B), so the order is: the 7B with headroom, else the 3B at 2.6 free as before, else the
+2B at 2.1, else nothing. Guards: MK1k (bars, order, pressure) and MK1l (the field on every ask), each
+broken by its own mutation and restored, MK1 16/16; TD1, M6 73/73, A153, AL2, DP1 green. The weights
+move from `models/trial/` to `models/` on main. `/m/agent` imports the keeper once per node process, so
+his chat door uses the fallback after the nodes' next restart; his daily cycle, at its next launch.
+
 ---
 
 ### A251. [two doc numbers checked: CONSTITUTION.md's count of protected blocks is stale since 09-19; JUDGE_EVALUATION.md's 9.1x is right for the corpus it names] 2026-10-04. Reported by the 2026-10-04 verification workflow; read and measured first-hand. ONE CONFIRMED (a stale count), ONE NOT CONFIRMED (two populations, not a contradiction)

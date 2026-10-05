@@ -7,6 +7,7 @@ Pins covenant_model.step_up (2026-09-21, his words: "we need to rapidly make up 
 ai"; measured that day: 15.3 GB RAM, 4.8 free with the 3B holding 2.0, the 7B needing 6.0 --
 so the 7B fit only once the 3B was put away, which the plain pick never saw).
 """
+import json
 import os
 import sys
 import tempfile
@@ -49,11 +50,11 @@ def main():
         M.alive = lambda: True
         M.free_gb = lambda: 4.8
         ok, why = M.step_up(say=quiet)
-        check("MK1a small up, 4.8 free + 2.3 reclaimable < 7.0 + %.1f headroom: stays on the small one (his choice 2)" % M.HEADROOM_GB,
+        check("MK1a small up, 4.8 free + %.1f reclaimable < 7.0 + %.1f headroom: stays on the small one (his choice 2)" % (M.CANDIDATES[-1][1], M.HEADROOM_GB),
               ok is False and calls == [] and "already on the largest" in why, (ok, why, calls))
         M.free_gb = lambda: 7.0
         ok, why = M.step_up(say=quiet)
-        check("MK1a2 ...and with room to spare (7.0 + 2.3 >= 7.0 + headroom) it steps up",
+        check("MK1a2 ...and with room to spare (7.0 + %.1f >= 7.0 + headroom) it steps up" % M.CANDIDATES[-1][1],
               ok and calls == ["stop", "start"] and why.startswith("stepped up"), (ok, why, calls))
 
         # (b) the big one already up: nothing changes, even with memory to spare
@@ -87,7 +88,7 @@ def main():
         M._read_state = lambda: {"model": small}
         M.free_gb = lambda: 3.0
         ok, why = M.step_up(say=quiet)
-        check("MK1f small up, 3.0 + 2.3 < the big one's bar: stays (already on the largest that fits)", ok is False and calls == [] and "already on the largest" in why, (ok, why))
+        check("MK1f small up, 3.0 + %.1f < the big one's bar: stays (already on the largest that fits)" % M.CANDIDATES[-1][1], ok is False and calls == [] and "already on the largest" in why, (ok, why))
 
         # (h) the plain pick honours the headroom for the big one only
         big_need, small_need = M.CANDIDATES[0][1], M.CANDIDATES[-1][1]
@@ -166,13 +167,75 @@ def main():
             M.BIN = real_bin
             if stub_env is not None:
                 os.environ["COVENANT_MODEL_STUB"] = stub_env
+
+        # (k) 2026-10-04, his words: "add it as the fallback". The 2B goes BELOW the 3B, and the two
+        # rules that keyed on "the last candidate" (no headroom; never put away under pressure) must
+        # stay on the 3B as well -- appending the 2B would have moved both off it in silence.
+        mid = "qwen2.5-3b-instruct-q4_k_m.gguf"
+        fb = "Qwen3.5-2B-Q4_K_M.gguf"
+        need = dict(M.CANDIDATES)
+        for n in (big, mid, fb):
+            open(os.path.join(tmp, n), "wb").write(b"x")
+        M.MODELS = tmp
+        bars = {n: M._bar(n, need[n]) for n in (big, mid, fb)}
+        check("MK1k the 3B and the fallback load with no headroom; the 7B keeps its headroom",
+              bars[mid] == need[mid] and bars[fb] == need[fb] and bars[big] == need[big] + M.HEADROOM_GB, bars)
+        order = {}
+        for label, f in (("7B", bars[big] + 0.1), ("3B", bars[mid] + 0.1), ("2B", (bars[fb] + bars[mid]) / 2),
+                         ("none", bars[fb] - 0.1)):
+            M.free_gb = (lambda v: (lambda: v))(f)
+            got = M.pick_model()
+            order[label] = got[1] if got else None
+        check("MK1k fallback order: room for the 7B -> 7B; for the 3B -> the 3B, as before; between the "
+              "fallback's bar and the 3B's -> the fallback; under it -> none",
+              order == {"7B": big, "3B": mid, "2B": fb, "none": None}, order)
+        stops.clear()
+        M.alive = lambda: True
+        M.LOG = os.path.join(tmp, "model.log")
+        put_away = {}
+        for n in (mid, fb):
+            M._read_state = (lambda v: (lambda: {"model": v}))(n)
+            M.free_gb = lambda: 0.5
+            M._last_used[0] = 1000.0
+            put_away[n] = M._pressure_check(now=1000.0 + 120)
+        check("MK1k under memory pressure an idle 3B is NOT put away, nor the fallback (as the 3B alone was before)",
+              put_away == {mid: False, fb: False} and stops == [], (put_away, stops))
+
+        # (l) the fallback answers NOTHING without enable_thinking off: measured 2026-10-04, all 160
+        # tokens went to reasoning (finish=length, empty content). ask() must send it on every call.
+        import io
+        import urllib.request as _ur
+        sent = []
+
+        class _Resp(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        real_urlopen, real_watch = _ur.urlopen, M._watch_idle
+        stub_env2 = os.environ.pop("COVENANT_MODEL_STUB", None)
+        try:
+            M.start = lambda say=print: (True, "up")
+            M._watch_idle = lambda: None
+            _ur.urlopen = lambda req, timeout=None: (sent.append(json.loads(req.data.decode("utf-8")))
+                                                      or _Resp(b'{"choices":[{"message":{"content":"ok"}}],"usage":{}}'))
+            text, _meta = M.ask([{"role": "user", "content": "hello"}], max_tokens=160)
+        finally:
+            _ur.urlopen, M._watch_idle = real_urlopen, real_watch
+            if stub_env2 is not None:
+                os.environ["COVENANT_MODEL_STUB"] = stub_env2
+        check("MK1l ask() sends chat_template_kwargs enable_thinking=false (the fallback answers nothing without it)",
+              text == "ok" and len(sent) == 1
+              and (sent[0].get("chat_template_kwargs") or {}).get("enable_thinking") is False, sent)
     finally:
         for k, v in real.items():
             setattr(M, k, v)
     # The weights are not tracked (models/ is gitignored), so the runner's staged copy has none: the file
     # check is made only where the directory exists, and says so otherwise.
     have = os.path.isdir(M.MODELS) and any(os.path.isfile(os.path.join(M.MODELS, n)) for n, _ in M.CANDIDATES)
-    check("MK1g the candidates are listed largest first%s" % ("; both weight files are on this tree" if have else " (no weights here: the staged runner)"),
+    check("MK1g the candidates are listed largest first%s" % ("; every weight file is on this tree" if have else " (no weights here: the staged runner)"),
           M.CANDIDATES[0][1] > M.CANDIDATES[-1][1] and (not have or all(os.path.isfile(os.path.join(M.MODELS, n)) for n, _ in M.CANDIDATES)))
 
     print()

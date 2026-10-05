@@ -55,26 +55,40 @@ LOG = os.path.join(HERE, "logs", "model_server.log")
 CANDIDATES = [
     ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
     ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),     # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
+    # THE FALLBACK (2026-10-04, his words: "add it as the fallback"). Loaded only when the 3B does
+    # not fit. Chosen by measurement, A252 / tools/tetsu_bakeoff.py: under the chat door's own system
+    # message it scored 11 of 24 on his exam against the 3B's 12, with two wrong-act answers against
+    # the 3B's three plus one conditional. Its bar is MEASURED, not estimated: 2116 MB working set at
+    # the end of 26 asks with the 8k cache. It needs enable_thinking off (ask() below): without it,
+    # measured, it spent all 160 tokens reasoning and answered nothing.
+    ("Qwen3.5-2B-Q4_K_M.gguf", 2.1),
 ]
+# THE RUNGS THAT EXIST SO TETSU CAN ANSWER: no headroom before they load, never put away for memory
+# pressure. Until 2026-10-04 both rules keyed on "the last candidate", which was the 3B. Appending the
+# fallback would have moved both onto it in silence -- the 3B would have needed 4.6 GB free instead of
+# 2.6, and an idle 3B would have been stopped under pressure. Named here so neither moves.
+ALWAYS_ANSWER = frozenset({"qwen2.5-3b-instruct-q4_k_m.gguf", "Qwen3.5-2B-Q4_K_M.gguf"})
 
 # KEEP THE PC FUNCTIONAL (2026-09-25, his words: "have to constantly optimize to keep the pc
 # functional also", and his choice between two of his own goals: "2" -- load the big model
 # only with room to spare, otherwise the small one). Measured that evening: the 7B loaded,
 # 0.88 GB free of 15.3, and his answers' median latency 72 s against about 5 s on the 3B.
-#   HEADROOM_GB  kept free for the rest of the PC before any model but the smallest loads.
-#   FLOOR_GB     below this, an idle model other than the smallest is put away; the next
+#   HEADROOM_GB  kept free for the rest of the PC before a model outside ALWAYS_ANSWER loads.
+#   FLOOR_GB     below this, an idle model outside ALWAYS_ANSWER is put away; the next
 #                question loads what fits.
 # BOTH NUMBERS ARE MINE (Claude's), not measurements and not his; he can set either in the
-# environment without touching code. The smallest model never needs headroom, so Tetsu can
-# always answer when anything fits at all.
+# environment without touching code. The ALWAYS_ANSWER rungs never need headroom, so Tetsu can
+# always answer when anything fits at all. (Until 2026-10-04 this said "the smallest", which was
+# then the 3B; see ALWAYS_ANSWER.)
 HEADROOM_GB = float(os.environ.get("COVENANT_MODEL_HEADROOM_GB", "2.0"))
 FLOOR_GB = float(os.environ.get("COVENANT_MODEL_FLOOR_GB", "1.0"))
 PRESSURE_IDLE_S = 60
 
 
 def _bar(name, need):
-    """Free memory a candidate needs before it loads: its size, plus headroom unless it is the smallest."""
-    return need + (0.0 if name == CANDIDATES[-1][0] else HEADROOM_GB)
+    """Free memory a candidate needs before it loads: its size, plus headroom unless it is a rung
+    that exists so Tetsu can answer (ALWAYS_ANSWER)."""
+    return need + (0.0 if name in ALWAYS_ANSWER else HEADROOM_GB)
 
 _lock = threading.Lock()
 _last_used = [0.0]
@@ -263,13 +277,13 @@ _idle_thread = [None]
 
 
 def _pressure_check(now=None):
-    """Put an idle model other than the smallest away when free memory is under FLOOR_GB.
-    Never mid-answer (idle at least PRESSURE_IDLE_S), never the smallest. True when it stopped one."""
+    """Put an idle big model away when free memory is under FLOOR_GB. Never mid-answer (idle at
+    least PRESSURE_IDLE_S), never a rung in ALWAYS_ANSWER. True when it stopped one."""
     now = time.time() if now is None else now
     if not alive():
         return False
     cur = str(_read_state().get("model") or "")
-    if not cur or cur == CANDIDATES[-1][0] or now - _last_used[0] < PRESSURE_IDLE_S:
+    if not cur or cur in ALWAYS_ANSWER or now - _last_used[0] < PRESSURE_IDLE_S:
         return False
     free = free_gb()
     if free is None or free >= FLOOR_GB:
@@ -326,7 +340,12 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
         # long-lived node process is the one that will put the model away.
         _last_used[0] = time.time()
         _watch_idle()
-    body = json.dumps({"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature)}).encode("utf-8")
+    # enable_thinking off (2026-10-04): the Qwen3.5 fallback, asked without it, spent all 160 tokens
+    # reasoning and returned an empty answer (finish=length); with it, it answered in 2.8 s. The 3B
+    # answered normally with the same field in both of its exam runs (A252); a template that does not
+    # use the variable ignores it.
+    body = json.dumps({"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature),
+                       "chat_template_kwargs": {"enable_thinking": False}}).encode("utf-8")
     req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (HOST, PORT), data=body,
                                  headers={"Content-Type": "application/json"})
     t0 = time.time()
