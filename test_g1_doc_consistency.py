@@ -228,6 +228,35 @@ def main():
           "different totals for the same repository on the same day",
           len(vals) == 1, sorted(vals))
 
+    # T4 (2026-10-04, A257). The README tells every reader to run
+    # `python readme_totals.py --check` -- "fails if unmarked prose disagrees" -- and it had
+    # failed since the day it was written (2026-09-17: a dated outreach row restating that
+    # day's totals, never marked <!--HISTORICAL-->). Nothing ran it, so nothing saw. A
+    # promised check that nothing runs is a forgotten step; G1 owns the totals, so it runs it.
+    import shutil
+    import subprocess
+    import tempfile
+    rt = os.path.join(HERE, "readme_totals.py")
+    p = subprocess.run([sys.executable, rt, "--check"], cwd=HERE, capture_output=True,
+                       text=True, timeout=120)
+    check("T4 `python readme_totals.py --check`, the command the README promises, passes: no "
+          "unmarked prose restates a total that disagrees with the marked lines",
+          p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-300:])
+    tmp = tempfile.mkdtemp(prefix="g1_t4_")
+    try:
+        os.makedirs(os.path.join(tmp, "docs"))
+        shutil.copy2(os.path.join(HERE, "README.md"), tmp)
+        shutil.copy2(os.path.join(HERE, "docs", "OUTREACH_INSTITUTIONAL.md"),
+                     os.path.join(tmp, "docs"))
+        with open(os.path.join(tmp, "README.md"), "a", encoding="utf-8") as fh:
+            fh.write("\nThe runner registers 999 suites.\n")
+        q = subprocess.run([sys.executable, rt, "--check"], cwd=tmp, capture_output=True,
+                           text=True, timeout=120)
+        check("T4m ...and it is not vacuous: an unmarked '999 suites' planted in a copy fails it",
+              q.returncode == 1 and "999 suites" in (q.stdout or ""), (q.stdout or "")[-200:])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
     n, ok = len(results), sum(results)
     print(f"\nG1: {ok}/{n} passed")
     return 0 if ok == n else 1

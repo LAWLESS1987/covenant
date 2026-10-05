@@ -40,7 +40,8 @@
 >
 > - Item 2 is **outdated as written**: `put()` archives the prior text to
 >   `.trash/` before a content-changing overwrite (`memory_store.py:665`,
->   "THE PRIOR WORDING SURVIVES AN OVERWRITE") and the ledger records the
+>   "THE PRIOR WORDING SURVIVES AN OVERWRITE" -- line 668 since the code above
+>   it grew; re-pointed 2026-10-04, A257) and the ledger records the
 >   archive name. `_atomic_write` itself still overwrites; the copy is taken
 >   above it.
 > - Item 3 is **half outdated**: `context_window` now reads the link and

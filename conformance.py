@@ -90,6 +90,8 @@ WHAT IT IS NOT
   so the clean-room builds were matching an ORACLE, not a description. His
   prescription, recorded and not yet acted on: "the thing to write is the
   specification of the two operations, not more vectors."
+  (A257-NIRSPEC, 2026-10-04: acted on the same day -- docs/SEMANTICS.md, 8903604,
+  2026-09-15, is that specification.)
 
   It is also not a proof of correctness, and it cannot be. It says an
   implementation answers these vectors the way this one does. Vectors nobody

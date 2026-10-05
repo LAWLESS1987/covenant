@@ -7293,6 +7293,61 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A257. [README docs measured against the system: ten claims refuted and tombstoned, three dated statements re-pointed, one promised check that nothing ran] 2026-10-04. His words: "using the tombstone system and the scientific method thoroughly and honestly update the read me docs", then "get the nodes green following our tombstones and then re do the docs", "remember edit run fix 3 times". MEASURED; every refuted site keeps its wording with the restated form and its tombstone beside it
+
+**Population, by discovery.** Tracked files whose name contains "readme": seven -- README.md,
+QUANT_README.md, ai_memory_system/, conformance_indep/, realdata/, sentinel_witness/ READMEs, and
+docs/variants/QUANT_README.md.PC-COPY (a kept variant, read, not edited). A reference walk over all seven
+read 44 relative links, 13 anchors, 98 ticked paths and 27 `python X.py` commands; 19 did not resolve,
+each opened and classified (deleted on purpose and said so; runtime paths; an HTTP route; the
+sentinel_witness files its own 2026-09-17 correction already lists as absent; and the two below).
+
+**Refuted, each by a measurement that could have agreed** (docs/RETRACTED.json, branch
+readme-docs-claims-as-written-2026-10-04 at 379315b, every tombstone driven red by a probe and green
+without it):
+- A257-SHIM: "a one-line shim keeps the old name for one release" -- deleted the same day, 865c0bd. Also
+  in docs/PARTNER.md and run_node.py.
+- A257-NIRSPEC: Pedersen's prescription "not yet acted on" -- docs/SEMANTICS.md, 8903604, 2026-09-15. Also
+  in conformance.py's docstring.
+- A257-130KB: "a 130 KB JSON file" -- the students are 247,576 and 137,316 bytes as committed. Also in
+  docs/PARTNER.md and mobile/TERMUX_SETUP.md twice.
+- A257-TENMIN: the totals can be run "in about ten minutes" -- the sweep printed 17.4 and 18.4 min.
+- A257-3OFF: "Three suites are deliberately off" -- DELIBERATELY_OFF has 13 entries, four of them suites.
+- A257-HOLDOUT and A257-EXAM: the 2026-09-17 figures under "What IS current" -- the file and the exam have
+  moved (exam tonight: 41 agree, 1 wrong, 11 abstained, 0 false clears, 1 false hold).
+- A257-A67RATE: "hard-accuses 8 of 8" -- F3's H3 reads 3 of 8 with tonight's students; A67 stays open.
+- A257-P0109: "rebalancing +0.45% at p=0.109" cited as evidence -- its own source shows p=0.109 is the
+  arithmetic of five-of-six folds and the sign flips on re-slicing. The no-edge conclusion stands.
+- A257-HASHLOC: realdata hashes "recorded in claude/IMPROVEMENT_LOG.md under D1" -- no claude/ here; the
+  D1 prefixes are in docs/IMPROVEMENT_LOG.md and verify the first 598 bars; the files grew by 13 bars on
+  2026-09-04, recorded before -> after in realdata/deep/REFRESH_LOG.md, and all twelve match their "after".
+
+**Confirmed, the same way:** the core identity on the header line; twelve launch gates; 148 B and ~150 B
+are the exact and approximate announce (covenant_lora_frame.py, the core); `holdout_score` returns three
+values and no false-hold term; the self-send exception is `relax_valueless_for_local_nodes`; caps $25 /
+$50 / two orders; the trader is ARMED and has placed nothing; F3 admits 0 of 27; LICENSE names no AGPL;
+conformance_indep lists ten unpinned points; sentinel_witness's 17 named / 5 present / 12 absent; every
+figure on QUANT_README (16 passed, 0 failed, re-run).
+
+**Re-pointed, not tombstoned** (true when written, dated): ai_memory_system's `memory_store.py:665` is now
+`:668`; sentinel_witness's "eight files" is nine tracked since d5315c3; QUANT_README's "could not fetch a
+verified crypto dataset" now points at realdata/ and TRADING_READINESS; QUANT_README gets the frame the
+2026-10-03 pass missed -- its commit (bb227ca) counted "Five tracked READMEs"; there were six.
+
+**A forgotten step.** The README tells every reader to run `python readme_totals.py --check` and it had
+failed since 2026-09-17 on a dated outreach row never marked `<!--HISTORICAL-->`. Nothing ran it. G1 T4 now
+does, with T4m proving it can fail; T4 was red before the marker and green after.
+
+**Found, not changed, and why.** "About ten minutes" for a check also appears in docs/OUTREACH*.md,
+docs/CASE_STUDY_SELF_REPORT.md, llms.txt and letters already sent; check.sh measured 3.8-4.1 s and the sweep
+17-18 min. Correcting a sent letter goes back to its recipient, which is his to send. The README heading
+"about three seconds" measured 3.8-4.1 s on a loaded machine and was left as approximate.
+
+**Repro:** `python test_r1_retracted.py`; `python test_g1_doc_consistency.py`; the figures above each name
+their command.
+
+---
+
 ### A256. [the memory gate's pattern screen refuses 17 of the live store's 94 memories, every one an imported conversation; re-reviewing the unchecked ones would retire 16 to 26] 2026-10-05. Found by dry-running A253's G3 re-review on a copy of the live store. MEASURED; whether to re-review the live store, and any screen change for imports, are his. Related to A254 (imported conversations refused), not a recurrence of it: A254's fix added 0 refusals here
 
 **Measured, on copies only** (`C:\Users\Lawre\ai_memory` copied to scratch; the live store and the nodes

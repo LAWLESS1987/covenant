@@ -216,6 +216,10 @@ Three things, in one process:
   repo, and it always answers. Fail-closed describes what happens when no judge
   answers; on a fresh clone one always does. A memo the student cannot decide
   comes back "Held, not judged", which also fails closed.
+
+  *A257-130KB, 2026-10-04: "130 KB" is no longer so.* There are two students, and as
+  committed they are 247,576 and 137,316 bytes; the nightly retrain grows them.
+  A size copied into prose rots, so measure it: `ls -l fallback_model*.json`.
 - **A propagation layer built as an address-event network.** A block announce is
   148 bytes because it carries an address, not a payload; the receiver fetches
   what it does not have. Link conductance is Hebbian, redundant announces are
@@ -306,6 +310,13 @@ Three things, in one process:
   (XRP −2.70% p=0.656; HBAR −7.06% p=0.891; rebalancing +0.45% at p=0.109).
   The regime rule is risk control, never alpha — and on three of ten assets it
   lost to holding. `docs/TRADING_READINESS.md` has the table.
+
+  *A257-P0109, 2026-10-04: the conclusion stands, and the last of those three figures
+  does not support it.* They are from the first, 220-bar run. The same document
+  re-tested on 598 bars (no asset distinguishable from chance, p 0.47–0.92, ten
+  assets) and found that p=0.109 is the arithmetic value of "five of six folds
+  positive", not a measurement of the data: cut the same bars into 8 or 12 folds
+  and the rebalancing spread changes sign.
 - **It is not multi-operator ready.** Every node so far is one person's. The
   moment a second operator exists, the block-validity rules become a
   protocol-version question — see `docs/PROTOCOL.md`.
@@ -473,6 +484,9 @@ count, each already half-broken:
   all four say this is a wall, not a bug
   ([ROUNDTABLE_2026-09-09](docs/ROUNDTABLE_2026-09-09.md)). Prove them wrong and
   you have done something none of them could.
+  *A257-A67RATE, 2026-10-04: no longer 8 of 8.* F3's report line reads 3 of 8 with the
+  students deployed tonight, and A67 is still open. The rate moves with every
+  retrain, so run it: `python test_f3_gate_end_to_end.py` (check H3).
 - **Break the exam instead of the gate.** A first draft of `discourse` was
   discarded because word count separated its labels perfectly, so a rule knowing
   nothing about conduct scored full marks. Find the next such shortcut.
@@ -553,6 +567,14 @@ What IS current, each with its denominator stated:
   theft). The gate errs toward refusing, which is the safe direction for a gate
   that fails closed.
 
+*A257-HOLDOUT, A257-EXAM, 2026-10-04: neither of those is current, and this list broke the rule
+this section opens with by copying them.* Every promoted model rewrites
+`ops/HOLDOUT.json` (as committed: 2026-10-03T08:05:46Z, 3,875 rows, 2,762
+decided, 2,607 right, 23 false clears), and the exam moves with the model
+(tonight, model c8a5cc4e7922: 53 cases, 41 agree, 1 wrong, 11 abstained, 0 false
+clears, 1 false hold, still in `discourse`). Read the file and run the command;
+the figures on this page are dated the moment they are written.
+
 Those are different denominators — ledger rows and exam cases — and neither is
 "legitimate transfers", which is what the old 12.8% counted. They are not a
 replacement for it. They are what can be measured today, said in the units they
@@ -589,6 +611,8 @@ a repository that is public. It is not a fallback; it is the only path.
 The distilled student — a 130 KB JSON model read into the process with no socket
 and no model server — is real, and it is what the nodes' **ethics gate** calls. It
 is not what the chat calls, and this paragraph previously conflated the two.
+*(A257-130KB, 2026-10-04: two students now, 247,576 and 137,316 bytes as committed;
+130 KB was a size once, not a property.)*
 
 *(It also said "Ollama, the model the nodes' ethics gate calls" until 2026-09-09.
 That was rewritten around the deletion without re-checking the tools it
@@ -641,6 +665,9 @@ the system's own lies — the suite totals at the top of this page are re-measur
 dated, and anyone can run them in about ten minutes. Along the way I found something researchers can use: a reproducible reason AI
 systems seem to recognise your work across sessions when they don't
 ([`docs/WHAT_WE_FOUND.md`](docs/WHAT_WE_FOUND.md)).
+*(A257-TENMIN, 2026-10-04: not ten. The full sweep took 17.4 and 18.4 minutes on this
+machine on 2026-10-03 and -04, and prints its own time; `sh check.sh` is the
+check that takes seconds.)*
 
 I need to get financially stable to keep doing this full time. Ten thousand dollars clears
 my debts and buys the room to focus. I'm not asking for charity; I'm asking people who can
@@ -703,6 +730,10 @@ loudly.
 - **Three suites are deliberately off**, on the record with reasons:
   `test_xrp_live.py` needs a funded testnet account, `test_covenant_app.py`
   needs the chain stopped. No green run speaks for either.
+  *A257-3OFF, 2026-10-04: not three, and not only those two.* The runner's
+  `DELIBERATELY_OFF` holds 13 entries. Four are test suites: those two,
+  `test_e3_witness_loop.py` and `test_c2_watchdog_live.py`. The rest are probes
+  and tools. The runner prints the count and every reason on each run.
 - A **suite the runner names but is not on disk**, an **orphan on disk that no
   runner calls**, a suite **kept out of the delivery by an ignore rule**, and a
   **missing declared dependency** are each their own named outcome, and none is
@@ -782,6 +813,9 @@ meaning survives incidental form.**
   prescription is on record and not yet acted on: write the specification of
   the two operations, not more vectors. Full account, with the nine lines
   reproduced: `docs/KNOWN_ISSUES.md` A121.
+  *A257-NIRSPEC, 2026-10-04: it was acted on the same day.* `docs/SEMANTICS.md` (commit
+  8903604, 2026-09-15) is that specification, and the top of this page already
+  points readers to it; this bullet was not updated with it.
 - **Mark Iskarous** (Johns Hopkins) — a texture representation invariant to
   force and speed. The identity survives, the incidental variation is
   discarded. The same move fixed two real bugs here in one day: a heading's em
@@ -826,6 +860,9 @@ model server removed from this project on 2026-09-07; a one-line shim keeps the
 old name for one release. What it does is register the judge seats the gate
 needs -- the two distilled students and the semantic judge -- and apply the
 operator's policy. No model server is assumed or reached.
+*(A257-SHIM, 2026-10-04: no shim survives. `run_with_ollama_judge.py` was deleted
+on 2026-09-12 in 865c0bd, "The launcher's old name is retired", so the old
+name fails on a clone. Use `run_node.py`.)*
 
 Do not start the node with `python covenant_unified_v8.py` directly. That was
 the line printed here until 2026-09-08 and it produces a node that **rejects

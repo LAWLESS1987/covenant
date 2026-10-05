@@ -429,6 +429,235 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "The hook and A155 as written are preserved on branch a255-hook-manifest-claim-as-written-2026-10-04 (at 93f7136). The hook keeps both paragraphs beside the A255 note that restates them; A155 is a record file and carries a dated note beside the paragraph."
+  },
+  {
+   "id": "A257-SHIM",
+   "claim": "That a one-line shim keeps the launcher's old name, run_with_ollama_judge.py, for one release (README.md Quick start; docs/PARTNER.md; run_node.py's docstring).",
+   "refuted_by": "git log --diff-filter=D: run_with_ollama_judge.py was deleted on 2026-09-12 in 865c0bd, 'The launcher's old name is retired' -- the day it was renamed. Found 2026-10-04 by a reference walk over every tracked README: the ticked path did not resolve.",
+   "truth": "There is no shim. The launcher is run_node.py; `python run_with_ollama_judge.py` fails on a clone.",
+   "verbatim": [
+    "a one-line shim keeps the old name for one release",
+    "a one-line shim keeps the\nold name for one release",
+    "A one-line shim keeps the old name for one\nrelease"
+   ],
+   "patterns": [
+    "one-line\\s+shim\\s+keeps\\s+the\\s+old\\s+name"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-NIRSPEC",
+   "claim": "That Pedersen's prescription -- write the specification of the two operations, not more vectors -- is on record and not yet acted on (README.md, the Mahowald-shortlist credit; conformance.py's docstring).",
+   "refuted_by": "docs/SEMANTICS.md was added on 2026-09-15 in 8903604, 'The specification Pedersen asked for, checked over every point in a bounded space'; the README's own Check-it-yourself section points readers to it. Measured 2026-10-04.",
+   "truth": "It was acted on the same day: docs/SEMANTICS.md is that specification.",
+   "verbatim": [
+    "prescription is on record and not yet acted on: write the specification of\n  the two operations, not more vectors.",
+    "prescription is on record and not yet acted on",
+    "prescription, recorded and not yet acted on"
+   ],
+   "patterns": [
+    "prescription(,\\s+recorded|\\s+is\\s+on\\s+record)\\s+and\\s+not\\s+yet\\s+acted\\s+on"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-130KB",
+   "claim": "That the distilled student the gate calls is a 130 KB JSON file/model (README.md twice; docs/PARTNER.md; mobile/TERMUX_SETUP.md twice).",
+   "refuted_by": "git cat-file -s at HEAD on 2026-10-04: fallback_model.json 247,576 bytes and fallback_model_2.json 137,316 bytes; twenty commits earlier they were 135,258 and 130,540. A size of a file the nightly retrain rewrites, copied into prose, rotted.",
+   "truth": "There are two students, a few hundred KB together and growing with the retrain; measure them with `ls -l fallback_model*.json`.",
+   "verbatim": [
+    "a 130 KB JSON file read into the node's own process",
+    "a 130 KB JSON model read into the process",
+    "the judge is a 130 KB model read in-process"
+   ],
+   "patterns": [
+    "130\\s*KB\\s+(JSON\\s+)?(file|model)"
+   ],
+   "note_on_patterns": "docs/history/ is allowed: dated narratives of 2026-08, where 130 KB was true.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "docs/history/"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-TENMIN",
+   "claim": "That anyone can run the suite totals at the top of the README in about ten minutes (README.md, Support this work).",
+   "refuted_by": "The two newest sweep transcripts on 2026-10-03 and 2026-10-04 print 'elapsed 17.4 min' and 'elapsed 18.4 min' (ONE_SWEEP.txt, ONE_RUN.txt).",
+   "truth": "The full sweep took 17-18 minutes on this machine on those dates and prints its own time; `sh check.sh` takes seconds.",
+   "verbatim": [
+    "anyone can run them in about ten minutes"
+   ],
+   "patterns": [
+    "run\\s+them\\s+in\\s+about\\s+ten\\s+minutes"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-3OFF",
+   "claim": "That three suites are deliberately off -- test_xrp_live.py and test_covenant_app.py named (README.md, Suite coverage).",
+   "refuted_by": "covenant_one.py DELIBERATELY_OFF, parsed 2026-10-04: 13 entries, of which four are test suites (test_e3_witness_loop.py, test_covenant_app.py, test_xrp_live.py, test_c2_watchdog_live.py) and the rest probes and tools. Three matched neither count.",
+   "truth": "Thirteen entries are switched off on the record, four of them test suites; the runner prints the count and every reason on each run.",
+   "verbatim": [
+    "**Three suites are deliberately off**, on the record with reasons"
+   ],
+   "patterns": [
+    "Three\\s+suites\\s+are\\s+deliberately\\s+off"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-HOLDOUT",
+   "claim": "That ops/HOLDOUT.json measured 2026-09-17T07:39:24Z -- of 3541 ledger rows the model decided 2414, got 2259 right, cleared 24 -- is what is current (README.md, 'What IS current').",
+   "refuted_by": "ops/HOLDOUT.json as committed on 2026-10-04 reads 2026-10-03T08:05:46Z: 3,875 rows, 2,762 decided, 2,607 right, 23 false clears. Every promoted model rewrites it.",
+   "truth": "The file holds the current figures with its own timestamp; read it rather than a copy.",
+   "verbatim": [
+    "of 3541 ledger rows the model decided 2414, got 2259 right, and cleared 24 it should have held",
+    "of 3541 ledger rows the\n  model decided 2414"
+   ],
+   "patterns": [
+    "of\\s+3541\\s+ledger\\s+rows\\s+the\\s+model\\s+decided\\s+2414"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-EXAM",
+   "claim": "That `python covenant_distill.py --exam` gives 53 cases, 39 agree, 7 wrong, 7 abstained, 0 false clears and 7 false holds (README.md, 'What IS current').",
+   "refuted_by": "Run 2026-10-04 with the deployed student (model c8a5cc4e7922, 3898 examples): 53 cases, 41 agree, 1 wrong, 11 abstained, 0 false clears, 1 false hold, in discourse.",
+   "truth": "The exam moves with every model; run the command. Zero false clears held on both dates.",
+   "verbatim": [
+    "53 cases, 39 agree, 7 wrong, 7 abstained"
+   ],
+   "patterns": [
+    "53\\s+cases,\\s+39\\s+agree,\\s+7\\s+wrong"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-A67RATE",
+   "claim": "That the judge hard-accuses 8 of 8 legitimate documents about violations (README.md, 'Or come to break it').",
+   "refuted_by": "test_f3_gate_end_to_end.py H3 on 2026-10-04: '3 of 8 legitimate discourse documents are hard-accused -- issue A67, open'.",
+   "truth": "3 of 8 with the students deployed on 2026-10-04; the rate moves with every retrain and A67 stays open. Run F3 and read H3.",
+   "verbatim": [
+    "It hard-accuses 8 of 8 legitimate documents about violations"
+   ],
+   "patterns": [
+    "hard-accuses\\s+8\\s+of\\s+8"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-P0109",
+   "claim": "That rebalancing showed +0.45% out of sample at p=0.109, cited beside XRP and HBAR as evidence that no timing edge survived (README.md, 'What it is not').",
+   "refuted_by": "docs/TRADING_READINESS.md section 1d (2026-08-22): on 598 bars p=0.109 reproduces as the arithmetic value of 'five of six folds positive' (binom_p(5,6)), not a measurement of the data, and re-sliced into 8 or 12 folds the same bars' spread changes sign.",
+   "truth": "No timing edge is distinguishable from chance (598 bars, ten assets, p 0.47-0.92); the conclusion stands, and p=0.109 is not evidence of anything.",
+   "verbatim": [
+    "rebalancing +0.45% at p=0.109"
+   ],
+   "patterns": [
+    "rebalancing\\s+\\+0\\.45%\\s+at\\s+p=0\\.109"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-HASHLOC",
+   "claim": "That the sha256 of every realdata/deep file is recorded in claude/IMPROVEMENT_LOG.md under D1 (realdata/README.md).",
+   "refuted_by": "Walked 2026-10-04: there is no claude/ directory; docs/IMPROVEMENT_LOG.md holds D1 as 8-hex prefixes of the 598-bar files, and none matched the files on disk -- because realdata/refresh_kraken.py appended 13 bars to each on 2026-09-04, recorded before -> after in realdata/deep/REFRESH_LOG.md. All twelve files match their 'after'; ADA's first 599 lines still hash to the D1 prefix a0ae69f1.",
+   "truth": "D1 prefixes are in docs/IMPROVEMENT_LOG.md and verify the first 598 bars; realdata/deep/REFRESH_LOG.md verifies the files as they are.",
+   "verbatim": [
+    "sha256 of every file is recorded in `claude/IMPROVEMENT_LOG.md` under D1"
+   ],
+   "patterns": [
+    "recorded\\s+in\\s+`?claude/IMPROVEMENT_LOG\\.md`?\\s+under\\s+D1"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
   }
  ]
 }

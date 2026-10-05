@@ -34,6 +34,7 @@ emulator there). The app and this kit run the same node with the same flags.
 ## Requirements
 
 - Android 8 or newer, arm64, 4 GB RAM is plenty: the judge is a 130 KB model read in-process.
+  *(A257-130KB, 2026-10-04: two students now, 247,576 and 137,316 bytes as committed -- still a few hundred KB.)*
 - Termux from F-Droid (the Play Store build is abandoned and breaks packages):
   https://f-droid.org/packages/com.termux/ . Optional: Termux:Widget (home-screen button)
   and Termux:Boot (start at boot), also from F-Droid.
@@ -64,6 +65,8 @@ server, nothing to download. Measured on a clean clone with no Ollama, no
 `GITHUB_TOKEN` and no API key (KNOWN_ISSUES A37): the node came up in **one
 second**, admitted an ordinary send, and rejected every theft, deception and
 coercion case offline.
+*(A257-130KB, 2026-10-04: two students now, 247,576 and 137,316 bytes as committed;
+130 KB was a size once, and the nightly retrain grows them.)*
 
 `python-cryptography` comes from Termux's package repo so nothing is compiled on the phone.
 `waitress` is optional and pure Python; with it the node serves through a bounded pool.

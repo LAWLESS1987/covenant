@@ -24,6 +24,10 @@
 > The whole folder is **eight files**, one of which is this README and one a
 > `__pycache__` artifact. There is also `seal_service.py`, which the table below
 > does not mention at all.
+> *(A257, 2026-10-04: true on 2026-09-17; now nine tracked files and the
+> `__pycache__`. `order_claims.py` and `verify_record.py` arrived in d5315c3 on
+> 2026-09-19; the table names neither. The 17 named / 5 present / 12 absent
+> count above still holds.)*
 >
 > **What this means for the table below.** Its structure is honest — it separates
 > "tested" from "cannot be tested without your device", which is the right shape

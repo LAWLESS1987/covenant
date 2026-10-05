@@ -16,6 +16,8 @@ local model server that was removed from this PC on 2026-09-07 and from the
 ethics quorum by policy before that. A one-line shim keeps the old name for one
 release, because the watchdog, the restart scripts and the running processes
 identified nodes by it. Nothing in the node changed with the name.
+A257-SHIM (2026-10-04): the shim did not survive the day -- run_with_ollama_judge.py
+was deleted on 2026-09-12 in 865c0bd ("The launcher's old name is retired").
 
 RUN (same args as the node):
   set COVENANT_DB_PATH=nodeA_prod.db

@@ -21,6 +21,15 @@ alignment, with two interior windows independently re-fetched and diffed
 byte-for-byte. sha256 of every file is recorded in `claude/IMPROVEMENT_LOG.md`
 under D1.
 
+*A257-HASHLOC, 2026-10-04: the hashes are elsewhere, and the files have grown since.*
+The D1 record is `docs/IMPROVEMENT_LOG.md` (there is no `claude/` here), as
+8-hex prefixes of the 598-bar files. On 2026-09-04 `realdata/refresh_kraken.py`
+appended 13 bars to each of the twelve, so the windows now end 2026-09-03 and
+the table below is the D1 state; every overlapping bar agreed.
+`realdata/deep/REFRESH_LOG.md` records each file's sha256 before and after, and
+all twelve files on disk match their "after". The D1 prefixes still verify the
+first 598 bars: ADA's first 599 lines hash to `a0ae69f1`.
+
 | file | bars | window |
 |---|---|---|
 | XLM_2025_2026Aug.csv  | 598 | 2025-01-01 -> 2026-08-21 |

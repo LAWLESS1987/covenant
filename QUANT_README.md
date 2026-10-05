@@ -1,5 +1,24 @@
 # Backtesting, paper trading, and edge maintenance
 
+> **Read as an experiment.** *Added 2026-10-04 for clarity, at the operator's
+> request of 2026-10-03 ("reflect the scientific method while leaving the
+> substance"); this page was missed that day (A257). A map onto the sections
+> below; nothing below it was changed except one dated note under "Using real
+> tick data".*
+>
+> - **Question.** Can a backtest's guardrails tell a mined illusion from a real
+>   edge, before any money depends on the answer?
+> - **Method.** Run them where the truth is known: a random walk, on which no
+>   edge can exist, and a genuinely trending series as the control.
+> - **Evidence.** [The headline result](#the-headline-result) and
+>   [What each guardrail caught](#what-each-guardrail-caught); every figure on
+>   this page reproduced on 2026-10-04 (16 passed, 0 failed).
+> - **What would refute it.** A mined winner the deflated Sharpe lets through,
+>   or the real trend it rejects.
+> - **Known limits.** [Honest limits](#honest-limits): synthetic data proves the
+>   machinery, not any strategy.
+> - **Reproduce.** `python test_backtest_guardrails.py`.
+
 **16/16 validation checks passing.** The framework is validated against data
 with **known ground truth** — a random walk, where no edge can exist — because
 you cannot verify anti-illusion machinery on real market data. On real data you
@@ -61,6 +80,12 @@ distorting every downstream number. I could not fetch a verified crypto dataset
 from this sandbox (the repo paths had moved and the GitHub API was rate-limited),
 so no real-data result is claimed here. Drop your own CSV in; nothing else
 changes.
+
+*A257, 2026-10-04: verified real data exists now, and so does a real-data
+result.* `realdata/deep/` holds twelve Kraken daily series with recorded hashes
+(`realdata/README.md`), and `docs/TRADING_READINESS.md` reports what these
+guardrails said on them: no timing edge distinguishable from chance. This page
+still claims no real-data result of its own.
 
 ## Honest limits
 

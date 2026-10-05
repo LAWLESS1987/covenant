@@ -65,6 +65,8 @@ python run_node.py --port 5000 --node-id A --genesis genesis.json
 (The launcher was named `run_with_ollama_judge.py` until 2026-09-12, for a local
 model server removed on 2026-09-07; a one-line shim keeps the old name for one
 release. You need no model server and no key.)
+*(A257-SHIM, 2026-10-04: no shim survives -- `run_with_ollama_judge.py` was deleted on
+2026-09-12 in 865c0bd. The old name fails on a clone; use `run_node.py` above.)*
 
 **What judges, on your machine, with no account.** The gate answers from a
 distilled student: a 130 KB JSON file tracked in this repo and read into the
@@ -73,6 +75,8 @@ clone with no Ollama, no `GITHUB_TOKEN` and no API key (KNOWN_ISSUES A37): the
 node came up in **one second**, admitted an ordinary send, and rejected every
 theft, deception and coercion case offline. A memo it cannot decide comes back
 "Held, not judged", which fails closed.
+*(A257-130KB, 2026-10-04: two students now, 247,576 and 137,316 bytes as committed and
+growing with the nightly retrain; 130 KB was a size once.)*
 
 Older instructions here and in the phone kit said you must install Ollama and
 that the node "fails CLOSED until a judge answers". Both were false by the time
