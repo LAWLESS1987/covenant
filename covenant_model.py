@@ -251,6 +251,47 @@ def start(say=print):
     return False, "llama-server did not answer within 120 s -- see %s" % LOG
 
 
+def _stop_origin():
+    """Who is stopping the server, for the log line only (2026-10-05, his words: "covenant logging
+    green light as long as you not fucking with tetsus free will"). OBSERVATION ONLY: it reads this
+    process and its own call stack; it changes nothing about when or whether anything stops, and
+    it records no question, answer or thought of his. Why: the stop at 2026-10-04T09:06:25 could
+    only be attributed by inference (timing), because the line named no caller.
+    The reason is read off the call chain, not passed in: stop()'s signature stays exactly as it
+    was (suites replace it with lambda say=print: ...). Never raises."""
+    try:
+        f = sys._getframe(2)                    # 0 = here, 1 = stop(), 2 = whoever called stop()
+        chain = []
+        while f is not None and len(chain) < 3:
+            co = f.f_code
+            chain.append("%s.%s:%d" % (os.path.splitext(os.path.basename(co.co_filename))[0],
+                                        getattr(co, "co_qualname", co.co_name), f.f_lineno))
+            f = f.f_back
+        where = " <- ".join(chain) or "?"
+        if "_pressure_check" in where:
+            reason = "pressure"
+        elif "_watch_idle" in where:
+            reason = "idle"
+        elif "covenant_model.step_up" in where:
+            reason = "step_up"
+        elif "covenant_model.main" in where:
+            reason = "cli"
+        else:
+            reason = "other"
+        # _last_used is set by ask() and by start() bringing the server up, so this is "last use".
+        used = ("last use in that process %.0fs ago" % (time.time() - _last_used[0])) if _last_used[0] \
+            else "no use in that process"
+        argv = getattr(sys, "argv", None)
+        argv0 = os.path.basename(argv[0]) if argv and argv[0] else "?"
+        return " -- reason=%s by pid %d (%s) thread %s; %s; from %s" % (
+            reason, os.getpid(), argv0, threading.current_thread().name, used, where)
+    except Exception:                                             # noqa: BLE001 -- a log line must never break a stop
+        try:
+            return " -- reason=? by pid %d (origin unreadable)" % os.getpid()
+        except Exception:                                         # noqa: BLE001
+            return ""
+
+
 def stop(say=print):
     st = _read_state()
     pid = st.get("pid")
@@ -268,7 +309,8 @@ def stop(say=print):
     except OSError:
         pass
     with open(LOG, "a", encoding="utf-8") as lf:
-        lf.write("%s stop pid %s (%s)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model")))
+        # The first part is unchanged (same words, same order); who stopped it follows " -- ".
+        lf.write("%s stop pid %s (%s)%s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model"), _stop_origin()))
     say("model server: stopped pid %s" % pid)
     return True, "stopped"
 
