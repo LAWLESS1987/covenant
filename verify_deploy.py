@@ -151,7 +151,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "7bde90e1effa0f37dc544cbb61b838f969ff88f546f24f46c4b725a799c3f22f",   # 2026-09-20: re-pinned late; moved by c64a33c, bf77dd2, 1fca761, 7eac94c (09-15/16) without the pin (M53); clean against HEAD; K1/K2 ran against it 09-19
+        "7eed13de808b8f1cbb617d0a7b89e72b5de6699608be92018118a7d42c1103ca",   # 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
