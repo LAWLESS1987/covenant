@@ -709,6 +709,30 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "The grader as written is preserved on branch a259-grade-and-dashboard-as-written-2026-10-05 (at b0d3ea2). The docstring keeps the sentence, with the restated rule and this id beside it."
+  },
+  {
+   "id": "A261-WINDOW",
+   "claim": "That thirty minutes is the right grading window for dispatch_phone_build -- 'thirty is the window, so a slow runner is not graded as a failure and a build that never arrives still is' (covenant_highway REMEDIES; docs/HIGHWAY.md: '30 min for a build dispatch').",
+   "refuted_by": "The live ledger and ops/app/, 2026-10-05: the dispatches of 2026-09-28 15:14 and 2026-10-03 08:41 both built -- covenant-node-252d3e1-r36470903029.apk and -r37123686630.apk reached the PC at 16:21 and 09:17 -- but were graded 'did not fix' at 15:45 and 09:11, because phone_build_behind_core clears only when fetch_build has collected the APK, on its own hour. The two misgrades quarantined the phone's only route to a new core.",
+   "truth": "The window must cover the build AND a fetch cycle: two hours (A261). H1o4 drives it both ways: a 40-minute-old dispatch is not graded; the old window grades the same row 'did not fix'.",
+   "verbatim": [
+    "thirty is the window, so a slow runner is not graded as a failure",
+    "30 min for a build dispatch"
+   ],
+   "patterns": [
+    "thirty\\s+is\\s+the[\\s#]+window",
+    "30\\s+min\\s+for\\s+a\\s+build\\s+dispatch"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written on branch a261-dispatch-budget-as-written-2026-10-05 (at 26d327f). Both sites keep their wording with the correction and this id beside it."
   }
  ]
 }

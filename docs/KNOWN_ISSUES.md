@@ -7293,6 +7293,35 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A261. [the phone's only route to a new core was quarantined by two builds that worked, and a refusal held the build budget] 2026-10-05. His words: "get the phone updated to the new core ... also fix everything". FIXED, each guard driven both ways; the build itself is the daemon's, within its budget
+
+**Measured.** The phone runs app 0.1.774+f6406a1 (core b708204ff11b), built 2026-10-04 15:01Z -- before
+the core moved to ee4e0db9047d. A new APK has to be built from main; `dispatch_phone_build` is the
+daemon's way to ask for one, once a day (his Actions minutes), and it was QUARANTINED: "did not fix" at
+2026-09-28 15:45 and 2026-10-03 09:11. Both builds worked: `ops/app/covenant-node-252d3e1-r36470903029.apk`
+and `-r37123686630.apk` reached the PC at 16:21 and 09:17. The condition they were graded against,
+phone_build_behind_core, clears only when fetch_build has COLLECTED the APK, on its own hour; the window
+was thirty minutes. And the daily budget was held until 23:06 tonight by a quarantine REFUSAL at 23:06:51
+last night -- a row that spent nothing.
+
+**Fixed.** A261-WINDOW (a claim that was wrong, tombstoned; branch a261-dispatch-budget-as-written-2026-10-05):
+the grading window is two hours, covering the build and a fetch cycle; docs/HIGHWAY.md corrected beside its
+"30 min". The budget: a DECLARED budget is measured from the last row that RAN (`_recent_spend`); the noise
+cooldown still counts any row, so the ledger stays quiet. H1o4 runs the real engine: a refusal two hours old
+does not hold the day, a dispatch that ran does, a refusal ten minutes old stays inside the noise hour; a
+40-minute-old dispatch is not graded, and the old window grades the same row "did not fix". HEAD's engine on
+the refusal: budget held. The quarantine is recalibrated on the record with the two APKs as its evidence;
+the misgraded rows stay.
+
+**Not done by me, deliberately.** The dispatch reads his GitHub credential, which only the watchdog daemon
+reads by design (A21/A141), and the day is a budget on his account that no caller may wave away. So I did
+not dispatch: the daemon, once on this code, finds nothing spent in 24 h and asks for the build itself.
+Installing on the phone is Android asking the person holding it -- his tap.
+
+**Repro:** `python test_h1_highway.py` (H1o4).
+
+---
+
 ### A260. [the public-CI listener told him "red on main" twice on a nine-day-old page] 2026-10-05. Found while verifying A259's fixes: the highway read public_ci_red PRESENT while every recent run was green. FIXED, the guard driven both ways
 
 **Measured.** The detector's cache, refreshed 08:56:47Z, held thirty runs all from 2026-09-26 and called a

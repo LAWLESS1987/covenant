@@ -1537,6 +1537,46 @@ def main():
     check("H1o3 a detector with no recurrence test keeps the old rule (still PRESENT -> did not fix)",
           len(got) == 1 and got[0]["outcome"] == "did not fix", str([g["outcome"] for g in got]))
 
+    # A261 (2026-10-05): the build runner's day is spent by a dispatch that RAN, and its grading window
+    # covers the fetch that clears the condition. Both misgrades and the refusal that held the day were
+    # measured in the live ledger; each check below runs the real engine.
+    DREM, DDET = "dispatch_phone_build", "phone_build_behind_core"
+
+    def _drow(led, ago, outcome, ran=None):
+        rw = {"t": "fixture", "at": time.time() - ago, "remedy": DREM, "detector": DDET,
+              "dry_run": False, "outcome": outcome}
+        if ran is not None:
+            rw["ran"] = ran
+        H.write_ledger(rw, led)
+    led = tmp_ledger()
+    _drow(led, 7200, "refused")
+    got = H.apply_remedy(DREM, present(), DDET, dry_run=True, ledger=led)
+    check("H1o4 a refusal two hours ago does not hold the build runner's day: nothing was spent",
+          not got.get("repeat") and got.get("outcome") == "dry run", {k: got.get(k) for k in ("outcome", "repeat")})
+    led = tmp_ledger()
+    _drow(led, 7200, "started", ran=True)
+    got = H.apply_remedy(DREM, present(), DDET, dry_run=True, ledger=led)
+    check("H1o4 broken the other way: a dispatch that RAN two hours ago does hold it",
+          got.get("repeat") is True, {k: got.get(k) for k in ("outcome", "repeat")})
+    led = tmp_ledger()
+    _drow(led, 600, "refused")
+    got = H.apply_remedy(DREM, present(), DDET, dry_run=True, ledger=led)
+    check("H1o4 a refusal ten minutes ago is still inside the hour's noise cooldown: the ledger stays quiet",
+          got.get("repeat") is True, {k: got.get(k) for k in ("outcome", "repeat")})
+    led = tmp_ledger()
+    started_row(led, NOW - 40 * 60, detector=DDET, remedy=DREM)
+    got = H.grade_started({DDET: present()}, ledger=led, now=NOW, dry_run=True)
+    check("H1o4 A261-WINDOW: a dispatch 40 minutes old is not graded yet -- the fetch that clears the "
+          "condition can be an hour away", got == [], str(got))
+    _keep = H.REMEDIES[DREM]["grade_after_s"]
+    try:
+        H.REMEDIES[DREM]["grade_after_s"] = 1800.0
+        got = H.grade_started({DDET: present()}, ledger=led, now=NOW, dry_run=True)
+        check("H1o4 mutation: the old thirty-minute window grades that same dispatch 'did not fix' -- "
+              "the misgrade of 09-28 and 10-03", len(got) == 1 and got[0]["outcome"] == "did not fix", str(got))
+    finally:
+        H.REMEDIES[DREM]["grade_after_s"] = _keep
+
     # A RECALIBRATION IS A BARRIER. Re-grading history across it would put back
     # the failures it was written to set aside, and invisibly.
     led = tmp_ledger()

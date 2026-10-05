@@ -1969,7 +1969,17 @@ REMEDIES = {
                              # The build takes about ten minutes; thirty is the
                              # window, so a slow runner is not graded as a failure
                              # and a build that never arrives still is.
-                             "async": True, "cooldown_s": 86400, "grade_after_s": 1800.0,
+                             # A261-WINDOW (2026-10-05): thirty minutes graded the
+                             # wrong thing. The condition clears only when
+                             # fetch_build has COLLECTED the APK, and fetch runs
+                             # on its own hour. The dispatches of 09-28 15:14 and
+                             # 10-03 08:41 both built: their APKs reached the PC at
+                             # 16:21 and 09:17 (ops/app/), after "did not fix" at
+                             # 15:45 and 09:11 -- and the two misgrades quarantined
+                             # the phone's only route to a new core. Two hours
+                             # covers build plus a fetch cycle; a build that never
+                             # arrives is still graded so.
+                             "async": True, "cooldown_s": 86400, "grade_after_s": 7200.0,
                              "touches": ["the build runner"],
                              "benefit": {"gains": ["an APK carrying the core that is on main",
                                                    "the phone's auto-update has something newer to find"],
@@ -2056,6 +2066,21 @@ def _recent_identical(name, detector, ledger=None, within_s=None, include_dry=Tr
         if row.get("remedy") == name and row.get("detector") == detector:
             if row.get("dry_run") and not include_dry:
                 continue
+            return row if (now - float(row.get("at", 0))) < within_s else None
+    return None
+
+
+def _recent_spend(name, detector, ledger=None, within_s=None, include_dry=True):
+    """The last row for this (remedy, detector) that SPENT -- the remedy ran -- if it is younger than
+    within_s, else None. A refusal, a hold or a proposal spends nothing (A261)."""
+    within_s = ROW_COOLDOWN_S if within_s is None else within_s
+    now = time.time()
+    for row in reversed(read_ledger(ledger)):
+        if row.get("remedy") != name or row.get("detector") != detector:
+            continue
+        if row.get("dry_run") and not include_dry:
+            continue
+        if row.get("ran") is True or row.get("outcome") == "started":
             return row if (now - float(row.get("at", 0))) < within_s else None
     return None
 
@@ -2174,7 +2199,17 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         eff = max(cooldown_s, declared)
     else:
         eff = cooldown_s
-    prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff, include_dry=bool(dry_run))
+    # A261 (2026-10-05): A DECLARED BUDGET IS SPENT BY A RUN, NOT BY A REFUSAL. The build runner's day
+    # exists to spend his Actions minutes at most once a day. A quarantine refusal at 2026-10-04 23:06:51
+    # spent nothing, and it held the budget until the next night all the same, because every row counted.
+    # So a declared budget is measured from the last row that RAN; the noise cooldown (the hour, or none for
+    # a person) still counts any row, so the ledger stays quiet.
+    if declared is not None and eff:
+        noise_s = ROW_COOLDOWN_S if cooldown_s is None else cooldown_s
+        prev = ((_recent_identical(name, detector, ledger, noise_s, include_dry=bool(dry_run)) if noise_s else None)
+                or _recent_spend(name, detector, ledger, declared, include_dry=bool(dry_run)))
+    else:
+        prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff, include_dry=bool(dry_run))
     if prev is not None:
         out = dict(prev)
         out["repeat"] = True

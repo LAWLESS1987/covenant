@@ -159,7 +159,9 @@ running a thing rather than describing it.
    `grade_started()` now keeps it. It waits out each remedy's own declared window
    (`grade_after_s` — 30 min for a build dispatch, 15 for a scheduled restart, an hour for a
    fetch) and only then measures: PRESENT then and ABSENT now is `fixed`, still PRESENT is
-   `did not fix`. UNKNOWN now is left ungraded, because a read that failed is not a verdict
+   `did not fix`. *(A261-WINDOW, 2026-10-05: "30 min for a build dispatch" was too short -- the
+   condition clears when fetch_build collects the APK, on its own hour; two dispatches that built
+   were graded "did not fix" before their APKs arrived. It is two hours now.)* UNKNOWN now is left ungraded, because a read that failed is not a verdict
    and calling it one would quarantine a remedy for the reader's blindness. Rows before a
    `recalibrated` row are never graded, or a re-grade would silently put back the failures the
    recalibration set aside. The original caution is kept rather than discarded: a start inside
