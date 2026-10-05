@@ -7344,6 +7344,15 @@ on disk; every key owner-only with inheritance cut; no keys in temp copies; Sync
 process from another tree or worktree; the one remote peer (a tailnet address) runs b708204ff11b, which is the core at
 f6406a1, the phone build's commit.
 
+**Observed, not changed.** (1) A remedy graded on the wrong change: `schedule_watchdog_restart` restarted
+the watchdog after the first covenant_earn.py edit, a second edit three minutes later made it stale again,
+and the grader recorded "did not fix" (2026-10-05T00:50:03); after that grade the highway did nothing each
+pass ("nothing done this pass") and a person stopped the watchdog for the guard to revive. The grader cannot
+tell a remedy that failed from a condition that came back. (2) The sweep's dashboard step writes a tailnet
+address into `dashboard.html`, a tracked file: the committed copy holds none, the regenerated one held one
+on 2026-10-05, and the opsec pre-push guard is what keeps it unpublished -- it refused this entry's first
+draft for the same reason (a peer's tailnet address, removed before it left the machine).
+
 **Repro:** `python exposure_check.py`; `python test_ea1_earn.py`; `python test_a82_exposure_unknown.py`.
 
 ---
