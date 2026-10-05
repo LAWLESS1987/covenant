@@ -7371,6 +7371,16 @@ pass `--teach`.
   ops/quorum_policy.json `github_when_local_down: false` (as of 2026-10-05), nothing leaves the PC.
   Set true, a payload the students hold goes to the runner, private or not. That is gate posture, so
   it is his.
+* **...and the tracked ledger** (added 2026-10-05, raised by the X-video session, read first-hand).
+  On that same runner path, `DeferringJudge` records the runner's verdict with source `"github"`
+  (covenant_judge_defer.py:494). `verdict_path_for` sends every source in `SHAREABLE_SOURCES`
+  ("github" is one) to `ops/verdicts.jsonl`, which git TRACKS in this public repository, not to the
+  gitignored `ops/verdicts_live.jsonl`. The row's text is `_payload_text` of the transaction, which
+  reads `message` (the answer, cut at 4,000 characters) and not `question`. So a private question
+  lands there only where the answer repeats it, but the answer itself does, one `git add` from
+  publication. This is not a second leak today: it is off with the policy. Closing it means
+  either the A91 membrane (which sources count as shareable) or the gate skipping the runner for a
+  private payload, and both are his.
 * **Local copies.** A private exchange stays in ops/chat/ask_log.jsonl and the withheld twin, both
   gitignored and on this PC only.
 * **What the path marker cannot see.** It reads only the `--in` path and an item's `"file"`. Text
