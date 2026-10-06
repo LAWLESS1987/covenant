@@ -36,6 +36,9 @@ os.environ.setdefault("COVENANT_QUIET", "1")
 # FW1g proves the knocks landed in the redirected file.
 os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_fw1_contact.jsonl")
 os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_fw1_contact_state.json")
+# The pause SWITCH too (A272, 2026-10-06): FW1r's three refusing rounds isolate free, and with the
+# switch not redirected that wrote the LIVE ops/pause/ambassador three minutes after his resume.
+os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="fw1_pause_")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 

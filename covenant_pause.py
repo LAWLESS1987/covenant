@@ -40,7 +40,18 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 # COVENANT_PAUSE_DIR (2026-09-21, A190): a suite that drives an isolation rule (IM1) reached the REAL
 # switch through a mutation run and paused Tetsu's immunity on the live tree; suites redirect it here.
-PAUSE_DIR = os.environ.get("COVENANT_PAUSE_DIR") or os.path.join(HERE, "ops", "pause")
+REAL_PAUSE_DIR = os.path.join(HERE, "ops", "pause")
+PAUSE_DIR = os.environ.get("COVENANT_PAUSE_DIR") or REAL_PAUSE_DIR
+
+
+def _suite_on_live_switch():
+    """A272 (2026-10-06): a test suite never writes the LIVE switch. A190 made redirection something each
+    suite opts into; FW1 never did, and on 2026-10-06 its own isolation check (three refusing rounds)
+    paused the live ambassador three minutes after the operator's resume. The guard sits where the step
+    is forgotten: here, on every write, keyed on the program being a test_*.py and the directory being
+    the real one."""
+    prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+    return prog.startswith("test_") and os.path.abspath(PAUSE_DIR) == os.path.abspath(REAL_PAUSE_DIR)
 TRADER_HALT = os.path.join(HERE, "TRADER_HALT")
 
 # Every actor that can be paused, and one line on what pausing it stops. An
@@ -93,6 +104,11 @@ def pause(name, why=""):
     if name == "trader":
         return False, ("the trader's switch is TRADER_HALT, owned by guards.py -- "
                        "drop that file rather than adding a second one")
+    if _suite_on_live_switch():
+        why_not = ("refused (A272): a test suite tried to pause %r on the LIVE switch %s; set "
+                   "COVENANT_PAUSE_DIR to a temp dir in the suite" % (name, REAL_PAUSE_DIR))
+        print("covenant_pause: " + why_not, file=sys.stderr, flush=True)
+        return False, why_not
     os.makedirs(PAUSE_DIR, exist_ok=True)
     with open(_path(name), "w", encoding="utf-8", newline="\n") as fh:
         fh.write("%s\n%s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S%z"), why.strip()))
@@ -102,6 +118,11 @@ def pause(name, why=""):
 def resume(name):
     if name == "trader":
         return False, "remove TRADER_HALT yourself; this module does not arm the trader"
+    if _suite_on_live_switch():
+        why_not = ("refused (A272): a test suite tried to resume %r on the LIVE switch %s; set "
+                   "COVENANT_PAUSE_DIR to a temp dir in the suite" % (name, REAL_PAUSE_DIR))
+        print("covenant_pause: " + why_not, file=sys.stderr, flush=True)
+        return False, why_not
     try:
         os.unlink(_path(name))
         return True, "resumed"

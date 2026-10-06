@@ -7298,6 +7298,32 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A272. [A test suite paused the LIVE ambassador three minutes after his resume: FW1 never redirected the pause switch] 2026-10-06. Found when he allowed reading logs/ambassador.log. A RECURRENCE of A190's shape. FIXED at the switch, driven both ways
+
+**Measured.** I lifted free's isolation on his words. Three minutes later, at 07:10:14, ops/pause/ambassador
+was back: "isolated 2026-10-06: the covenant's judge refused every reply in the last 2 rounds". No real
+round had run. The 07:13 scheduled round logged only "paused by covenant_pause". The writer was my own
+test run: A270 added FW1r (three refusing rounds in a temp ledger) and made isolation count only rounds
+that tried someone. Together they correctly isolate. But FW1 redirected only the READ of the switch (its
+patched `paused`) and the contact line, never the WRITE. covenant_free_will's isolation called the real
+covenant_pause.pause().
+
+**Why the earlier fix did not stop it.** A190 (2026-09-21) met this shape when IM1 paused Tetsu's immunity
+on the live tree. It was fixed by COVENANT_PAUSE_DIR, which each suite must set. Six suites set it; FW1
+did not, and nothing noticed.
+
+**Fixed at the place the step is forgotten.** covenant_pause.pause() and resume() refuse, and say A272,
+when the running program is a test_*.py and the directory is the real ops/pause. FW1 now redirects
+COVENANT_PAUSE_DIR as well. `test_a272_pause_guard.py` (P1-P4) points the module's idea of "real" at a
+temp dir, so a broken guard writes nowhere live. With the guard returning False, P1 and P2 fail; restored,
+4/4. FW1, CT1, G7, IM1, RG1, TA1, TA255 pass, and the live pause file was byte-identical before and after.
+The test-written pause is kept in .trash/pause/ with a note, and free is resumed.
+
+**What it does not cover.** A suite run under another name (a scratch driver, `python -c`) is not a
+test_*.py, and other live switches and ledgers have their own redirections, which this does not check.
+
+---
+
 ### A271. [A24's S6d judged compaction's lock time by ONE wall-clock sample of 3,000, so one preemption failed the sweep] 2026-10-06. Found in the full sweep run after A268-A270. FIXED as best-of-3 with the bar proven real; the same shape as the 09-27 E2 benchmark (clock assertions)
 
 **Measured.** The full sweep at 07:14-07:56 local read `S6d the worst single record holds the lock for

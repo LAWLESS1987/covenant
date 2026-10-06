@@ -453,6 +453,8 @@ SUITES = [
     ("test_a268_in_place_env.py",         240,  "JUDGE"),
     # A269 (2026-10-06): the model keeper starts llama-server with one slot, so a request gets all of -c.
     ("test_a269_model_one_slot.py",       120,  "JUDGE"),
+    # A272 (2026-10-06): covenant_pause refuses a test suite on the LIVE switch (FW1 paused free for real).
+    ("test_a272_pause_guard.py",          120,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
