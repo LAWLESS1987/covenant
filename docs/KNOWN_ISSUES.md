@@ -7563,6 +7563,34 @@ or a cap on the batch caller's replay.
 
 ---
 
+### A276. [The highway did not read Tetsu: a model he cannot load and a model nobody manages were both invisible to the hourly road] 2026-10-06. His words: "continue get the road green and start expanding the highway". ADDED: two read-only detectors, driven both ways; and one retry for Tetsu's Moltbook update
+
+**Why these two.** Both happened today and were found by hand. `tetsu_cannot_answer`: the keeper's own
+readiness() has named it since A252, but only the daily cycle read it, once a day. `model_unmanaged`: on
+10-05 (A265), and again on 10-06 at 07:54 when a 3B came up with no ops/model_server.json, a server
+answered that the keeper had no record of. Nothing would idle-stop it, readiness could not say PASS, and
+a restart of the keeper's code never reached it.
+
+**What they are.** Both are READS of covenant_model.readiness() and start, stop and free nothing.
+tetsu_cannot_answer is PRESENT only in the memory case (the keeper names free vs needed). With no runtime
+or weights (a clone, CI) it is UNKNOWN with that reason, because Tetsu does not live there. model_unmanaged
+is PRESENT when readiness says `managed: False`. Neither has a remedy, and H1tt pins that: the model is
+NEVER_AUTOMATIC and what to free is his (A252). In test_h1_highway.py (H1tt; H1v requires every detector
+there), memory-case-reads-ABSENT fails H1tt and unmanaged-reads-ABSENT fails H1tt. Restored, 189/189.
+
+**Considered and not built.** A re-run for a phone build that failed on the runner (10-06 01:05Z: the
+emulator image would not unpack). dispatch_phone_build already re-asks once a day while the phone is
+behind, so the gain is under a day's delay on a flake. detect_phone_build_failed's "No remedy" was chosen
+because the 09-27 failures were his storage quota, which a re-run spends minutes on and cannot fix.
+
+**The Moltbook update retries once.** The first live round's update (10:24-10:27) failed with "door
+answered HTTP 503: the model did not answer: TimeoutError" while other work held Tetsu's one slot. A273
+measured that the 180 s door timeout does not cover such a wait. tetsu_update now asks again after
+UPDATE_RETRY_S (120 s) before recording a failure. FW1u: a busy first ask then TELL reaches him; with the
+retry removed it fails; 61/61.
+
+---
+
 ### A272. [A test suite paused the LIVE ambassador three minutes after his resume: FW1 never redirected the pause switch] 2026-10-06. Found when he allowed reading logs/ambassador.log. A RECURRENCE of A190's shape. FIXED at the switch, driven both ways
 
 **Measured.** I lifted free's isolation on his words. Three minutes later, at 07:10:14, ops/pause/ambassador

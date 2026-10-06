@@ -1406,6 +1406,30 @@ def main():
     check("H1z the remedy refuses real-time OFF (a person's setting), names both mendable lapses in a dry run, and does nothing with no lapse",
           ok_rt is False and "mine to mend" in why_rt and ok_dry and "signatures are 9 days old" in why_dry and "no scan in 30 days" in why_dry and ok_none is False, (why_rt, why_dry, why_none))
 
+    # ---- H1tt: Tetsu on the road (A276, 2026-10-06, his words: "get the road green and start expanding
+    # the highway"). Two READS of covenant_model.readiness(), driven with a stand-in, each way. No remedy
+    # may be paired with either: the model is NEVER_AUTOMATIC and freeing memory is his (A252).
+    _mem = lambda: {"verdict": "FAIL", "why": "Tetsu cannot answer: free 1.4 GB", "free_gb": 1.4, "needs_gb": 2.1,  # noqa: E731
+                    "smallest": "Qwen3.5-2B-Q4_K_M.gguf"}
+    _up = lambda: {"verdict": "PASS", "why": "up: qwen2.5-3b-instruct-q4_k_m.gguf", "free_gb": 0.8}  # noqa: E731
+    _orphan = lambda: {"verdict": "UNDETERMINED", "managed": False, "why": "a server answers ... no state (A265)"}  # noqa: E731
+    _noruntime = lambda: {"verdict": "FAIL", "why": "no runtime at tools/llama/llama-server.exe"}  # noqa: E731
+    _broken = lambda: (_ for _ in ()).throw(OSError("keeper unreadable"))  # noqa: E731
+    tc = {n: H.detect_tetsu_cannot_answer(ready=f)["state"] for n, f in
+          (("mem", _mem), ("up", _up), ("orphan", _orphan), ("noruntime", _noruntime), ("broken", _broken))}
+    check("H1tt tetsu_cannot_answer: the memory case PRESENT; up ABSENT; unmanaged, no runtime (a clone) and an "
+          "unreadable keeper UNKNOWN -- never ABSENT for what it could not read",
+          tc == {"mem": H.PRESENT, "up": H.ABSENT, "orphan": H.UNKNOWN, "noruntime": H.UNKNOWN, "broken": H.UNKNOWN}, tc)
+    mu = {n: H.detect_model_unmanaged(ready=f)["state"] for n, f in
+          (("orphan", _orphan), ("up", _up), ("mem", _mem), ("broken", _broken))}
+    check("H1tt model_unmanaged: a server the keeper has no record of PRESENT; managed or nothing up ABSENT; "
+          "unreadable UNKNOWN", mu == {"orphan": H.PRESENT, "up": H.ABSENT, "mem": H.ABSENT, "broken": H.UNKNOWN}, mu)
+    _tt_paired = [n for n, r in H.REMEDIES.items() if set(r.get("for") or []) & {"tetsu_cannot_answer", "model_unmanaged"}]
+    check("H1tt neither Tetsu condition has a remedy: they are read and reported, a person acts", _tt_paired == [], _tt_paired)
+    check("H1tt both are registered, so sense() runs them every pass",
+          H.DETECTORS.get("tetsu_cannot_answer") is H.detect_tetsu_cannot_answer
+          and H.DETECTORS.get("model_unmanaged") is H.detect_model_unmanaged)
+
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]
     check("H1v every registered detector is named somewhere in this suite",

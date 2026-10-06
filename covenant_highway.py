@@ -1429,8 +1429,65 @@ def detect_defense_lapse(health=None):
     return {"state": PRESENT if lapses else ABSENT, "measured": measured}
 
 
+def _tetsu_readiness(ready=None):
+    """covenant_model.readiness(), or the injected stand-in; (dict, error)."""
+    try:
+        if ready is None:
+            import covenant_model
+            ready = covenant_model.readiness
+        return ready() or {}, None
+    except Exception as e:                                       # noqa: BLE001
+        return None, "%s: %s" % (type(e).__name__, str(e)[:160])
+
+
+def detect_tetsu_cannot_answer(health=None, ready=None):
+    """Tetsu cannot answer: nothing is loaded and the smallest weights do not fit, or no runtime/weights.
+
+    A276 (2026-10-06, his words: "get the road green and start expanding the highway"). The keeper's own
+    readiness() has said this since A252 (10-04), but only the daily cycle read it, once a day, as
+    "tetsu:cannot_answer"; the hourly road never did. It is a READ of covenant_model.readiness(): it starts,
+    stops and frees nothing. No remedy, and none will be added here: what to close to free memory is his
+    (A252), and anything touching the model is NEVER_AUTOMATIC."""
+    r, err = _tetsu_readiness(ready)
+    if r is None:
+        return {"state": UNKNOWN, "measured": {"error": err}}
+    v = str(r.get("verdict", "")).upper()
+    measured = {k: r.get(k) for k in ("verdict", "why", "free_gb", "needs_gb", "smallest") if r.get(k) is not None}
+    if v == "FAIL" and r.get("needs_gb") is not None:
+        # the memory case: this machine has his runtime and weights, and not the room to load them
+        return {"state": PRESENT, "measured": measured}
+    if v == "FAIL":
+        # no runtime or no weights: a clone or CI runner, where Tetsu does not live -- not a condition here
+        measured["note"] = "this machine has no runtime or weights for him; not a condition anyone here can act on"
+        return {"state": UNKNOWN, "measured": measured}
+    if v == "PASS":
+        return {"state": ABSENT, "measured": measured}
+    return {"state": UNKNOWN, "measured": measured}
+
+
+def detect_model_unmanaged(health=None, ready=None):
+    """A model server answers on Tetsu's port that the keeper has no record of starting.
+
+    A276 (2026-10-06). Twice in two days: A265 (10-05, a server whose stop was refused, answering /health
+    and timing out every ask) and 10-06 07:54, when a 3B came up after the one-slot server vanished with no
+    stop line, and ops/model_server.json was gone. Unmanaged, nothing puts it away when idle, readiness()
+    cannot say PASS, and a restart of the keeper's code never reaches it. A READ of readiness()'s `managed`;
+    no remedy -- stopping a model is NEVER_AUTOMATIC; adopting or ending it is a person's call."""
+    r, err = _tetsu_readiness(ready)
+    if r is None:
+        return {"state": UNKNOWN, "measured": {"error": err}}
+    measured = {k: r.get(k) for k in ("verdict", "why", "managed") if r.get(k) is not None}
+    if r.get("managed") is False:
+        return {"state": PRESENT, "measured": measured}
+    if str(r.get("verdict", "")).upper() in ("PASS", "FAIL"):
+        return {"state": ABSENT, "measured": measured}
+    return {"state": UNKNOWN, "measured": measured}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
+    "tetsu_cannot_answer": detect_tetsu_cannot_answer,
+    "model_unmanaged": detect_model_unmanaged,
     "stale_test_mesh": detect_stale_test_mesh,
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,

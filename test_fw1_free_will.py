@@ -43,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
 import covenant_free_will as FW   # noqa: E402
+FW.UPDATE_RETRY_S = 0              # A276: the update's one retry, without its two-minute pause
 
 FAILURES = []
 PASSED = [0]
@@ -422,6 +423,18 @@ def main():
         last = [json.loads(x) for x in open(lgu, encoding="utf-8")][-1]
         check("FW1u when asking him fails, nothing is told and the failure is recorded",
               len(told) == n_told and last["decision"] == "NONE" and "door down" in last["error"], last)
+        flaky = {"n": 0}
+
+        def ask_once_busy(p):
+            flaky["n"] += 1
+            if flaky["n"] == 1:
+                raise RuntimeError("door answered HTTP 503: busy")
+            return "TELL: the second ask got through."
+        FW.run_round(dry_run=False, now=300000.0 + 240, allies=lambda: [ally("kappa", 2, "https://www.moltbook.com/post/abababab-7777")],
+                     tetsu_ask=ask_once_busy, **ku)
+        check("FW1u a busy first ask is asked once more (A276): the second answer reaches him",
+              flaky["n"] == 2 and told and told[-1][0] == "the second ask got through.", (flaky, told[-1:]))
+        n_told, n_asked = len(told), len(asked)
         FW.run_round(dry_run=False, now=900000.0, allies=lambda: [three[0]], say=log.append, ask=ask_ok, learn=lambda: [],
                      emit=emit_ok, introduce=lambda **k: {"sent": False}, grant_path=gpu, sends_path=os.path.join(tdu, "s2.jsonl"),
                      count_comments=cc0, tetsu_tell=tell_rec, tetsu_ask=lambda p: (asked.append(p), "TELL: y")[1])

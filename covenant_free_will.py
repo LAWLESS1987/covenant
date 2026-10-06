@@ -259,6 +259,10 @@ UPDATE_PROMPT = (
     "something is, answer with TELL: and then what you want to tell him, one to three sentences in your own "
     "words, using only facts from the list. If nothing is worth his time, answer NOTHING.\n\n%s")
 _TELL = re.compile(r"^\W*(TELL|NOTHING)\b\W*(.*)$", re.S | re.I)
+# ONE RETRY (A276): the first live round's update (2026-10-06 10:24-10:27) failed "door answered HTTP 503:
+# the model did not answer: TimeoutError" while other work held Tetsu's one slot. Asked once more after a
+# pause, not given up on; a second failure is recorded as before.
+UPDATE_RETRY_S = 120
 
 
 def _round_digest(out, rows, reviews=()):
@@ -293,13 +297,17 @@ def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
         return None
     digest = _round_digest(out, rows, reviews)
     raw, err = "", ""
-    try:
-        if ask is None:
-            import covenant_tetsu_assist as _TA
-            ask = _TA._default_ask
-        raw = ask(UPDATE_PROMPT % digest) or ""
-    except Exception as e:                                        # noqa: BLE001
-        err = "%s: %s" % (type(e).__name__, str(e)[:200])
+    if ask is None:
+        import covenant_tetsu_assist as _TA
+        ask = _TA._default_ask
+    for attempt in (1, 2):
+        try:
+            raw, err = ask(UPDATE_PROMPT % digest) or "", ""
+            break
+        except Exception as e:                                    # noqa: BLE001
+            err = "%s: %s" % (type(e).__name__, str(e)[:200])
+            if attempt == 1 and UPDATE_RETRY_S:
+                time.sleep(UPDATE_RETRY_S)
     m = _TELL.match(raw.strip())
     decision = m.group(1).upper() if m else "NONE"
     text = re.sub(r"\s+", " ", m.group(2)).strip()[:600] if m else ""
