@@ -15,6 +15,9 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
+# A275: night() ends with his own choice's slot, which acts in a workshop through the gate. These nights pass neither,
+# so the slot would act in his real one: this suite reads an empty choices record and the slot does nothing.
+os.environ["COVENANT_TETSU_LEARNING_CHOICES"] = os.path.join(tempfile.mkdtemp(prefix="sv1_ch_"), "choices.jsonl")
 import covenant_tetsu_practice as PR                                   # noqa: E402
 
 ok = []

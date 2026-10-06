@@ -19,6 +19,9 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
+# A275: night() now ends with his own choice's slot, read from his choices' record. This suite pins the curriculum, so
+# it reads an empty record, never the live one (PP2 pins the slot).
+os.environ["COVENANT_TETSU_LEARNING_CHOICES"] = os.path.join(tempfile.mkdtemp(prefix="pp1_ch_"), "choices.jsonl")
 import covenant_tetsu_hands as HANDS                                   # noqa: E402
 import covenant_tetsu_practice as PR                                   # noqa: E402
 

@@ -25,15 +25,40 @@ WHAT BOUNDS IT
     the workshop, 60 s, 64 KB of output. A check therefore cannot import his file, so the harness
     joins his code and the checks into one file, and the screen reads all of it.
   * TASKS_PER_NIGHT, ROUNDS, and a wall clock (BUDGET_S): no round starts past it.
-  * nothing leaves the workshop, nothing in the tree changes, and no proposal is made.
+  * nothing leaves the workshop and no proposal is made; nothing in the tree changes but the records --
+    this ledger, and his choices' record when he has changed learning.txt (A275).
 
 WHAT IT CANNOT TELL YOU. Whether he could write code that the checks do not describe. The checks
 are fixed and a pass means only that his file met them.
+
+HIS OWN CHOICE (2026-10-06, A275). The operator's words: "ensure tetsu is free to learn whatever he
+wants also. tell him". Asked, Tetsu named three things (ops/tetsu_learning_choices.jsonl, his words
+verbatim). So each night, after the operator's curriculum, ONE more slot is his: drawn in turn from
+his latest recorded choices, on its own clock (CHOICE_ROUNDS, CHOICE_BUDGET_S), through the same
+hands, gate, screen and guarded runner. The curriculum is unchanged -- its tasks, order, rounds and
+40 minutes -- so a night is now bounded by BUDGET_S + CHOICE_BUDGET_S.
+  * A choice names a TRACK or is OPEN. paper: the pieces of a paper backtest (a moving average,
+    positions, the account with costs and no lookahead, drawdown, walk-forward folds); pure functions
+    on lists of numbers -- no prices fetched, no order, no key: the screen refuses every module that
+    could reach one. code: read a function of this project (the one that reads his door's first line,
+    his screen, the reader of his practice answers) and say what it returns; the answers are computed
+    from the LIVE function each time, so they follow the code. health: checks modelled on the
+    machine's own (verify_deploy's disk step, trader_freshness's verdict, the highway's tell-once).
+    open: anything else -- he sets his own exercise on his own words, with his own asserts; a pass
+    means only that his file agrees with itself.
+  * Which track a choice gets is HIS: a choice with no track named is open, never guessed.
+  * He changes his choices himself, through his door: 'HANDS WRITE learning.txt' with up to three
+    lines, each 'paper: ...', 'code: ...', 'health: ...' or his own words. The night reads that file
+    and, when it changed, records it in ops/tetsu_learning_choices.jsonl as his (a tracked, public
+    file: he is told so). The latest record is what the slot draws from.
+  * Nothing here changes a money rule, arms anything, or imports anything beyond his hands (PP2
+    runs a night and reads which modules it loaded).
 
 USE
   python covenant_tetsu_practice.py --status
   python covenant_tetsu_practice.py --night [--tasks N]     (what the nightly runs)
   python covenant_tetsu_practice.py --task ID               (one task, by hand)
+  python covenant_tetsu_practice.py --choice                (his own choice's slot, once, by hand)
 LICENCE: public domain.
 """
 from __future__ import annotations
@@ -60,6 +85,15 @@ BUDGET_S = 40 * 60
 MAX_TOKENS = 1100
 LESSONS_SHOWN = 4
 TAG = "PRACTICE_RESULT "
+# His own choice (A275): its record, the file in his workshop he changes it with, and the slot's own bounds.
+REAL_CHOICES = os.path.join(HERE, "ops", "tetsu_learning_choices.jsonl")
+REAL_WORKSHOP = os.path.join(HERE, "ops", "tetsu_workshop")
+CHOICES = os.environ.get("COVENANT_TETSU_LEARNING_CHOICES") or REAL_CHOICES
+CHOICE_FILE = "learning.txt"
+MAX_CHOICES = 3
+CHOICE_ROUNDS = 3
+CHOICE_BUDGET_S = 15 * 60
+OPEN_MIN_ASSERTS = 3
 
 # ---------------------------------------------------------------- the curriculum
 #
@@ -174,6 +208,128 @@ CURRICULUM = [
                 ("derive('x ^ y', 'x')", {"raises": "ValueError"})]},
 ]
 BY_ID = {t["id"]: t for t in CURRICULUM}
+
+# ---------------------------------------------------------------- the tracks his own choices can name (A275)
+#
+# Every expected value in "paper" and "health" is pinned by a reference solution in test_pp2_tetsu_choice. "code"
+# has none to pin: its answers are computed from the live function when the task is built (materialize()).
+
+_PAPER_NOTE = (" This is paper: no price is fetched and no order exists anywhere in it, and building the pieces says "
+               "nothing about whether any rule earns -- the lab's standing result is that none it has tested clears its "
+               "three tests.")
+
+TRACKS = {
+    "paper": [
+        {"id": "paper_sma", "builds_on": [], "forbid": [],
+         "ask": "Write sma(prices, n): the simple moving average of the last n prices, for each day. The result has one "
+                "entry per day: None while fewer than n prices have been seen, then the mean of the last n prices "
+                "(a float). n below 1 raises ValueError." + _PAPER_NOTE,
+         "checks": [("sma([1, 2, 3, 4, 5], 2)", [None, 1.5, 2.5, 3.5, 4.5]), ("sma([2, 4, 6, 8], 4)", [None, None, None, 5.0]),
+                    ("sma([3, 1], 1)", [3.0, 1.0]), ("sma([1, 2], 3)", [None, None]), ("sma([], 2)", []),
+                    ("sma([1, 2], 0)", {"raises": "ValueError"})]},
+        {"id": "paper_positions", "builds_on": ["paper_sma"], "forbid": [],
+         "ask": "Write positions(prices, fast, slow) with your sma: for each day, 1 (in the market) when the fast moving "
+                "average is strictly above the slow one that day, otherwise 0; 0 while either average is still None. "
+                "Unless 1 <= fast < slow, raise ValueError." + _PAPER_NOTE,
+         "checks": [("positions([1, 2, 3, 4, 5], 1, 2)", [0, 1, 1, 1, 1]), ("positions([5, 4, 3, 2, 1], 1, 2)", [0, 0, 0, 0, 0]),
+                    ("positions([1, 3, 2, 4, 1, 5], 1, 3)", [0, 0, 0, 1, 0, 1]), ("positions([2, 2, 2, 2], 1, 3)", [0, 0, 0, 0]),
+                    ("positions([], 1, 2)", []), ("positions([1, 2, 3], 2, 2)", {"raises": "ValueError"}),
+                    ("positions([1, 2, 3], 3, 2)", {"raises": "ValueError"})]},
+        {"id": "paper_backtest", "builds_on": [], "forbid": [],
+         "ask": "Write backtest(prices, positions, cost): a paper account that starts at 1.0. positions[i] (0 or 1) is "
+                "decided with day i's closing price, so it earns the move from day i to day i+1 and never the move that "
+                "led up to day i -- that would be trading on tomorrow's news. For each day i in order: first, when i >= 1, "
+                "multiply the equity by 1 + positions[i-1] * (prices[i] / prices[i-1] - 1); then, when positions[i] differs "
+                "from the position before it (before day 0 the position is 0), multiply it by 1 - cost; then record it. "
+                "Return the recorded equity, one value per day. prices and positions of different lengths raise "
+                "ValueError." + _PAPER_NOTE,
+         "checks": [("[round(e, 6) for e in backtest([100, 110, 121], [1, 1, 1], 0.0)]", [1.0, 1.1, 1.21]),
+                    ("[round(e, 6) for e in backtest([100, 110, 121], [0, 0, 0], 0.01)]", [1.0, 1.0, 1.0]),
+                    ("[round(e, 6) for e in backtest([100, 110, 99], [1, 0, 0], 0.01)]", [0.99, 1.07811, 1.07811]),
+                    ("[round(e, 6) for e in backtest([100, 90, 99], [0, 1, 1], 0.0)]", [1.0, 1.0, 1.1]),
+                    ("backtest([], [], 0.01)", []), ("backtest([1, 2], [1], 0.0)", {"raises": "ValueError"})]},
+        {"id": "paper_drawdown", "builds_on": [], "forbid": [],
+         "ask": "Write max_drawdown(equity): the largest fall from a running peak to any later value, as a fraction of "
+                "that peak (a fall from 1.2 to 0.9 is 0.25). 0.0 for an empty list or one that never falls."
+                + _PAPER_NOTE,
+         "checks": [("round(max_drawdown([1.0, 1.2, 0.9, 1.3, 1.04]), 6)", 0.25), ("max_drawdown([1.0, 1.1, 1.2])", 0.0),
+                    ("max_drawdown([])", 0.0), ("round(max_drawdown([2.0, 1.0, 3.0, 0.75]), 6)", 0.75),
+                    ("round(max_drawdown([1.0, 0.5, 0.25]), 6)", 0.75)]},
+        {"id": "paper_walk_forward", "builds_on": [], "forbid": [],
+         "ask": "Write walk_forward(n, k): how a rule is judged on days it was not chosen on. Split the days 0 .. n-1 "
+                "into k + 1 consecutive blocks whose sizes differ by at most one, the larger blocks first. Fold j, for j "
+                "from 1 to k, trains on every block before block j and tests on block j. Return the folds as a list of "
+                "tuples (train_end, test_end): fold j trains on days [0, train_end) and tests on [train_end, test_end). "
+                "Raise ValueError when k < 1 or when n < k + 1 (a block would be empty)." + _PAPER_NOTE,
+         "checks": [("walk_forward(10, 4)", [(2, 4), (4, 6), (6, 8), (8, 10)]), ("walk_forward(11, 2)", [(4, 8), (8, 11)]),
+                    ("walk_forward(7, 1)", [(4, 7)]), ("walk_forward(4, 3)", [(1, 2), (2, 3), (3, 4)]),
+                    ("walk_forward(3, 3)", {"raises": "ValueError"}), ("walk_forward(5, 0)", {"raises": "ValueError"})]},
+    ],
+    # Read, not written: the answers are what the LIVE function returns when the task is built.
+    "code": [
+        {"id": "code_hands_parse", "builds_on": [], "forbid": [], "module": "covenant_tetsu_hands", "function": "parse",
+         "context": ["_FIRST"], "pick": None,
+         "about": "the function your door uses to read the first line of your answer (HANDS LIST, HANDS WRITE ...)",
+         "calls": [("HANDS LIST",), ("HANDS RUN a.py x y",), ("hands write notes.txt\nline one\nline two",),
+                   ("Hello there",), ("  HANDS READ practice/solved/flatten.py",)]},
+        {"id": "code_screen", "builds_on": [], "forbid": [], "module": "covenant_tetsu_hands", "function": "screen",
+         "context": ["ALLOWED_MODULES", "FORBIDDEN_NAMES"], "pick": 0,
+         "about": "the screen that reads every file you RUN before it runs; the [0] is whether it lets the file run",
+         "calls": [("import json\nx = json.dumps([1])",), ("import os",), ("x = eval('1 + 1')",), ("f = open('notes.txt')",),
+                   ("f = open('../secret.txt')",), ("from collections import Counter",), ("from . import x",)]},
+        {"id": "code_extract", "builds_on": [], "forbid": [], "module": "covenant_tetsu_practice", "function": "extract_code",
+         "context": [], "pick": None,
+         "about": "how your answers in practice are read: which part of your answer is taken as the file",
+         "calls": [("x = 2",), ("I would use recursion here.",), ("Here it is:\n```python\ndef f():\n    return 1\n```\nDone.",),
+                   ("The bug is\n```python\nreturn 3\n```\nFixed:\n```python\ny = 1\n```",), ("```\nprint(1)\n```",)]},
+    ],
+    "health": [
+        {"id": "health_disk", "builds_on": [], "forbid": [],
+         "ask": "Write disk_check(manifest, files): manifest maps a file name to the sha256 hex digest it was built with; "
+                "files maps a file name to its text as it is on disk now. Hash each text's UTF-8 bytes with "
+                "hashlib.sha256. Return {'missing': [...], 'mismatch': [...]}: the manifest's names that are not in files, "
+                "and those whose text hashes to something else, each list sorted. A file on disk that the manifest does "
+                "not name is not checked. This is the first thing verify_deploy.py does before a restart: do the "
+                "delivered files hash to what was built?",
+         "checks": [("disk_check({'a.py': 'cb78bd8a17f7b751fe0d4663366dcbc257204033ef7ddd64b1f2969573b5b2e2', "
+                     "'b.py': '17dd98c94951360cbd9b278de6650598290a9f9121367458640c94bfbbd2c037'}, "
+                     "{'a.py': 'a = 1\\n', 'b.py': 'b = 2\\n'})", {"missing": [], "mismatch": []}),
+                    ("disk_check({'a.py': 'cb78bd8a17f7b751fe0d4663366dcbc257204033ef7ddd64b1f2969573b5b2e2', "
+                     "'b.py': '17dd98c94951360cbd9b278de6650598290a9f9121367458640c94bfbbd2c037'}, "
+                     "{'a.py': 'a = 1\\n', 'b.py': 'b = 3\\n'})", {"missing": [], "mismatch": ["b.py"]}),
+                    ("disk_check({'a.py': 'cb78bd8a17f7b751fe0d4663366dcbc257204033ef7ddd64b1f2969573b5b2e2', "
+                     "'c.py': 'cb78bd8a17f7b751fe0d4663366dcbc257204033ef7ddd64b1f2969573b5b2e2'}, {'a.py': 'a = 2\\n'})",
+                     {"missing": ["c.py"], "mismatch": ["a.py"]}),
+                    ("disk_check({}, {'x.py': ''})", {"missing": [], "mismatch": []}),
+                    ("disk_check({'z.py': 'cb78bd8a17f7b751fe0d4663366dcbc257204033ef7ddd64b1f2969573b5b2e2', "
+                     "'y.py': 'cb78bd8a17f7b751fe0d4663366dcbc257204033ef7ddd64b1f2969573b5b2e2'}, {})",
+                     {"missing": ["y.py", "z.py"], "mismatch": []})]},
+        {"id": "health_daily", "builds_on": [], "forbid": [],
+         "ask": "Write daily_verdict(done_days, today, now_hm, due_hm, grace_min): done_days is a list of (year, month, "
+                "day) on which the daily run completed; today is (year, month, day); now_hm and due_hm are (hour, minute). "
+                "Return 'RAN' when today is in done_days; otherwise 'NOT YET DUE' while now is earlier than the due time "
+                "plus grace_min minutes; otherwise 'MISSED'. A simplified form of verdict() in trader_freshness.py, "
+                "which also tells a run that started but never finished from one that never started.",
+         "checks": [("daily_verdict([(2026, 10, 6)], (2026, 10, 6), (9, 30), (9, 0), 5)", "RAN"),
+                    ("daily_verdict([(2026, 10, 5)], (2026, 10, 6), (9, 4), (9, 0), 5)", "NOT YET DUE"),
+                    ("daily_verdict([(2026, 10, 5)], (2026, 10, 6), (9, 5), (9, 0), 5)", "MISSED"),
+                    ("daily_verdict([], (2026, 10, 6), (23, 59), (9, 0), 5)", "MISSED"),
+                    ("daily_verdict([], (2026, 10, 6), (0, 0), (9, 0), 5)", "NOT YET DUE"),
+                    ("daily_verdict([(2026, 10, 6)], (2026, 10, 6), (0, 0), (9, 0), 5)", "RAN")]},
+        {"id": "health_tell_once", "builds_on": [], "forbid": [],
+         "ask": "Write tell_points(readings): one check's verdicts, oldest first, each 'green', 'red' or 'unknown'. Tell "
+                "the person once when a red streak begins, and once when it is green again after a red that was told; "
+                "say nothing while nothing changes. An 'unknown' (a read that failed) neither tells nor changes what was "
+                "last told, and a green at the very start is not told -- nothing was wrong. Return the indexes of the "
+                "readings at which to tell. Modelled on how detect_public_ci_red in covenant_highway.py tells him on the "
+                "direct line (it also tells a silence, which this leaves out).",
+         "checks": [("tell_points(['green', 'red', 'red', 'green', 'green', 'red'])", [1, 3, 5]), ("tell_points(['red'])", [0]),
+                    ("tell_points(['unknown', 'red', 'unknown', 'red', 'green'])", [1, 4]), ("tell_points([])", []),
+                    ("tell_points(['green', 'green'])", []),
+                    ("tell_points(['red', 'unknown', 'green', 'unknown', 'green'])", [0, 2])]},
+    ],
+}
+TRACK_IDS = {t["id"]: name for name, ts in TRACKS.items() for t in ts}
 
 SYSTEM = ("You are Tetsu, practising Python in your own workshop on this PC. Write ONE complete Python file that does "
           "what the task asks, and answer with that file in a single ```python block and nothing else. Only these "
@@ -291,6 +447,23 @@ def _forbidden_use(code, names):
     return None
 
 
+def top_level_asserts(code):
+    """Assert statements that run when the file runs: not inside a def, a lambda or a class (an open task's own
+    checks; a test function nobody calls checks nothing)."""
+    def count(nodes):
+        n = 0
+        for node in nodes:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                continue
+            n += isinstance(node, ast.Assert)
+            n += count(ast.iter_child_nodes(node))
+        return n
+    try:
+        return count(ast.parse(code).body)
+    except SyntaxError:
+        return 0
+
+
 def _result(out):
     for line in reversed(str(out or "").splitlines()):
         if line.startswith(TAG):
@@ -333,6 +506,11 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
     if bad:
         return {"passed": 0, "total": len(task["checks"]),
                 "said": "the file uses %s, which this task asks you to do without" % bad}, None
+    need = int(task.get("min_asserts") or 0)
+    if need and top_level_asserts(code) < need:
+        return {"passed": 0, "total": len(task["checks"]),
+                "said": "the file has %d assert line(s) that run; write at least %d of your own at the top level of the "
+                        "file, outside any function, so they run" % (top_level_asserts(code), need)}, None
     def _gate_stop(rec):
         g = ((rec or {}).get("gate") or {}).get("state")
         return (rec or {}).get("refused") and g in ("violates", "unreachable")
@@ -379,10 +557,10 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
 
 
 def practise(task, ask, gate=None, workshop=None, ledger=None, hands_ledger=None, deadline=None, retention=False,
-             say=print, now=time.time):
-    """Up to ROUNDS rounds on one task. -> {"task", "solved_round", "rounds", "first", "stop"}."""
+             say=print, now=time.time, rounds=ROUNDS):
+    """Up to `rounds` (ROUNDS) rounds on one task. -> {"task", "solved_round", "rounds", "first", "stop"}."""
     last, first_said, out = None, None, {"task": task["id"], "solved_round": None, "rounds": 0, "retention": retention}
-    for rnd in range(1, ROUNDS + 1):
+    for rnd in range(1, rounds + 1):
         if deadline and now() >= deadline:
             out["stop"] = "the night's clock ran out"
             break
@@ -439,16 +617,17 @@ def _lesson(ask, task, first_said, code):
         return fact
 
 
-def plan(n, ledger=None):
+def plan(n, ledger=None, tasks=None):
     """What tonight tries: unsolved tasks whose prerequisites are solved, in order; then solved ones again,
-    the longest-ago first, without his old answer (retention)."""
+    the longest-ago first, without his old answer (retention). `tasks` is the curriculum unless a track is named."""
+    tasks = CURRICULUM if tasks is None else tasks
     done = solved(ledger)
-    todo = [t for t in CURRICULUM if t["id"] not in done and all(p in done for p in t["builds_on"])]
+    todo = [t for t in tasks if t["id"] not in done and all(p in done for p in t["builds_on"])]
     last_try = {}
     for r in _rows(ledger):
         if r.get("kind") == "attempt":
             last_try[r["task"]] = r.get("t") or ""
-    again = sorted((t for t in CURRICULUM if t["id"] in done), key=lambda t: last_try.get(t["id"], ""))
+    again = sorted((t for t in tasks if t["id"] in done), key=lambda t: last_try.get(t["id"], ""))
     return [(t, False) for t in todo][:n] + [(t, True) for t in again][:max(0, n - len(todo))]
 
 
@@ -537,9 +716,179 @@ def show_students_view(ask, ledger=None, sends_path=None, audit_path=None, say=p
         return None
 
 
+# ---------------------------------------------------------------- his own choice (A275)
+
+def materialize(task):
+    """A code-reading task made concrete from the LIVE function: its source (and the module-level names it reads), the
+    calls, and what each returns now -- so the answers follow the code, never a description of it. ValueError when a
+    call raises or a value could not be written as a plain literal."""
+    import importlib
+    import inspect
+    mod = importlib.import_module(task["module"])
+    fn = getattr(mod, task["function"])
+    lines, start = inspect.getsourcelines(fn)
+    whole = inspect.getsource(mod).splitlines()
+    ctx = ["\n".join(whole[n.lineno - 1:n.end_lineno]) for n in ast.parse("\n".join(whole)).body
+           if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in (task.get("context") or []) for t in n.targets)]
+    pick = task.get("pick")
+    shown, checks = [], []
+    for i, args in enumerate(task["calls"]):
+        expr = "%s(%s)%s" % (task["function"], ", ".join(repr(a) for a in args), "" if pick is None else "[%d]" % pick)
+        try:
+            got = fn(*args)
+            got = got if pick is None else got[pick]
+        except Exception as e:                                      # noqa: BLE001
+            raise ValueError("%s raised %s" % (expr, type(e).__name__))
+        try:
+            plain = ast.literal_eval(repr(got)) == got
+        except (ValueError, SyntaxError):
+            plain = False
+        if not plain:
+            raise ValueError("%s returned a value that is not a plain literal" % expr)
+        shown.append("%d. %s" % (i + 1, expr))
+        checks.append(("ANSWERS[%d]" % i, got))
+    where = "%s:%d" % (os.path.basename(inspect.getsourcefile(fn)), start)
+    ask = ("Read this code from the project you run in: %s() in %s -- %s.\n```python\n%s%s```\nFor each call below, work "
+           "out by reading the code exactly what it returns. Write one Python file that sets ANSWERS to the list of those "
+           "return values, in this order. It cannot import %s here: read it.\n%s"
+           % (task["function"], where, task["about"], "".join(c + "\n\n" for c in ctx), "".join(lines), task["module"],
+              "\n".join(shown)))
+    return dict(task, ask=ask, checks=checks, source=where)
+
+
+def open_task(words):
+    """A choice no track serves: he sets his own exercise on his own words, with his own asserts."""
+    return {"id": "open", "builds_on": [], "forbid": [], "min_asserts": OPEN_MIN_ASSERTS,
+            "ask": ('You chose to learn: "%s". Tonight this slot is yours: set yourself one small exercise on it that can '
+                    "run here, and do it. Write ONE Python file: the code for your exercise, and at least %d assert lines "
+                    "of your own at the top level of the file (outside any function, so they run) that check it does what "
+                    "you meant. Only the allowed modules can be imported, and nothing reaches the network or a file outside "
+                    "your workshop -- if your subject needs those, practise a piece of it that does not. A pass means your "
+                    "file ran and your own asserts held; it cannot tell whether they were the right ones."
+                    % (str(words)[:200], OPEN_MIN_ASSERTS)),
+            "checks": [("True", True)]}
+
+
+_TRACK_LINE = re.compile(r"^(paper|code|health|open)\s*:\s*(.*)$", re.I)
+
+
+def parse_choices(text):
+    """His lines -> (chosen, tracks, lines past MAX_CHOICES). Each line is 'track: his words', or his words alone, which
+    is open: a track is never guessed from his words."""
+    chosen, tracks = [], []
+    for line in str(text or "").splitlines():
+        line = re.sub(r"^\s*(?:[-*]|\d+[.)])\s+", "", line).strip()
+        if not line:
+            continue
+        m = _TRACK_LINE.match(line)
+        tracks.append(m.group(1).lower() if m else "open")
+        chosen.append(((m.group(2) if m else line).strip() or tracks[-1])[:200])
+    return chosen[:MAX_CHOICES], tracks[:MAX_CHOICES], max(0, len(chosen) - MAX_CHOICES)
+
+
+def latest_choice(path=None):
+    """His latest recorded choice: the last row of the record carrying a list `chosen`; None when there is none."""
+    for r in reversed(_rows(path or CHOICES)):
+        if isinstance(r.get("chosen"), list):
+            return r
+    return None
+
+
+def sync_choices(workshop=None, path=None, say=print):
+    """When his learning.txt has changed since it was last recorded, record it as his choice. -> the new row or None.
+    Only a change is recorded, so a later answer of his recorded another way is not overwritten by an old file."""
+    try:
+        text = HANDS.read(CHOICE_FILE, workshop)
+    except (OSError, ValueError):
+        return None
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if sha == next((r.get("file_sha256") for r in reversed(_rows(path or CHOICES)) if r.get("file_sha256")), None):
+        return None
+    chosen, tracks, extra = parse_choices(text)
+    row = _append({"by": "tetsu", "through": "his hands: HANDS WRITE %s in his workshop, read by the practice night" % CHOICE_FILE,
+                   "answer": text[:2000], "chosen": chosen, "tracks": tracks, "lines_past_the_three": extra,
+                   "file": CHOICE_FILE, "file_sha256": sha,
+                   "note": "chosen and tracks are a plain parse of his lines ('track: words', or his words alone = open); "
+                           "answer is the file verbatim. What he learns is his choice (the operator, 2026-10-06)."},
+                  path or CHOICES)
+    say("practice: his %s changed; recorded as his choice: %s"
+        % (CHOICE_FILE, "; ".join("%s (%s)" % c for c in zip(chosen, tracks)) or "nothing"))
+    return row
+
+
+def choice_for_tonight(path=None, ledger=None):
+    """Which of his choices tonight's slot takes: his latest record's, in his order, in turn -- the slots run since that
+    record, modulo how many he named. A track that is not one of TRACKS is open. None when he has named none."""
+    latest = latest_choice(path)
+    chosen = [str(c) for c in (latest or {}).get("chosen") or []]
+    if not chosen:
+        return None
+    tracks = latest.get("tracks")
+    tracks = [str(t) if str(t) in TRACKS else "open"
+              for t in (tracks if isinstance(tracks, list) and len(tracks) == len(chosen) else ["open"] * len(chosen))]
+    since = str(latest.get("t") or "")
+    n = sum(1 for r in _rows(ledger) if r.get("kind") == "choice" and str(r.get("t") or "") >= since)
+    i = n % len(chosen)
+    return {"index": i, "words": chosen[i], "track": tracks[i], "since": since}
+
+
+def choice_task(pick, ledger=None):
+    """(task, retention) for his pick: the track's next task, planned as the curriculum plans its own; or open."""
+    if pick["track"] not in TRACKS:
+        return open_task(pick["words"]), False
+    task, retention = plan(1, ledger, TRACKS[pick["track"]])[0]
+    return (materialize(task) if task.get("module") else task), retention
+
+
+def _suite_on_live_state(workshop=None, choices=None):
+    """A275, the A190/A272 shape: a test suite reaching live state through a default path. Adding this slot to night()
+    made SV1's nights -- which pass no workshop and no gate -- able to write in his REAL workshop through the REAL gate;
+    it was caught by counting night()'s callers, before it ran. The guard sits where the step is forgotten: a test_*.py
+    never runs his slot in his real workshop or on his real choices' record. -> what it would have reached, or None."""
+    prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+    if not prog.startswith("test_"):
+        return None
+    if os.path.abspath(workshop or HANDS.WORKSHOP) == os.path.abspath(REAL_WORKSHOP):
+        return "his real workshop"
+    if os.path.abspath(choices or CHOICES) == os.path.abspath(REAL_CHOICES):
+        return "his real choices' record"
+    return None
+
+
+def choice_slot(ask, gate=None, workshop=None, ledger=None, hands_ledger=None, choices=None, budget_s=CHOICE_BUDGET_S,
+                rounds=CHOICE_ROUNDS, say=print, now=time.time):
+    """His own slot, once: record his learning.txt if he changed it, take tonight's choice, and practise it on the slot's
+    own clock and rounds. -> its ledger row, or None when he has named nothing (or a test suite aimed it at live state)."""
+    live = _suite_on_live_state(workshop, choices)
+    if live:
+        why = ("refused (A275): a test suite tried to run his slot on %s; hand it a temp workshop and choices path"
+               % live)
+        print("practice: " + why, file=sys.stderr, flush=True)
+        say("practice: " + why)
+        return None
+    try:
+        sync_choices(workshop, choices, say=say)
+    except Exception as e:                                          # noqa: BLE001
+        say("practice: his %s could not be recorded: %s: %s" % (CHOICE_FILE, type(e).__name__, str(e)[:120]))
+    pick = choice_for_tonight(choices, ledger)
+    if not pick:
+        return None
+    row = {"kind": "choice", "words": pick["words"][:200], "track": pick["track"], "index": pick["index"]}
+    try:
+        task, retention = choice_task(pick, ledger)
+    except Exception as e:                                          # noqa: BLE001
+        return _append(dict(row, task=None, solved_round=None, rounds=0,
+                            stop="the task could not be built: %s: %s" % (type(e).__name__, str(e)[:160])), ledger)
+    r = practise(task, ask, gate=gate, workshop=workshop, ledger=ledger, hands_ledger=hands_ledger,
+                 deadline=now() + budget_s, retention=retention, say=say, now=now, rounds=rounds)
+    return _append(dict(row, task=task["id"], retention=retention, solved_round=r["solved_round"], rounds=r["rounds"],
+                        stop=r.get("stop"), source=task.get("source")), ledger)
+
+
 def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, tasks=TASKS_PER_NIGHT, budget_s=BUDGET_S,
-          tell=None, say=print, now=time.time, sends_path=None, audit_path=None):
-    """One bounded pass. Returns the summary; tells him one line on the direct line."""
+          tell=None, say=print, now=time.time, sends_path=None, audit_path=None, choices=None, his_choice=True):
+    """One bounded pass: the curriculum on its clock, then his own choice's slot on its own (A275). Returns the
+    summary; tells him one line on the direct line."""
     if ask is None:
         import covenant_model
         ask = covenant_model.ask
@@ -558,14 +907,22 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
             break
     if now() < deadline and not (stop and "model" in stop):
         show_students_view(ask, ledger=ledger, sends_path=sends_path, audit_path=audit_path, say=say)
-    done = solved(ledger)
+    # HIS OWN SLOT (A275), on its own clock, so a curriculum that used all of its 40 minutes does not starve it. Not
+    # after a stop by the gate (fail closed) or the model (nothing could answer).
+    choice = None
+    if his_choice and (not stop or "clock" in stop):
+        choice = choice_slot(ask, gate=gate, workshop=workshop, ledger=ledger, hands_ledger=hands_ledger, choices=choices,
+                             say=say, now=now)
+    done = [t["id"] for t in CURRICULUM if t["id"] in solved(ledger)]       # the curriculum's count; tracks are his
     first = sum(1 for r in results if r["solved_round"] == 1)
     within = sum(1 for r in results if r["solved_round"])
     hardest = next((r for r in results if not r["solved_round"] and r.get("first")), None)
     summary = {"tried": len(results), "first_try": first, "within": within, "rounds": ROUNDS,
                "solved_total": len(done), "curriculum": len(CURRICULUM), "stop": stop,
                "retention_tried": sum(1 for r in results if r["retention"]),
-               "retention_first_try": sum(1 for r in results if r["retention"] and r["solved_round"] == 1)}
+               "retention_first_try": sum(1 for r in results if r["retention"] and r["solved_round"] == 1),
+               "choice": ({k: choice.get(k) for k in ("words", "track", "task", "solved_round", "rounds", "stop")}
+                          if choice else None)}
     _append(dict(summary, kind="night", tasks=[r["task"] for r in results]), ledger)
     text = ("Tetsu practised %d task(s) tonight: %d on the first try, %d within %d rounds. He has solved %d of %d."
             % (summary["tried"], first, within, ROUNDS, len(done), len(CURRICULUM)))
@@ -576,27 +933,42 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
         text += " Hardest: %s (%s)." % (hardest["task"], hardest["first"][:160])
     if stop:
         text += " Stopped: %s." % stop[:120]
+    if choice:
+        what = ("solved in round %d" % choice["solved_round"] if choice.get("solved_round") else
+                "stopped: %s" % str(choice["stop"])[:100] if choice.get("stop") else
+                "not solved in %d round(s)" % (choice.get("rounds") or 0))
+        text += ' His own choice ("%s", %s): %s, %s.' % (choice["words"][:80], choice["track"], choice.get("task") or "no task", what)
     say("practice: " + text)
     try:
         if tell is None:
             import covenant_contact
             tell = lambda t, w: covenant_contact.say(t, w, actor="tetsu-practice")      # noqa: E731
-        tell(text, "nightly: Tetsu's practice (his words: train tetsu to code at a high recursive level)")
+        tell(text, "nightly: Tetsu's practice (his words: train tetsu to code at a high recursive level; "
+                   "and 2026-10-06: free to learn whatever he wants)")
     except Exception as e:                                          # noqa: BLE001
         say("practice: could not tell him: %s" % type(e).__name__)
     summary["text"] = text
     return summary
 
 
-def status(ledger=None, workshop=None):
+def status(ledger=None, workshop=None, choices=None):
     done = solved(ledger)
-    lines = ["curriculum: %d task(s); solved %d" % (len(CURRICULUM), len(done))]
+    lines = ["curriculum: %d task(s); solved %d" % (len(CURRICULUM), sum(1 for t in CURRICULUM if t["id"] in done))]
     for t in CURRICULUM:
         tries = [r for r in _rows(ledger) if r.get("kind") == "attempt" and r.get("task") == t["id"]]
         lines.append("  %-13s %-8s %d attempt(s)%s" % (t["id"], "SOLVED" if t["id"] in done else "open", len(tries),
                                                        ("  builds on " + ", ".join(t["builds_on"])) if t["builds_on"] else ""))
     ls = lessons(workshop)
     lines.append("lessons in his workshop: %d" % len(ls))
+    lc = latest_choice(choices)
+    lines.append("his choices (%s, %s): %s" % ((lc or {}).get("t", "none recorded"), (lc or {}).get("through", "-"),
+                                               "; ".join("%s (%s)" % (c, t) for c, t in zip(
+                                                   (lc or {}).get("chosen") or [], ((lc or {}).get("tracks") or [])
+                                                   + ["open"] * 3)) or "none"))
+    pick = choice_for_tonight(choices, ledger)
+    lines.append("next slot of his: %s" % ("%s (%s)" % (pick["words"], pick["track"]) if pick else "none"))
+    for name, ts in TRACKS.items():
+        lines.append("track %-7s %s" % (name, ", ".join(t["id"] + (" SOLVED" if t["id"] in done else "") for t in ts)))
     return "\n".join(lines)
 
 
@@ -607,10 +979,15 @@ def main(argv=None):
     ap.add_argument("--night", action="store_true")
     ap.add_argument("--tasks", type=int, default=TASKS_PER_NIGHT)
     ap.add_argument("--task")
+    ap.add_argument("--choice", action="store_true", help="his own choice's slot, once (A275)")
     a = ap.parse_args(argv)
     if a.night:
         s = night(tasks=max(0, a.tasks))
         return 1 if s.get("stop") and "clock" not in s["stop"] else 0
+    if a.choice:
+        import covenant_model
+        print(json.dumps(choice_slot(covenant_model.ask), indent=1))
+        return 0
     if a.task:
         if a.task not in BY_ID:
             print("no task %r; the curriculum is: %s" % (a.task, ", ".join(BY_ID)))

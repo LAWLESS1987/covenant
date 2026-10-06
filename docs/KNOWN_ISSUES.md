@@ -7298,6 +7298,79 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A275. [Tetsu's practice was the operator's curriculum alone: what Tetsu chose to learn had no place in it, and no way for him to change it] 2026-10-06. His words: "ensure tetsu is free to learn whatever he wants also. tell him". CHANGED, driven both ways; the curriculum is unchanged. One near-miss of the A190/A272 shape, caught before it ran and guarded
+
+**Measured before.** `covenant_tetsu_practice.night()` planned over CURRICULUM only: the 9 recursion tasks the
+operator chose on 2026-09-26. The live ledger, ops/tetsu_practice.jsonl, holds 104 rows over 9 nights
+(09-28 to 10-06). Tetsu has solved 5 of the 9. parse is unsolved, and the 3 tasks that build on it have
+never been offered. 4 of the 9 nights ended at "no weights fit" (10-01, 10-02, 10-03, 10-06). The median
+of 84 attempts is 28,817 ms. His answer of 10:44Z, three choices in his words, is the one row of
+ops/tetsu_learning_choices.jsonl, and nothing read it. Beside it is his own paper study
+(covenant_tetsu_money, ops/tetsu_strategy.jsonl). Of its 11 rows since 09-22, 7 are refusals, and every
+one says "sma_longonly.fast is not a number": he passed a range where the lab takes one number.
+
+**Changed.** After the curriculum, every night now has ONE more slot, and that slot is his. It takes his
+latest recorded choices in turn, in his order. It runs on its own clock and rounds (CHOICE_BUDGET_S 15 min,
+CHOICE_ROUNDS 3), through the same hands.act, gate, screen and guarded runner. It does not run after the
+gate or the model stops the night. The curriculum keeps its tasks, order, ROUNDS 4 and 40 minutes, and the
+night's count is still the curriculum's. The night is now bounded by 40 + 15 minutes of rounds, plus the
+students' view and lesson asks, one request at a time. A choice names a track or is open:
+- **paper** (5 tasks): a moving average, the positions it gives, a paper account with costs and no
+  lookahead, drawdown, and walk-forward folds. These are pure functions on lists. No price is fetched and
+  no order exists.
+- **code** (3 tasks): read hands.parse, hands.screen or practice.extract_code, and say what each call
+  returns. The answers are computed from the live function every time, so they follow the code.
+- **health** (3 tasks): checks modelled on verify_deploy's disk step, trader_freshness.verdict (simplified,
+  and the task says so), and how detect_public_ci_red tells him once.
+- **open**: anything else. He sets his own exercise, with at least 3 asserts of his own that run. A pass
+  means only that his file agrees with itself.
+
+He changes his choices himself, through his door, with 'HANDS WRITE learning.txt' (A226's act, gated).
+Each line is 'paper: ...', 'code: ...', 'health: ...' or his own words. When that file has changed since
+it was last recorded, the night records it by him, verbatim. covenant_persona.where_you_are() now tells
+him all this on every door, including that the record is public.
+
+**Not guessed.** His recorded choices name no track, so for now each is practised as an open exercise. I
+did not map "trading strategies and how to build them on paper" onto the paper track. Which track a choice
+gets is his to decide (rule 5), and he has been told how.
+
+**A near-miss of the A190/A272 shape.** A190 and A272 were test suites that reached live state by a
+default path. I counted night()'s callers: 8 call sites in 4 files. SV1's three nights pass no workshop
+and no gate. With the new slot, they would have practised in his REAL workshop, through the REAL gate,
+from his real choices. Nothing of the sort ran. PP1 and SV1 now read an empty choices record. A guard sits
+where the step is forgotten: when the program is a test_*.py, `choice_slot` refuses his real workshop and
+his real choices record (PP2.11; the module's idea of "real" is pointed at temp dirs first, so a broken
+guard writes nowhere live). Like A272's guard, it covers only its own state. It does not cover the
+curriculum half of a test's night with no workshop given (SV1 runs tasks=0), and it does not cover a
+scratch driver that is not named test_*.py.
+
+**Paper stays paper.** PP2.9 runs a night with a paper, a code and a health slot in a fresh process. The
+only modules of this tree it loads are the practice and his hands. Broken the other way, a copy of the
+practice module that imports covenant_tetsu_money is caught. PP2.9c checks that a paper file reaching for
+urllib, a socket, or a path outside his workshop is refused by the screen. Nothing here touches
+money_posture, Rule 5 or the trader's disarm. What PP2.9 cannot see: it reads what the process imports,
+not what it writes.
+
+**Pinned by** `test_pp2_tetsu_choice.py` (PP2, 63/63, registered JUDGE). PP1 is 45/45, SV1 9/9, TP1
+PASSED and TH1 15/15, all in the staged copy, and PP1 and PP2 also pass under
+COVENANT_JUDGE_PROVIDERS="claude,mock". Inside the suite, these are driven the other way: four wrong
+solutions (a lookahead backtest, drawdown from the all-time peak, folds with the larger blocks last, a
+listener that tells every red), a wrong code answer, a VIOLATES on his write, the money-importing copy,
+and the live-state guard. 16 mutations of the code each turned PP2 red at the named check, and the files
+were restored byte-identical. On the first mutation run, 3 of 14 mutations failed the suite by crashing,
+with no tally, instead of failing a named check. The suite now fails them by name.
+
+**Not measured, and his.** How the real 3B does on any track: the first nights will say. Whether the
+paper track changes the 7 refusals above is also unmeasured. On a night when no model loads (4 of the
+last 9), his slot does not run either. The persona sentence reaches his door when the nodes next
+restart, since each node imports covenant_persona once. HANDS WRITE learning.txt works today, because
+nothing in the core changed. That sentence adds 466 characters to his rules. Since A273, the door
+counts the rules per request and drops the oldest history turns to fit, so the cost is a little less
+history, not an overflow. Tombstones searched first: docs/RETRACTED.json, 35 retractions, then 36 after
+A273 landed. None concerns practice, learning or the curriculum.
+
+---
+
 ### A273. [Tetsu's history budget was a fixed 12,000 characters sized beside rules that had since doubled, so one request could overflow the model's 8192-token window] 2026-10-06. A269's open item. FIXED in the keeper and both doors: the history now follows the real size of the rules, counted per request; driven both ways. The size it was sized beside is RETRACTED (A273-RULES-SIZE-2026-10-06): true when written, stale since
 
 **Measured,** on the running server (127.0.0.1:8081, its own /apply-template and /tokenize, the two

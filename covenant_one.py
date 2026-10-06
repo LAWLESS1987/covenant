@@ -636,6 +636,10 @@ SUITES = [
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
     ("test_pp1_tetsu_practice.py", 240, "JUDGE"),
+    # PP2 (2026-10-06, A275, his words: "ensure tetsu is free to learn whatever he wants also. tell him"): one slot a night
+    # drawn from Tetsu's OWN recorded choices, after the curriculum and on its own clock; he changes them by HANDS WRITE
+    # learning.txt; paper stays paper (a whole night loads no module but the practice and his hands). Real runs.
+    ("test_pp2_tetsu_choice.py", 240, "JUDGE"),
     # FL1 (2026-09-28, his words: "Yes, label them"): the assistant labels harvested forum rows only under
     # ops/forum_label_grant.json, through covenant_moltbook_release's one door -- excerpts of real eligible posts,
     # the exam-contamination filter applied, once each; without the grant it refuses as before.
