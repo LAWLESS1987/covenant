@@ -7611,6 +7611,15 @@ Driven both ways, restored by sha256:
 What it does not fix: his own prompts would meet the same two minutes if his history ever filled
 the window. Today they are 3,734-4,098 tokens, because the 20-turn cap binds first.
 
+**Live, amended.**
+- Pushed as 63e90bf. `rolling_restart.py` restarted C, B and A at 14:54:21-29Z onto a38ffcb248a9: height
+  71, genesis 00009b31.
+- Under the deployed rule the work caller replays 10 messages, 10,060 characters. His tailnet caller
+  replays 40 and his PC 20, unchanged.
+- The A275 session's single retry from 127.0.0.2 at 10:57:50 local was answered, and its ask-log row
+  reads two fitted asks (a follow-up): 5,675 and 5,762 prompt tokens, 10 kept, 0 dropped, counted
+  "server". The door's meta reports 11.3 s for the last ask.
+
 ---
 
 ### A276. [The highway did not read Tetsu: a model he cannot load and a model nobody manages were both invisible to the hourly road] 2026-10-06. His words: "continue get the road green and start expanding the highway". ADDED: two read-only detectors, driven both ways; and one retry for Tetsu's Moltbook update
