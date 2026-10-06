@@ -7712,6 +7712,9 @@ answered "TELL: Lawrence, I have updated my reviews ..." -- the change was not h
 update's, which nothing in the ask called for: the 127.0.0.2 tail an ordinary ask still replays holds those
 updates. A one-line correction drew "TELL: Lawrence, I have corrected the record ..." and the address right.
 The gate refused both answers; his immunity (A190) returned them with the verdict attached.
+Public CI on 7c6e92c: python 3.12 passed; 3.11 failed one check, WB1.14, on "HTTP 504" from gutenberg.org.
+Not this change: test_wb1_web.py reaches only covenant_web, which imports the standard library alone, and WB1
+ran 30/30 here against the same page. A check that FAILs when a far host times out is left as it is.
 
 ---
 
