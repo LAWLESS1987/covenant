@@ -782,6 +782,54 @@ def detect_sweep_red(health=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
+def detect_sweep_not_current(health=None, here=None):
+    """The newest full sweep with a verdict measured a DIFFERENT core than the one on disk.
+
+    A278 (2026-10-06, his words: "keep expanding the highway"). sweep_red reads the newest transcript's
+    verdict and never asks which core it measured. That day the core changed three times (A274, then the
+    A273 batch-caller fix), and after each landing the road went on reporting a sweep of code that was no
+    longer there -- once a 06:05 FAIL of 74d6d31e9f5d while a38ffcb248a9 ran. Three full sweeps were re-run
+    by hand to catch up. G12 (launch_check) already asks "a green sweep of THIS core"; the road did not.
+
+    Same discovery as sweep_red (content, not a filename list): top-level *.txt carrying "suites run" and a
+    RESULT: PASS|FAIL line, partial (--only) runs excluded. The core is the transcript's own
+    "sha256 <12 hex>" line, compared with the first 12 hex of covenant_unified_v8.py on disk."""
+    import glob
+    import hashlib
+    import re
+    here = here or HERE
+    verdict_re = re.compile(r"^\s*RESULT:\s*(PASS|FAIL)", re.M)
+    partial_re = re.compile(r"^#\s*scope:\s*PARTIAL\b", re.M)
+    newest = None
+    for p in glob.glob(os.path.join(here, "*.txt")):
+        try:
+            with io.open(p, encoding="utf-8", errors="replace") as fh:
+                txt = fh.read()
+        except OSError:
+            continue
+        if "suites run" not in txt or not verdict_re.search(txt) or partial_re.search(txt):
+            continue
+        mt = os.path.getmtime(p)
+        if newest is None or mt > newest[0]:
+            newest = (mt, p, txt)
+    if newest is None:
+        return {"state": UNKNOWN, "measured": {"why": "no full sweep on disk states PASS or FAIL"}}
+    try:
+        with open(os.path.join(here, "covenant_unified_v8.py"), "rb") as fh:
+            disk = hashlib.sha256(fh.read()).hexdigest()[:12]
+    except OSError as e:
+        return {"state": UNKNOWN, "measured": {"why": "the core on disk is unreadable: %s" % e}}
+    mt, path, txt = newest
+    m = re.search(r"sha256 ([0-9a-f]{12})", txt)
+    measured = {"artifact": os.path.basename(path), "disk_core": disk,
+                "transcript_core": m.group(1) if m else None,
+                "age_h": round((time.time() - mt) / 3600.0, 1)}
+    if not m:
+        measured["why"] = "the transcript names no core"
+        return {"state": UNKNOWN, "measured": measured}
+    return {"state": ABSENT if m.group(1) == disk else PRESENT, "measured": measured}
+
+
 PUBLIC_CI = os.path.join(HERE, "ops", "public_ci.json")       # gitignored: this PC's last reading of the public CI
 CI_REPO = os.environ.get("COVENANT_CI_REPO", "LAWLESS1987/covenant")
 CI_WORKFLOW = "covenant.yml"
@@ -1492,6 +1540,7 @@ DETECTORS = {
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,
     "sweep_red": detect_sweep_red,
+    "sweep_not_current": detect_sweep_not_current,
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,
@@ -1894,6 +1943,56 @@ def remedy_rerun_unclean(measured, dry_run=True):
                   "sweep; this only closes the gap." % was)
 
 
+def _sweep_running():
+    """Command lines of a covenant_one.py already running on this PC (any caller: the daily, a person,
+    this remedy). Windows only; elsewhere [] -- and the remedy below runs only where it can look."""
+    try:
+        import covenant_daily
+        return covenant_daily._processes("covenant_one.py")
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
+def _sweep_launch(cmd, log_path):
+    import covenant_quiet
+    out = open(log_path, "a", encoding="utf-8")
+    return covenant_quiet.popen_survivor(cmd, cwd=HERE, stdout=out, stderr=out)
+
+
+def remedy_run_full_sweep(measured, dry_run=True):
+    """ASYNCHRONOUS: run the full sweep (covenant_one.py) on the core that is on disk now.
+
+    A278 (2026-10-06). After a core landing the newest sweep speaks for code that is gone. This starts one
+    sweep, detached (launch_survivor's breakaway path), and the next passes grade it once it has written a
+    verdict: sweep_not_current clears whichever way it came out, and a FAIL is then sweep_red's to say.
+    It writes only the sweep's own outputs. It declines -- which spends nothing (A261) -- when a sweep is
+    already running, when it cannot tell, when it is called from a test or from inside a sweep, and off
+    Windows, where it cannot look for a running one."""
+    import sys as _sys
+    if os.name != "nt":
+        return False, "not on Windows: cannot see whether a sweep is already running, so none is started"
+    prog = os.path.basename(str(_sys.argv[0] if _sys.argv else "") or "")
+    if prog.startswith("test_") or os.environ.get("COVENANT_ONE_TRANSCRIPT") or os.environ.get("COVENANT_INSECURE_MOCK_JUDGE"):
+        return False, "called from a test or from inside a sweep; a sweep is never started from there"
+    running = _sweep_running()
+    if running is None:
+        return False, "could not list running processes; not starting a second sweep blind"
+    if running:
+        return False, "a sweep is already running (%s); it will speak for the core" % running[0][:120]
+    if dry_run:
+        return True, "would start covenant_one.py on core %s (the newest sweep measured %s)" % (
+            (measured or {}).get("disk_core"), (measured or {}).get("transcript_core"))
+    py = os.path.join(HERE, ".venv", "Scripts", "python.exe")
+    if not os.path.isfile(py):
+        py = _sys.executable
+    try:
+        p = _sweep_launch([py, os.path.join(HERE, "covenant_one.py")], os.path.join(HERE, "logs", "sweep_remedy.log"))
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the sweep could not be started: %s: %s" % (type(e).__name__, e)
+    return True, "started covenant_one.py (pid %s) on core %s; ~40 min; graded once it writes its verdict" % (
+        getattr(p, "pid", "?"), (measured or {}).get("disk_core"))
+
+
 def remedy_evict_test_mesh(measured, dry_run=True):
     """STATELESS: end the leftover TEST nodes (run_node.py --port 60x0) of a sweep that is not running.
 
@@ -1975,6 +2074,15 @@ REMEDIES = {
                                             "red that is transient clears; red that is real is named"],
                                   "cost": ["the seconds those suites take, never the full ~14 min sweep"],
                                   "irreversible": []}},
+    # A278 (2026-10-06): a sweep of the core on disk, at most once in SWEEP_BUDGET_S, graded once it wrote.
+    "run_full_sweep": {"fn": remedy_run_full_sweep, "klass": AUTO_REVERSIBLE,
+                       "for": ["sweep_not_current"], "kind": "stateless",
+                       "async": True, "cooldown_s": 6 * 3600, "grade_after_s": 3600.0,
+                       "touches": ["the sweep's transcript (ONE_RUN.txt)", "this PC's CPU for ~40 min"],
+                       "benefit": {"gains": ["the road's verdict speaks for the code that is running",
+                                             "a landing is measured the same hour, not the next morning"],
+                                   "cost": ["~40 min of CPU beside Tetsu and the nodes, at most once in 6 h"],
+                                   "irreversible": []}},
     "restart_nodes": {"fn": remedy_restart_nodes, "klass": AUTO_REVERSIBLE,
                       "for": ["source_drift", "node_down"], "kind": "stateless",
                       # A240: inside a node the restart runs detached and finishes after this

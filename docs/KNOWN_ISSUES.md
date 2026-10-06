@@ -7622,6 +7622,34 @@ the window. Today they are 3,734-4,098 tokens, because the 20-turn cap binds fir
 
 ---
 
+### A278. [The road reported a sweep of code that was no longer running: sweep_red never asked which core its transcript measured] 2026-10-06. His words: "keep expanding the highway". ADDED: sweep_not_current and run_full_sweep, driven both ways
+
+**Measured.** The core changed three times on 2026-10-06 (74d6d31e9f5d, 55bd8038ecfa for A274, then
+a38ffcb248a9 for the A273 batch-caller fix). After each landing, sweep_red went on reading the newest
+transcript with a verdict, whatever core it measured. At 11:0x local it read a 06:05 FAIL of 74d6d31e9f5d
+while a38ffcb248a9 ran. G12 (launch_check) already asks for "a green sweep of THIS core"; the road did not.
+I ran the full sweep by hand three times to catch up, and two of those runs were INCOMPLETE because a core
+landed mid-run.
+
+**Added.** `detect_sweep_not_current`: the same discovery as sweep_red (content, not filenames; --only runs
+excluded), comparing the transcript's own `sha256 <12 hex>` core line with covenant_unified_v8.py on disk.
+A full sweep of the current core is ABSENT even when it says FAIL, because the FAIL is sweep_red's to say.
+`remedy_run_full_sweep` (AUTO_REVERSIBLE, stateless, async, at most once in 6 h, graded after an hour)
+starts covenant_one.py detached through covenant_quiet.popen_survivor, the breakaway path. It declines,
+spending nothing (A261), when a sweep is already running, when it cannot list processes, from a test_*.py
+or inside a sweep, and off Windows. What it touches is the sweep's transcript and ~40 min of CPU; none of
+it is NEVER_AUTOMATIC.
+
+**Pinned.** H1sc (the detector each way on a temp tree; the remedy's refusals and its one launch, with
+stand-in process list and launcher). Mutations: the core ignored (189/193); the test guard removed
+(188/193); the running-sweep check removed (188/193); restored 193/193. Live at commit: ABSENT, with
+ONE_RUN.txt measuring a38ffcb248a9, the core on disk.
+
+**What it cannot see.** A sweep can still go INCOMPLETE when a core lands mid-run. The remedy fires again
+on the next pass after its 6 h budget, not at once.
+
+---
+
 ### A277. [The Moltbook orb read amber on the day a reply went out: it counted the last six attempts, and A270 made a round try ~200] 2026-10-06. Found reading every orb after the road went green. Caused by my A270. FIXED, driven both ways
 
 **Measured.** At 11:29 local the /pc/3d state read Moltbook "0 of 6 sent", amber. free's reply to

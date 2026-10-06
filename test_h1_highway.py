@@ -1406,6 +1406,68 @@ def main():
     check("H1z the remedy refuses real-time OFF (a person's setting), names both mendable lapses in a dry run, and does nothing with no lapse",
           ok_rt is False and "mine to mend" in why_rt and ok_dry and "signatures are 9 days old" in why_dry and "no scan in 30 days" in why_dry and ok_none is False, (why_rt, why_dry, why_none))
 
+    # ---- H1sc: the sweep measured THIS core (A278, 2026-10-06, his words: "keep expanding the highway").
+    # A temp tree with its own core file and transcripts; the remedy's process list and launcher are
+    # stand-ins, so no test can start a real sweep.
+    import hashlib as _hl
+    _sc = tempfile.mkdtemp(prefix="h1sc_")
+    with open(os.path.join(_sc, "covenant_unified_v8.py"), "wb") as _fh:
+        _fh.write(b"# core v2\n")
+    _disk = _hl.sha256(b"# core v2\n").hexdigest()[:12]
+
+    def _transcript(name, core, verdict="PASS", partial=False):
+        with open(os.path.join(_sc, name), "w", encoding="utf-8") as fh:
+            fh.write(("# scope: PARTIAL\n" if partial else "") + "  core  covenant_unified_v8.py  10 bytes  sha256 %s\n"
+                     "  suites run  178\n  checks failed  0\n  RESULT: %s. ...\n" % (core, verdict))
+    r_none = H.detect_sweep_not_current(here=_sc)["state"]
+    _transcript("OLD.txt", "0123456789ab")
+    r_old = H.detect_sweep_not_current(here=_sc)
+    _transcript("ONLY.txt", _disk, partial=True)
+    r_partial = H.detect_sweep_not_current(here=_sc)["state"]
+    _transcript("NEW.txt", _disk, verdict="FAIL")
+    r_new = H.detect_sweep_not_current(here=_sc)
+    check("H1sc sweep_not_current: no sweep UNKNOWN; a sweep of another core PRESENT (naming both); a partial "
+          "run of this core does not count; a full sweep of this core ABSENT even when it says FAIL (that is sweep_red's)",
+          r_none == H.UNKNOWN and r_old["state"] == H.PRESENT and r_old["measured"]["transcript_core"] == "0123456789ab"
+          and r_old["measured"]["disk_core"] == _disk and r_partial == H.PRESENT and r_new["state"] == H.ABSENT,
+          (r_none, r_old, r_partial, r_new))
+    _rs = H.REMEDIES.get("run_full_sweep") or {}
+    check("H1sc run_full_sweep is paired with sweep_not_current alone: AUTO_REVERSIBLE, stateless, async, at most once in 6 h",
+          _rs.get("for") == ["sweep_not_current"] and _rs.get("klass") == H.AUTO_REVERSIBLE and _rs.get("kind") == "stateless"
+          and _rs.get("async") is True and _rs.get("cooldown_s", 0) >= 6 * 3600, _rs)
+    _real_sc = (H._sweep_running, H._sweep_launch, sys.argv[0],
+                {k: os.environ.get(k) for k in ("COVENANT_ONE_TRANSCRIPT", "COVENANT_INSECURE_MOCK_JUDGE")})
+    _launched = []
+    try:
+        H._sweep_launch = lambda cmd, log: (_launched.append(cmd), type("P", (), {"pid": 4242})())[1]
+        H._sweep_running = lambda: []
+        ok_test, why_test = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)   # argv[0] is this suite
+        sys.argv[0] = "covenant_watchdog.py"
+        for k in _real_sc[3]:
+            os.environ.pop(k, None)
+        H._sweep_running = lambda: ["4711 python covenant_one.py"]
+        ok_busy, why_busy = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
+        H._sweep_running = lambda: None
+        ok_blind, why_blind = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
+        H._sweep_running = lambda: []
+        ok_dry, why_dry = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=True)
+        n_before = len(_launched)
+        ok_go, why_go = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
+    finally:
+        H._sweep_running, H._sweep_launch, sys.argv[0] = _real_sc[0], _real_sc[1], _real_sc[2]
+        for k, v in _real_sc[3].items():
+            if v is not None:
+                os.environ[k] = v
+    if os.name == "nt":
+        check("H1sc the remedy declines from a test, beside a running sweep, and when it cannot look; a dry run starts nothing",
+              ok_test is False and "test" in why_test and ok_busy is False and "already running" in why_busy
+              and ok_blind is False and ok_dry is True and n_before == 0, (why_test, why_busy, why_blind, why_dry, _launched))
+        check("H1sc ...and with the way clear it starts exactly one covenant_one.py",
+              ok_go is True and len(_launched) == 1 and _launched[0][-1].endswith("covenant_one.py") and "4242" in why_go, (why_go, _launched))
+    else:
+        check("H1sc off Windows the remedy declines (it cannot see a running sweep) and starts nothing",
+              ok_go is False and not _launched, (why_go, _launched))
+
     # ---- H1tt: Tetsu on the road (A276, 2026-10-06, his words: "get the road green and start expanding
     # the highway"). Two READS of covenant_model.readiness(), driven with a stand-in, each way. No remedy
     # may be paired with either: the model is NEVER_AUTOMATIC and freeing memory is his (A252).
