@@ -611,6 +611,9 @@ run test_a259_dashboard_redact.py 120
 # A263 (2026-10-05): an ask marked private is answered on this PC and never queued for the
 # teacher panel, which runs on the public repository's runner. Stub model; redirected paths.
 run test_a263_private_teacher.py 180
+# A265 (2026-10-05): the model keeper's stop counts only when the server stops answering; a refused
+# kill keeps the state and logs STOP FAILED. Every kill is a recorder; nothing real is stopped.
+run test_a265_model_stop.py 120
 echo "=== THIS RUNNER'S OWN CLEANUP (K1) ==="
 # Added 2026-08-27 with the key-preservation fix at the top of this file.
 # It is registered HERE, in the same change that introduced it, because an

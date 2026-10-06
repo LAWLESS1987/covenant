@@ -7298,6 +7298,51 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A265. [the model keeper logged "stop pid 5524" for a kill Windows refused, so Tetsu's server ran unmanaged for a day and the first private batch ask timed out against it] 2026-10-05. Found running the X video transcripts through Tetsu's door (his words: "run the X video transcripts through tetsu with --private"). FIXED, the guard driven both ways; the orphan was ended on his UAC approval
+
+**Measured.** The first `tools/tetsu_work.py --private` item came back 503 after 180 s:
+`the model did not answer: TimeoutError: timed out`. A `llama-server` (pid 5524, created 2026-10-04
+19:07:08, the second the keeper logged a 3B start) was answering /health on 127.0.0.1:8081, but
+logs/model_server.log said `stop pid 5524 ... reason=idle` at 23:10:12 that night, and
+ops/model_server.json was gone. Free memory: 0.52 GB, with the 3B needing 2.6. Its working set fell to
+10 MB of 3,381 MB private, so Windows had paged it out and every answer had to read it back from disk.
+It was idle (0 CPU over 5 s, 4 slots not processing) and listened on loopback only.
+
+**Cause.** `covenant_model.stop()` ran `taskkill /PID /T /F` with its result discarded, then deleted the
+state and logged the stop. Asked again from this account, taskkill answered exit 128, "Access is
+denied", for 5524 and its child conhost. Even `GetOwner` was refused, so the server ran with rights
+the node lacks; what started it with those rights is UNDETERMINED (its parent, 26552, had exited).
+With no state the keeper went blind three ways: `start()` saw /health answer and reused it as
+"already up"; the idle and memory-pressure checks found no model to put away; and `readiness()` read
+PASS ("up: ?") while asks timed out. No earlier record has this shape (no "taskkill" or "Access is
+denied" anywhere in this file), and no suite had ever run the real `stop()`: MK1 replaces it with a
+stub.
+
+**Fixed.** `stop()` reads the kill's result and asks the server whether it still answers, for up to
+`STOP_VERIFY_S`. While it answers, the state is KEPT, the log says `STOP FAILED` with taskkill's
+words, and `stop()` returns False. Only a server that has stopped answering is logged `stop pid`, as
+before. `readiness()` reads UNDETERMINED (`managed: False`), not PASS, when something answers on the
+port and the keeper recorded nothing. Counted first: `stop()` has 4 call sites inside the keeper and
+2 outside (covenant_daily, covenant_image), and none reads its result; `readiness()` has 1 consumer
+(covenant_daily), which already carries UNDETERMINED.
+
+**Ended.** He approved a UAC prompt for one elevated `Stop-Process -Id 5524 -Force`. 5524 was gone at
+21:01:16 and 8081 closed. A fresh, managed 3B starts at the next ask once about 2.7 GB is free. What
+to close to free it is his (A252).
+
+**Not fixed, named.** A refused kill is now SEEN, not prevented. A server started with higher rights
+still cannot be stopped by the node, and the keeper says so instead of believing otherwise. Whatever
+started 5524 elevated is UNDETERMINED.
+
+**Pinned by** `test_a265_model_stop.py` (9), registered in covenant_one.py and run_all_tests.sh. Every
+kill is a recorder and the pid does not exist. Broken in source (verification and readiness branch
+removed): 5/9, and S1 reproduces the incident (`True, 'stopped'` and a "stop pid" line for a kill
+that did not happen); restored, 9/9. MK1, TD1, IG1 and A263 38/38 stayed green.
+
+**Repro:** `python test_a265_model_stop.py`; `python -c "import covenant_model as M; print(M.readiness())"`.
+
+---
+
 ### A263. [Tetsu's doors queued every exchange for a teacher panel on the PUBLIC runner, so a private transcript handed to him would have been published; and a docstring said the opposite guard existed] 2026-10-05. Found by the X-video session (tools/tetsu_work.py on private transcripts); his words, relayed by that session: "go ahead and add the guard to tetsus door". FIXED with an opt-in marker, the guard driven both ways; the live nodes take it at their next restart. A RECURRENCE of A128's stated residual
 
 **The route, read end to end.** `/m/agent` (covenant_unified_v8.py:8458) and `/pc/council`

@@ -140,7 +140,15 @@ def readiness():
 
     Returns {"verdict": PASS | FAIL | UNDETERMINED, "why": text, "free_gb": float|None, ...}."""
     if alive():
-        return {"verdict": "PASS", "why": "up: %s" % (_read_state().get("model") or "?"), "free_gb": free_gb()}
+        st = _read_state()
+        if not st.get("pid") and not st.get("model"):
+            # A265: something answers on the port and this keeper recorded nothing. On 2026-10-05 that
+            # was a server whose stop had failed: it answered /health and timed out every ask.
+            return {"verdict": "UNDETERMINED", "free_gb": free_gb(), "managed": False,
+                    "why": "a server answers on %s:%d that this keeper has no record of starting (no state): "
+                           "whether it answers in time is not measured, and nothing here can put it away (A265)"
+                           % (HOST, PORT)}
+        return {"verdict": "PASS", "why": "up: %s" % (st.get("model") or "?"), "free_gb": free_gb()}
     if os.environ.get("COVENANT_MODEL_STUB"):
         return {"verdict": "PASS", "why": "stub", "free_gb": None}
     if not os.path.isfile(BIN):
@@ -292,18 +300,42 @@ def _stop_origin():
             return ""
 
 
+# A STOP IS A STOP ONLY WHEN THE SERVER STOPS ANSWERING (A265, 2026-10-05). The idle stop at
+# 2026-10-04T23:10:12 logged "stop pid 5524", deleted the state and returned True -- and taskkill
+# had answered "Access is denied" (exit 128): that server ran with rights the node lacks. It kept
+# answering on 8081 for a day with no state, so start() reused it as "already up", the idle and
+# pressure checks could never put it away, and readiness() read PASS while every ask timed out
+# against a model Windows had paged out (0.52 GB free). The kill's own result is now read, and the
+# server is asked whether it still answers; until it does not, the state is kept so the keeper
+# still knows what it is running, and the log says the stop FAILED, with taskkill's words.
+STOP_VERIFY_S = 10
+
+
 def stop(say=print):
     st = _read_state()
     pid = st.get("pid")
     if not pid:
         return False, "not started by this keeper"
+    detail = ""
     try:
         if os.name == "nt":
-            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+            r = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
+            detail = "taskkill exit %s: %s" % (r.returncode, " ".join(((r.stderr or "") + " " + (r.stdout or "")).split())[:240])
         else:
             os.kill(int(pid), 15)
     except Exception as e:                                        # noqa: BLE001
         return False, "could not stop pid %s: %s" % (pid, e)
+    for _ in range(int(STOP_VERIFY_S * 2)):
+        if not alive():
+            break
+        time.sleep(0.5)
+    else:
+        with open(LOG, "a", encoding="utf-8") as lf:
+            lf.write("%s STOP FAILED pid %s (%s): it still answers on %s:%d after %ss; state kept (A265). %s%s\n"
+                     % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model"), HOST, PORT, STOP_VERIFY_S,
+                        detail, _stop_origin()))
+        say("model server: could NOT stop pid %s -- it still answers (%s)" % (pid, detail or "no detail"))
+        return False, "could not stop pid %s: it still answers (%s)" % (pid, detail or "no detail")
     try:
         os.remove(STATE)
     except OSError:

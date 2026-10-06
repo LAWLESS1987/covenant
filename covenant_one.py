@@ -445,6 +445,9 @@ SUITES = [
     ("test_tl1_tetsu_live.py",            120,  "JUDGE"),
     ("test_im1_immunity.py",              120,  "JUDGE"),
     ("test_mk1_model_keeper.py",          120,  "JUDGE"),
+    # A265 (2026-10-05), registered in the change that created it: the keeper's stop is a stop only
+    # when the server stops answering. The first suite to run the real stop(); every kill is a recorder.
+    ("test_a265_model_stop.py",           120,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
