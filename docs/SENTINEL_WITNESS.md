@@ -102,6 +102,10 @@ $50/day, 2 orders/day and the XRP/LINK/HBAR floors kept).
   decision admitted and mined by node A (tx `49bfef21...`). It planned no orders.
   Cash is below the 10% floor, XRP is at its frozen floor, `contribution_symbols`
   is empty, and no daily plan has been approved here since 2026-09-19.
+  **A reader cannot check these four facts** (II.6). They rest on the exchange
+  account, on `private/RESERVE.json` and on the gitignored approvals ledger, and
+  none of those is ever published. What is public is the code that reads them,
+  and the sealed decision's commitment on the operator's node.
 
 **What retiring this repository's copy has to do first.** Sentinel-Witness's
 seal call and this repository's `sentinel_witness/seal_service.py` both import

@@ -42,7 +42,9 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #
 # 2026-10-05: docs/SENTINEL_WITNESS.md alone re-frozen (4,227 -> 7,747 bytes):
 # the record of the trading layer's move to Sentinel-Witness, written on the
-# operator's instruction. sentinel_witness/README.md and seal_service.py had
+# operator's instruction. Then 7,747 -> 8,049 the same day: C4.2 turned CI red
+# because that record named private/RESERVE.json and stated account facts
+# without saying a reader cannot check them (II.6); the limit is now stated. sentinel_witness/README.md and seal_service.py had
 # already drifted before that edit; they are NOT re-frozen here, because
 # accounting for them is not this commit's to do.
 #
@@ -63,7 +65,7 @@ FROZEN = {
     "test_sentinels.py":                        (968, "f8c1ea4e1e026cff61aeb98d0be3d9c9b4c822cedf3b3cfe176e99fd44510710"),
     "test_g6_sentinels_fail.py":                (7138, "b0cbebc02d4d0e6bcbc1d301c61aea8e65191bee87392d3832cd948296d3a5e0"),
     "covenant_sentinels.py":                    (28343, "a762cd17624de25fa999fa48e15663d762b6f57dd6a5f5b0bdb0c102002e7926"),
-    "docs/SENTINEL_WITNESS.md":                 (7747, "5e11f3864977fd7658caabf4f6e8c47802802b04410ccee7a6425ba467857dbf"),
+    "docs/SENTINEL_WITNESS.md":                 (8049, "b2d5fc81e9de4c3507ff2a7ca1a5c08daea570c0cbc77ec9b5e0d9d208fc2d5b"),
 }
 
 # The suite tallies measured at the freeze. A CHANGE HERE IS NOT A FAILURE --
