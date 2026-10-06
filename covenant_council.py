@@ -360,7 +360,7 @@ def register(api):
             return jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503
         # A273: no character budget where the keeper can count; deliberate() fits each role's request.
         _fit = getattr(_m, "fit", None)
-        history = cov.agent_history(_log_path(), addr, budget=None if _fit else cov.AGENT_HISTORY_BUDGET,
+        history = cov.agent_history(_log_path(), addr, budget=cov.agent_history_budget(addr, _fit is not None),
                                     include_private=private)
         # A210 ("Free browser access"): a URL in the question is read through the
         # web door, read-only and on record, and handed to the council as data.

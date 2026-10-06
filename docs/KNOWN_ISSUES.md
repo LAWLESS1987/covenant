@@ -7561,6 +7561,37 @@ under A273 brings it nearer the timeout. Nothing is changed here. How the door, 
 batch share one slot is a choice between his goals: a longer door timeout, free yielding to the door,
 or a cap on the batch caller's replay.
 
+**Amended the same day: the work caller keeps its old ceiling. The longer batch prompt was my
+regression.** The A275 session reported it ("Feed Tetsu's own learning choices into his practice").
+Its one ask from 127.0.0.2 after the restart returned 503 TimeoutError at 180.7 s, on a 7,064-token
+prompt. Re-measured here:
+- This CPU reads a cold prompt at 58.5 tokens a second (2,902 tokens in 49.6 s, the server's own
+  timings). The A275 session measured 64.4.
+- On the old budget, the batch caller's last 12 asks (09:02-09:52) took 66-118 s, and all 12 were
+  answered.
+- Fitted to the window, its prompt grew from 5,425 to 6,722-7,064 tokens. That is about two minutes of
+  reading before the answer starts.
+
+That was a cost A273 put on the batch alone, and what bought it was replaying the batch's own earlier
+items to itself, not his conversation. So `agent_history_budget(addr, can_fit)` keeps
+AGENT_HISTORY_BUDGET for a caller in `AGENT_WORK_CALLERS` ("127.0.0.2", tools/tetsu_work.py's SOURCE,
+covenant_persona.WORK_CALLERS). Every request is still fitted to the window. His callers still replay as
+much as fits. Both doors use the rule.
+
+Pinned by W1-W4 in the same suite, now 22/22:
+- W1 the rule itself.
+- W2 the three spellings of the address agree.
+- W3 the real door with short rules: his caller replays 24,000 characters, the work caller 12,000.
+- W4 the council for the work caller.
+
+Driven both ways, restored by sha256:
+- M6, the rule forgets the work caller: 19/22, W1 W3 W4 red.
+- M7, the council's line back to no ceiling: 21/22, W4 red.
+- M1, re-run on the new code: 18/22.
+
+What it does not fix: his own prompts would meet the same two minutes if his history ever filled
+the window. Today they are 3,734-4,098 tokens, because the 20-turn cap binds first.
+
 ---
 
 ### A276. [The highway did not read Tetsu: a model he cannot load and a model nobody manages were both invisible to the hourly road] 2026-10-06. His words: "continue get the road green and start expanding the highway". ADDED: two read-only detectors, driven both ways; and one retry for Tetsu's Moltbook update

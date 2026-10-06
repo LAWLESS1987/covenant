@@ -24,6 +24,9 @@ place of the server, so the request the door SENDS is checked by a count the doo
   D1-D5  /m/agent, the real handler, with long rules: every request it sends fits, keeps the most
          history that fits, a follow-up is fitted from what was sent, the record says what was kept,
          and a keeper without fit() still answers on the old 12,000-character budget
+  W1-W4  the work caller (tools/tetsu_work.py's own address) keeps the old 12,000-character ceiling
+         under the fit, because a fitted batch prompt (6,722 tokens) ran past the door's 180 s at
+         this CPU's 58.5 tokens a second; his callers replay as much as fits
   C1-C2  /pc/council the same: each of the three roles' requests fits
   L1     the live server, when one answers on 127.0.0.1:8081: fit() with the server's own count keeps
          a long request inside 8,192 -- SKIP, counted apart, where no server answers (the runner)
@@ -234,6 +237,49 @@ def main():
         check("D5 a keeper without fit() still answers, on the old budget (%d characters <= %d)"
               % (hchars, cov.AGENT_HISTORY_BUDGET), r.status_code == 200 and len(sent) == 1
               and 0 < hchars <= cov.AGENT_HISTORY_BUDGET and sent[0][1] == 700, (r.status_code, hchars))
+
+        # ---- W: the work caller keeps its ceiling ----------------------------------------------
+        WORK = cov.AGENT_WORK_CALLERS[0]
+        check("W1 the budget rule: his caller reads with none where the keeper fits; a work caller, or any "
+              "caller without fit(), keeps AGENT_HISTORY_BUDGET",
+              cov.agent_history_budget(CALLER, True) is None
+              and cov.agent_history_budget(WORK, True) == cov.AGENT_HISTORY_BUDGET
+              and cov.agent_history_budget(CALLER, False) == cov.AGENT_HISTORY_BUDGET,
+              (cov.agent_history_budget(CALLER, True), cov.agent_history_budget(WORK, True)))
+        sys.path.insert(0, os.path.join(HERE, "tools"))
+        import tetsu_work as TW
+        check("W2 the work caller is the batch tool's own address (tools/tetsu_work.SOURCE) and the persona's "
+              "WORK_CALLERS, so moving one without the others turns this red",
+              set(cov.AGENT_WORK_CALLERS) == set(P.WORK_CALLERS) and TW.SOURCE in cov.AGENT_WORK_CALLERS,
+              (cov.AGENT_WORK_CALLERS, P.WORK_CALLERS, TW.SOURCE))
+        size[0] = 2000                                            # short rules: the window has room
+        both = os.path.join(d, "ask_log_w.jsonl")
+        write_log(both, CALLER, 20)
+        with open(both, "a", encoding="utf-8") as fh:
+            for i in range(20):
+                fh.write(json.dumps({"kind": "agent", "from": WORK, "text": "W%02d " % i + words(1996, i),
+                                     "answer": "B%02d " % i + words(1996, 50 + i)}) + "\n")
+        real_log = os.environ["COVENANT_ASK_LOG"]
+        os.environ["COVENANT_ASK_LOG"] = both
+        try:
+            got = {}
+            for who in (CALLER, WORK):
+                sent.clear()
+                client.post("/m/agent", json={"text": "a short question"}, environ_base={"REMOTE_ADDR": who})
+                got[who] = (sum(len(x["content"]) for x in sent[0][0][1:-1]), tokens(sent[0][0]) + sent[0][1]) if sent else (0, 0)
+            sent.clear()
+            client.post("/pc/council", json={"text": "a short question"}, environ_base={"REMOTE_ADDR": WORK})
+            council_work = [sum(len(x["content"]) for x in s[1:-1]) for s, _ in sent]
+        finally:
+            os.environ["COVENANT_ASK_LOG"] = real_log
+        check("W4 /pc/council, the work caller: each role replays at most %d characters %s"
+              % (cov.AGENT_HISTORY_BUDGET, council_work),
+              len(council_work) == 3 and all(0 < c <= cov.AGENT_HISTORY_BUDGET for c in council_work), council_work)
+        check("W3 the real door, short rules: his caller replays more than 12,000 characters (%d), the work caller "
+              "at most %d (%d), and both fit the window" % (got[CALLER][0], cov.AGENT_HISTORY_BUDGET, got[WORK][0]),
+              got[CALLER][0] > cov.AGENT_HISTORY_BUDGET and 0 < got[WORK][0] <= cov.AGENT_HISTORY_BUDGET
+              and all(t <= CTX - MARGIN for _, t in got.values()), got)
+        size[0] = LONG_RULES
 
         # ---- C: /pc/council ------------------------------------------------------------------
         sent.clear()

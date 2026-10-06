@@ -678,6 +678,22 @@ AGENT_HISTORY_CHARS = 2000
 AGENT_HISTORY_BUDGET = 12000
 AGENT_ANSWER_TOKENS = 700
 AGENT_HISTORY_KINDS = ("agent", "council")
+# THE WORK CALLER KEEPS ITS CEILING (A273, the same day). Fitting to the window let the batch caller --
+# tools/tetsu_work.py's SOURCE, covenant_persona.WORK_CALLERS, never his own conversation -- replay 16
+# messages, a 6,722-token prompt where the old budget gave 10 (5,425). This CPU reads a cold prompt at
+# 58.5 tokens a second (measured: 2,902 tokens in 49.6 s; the A275 session measured 64.4), so that
+# prompt alone is about two minutes: it answered in 138.7 s with the slot idle, and the A275 session's
+# 7,064-token ask timed out at 180.7 s, the door's limit. On the old budget its last 12 asks
+# (ops/chat/ask_log.jsonl, 09:02-09:52) had taken 66-118 s, all 12 answered.
+# So a work caller still replays at most AGENT_HISTORY_BUDGET characters, then is fitted like any
+# other; his callers replay as much as fits.
+AGENT_WORK_CALLERS = ("127.0.0.2",)
+
+
+def agent_history_budget(addr, can_fit):
+    """The character budget agent_history() reads with: none where the keeper fits to the window and
+    the caller is his, the old AGENT_HISTORY_BUDGET for a work caller or a keeper without fit()."""
+    return None if can_fit and addr not in AGENT_WORK_CALLERS else AGENT_HISTORY_BUDGET
 
 # A PRIVATE ASK (A263, 2026-10-05). Every exchange at /m/agent and /pc/council was queued for the
 # teacher, and the teacher is a panel on the PUBLIC repository's runner whose job summary is public
@@ -8932,7 +8948,7 @@ class CovenantAPI:
             _log_path = os.environ.get("COVENANT_ASK_LOG") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "chat", "ask_log.jsonl")
             # A273: no character budget where the keeper can count -- fit() below keeps what the window holds.
             _fit = getattr(_m, "fit", None)
-            history = agent_history(_log_path, addr, budget=None if _fit else AGENT_HISTORY_BUDGET,
+            history = agent_history(_log_path, addr, budget=agent_history_budget(addr, _fit is not None),
                                     include_private=private)
             # The system message is composed (2026-09-21, A174): the fixed rules above,
             # then the register Tetsu may revise, then a short TRUE brief of the day, so
