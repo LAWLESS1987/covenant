@@ -7635,6 +7635,26 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A281. [Nothing watched whether Windows was still firing the scheduled tasks the system runs on] 2026-10-06. His words: "yes post the corrections and keep expanding". ADDED: schedule_stalled, read-only, driven both ways
+
+The guard that revives the watchdog (CovenantGuard), the nightly (CovenantDistill), free's rounds
+(CovenantAmbassador), the refine check and the trader's read all run because the Windows scheduler starts
+them. If it stopped firing one, that function would stop, and every other detector would read the absence
+as quiet. `detect_schedule_stalled` reads Covenant* tasks (at most every 10 min) and is PRESENT when an
+enabled one has missed runs, or a next run more than an hour past. It asks whether the schedule is ALIVE,
+not whether a run passed. CovenantDistill's last result that day was 1, the 03:30 nightly reporting NOT
+GREEN for the morning's reds. That was already told on the direct line, its causes are fixed, and a
+past run's exit code would have held the road red for a day over old news. A disabled task is listed and
+not flagged: disabling one is a person's choice. Off Windows, or unreadable, UNKNOWN. No remedy. H1sk:
+ignoring overdue fails it, and so does flagging a disabled task; H1 197/197. Live at commit: 5 tasks, none
+stalled.
+
+**Considered and not built here:** a detector for Tetsu's door failing while readiness reads PASS (the
+morning's 503s). The core returns the 503 and records nothing, so there is nothing to read without
+changing covenant_unified_v8.py: its pin, a sweep and a restart.
+
+---
+
 ### A280. [free's replies claimed measurements the covenant never made: her prompt asked "what the covenant measured" and gave her nothing to cite] 2026-10-06. Found reading the noon round's sends. Three such replies are PUBLIC on Moltbook. FIXED for every draft from now; the three posted are his to correct
 
 **Measured.** All three replies that went out on 2026-10-06 claimed a measurement that is on no record:

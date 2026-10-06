@@ -830,6 +830,68 @@ def detect_sweep_not_current(health=None, here=None):
     return {"state": ABSENT if m.group(1) == disk else PRESENT, "measured": measured}
 
 
+SCHEDULE_EVERY_S = 600      # one scheduler read per 10 min: a PowerShell spawn, and the watchdog passes every minute
+SCHEDULE_LATE_S = 3600      # a next run more than an hour in the past is a scheduler that is not firing it
+_schedule_cache = {"at": 0.0, "tasks": None}
+
+
+def _read_schedule():
+    """[{name, state, last_run, next_run, missed}] for every Covenant* task, or None where it cannot be read."""
+    if os.name != "nt":
+        return None
+    ps = ("Get-ScheduledTask -TaskName 'Covenant*' -ErrorAction SilentlyContinue | ForEach-Object { "
+          "$i = $_ | Get-ScheduledTaskInfo; [pscustomobject]@{name=$_.TaskName; state=[string]$_.State; "
+          "last=$(if ($i.LastRunTime -and $i.LastRunTime.Year -gt 2000) {([DateTimeOffset]$i.LastRunTime).ToUnixTimeSeconds()} else {$null}); "
+          "next=$(if ($i.NextRunTime) {([DateTimeOffset]$i.NextRunTime).ToUnixTimeSeconds()} else {$null}); "
+          "missed=$i.NumberOfMissedRuns} } | ConvertTo-Json -Compress")
+    import subprocess
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
+                           timeout=60, creationflags=0x08000000)
+        data = json.loads(r.stdout or "null")
+    except Exception:                                            # noqa: BLE001
+        return None
+    if data is None:
+        return []
+    data = data if isinstance(data, list) else [data]
+    return [{"name": d.get("name"), "state": d.get("state"), "last_run": d.get("last"), "next_run": d.get("next"),
+             "missed": int(d.get("missed") or 0)} for d in data]
+
+
+def detect_schedule_stalled(health=None, tasks=None, now=None):
+    """A Covenant scheduled task that is enabled and is not being fired: missed runs, or a next run long past.
+
+    A281 (2026-10-06, his words: "keep expanding the highway"). Much of what runs here runs because Windows
+    starts it: the guard that revives the watchdog (CovenantGuard), the nightly (CovenantDistill), free's
+    rounds (CovenantAmbassador), the refine check, the trader's read. If the scheduler stopped firing one,
+    the function would stop and every other detector would read the absence as quiet. This asks whether the
+    schedule is ALIVE, not whether a run passed -- outcomes have their own detectors and their own reports,
+    and a past run's exit code would keep the road red over news already told (the 03:30 nightly's NOT
+    GREEN that morning). A disabled task is listed and not flagged: disabling one is a person's choice. No
+    remedy: the scheduler's configuration is his."""
+    now = time.time() if now is None else now
+    if tasks is None:
+        if _schedule_cache["tasks"] is None or now - _schedule_cache["at"] > SCHEDULE_EVERY_S:
+            _schedule_cache.update(at=now, tasks=_read_schedule())
+        tasks = _schedule_cache["tasks"]
+    if tasks is None:
+        return {"state": UNKNOWN, "measured": {"why": "the scheduler could not be read here (not Windows, or the read failed)"}}
+    if not tasks:
+        return {"state": UNKNOWN, "measured": {"why": "no Covenant* scheduled task on this machine"}}
+    stalled, disabled = [], []
+    for t in tasks:
+        if str(t.get("state")) == "Disabled":
+            disabled.append(t.get("name"))
+            continue
+        nxt = t.get("next_run")
+        if t.get("missed"):
+            stalled.append("%s missed %d run(s)" % (t.get("name"), t["missed"]))
+        elif nxt is not None and now - float(nxt) > SCHEDULE_LATE_S:
+            stalled.append("%s was due %.1f h ago and has not run" % (t.get("name"), (now - float(nxt)) / 3600.0))
+    measured = {"tasks": len(tasks), "stalled": stalled, "disabled": disabled}
+    return {"state": PRESENT if stalled else ABSENT, "measured": measured}
+
+
 AMBASSADOR_STALL_H = 8.0     # rounds run every 3 h (CovenantAmbassador) plus the nightly's; 8 h is two missed
 
 
@@ -1590,6 +1652,7 @@ DETECTORS = {
     "sweep_red": detect_sweep_red,
     "sweep_not_current": detect_sweep_not_current,
     "ambassador_stalled": detect_ambassador_stalled,
+    "schedule_stalled": detect_schedule_stalled,
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,

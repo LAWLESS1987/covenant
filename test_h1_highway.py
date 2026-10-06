@@ -1486,6 +1486,24 @@ def main():
     _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
     check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
 
+    # ---- H1sk: the schedule is alive (A281, 2026-10-06). Stand-in task lists; the scheduler is never read here.
+    _t = 1_900_000_000.0
+    _ok = {"name": "CovenantGuard", "state": "Ready", "last_run": _t - 120, "next_run": _t + 60, "missed": 0}
+    sk = {
+        "alive": H.detect_schedule_stalled(tasks=[_ok], now=_t)["state"],
+        "late": H.detect_schedule_stalled(tasks=[_ok, dict(_ok, name="CovenantDistill", next_run=_t - 2 * 3600)], now=_t),
+        "missed": H.detect_schedule_stalled(tasks=[dict(_ok, missed=2)], now=_t)["state"],
+        "disabled": H.detect_schedule_stalled(tasks=[dict(_ok, state="Disabled", next_run=_t - 9 * 3600)], now=_t),
+        "unread": H.detect_schedule_stalled(tasks=None if False else [], now=_t)["state"],
+    }
+    check("H1sk schedule_stalled: firing ABSENT; a task 2 h overdue PRESENT naming it; missed runs PRESENT; a DISABLED task "
+          "listed and not flagged (his choice); no task here UNKNOWN",
+          sk["alive"] == H.ABSENT and sk["late"]["state"] == H.PRESENT and "CovenantDistill" in sk["late"]["measured"]["stalled"][0]
+          and sk["missed"] == H.PRESENT and sk["disabled"]["state"] == H.ABSENT and sk["disabled"]["measured"]["disabled"] == ["CovenantGuard"]
+          and sk["unread"] == H.UNKNOWN, sk)
+    check("H1sk no remedy: the scheduler's configuration is his",
+          [n for n, r in H.REMEDIES.items() if "schedule_stalled" in (r.get("for") or [])] == [])
+
     # ---- H1tt: Tetsu on the road (A276, 2026-10-06, his words: "get the road green and start expanding
     # the highway"). Two READS of covenant_model.readiness(), driven with a stand-in, each way. No remedy
     # may be paired with either: the model is NEVER_AUTOMATIC and freeing memory is his (A252).
