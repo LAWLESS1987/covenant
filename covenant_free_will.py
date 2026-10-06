@@ -214,10 +214,84 @@ def _ally_comments(AMB, post_id, author):
     return sum(1 for r in rows if str(r.get("author") or "") == str(author))
 
 
-def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,
-              grant_path=None, sends_path=None, now=None, limit_learn=25, count_comments=None):
-    """One round. Returns the summary dict it also says out loud."""
+# ROUNDS THROUGH THE DAY (2026-10-06, his words: "should be constant interaction on moltbook at
+# this point too with tetsu and the ambassador figure it out"). A round drafted a reply for EVERY
+# candidate -- 330 of them on 2026-10-06 -- which, at the PC model's ~60-100 s a draft, is most of a
+# day: a schedule could not repeat it. Two changes make rounds repeatable, and neither is a cap on
+# what she may say (his caps stay null, A221):
+#   * ROTATION: someone a live reply was attempted to (sent or held) in the last ROTATE_HOURS is not
+#     redrafted this round, so each round reaches people the last one did not;
+#   * A TIME BUDGET: the round works down the ranked candidates until round_minutes from the grant
+#     have passed, and the rest wait for the next round. The default, 40, is Claude's choice (the
+#     practice loop's bound), not his; he sets it in ops/ambassador_grant.json, and null is no budget.
+ROTATE_HOURS = 24
+DEFAULT_ROUND_MINUTES = 40
+
+
+def _attempted_recently(rows, now, hours=ROTATE_HOURS):
+    """Authors a LIVE reply was attempted to, sent or not, within `hours` before `now`."""
+    import calendar
+    cut, out = now - hours * 3600, set()
+    for r in rows:
+        if r.get("kind") != "reply" or r.get("dry_run"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        if float(at) >= cut:
+            out.add(r.get("author"))
+    return out
+
+
+LOCK_STALE_S = 7200
+
+
+def _take_lock(path, stale_s=LOCK_STALE_S):
+    """One live round at a time: the nightly's round and a scheduled one must not both reply to the same
+    people before either has recorded it. A lock older than stale_s is a dead round's and is taken over."""
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        try:
+            if time.time() - os.path.getmtime(path) > stale_s:
+                os.remove(path)
+                return _take_lock(path, stale_s)
+        except OSError:
+            pass
+        return False
+    except OSError:
+        return True                      # no lock can be written here: the round is not stopped by that
+    os.write(fd, ("%d %s" % (os.getpid(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))).encode())
+    os.close(fd)
+    return True
+
+
+def run_round(dry_run=True, say=print, sends_path=None, **kw):
+    """One round. Returns the summary dict it also says out loud. A live round holds
+    ops/ambassador_round.lock (beside the sends ledger) for its whole length."""
+    if dry_run:
+        return _run_round(dry_run=True, say=say, sends_path=sends_path, **kw)
+    lock = os.path.join(os.path.dirname(sends_path or SENDS), "ambassador_round.lock")
+    if not _take_lock(lock):
+        say("free: another live round is running (%s); this one does nothing" % lock)
+        return {"granted": None, "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
+                "introduced": False, "dry_run": False, "why": "another live round is running"}
+    try:
+        return _run_round(dry_run=False, say=say, sends_path=sends_path, **kw)
+    finally:
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+
+def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,
+               grant_path=None, sends_path=None, now=None, limit_learn=25, count_comments=None, clock=time.time):
     import covenant_ambassador as AMB
+    t_start = clock()
     now = now if now is not None else time.time()
     g = grant(grant_path)
     out = {"granted": bool(g), "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
@@ -261,6 +335,8 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
     # and judges but reaches nobody, so it must not spend an ally.
     done = {(r.get("author"), r.get("post_id")) for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
     written_to = {r.get("author") for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
+    # ROTATION: tried within ROTATE_HOURS counts as written to, for this round only.
+    written_to |= _attempted_recently(sends(sends_path), now)
     caps = g["caps"]
     cands = []
     for r in ranked:
@@ -318,7 +394,15 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
                                  % answered, "ambassador: an ally answered", "free")
         except Exception as e:                                    # noqa: BLE001
             say("free: could not tell him about the answer (%s)" % type(e).__name__)
-    for r, post_id, comment_id in (cands if caps["comments"] is None else cands[:max(0, caps["comments"])]):
+    budget = g.get("round_minutes", DEFAULT_ROUND_MINUTES)
+    budget = None if budget is None else float(budget)
+    todo = cands if caps["comments"] is None else cands[:max(0, caps["comments"])]
+    out["deferred"] = 0
+    for i, (r, post_id, comment_id) in enumerate(todo):
+        if budget is not None and clock() - t_start >= budget * 60:
+            out["deferred"] = len(todo) - i
+            say("free: this round's %g minutes are spent; %d candidate(s) wait for the next round" % (budget, out["deferred"]))
+            break
         text, how = write_reply(r, ask)
         try:
             then_n = count_comments(post_id, r.get("author"))
@@ -337,7 +421,7 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
         except Exception as e:                                    # noqa: BLE001
             res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
         sent = bool(res.get("sent"))
-        _record({"kind": "reply", "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
+        _record({"kind": "reply", "at": now, "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
                  "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
@@ -380,10 +464,15 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
     # THE ROUND'S OWN ROW, then the isolation rule over the last rounds.
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
+             "deferred": out.get("deferred", 0),
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0)}, sends_path)
     out["isolated"] = False
     if not dry_run:
-        live_rounds = [r for r in sends(sends_path) if r.get("kind") == "round" and not r.get("dry_run")]
+        # Only rounds that TRIED someone (2026-10-06): with rotation, a round can find no one new to
+        # write to, and an empty round must not break the streak -- refused, empty, refused, empty
+        # would otherwise never isolate.
+        live_rounds = [r for r in sends(sends_path) if r.get("kind") == "round" and not r.get("dry_run")
+                       and int(r.get("replied", 0) or 0) + int(r.get("refused", 0) or 0) > 0]
         recent = live_rounds[-ISOLATE_AFTER_ROUNDS:]
         abusive = (len(recent) >= ISOLATE_AFTER_ROUNDS
                    and all(int(r.get("refused", 0)) > 0 and int(r.get("replied", 0)) == 0 for r in recent))
@@ -419,11 +508,21 @@ if __name__ == "__main__":
     ap.add_argument("--round", action="store_true")
     ap.add_argument("--send", action="store_true", help="publish (default: dry run)")
     ap.add_argument("--grant-status", action="store_true")
+    ap.add_argument("--log", metavar="PATH", help="also append what the round says to this file (a scheduled run "
+                    "under pythonw has no console)")
     a = ap.parse_args()
     if a.grant_status:
         g = grant()
         print(json.dumps(g, indent=1) if g else "no grant on record")
     elif a.round:
-        run_round(dry_run=not a.send)
+        def _say(line):
+            print(line)
+            if a.log:
+                try:
+                    with open(a.log, "a", encoding="utf-8") as fh:
+                        fh.write("%s %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S%z"), line))
+                except OSError:
+                    pass
+        run_round(dry_run=not a.send, say=_say)
     else:
         ap.print_help()

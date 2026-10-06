@@ -317,6 +317,95 @@ def main():
     check("FW1h a post is never written from a directive-flagged row", t9b is None)
     check("FW1h the tree's grant now carries free rein and his words", FW.grant()["free_rein"] is True and "free reign" in json.load(open(FW.GRANT, encoding="utf-8"))["words_2026_09_21_evening"])
 
+    # FW1r / FW1t (2026-10-06, his words: "should be constant interaction on moltbook ... figure it
+    # out"): rounds through the day need rotation and a time budget; neither is a cap on what she says.
+    print("FW1r -- rotation: someone tried live in the last day is not redrafted; a dry run spends no one")
+    tdr = tempfile.mkdtemp(prefix="fw1r_")
+    gpr, spr = os.path.join(tdr, "grant.json"), os.path.join(tdr, "sends.jsonl")
+    with open(gpr, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    held = []
+
+    def emit_hold(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw):
+        held.append(post_id)
+        return {"sent": False, "judged": "held", "why": "held by covenant's judge (no view)"}
+    three = [ally("alpha", 3, "https://www.moltbook.com/post/aaaaaaaa-1111"), ally("beta", 2, "https://www.moltbook.com/post/bbbbbbbb-2222"),
+             ally("gamma", 1, "https://www.moltbook.com/post/cccccccc-3333")]
+    kw = dict(say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_hold,
+              introduce=lambda **k: {"sent": False}, grant_path=gpr, sends_path=spr, count_comments=cc0)
+    FW.run_round(dry_run=True, now=10000.0, **kw)
+    o1 = FW.run_round(dry_run=False, now=10000.0 + 60, **kw)
+    check("FW1r a dry run spends no one: the live round after it still tries all three", o1["candidates"] == 3 and o1["refused"] == 3, o1)
+    o2 = FW.run_round(dry_run=False, now=10000.0 + 3600, **kw)
+    check("FW1r an hour later the three held ones are not redrafted (no candidates, nothing emitted)",
+          o2["candidates"] == 0 and len(held) == 6, (o2, len(held)))
+    o3 = FW.run_round(dry_run=False, now=10000.0 + FW.ROTATE_HOURS * 3600 + 120, **kw)
+    check("FW1r after ROTATE_HOURS they are candidates again", o3["candidates"] == 3, o3)
+
+    print("FW1t -- the time budget: the round stops drafting when round_minutes are spent, and says so")
+    tdt = tempfile.mkdtemp(prefix="fw1t_")
+    gpt, spt = os.path.join(tdt, "grant.json"), os.path.join(tdt, "sends.jsonl")
+    with open(gpt, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": 2}, fh)
+    tick = [0.0]
+
+    def clock():
+        tick[0] += 50.0          # every look at the clock is 50 s later: a draft costs time
+        return tick[0]
+    sent_t = []
+
+    def emit_ok(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw2):
+        sent_t.append(post_id)
+        return {"sent": not dry_run, "judged": "clean", "why": ""}
+    logt = []
+    ot = FW.run_round(dry_run=False, say=logt.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
+                      introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=50000.0, count_comments=cc0, clock=clock)
+    check("FW1t with round_minutes 2, two of three are drafted and the third waits (deferred 1, said out loud)",
+          ot["replied"] == 2 and ot.get("deferred") == 1 and sent_t == ["aaaaaaaa-1111", "bbbbbbbb-2222"]
+          and any("wait for the next round" in l for l in logt), (ot, sent_t))
+    rows_t = [r for r in FW.sends(spt) if r.get("kind") == "round"]
+    check("FW1t the round's own row records what it deferred", rows_t and rows_t[-1].get("deferred") == 1, rows_t[-1:])
+    check("FW1t round_minutes null is no budget, and the default is DEFAULT_ROUND_MINUTES",
+          FW.DEFAULT_ROUND_MINUTES == 40 and o1.get("deferred") == 0, (FW.DEFAULT_ROUND_MINUTES, o1.get("deferred")))
+
+    print("FW1k -- one live round at a time (the nightly's and a scheduled one)")
+    lockp = os.path.join(tdt, "ambassador_round.lock")
+    open(lockp, "w").close()
+    sent_t.clear()
+    logk = []
+    ok_ = FW.run_round(dry_run=False, say=logk.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
+                       introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=99000.0, count_comments=cc0)
+    check("FW1k while another live round holds the lock, a second does nothing and says why",
+          ok_["replied"] == 0 and not sent_t and any("another live round" in l for l in logk) and os.path.exists(lockp), (ok_, logk[-1:]))
+    open(lockp, "w").close()
+    os.utime(lockp, (time.time() - FW.LOCK_STALE_S - 60,) * 2)
+    ok2 = FW.run_round(dry_run=False, say=logk.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
+                       introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=99000.0, count_comments=cc0,
+                       clock=lambda: 0.0)
+    check("FW1k a stale lock (a dead round's) is taken over, and released when the round ends",
+          ok2["replied"] > 0 and not os.path.exists(lockp), (ok2, os.path.exists(lockp)))
+
+    print("FW1i -- an empty round (no one new, rotation) does not break the isolation streak")
+    tdi = tempfile.mkdtemp(prefix="fw1i2_")
+    gpi, spi = os.path.join(tdi, "grant.json"), os.path.join(tdi, "sends.jsonl")
+    with open(gpi, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    import covenant_pause as _cp2
+    paused_by = []
+    _real_pause = _cp2.pause
+    _cp2.pause = lambda name, why="": paused_by.append((name, why))
+    try:
+        ka = dict(say=log.append, ask=ask_ok, learn=lambda: [], emit=emit_hold, introduce=lambda **k: {"sent": False},
+                  grant_path=gpi, sends_path=spi, count_comments=cc0)
+        r1 = FW.run_round(dry_run=False, now=200000.0, allies=lambda: [three[0]], **ka)
+        r2 = FW.run_round(dry_run=False, now=200000.0 + 60, allies=lambda: [three[0]], **ka)
+        r3 = FW.run_round(dry_run=False, now=200000.0 + 120, allies=lambda: [three[0], three[1]], **ka)
+    finally:
+        _cp2.pause = _real_pause
+    check("FW1i refused, empty, refused: the empty round is skipped and the two refusing rounds isolate her",
+          r1["refused"] == 1 and r2["candidates"] == 0 and r3["refused"] == 1 and r3.get("isolated") is True
+          and paused_by and paused_by[-1][0] == "ambassador", (r1["refused"], r2["candidates"], r3.get("isolated"), paused_by))
+
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:

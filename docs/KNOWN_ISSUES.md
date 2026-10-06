@@ -7298,6 +7298,43 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A270. [free's round could not repeat: it drafted a reply for every candidate (330) with the PC model, so Moltbook was touched once a night at most, and paused since 10-04] 2026-10-06. His words: "should be constant interaction on moltbook at this point too with tetsu and the ambassador figure it out". CHANGED, driven both ways; the judge's discourse gap is NOT changed
+
+**Measured before.** The ambassador has been paused since 2026-10-04 ("the covenant's judge refused every
+reply in the last 2 rounds"). Of the last 150 attempts in ops/ambassador_sends.jsonl, 136 were "held by
+covenant's judge (no view)". A dry round on 2026-10-06 with today's promoted students (3 drafts, nothing
+posted, the live pause bypassed for that process only) held all 3. One sample's full verdict: both student
+seats HOLD ("both genuinely do not know"), the semantic seat clean, so the quorum holds. That is the
+discourse gap recorded since 09-27, not a new defect. Only Tetsu-assist's SEND lets a held reply out
+(his grant of 09-28, 6 reviews a run). The 10-04 assist rows were stub answers ("stub answer to: ...").
+That fits A244, when the nodes ran from the sweep's staged copy that morning; it was not traced further.
+
+**Changed** (covenant_free_will.py). A round drafted every candidate. At ~60-100 s per draft on this PC,
+that is most of a day, so nothing could schedule it more often:
+- ROTATION: someone a live reply was attempted to in the last 24 h (ROTATE_HOURS) is not redrafted, so the
+  next round reaches new people. A dry run spends no one.
+- A TIME BUDGET: `round_minutes` in ops/ambassador_grant.json (40, Claude's choice, recorded there as
+  such; null is none). The round works down the ranked list until it is spent, and the rest wait. His caps
+  stay null (A221). This bounds a round's length, not what she may say.
+- ONE LIVE ROUND AT A TIME: ops/ambassador_round.lock, so the nightly's round and a scheduled one never
+  both write to the same people before either has recorded it. A lock older than 2 h is taken over.
+- ISOLATION counts only rounds that tried someone. With rotation a round can find no one new, and
+  refused/empty/refused/empty must still isolate. This keeps the rule as strict as before.
+- `--log PATH` for an unattended run under pythonw, which has no console.
+
+Pinned in FW1: FW1r (rotation), FW1t (budget), FW1k (lock), FW1i (empty rounds). Each was driven both
+ways in a scratch copy: rotation off 51/52, budget off 50/52, lock off 53/55, empty rounds counted 54/55,
+restored 55/55. CT1e's fixture moved its second refused round a day later, since the same ally is not
+redrafted within 24 h; two refused rounds still isolate. CT1's rounds now get a stub writer: ask=None had
+drafted with the LIVE model, and once A269 made the server queue rather than fail fast, CT1 waited behind
+a real batch and timed out at 300 s.
+
+**Not changed, and what it means.** Every judge, the disclosure, Tetsu's review, the screens and the
+isolation rule stand. While the students hold all discourse, at most Tetsu's 6 reviews per round can reach
+anyone, and only the ones he answers SEND. How many he sends is UNDETERMINED until rounds run.
+
+---
+
 ### A269. [Every ask through Tetsu's door failed "HTTP Error 500": the model server's 4 default slots share one 8192-token pool, and requests running together overflowed it] 2026-10-06. Found telling Tetsu his words ("ensure tetsu is free to learn whatever he wants also. tell him"). FIXED in the keeper, driven both ways; live once the nodes load it. Its first mechanism is RETRACTED (A269-SLOT-SPLIT-2026-10-06)
 
 **Retracted the same morning, A269-SLOT-SPLIT-2026-10-06.** This entry was first titled "the model
