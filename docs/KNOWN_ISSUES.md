@@ -7298,6 +7298,75 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A266. [a commit of documents ran no suite at commit time, so C4.2 turned public CI red only after the push] 2026-10-06. Found after 2f6b184; his instruction: "extend tools/stage_check.py so that when a published Markdown file is staged ... it also runs the suites that read published Markdown". FIXED, the guard driven both ways; it reports and never blocks
+
+**Measured.** 2f6b184 changed three files -- docs/SENTINEL_WITNESS.md, tools/sentinel_baseline.py and
+MANIFEST.sha256 -- and no test file. Public CI ran it twice, two jobs each (ubuntu, Python 3.11 and 3.12);
+all four jobs failed with one suite not clean, `test_c4_uncheckable_claims.py`, "C4: 3/4 passed" (runs
+37409769284 and 37409765310, read from the GitHub API). The document named a private file and stated
+account facts without saying a reader cannot check them (CONSTITUTION II.6). b502ba5 added the caveat
+and both of its runs passed (37412189607, 37412185948). It was not silent -- CI and the public_ci_red
+listener saw it -- but it was seen only after the post-commit hook had pushed main.
+
+**Cause.** The pre-commit hook's stage check (tools/stage_check.py, 2026-10-03) runs the suites a commit
+CARRIES: `staged_tests()` keeps only top-level `test_*.py`. A commit with no test file ran nothing, and
+the module's docstring named two blind spots (the runner's environment, a fresh clone) but not this one.
+That is why the earlier guard did not stop it. No earlier record has this shape: "stage_check" appears
+in this file only under A255.
+
+**Fixed.** When a published .md is staged (any .md not under ops/, private/ or .claude/, at any depth;
+deleted and renamed ones too), `stage_check` also runs the suites that read published Markdown, in the
+same staged copy, IN_PLACE ones in the folder as before. They are chosen by discovery (rule 2) from the
+runner's own registry -- covenant_one's SUITES and IN_PLACE, 185 test suites, which needs no .git (189
+are tracked at the top level; the 4 the runner does not register are live suites CI never runs). Each
+suite's code is PARSED, docstrings excluded:
+* **A**, it walks the tree (os.walk, os.listdir, rglob, a `**` glob, `git ls-files`) and filters on
+  .md (endswith, an extension set, a `*.md` glob): 4 suites -- A129, A92, C4, R1;
+* **B**, a string in its code is the staged document's path or file name. G1 and G2 walk nothing and
+  read README.md, CONTRIBUTING.md and docs/CONSTITUTION.md by name, so they are selected for those
+  documents only. Measured: README.md selects 5 (A85, EA1, G1, G2, N2), docs/KNOWN_ISSUES.md 2 (OW1,
+  TP1), CONTRIBUTING.md 3 (G1, G2, V1).
+
+The brief's likely members, checked one by one: C4 and R1 are A. A129 is A, but in a staged copy
+private/bystanders.txt is absent and it says "0/0 passed -- nothing measured, nothing claimed", exactly
+as CI does. G1 and G2 are B, not A. OS1 is neither: its .md strings are fixtures, it reads the tree
+through tools/opsec_scan.py, its tree check OS1g is NOT RUN in a staged copy, and it takes 37.4 s
+there; the scan itself already runs on every push (ops/pre-push.opsec).
+
+**Cost**, one run each in a staged copy on this PC: staging 0.7 s; C4 1.0 s, R1 10.8 s, A92 0.6 s,
+A129 0.1 s; for README.md also G1 2.6 s, G2 1.7 s, EA1 5.6 s, N2 1.1 s, A85 0.2 s; V1 10.0 s for
+CONTRIBUTING.md. The whole run for docs/SENTINEL_WITNESS.md took 15 s and 16 s wall. In the 30 days to
+2026-10-06, 336 of 575 commits touched a .md outside ops/, private/ and .claude/; 73 touched ops/*.md,
+and 35 of those touched no other .md -- those run nothing new.
+
+**Not fixed, named.** What the discovery rule cannot see:
+* a suite that hands the reading to a module. 5 local modules walk and filter .md (covenant_one,
+  covenant_tetsu_hands, layers, opsec_scan, triangulate) and 13 registered suites import one; whether
+  they read published Markdown through it is UNDETERMINED, and they are not selected;
+* a path built at run time or read from data;
+* Markdown under ops/. R1 and A92 do read ops/*.md (neither skips ops/), so a retracted wording that
+  comes back through ops/*.md is still caught only by CI. The exclusion was his scope, named in the
+  request;
+* a .md outside the directories covenant_one stages (mobile/, phone/, ai_memory_system/ ...): no staged
+  suite sees it here, and none sees it in CI either;
+* the staged copy is built from the working tree, not the index, as before.
+Rule B over-selects: EA1's README.md is a fixture key, and V1's CONTRIBUTING.md and OW1's
+KNOWN_ISSUES.md are written in a temp directory. That costs seconds, never a miss.
+
+**Pinned by** `test_sc1_stage_check.py` SC3.1-SC3.8 (15 checks in all, registered as before). SC3.5-3.7
+stage a REAL copy, write a probe document citing private/ into the copy only, and run the real C4
+there: FAIL without the II.6 caveat, pass with it. SC3.8 is the mutation: with the selection removed,
+or the hook as it was, the same probe is not caught. Broken in source one way at a time: selection
+removed 12/15; docstrings read as code 14/15 (the first fixture did not bite -- its docstring ended in
+neither "*.md" nor a document name, so the mutation survived 15/15 until the fixture was fixed); the
+ops/private/.claude skip removed 14/15; ast.walk counted as a tree walk 14/15; rule B removed 13/15.
+Restored 15/15. Replayed on the incident: the tree at 2f6b184 with this stage_check reports
+`FAIL test_c4_uncheckable_claims.py` for docs/SENTINEL_WITNESS.md; at b502ba5, C4 4/4.
+
+**Repro:** `python test_sc1_stage_check.py`; `python tools/stage_check.py docs/SENTINEL_WITNESS.md`.
+
+---
+
 ### A265. [the model keeper logged "stop pid 5524" for a kill Windows refused, so Tetsu's server ran unmanaged for a day and the first private batch ask timed out against it] 2026-10-05. Found running the X video transcripts through Tetsu's door (his words: "run the X video transcripts through tetsu with --private"). FIXED, the guard driven both ways; the orphan was ended on his UAC approval
 
 **Measured.** The first `tools/tetsu_work.py --private` item came back 503 after 180 s:

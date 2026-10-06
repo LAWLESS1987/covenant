@@ -15,9 +15,32 @@ machine does not), and a fresh clone's lack of hooks and local config. Those are
 `python covenant_one.py --ci` on a fresh clone; this catches the .git-less directory, which is the
 case that recurred.
 
-    python tools/stage_check.py              # the staged (index) test files
-    python tools/stage_check.py test_x.py    # named files
+PUBLISHED MARKDOWN (A266, 2026-10-06). A commit can turn CI red without carrying a test file:
+2f6b184 changed only docs/SENTINEL_WITNESS.md (and a tool), no suite ran at commit time, and both
+CI runners failed C4.2 -- the document named a private file and stated account facts without
+saying a reader cannot check them. Fixed in b502ba5, after the push. So when a published .md is
+staged (any .md not under ops/, private/ or .claude/, deleted and renamed ones included), the
+suites that READ published Markdown run too, in the same staged copy. They are found by what
+their code does, never by a list (CLAUDE.md rule 2), among the suites the runner registers:
+  A. the suite walks the tree (os.walk, os.listdir, rglob, a ** glob, git ls-files) AND filters
+     on .md (endswith(".md"), an extension set holding ".md", a "*.md" glob) -- it reads every
+     published document;
+  B. a string in the suite's code (docstrings excluded) is the staged document's path or file
+     name -- it reads that document by name (G1 and G2 read README.md and docs/CONSTITUTION.md
+     this way, and walk nothing).
+Parsed with ast, not grepped: ".md" in a docstring, or in a fixture name built with +, is not a
+filter. What the rule CANNOT see, said plainly: a suite that hands the reading to a module (OS1
+reads through tools/opsec_scan.py; the rule reads the suite's own code only); a path built at run
+time or read from data; Markdown under ops/, which R1 and A92 do read, so a retracted wording that
+comes back through ops/*.md is still caught only by CI; and a .md outside the directories
+covenant_one stages (mobile/, phone/ ...), which no staged suite sees here or in CI. Rule B
+over-selects -- a fixture named README.md selects its suite -- which costs seconds, never a miss.
+
+    python tools/stage_check.py                 # the staged (index) test files and documents
+    python tools/stage_check.py test_x.py       # named files
+    python tools/stage_check.py docs/X.md       # the suites that read a named document
 """
+import ast
 import os
 import shutil
 import subprocess
@@ -26,11 +49,114 @@ import sys
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 
+#: Markdown under these directories (at any depth) does not trigger the document suites: ops/
+#: holds the running system's records (C4 skips it too), private/ is never published, and .claude/
+#: is the assistant's. The scope is his call (rule 5), named in the A266 request.
+DOC_SKIP = {"ops", "private", ".claude"}
+
 
 def staged_tests(run=None):
     run = run or (lambda: subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=AM"],
                                          cwd=HERE, capture_output=True, text=True).stdout)
     return [p for p in run().split() if os.path.basename(p).startswith("test_") and p.endswith(".py") and "/" not in p]
+
+
+def staged_docs(run=None):
+    """Published .md paths in the commit, whatever their status: a deleted or renamed document breaks
+    a suite that reads it by name as surely as an edited one (--no-renames lists both sides)."""
+    run = run or (lambda: subprocess.run(["git", "diff", "--cached", "--name-only", "--no-renames", "-z"],
+                                         cwd=HERE, capture_output=True, text=True).stdout)
+    return [p for p in run().split("\0") if p.endswith(".md") and not set(p.split("/")[:-1]) & DOC_SKIP]
+
+
+def runner_suites():
+    """The test suites covenant_one runs (SUITES and IN_PLACE) that are on disk here -- CI's population,
+    which needs no .git. Tracked suites the runner does not register are never run by CI."""
+    try:
+        import covenant_one as C1
+        names = [n for n, _, _ in C1.SUITES] + [n for n, _, _ in C1.IN_PLACE]
+    except Exception:                                            # noqa: BLE001
+        return []
+    return [n for n in dict.fromkeys(names) if n.startswith("test_") and os.path.isfile(os.path.join(HERE, n))]
+
+
+def _prose(tree):
+    """ids of string constants that are statements -- docstrings -- which describe, never read."""
+    return {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant)}
+
+
+def _const(n, prose=()):
+    return n.value if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in prose else None
+
+
+def _walks_tree(tree):
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Call):
+            f = n.func
+            name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else ""
+            owner = f.value.id if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) else ""
+            if name in ("walk", "listdir", "scandir") and owner in ("os", ""):      # not ast.walk
+                return True
+            if name == "rglob":
+                return True
+            if name in ("glob", "iglob") and any("**" in (_const(a) or "") for a in n.args):
+                return True
+        if isinstance(n, (ast.List, ast.Tuple)) and any(_const(e) == "ls-files" for e in n.elts):
+            return True
+    return False
+
+
+def _filters_md(tree, prose):
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.Set, ast.Tuple, ast.List)) and any(_const(e) == ".md" for e in n.elts):
+            return True
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "endswith"
+                and any(_const(a) == ".md" for a in n.args)):
+            return True
+        if isinstance(n, ast.Compare) and any(_const(c) == ".md" for c in [n.left] + n.comparators):
+            return True
+        if (_const(n, prose) or "").endswith("*.md"):
+            return True
+    return False
+
+
+def doc_readers(docs, population=None, read=None):
+    """{suite: why} -- the registered suites whose CODE reads the given published Markdown (rules A and
+    B in the module docstring). An unreadable or unparseable suite is skipped: it fails its own run."""
+    read = read or (lambda t: open(os.path.join(HERE, t), encoding="utf-8").read())
+    out = {}
+    for t in (runner_suites() if population is None else population):
+        try:
+            tree = ast.parse(read(t))
+        except (OSError, SyntaxError, ValueError, UnicodeDecodeError):
+            continue
+        prose = _prose(tree)
+        if _walks_tree(tree) and _filters_md(tree, prose):
+            out[t] = "reads every published .md"
+            continue
+        strs = {s for s in (_const(n, prose) for n in ast.walk(tree)) if s}
+        named = [d for d in docs if any(s == d or s == d.rsplit("/", 1)[-1] or s.endswith("/" + d.rsplit("/", 1)[-1])
+                                        for s in strs)]
+        if named:
+            out[t] = "names " + ", ".join(named)
+    return out
+
+
+def selection(tests, docs, readers=None, say=print):
+    """The suites this commit runs: its own test files, then (A266) the suites that read its published
+    Markdown, each once."""
+    names = list(tests)
+    if docs:
+        found = (readers or doc_readers)(docs)
+        shown = ", ".join(docs[:4]) + (" and %d more" % (len(docs) - 4) if len(docs) > 4 else "")
+        if found:
+            say("stage-check: published markdown in this commit (%s) -- also running the %d suite(s) that read it: %s"
+                % (shown, len(found), "; ".join("%s (%s)" % (t, why) for t, why in sorted(found.items()))))
+        else:
+            say("stage-check: published markdown in this commit (%s), and NO registered suite was found that "
+                "reads it -- nothing checked it here" % shown)
+        names += [t for t in sorted(found) if t not in names]
+    return names
 
 
 def suite_env(base=None):
@@ -96,7 +222,15 @@ def check(tests, stage=None, clean=None, run=None, say=print, timeout=300):
     return out
 
 
+def for_commit(tests_run=None, docs_run=None, readers=None, say=print, **kw):
+    """The hook's whole path: what the commit stages, selected, then run where the runner runs it."""
+    return check(selection(staged_tests(tests_run), staged_docs(docs_run), readers, say), say=say, **kw)
+
+
 if __name__ == "__main__":
-    names = sys.argv[1:] or staged_tests()
-    check(names)
+    args = sys.argv[1:]
+    if args:
+        check(selection([a for a in args if not a.endswith(".md")], [a for a in args if a.endswith(".md")]))
+    else:
+        for_commit()
     sys.exit(0)
