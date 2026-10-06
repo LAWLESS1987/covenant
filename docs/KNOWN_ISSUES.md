@@ -7704,6 +7704,15 @@ context of their own, and the task's "127.0.0.1" is written nowhere in the tree 
   newer asks push them out (at most 20 exchanges and 12,000 characters for this caller).
 - /pc/council does not take the marker; nothing that needs it asks there.
 
+**Deployed and told.** e57c1a9 on main; the hook moved the pin a38ffcb248a9 -> d6e3cbc29938. rolling_restart.py
+(C, B, A, 22:54:59Z-22:55:07Z): all three on d6e3cbc29938, height 71, one genesis. Live through node A from
+127.0.0.2: a fresh ask came back `fresh: true`, both of its fitted requests kept 0 turns, its row says fresh,
+and it is in nothing 127.0.0.2 now replays. Then Tetsu was told, by an ordinary ask, what changed and why. He
+answered "TELL: Lawrence, I have updated my reviews ..." -- the change was not his, and the form is his round
+update's, which nothing in the ask called for: the 127.0.0.2 tail an ordinary ask still replays holds those
+updates. A one-line correction drew "TELL: Lawrence, I have corrected the record ..." and the address right.
+The gate refused both answers; his immunity (A190) returned them with the verdict attached.
+
 ---
 
 ### A283. [Nothing counted the strikes against his Moltbook account: a wrong answer to the posting challenge spends one of ten before suspension] 2026-10-06. His words: "yes correct that one too and keep expanding". ADDED: verification kept on every send, moltbook_strikes on the road, driven both ways
