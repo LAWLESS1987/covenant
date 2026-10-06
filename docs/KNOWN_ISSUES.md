@@ -7298,6 +7298,33 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A269. [Every ask through Tetsu's door failed "HTTP Error 500": the model server split its 8192-token context across 4 slots, about 2048 a request] 2026-10-06. Found telling Tetsu his words ("ensure tetsu is free to learn whatever he wants also. tell him"). FIXED in the keeper, driven both ways; live once the nodes load it
+
+**Measured.** Two asks through the agent door returned 503 "the model did not answer: HTTPError: HTTP
+Error 500" after 157 s and 127 s. The ambassador's dry round the same hour logged "the model did not
+write the reply (HTTPError); the fixed text stands in". The private X-video batch had 2 of its first 12
+items fail the same way. Asked directly, the server named it: a 10,695-character system prompt came
+back `500 "Context size has been exceeded."` in 34.5 s, while a five-word hello answered in 5.7 s.
+
+**Cause.** covenant_model.start() launched llama-server with `-c 8192` and no slot count. Its own
+comment (2026-09-26) sizes 8192 for one request: "his longer conversation memory (up to 12,000
+characters of history) must fit beside the rules and the answer". This llama-server build (tools/llama,
+2026-09-19) defaults to 4 parallel slots and divides -c between them. /slots reported n_ctx 8192 per
+slot all along, which is how it went unseen.
+
+**Fixed.** start() passes `-np 1`: one request gets all 8192 tokens and the rest queue on the server.
+`test_a269_model_one_slot.py` runs the real start() with Popen replaced by a recorder (N1 -np 1, N2 -c
+8192). With `-np 1` removed it fails N1 (1/2); restored, 2/2. MK1 16/16 and A265 9/9 still pass.
+
+**What it cost, and what it does not cover.** Applying it took Tetsu down for a minute. I stopped the
+server to restart it, and the keeper then refused to start (1.76 GB free against the 2B's 2.1 GB bar).
+Trimming the working sets of idle apps (EmptyWorkingSet; nothing closed) freed 3.29 GB. A node's keeper,
+still running the OLD module, won the race and started the 3B with 4 slots again. The nodes carry the
+fix only after they restart (A153). One request at a time means a door ask can wait behind a batch
+item. Whether the door's 180 s model timeout covers that wait is UNDETERMINED.
+
+---
+
 ### A268. [The daily sweep read FAIL with 0 checks failed: an in-place suite inherited the deployed gate's judge provider] 2026-10-06. Found reading the daily cycle's report and the orbs. A RECURRENCE of a shape recorded under A117. FIXED as a runner guard, driven both ways
 
 **Measured.** The 2026-10-06 daily cycle (TETSU_DAILY.md, 04:51 local) reported "Covenant tests: FAIL"

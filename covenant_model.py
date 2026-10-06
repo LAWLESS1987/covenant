@@ -240,7 +240,12 @@ def start(say=print):
     # history, agent_history) must fit beside the rules and the answer. The 3B's bar in
     # CANDIDATES carries the larger cache.
     ctx = "8192"
-    args = [BIN, "-m", path, "--host", HOST, "--port", str(PORT), "-c", ctx, "-t", str(threads),
+    # ONE SLOT (A269, 2026-10-06). This llama-server build defaults to 4 parallel slots and splits
+    # -c between them, so every request had about 2048 tokens, not the 8192 above: a 10,695-character
+    # system prompt came back "500 Context size has been exceeded" in 34.5 s, and every ask through
+    # Tetsu's door that day failed the same way. -np 1 gives one request the whole 8192; the others
+    # queue on the server instead of failing.
+    args = [BIN, "-m", path, "--host", HOST, "--port", str(PORT), "-c", ctx, "-np", "1", "-t", str(threads),
             "--no-webui", "--log-disable"]
     creation = 0x08000000 if os.name == "nt" else 0               # CREATE_NO_WINDOW
     with open(LOG, "a", encoding="utf-8") as lf:
