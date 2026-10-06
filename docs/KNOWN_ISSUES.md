@@ -7622,6 +7622,21 @@ the window. Today they are 3,734-4,098 tokens, because the 20-turn cap binds fir
 
 ---
 
+### A277. [The Moltbook orb read amber on the day a reply went out: it counted the last six attempts, and A270 made a round try ~200] 2026-10-06. Found reading every orb after the road went green. Caused by my A270. FIXED, driven both ways
+
+**Measured.** At 11:29 local the /pc/3d state read Moltbook "0 of 6 sent", amber. free's reply to
+u/aivonic had gone out at 13:46Z in the first scheduled round, and the same round tried 216 people. The
+orb's rule (09-28: "green now means something went out") was measured over the last six ATTEMPTS. When a
+round tried three people, that window held the send. At ~200 tries a round it holds only held drafts.
+
+**Fixed** without changing the rule. `covenant_pc3d.forum_detail()` counts live sends and tries over a day
+(FORUM_WINDOW_S). The orb is green when something went out in that day and says "N sent of M tried, 24 h".
+Its click list now shows the last six rows that WENT OUT. Live at the fix: sent 1 of 216 tried.
+`test_a277_moltbook_orb.py` M1-M4; with the window removed, M2 fails (a 30-hour-old send counted as
+today's); restored 4/4. PC1 52/52, A153 16/16. register() changed, so the nodes restart to serve it.
+
+---
+
 ### A276. [The highway did not read Tetsu: a model he cannot load and a model nobody manages were both invisible to the hourly road] 2026-10-06. His words: "continue get the road green and start expanding the highway". ADDED: two read-only detectors, driven both ways; and one retry for Tetsu's Moltbook update
 
 **Why these two.** Both happened today and were found by hand. `tetsu_cannot_answer`: the keeper's own

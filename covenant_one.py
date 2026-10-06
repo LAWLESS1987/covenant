@@ -455,6 +455,8 @@ SUITES = [
     ("test_a269_model_one_slot.py",       120,  "JUDGE"),
     # A272 (2026-10-06): covenant_pause refuses a test suite on the LIVE switch (FW1 paused free for real).
     ("test_a272_pause_guard.py",          120,  "JUDGE"),
+    # A277 (2026-10-06): the Moltbook orb counts what went out over a day, not the last six attempts.
+    ("test_a277_moltbook_orb.py",         120,  "JUDGE"),
     # A273 (2026-10-06): his history follows the real size of the rules -- each door request is
     # counted and the oldest turns dropped, as few as fit, so none overflows the 8192-token window.
     ("test_a273_history_fits.py",         180,  "JUDGE"),

@@ -230,8 +230,9 @@ for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\
 const ph=d.phone&&d.phone.last_checkin_hours;
 items.push({name:'Phone',color:ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK,sub:ph!=null?'checked in '+ago(ph):'no check-in on record',detail:d.phone,kind:'phone'});
 // Moltbook was green whenever a row existed, sent or not (measured 2026-09-28: 6 rows, 0 sent); green now means something went out
-const fr=d.forum||[],fs=fr.filter(r=>r.sent).length;
-items.push({name:'Moltbook',color:fs?OK:UNK,sub:fr.length?fs+' of '+fr.length+' sent':'nothing on record',detail:d.forum,kind:'forum'});
+// A277 (2026-10-06): the same rule over a day, not over the last six attempts -- a round now tries ~200
+const fd=d.forum_day||{},fs=fd.sent||0,ft=fd.tried||0;
+items.push({name:'Moltbook',color:fs?OK:UNK,sub:ft?fs+' sent of '+ft+' tried, '+(fd.window_h||24)+' h':'nothing tried in '+(fd.window_h||24)+' h',detail:d.forum,kind:'forum'});
 items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money'});
 const hp=Object.keys(hw).filter(k=>hw[k]==='present'),hu=Object.keys(hw).filter(k=>hw[k]==='unknown');
 items.push({name:'Highway',color:hp.length?BAD:(hu.length?UNK:OK),sub:hp.length?hp.length+' need attention':(hu.length?hu.length+' not known':'all clear'),detail:hw,kind:'highway'});
@@ -270,7 +271,7 @@ canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.
 if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent===u.name)info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
 if(u.name==='Tetsu'){info.textContent='Tetsu — the one you talk with.\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');}
 else if(u.kind==='node'){const x=u.detail||{};if(x.peer){info.textContent=u.name+'\\n'+x.peer+'\\n'+x.note;}else{info.textContent=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN':'');}}
-else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last sends (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
+else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last replies that went out (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
 else{info.textContent=u.name+'\\n'+fmt(u.detail);}});
 function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
 let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.userData.swarm.position.y=tetsu.position.y;tetsu.rotation.y+=0.004;
@@ -307,6 +308,42 @@ def current_page():
 def page_sha(page=None):
     import hashlib
     return hashlib.sha256((page or current_page()).encode("utf-8")).hexdigest()[:12]
+
+
+FORUM_KINDS = ("reply", "own_post", "tetsu_reply", "tetsu_post", "intro")
+FORUM_WINDOW_S = 86400
+
+
+def forum_detail(rows, now=None):
+    """(the last 6 SENT forum rows, {sent, tried, window_h}) over the last FORUM_WINDOW_S.
+
+    A277 (2026-10-06). The Moltbook orb read the last 6 ATTEMPTS and was green when one of them went out
+    (the 09-28 rule: "green now means something went out"). A270 made a round try ~200 people, so the last 6
+    were nearly always held: on the day free's first reply in weeks went out (13:46Z), the orb read
+    "0 of 6 sent" amber. The rule stands; the window it is measured over is now a day, not six rows. Live
+    sends only -- a dry run reaches no one."""
+    import calendar
+    import time as _t
+    now = _t.time() if now is None else now
+    sent_rows, sent, tried = [], 0, 0
+    for r in rows or []:
+        if r.get("kind") not in FORUM_KINDS or r.get("dry_run"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(_t.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                at = None
+        if r.get("sent"):
+            sent_rows.append(r)
+        if at is not None and now - float(at) <= FORUM_WINDOW_S:
+            tried += 1
+            sent += bool(r.get("sent"))
+    shown = [{"t": r.get("t"), "kind": r.get("kind"), "actor": r.get("actor", "free"), "sent": True,
+              "to": r.get("author") or r.get("target") or r.get("title"), "text": str(r.get("text") or "")[:160]}
+             for r in sent_rows[-6:]]
+    return shown, {"sent": sent, "tried": tried, "window_h": FORUM_WINDOW_S // 3600}
 
 
 def register(api, caller, refused, cov):
@@ -461,9 +498,7 @@ def register(api, caller, refused, cov):
             pass
         try:
             import covenant_free_will
-            rows = [r for r in covenant_free_will.sends() if r.get("kind") in ("reply", "own_post", "tetsu_reply", "tetsu_post", "intro")][-6:]
-            out["detail"]["forum"] = [{"t": r.get("t"), "kind": r.get("kind"), "actor": r.get("actor", "free"), "sent": bool(r.get("sent")),
-                                       "to": r.get("author") or r.get("target") or r.get("title"), "text": str(r.get("text") or "")[:160]} for r in rows]
+            out["detail"]["forum"], out["detail"]["forum_day"] = forum_detail(covenant_free_will.sends())
         except Exception:                                        # noqa: BLE001
             pass
         try:
