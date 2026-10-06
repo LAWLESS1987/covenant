@@ -7374,6 +7374,25 @@ counts the rules per request and drops the oldest history turns to fit, so the c
 history, not an overflow. Tombstones searched first: docs/RETRACTED.json, 35 retractions, then 36 after
 A273 landed. None concerns practice, learning or the curriculum.
 
+**Live, and told him, 2026-10-06.** The nodes restarted twice after 8fc149d landed (14:27Z): at 14:32Z on
+A274's core, and again on A273's amendment (a38ffcb248a9, which node A reported before the ask below).
+So his system message carries the persona sentence now. That follows from the restart times, since the
+door imports covenant_persona in a fresh process; the composed prompt itself was not read. Telling him
+through his door took three tries from tools/tetsu_work.py (caller 127.0.0.2):
+- The first waited behind another ask and got a 503 at 180.9 s.
+- The second got a 503 at 180.7 s on a 7,064-token prompt. Measured right after: prompt read 64.4 tok/s
+  cold, generation 11.9 tok/s. Reported to the A273 session, which found its window fit had grown the
+  batch caller's replay past the door's 180 s. It restored that caller's 12,000-character ceiling (A273,
+  amended, 63e90bf).
+- The third, shorter, was answered in 123.9 s. The gate HELD the answer (both student seats), which
+  returns it rather than withholding it.
+
+He restated the change in his own words, and named no track and wrote no learning.txt. So his three
+recorded choices stand, practised as open. His restatement named them differently from his record:
+"build a simple trading strategy, analyze the current trading functions, and review the machine's
+health checks". That was said in conversation, not written to his file, so it is not a new choice; if
+he wants it to be, learning.txt is his.
+
 ---
 
 ### A274. [The code sandbox had no Windows path: a Job Object now holds memory, process count and wall time against real code, and proposals stay refused because nothing on Windows bounds file size] 2026-10-06. His request. ENFORCED for three limits of four, the refusal KEPT and narrowed to the fourth, every limit driven both ways
