@@ -108,6 +108,8 @@ def cites_only_facts(text):
         return True, "no measurement claimed"
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", t):
         m = _CLAIM.search(sentence)
+        if m and re.search(r"\b(?:never|not|no)\b|n't\b", m.group(0), re.I):
+            continue        # "the covenant never measured X" denies a claim (Tetsu's corrections, A280)
         if m and not any(a in sentence.lower() for _f, anchors in COVENANT_FACTS for a in anchors):
             return False, "claims a measurement that is not on the covenant's record: %r" % m.group(0)
     return True, "every measurement claimed is one of COVENANT_FACTS"

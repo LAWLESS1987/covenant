@@ -1623,6 +1623,41 @@ def detect_tetsu_cannot_answer(health=None, ready=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
+ASKS_WINDOW_S = 7200
+ASKS_MIN = 3
+
+
+def detect_tetsu_asks_failing(health=None, rows=None, now=None):
+    """Tetsu reads as up and his answers fail: of the asks in the last ASKS_WINDOW_S, at least ASKS_MIN and at
+    least half did not answer.
+
+    A282 (2026-10-06). That morning readiness() read PASS while every ask through his door came back 503
+    ("Context size has been exceeded", A269), and at 10:24 the round's update to him timed out. The door is
+    in the core and records nothing; covenant_model.ask now writes one line per real ask (ops/model_asks.jsonl)
+    and this reads it. No ledger at all (a clone, CI, before the first ask) is UNKNOWN; no ask in the window
+    is ABSENT -- nothing asked, nothing failing. No remedy: the model is NEVER_AUTOMATIC."""
+    now = time.time() if now is None else now
+    if rows is None:
+        try:
+            import covenant_model
+            path = covenant_model.ASKS
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.readlines()[-400:]
+            rows = [json.loads(x) for x in lines if x.strip()]
+        except FileNotFoundError:
+            return {"state": UNKNOWN, "measured": {"why": "no ask has been recorded here (ops/model_asks.jsonl)"}}
+        except Exception as e:                                   # noqa: BLE001
+            return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    recent = [r for r in rows if isinstance(r, dict) and now - float(r.get("at") or 0) <= ASKS_WINDOW_S]
+    failed = [r for r in recent if not r.get("ok")]
+    measured = {"asked": len(recent), "failed": len(failed), "window_h": ASKS_WINDOW_S / 3600.0}
+    if failed:
+        measured["last_error"] = str(failed[-1].get("error") or "")[:160]
+    if len(recent) >= ASKS_MIN and len(failed) * 2 >= len(recent):
+        return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
 def detect_model_unmanaged(health=None, ready=None):
     """A model server answers on Tetsu's port that the keeper has no record of starting.
 
@@ -1646,6 +1681,7 @@ DETECTORS = {
     "node_down": detect_node_down,
     "tetsu_cannot_answer": detect_tetsu_cannot_answer,
     "model_unmanaged": detect_model_unmanaged,
+    "tetsu_asks_failing": detect_tetsu_asks_failing,
     "stale_test_mesh": detect_stale_test_mesh,
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,

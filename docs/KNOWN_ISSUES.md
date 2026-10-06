@@ -7635,6 +7635,24 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A282. [Tetsu could read PASS while every ask failed, and nothing recorded the failures] 2026-10-06. His words: "keep expanding". ADDED: a line per real ask, and tetsu_asks_failing on the road, driven both ways
+
+On the morning of 2026-10-06 readiness() read PASS while every ask through his door returned 503 (A269).
+At 10:24 the round's update to him timed out. The door is in the core and returns its 503 without a record,
+so the road could not see either; A281 left this as considered and not built. It needed no core change:
+every door ask goes through covenant_model.ask, which now writes one line per REAL ask to
+ops/model_asks.jsonl: answered or not, milliseconds, the error. The file is gitignored and rotates at
+512 KB. A failed start is recorded too. The stub writes nothing, and a test program never writes the live
+ledger (A272's lesson). `detect_tetsu_asks_failing`: of the asks in the last 2 h, at least 3 and at least
+half failed is PRESENT, naming the last error; no ask in the window ABSENT; no ledger at all UNKNOWN. No
+remedy, because the model is NEVER_AUTOMATIC.
+
+`test_a282_model_asks.py` (Q1-Q3, the real ask() with stand-in urlopen and start): drop the failure line
+and Q1 and Q2 fail; drop the test guard and Q3 fails; restored 3/3. MK1, A265 and A269 pass, and MK1's own
+asks left no live ledger. H1ak in H1 (199/199).
+
+---
+
 ### A281. [Nothing watched whether Windows was still firing the scheduled tasks the system runs on] 2026-10-06. His words: "yes post the corrections and keep expanding". ADDED: schedule_stalled, read-only, driven both ways
 
 The guard that revives the watchdog (CovenantGuard), the nightly (CovenantDistill), free's rounds
@@ -7693,7 +7711,15 @@ you", "you asked me/us"). FW1m pins it; turning it off fails exactly that check;
 replies sent on 2026-10-06, the screen would now stop four (three invented measurements, one invented
 exchange) and pass two.
 
-**Not fixed, and not mine to do alone.** The four replies are public. A correction under each, or their
+**A denial is not a claim.** Tetsu's correction drafts ("The covenant never measured the backend's response
+to exceeding a grant") tripped the screen, which read "covenant ... measured" without the "never". A
+claiming span with never/not/no/n't is now passed as a denial; an unanchored claim beside it still fails
+(FW1m, FW1 69/69).
+
+**The four replies are public; corrections were his to approve.** He said "yes post the corrections" and
+"have tetsu assist". Tetsu drafted each correction through his door, and each is posted under free's own
+comment through emit (the judge, then his review on a hold), recorded in the sends ledger as kind
+"correction". A correction under each, or their
 removal, is speech in his project's name on his account: his decision.
 
 ---

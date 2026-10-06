@@ -420,6 +420,9 @@ def main():
           FW.cites_only_facts("I agree. I asked you to clarify why the signature is required. What do you propose?")[0] is False
           and FW.cites_only_facts("I agree. You asked me what we log; nothing yet. Why?")[0] is False
           and FW.cites_only_facts(plain)[0] is True)
+    check("FW1m a denial is not a claim: 'The covenant never measured X' (a correction) passes; 'measured X' beside it does not",
+          FW.cites_only_facts("I am sorry. The covenant never measured the backend's response to exceeding a grant.")[0] is True
+          and FW.cites_only_facts("The covenant never measured that. The covenant measured something else.")[0] is False)
     tds = tempfile.mkdtemp(prefix="fw1s_")
     gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
     with open(gps, "w", encoding="utf-8") as fh:

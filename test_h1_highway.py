@@ -1486,6 +1486,29 @@ def main():
     _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
     check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
 
+    # ---- H1ak: Tetsu up and failing (A282, 2026-10-06). Stand-in rows, a fixed clock.
+    _ta = 1_900_000_000.0
+    _okr = lambda ago: {"at": _ta - ago, "ok": True, "ms": 900}                                    # noqa: E731
+    _bad = lambda ago: {"at": _ta - ago, "ok": False, "ms": 34500, "error": "HTTPError: HTTP Error 500"}  # noqa: E731
+    ak = {
+        "failing": H.detect_tetsu_asks_failing(rows=[_bad(60), _bad(120), _okr(180), _bad(240)], now=_ta),
+        "healthy": H.detect_tetsu_asks_failing(rows=[_okr(60), _okr(120), _bad(180), _okr(240)], now=_ta)["state"],
+        "too_few": H.detect_tetsu_asks_failing(rows=[_bad(60), _bad(120)], now=_ta)["state"],
+        "old": H.detect_tetsu_asks_failing(rows=[_bad(3 * 3600), _bad(3 * 3600 + 5), _bad(3 * 3600 + 9)], now=_ta)["state"],
+    }
+    check("H1ak tetsu_asks_failing: 3 of 4 recent asks failed PRESENT naming the error; 1 of 4 ABSENT; 2 asks too few to "
+          "judge ABSENT; failures older than the window ABSENT",
+          ak["failing"]["state"] == H.PRESENT and "500" in ak["failing"]["measured"]["last_error"]
+          and ak["healthy"] == H.ABSENT and ak["too_few"] == H.ABSENT and ak["old"] == H.ABSENT, ak)
+    import covenant_model as _CMk
+    _real_asks = _CMk.ASKS
+    try:
+        _CMk.ASKS = os.path.join(tempfile.mkdtemp(prefix="h1ak_"), "absent.jsonl")
+        r_noledger = H.detect_tetsu_asks_failing(now=_ta)["state"]
+    finally:
+        _CMk.ASKS = _real_asks
+    check("H1ak no ledger here is UNKNOWN, never ABSENT", r_noledger == H.UNKNOWN, r_noledger)
+
     # ---- H1sk: the schedule is alive (A281, 2026-10-06). Stand-in task lists; the scheduler is never read here.
     _t = 1_900_000_000.0
     _ok = {"name": "CovenantGuard", "state": "Ready", "last_run": _t - 120, "next_run": _t + 60, "missed": 0}

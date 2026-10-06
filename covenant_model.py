@@ -425,6 +425,28 @@ def _watch_idle():
     _idle_thread[0] = t
 
 
+_REAL_ASKS = os.path.join(HERE, "ops", "model_asks.jsonl")
+ASKS = os.environ.get("COVENANT_MODEL_ASKS") or _REAL_ASKS       # gitignored; rotates to .prev at ASKS_MAX_BYTES
+ASKS_MAX_BYTES = 512 * 1024
+
+
+def _note_ask(ok, ms, err=""):
+    """A282 (2026-10-06): one line per real ask -- did it answer, how long, why not. On 2026-10-06 readiness()
+    read PASS all morning while every ask through Tetsu's door came back 503 (A269), and the core's door returns
+    that 503 and records nothing, so the road had nothing to read. Never the live file from a test program
+    (A272's lesson); never raises."""
+    try:
+        prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+        if os.path.abspath(ASKS) == os.path.abspath(_REAL_ASKS) and prog.startswith("test_"):
+            return
+        if os.path.exists(ASKS) and os.path.getsize(ASKS) > ASKS_MAX_BYTES:
+            os.replace(ASKS, ASKS + ".prev")
+        with open(ASKS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"at": round(time.time(), 1), "ok": bool(ok), "ms": int(ms), "error": str(err)[:160]}) + "\n")
+    except Exception:                                            # noqa: BLE001
+        pass
+
+
 def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     """One chat completion. messages: [{"role","content"}...]. Returns (text, meta) or raises."""
     if os.environ.get("COVENANT_MODEL_STUB"):
@@ -440,6 +462,7 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     with _lock:
         ok, why = start(say=lambda *_a: None)
         if not ok:
+            _note_ask(False, 0, "could not start: %s" % why)
             raise RuntimeError(why)
         # WHOEVER ASKS, KEEPS (2026-09-19). The idle watcher lives in the process
         # that asks -- the CLI's watcher died with the CLI and left the server
@@ -456,8 +479,13 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (HOST, PORT), data=body,
                                  headers={"Content-Type": "application/json"})
     t0 = time.time()
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        d = json.loads(r.read().decode("utf-8", "replace"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            d = json.loads(r.read().decode("utf-8", "replace"))
+    except Exception as e:                                       # noqa: BLE001 -- recorded, then raised as before
+        _note_ask(False, (time.time() - t0) * 1000, "%s: %s" % (type(e).__name__, str(e)[:120]))
+        raise
+    _note_ask(True, (time.time() - t0) * 1000)
     _last_used[0] = time.time()
     text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
     usage = d.get("usage", {}) or {}
