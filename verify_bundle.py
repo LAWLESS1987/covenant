@@ -119,6 +119,7 @@ OUTPUTS = {
     "outbound_overrides.jsonl",    # covenant_ambassador.py / covenant_ai_consult.py, before each override
     "tetsu_assist.jsonl",          # covenant_tetsu_assist.py
     "oa_sources.jsonl",            # covenant_study.py appends each open-access article it caches
+    "tetsu_learning_choices.jsonl",  # 2026-10-06: Tetsu's own answers to "what do you want to learn?"
     # covenant_distill.py writes this whole every night (nights every bar
     # was met). A .json, so the .jsonl test above cannot see the next one.
     "RUN_WITHOUT.json",

@@ -7298,6 +7298,27 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A271. [A24's S6d judged compaction's lock time by ONE wall-clock sample of 3,000, so one preemption failed the sweep] 2026-10-06. Found in the full sweep run after A268-A270. FIXED as best-of-3 with the bar proven real; the same shape as the 09-27 E2 benchmark (clock assertions)
+
+**Measured.** The full sweep at 07:14-07:56 local read `S6d the worst single record holds the lock for
+under 5 ms -- max=5510us`, A24 69/70, RESULT: FAIL. It ran beside Tetsu's model on 10 of 12 threads, and
+I chose to run it then. The same bytes alone read 3664 and 3963 us. The check took max() of one run, so a
+single preemption anywhere in 3,000 records decided it.
+
+**Fixed** (test only; the core is unchanged). S6d takes the peak of the quietest of 3 runs (`s6_peak`).
+Noise only adds time, and a slow compaction recurs every `_compact_batch` records, so it lifts every run's
+peak. New S6e proves the bar still bites: with `_compact_locked` made 6 ms slower, the same measure reads
+8662 and 8811 us and would fail S6d. After the change, two runs read 2417 and 2416 us, 71/71.
+
+**Also from that sweep, my own miss (A255 C1).** A270 added a tracked ledger,
+ops/tetsu_learning_choices.jsonl, without classifying it in verify_bundle.OUTPUTS, so folder integrity read
+`test_a255_runtime_outputs.py=FAIL` (8 of 9 classified). It is classified now, 23/23. Tetsu's update log
+and the round lock are gitignored beside ops/ambassador_sends.jsonl. The commit hook's stage-check ran no
+A255 for a commit that ADDED a tracked .jsonl, which is why it reached main. That is a forgotten-step gap,
+not fixed here.
+
+---
+
 ### A270. [free's round could not repeat: it drafted a reply for every candidate (330) with the PC model, so Moltbook was touched once a night at most, and paused since 10-04] 2026-10-06. His words: "should be constant interaction on moltbook at this point too with tetsu and the ambassador figure it out". CHANGED, driven both ways; the judge's discourse gap is NOT changed
 
 **Measured before.** The ambassador has been paused since 2026-10-04 ("the covenant's judge refused every
