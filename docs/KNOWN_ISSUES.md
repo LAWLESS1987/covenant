@@ -7534,6 +7534,33 @@ sentence then turned R1 red, and removing it restored green.
 - *Live state.* It is live on a node only once that node restarts (A153). That restart is recorded
   below when done.
 
+**Live, 2026-10-06.** Pushed as 650b7b7, and public CI was green on it. The batch session ("Guard
+Tetsu's door against private/ material") was checked first. No tetsu_work.py process was alive, and the
+batch caller's last ask was at 09:52, so it was not messaged. `rolling_restart.py`, run from the
+production tree, restarted C, B and A at 10:14:51, 10:14:59 and 10:15:07. Each came back at height 71,
+genesis 00009b31, on source 7572d7ec845c. All three still answered after the shell that started them
+had ended: a breakaway launch was measured to survive this harness's job first.
+- *The door, live.* One private ask went through node A's door from the work address (tools/tetsu_work.py
+  --private, so nothing of it reached his history or the public panel). Its ask-log row reads `fit`:
+  prompt_tokens 6,722, answer_tokens 700, kept 16, dropped 24, counted "server". It answered in 138.7 s.
+- *His own callers.* Counted the same way, nothing changes for them today. His tailnet caller keeps 40
+  of 40 messages (a 4,098-token prompt) and 127.0.0.1 keeps 20 of 20, which is what the old budget
+  replayed: the 20-turn cap binds before the window does.
+- *The batch caller.* 127.0.0.2 now keeps 16 messages, a 6,722-token prompt, where the old budget kept
+  10 (5,425 tokens). That is more memory and more prompt for the CPU to read.
+
+**Measured beside it: the door's 180 s timeout does not always cover the wait.** A269 left this
+UNDETERMINED. The same ask, sent first at 10:19, failed after 181 s: "the model did not answer:
+TimeoutError: timed out". The one slot was busy the whole time with free's round
+(covenant_free_will.py --round --send). That round started at 09:43:48 and drafts for 40 minutes
+(round_minutes 40 in ops/ambassador_grant.json). It is run through the day by the Windows task
+CovenantAmbassador; the next run was 12:00. It started this llama-server itself, at 10:03:18. A door
+ask during a round waits behind a draft and then reads its whole prompt cold. With the slot idle, the
+same ask took 138.7 s. His own prompts measured 3,734 and 4,098 tokens. The batch's longer prompt
+under A273 brings it nearer the timeout. Nothing is changed here. How the door, free's rounds and the
+batch share one slot is a choice between his goals: a longer door timeout, free yielding to the door,
+or a cap on the batch caller's replay.
+
 ---
 
 ### A272. [A test suite paused the LIVE ambassador three minutes after his resume: FW1 never redirected the pause switch] 2026-10-06. Found when he allowed reading logs/ambassador.log. A RECURRENCE of A190's shape. FIXED at the switch, driven both ways
