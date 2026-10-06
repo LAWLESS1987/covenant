@@ -7316,7 +7316,7 @@ did not, and nothing noticed.
 when the running program is a test_*.py and the directory is the real ops/pause. FW1 now redirects
 COVENANT_PAUSE_DIR as well. `test_a272_pause_guard.py` (P1-P4) points the module's idea of "real" at a
 temp dir, so a broken guard writes nowhere live. With the guard returning False, P1 and P2 fail; restored,
-4/4. FW1, CT1, G7, IM1, RG1, TA1, TA255 pass, and the live pause file was byte-identical before and after.
+4/4. FW1, CT1, G7, IM1, RG1, TA1, A255 pass, and the live pause file was byte-identical before and after.
 The test-written pause is kept in .trash/pause/ with a note, and free is resumed.
 
 **What it does not cover.** A suite run under another name (a scratch driver, `python -c`) is not a
