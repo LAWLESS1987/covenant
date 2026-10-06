@@ -876,6 +876,29 @@
    "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it."
   },
   {
+   "id": "A273-RULES-SIZE-2026-10-06",
+   "claim": "That the door's rules -- the system message Tetsu is handed -- are about 5,600 characters, so a fixed history budget of 12,000 characters fits the model's 8k window beside them and the answer -- stated 2026-09-26 in the comment above AGENT_HISTORY_BUDGET in covenant_unified_v8.py, and by test_m6_mobile_door.py's M6q3 comment as the budget his model's window can hold. TRUE WHEN WRITTEN: A223 measured the rules that day at 4,919 characters (5,607 for the council). What was wrong is the premise that a size measured once would hold: the rules are composed per request from parts read at call time, and nothing re-measured them.",
+   "refuted_by": "Measured 2026-10-06 on the running server (127.0.0.1:8081, /tokenize and /apply-template): covenant_persona.compose_system(AGENT_SYSTEM) was 11,817 characters, 2,916 tokens -- fixed rules 3,082, register 2,085, where_you_are 2,110, about_him 2,800 (its cap), standing_directive 1,019 (added 2026-09-28), brief 711 -- and the council's, with the method, 12,547 characters, 3,105 tokens. Those rules with the batch caller's real history under the fixed budget (16 messages, 10,980 characters) and a dense 4,000-character question made a 7,594-token prompt, 8,294 with the door's 700-token answer: over 8,192. The council's request for the same caller came to 8,661 with its 500-token answer.",
+   "truth": "The rules are composed per request and had grown to more than twice the size the budget was sized beside; no character budget sized once can follow them. Since A273 the doors read the turns with no character budget and covenant_model.fit() counts each request with the server's own chat template and tokenizer, dropping the oldest exchanges -- as few as the window needs -- so the prompt plus the answer fits 8,192 tokens whatever the rules grow to. AGENT_HISTORY_BUDGET is kept only for a keeper without fit().",
+   "verbatim": [
+    "up to 20 exchanges, each side up to 2000 characters, newest kept first until 12,000 characters in all (was 6 x 600), so the history fits his model's 8k window beside the rules (~5,600 characters) and the answer.",
+    "The PC app's COUNCIL exchanges are replayed too, the newest are kept first, and the total stays inside the budget his model's window can hold."
+   ],
+   "patterns": [
+    "rules[^\n]{0,30}5,?600 characters",
+    "inside the budget his model's window can hold"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a273-rules-size-claim-as-written-2026-10-06 (at 036d3ad). covenant_unified_v8.py keeps the sentence as written with this id beside it; test_m6_mobile_door.py keeps M6q3's comment with this id beside it; docs/KNOWN_ISSUES.md is NOT exempt: A269's open item quotes the old size beside this id."
+  },
+  {
    "id": "A274-DEGRADED-ANY-WARNING-2026-10-06",
    "claim": "That a node's /health reports degraded whenever any warning exists, so the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green while the win32 code-sandbox warning stands -- written in a Claude session note on 2026-10-06 (the 'greenlight' memory) and carried from there into the request that became A274.",
    "refuted_by": "covenant_unified_v8.py's /health builds `warnings` as one list and `degraded` from four booleans -- keyless, insecure, own_genesis, crisis_mode -- and no warning sets any of them. Measured on A, B and C on 2026-10-06 before any change: degraded=True on all three with judge_keyless=True, judge_insecure=False, crisis_mode=False; the sandbox warning was one of two warnings on each and decided nothing.",

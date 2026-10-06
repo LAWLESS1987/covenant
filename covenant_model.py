@@ -84,6 +84,31 @@ HEADROOM_GB = float(os.environ.get("COVENANT_MODEL_HEADROOM_GB", "2.0"))
 FLOOR_GB = float(os.environ.get("COVENANT_MODEL_FLOOR_GB", "1.0"))
 PRESSURE_IDLE_S = 60
 
+# THE WINDOW, COUNTED (A273, 2026-10-06). The server holds CTX_TOKENS for one request (-c, -np 1):
+# the prompt AND the answer it writes. The doors' history budget was a fixed 12,000 characters,
+# sized beside rules of "about 5,600 characters" (retracted: A273-RULES-SIZE-2026-10-06, docs/
+# RETRACTED.json); measured today the composed rules were 11,817
+# characters, 2,916 tokens by the server's own tokenizer, and those rules with the batch caller's
+# real history (16 messages, 10,980 characters) and a dense 4,000-character question came to a
+# 7,594-token prompt: 8,294 with the door's 700-token answer. fit() replaces the guess with
+# a count: the server's own chat template (/apply-template) and tokenizer (/tokenize), the two
+# steps /v1/chat/completions takes, measured answering in 33 ms while the one slot was busy
+# generating -- so counting never waits behind another ask.
+#   FIT_MARGIN_TOKENS          slack kept free, mine (Claude's), not a measurement.
+#   FALLBACK_CHARS_PER_TOKEN   used only when the server cannot be asked (a stub, a server that
+#                              will not start -- and then ask() fails too). MEASURED: 321 texts and
+#                              answers of 200+ characters from ops/chat/ask_log.jsonl ran 3.04
+#                              characters a token at the lowest, 3.48 at the 1st percentile, 4.52
+#                              at the median; 3.0 is at or under every one of them.
+#   MIN_ANSWER_TOKENS          with nothing left to drop, the answer may be shortened to this and
+#                              no further; below it the request is refused, never sent too big.
+CTX_TOKENS = 8192
+FIT_MARGIN_TOKENS = 64
+FALLBACK_CHARS_PER_TOKEN = 3.0
+FALLBACK_TOKENS_PER_MESSAGE = 8        # the template's own tokens; measured ~5 a message (Qwen2.5)
+MIN_ANSWER_TOKENS = 128
+COUNT_TIMEOUT_S = 10
+
 
 def _bar(name, need):
     """Free memory a candidate needs before it loads: its size, plus headroom unless it is a rung
@@ -239,7 +264,9 @@ def start(say=print):
     # 8k for both (2026-09-26): his longer conversation memory (up to 12,000 characters of
     # history, agent_history) must fit beside the rules and the answer. The 3B's bar in
     # CANDIDATES carries the larger cache.
-    ctx = "8192"
+    # (A273, 2026-10-06: 12,000 characters did not always fit beside the rules, which had grown to
+    # 2,916 tokens; the doors now fit the history to this window by counting it -- fit() below.)
+    ctx = str(CTX_TOKENS)
     # ONE SLOT (A269, 2026-10-06). This llama-server build defaults to 4 parallel slots that share ONE
     # pool of -c tokens: requests running at the same time together overflowed it, and the server
     # answered "500 Context size has been exceeded" -- to a 2,521-token probe while the X batch's
@@ -436,6 +463,93 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     usage = d.get("usage", {}) or {}
     return text, {"model": _read_state().get("model", "?"), "tokens": int(usage.get("completion_tokens", 0) or 0),
                   "ms": int((time.time() - t0) * 1000)}
+
+
+class ContextTooLong(RuntimeError):
+    """A request that cannot fit the model's window even with every replayed turn dropped (A273)."""
+
+
+def _post(path, body, timeout=COUNT_TIMEOUT_S):
+    req = urllib.request.Request("http://%s:%d%s" % (HOST, PORT, path), data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def count_prompt_tokens(messages):
+    """The prompt's size in tokens as the server will see it: its chat template, then its tokenizer
+    (the same template arguments ask() sends). None when the server cannot be asked."""
+    try:
+        prompt = _post("/apply-template", {"messages": messages,
+                                           "chat_template_kwargs": {"enable_thinking": False}})["prompt"]
+        return len(_post("/tokenize", {"content": prompt, "add_special": True})["tokens"])
+    except Exception:                                             # noqa: BLE001 -- the caller falls back to the estimate
+        return None
+
+
+def estimate_prompt_tokens(messages):
+    """An upper estimate from characters, at FALLBACK_CHARS_PER_TOKEN (measured; see above)."""
+    return FALLBACK_TOKENS_PER_MESSAGE + sum(
+        FALLBACK_TOKENS_PER_MESSAGE + int(-(-len(str(m.get("content", ""))) // FALLBACK_CHARS_PER_TOKEN))
+        for m in messages)
+
+
+def _counter():
+    """(count, how): the server's count when it can be asked, the estimate otherwise. The server is
+    started first, as ask() would start it: a count against a stopped server would fall back to the
+    estimate, and the first message after an idle stop -- when he comes back to the conversation --
+    would lose memory the window had room for."""
+    if os.environ.get("COVENANT_MODEL_STUB"):
+        return estimate_prompt_tokens, "estimate (stub)"
+    with _lock:
+        ok, _why = start(say=lambda *_a: None)
+    if ok and count_prompt_tokens([{"role": "user", "content": "."}]) is not None:
+        def exact(ms):
+            n = count_prompt_tokens(ms)
+            return estimate_prompt_tokens(ms) if n is None else n
+        return exact, "server"
+    return estimate_prompt_tokens, "estimate"
+
+
+def fit(messages, max_tokens=700, droppable=0, count=None):
+    """(messages, max_tokens, info): the request cut to fit the window, CTX_TOKENS, before it is sent.
+
+    messages[0] is the system message; messages[1:1 + droppable] are the replayed turns, oldest first,
+    in user/assistant pairs; everything after them -- this question, and on a follow-up the first
+    answer and its DATA -- is kept whole. The fewest oldest pairs are dropped that make the prompt plus
+    max_tokens plus FIT_MARGIN_TOKENS fit, so as much of his conversation as fits stays. With no turn
+    left to drop, the answer is shortened, to MIN_ANSWER_TOKENS at the least; below that ContextTooLong
+    is raised. info: prompt_tokens, answer_tokens, ctx, kept, dropped, counted."""
+    how = "given"
+    if count is None:
+        count, how = _counter()
+    head, hist, tail = list(messages[:1]), list(messages[1:1 + droppable]), list(messages[1 + droppable:])
+    cuts = list(range(0, len(hist), 2)) + [len(hist)]             # messages dropped: 0, 2, 4 ... all
+    limit = CTX_TOKENS - FIT_MARGIN_TOKENS
+    sizes = {}
+
+    def size(i):                                                  # the prompt with cuts[i] turns dropped
+        if i not in sizes:
+            sizes[i] = int(count(head + hist[cuts[i]:] + tail))
+        return sizes[i]
+    lo, hi = 0, len(cuts) - 1                                     # dropping more never makes it larger
+    if size(hi) + max_tokens > limit:
+        lo = hi
+    else:
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if size(mid) + max_tokens <= limit:
+                hi = mid
+            else:
+                lo = mid + 1
+    n = size(lo)
+    answer = min(int(max_tokens), limit - n)
+    info = {"prompt_tokens": n, "answer_tokens": answer, "ctx": CTX_TOKENS, "kept": len(hist) - cuts[lo],
+            "dropped": cuts[lo], "counted": how}
+    if answer < min(int(max_tokens), MIN_ANSWER_TOKENS):
+        raise ContextTooLong("the request is %d tokens before any answer, with all %d replayed turns dropped; "
+                             "the model's window is %d (A273)" % (n, len(hist), CTX_TOKENS))
+    return head + hist[cuts[lo]:] + tail, answer, info
 
 
 def status():
