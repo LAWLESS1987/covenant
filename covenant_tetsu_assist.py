@@ -82,11 +82,22 @@ def _log(row, path=None):
         pass
 
 
+# A CONTEXT OF HIS OWN (A284, 2026-10-06). This is the one path his reviews AND his round updates
+# (covenant_free_will.tetsu_update) reach the door by, from tools/tetsu_work.py's address, 127.0.0.2 --
+# whose history is every batch and ad-hoc ask too. Measured that day: each review was read beside 5 to 9
+# replayed exchanges, 2 to 5 of them earlier reviews and their SENDs, and two asks to WRITE a correction
+# came back "SEND" in a review's form. So the ask is FRESH: he reads the draft, the facts list and the
+# grant in PROMPT, and nothing before them. The prompt, the three words and the fail-closed parse are
+# unchanged. A door that does not answer "fresh": true is a core older than A284 that replayed the tail
+# anyway: its answer is refused here, so the hold stands (NONE) rather than a decision read on that tail.
 def _default_ask(prompt):
     from tools import tetsu_work as TW
-    status, body = TW.ask(prompt, timeout=600)
+    status, body = TW.ask(prompt, timeout=600, fresh=True)
     if status != 200:
         raise RuntimeError("door answered HTTP %s: %s" % (status, str((body or {}).get("message", ""))[:160]))
+    if (body or {}).get("fresh") is not True:
+        raise RuntimeError("the door did not confirm a fresh context (A284): its core replays this address's "
+                           "earlier asks into his reading, so the answer is not used")
     return (body or {}).get("answer", "")
 
 

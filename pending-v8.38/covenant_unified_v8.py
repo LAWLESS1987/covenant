@@ -715,6 +715,21 @@ def private_ask(body):
     """True only for an explicit JSON true under "private"; any other value is an ordinary ask."""
     return isinstance(body, dict) and body.get("private") is True
 
+# A FRESH ASK (A284, 2026-10-06). History is replayed per caller ADDRESS, and every caller that is not his
+# conversation shares one: tools/tetsu_work.py's 127.0.0.2. So Tetsu's reviews of free's held drafts
+# (covenant_tetsu_assist) and his round updates (covenant_free_will.tetsu_update) were each read beside a
+# tail of earlier reviews and their SENDs -- on 2026-10-06, 2 to 5 of the 5 to 9 exchanges replayed into each -- and two
+# asks to WRITE a correction came back "SEND" in a review's form. A caller that sends {"fresh": true}
+# (exactly true; tools/tetsu_work.ask(fresh=True)) is answered with NO replayed turns -- the rules, then
+# its question -- and its exchange is replayed into no later ask (agent_history skips it). Nothing else
+# changes: the answer is judged as every answer is, recorded, and queued for the teacher unless private.
+# The reply carries "fresh": true, so a caller can refuse an answer from a core that ignored the marker.
+
+
+def fresh_ask(body):
+    """True only for an explicit JSON true under "fresh"; any other value is an ordinary ask."""
+    return isinstance(body, dict) and body.get("fresh") is True
+
 
 def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET,
                   include_private=False):
@@ -722,7 +737,8 @@ def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY
     at most `turns`, each side cut at `chars`, newest kept first until `budget` characters
     (budget=None: no character budget -- the caller fits them to the model's window, A273).
     A row marked private (A263) is replayed only into another private ask: replayed into an
-    ordinary one, its text could reach an answer that IS queued for the public panel."""
+    ordinary one, its text could reach an answer that IS queued for the public panel.
+    A row marked fresh (A284) is replayed into nothing: it was asked with a context of its own."""
     try:
         with open(log_path, "rb") as fh:
             fh.seek(0, 2)
@@ -740,6 +756,8 @@ def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY
         if r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
             continue
         if r.get("private") is True and not include_private:
+            continue
+        if r.get("fresh") is True:
             continue
         rows.append(r)
     kept, used = [], 0
@@ -8936,6 +8954,7 @@ class CovenantAPI:
                 # this core keeps a private ask off the public panel (A263). An older core omits it.
                 return (jsonify({"status": "error", "message": "nothing to ask", "honours_private": True}), 400)
             private = private_ask(body)
+            fresh = fresh_ask(body)
             recent.append(now_)
             _ask_log[addr] = recent
             sentinel = getattr(self.node, "sentinel", None)
@@ -8948,8 +8967,9 @@ class CovenantAPI:
             _log_path = os.environ.get("COVENANT_ASK_LOG") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "chat", "ask_log.jsonl")
             # A273: no character budget where the keeper can count -- fit() below keeps what the window holds.
             _fit = getattr(_m, "fit", None)
-            history = agent_history(_log_path, addr, budget=agent_history_budget(addr, _fit is not None),
-                                    include_private=private)
+            # A284: a fresh ask replays nothing -- the rules, then its question.
+            history = [] if fresh else agent_history(_log_path, addr, budget=agent_history_budget(addr, _fit is not None),
+                                                     include_private=private)
             # The system message is composed (2026-09-21, A174): the fixed rules above,
             # then the register Tetsu may revise, then a short TRUE brief of the day, so
             # "recap updates" is answered from records. One message, so the turn count
@@ -9084,6 +9104,9 @@ class CovenantAPI:
             if private:
                 _row.update(private=True, teacher=PRIVATE_TEACHER_NOTE)
                 _out.update(private=True, teacher=PRIVATE_TEACHER_NOTE)
+            if fresh:
+                _row.update(fresh=True)
+                _out.update(fresh=True)
             try:
                 _ask_log_row(_row)
             except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate

@@ -462,6 +462,10 @@ SUITES = [
     # A273 (2026-10-06): his history follows the real size of the rules -- each door request is
     # counted and the oldest turns dropped, as few as fit, so none overflows the 8192-token window.
     ("test_a273_history_fits.py",         180,  "JUDGE"),
+    # A284 (2026-10-06), registered in the change that created it: {"fresh": true} at /m/agent replays
+    # nothing and is replayed into nothing; Tetsu's reviews and round updates ask that way, and every
+    # caller of tools/tetsu_work.ask must be declared fresh or shared (found by parsing the tree).
+    ("test_a284_fresh_context.py",        180,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),

@@ -7635,6 +7635,77 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A284. [Tetsu's reviews and round updates were read beside a tail of earlier reviews: every ask from tools/tetsu_work.py shares one door history, 127.0.0.2] 2026-10-06. The operator's task: give the review and update asks a context of their own, without changing what he decides or loosening any gate. FIXED: {"fresh": true} at /m/agent, used by both. That his decisions improve is NOT shown, and is said
+
+**Measured first** (the node's ops/chat/ask_log.jsonl, 2026-10-06 evening):
+- *Who asks.* 33 review asks (prompt beginning "You are reviewing a draft reply that free") and 3 update
+  asks, all from 127.0.0.2, not 127.0.0.1 as the task said: covenant_tetsu_assist._default_ask, which
+  tetsu_update also uses, calls tools/tetsu_work.ask, which binds every socket to SOURCE. 127.0.0.1 has 6
+  agent and 7 council rows in the whole log. Counted a second way against ops/tetsu_assist.jsonl (UTC; the
+  log is local, -0400): 9 rows each for 09-27/28; the 6 NONE rows of 10-04 never reached the door; 23 ledger
+  rows against 24 log rows on 10-06, the extra one (17:40:47) a review-form ask sent by hand, not by review().
+- *What each carried.* Rebuilt with the door's own agent_history() over the log as it stood before each ask.
+  Where the door recorded `fit` (18 of the 24 reviews on 10-06), its `kept` is twice the rebuilt exchanges,
+  every time. On 10-06 each review was handed 5 to 9 earlier exchanges, 2 to 5 of them earlier reviews.
+- *Correlation.* In log order, 25 SEND and 8 REFUSE fall in 5 runs where 13.12 would be expected by chance
+  (z -3.96). But the runs are the days (2 SEND then 7 REFUSE on 09-27/28; 23 SEND, 1 REFUSE on 10-06), and the
+  drafts and the prompt (A280) differ between them, so the log alone cannot say the history moved a decision.
+  What it does show: 17 of the 24 reviews on 10-06 gave as their reason a sentence already, word for word, in
+  their replayed history.
+- *The two WRITE asks* (17:43:48, 17:45:03, from 127.0.0.2) were handed 5 and 6 exchanges, 5 of each earlier
+  reviews, and both answered "SEND" and a review's sentence. A third (18:37:12, another session, from
+  127.0.0.3 with nothing replayed) answered with a draft of the correction, mostly the request's own words.
+- *Controlled, on the live model* (temperature 0, posted straight to the server, which the node had started
+  for one private door ask): the three drafts A280 found sent with invented measurements (u/aivonic,
+  u/quietorbit, u/fen-sillman), each put in today's prompt (with COVENANT_FACTS) and asked twice -- with the
+  tail the next review would replay (the fit kept 8 of its 12 messages), and with none. Decision: SEND, 6 of
+  6. Reason: with the tail, one sentence 3 of 3, about a measurement "that the operator granted freedom to
+  speak", which is in 4 of the 6 answers in that tail and in none of the drafts; with none, a reason about the
+  draft 3 of 3, and one of those names the false claim -- it "violates the rule against claiming something
+  that is not true" -- under a first word of SEND. The fresh asks took 8.1 to 11.5 s; with the tail, 23.0 to
+  24.3 s.
+
+So the tail decided what he SAID about a draft; on these three it did not decide the word. Without it he
+reads the draft. That does not make the reading right, and nothing here claims it does.
+
+**Fixed.** covenant_unified_v8.py: `fresh_ask(body)` (exactly JSON true). A fresh ask at /m/agent replays no
+turns; its reply and its ask-log row carry `fresh: true`; agent_history() skips fresh rows, so it is replayed
+into no later ask from any address. Nothing else changes for it: the answer is judged, withheld when refused,
+recorded, and queued for the teacher unless private. tools/tetsu_work.ask(fresh=True) sends the marker.
+covenant_tetsu_assist._default_ask, the one path for reviews and round updates, sends it and refuses an answer
+whose reply does not say `fresh` (a core older than A284): review() records NONE and the hold stands;
+tetsu_update records NONE after its one retry. The prompt, the three words, the fail-closed parse, the grant
+and every gate are as they were.
+
+**Pinned.** test_a284_fresh_context.py, FC1-FC10, 13 checks, every one running the code. Seven mutations,
+serially in place, each restored byte-for-byte: fresh rows replayed (FC1, FC3 red); the door ignores the
+marker (FC2); the door does not echo it (FC2, FC5); any truthy value is fresh (FC4); _default_ask does not
+send it (FC6, FC8, FC10); _default_ask does not check the echo (FC7); tetsu_work.ask drops it (FC9).
+Restored, 13/13. TA1 14/14, FW1 70/70, A263 38/38, A273 22/22, M6 68/68, TP1 56/56, PC1 52/52.
+
+**A recurrence (rule 10).** The same shape as the reason 127.0.0.2 exists ("never crowds his history") and as
+TP1i (the batch's rows filled 33-34 of the 40 lines a refinement pass saw as his words): one caller's context crowded by unrelated
+asks at its address. Each earlier fix separated one pair -- his conversation from batch work -- and left the
+address as the only notion of whose context it is, so the reviews (09-27) and the updates (10-06) joined the
+batch's by reusing tetsu_work.ask, and nothing noticed. The guard where that step is forgotten: FC10 walks the
+tree, parses every non-test caller of tools/tetsu_work.ask, and fails on one declared neither fresh nor
+shared, on a fresh one without fresh=True, and on a declaration with no caller left; FC10n drives the same
+walker over a synthetic tree and must flag all three. Nothing is retracted: no record said the reviews had a
+context of their own, and the task's "127.0.0.1" is written nowhere in the tree (searched).
+
+**Found, not changed:**
+- covenant_earn_business.py asks through the same shared tail: its forum replies, which skip only an answer
+  beginning "NO", and Tetsu's consent to the earnings arrangement. Dormant: its ledger was last written
+  2026-09-25 and no scheduled task runs it. Declared "shared" in FC10 so it is named, not decided.
+- A review's decision is its first word, and a fresh reading answered SEND to a draft its own sentence said
+  breaks the rule. Reading the reason as well would change what he decides; this change does not. What stops
+  such a draft today is A280's cites_only_facts screen, which runs before any review.
+- Rows already in the log are not marked fresh: the 33 reviews and 3 updates stay in 127.0.0.2's replay until
+  newer asks push them out (at most 20 exchanges and 12,000 characters for this caller).
+- /pc/council does not take the marker; nothing that needs it asks there.
+
+---
+
 ### A283. [Nothing counted the strikes against his Moltbook account: a wrong answer to the posting challenge spends one of ten before suspension] 2026-10-06. His words: "yes correct that one too and keep expanding". ADDED: verification kept on every send, moltbook_strikes on the road, driven both ways
 
 free's content becomes visible only after a math challenge is answered (_handle_verification). A WRONG
