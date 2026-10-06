@@ -830,6 +830,54 @@ def detect_sweep_not_current(health=None, here=None):
     return {"state": ABSENT if m.group(1) == disk else PRESENT, "measured": measured}
 
 
+AMBASSADOR_STALL_H = 8.0     # rounds run every 3 h (CovenantAmbassador) plus the nightly's; 8 h is two missed
+
+
+def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None, now=None):
+    """free has a grant to speak on Moltbook and is not speaking: paused, or no live round in AMBASSADOR_STALL_H.
+
+    A279 (2026-10-06, his words: "keep expanding the highway"). free was isolated on 2026-10-04 and stayed
+    so for two days; covenant_pause.report() said it as an INFO line every pass and the road said nothing.
+    On 10-06 a test re-paused her three minutes after his resume (A272) and only a log read found it. A READ:
+    the grant (ops/ambassador_grant.json), the pause switch, and the live round rows in the sends ledger. No
+    remedy: lifting a pause is his, and a round speaks in public. No grant is ABSENT (off is his choice);
+    no live round ever on record here (a clone, CI) is UNKNOWN."""
+    import calendar
+    now = time.time() if now is None else now
+    try:
+        if grant is None or paused is None or rounds is None:
+            import covenant_free_will as FW
+            import covenant_pause as CP
+            grant = FW.grant() if grant is None else grant
+            paused = CP.paused("ambassador") if paused is None else paused
+            rounds = [r for r in FW.sends() if r.get("kind") == "round" and not r.get("dry_run")] if rounds is None else rounds
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    if not grant:
+        return {"state": ABSENT, "measured": {"why": "no grant on record: free is off by his choice"}}
+    is_paused, why = paused if isinstance(paused, tuple) else (bool(paused), "")
+    last = None
+    for r in rounds or []:
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        last = float(at) if last is None else max(last, float(at))
+    measured = {"paused": bool(is_paused), "last_live_round_h": None if last is None else round((now - last) / 3600.0, 1)}
+    if is_paused:
+        measured["why"] = str(why)[:240]
+        return {"state": PRESENT, "measured": measured}
+    if last is None:
+        measured["why"] = "no live round on record here"
+        return {"state": UNKNOWN, "measured": measured}
+    if now - last > AMBASSADOR_STALL_H * 3600:
+        measured["why"] = "granted and not paused, and no live round in %.1f h" % ((now - last) / 3600.0)
+        return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
 PUBLIC_CI = os.path.join(HERE, "ops", "public_ci.json")       # gitignored: this PC's last reading of the public CI
 CI_REPO = os.environ.get("COVENANT_CI_REPO", "LAWLESS1987/covenant")
 CI_WORKFLOW = "covenant.yml"
@@ -1541,6 +1589,7 @@ DETECTORS = {
     "defense_lapse": detect_defense_lapse,
     "sweep_red": detect_sweep_red,
     "sweep_not_current": detect_sweep_not_current,
+    "ambassador_stalled": detect_ambassador_stalled,
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,

@@ -1468,6 +1468,24 @@ def main():
         check("H1sc off Windows the remedy declines (it cannot see a running sweep) and starts nothing",
               ok_go is False and not _launched, (why_go, _launched))
 
+    # ---- H1am: free granted and silent (A279, 2026-10-06). Every input is a stand-in.
+    _n = 1_900_000_000.0
+    _g = {"granted": True}
+    am = {
+        "no_grant": H.detect_ambassador_stalled(grant=None or {}, paused=(False, ""), rounds=[], now=_n)["state"],
+        "paused": H.detect_ambassador_stalled(grant=_g, paused=(True, "isolated 2026-10-04: ..."), rounds=[{"at": _n - 600}], now=_n),
+        "fresh": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 3 * 3600}], now=_n)["state"],
+        "stale": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 9 * 3600}, {"t": "2001-01-01T00:00:00Z"}], now=_n),
+        "never": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[], now=_n)["state"],
+    }
+    check("H1am ambassador_stalled: no grant ABSENT (his choice); paused PRESENT with the pause's own words; a round 3 h ago "
+          "ABSENT; none in 9 h PRESENT; no round ever on record UNKNOWN",
+          am["no_grant"] == H.ABSENT and am["paused"]["state"] == H.PRESENT and "isolated" in am["paused"]["measured"]["why"]
+          and am["fresh"] == H.ABSENT and am["stale"]["state"] == H.PRESENT and am["stale"]["measured"]["last_live_round_h"] == 9.0
+          and am["never"] == H.UNKNOWN, am)
+    _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
+    check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
+
     # ---- H1tt: Tetsu on the road (A276, 2026-10-06, his words: "get the road green and start expanding
     # the highway"). Two READS of covenant_model.readiness(), driven with a stand-in, each way. No remedy
     # may be paired with either: the model is NEVER_AUTOMATIC and freeing memory is his (A252).

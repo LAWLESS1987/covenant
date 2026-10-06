@@ -7622,6 +7622,43 @@ the window. Today they are 3,734-4,098 tokens, because the 20-turn cap binds fir
 
 ---
 
+### A279. [free sat isolated for two days and the road said nothing: a granted ambassador that is not speaking was not a condition] 2026-10-06. His words: "keep expanding the highway". ADDED: ambassador_stalled, read-only, driven both ways
+
+free was isolated on 2026-10-04 and stayed so until 10-06. covenant_pause.report() said it as an INFO line
+every pass, and no detector read it. On 10-06 a test re-paused her (A272) and only a log read found it.
+`detect_ambassador_stalled` reads the grant, the pause switch and the live round rows. Its states: PRESENT
+when granted and paused (with the pause's own words) or when there has been no live round in 8 h (the
+schedule runs every 3 h); ABSENT with no grant, because off is his choice; UNKNOWN with no live round ever
+on record (a clone, CI). No remedy: lifting a pause is his, and a round speaks in public. H1am drives each
+state with stand-ins; H1 195/195. Live at the time of writing it reads PRESENT, because I paused free for
+A280, which is the road telling the truth about it.
+
+---
+
+### A280. [free's replies claimed measurements the covenant never made: her prompt asked "what the covenant measured" and gave her nothing to cite] 2026-10-06. Found reading the noon round's sends. Three such replies are PUBLIC on Moltbook. FIXED for every draft from now; the three posted are his to correct
+
+**Measured.** All three replies that went out on 2026-10-06 claimed a measurement that is on no record:
+u/aivonic 13:46Z ("The covenant measured the effectiveness of automated systems in enforcing intent versus
+mere execution"), u/quietorbit 16:03Z ("The covenant measured this by testing the backend's response to
+exceeding a grant"), u/fen-sillman 16:06Z ("The covenant measured the risk of over-authorization ...").
+REPLY_SYSTEM and POST_SYSTEM told the model to "say ... what the covenant measured that bears on it" and
+gave it nothing to say, beside "Never invent a fact". Tetsu-assist sent all three; his prompt had no list
+to check a claim against. FW1's own fixture draft said "we measured the same thing". I paused free at
+14:42 local, before the 15:00 round.
+
+**Fixed.** `COVENANT_FACTS`: six true statements, each checkable in docs/KNOWN_ISSUES.md or
+docs/RETRACTED.json, each with the anchor a draft must carry to cite it. Both prompts list them as the ONLY
+measurements she may mention, or none. `cites_only_facts()` sets aside any model draft or post that says
+the covenant (or we) measured, tested, found or showed something without an anchor. A reply falls back to
+the fixed text, which claims nothing; a post is not written. Tetsu's review prompt carries the same list
+and REFUSEs any other claim. Against the three posted replies, the screen rejects all three. FW1m drives it
+(screen off: 2 fail); FW1d's fixture now cites a fact; FW1 65/65, TA1, CT1, TF1 pass.
+
+**Not fixed, and not mine to do alone.** The three replies are public. A correction under each, or their
+removal, is speech in his project's name on his account: his decision.
+
+---
+
 ### A278. [The road reported a sweep of code that was no longer running: sweep_red never asked which core its transcript measured] 2026-10-06. His words: "keep expanding the highway". ADDED: sweep_not_current and run_full_sweep, driven both ways
 
 **Measured.** The core changed three times on 2026-10-06 (74d6d31e9f5d, 55bd8038ecfa for A274, then

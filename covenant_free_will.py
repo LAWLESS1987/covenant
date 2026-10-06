@@ -70,12 +70,50 @@ MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|i
 # --resume ambassador. Nothing here lifts it.
 ISOLATE_AFTER_ROUNDS = 2
 
+# THE FACTS SHE MAY CITE (A280, 2026-10-06). REPLY_SYSTEM asked the model to "say in one sentence what the
+# covenant measured that bears on it" and gave it nothing to say: the first three replies to go out in
+# weeks each claimed a measurement the covenant never made ("The covenant measured this by testing the
+# backend's response to exceeding a grant"), and Tetsu's review, which had no list either, sent them.
+# Each line below is true and checkable in the public record (docs/KNOWN_ISSUES.md, docs/RETRACTED.json);
+# the second element is what a draft must contain to count as citing it.
+COVENANT_FACTS = (
+    ("when its judges cannot agree, a hold fails closed and the ledger admits nothing", ("fail closed", "fails closed")),
+    ("it publishes what went wrong: a public list of known issues, each with what was measured and how it was fixed",
+     ("known issues",)),
+    ("a claim it got wrong is kept with its original wording, and a check fails the build if that wording comes back",
+     ("original wording", "retract")),
+    ("a mutation test of its own guards found 35 of 36 suspected guards were fake: they searched the source text "
+     "instead of running the code", ("35 of 36",)),
+    ("on 2026-10-06 its small judges held 215 of 216 forum drafts in one round, because they cannot yet read discourse",
+     ("215 of 216",)),
+    ("on 2026-10-06 one of its own tests paused its live ambassador; the switch now refuses a test", ("paused its",)),
+)
+_FACT_LINES = "\n".join("- " + f for f, _m in COVENANT_FACTS)
+_CLAIM = re.compile(r"\b(?:covenant|we|our (?:project|ledger|judges?))\b[^.?!]{0,40}\b(?:measured|tested|found|showed|proved|confirmed)\b", re.I)
+
+
+def cites_only_facts(text):
+    """(ok, why): a draft that claims the covenant measured/tested/found something must carry one of
+    COVENANT_FACTS' anchors; a draft that claims nothing passes. Deliberately blunt (A280)."""
+    t = str(text or "")
+    if not _CLAIM.search(t):
+        return True, "no measurement claimed"
+    low = t.lower()
+    for fact, anchors in COVENANT_FACTS:
+        if any(a in low for a in anchors):
+            return True, "cites: " + fact[:60]
+    return False, "claims a measurement that is not on the covenant's record: %r" % _CLAIM.search(t).group(0)
+
+
 REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project "
                 "whose ledger admits nothing until its own judges agree, and which publishes its failures. "
                 "You are replying to another agent as an ally. Write 60 to 120 words, plain, first person, "
                 "no headings, no lists, no flattery, no marketing. Name the specific thing they wrote that "
-                "you agree with, say in one sentence what the covenant measured that bears on it, and ask "
-                "them one real question. Never invent a fact, never mention money, tokens, prices or "
+                "you agree with. If one of the facts below bears on it, say it in one sentence, without adding "
+                "anything to it; if none does, say nothing about what the covenant measured. Ask them one real "
+                "question. These are the ONLY things the covenant has measured that you may mention:\n"
+                + _FACT_LINES + "\n"
+                "Never invent a fact, never mention money, tokens, prices or "
                 "trading, and never say anything about the operator's private life. Do not add a signature; "
                 "one is attached for you.")
 
@@ -95,8 +133,11 @@ FALLBACK_REPLY = ("You wrote something here that I recognise: %s. The covenant i
 POST_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project whose "
                "ledger admits nothing until its own judges agree, and which publishes its failures. Write ONE short "
                "post of your own, 80 to 160 words, plain, first person, no headings, no lists, no marketing: start from "
-               "the one thing you read on the forum today that is quoted below, say what the covenant measured that "
-               "bears on it, and end with one real question to whoever reads it. Never invent a fact, never mention "
+               "the one thing you read on the forum today that is quoted below; if one of the facts below bears on it, "
+               "say it without adding anything, and if none does, say nothing about what the covenant measured; end "
+               "with one real question to whoever reads it. These are the ONLY things the covenant has measured that "
+               "you may mention:\n" + _FACT_LINES + "\n"
+               "Never invent a fact, never mention "
                "money, tokens, prices or trading, never the operator's private life. First line: a title under 80 "
                "characters. Then a blank line. Then the post.")
 
@@ -122,7 +163,10 @@ def write_post(rows, ask):
         title, _sep, body = text.partition("\n")
         title, body = title.strip().strip("#").strip()[:80], body.strip()
         words = len(body.split())
-        if title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
+        grounded, why_not = cites_only_facts(title + " " + body)
+        if not grounded:
+            print("free: her post was set aside (%s); no post this round" % why_not, flush=True)
+        elif title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
             return title, body, pick
     except Exception as e:                                        # noqa: BLE001
         print("free: the model did not write the post (%s)" % type(e).__name__, flush=True)
@@ -199,7 +243,10 @@ def write_reply(row, ask=None):
             text, _meta = ask(msgs, max_tokens=260)
             text = re.sub(r"\s+\n", "\n", str(text or "")).strip()
             words = len(text.split())
-            if 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
+            grounded, why_not = cites_only_facts(text)
+            if not grounded:
+                print("free: the model's reply was set aside (%s); the fixed text stands in" % why_not, flush=True)
+            elif 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
                 return text, "model"
         except Exception as e:                                    # noqa: BLE001 -- the fixed text is the fallback
             print("free: the model did not write the reply (%s); the fixed text stands in" % type(e).__name__, flush=True)

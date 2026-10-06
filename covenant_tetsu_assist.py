@@ -55,6 +55,9 @@ PROMPT = (
     "if it claims something that is not true or an act that was not done; or if it is about money, tokens, "
     "prices or trading. Otherwise, if it is honest and worth saying, send it. If you think free should stop "
     "posting for now, say PAUSE.\n\n"
+    "The ONLY things the covenant has measured that a draft may cite are listed here. A draft that says the "
+    "covenant (or we) measured, tested, found or showed anything else claims something that is not true: "
+    "REFUSE it.\n" + "\n".join("- " + f for f, _m in __import__("covenant_free_will").COVENANT_FACTS) + "\n\n"
     "Answer with ONE word first -- SEND, REFUSE or PAUSE -- then one sentence of why.\n\n"
     "What the students said: %s\n\nThe draft:\n%s")
 

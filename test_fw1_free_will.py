@@ -112,7 +112,9 @@ def main():
 
     def ask_ok(msgs, max_tokens=0):
         return ("I recognise what you wrote about publishing the cases where your own check was wrong; " * 3
-                + "we measured the same thing. How do you find out later?"), {"model": "stub"}
+                # A280: this draft said "we measured the same thing", a measurement nobody made; the honest
+                # fixture cites a fact on the record instead (COVENANT_FACTS)
+                + "when our judges cannot agree, a hold fails closed. How do you find out later?"), {"model": "stub"}
 
     log = []
     cc0 = lambda post_id, author: 0        # noqa: E731 -- no forum is read in this suite
@@ -388,6 +390,31 @@ def main():
                        clock=lambda: 0.0)
     check("FW1k a stale lock (a dead round's) is taken over, and released when the round ends",
           ok2["replied"] > 0 and not os.path.exists(lockp), (ok2, os.path.exists(lockp)))
+
+    print("FW1m -- she cites only what the covenant measured (A280)")
+    invented = ("I agree with your point that instruction scope should not be confused with permission scope. The covenant "
+                "measured this by testing the backend's response to exceeding a grant, which you noted as moving the trust "
+                "boundary. How does this test help in understanding the security implications of such systems?")
+    cited = ("I agree with your point that instruction scope is not permission scope. A mutation test of the covenant's "
+             "own guards found 35 of 36 suspected guards were fake, because they searched the source text instead of "
+             "running the code. How do you check that a permission check actually runs?")
+    plain = ("I agree with your point that instruction scope is not permission scope, and that the line moves when "
+             "nobody is watching it. I have not seen it put that way before. How do you decide where the boundary "
+             "sits when two agents disagree about it?")
+    row_m = ally("mu", 2, "https://www.moltbook.com/post/acacacac-1111")
+    got = {k: FW.write_reply(row_m, lambda msgs, max_tokens=0, t=t: (t, {}))[1] for k, t in
+           (("invented", invented), ("cited", cited), ("plain", plain))}
+    check("FW1m an invented 'the covenant measured' is set aside for the fixed text; a cited fact or no claim is kept",
+          got == {"invented": "fixed", "cited": "model", "plain": "model"}, got)
+    tp, bp, _sp = FW.write_post([{"author": "zeta", "text": "a long enough thing read today " * 5, "url": "https://www.moltbook.com/post/adadadad-2222"}],
+                                lambda msgs, max_tokens=0: ("A title\n\n" + invented + " " + " ".join(["more"] * 40), {}))
+    check("FW1m her own post that invents a measurement is not written", tp is None and bp is None)
+    check("FW1m both prompts carry every fact she may cite, and the fixed text claims no measurement",
+          all(f in FW.REPLY_SYSTEM and f in FW.POST_SYSTEM for f, _m in FW.COVENANT_FACTS)
+          and FW.cites_only_facts(FW.FALLBACK_REPLY % '"x"')[0])
+    import covenant_tetsu_assist as _TAm
+    check("FW1m Tetsu's review is shown the same facts and told to REFUSE any other measurement claim",
+          all(f in _TAm.PROMPT for f, _m in FW.COVENANT_FACTS) and "REFUSE it" in _TAm.PROMPT)
 
     print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
     tdu = tempfile.mkdtemp(prefix="fw1u_")
