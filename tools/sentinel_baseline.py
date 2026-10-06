@@ -40,6 +40,12 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #                                                        prose it required was
 #                                                        diluting the judge)
 #
+# 2026-10-05: docs/SENTINEL_WITNESS.md alone re-frozen (4,227 -> 7,747 bytes):
+# the record of the trading layer's move to Sentinel-Witness, written on the
+# operator's instruction. sentinel_witness/README.md and seal_service.py had
+# already drifted before that edit; they are NOT re-frozen here, because
+# accounting for them is not this commit's to do.
+#
 # guards.py is deliberately NOT frozen here even though it now carries
 # ABSTENTION_REASONS and split_reasons. It is a shared money-path file covered
 # by G4 and F7; freezing it in the sentinel baseline would turn every trader
@@ -57,7 +63,7 @@ FROZEN = {
     "test_sentinels.py":                        (968, "f8c1ea4e1e026cff61aeb98d0be3d9c9b4c822cedf3b3cfe176e99fd44510710"),
     "test_g6_sentinels_fail.py":                (7138, "b0cbebc02d4d0e6bcbc1d301c61aea8e65191bee87392d3832cd948296d3a5e0"),
     "covenant_sentinels.py":                    (28343, "a762cd17624de25fa999fa48e15663d762b6f57dd6a5f5b0bdb0c102002e7926"),
-    "docs/SENTINEL_WITNESS.md":                 (4227, "a829e95279cf90507eb6c08c6f8199e6ee50f853ae913b7e1d817476ec707928"),
+    "docs/SENTINEL_WITNESS.md":                 (7747, "5e11f3864977fd7658caabf4f6e8c47802802b04410ccee7a6425ba467857dbf"),
 }
 
 # The suite tallies measured at the freeze. A CHANGE HERE IS NOT A FAILURE --
