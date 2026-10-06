@@ -7298,6 +7298,73 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A267. [C4 walked .claude/worktrees/, so run in the main folder it counted every worktree's copy of the documents as the tree] 2026-10-06. Found by hand-running C4 in the main folder; his instruction: "Apply the same prune to C4's published_markdown() ... and drive it both ways". FIXED, the guard driven both ways; it never affected CI or the commit hook
+
+**Measured** in the main folder at f35d94c, which held 7 worktrees. C4's walk read 1354 .md files;
+1162 of them were under .claude/worktrees/ and 192 were the tree. C4.2 reported "52 citing, 44
+caveated, 8 declared illustrative". By root: the tree 7 citing, the worktrees 7, 6, 7, 6, 6, 7, 6. The
+8 declared illustrative were CLAUDE.md in the root and in each worktree, because the exemption matches
+by file name. Counted a second way, `git ls-files '*.md'` in the main folder with the same pattern and
+the same skipped directories: 7. Both routes give 7 for the tree, so the other 45 were the same
+documents read again through other checkouts. (With 5 worktrees he measured 38, 32 and 6.) It passed
+anyway. But a worktree on an older commit that still held an uncaveated document, such as
+docs/SENTINEL_WITNESS.md before b502ba5, would have turned C4.2 red in the main folder for a file that
+is not in the tree.
+
+**Where it does not reach.** covenant_one runs C4 in its staged copy, which never contains .claude/,
+and tools/stage_check.py (A266) runs it there too, since C4 is not IN_PLACE. CI and the commit hook
+were never affected. Only a run by hand in a folder that holds worktrees was.
+
+**A recurrence, the sixth of this shape.** A walker of the repository that does not prune
+.claude/worktrees/ has been fixed five times before, each time only where it was found:
+covenant_seal.py (A65, measured 2026-09-07, and A85: 24,638 of 25,859 manifest entries),
+test_p18_version_collision.py (its own skip, added 2026-09-09), test_f5_reserve.py (skips .claude/,
+with worktrees given as the reason), and test_r1_retracted.py (bc13694, 2026-09-27). C4 was written on
+2026-09-18, between those fixes. **Why the earlier tombstones did not stop it:** none of them was a
+tombstone for the class. Each repaired its own walker and left nothing that a new walker would trip
+over. R1's prune went into the A236 commit and never got an entry here, so searching this file for
+"worktree" finds A65 and A85 but not the fix C4 should have copied. And A266 counted the route-A
+suites earlier today, but in the staged copy, where .claude/ does not exist, so its count could not see
+this.
+
+**Fixed.** `published_markdown()` prunes .claude/worktrees/ by PATH, as R1 does: it removes
+`worktrees` only from the subdirectories of `<root>/.claude`, and the rest of .claude/ is still
+scanned. It now takes a root, and the counting moved into `classify(root)` so the probe can run it on
+a scratch tree. After, the same main folder with the same 7 worktrees, measured through the fixed
+code: 192 .md files, "7 citing, 6 caveated, 1 declared illustrative". That is the same 7 as both
+routes above.
+
+**The other route-A suites**, the 4 that A266's detector selects (A129, A92, C4, R1), measured against
+the main folder by running each one's own file-listing code rather than reading its skip list:
+* R1 read 1825 files, 0 under .claude/worktrees/ and 5 elsewhere in .claude/. Its prune works.
+* A129 listed 873 files with `git ls-files`, 0 under .claude/worktrees/. Worktrees are untracked.
+* A92 read 996 files, 0 under .claude/ at all, because its SKIP_DIRS names `.claude`. It needs no
+  prune. Named, not changed: the same skip means A92 never reads the 2 tracked files in .claude/hooks/
+  that have its extensions (verify_citations.py, test_cite_hook.py).
+Walkers of the root outside route A, measured the same way: verify_bundle.shipped() 1356 files, 0
+under worktrees (`.claude` is in its SKIP_DIR); the setter glob in tools/audit_a1_a46_status.py 75
+files, 0 (a `**` glob skips dot-directories); the p18 scan 12, 0. Not measured: tools/layers.py's
+fallback walk, which has no .claude skip but runs only when `git ls-files` fails; compile_record.py,
+whose root is an argument; and tools/purge_history.py.
+
+**Pinned by** C4.5 in `test_c4_uncheckable_claims.py`. On a scratch tree it writes the same uncaveated
+citation to .claude/worktrees/x/docs/, .claude/hooks/ and docs/worktrees/. It requires the first to be
+on the walk's path and never flagged, and the other two to be flagged. Driven both ways on the real
+suite, with an uncaveated probe at .claude/worktrees/x/docs/PROBE_A267.md in a worktree, git-ignored:
+with the prune, 5/5; with the two prune lines mutated out, 3/5 and exit 1, where C4.2 names the probe
+and C4.5 is red; restored byte-identical, with the probe removed, 5/5. C4.5 also refuses the two wrong
+fixes: pruning `worktrees` by NAME drops docs/worktrees/, and skipping all of .claude/ as A92 does
+drops .claude/hooks/. Each one turns it red.
+
+**Not guarded, named.** C4.5 protects C4. The next suite someone writes that walks the tree is still
+protected by nothing until it is found. A guard for the class would have to run each tree-walking
+suite with a worktree present, and that is not built.
+
+**Repro:** `python test_c4_uncheckable_claims.py` (C4.5); from the main folder, the C4.2 count with
+and without .claude/worktrees/ present.
+
+---
+
 ### A266. [a commit of documents ran no suite at commit time, so C4.2 turned public CI red only after the push] 2026-10-06. Found after 2f6b184; his instruction: "extend tools/stage_check.py so that when a published Markdown file is staged ... it also runs the suites that read published Markdown". FIXED, the guard driven both ways; it reports and never blocks
 
 **Measured.** 2f6b184 changed three files -- docs/SENTINEL_WITNESS.md, tools/sentinel_baseline.py and
