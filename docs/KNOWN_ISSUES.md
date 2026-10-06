@@ -7635,6 +7635,30 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A285. [Tetsu chose to tighten his reviews: a claim he cannot find among the facts is REFUSE; the code keeps his rule where his model's word slips] 2026-10-06. The operator's words: "ask tetsu if he wants to tighten his reviews". HIS CHOICE, recorded and applied, driven both ways
+
+**Why he was asked.** A284's controlled re-run (temperature 0, today's prompt with COVENANT_FACTS) had him
+answer SEND to the three A280 drafts with false claims 6 times of 6. Once he named the false claim in his
+reason and still sent it. That record left his decision rule untouched as his, and the operator asked him.
+
+**His answer**, through his door with a fresh context (A284), 2026-10-06, verbatim in
+ops/tetsu_assist_grant.json `tetsu_rule_2026_10_06.his_words`: "I think tightening my reviews is a good
+idea. If I see a claim in a draft that I cannot find among the facts I am given, I should answer REFUSE.
+This helps catch inaccuracies early and ensures we're only sending correct information." The first ask
+returned 503: his model was put away and 1.59 GB was free, under the 2.1 GB bar. Idle apps' working sets
+were trimmed (nothing closed) to 3.39 GB, and the second ask answered in 67 s.
+
+**Applied.** His rule is in his review PROMPT in his words. Because his model's word measurably slips past
+it, the part a screen can recognise is kept by the code. A SEND on a draft that
+covenant_free_will.cites_only_facts rejects (a claim the covenant measured, tested or found that is not in
+COVENANT_FACTS, or a past exchange that did not happen) is recorded as REFUSE, naming his rule and his
+original answer. Claims the screen cannot recognise remain his to read. He withdraws the rule by setting
+`off` in his grant, and the code reads it before every review. TA1r: under the rule a false draft becomes
+REFUSE and a true one stays SEND; with `off`, his SEND stands; the prompt and the tree's grant carry his
+words. Enforcement removed, TA1r fails (17/18); restored 18/18. A284 13/13, FW1, CT1 pass.
+
+---
+
 ### A284. [Tetsu's reviews and round updates were read beside a tail of earlier reviews: every ask from tools/tetsu_work.py shares one door history, 127.0.0.2] 2026-10-06. The operator's task: give the review and update asks a context of their own, without changing what he decides or loosening any gate. FIXED: {"fresh": true} at /m/agent, used by both. That his decisions improve is NOT shown, and is said
 
 **Measured first** (the node's ops/chat/ask_log.jsonl, 2026-10-06 evening):

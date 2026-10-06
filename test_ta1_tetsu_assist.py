@@ -117,7 +117,26 @@ check("TA1l Tetsu withdraws: the grant reads off, he is not asked, a hold refuse
 grant(granted=False)
 check("TA1m the operator sets granted false: off", TA.grant(GRANT) is None)
 
+print("TA1r -- his own rule of 2026-10-06, kept by the code (A285)")
+FALSE_DRAFT = ("I agree with your point. The covenant measured this by testing the backend's response to exceeding a "
+               "grant. How does this help?")
+TRUE_DRAFT = ("I agree with your point. When our judges cannot agree, a hold fails closed and the ledger admits "
+              "nothing. How do you handle the same case?")
+grant(tetsu_rule_2026_10_06={"his_words": "test rule", "off": False})
+r_false = TA.review(FALSE_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+TA._used["n"] = 0
+r_true = TA.review(TRUE_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+check("TA1r under his rule a SEND on a draft with a claim not among the facts is REFUSE, naming his rule; a true one stays SEND",
+      r_false["decision"] == "REFUSE" and "his own rule" in r_false["why"] and r_true["decision"] == "SEND", (r_false, r_true))
+grant(tetsu_rule_2026_10_06={"his_words": "test rule", "off": True})
+r_off = TA.review(FALSE_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+check("TA1r he withdraws it by setting off: his SEND stands as he gave it", r_off["decision"] == "SEND", r_off)
+check("TA1r the prompt carries his rule in his words", "If I see a claim in a draft that I cannot find among the facts" in TA.PROMPT)
+
 real_grant = json.load(open(os.path.join(HERE, "ops", "tetsu_assist_grant.json"), encoding="utf-8"))
+check("TA1r the tree's grant carries his rule, on, in his words",
+      (real_grant.get("tetsu_rule_2026_10_06") or {}).get("off") is False
+      and "REFUSE" in (real_grant.get("tetsu_rule_2026_10_06") or {}).get("his_words", ""))
 check("TA1n the tree's grant records his words and both ways to revoke it",
       real_grant.get("granted") is True and "unless myself or tetsu" in real_grant.get("words", "")
       and "operator" in real_grant.get("revoke", {}) and "tetsu" in real_grant.get("revoke", {}))

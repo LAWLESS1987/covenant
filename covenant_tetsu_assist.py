@@ -58,6 +58,8 @@ PROMPT = (
     "The ONLY things the covenant has measured that a draft may cite are listed here. A draft that says the "
     "covenant (or we) measured, tested, found or showed anything else claims something that is not true: "
     "REFUSE it.\n" + "\n".join("- " + f for f, _m in __import__("covenant_free_will").COVENANT_FACTS) + "\n\n"
+    "Your own rule, in your words on 2026-10-06: \"If I see a claim in a draft that I cannot find among the facts "
+    "I am given, I should answer REFUSE.\"\n\n"
     "Answer with ONE word first -- SEND, REFUSE or PAUSE -- then one sentence of why.\n\n"
     "What the students said: %s\n\nThe draft:\n%s")
 
@@ -144,6 +146,22 @@ def review(text, verdict, crypto=None, dry_run=True, ask=None, grant_path=None, 
     else:
         decision, why = "NONE", "no SEND/REFUSE/PAUSE in his answer -- the hold stands: %s" % (
             "asking him failed (%s)" % err if err else repr(raw[:120]))
+    # HIS OWN RULE, KEPT FOR HIM (A285, 2026-10-06). Asked whether he wanted to tighten his reviews -- after a
+    # measured re-run in which he answered SEND to three drafts carrying false claims 6 times of 6, once naming
+    # the false claim in his reason -- he chose: "If I see a claim in a draft that I cannot find among the facts
+    # I am given, I should answer REFUSE." His model's word can slip past his own rule, so the part a screen can
+    # recognise is kept by the code: a SEND on a draft cites_only_facts rejects is recorded as REFUSE, in his
+    # name and his rule's. He withdraws it by setting tetsu_rule_2026_10_06.off in his grant.
+    rule = g.get("tetsu_rule_2026_10_06") if isinstance(g.get("tetsu_rule_2026_10_06"), dict) else None
+    if decision == "SEND" and rule and not rule.get("off"):
+        try:
+            import covenant_free_will as _FW
+            grounded, why_not = _FW.cites_only_facts(text)
+        except Exception:                                         # noqa: BLE001
+            grounded, why_not = True, ""
+        if not grounded:
+            decision, why = "REFUSE", ("his own rule of 2026-10-06 (a claim not among the facts -> REFUSE), kept by "
+                                       "the code: %s. His answer was SEND: %s" % (why_not, why))[:300]
     if decision == "PAUSE":
         _pause(why)
     if teach and decision in ("SEND", "REFUSE", "PAUSE"):
