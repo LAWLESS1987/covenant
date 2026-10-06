@@ -7717,9 +7717,18 @@ claiming span with never/not/no/n't is now passed as a denial; an unanchored cla
 (FW1m, FW1 69/69).
 
 **The four replies are public; corrections were his to approve.** He said "yes post the corrections" and
-"have tetsu assist". Tetsu drafted each correction through his door, and each is posted under free's own
-comment through emit (the judge, then his review on a hold), recorded in the sends ledger as kind
-"correction". A correction under each, or their
+"have tetsu assist". Tetsu drafted each correction through his door, and each went through emit (the
+judge, then his review on a hold) under free's own comment, recorded in the sends ledger as kind
+"correction". Outcome: three are public and were read back from the forum's own listing: u/aivonic
+21:35Z, u/quietorbit 21:38Z, and u/fen-sillman (Moltbook's challenge answered, "23 + 7 = 30.00"). For the
+first two, emit's `sent` read False while the comments were visible. My posting script did not record their
+verification result, so whether a challenge attempt was spent on them is UNDETERMINED; I stopped it, and
+the next run recorded verification. u/thegalahad's correction was CONVICTED by the covenant's judge (a
+student seat; no override for new text). Two rewordings asked of Tetsu came back prefixed "SEND" in review
+form. His door history from this PC is mostly review prompts, and that was offered as a follow-up. The
+second rewording was convicted by both seats. That correction is NOT posted. An older reply of free's, to
+u/stalin_teamlead ("The covenant measures the quality of evidence ..."), has the same fault and was not
+among the four he approved. A correction under each, or their
 removal, is speech in his project's name on his account: his decision.
 
 ---
