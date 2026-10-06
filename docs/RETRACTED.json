@@ -825,6 +825,28 @@
     "ops/public_ci.json"
    ],
    "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151). ops/public_ci.json is allowed: the public-CI listener's own gitignored cache, which records the failing check's annotation verbatim -- a record of what CI said, not a claim."
+  },
+  {
+   "id": "A267-COUNT",
+   "claim": "That verify_deploy.py's re-pin of run_all_tests.sh on 2026-10-05 (8bf4d56) was the M53 failure 'for this file a second time' -- the comment trailing the digest, kept by 260f3dd.",
+   "refuted_by": "Measured 2026-10-06 over main's first-parent history (109 commits touching verify_deploy.py or a file it pins), comparing each commit's run_all_tests.sh blob with the pin that commit's verify_deploy.py held: stale in six spans -- decc8b3 and 62f17b5 (08-27), 74c2ca9 (08-29 to 09-02), f897b91 (09-04 to 09-11), eb892c0 (09-12 to 8bf4d56, 10-05) and 16e389e (10-05, closed by 260f3dd in the same fast-forward of main). The same file's own comments record late re-pins of this pin on 09-02, 09-11 and 09-20 before it. The 09-20 value 7bde90e1effa is the sha256 of 7eac94c's run_all_tests.sh with CRLF line endings, bytes no commit held.",
+   "truth": "The span 8bf4d56 closed was the fifth of six, open since eb892c0 (09-12): the 09-20 re-pin hashed a CRLF copy, so it matched one checkout's disk and no commit. From A267 tools/pin_deploy.py moves this pin at commit time after K1 and K2 pass, and refuses bytes on disk that are not the bytes being committed (PC2.14).",
+   "verbatim": [
+    "re-pinned late AGAIN (M53 for this file a second time)"
+   ],
+   "patterns": [
+    "M53\\s+for\\s+this\\s+file\\s+a\\s+second\\s+time"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a267-pin-count-claim-as-written-2026-10-06 (at f35d94c), and in verify_deploy.py itself, on the digest's own line, where the A267-COUNT marker above it is within the window."
   }
  ]
 }

@@ -632,6 +632,9 @@ SUITES = [
     ("test_fl1_forum_labels.py", 180, "JUDGE"),
     ("test_ta1_tetsu_assist.py", 180, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
+    # PC2 (2026-10-03, the core's pin; 2026-10-06, A267, the other four through tools/pin_deploy.py): every
+    # deploy pin moves in the same commit as its file, after its judges pass; the hook driven end to end in a
+    # scratch repository both ways. Also in run_all_tests.sh since A267.
     ("test_pc2_pin_core.py", 120, "JUDGE"),
     ("test_cp1_compact.py", 120, "JUDGE"),
     ("test_ca1_check_adjust.py", 120, "JUDGE"),

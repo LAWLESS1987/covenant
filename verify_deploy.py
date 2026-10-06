@@ -150,8 +150,17 @@ MANIFEST = {
     # gates joined this runner, run_local_sweep.SUITES and covenant_one's
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
+    # 2026-10-06 (A267): from here this digest, like every pin here but the core's,
+    # is moved at commit time by tools/pin_deploy.py, which the pre-commit hook runs:
+    # K1 and K2 first, on the bytes being committed, no move if either fails. The comment
+    # trailing the digest records the last HAND move and the tool never edits it.
+    # [A267-COUNT: its "M53 for this file a second time" is kept as written and is
+    # wrong. Measured over main's first-parent history, this pin was stale in six
+    # spans; the one 8bf4d56 closed was the fifth, open since eb892c0 (09-12),
+    # because the 09-20 value 7bde90e1effa was the digest of a CRLF copy of
+    # 7eac94c's file, which no commit held.]
     "run_all_tests.sh":
-        "e7c0c68ef756e0b6d74c8aac28cf3c4b4e62895fe3965916ad7b7b324b6f22f5",   # 2026-10-05 evening: moved WITH the file, before it reached main (16e389e added the A265 suite line); K1 20/20, K2 25/25 against these bytes first. Was 7eed13de808b: 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
+        "b1a49a4b2bba2cd05f2c3a1585cab67401d8f875a08eac0c85dc5e94f1408acb",   # 2026-10-05 evening: moved WITH the file, before it reached main (16e389e added the A265 suite line); K1 20/20, K2 25/25 against these bytes first. Was 7eed13de808b: 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -173,6 +182,9 @@ MANIFEST = {
     # model files or SEM4's pristine source -- the candidate overlay had
     # since 00:40Z, and the first v8.40 deployed sweep went red on all four
     # semantic suites from that asymmetry. P19 23/23 after each move.
+    # 2026-10-06 (A267): moved at commit time by tools/pin_deploy.py after P19
+    # passes; test_p19_overlay_guard.py below and test_a3s_send_bounds.py above
+    # after each passes itself.
     "run_local_sweep.py":
         "cfe07f71da4a303d8efbd1e6d13893278afe25a414447351914e48d7e804e81b",   # 2026-09-20: re-pinned late; moved by eb892c0 (Ollama removal, 09-12) without the pin (M53); clean against HEAD; P19 23/23 ran against it 09-19
     "test_p19_overlay_guard.py":

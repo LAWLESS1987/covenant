@@ -7298,6 +7298,113 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A267. [only the core's deploy pin moved with its file, so run_all_tests.sh's went stale in six spans and verify_deploy refused the restarts it gates] 2026-10-06. His instruction: extend the commit-time mover so run_all_tests.sh's pin moves in the same commit as the file, only after the suites that judge it pass, and never silently. FIXED, the guard driven both ways; live once the tracked hook is installed after this reaches main
+
+**Which recurrence.** M53 ("the pins move in the SAME change as the files"), searched first in this file
+and docs/RETRACTED.json: the record counts it for the core's pin (A235 the fourth, A238 the fifth, A243
+item 4 the sixth, which built tools/pin_core.py); RETRACTED.json had nothing of this shape. Measured over
+main's first-parent history -- 109 commits touching verify_deploy.py or a file it pins, each commit's file
+hashed against the pin that commit's verify_deploy.py held -- the pins were stale in these spans:
+
+| pinned file | stale spans | the spans |
+|---|---|---|
+| run_all_tests.sh | 6 | decc8b3 (08-27); 62f17b5 (08-27 to 08-29); 74c2ca9 (08-29 to 09-02); f897b91 (09-04 to 09-11); eb892c0 (09-12 to 8bf4d56, 10-05); 16e389e (10-05, closed by 260f3dd before main pointed at it) |
+| covenant_unified_v8.py | 5 | the five late re-pins the record counts; none since pin_core (16aa973 and 0dd9a23 both carried their pin) |
+| run_local_sweep.py | 3 | 143c107 (08-29); 74c2ca9 (08-29 to 09-02); eb892c0 (09-12 to 09-20) |
+| test_a3s_send_bounds.py | 1 | 8c953f3 (09-09 to 09-11) |
+| test_p19_overlay_guard.py | 0 | |
+
+So the instance 260f3dd caught by hand is run_all_tests.sh's sixth span, and the one 8bf4d56 closed was
+its fifth, open since 09-12 -- not "a second time", as the comment on that digest says (tombstoned
+A267-COUNT, below). **The unit matters.** These are spans of commits whose committed bytes disagree with
+their committed pin, which is what a fresh clone, CI and the phone build see. The operator's restart gate
+reads the main checkout's disk, which can differ: the 09-20 value 7bde90e1effa is the sha256 of 7eac94c's
+run_all_tests.sh with CRLF line endings, so it matched a checkout holding CRLF bytes and no commit at all.
+
+**Why the earlier tombstone did not stop it.** A243 recorded pin_core as "the guard that stops the
+seventh" -- of the core's pin, the count that entry kept, and it has. It covered one pin of five. 0dd9a23
+shows the gap in one commit: pin_core moved the core's pin and nothing moved run_all_tests.sh's. The fix
+repaired the instance and left nothing to stop the next one on the other four -- the shape CLAUDE.md
+rule 10 was written about, and the coverage lesson again: count the population a check reads before
+saying what it covers.
+
+**Consumers, counted before changing anything** (git grep of `verify_deploy` and `pin_core`):
+* verify_deploy.py's MANIFEST is read by verify_deploy.py itself, which stops before a restart on any
+  mismatch -- run by AM_VERIFY_AND_RESTART.bat, AN_LAUNCH.bat and `covenant_one.py --restart` (ONE_UP.bat
+  through it), and with `--no-restart` by covenant_daily.py; by covenant_watchdog.py's
+  `_verify_deploy_pin` (ast, the hourly repo row); by tools/pin_core.py (the core's pin and EXPECTED_LINES
+  only); by test_pc2_pin_core.py. test_p20's E12 checks build a fixture shaped like it and read no real pin.
+* tools/pin_core.py: called by ops/pre-commit.synchold (2b), imported by test_pc2_pin_core.py, which
+  covenant_one.py registers. Nothing else.
+* **Not a consumer, contrary to the brief:** the highway's `restart_nodes` runs rolling_restart.py, which
+  never reads verify_deploy.py. It restarts the nodes onto whatever core is on disk. A stale pin refuses
+  the operator's restart paths above, not the self-heal's.
+Nothing here narrows what any of them accepts: verify_deploy.py changes only in comments and one digest.
+
+**Fixed.** `tools/pin_deploy.py`, run by the pre-commit hook on every commit (new step 2d: after the
+core's 2b, before 2c and the manifest, both of which read verify_deploy.py). pin_core is unchanged.
+* *Which files* are discovered from verify_deploy.py's MANIFEST (ast), the core left to pin_core. Each
+  other file's judges are in `JUDGES`, from what its pin comment recorded at each hand move:
+  run_all_tests.sh -- K1, K2; run_local_sweep.py -- P19; the two pinned test files -- themselves.
+* *The order:* the judges run first, each once; a pin moves only if all of its judges pass. Otherwise it
+  stays, the hook prints `NOT moved: <file> -- the suites that judge these bytes failed: <suite>`, and
+  verify_deploy reads FAIL until a person looks. It never blocks a commit.
+* *The bytes:* a file whose bytes on disk are not its bytes in the index is not moved, and that is said
+  (the 09-20 CRLF shape, or a partial stage). If verify_deploy.py has unstaged changes nothing moves,
+  because staging it would commit them. When it moves a pin it stages verify_deploy.py itself.
+* *The judges* run without git's repository-pinning variables (A255).
+* *Cost:* K1 and K2 together took 52 s and 93 s on two runs on this PC, paid only by a commit that
+  stages run_all_tests.sh with a pin to move. P19 2 s, A3s 13 s.
+
+**Decided, with reasons: all four pins, not run_all_tests.sh alone.** run_local_sweep.py's pin was stale
+in three spans and test_a3s's in one; test_p19's never has, but an edit would stale it the same way. The
+mover costs nothing on a commit that does not stage them, and a sixth pin is caught: PC2.10 fails while
+any pinned file has no judges. **What it cannot see for the two test files:** a pinned test is judged
+only by itself, so its pass proves it runs green on these bytes, not that it still bites. A suite
+weakened until it passes would be pinned, as it would have been by hand.
+
+**Its own registration.** PC2 ran only under covenant_one. This change adds it to run_all_tests.sh,
+which is the edit that stales that file's pin. With the change staged, the hook's own call
+(`python tools/pin_deploy.py --write --staged`) ran K1 and K2, both passing, moved the pin
+e7c0c68ef756 -> b1a49a4b2bba and staged verify_deploy.py, before covenant_one ran.
+
+**Pinned by** `test_pc2_pin_core.py`, PC2.9-PC2.24 beside the core's eight (24/24). PC2.9 reads the real
+tree: every pin matches its file. PC2.11-PC2.18 drive the tool on temp copies with git and the judges
+stubbed. PC2.20 drives the real judge runner with GIT_DIR and GIT_INDEX_FILE planted. PC2.22-PC2.24
+install the tracked hook in a scratch repository and commit run_all_tests.sh edits through it: with K1
+and K2 passing, HEAD carries the moved pin and nothing else in verify_deploy.py changed, and the judges
+saw no GIT_INDEX_FILE (git does export it to the hook, measured); with K2 failing, the commit lands, its
+pin is not moved, and the hook names K2. Broken one way at a time, serially, restored byte-exact after
+each: judges ignored -> PC2.12/13/17/23/24 red; the disk-vs-index check removed -> PC2.14; the
+verify_deploy-unstaged check removed -> PC2.15; judges given the hook's git variables -> PC2.20/23; the
+hook's step removed -> PC2.21-24; verify_deploy.py not staged -> PC2.13/22/24; a pinned file's judges
+removed -> PC2.10/17. Restored 24/24.
+
+**Tombstone.** `A267-COUNT` in docs/RETRACTED.json holds the comment's wording; it stays as written on
+the digest's line in verify_deploy.py with the marker above it, and on branch
+`a267-pin-count-claim-as-written-2026-10-06` (at f35d94c; local, not pushed). R1 105/105; a probe file
+with the old wording and no citation took it to 104/105, and so did renaming the marker in
+verify_deploy.py; restored 105/105.
+
+**Not fixed, named.**
+* *The installed hook.* .git/hooks/pre-commit is shared by every worktree, and A117.8c requires it to
+  equal the main checkout's tracked copy, so it is not installed from this branch. After this reaches
+  main, A117.8c reads red until `cp ops/pre-commit.synchold .git/hooks/pre-commit`, and until then step
+  2d runs nowhere. That install is itself a forgotten-step shape; A117.8c is its guard.
+* *pin_core, unchanged as asked,* keeps three gaps this tool closes for the others: it hashes the core on
+  disk without comparing it with the index; its judges inherit the hook's git variables (latent: none of
+  K1, K2, P19 or A3s calls git); and step 2b stages verify_deploy.py whenever it differs, so unrelated
+  unstaged edits there go into a core commit.
+* *The sweep is stricter on purpose.* PC2.9 fails on any stale pin, as PC2.1 has for the core since
+  10-03. A commit made through the old hook, or with a failing judge, turns the sweep red until the pin
+  is moved.
+* EXPECTED_LINES' blind spot on the `--no-restart` path (A238) is untouched; stage_check still builds
+  its copy from the working tree, not the index (A266).
+
+**Repro:** `python test_pc2_pin_core.py`; `python tools/pin_deploy.py --check`.
+
+---
+
 ### A266. [a commit of documents ran no suite at commit time, so C4.2 turned public CI red only after the push] 2026-10-06. Found after 2f6b184; his instruction: "extend tools/stage_check.py so that when a published Markdown file is staged ... it also runs the suites that read published Markdown". FIXED, the guard driven both ways; it reports and never blocks
 
 **Measured.** 2f6b184 changed three files -- docs/SENTINEL_WITNESS.md, tools/sentinel_baseline.py and

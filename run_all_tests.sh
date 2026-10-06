@@ -624,6 +624,13 @@ run test_k3_p9_owner_only_guard.py 60
 # K2 pins this runner's own arithmetic: a failure must never be counted
 # as a pass. Registered with the fix, not after it.
 run test_k2_tally_arithmetic.py 60
+# PC2 (2026-10-03; the other four pins 2026-10-06, A267) pins that verify_deploy.py's
+# pins move in the SAME commit as their files, and only after the suites that judge
+# those bytes pass -- this file's own pin included, whose judges are K1 and K2 above.
+# It ran only under covenant_one until this line, which is the edit that stales this
+# file's pin: the change that adds it moved that pin with the tool PC2 tests.
+# Stub judges and scratch repositories only.
+run test_pc2_pin_core.py 120
 # D1 (2026-08-30) pins the other half of "can this run at all": a DECLARED
 # dependency that is not installed must name itself, and name the suites it
 # takes down with it. On the run that produced this line, xrpl-py was absent
