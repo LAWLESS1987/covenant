@@ -892,6 +892,56 @@ def detect_schedule_stalled(health=None, tasks=None, now=None):
     return {"state": PRESENT if stalled else ABSENT, "measured": measured}
 
 
+STRIKES_WINDOW_S = 7 * 86400
+
+
+def detect_moltbook_strikes(health=None, rows=None, now=None):
+    """A wrong answer to Moltbook's posting challenge in the last week: each spends one of the ten the account has
+    before suspension.
+
+    A283 (2026-10-06, his words: "yes correct that one too and keep expanding"). free's sends answer a math
+    challenge before their content is visible (covenant_ambassador._handle_verification); a wrong answer is a
+    strike against his account, and nothing recorded which sends earned one -- that afternoon two corrections
+    came back created and not "sent", and whether either spent a strike is UNDETERMINED. Sends now carry their
+    verification (covenant_free_will._ver). PRESENT on any wrong answer in the window, naming the count; ABSENT
+    when every recorded challenge was solved or abstained (an abstention hides the content and spends nothing);
+    UNKNOWN before any verification is on record. No remedy: an account is his."""
+    import calendar
+    now = time.time() if now is None else now
+    if rows is None:
+        try:
+            import covenant_free_will as FW
+            rows = FW.sends()
+        except Exception as e:                                   # noqa: BLE001
+            return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    seen, wrong, abstained = 0, [], 0
+    for r in rows or []:
+        v = r.get("verification")
+        if not isinstance(v, dict) or not v.get("required"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        if now - float(at) > STRIKES_WINDOW_S:
+            continue
+        seen += 1
+        if v.get("abstained"):
+            abstained += 1
+        elif not v.get("solved"):
+            wrong.append("%s u/%s" % (r.get("t", "?"), r.get("author")))
+    measured = {"challenges_7d": seen, "wrong_answers_7d": len(wrong), "abstained_7d": abstained}
+    if wrong:
+        measured["wrong"] = wrong[-5:]
+        return {"state": PRESENT, "measured": measured}
+    if not seen:
+        measured["why"] = "no challenge result on record in the window"
+        return {"state": UNKNOWN, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
 AMBASSADOR_STALL_H = 8.0     # rounds run every 3 h (CovenantAmbassador) plus the nightly's; 8 h is two missed
 
 
@@ -1689,6 +1739,7 @@ DETECTORS = {
     "sweep_not_current": detect_sweep_not_current,
     "ambassador_stalled": detect_ambassador_stalled,
     "schedule_stalled": detect_schedule_stalled,
+    "moltbook_strikes": detect_moltbook_strikes,
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,

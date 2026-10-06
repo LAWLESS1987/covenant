@@ -384,6 +384,17 @@ def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
     return row
 
 
+def _ver(res):
+    """A283 (2026-10-06): what Moltbook's posting challenge did with this send, kept in the ledger. A WRONG answer
+    spends one of the ten the account has before suspension (submit_verification's own docstring); an
+    unreadable challenge is abstained, spends nothing, and leaves the content hidden. None when no content was
+    created (a hold, a refusal, a dry run)."""
+    v = (res or {}).get("verification")
+    if not (res or {}).get("created") or not isinstance(v, dict):
+        return None
+    return {"required": bool(v.get("required")), "solved": bool(v.get("solved")), "abstained": bool(v.get("abstained"))}
+
+
 LOCK_STALE_S = 7200
 
 
@@ -602,7 +613,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         except Exception as e:                                    # noqa: BLE001
             res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
         sent = bool(res.get("sent"))
-        _record({"kind": "reply", "at": now, "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
+        _record({"kind": "reply", "at": now, "verification": _ver(res), "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
                  "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
@@ -635,7 +646,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                 except Exception as e:                            # noqa: BLE001
                     res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
                 sent = bool(res.get("sent"))
-                _record({"kind": "own_post", "at": now, "title": title, "chars": len(body), "text": body[:400], "from_author": (src or {}).get("author"),
+                _record({"kind": "own_post", "at": now, "verification": _ver(res), "title": title, "chars": len(body), "text": body[:400], "from_author": (src or {}).get("author"),
                          "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                          "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None}, sends_path)
                 out["own_post"] = sent

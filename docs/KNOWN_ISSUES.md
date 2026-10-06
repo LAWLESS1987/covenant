@@ -7635,6 +7635,31 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A283. [Nothing counted the strikes against his Moltbook account: a wrong answer to the posting challenge spends one of ten before suspension] 2026-10-06. His words: "yes correct that one too and keep expanding". ADDED: verification kept on every send, moltbook_strikes on the road, driven both ways
+
+free's content becomes visible only after a math challenge is answered (_handle_verification). A WRONG
+answer spends one of the ten the account has before suspension; an unreadable challenge is abstained,
+spends nothing, and leaves the content hidden. Nothing kept which sends earned which. That afternoon two
+corrections came back created and not "sent", and whether either spent a strike is UNDETERMINED (A280).
+covenant_free_will now keeps `verification` {required, solved, abstained} on every reply and own post
+(None when nothing was created). `detect_moltbook_strikes`: any wrong answer in the last 7 days is PRESENT,
+with the count. Every recorded challenge solved or abstained is ABSENT; nothing on record is UNKNOWN. No
+remedy: the account is his. FW1v (dropping the field fails it), H1st (ignoring wrong answers fails it).
+FW1 70/70, H1 201/201. Live at commit: 1 challenge on record (the u/fen-sillman correction, solved), 0
+wrong.
+
+**The fifth correction (u/stalin_teamlead, his "yes correct that one too").** Asked from a fresh source
+address (127.0.0.3, no history), Tetsu wrote a draft that mostly repeated the request; a student seat
+convicted it. The form that went out three times earlier ("I am sorry for the mistake. The covenant never
+measured ... I will not post that sentence again.") was also convicted, by the junior seat. NOT posted;
+the gate is not overridden. Both convicted corrections, this one and u/thegalahad's, went to the teacher
+queue for the panel as `ambassador_correction:convicted_by_students_2026-10-06`. An apology convicted is
+the discourse gap the students are being taught. Found on the way: tools/tetsu_work.py asks from
+127.0.0.2 for EVERY caller, so Tetsu's reviews, the X-video batch and other asks share one door history.
+This was added to the follow-up on separating his review history.
+
+---
+
 ### A282. [Tetsu could read PASS while every ask failed, and nothing recorded the failures] 2026-10-06. His words: "keep expanding". ADDED: a line per real ask, and tetsu_asks_failing on the road, driven both ways
 
 On the morning of 2026-10-06 readiness() read PASS while every ask through his door returned 503 (A269).

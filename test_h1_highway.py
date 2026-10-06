@@ -1509,6 +1509,23 @@ def main():
         _CMk.ASKS = _real_asks
     check("H1ak no ledger here is UNKNOWN, never ABSENT", r_noledger == H.UNKNOWN, r_noledger)
 
+    # ---- H1st: Moltbook strikes (A283, 2026-10-06). Stand-in ledger rows.
+    _ts = 1_900_000_000.0
+    _v = lambda req, sol, ab=False, ago=3600: {"t": "x", "at": _ts - ago, "author": "a", "verification":  # noqa: E731
+                                               {"required": req, "solved": sol, "abstained": ab}}
+    st_ = {
+        "clean": H.detect_moltbook_strikes(rows=[_v(True, True), _v(False, False), {"kind": "reply"}], now=_ts)["state"],
+        "wrong": H.detect_moltbook_strikes(rows=[_v(True, True), _v(True, False)], now=_ts),
+        "abstained": H.detect_moltbook_strikes(rows=[_v(True, False, ab=True)], now=_ts)["state"],
+        "old": H.detect_moltbook_strikes(rows=[_v(True, False, ago=8 * 86400)], now=_ts)["state"],
+        "none": H.detect_moltbook_strikes(rows=[{"kind": "reply", "sent": True}], now=_ts)["state"],
+    }
+    check("H1st moltbook_strikes: every challenge solved ABSENT; a wrong answer PRESENT and counted; an abstention spends "
+          "nothing (ABSENT); a strike older than a week out of the window (UNKNOWN: nothing in it); nothing on record UNKNOWN",
+          st_["clean"] == H.ABSENT and st_["wrong"]["state"] == H.PRESENT and st_["wrong"]["measured"]["wrong_answers_7d"] == 1
+          and st_["abstained"] == H.ABSENT and st_["old"] == H.UNKNOWN and st_["none"] == H.UNKNOWN, st_)
+    check("H1st no remedy: the account is his", [n for n, r in H.REMEDIES.items() if "moltbook_strikes" in (r.get("for") or [])] == [])
+
     # ---- H1sk: the schedule is alive (A281, 2026-10-06). Stand-in task lists; the scheduler is never read here.
     _t = 1_900_000_000.0
     _ok = {"name": "CovenantGuard", "state": "Ready", "last_run": _t - 120, "next_run": _t + 60, "missed": 0}

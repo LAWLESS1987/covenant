@@ -448,6 +448,21 @@ def main():
     check("FW1m Tetsu's review is shown the same facts and told to REFUSE any other measurement claim",
           all(f in _TAm.PROMPT for f, _m in FW.COVENANT_FACTS) and "REFUSE it" in _TAm.PROMPT)
 
+    print("FW1v -- a send keeps what Moltbook's challenge did with it (A283)")
+    tdv = tempfile.mkdtemp(prefix="fw1v_")
+    gpv, spv = os.path.join(tdv, "grant.json"), os.path.join(tdv, "sends.jsonl")
+    with open(gpv, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    outcomes = iter([{"sent": True, "created": True, "verification": {"required": True, "solved": True, "answer": "30.00"}},
+                     {"sent": False, "created": True, "verification": {"required": True, "solved": False}},
+                     {"sent": False, "judged": "held", "why": "held"}])
+    FW.run_round(dry_run=False, say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three),
+                 emit=lambda text, **k: next(outcomes), introduce=lambda **k: {"sent": False},
+                 grant_path=gpv, sends_path=spv, now=700000.0, count_comments=cc0)
+    vs = [r.get("verification") for r in FW.sends(spv) if r.get("kind") == "reply"]
+    check("FW1v solved, a wrong answer, and no content created are each kept as such (None when nothing was created)",
+          vs == [{"required": True, "solved": True, "abstained": False}, {"required": True, "solved": False, "abstained": False}, None], vs)
+
     print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
     tdu = tempfile.mkdtemp(prefix="fw1u_")
     gpu, spu, lgu = os.path.join(tdu, "grant.json"), os.path.join(tdu, "sends.jsonl"), os.path.join(tdu, "updates.jsonl")
