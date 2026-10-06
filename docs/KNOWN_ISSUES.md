@@ -7298,6 +7298,94 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A273. [Tetsu's history budget was a fixed 12,000 characters sized beside rules that had since doubled, so one request could overflow the model's 8192-token window] 2026-10-06. A269's open item. FIXED in the keeper and both doors: the history now follows the real size of the rules, counted per request; driven both ways. The size it was sized beside is RETRACTED (A273-RULES-SIZE-2026-10-06): true when written, stale since
+
+**Measured,** on the running server (127.0.0.1:8081, its own /apply-template and /tokenize, the two
+steps /v1/chat/completions takes). `compose_system(AGENT_SYSTEM)`, the door's rules, was 11,817
+characters, 2,916 tokens. The council's, with the method, was 12,547 characters, 3,105 tokens. The
+parts: fixed rules 3,082, register 2,085, where_you_are 2,110, about_him 2,800 (its cap),
+standing_directive 1,019, brief 711. With the batch caller's real history under the fixed budget
+(127.0.0.2: 16 messages, 10,980 characters) and a dense 4,000-character question, the prompt was 7,594
+tokens. With the door's 700-token answer that is 8,294, over 8,192. The council's request for the same
+caller came to 8,661 with its 500-token answer. His own callers fitted that day: his tailnet address
+at most 6,738 with the answer, 127.0.0.1 at most 6,374. The model server ran the 3B, one slot, n_ctx 8192.
+
+**Cause.** A223 (2026-09-26) sized the budget against a measurement: the rules were then 4,919
+characters (5,607 for the council), and the comment above AGENT_HISTORY_BUDGET says ~5,600. That was
+true that day. But the rules are composed per request from parts read at call time. The standing
+directive (1,019) was added two days later, and nothing re-measured the sum. A size measured once was
+treated as a constant.
+
+**Why nothing stopped it.** The record and the tombstones hold no earlier instance of a prompt sized by
+a constant. The nearest shape is the deploy pins (A267): a value that must move with something else,
+moved by hand, until a guard moved it at the place the step is forgotten. This is the same remedy: the
+size is counted where the request is sent, every time.
+
+**Fixed.**
+- `covenant_model.fit(messages, max_tokens, droppable)`. It counts the prompt with the server's own
+  chat template and tokenizer, then drops the oldest replayed exchanges, as few as needed, until prompt
+  plus answer plus a 64-token margin fit `CTX_TOKENS` (8192, the same constant start() now passes as
+  `-c`). The system message, this question, and on a follow-up the first answer and its DATA are kept
+  whole. With nothing left to drop, the answer is shortened to what remains, down to 128 tokens. Below
+  that it raises `ContextTooLong`, so the door answers 503 with the reason at once, instead of sending
+  it to fail. The server is started before counting, as ask() would start it. Otherwise the first
+  message after the idle stop, which is when he comes back to a conversation, would be estimated
+  rather than counted. Counting does not wait behind another ask: /tokenize answered in 33 ms and
+  /apply-template in 13 ms while the one slot was busy generating. Without a server (a stub), it
+  estimates at 3.0 characters a token. That ratio is measured: 321 texts and answers of 200+ characters
+  in ops/chat/ask_log.jsonl ran 3.04 at the lowest, 3.48 at the 1st percentile, 4.52 at the median.
+- `/m/agent` (the core). The turns are read with no character budget, and every ask is fitted: the
+  first, and each of the six follow-ups (the held notice, FETCH, MOLTBOOK, HANDS, HEAL, WEB). msgs is
+  cut in place, so a follow-up is fitted from what was actually sent. The reply and the ask-log row
+  carry `fit`: prompt_tokens, answer_tokens, kept, dropped, counted.
+- `/pc/council`. Each role's request is fitted (`deliberate(..., fit=)`), because the critic's and the
+  reviser's questions carry what the council said before them. The row and the steps carry `fit`.
+- A keeper without fit() still answers on the old 12,000-character budget (`getattr`). The phone's own
+  keeper is not read here.
+
+Both consumers were found by `grep agent_history(`: the door and the council, nothing else in the tree
+apart from M6. Every direct `_m.ask` in the core is inside the door, 1 + 6, and all 7 are now fitted.
+
+**Pinned:** `test_a273_history_fits.py`, registered in SUITES, 18/18. Its tokens are the suite's own
+count (4 characters a token, 5 a message), handed to the keeper in place of the server. So the request
+the door SENDS is checked by a count the door did not make, and "as much as fits" is checked against a
+brute force. F1-F3 fit() itself (long rules keep the newest 4 of 40, the most that fit; short rules
+keep 24,000 characters, double the old budget; the answer is shortened, then refused). F4-F5 the
+counter. D1-D5 the real /m/agent handler with 16,000-character rules. C1-C2 the real /pc/council. L1
+the live server's own count, where one answers: 7,285 + 700 <= 8,192, 8 of 40 turns kept. It is
+SKIP, counted apart, on the runner. Driven both ways, serially, the files restored byte-for-byte after
+each (checked by sha256):
+- M1, the door's fixed 12,000 budget restored and its asks unfitted: 15/18, D1 D2 D4 red. That is the
+  mutation asked for, red when the rules are long.
+- M2, the council the same: 16/18, C1 C2 red.
+- M3, fit() never cuts: 7/18.
+- M4, fit() drops every turn: 12/18. "As much as fits" is pinned, not only "fits".
+- M5, the counter skips start(): 17/18, F5 red.
+- Restored: 18/18.
+
+The retraction is driven both ways too: R1 failed on two real restatements, my own comment in
+covenant_model.py and A269's open item below, until each cited the tombstone. A probe file with the old
+sentence then turned R1 red, and removing it restored green.
+
+**What it does not cover.**
+- *DATA bigger than the window.* A follow-up's DATA can exceed the window on its own: a HANDS file read
+  hands back up to 64,000 characters (MAX_OUT), the crawl 12,000, a fetch 8,192, the forum 6,000. Such
+  a request is now refused with the reason instead of sent. The answer still does not come, and
+  cutting DATA to fit is not done here.
+- *Other callers.* Callers that build their own prompt and replay no turns are not fitted: the daily,
+  the practice loop, free_will, the persona's refine, tetsu_money, code_consensus, and anything calling
+  covenant_model.ask directly. There is no history in them to drop.
+- *Overflow during the answer.* Whether the server answers a prompt that fits but whose answer runs out
+  of window with a 500 or by stopping short is UNDETERMINED. Measuring it needs an 8k-token prompt on
+  his PC's one slot (minutes of CPU; the slot was busy) or a second server (1.8 GB free). The fit
+  reserves the answer either way.
+- *The estimate.* If a later server build stops answering /apply-template while still answering chat,
+  the estimate is used. Text denser than 3.0 characters a token would then be undercounted.
+- *Live state.* It is live on a node only once that node restarts (A153). That restart is recorded
+  below when done.
+
+---
+
 ### A272. [A test suite paused the LIVE ambassador three minutes after his resume: FW1 never redirected the pause switch] 2026-10-06. Found when he allowed reading logs/ambassador.log. A RECURRENCE of A190's shape. FIXED at the switch, driven both ways
 
 **Measured.** I lifted free's isolation on his words. Three minutes later, at 07:10:14, ops/pause/ambassador
@@ -7437,6 +7525,12 @@ today, `compose_system(AGENT_SYSTEM)` is 11,813. Rules (11,813) plus the 12,000-
 budget plus a question plus 700 answer tokens can exceed 8192 tokens even with one slot, in his own
 conversations as well as the batch. Not changed here: the budget lives in the core, and moving it moves
 the core's pin and needs the nodes restarted.
+
+**Closed by A273 (2026-10-06, above).** The history now follows the real size of the rules:
+covenant_model.fit() counts each request with the server's own tokenizer and drops the oldest turns, as
+few as fit, in /m/agent and /pc/council. The "about 5,600 characters" quoted above is retracted as
+A273-RULES-SIZE-2026-10-06. It was true when written (A223 measured 4,919; 5,607 for the council), and
+the rules grew after it.
 
 ---
 
