@@ -448,6 +448,9 @@ SUITES = [
     # A265 (2026-10-05), registered in the change that created it: the keeper's stop is a stop only
     # when the server stops answering. The first suite to run the real stop(); every kill is a recorder.
     ("test_a265_model_stop.py",           120,  "JUDGE"),
+    # A268 (2026-10-06), registered in the change that created it: an in-place suite runs without
+    # the deployed gate's env (in_place_env); M6 died on an inherited 'deferring' provider.
+    ("test_a268_in_place_env.py",         240,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
@@ -1111,6 +1114,29 @@ def phase_coverage(say):
     return absent, orphans, missing_deps, sorted(ignored_by)
 
 
+# A268 (2026-10-06). The deployed gate's wiring, as covenant_judge_defer.apply_policy
+# writes it. A process that judged an outbound post (covenant_moltbook) applies the
+# policy to its OWN os.environ, and the daily cycle's sweep inherited it: on
+# 2026-10-06 test_m6_mobile_door.py died before its first node check with
+# "unknown judge provider: 'deferring'" -- the node's provider, named to a suite that
+# never imports the module that registers it -- and the sweep read FAIL with 0
+# checks failed. By hand, from a clean shell, it was 73/73. That shape is recorded
+# under A117 (test_a114_own_genesis inherited the sweep's provider); that fix repaired
+# the one suite and left nothing to stop the next one. This is the thing that stops it: the in-place suites run with these keys removed, so
+# each reads its own default, exactly as a person running it by hand would.
+DEPLOYED_GATE_ENV = ("COVENANT_JUDGE_PROVIDERS", "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
+                     "COVENANT_SILENCE_IS_NOT_DISSENT", "COVENANT_RELAX_VALUELESS_FOR")
+
+
+def in_place_env(base=None):
+    """The environment an in-place suite runs with: the caller's, minus the deployed
+    gate's wiring (DEPLOYED_GATE_ENV, A268)."""
+    env = dict(os.environ if base is None else base)
+    for k in DEPLOYED_GATE_ENV:
+        env.pop(k, None)
+    return env
+
+
 IN_PLACE = [
     # (file, seconds, why it may not be run from a scratch copy)
     ("verify_bundle.py", 120,
@@ -1227,7 +1253,7 @@ def phase_integrity(say, transported=False):
             say("    ABSENT -- not on disk. NOT measured, and not a pass.")
             out.append((name, "ABSENT"))
             continue
-        rc = run_open(say, [sys.executable, name], timeout=tmo)
+        rc = run_open(say, [sys.executable, name], timeout=tmo, env=in_place_env())
         out.append((name, "ok" if rc == 0 else "FAIL rc=%s" % rc))
 
     # THE RULES THEMSELVES. Added 2026-08-30, on discovering that NOTHING ran

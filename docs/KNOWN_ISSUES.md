@@ -7298,6 +7298,45 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
+### A268. [The daily sweep read FAIL with 0 checks failed: an in-place suite inherited the deployed gate's judge provider] 2026-10-06. Found reading the daily cycle's report and the orbs. A RECURRENCE of a shape recorded under A117. FIXED as a runner guard, driven both ways
+
+**Measured.** The 2026-10-06 daily cycle (TETSU_DAILY.md, 04:51 local) reported "Covenant tests: FAIL"
+beside 4863 checks passed and 0 failed, and the Highway orb read sweep_red. The sweep's one red was
+folder integrity: `test_m6_mobile_door.py=FAIL rc=1`, a traceback before M6's first node check,
+`ValueError: unknown judge provider: 'deferring'`. Run by hand from a clean shell, M6 was 73/73.
+Reproduced with `COVENANT_JUDGE_PROVIDERS=deferring,semantic python test_m6_mobile_door.py`.
+
+**Cause.** covenant_one.py's phase_integrity ran every in-place suite with the caller's whole
+environment, unlike the staged sweep, which sets its own judge. The daily cycle runs covenant_one.py
+from the watchdog's process tree, and "deferring,semantic" is the deployed gate's provider pair.
+covenant_judge_defer.apply_policy writes it, and covenant_moltbook (also covenant_ai_consult) apply it
+to their OWN os.environ before judging. Which process first carried it into the daily cycle is
+UNDETERMINED: a running process's environment was not read. M6 builds a node without importing
+covenant_judge_defer, the module that registers "deferring", so it could not run at all.
+
+**Why this is a recurrence.** A117's record (the 37-red run, above) names a second cause of the same
+shape: test_a114_own_genesis.py inherited the sweep's own provider and failed on the runner only. That
+fix repaired the one suite and left nothing in the runner, so the next in-place suite that builds a
+quorum met the same thing.
+
+**Fixed** in the runner, not the suite. `covenant_one.in_place_env()` is the caller's environment
+minus `DEPLOYED_GATE_ENV`: the four keys apply_policy writes (COVENANT_JUDGE_PROVIDERS, its _OVERRIDE,
+COVENANT_SILENCE_IS_NOT_DISSENT, COVENANT_RELAX_VALUELESS_FOR). Every in-place suite runs with it, so
+each one reads its own default, as a person running it by hand would. `test_a268_in_place_env.py`,
+registered in SUITES: E1 the strip; E2 the real phase_integrity against a probe suite that exits 1 if
+it sees any of the four keys; E3 the real failure both ways (the quorum refuses 'deferring' under the
+raw env and builds under in_place_env). Driven both ways in a scratch copy: with the call site back to
+the caller's env, E2 fails (3/4); with the strip disabled, E1, E2 and E3b fail (1/4); restored, 4/4.
+End to end: `covenant_one.py --only test_a268_in_place_env.py` with the deployed pair set in the
+caller's env read `test_m6_mobile_door.py=ok` under folder integrity.
+
+**What it does not cover.** Other deployment variables a caller may carry (timeouts, COVENANT_DB_PATH)
+still pass through to in-place suites. Only the gate's wiring is removed, because only it is known to
+break a suite. run_all_tests.sh does not list A268 yet: another session was changing that file's
+deploy pin at the time. CI runs covenant_one.py, which does list it.
+
+---
+
 ### A267. [C4 walked .claude/worktrees/, so run in the main folder it counted every worktree's copy of the documents as the tree] 2026-10-06. Found by hand-running C4 in the main folder; his instruction: "Apply the same prune to C4's published_markdown() ... and drive it both ways". FIXED, the guard driven both ways; it never affected CI or the commit hook
 
 **Measured** in the main folder at f35d94c, which held 7 worktrees. C4's walk read 1354 .md files;
