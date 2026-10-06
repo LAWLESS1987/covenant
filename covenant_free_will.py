@@ -246,6 +246,79 @@ def _attempted_recently(rows, now, hours=ROTATE_HOURS):
     return out
 
 
+# TETSU TELLS HIM (2026-10-06, his words: "have tetsu update me on moltbook interactions that he thinks
+# i should know about"). After a live round that did anything, Tetsu reads a digest of it and decides:
+# TELL (a few sentences in his own words, onto the direct line) or NOTHING. The choice is his; every
+# decision is recorded, told or not.
+TETSU_UPDATES = os.path.join(HERE, "ops", "tetsu_moltbook_updates.jsonl")
+UPDATE_PROMPT = (
+    "He asked: \"have tetsu update me on moltbook interactions that he thinks i should know about\". "
+    "Below is what free (the ambassador) did on Moltbook in the round that just ended, and your own reviews "
+    "of her held drafts. You decide whether any of it is worth telling him -- someone writing back, a reply "
+    "that went out, something held or refused he may care about, anything you judge he should know. If "
+    "something is, answer with TELL: and then what you want to tell him, one to three sentences in your own "
+    "words, using only facts from the list. If nothing is worth his time, answer NOTHING.\n\n%s")
+_TELL = re.compile(r"^\W*(TELL|NOTHING)\b\W*(.*)$", re.S | re.I)
+
+
+def _round_digest(out, rows, reviews=()):
+    lines = ["round: %d candidate(s), %d replied, %d held or refused, %d waiting for the next round, %d ally answer(s)"
+             % (out.get("candidates", 0), out.get("replied", 0), out.get("refused", 0), out.get("deferred", 0) or 0,
+                out.get("answered", 0) or 0)]
+    for r in rows:
+        k = r.get("kind")
+        if k == "reply":
+            lines.append(("SENT to u/%s: %s" % (r.get("author"), str(r.get("text") or "")[:160])) if r.get("sent")
+                         else ("held, to u/%s: %s" % (r.get("author"), str(r.get("why") or "")[:70])))
+        elif k == "answer":
+            lines.append("u/%s WROTE BACK (their comments on that post: %s -> %s)"
+                         % (r.get("author"), r.get("comments_then"), r.get("comments_now")))
+        elif k in ("own_post", "intro"):
+            lines.append("%s %s%s" % ("her own post" if k == "own_post" else "introduction",
+                                      "posted" if r.get("sent") else "not posted",
+                                      (": " + str(r.get("title"))[:80]) if r.get("title") else ""))
+        elif k == "isolation":
+            lines.append("ISOLATED: " + str(r.get("why") or "")[:160])
+    for v in reviews:
+        lines.append("your review: %s -- %s" % (v.get("decision"), str(v.get("why") or "")[:100]))
+    return "\n".join(lines)[:1800]
+
+
+def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
+    """Tetsu's reading of one live round: TELL him or NOTHING. Returns the recorded row, or None when the
+    round did nothing (his time is not spent on an empty round)."""
+    activity = (int(out.get("replied", 0) or 0) + int(out.get("refused", 0) or 0) + int(out.get("answered", 0) or 0)
+                + int(bool(out.get("own_post"))) + int(bool(out.get("introduced"))) + int(bool(out.get("isolated"))))
+    if not activity:
+        return None
+    digest = _round_digest(out, rows, reviews)
+    raw, err = "", ""
+    try:
+        if ask is None:
+            import covenant_tetsu_assist as _TA
+            ask = _TA._default_ask
+        raw = ask(UPDATE_PROMPT % digest) or ""
+    except Exception as e:                                        # noqa: BLE001
+        err = "%s: %s" % (type(e).__name__, str(e)[:200])
+    m = _TELL.match(raw.strip())
+    decision = m.group(1).upper() if m else "NONE"
+    text = re.sub(r"\s+", " ", m.group(2)).strip()[:600] if m else ""
+    told = None
+    if decision == "TELL" and text:
+        if tell is None:
+            import covenant_contact
+            tell = covenant_contact.say
+        told = tell(text, "moltbook: what Tetsu thinks you should know", "tetsu")
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "decision": decision, "told": bool(told),
+           "text": text, "digest": digest, "error": err, "unparsed": raw[:300] if decision == "NONE" else ""}
+    try:
+        with open(log_path or TETSU_UPDATES, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    return row
+
+
 LOCK_STALE_S = 7200
 
 
@@ -269,9 +342,10 @@ def _take_lock(path, stale_s=LOCK_STALE_S):
     return True
 
 
-def run_round(dry_run=True, say=print, sends_path=None, **kw):
+def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tetsu_ask=None, tetsu_tell=None, **kw):
     """One round. Returns the summary dict it also says out loud. A live round holds
-    ops/ambassador_round.lock (beside the sends ledger) for its whole length."""
+    ops/ambassador_round.lock (beside the sends ledger) for its whole length. With tetsu_updates, a live
+    round that did anything ends with Tetsu deciding what, if anything, to tell him (tetsu_update)."""
     if dry_run:
         return _run_round(dry_run=True, say=say, sends_path=sends_path, **kw)
     lock = os.path.join(os.path.dirname(sends_path or SENDS), "ambassador_round.lock")
@@ -280,7 +354,32 @@ def run_round(dry_run=True, say=print, sends_path=None, **kw):
         return {"granted": None, "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
                 "introduced": False, "dry_run": False, "why": "another live round is running"}
     try:
-        return _run_round(dry_run=False, say=say, sends_path=sends_path, **kw)
+        n_sends = len(sends(sends_path))
+        n_reviews = None
+        if tetsu_updates:
+            try:
+                import covenant_tetsu_assist as _TA
+                with open(_TA.LEDGER, encoding="utf-8") as fh:
+                    n_reviews = sum(1 for _ in fh)
+            except Exception:                                     # noqa: BLE001
+                n_reviews = None
+        out = _run_round(dry_run=False, say=say, sends_path=sends_path, **kw)
+        if tetsu_updates:
+            reviews = []
+            if n_reviews is not None:
+                try:
+                    with open(_TA.LEDGER, encoding="utf-8") as fh:
+                        reviews = [json.loads(x) for x in fh.read().splitlines()[n_reviews:] if x.strip()]
+                except Exception:                                 # noqa: BLE001
+                    reviews = []
+            try:
+                u = tetsu_update(out, sends(sends_path)[n_sends:], reviews, ask=tetsu_ask, tell=tetsu_tell)
+                if u:
+                    out["tetsu_update"] = u["decision"]
+                    say("free: Tetsu read the round and chose %s%s" % (u["decision"], " (told him)" if u["told"] else ""))
+            except Exception as e:                                # noqa: BLE001
+                say("free: Tetsu's update could not run (%s)" % type(e).__name__)
+        return out
     finally:
         try:
             os.remove(lock)
@@ -523,6 +622,6 @@ if __name__ == "__main__":
                         fh.write("%s %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S%z"), line))
                 except OSError:
                     pass
-        run_round(dry_run=not a.send, say=_say)
+        run_round(dry_run=not a.send, say=_say, tetsu_updates=True)
     else:
         ap.print_help()

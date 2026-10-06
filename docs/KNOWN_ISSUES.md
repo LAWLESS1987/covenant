@@ -7329,6 +7329,16 @@ redrafted within 24 h; two refused rounds still isolate. CT1's rounds now get a 
 drafted with the LIVE model, and once A269 made the server queue rather than fail fast, CT1 waited behind
 a real batch and timed out at 300 s.
 
+**Tetsu tells him (added the same day, his words: "have tetsu update me on moltbook interactions that he
+thinks i should know about").** After a live round that did anything, `tetsu_update` hands Tetsu a digest
+of at most 1,800 characters through his door: who was sent to (with the text), who was held and why, who
+wrote back, and his own SEND/REFUSE reviews from that round. He answers `TELL: ...` in his own words, which
+goes onto the direct line as actor tetsu (covenant_contact.say, its screens apply), or `NOTHING`. Every
+decision is recorded in ops/tetsu_moltbook_updates.jsonl. A round that did nothing does not ask him. It
+runs only where a caller passes tetsu_updates=True: the scheduled round and the nightly. A suite's rounds
+never reach his door. FW1u, driven both ways (telling on NOTHING: 4 fail; asking on an empty round: 3
+fail; restored 60/60).
+
 **Not changed, and what it means.** Every judge, the disclosure, Tetsu's review, the screens and the
 isolation rule stand. While the students hold all discourse, at most Tetsu's 6 reviews per round can reach
 anyone, and only the ones he answers SEND. How many he sends is UNDETERMINED until rounds run.

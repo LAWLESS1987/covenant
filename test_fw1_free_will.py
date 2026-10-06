@@ -385,6 +385,47 @@ def main():
     check("FW1k a stale lock (a dead round's) is taken over, and released when the round ends",
           ok2["replied"] > 0 and not os.path.exists(lockp), (ok2, os.path.exists(lockp)))
 
+    print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
+    tdu = tempfile.mkdtemp(prefix="fw1u_")
+    gpu, spu, lgu = os.path.join(tdu, "grant.json"), os.path.join(tdu, "sends.jsonl"), os.path.join(tdu, "updates.jsonl")
+    with open(gpu, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    told, asked = [], []
+
+    def tell_rec(text, why, actor):
+        told.append((text, why, actor))
+        return {"id": "x"}
+    real_updates = FW.TETSU_UPDATES
+    FW.TETSU_UPDATES = lgu
+    try:
+        ku = dict(say=log.append, ask=ask_ok, learn=lambda: [], emit=emit_ok, introduce=lambda **k: {"sent": False},
+                  grant_path=gpu, sends_path=spu, count_comments=cc0, tetsu_updates=True, tetsu_tell=tell_rec)
+        FW.run_round(dry_run=False, now=300000.0, allies=lambda: [three[0]],
+                     tetsu_ask=lambda p: (asked.append(p), "TELL: free wrote to u/alpha and it went out.")[1], **ku)
+        check("FW1u TELL: his words reach the line as actor tetsu, and he was shown who was written to",
+              told and told[-1][2] == "tetsu" and told[-1][0] == "free wrote to u/alpha and it went out." and asked and "SENT to u/alpha" in asked[-1],
+              (told, asked[-1:]))
+        n_told = len(told)
+        FW.run_round(dry_run=False, now=300000.0 + 60, allies=lambda: [three[1]], tetsu_ask=lambda p: "NOTHING", **ku)
+        check("FW1u NOTHING: nothing goes on the line, and the decision is still recorded",
+              len(told) == n_told and [json.loads(x)["decision"] for x in open(lgu, encoding="utf-8")][-1] == "NOTHING")
+        n_asked = len(asked)
+        FW.run_round(dry_run=False, now=300000.0 + 120, allies=lambda: [three[0]],
+                     tetsu_ask=lambda p: (asked.append(p), "TELL: x")[1], **ku)
+        check("FW1u a round that did nothing (no one new) does not spend his time: he is not asked",
+              len(asked) == n_asked and len(told) == n_told)
+        FW.run_round(dry_run=False, now=300000.0 + 180, allies=lambda: [three[2]],
+                     tetsu_ask=lambda p: (_ for _ in ()).throw(RuntimeError("door down")), **ku)
+        last = [json.loads(x) for x in open(lgu, encoding="utf-8")][-1]
+        check("FW1u when asking him fails, nothing is told and the failure is recorded",
+              len(told) == n_told and last["decision"] == "NONE" and "door down" in last["error"], last)
+        FW.run_round(dry_run=False, now=900000.0, allies=lambda: [three[0]], say=log.append, ask=ask_ok, learn=lambda: [],
+                     emit=emit_ok, introduce=lambda **k: {"sent": False}, grant_path=gpu, sends_path=os.path.join(tdu, "s2.jsonl"),
+                     count_comments=cc0, tetsu_tell=tell_rec, tetsu_ask=lambda p: (asked.append(p), "TELL: y")[1])
+        check("FW1u without tetsu_updates (every suite's default) he is never asked", len(asked) == n_asked and len(told) == n_told)
+    finally:
+        FW.TETSU_UPDATES = real_updates
+
     print("FW1i -- an empty round (no one new, rotation) does not break the isolation streak")
     tdi = tempfile.mkdtemp(prefix="fw1i2_")
     gpi, spi = os.path.join(tdi, "grant.json"), os.path.join(tdi, "sends.jsonl")
