@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12854   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
+EXPECTED_LINES = 13289   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -124,7 +124,7 @@ MANIFEST = {
     # P19 23/23 and A3s 51/51 were run against THESE bytes BEFORE this line
     # moved, the order the b969 lesson below requires.
     "covenant_unified_v8.py":
-        "74d6d31e9f5db1884774df0024e2d0ab7d3ef5fe55ee778f005a1c85fa7dbca4",
+        "7abb0ff8b024ac030e477a1b45cc05aaa17ed9ff89deb4681345aca364b13aa7",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
@@ -151,7 +151,7 @@ MANIFEST = {
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
     "run_all_tests.sh":
-        "e7c0c68ef756e0b6d74c8aac28cf3c4b4e62895fe3965916ad7b7b324b6f22f5",   # 2026-10-05 evening: moved WITH the file, before it reached main (16e389e added the A265 suite line); K1 20/20, K2 25/25 against these bytes first. Was 7eed13de808b: 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
+        "8b2df9166a16227bf98a857f0c6b31563a6755668d19b9105e59ac715bed57ff",   # 2026-10-06: moved WITH the file (A274 added its suite line); K1 20/20, K2 25/25 against these bytes first. Was e7c0c68ef756: 2026-10-05 evening: moved WITH the file, before it reached main (16e389e added the A265 suite line); K1 20/20, K2 25/25 against these bytes first. Was 7eed13de808b: 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40

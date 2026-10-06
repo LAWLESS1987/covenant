@@ -4011,6 +4011,52 @@ SANDBOX_UNAVAILABLE_REASON = ("" if SANDBOX_FORK_AVAILABLE else
     "process and file-size limits cannot be enforced; code proposals are "
     "refused rather than executed unbounded" % sys.platform)
 
+# A274 (2026-10-06) -- the Windows path, and the one limit it cannot enforce.
+# His words: design a Windows path that enforces the SAME limits the fork path
+# enforces -- memory, process count, file size, wall time -- with a Win32 Job
+# Object, and "if one limit cannot be enforced on Windows, keep refusing and say
+# which, rather than claiming parity". _win_job_run() below is that path. What
+# was measured on this PC (Store Python 3.12, Windows 11), not assumed:
+#   * memory      ProcessMemoryLimit = JobMemoryLimit = 256 MiB. A gradual
+#                 allocation stops in MemoryError at a peak of 267,210,752 bytes,
+#                 under the 268,435,456 cap. ENFORCED.
+#   * processes   ActiveProcessLimit = 1. NOT enforced by the job alone: this
+#                 interpreter is an MSIX-packaged app, and a packaged process's
+#                 children from OUTSIDE the package (cmd.exe, os.system) break away
+#                 from every job by default -- measured: the cmd.exe a jailed child
+#                 started was in no job at all, while a second Python was refused
+#                 (1816). The desktop-app policy BREAKAWAY_DISABLE_PROCESS_TREE,
+#                 set at creation, keeps them inside; with it cmd, os.system and
+#                 Python are all refused. ENFORCED by the two together.
+#                 (PROCESS_CREATION_CHILD_PROCESS_RESTRICTED was tried as well: the
+#                 packaged interpreter cannot start under it, 0xC0000142.)
+#   * wall time   the parent's deadline and TerminateJobObject; kill-on-close ends
+#                 the child if the node itself dies. ENFORCED.
+#   * file size   NOTHING. A job has no file-size limit and Windows has no
+#                 per-process one. The two nearest things were measured and are
+#                 not bounds: a Low-integrity token refused a write to %TEMP% but
+#                 put 1.77 GB into LocalLow in 3 s; an I/O rate cap of 64 KiB/s was
+#                 accepted by the job and 2.78 GB still landed in 3 s.
+# So file_size is listed below as unenforceable, the gate stays shut, and the
+# reason says which limit is missing instead of all three. Removing "file_size"
+# from SANDBOX_WIN_UNENFORCEABLE is the only thing that opens the Windows path;
+# do it only with a measured bound, and test_a274_win_job_sandbox.py's G1 turns
+# red the moment it happens so the change cannot be quiet.
+SANDBOX_WIN_UNENFORCEABLE = ("file_size",)
+SANDBOX_WIN_JOB_AVAILABLE = (
+    sys.platform == "win32" and not SANDBOX_WIN_UNENFORCEABLE
+    and os.environ.get("COVENANT_FORCE_NO_SANDBOX") != "1")
+SANDBOX_AVAILABLE = SANDBOX_FORK_AVAILABLE or SANDBOX_WIN_JOB_AVAILABLE
+if SANDBOX_AVAILABLE:
+    SANDBOX_UNAVAILABLE_REASON = ""
+elif sys.platform == "win32" and os.environ.get("COVENANT_FORCE_NO_SANDBOX") != "1":
+    SANDBOX_UNAVAILABLE_REASON = (
+        "no per-process file-size limit on this platform (win32): RLIMIT_FSIZE has "
+        "no Windows equivalent, so the sandbox's file-size limit cannot be enforced. "
+        "Its memory, process-count and wall-time limits can be (a Job Object, A274), "
+        "but a proposal runs only under all four, so code proposals are refused "
+        "rather than executed with one missing")
+
 CODE_SAFE_BUILTINS = {
     "abs": abs, "all": all, "any": any, "bool": bool, "len": len, "list": list,
     "map": map, "max": max, "min": min, "range": range, "sorted": sorted,
@@ -4393,6 +4439,8 @@ def run_sandboxed(source: str, timeout: float = CODE_MAX_EVAL_TIME_SECONDS) -> D
         conn.close()
 
     if not SANDBOX_FORK_AVAILABLE:                          # W2 (v8.30)
+        if SANDBOX_WIN_JOB_AVAILABLE:                       # A274: shut while file_size is unenforceable
+            return _win_job_run(source, timeout)
         return {"ran": False, "timed_out": False, "ok": False,
                 "error": "SandboxUnavailable: " + SANDBOX_UNAVAILABLE_REASON}
 
@@ -4421,6 +4469,393 @@ def run_sandboxed(source: str, timeout: float = CODE_MAX_EVAL_TIME_SECONDS) -> D
     # distinction was invisible before (see the _target comment above).
     return {"ran": True, "timed_out": False, "ok": False,
             "error": f"child exited without reporting (exitcode={proc.exitcode})"}
+
+
+# ---------------------------------------------------------------------------
+# A274 -- the Windows path (the measurements are in the A274 note above
+# SANDBOX_WIN_UNENFORCEABLE). Each limit is a constant on a line of its own, so
+# test_a274_win_job_sandbox.py can drop exactly one and require its suite to go
+# red; the value of a limit is set only when its flag is, so a dropped flag is a
+# dropped limit and not a mismatch that refuses for some other reason.
+_WJ_KILL_ON_JOB_CLOSE = 0x2000                   # the node's death ends the child too
+_WJ_ACTIVE_PROCESS = 0x0008
+_WJ_PROCESS_MEMORY = 0x0100
+_WJ_JOB_MEMORY = 0x0200
+_WJ_DIE_ON_UNHANDLED_EXCEPTION = 0x0400          # no error dialog holds a dead child open
+_WJ_LIMIT_FLAGS = (0
+                   | _WJ_KILL_ON_JOB_CLOSE
+                   | _WJ_ACTIVE_PROCESS
+                   | _WJ_PROCESS_MEMORY
+                   | _WJ_JOB_MEMORY
+                   | _WJ_DIE_ON_UNHANDLED_EXCEPTION)
+_WJ_MAX_PROCESSES = 1                            # the child itself, and nothing it starts
+_WJ_DESKTOP_APP_POLICY = 0x00020012              # PROC_THREAD_ATTRIBUTE_DESKTOP_APP_POLICY
+_WJ_BREAKAWAY_DISABLE_PROCESS_TREE = 0x2         # a packaged child's children stay in the job
+_WJ_HANDLE_LIST = 0x00020002                     # PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+_WJ_READ_CAP = 64 * 1024                         # what the parent keeps of the child's output
+_WJ_STARTUP_SECONDS = 30.0                       # interpreter start, before any source is sent
+
+# The child's whole program. It reads its OWN job before it reads a byte of the
+# proposal, and refuses unless that job carries exactly the limits the parent
+# set: the parent assigning a job is not the same fact as the process that runs
+# the snippet being inside it (measured: through the venv redirector the real
+# interpreter started outside the job, and the redirector, which was inside,
+# answered for it).
+_WJ_BOOT = r'''
+import builtins, ctypes, json, sys
+from ctypes import wintypes as w
+class B(ctypes.Structure):
+    _fields_ = [("u1", ctypes.c_int64), ("u2", ctypes.c_int64), ("flags", w.DWORD),
+                ("ws1", ctypes.c_size_t), ("ws2", ctypes.c_size_t), ("active", w.DWORD),
+                ("aff", ctypes.c_size_t), ("prio", w.DWORD), ("sched", w.DWORD)]
+class X(ctypes.Structure):
+    _fields_ = [("basic", B), ("io", ctypes.c_uint64 * 6), ("pml", ctypes.c_size_t),
+                ("jml", ctypes.c_size_t), ("ppk", ctypes.c_size_t), ("jpk", ctypes.c_size_t)]
+out = sys.stdout.buffer
+k = ctypes.WinDLL("kernel32")
+k.QueryInformationJobObject.argtypes = [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD, ctypes.c_void_p]
+x = X()
+seen = [int(bool(k.QueryInformationJobObject(None, 9, ctypes.byref(x), ctypes.sizeof(x), None))),
+        x.basic.flags, x.basic.active, x.pml, x.jml]
+if seen != __EXPECTED__:
+    out.write(b"NOJOB " + json.dumps(seen).encode() + b"\n")
+    out.flush()
+    sys.exit(3)
+out.write(b"READY\n")
+out.flush()
+msg = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+g = {"__builtins__": {n: getattr(builtins, n) for n in msg["builtins"]}}
+try:
+    exec(compile(msg["source"], "<code_proposal>", "exec"), g)
+    r = {"ok": True, "error": None}
+except Exception as e:
+    r = {"ok": False, "error": ("%s: %s" % (type(e).__name__, e))[:2000]}
+out.write(b"RESULT " + json.dumps(r).encode() + b"\n")
+out.flush()
+'''
+
+_WJ_API = None
+
+
+def _win_job_api():
+    """ctypes bindings for the A274 path, built on first use, on Windows only --
+    nothing here is imported at node start."""
+    global _WJ_API
+    if _WJ_API is not None:
+        return _WJ_API
+    import ctypes
+    import types
+    from ctypes import wintypes as w
+
+    class BASIC(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", w.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", w.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", w.DWORD), ("SchedulingClass", w.DWORD)]
+
+    class EXT(ctypes.Structure):                 # JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        _fields_ = [("BasicLimitInformation", BASIC), ("IoInfo", ctypes.c_uint64 * 6),
+                    ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                    ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    class SI(ctypes.Structure):                  # STARTUPINFOW
+        _fields_ = [("cb", w.DWORD), ("lpReserved", w.LPWSTR), ("lpDesktop", w.LPWSTR),
+                    ("lpTitle", w.LPWSTR), ("dwX", w.DWORD), ("dwY", w.DWORD), ("dwXSize", w.DWORD),
+                    ("dwYSize", w.DWORD), ("dwXCountChars", w.DWORD), ("dwYCountChars", w.DWORD),
+                    ("dwFillAttribute", w.DWORD), ("dwFlags", w.DWORD), ("wShowWindow", w.WORD),
+                    ("cbReserved2", w.WORD), ("lpReserved2", ctypes.c_void_p),
+                    ("hStdInput", w.HANDLE), ("hStdOutput", w.HANDLE), ("hStdError", w.HANDLE)]
+
+    class SIEX(ctypes.Structure):                # STARTUPINFOEXW
+        _fields_ = [("StartupInfo", SI), ("lpAttributeList", ctypes.c_void_p)]
+
+    class PI(ctypes.Structure):                  # PROCESS_INFORMATION
+        _fields_ = [("hProcess", w.HANDLE), ("hThread", w.HANDLE),
+                    ("dwProcessId", w.DWORD), ("dwThreadId", w.DWORD)]
+
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    vp, sz = ctypes.c_void_p, ctypes.c_size_t
+    for name, res, args in (
+            ("CreateJobObjectW", w.HANDLE, [vp, w.LPCWSTR]),
+            ("SetInformationJobObject", w.BOOL, [w.HANDLE, ctypes.c_int, vp, w.DWORD]),
+            ("QueryInformationJobObject", w.BOOL, [w.HANDLE, ctypes.c_int, vp, w.DWORD, vp]),
+            ("AssignProcessToJobObject", w.BOOL, [w.HANDLE, w.HANDLE]),
+            ("IsProcessInJob", w.BOOL, [w.HANDLE, w.HANDLE, ctypes.POINTER(w.BOOL)]),
+            ("TerminateJobObject", w.BOOL, [w.HANDLE, w.UINT]),
+            ("TerminateProcess", w.BOOL, [w.HANDLE, w.UINT]),
+            ("ResumeThread", w.DWORD, [w.HANDLE]),
+            ("WaitForSingleObject", w.DWORD, [w.HANDLE, w.DWORD]),
+            ("GetExitCodeProcess", w.BOOL, [w.HANDLE, ctypes.POINTER(w.DWORD)]),
+            ("CloseHandle", w.BOOL, [w.HANDLE]),
+            ("SetHandleInformation", w.BOOL, [w.HANDLE, w.DWORD, w.DWORD]),
+            ("InitializeProcThreadAttributeList", w.BOOL, [vp, w.DWORD, w.DWORD, ctypes.POINTER(sz)]),
+            ("UpdateProcThreadAttribute", w.BOOL, [vp, w.DWORD, sz, vp, sz, vp, vp]),
+            ("DeleteProcThreadAttributeList", None, [vp]),
+            ("CreateProcessW", w.BOOL, [w.LPCWSTR, w.LPWSTR, vp, vp, w.BOOL, w.DWORD, vp,
+                                        w.LPCWSTR, vp, vp])):
+        fn = getattr(k, name)
+        fn.restype, fn.argtypes = res, args
+    _WJ_API = types.SimpleNamespace(ctypes=ctypes, w=w, k=k, EXT=EXT, SIEX=SIEX, PI=PI)
+    return _WJ_API
+
+
+def _wj_intended() -> List[int]:
+    """[queried, flags, process limit, process memory, job memory] -- what the job
+    must read back as, and what the child must find itself inside."""
+    f = _WJ_LIMIT_FLAGS
+    return [1, f,
+            _WJ_MAX_PROCESSES if f & _WJ_ACTIVE_PROCESS else 0,
+            CODE_SANDBOX_MAX_MEMORY_BYTES if f & _WJ_PROCESS_MEMORY else 0,
+            CODE_SANDBOX_MAX_MEMORY_BYTES if f & _WJ_JOB_MEMORY else 0]
+
+
+def _win_sandbox_boot() -> str:
+    return _WJ_BOOT.replace("__EXPECTED__", repr(_wj_intended()))
+
+
+def _wj_interpreter() -> str:
+    """The interpreter the child runs. In a venv, sys.executable is a redirector
+    that starts the real interpreter as a SECOND process; measured, that second
+    process was running before the job was assigned and never joined it. The base
+    interpreter is one process. python.exe rather than pythonw.exe so the pipes
+    are its stdio; CREATE_NO_WINDOW keeps it from opening a console."""
+    exe = getattr(sys, "_base_executable", None) or sys.executable
+    head, tail = os.path.split(exe)
+    if tail.lower().startswith("pythonw"):
+        alt = os.path.join(head, "python" + tail[len("pythonw"):])
+        if os.path.exists(alt):
+            exe = alt
+    return exe
+
+
+class _SandboxPipeReader:
+    """Reads the child's output on its own thread, keeping at most _WJ_READ_CAP
+    bytes, so a child that floods its pipe costs the node 64 KiB and not its
+    memory. Owns the fd and closes it at EOF."""
+
+    def __init__(self, fd: int):
+        self._fd = fd
+        self._buf = b""
+        self.eof = False
+        self.read_error: Optional[OSError] = None
+        self._cv = threading.Condition()
+        threading.Thread(target=self._pump, name="a274-sandbox-pipe", daemon=True).start()
+
+    def _pump(self):
+        try:
+            while True:
+                chunk = os.read(self._fd, 4096)
+                if not chunk:
+                    break
+                with self._cv:
+                    room = _WJ_READ_CAP - len(self._buf)
+                    if room > 0:
+                        self._buf += chunk[:room]
+                    self._cv.notify_all()
+        except OSError as e:
+            self.read_error = e
+        finally:
+            os.close(self._fd)
+            with self._cv:
+                self.eof = True
+                self._cv.notify_all()
+
+    def line(self, deadline: float) -> Optional[bytes]:
+        """The next complete line, or None at EOF or at `deadline`."""
+        with self._cv:
+            while True:
+                i = self._buf.find(b"\n")
+                if i >= 0:
+                    ln, self._buf = self._buf[:i], self._buf[i + 1:]
+                    return ln.rstrip(b"\r")
+                left = deadline - time.monotonic()
+                if self.eof or left <= 0:
+                    return None
+                self._cv.wait(left)
+
+    def tail(self) -> str:
+        with self._cv:
+            return self._buf[-300:].decode("utf-8", "replace")
+
+
+def _sandbox_feed(fd: int, data: bytes) -> Optional[OSError]:
+    """Writes the proposal to the child's stdin on its own thread, then closes it.
+    A child that dies mid-read breaks the pipe; the reader's EOF is how the parent
+    learns that, so the error is returned rather than needed."""
+    try:
+        view = memoryview(data)
+        while len(view):
+            view = view[os.write(fd, view[:65536]):]
+    except OSError as e:
+        return e
+    finally:
+        os.close(fd)
+    return None
+
+
+def _win_job_run(source: str, timeout: float = CODE_MAX_EVAL_TIME_SECONDS,
+                 builtin_names: Optional[List[str]] = None) -> Dict[str, Any]:
+    """A274 -- what run_sandboxed's fork path does, on Windows: run `source` with
+    the restricted builtins in a child that cannot exceed 256 MiB, cannot start a
+    process, and is ended at `timeout`. Same result shape as the fork path, plus
+    `pid` and `peak_memory` (the job's PeakProcessMemoryUsed) as evidence.
+
+    The child is created SUSPENDED, assigned to the job, checked to be inside it
+    by the parent AND by itself, and only then resumed; the proposal is written
+    to its stdin after it reports READY, so not one instruction of the snippet
+    runs outside the limits. `timeout` counts from then, as the fork path's
+    counts from a fork that costs nothing; interpreter start-up has its own bound.
+
+    `builtin_names` defaults to CODE_SAFE_BUILTINS. test_a274 widens it to stand
+    in for a snippet that has ALREADY escaped the restricted builtins -- the only
+    case the OS limits exist for. It is a Python argument, not a route or a
+    variable: nothing a peer sends can reach it.
+
+    Not reached from /propose_code while SANDBOX_WIN_UNENFORCEABLE names a limit.
+    """
+    def refused(why: str) -> Dict[str, Any]:
+        return {"ran": False, "timed_out": False, "ok": False, "error": "SandboxUnavailable: " + why}
+
+    if sys.platform != "win32":
+        return refused("the Job Object path exists only on win32")
+    try:
+        api = _win_job_api()
+    except (OSError, AttributeError) as e:
+        return refused("Job Object API unavailable: %s" % e)
+    import msvcrt
+    import subprocess
+    import tempfile
+    ct, w, k = api.ctypes, api.w, api.k
+    names = sorted(CODE_SAFE_BUILTINS) if builtin_names is None else list(builtin_names)
+    want = _wj_intended()
+
+    def seen(job):
+        x = api.EXT()
+        ok = k.QueryInformationJobObject(job, 9, ct.byref(x), ct.sizeof(x), None)
+        b = x.BasicLimitInformation
+        return ([int(bool(ok)), b.LimitFlags, b.ActiveProcessLimit, x.ProcessMemoryLimit,
+                 x.JobMemoryLimit], x.PeakProcessMemoryUsed)
+
+    job = k.CreateJobObjectW(None, None)
+    if not job:
+        return refused("CreateJobObject failed (error %d)" % ct.get_last_error())
+    hproc = hthread = None
+    in_w = out_r = None
+    try:
+        info = api.EXT()
+        info.BasicLimitInformation.LimitFlags = want[1]
+        info.BasicLimitInformation.ActiveProcessLimit = want[2]
+        info.ProcessMemoryLimit = want[3]
+        info.JobMemoryLimit = want[4]
+        if not k.SetInformationJobObject(job, 9, ct.byref(info), ct.sizeof(info)):
+            return refused("SetInformationJobObject failed (error %d)" % ct.get_last_error())
+        if seen(job)[0] != want:
+            return refused("the job did not take its limits: set %s, read back %s" % (want, seen(job)[0]))
+
+        in_r, in_w = os.pipe()
+        out_r, out_w = os.pipe()
+        try:
+            child_in, child_out = msvcrt.get_osfhandle(in_r), msvcrt.get_osfhandle(out_w)
+            for h in (child_in, child_out):      # inheritable, and the handle list below
+                k.SetHandleInformation(h, 1, 1)  # gives them to this child and no other
+            size = ct.c_size_t()
+            k.InitializeProcThreadAttributeList(None, 2, 0, ct.byref(size))
+            attrs = ct.create_string_buffer(size.value)
+            if not k.InitializeProcThreadAttributeList(attrs, 2, 0, ct.byref(size)):
+                return refused("InitializeProcThreadAttributeList failed (error %d)" % ct.get_last_error())
+            try:
+                policy = w.DWORD(_WJ_BREAKAWAY_DISABLE_PROCESS_TREE)
+                handles = (w.HANDLE * 2)(child_in, child_out)
+                if not (k.UpdateProcThreadAttribute(attrs, 0, _WJ_DESKTOP_APP_POLICY, ct.byref(policy),
+                                                    ct.sizeof(policy), None, None)
+                        and k.UpdateProcThreadAttribute(attrs, 0, _WJ_HANDLE_LIST, handles,
+                                                        ct.sizeof(handles), None, None)):
+                    return refused("UpdateProcThreadAttribute failed (error %d)" % ct.get_last_error())
+                si = api.SIEX()
+                si.StartupInfo.cb = ct.sizeof(api.SIEX)
+                si.StartupInfo.dwFlags = 0x100                       # STARTF_USESTDHANDLES
+                si.StartupInfo.hStdInput = child_in
+                si.StartupInfo.hStdOutput = si.StartupInfo.hStdError = child_out
+                si.lpAttributeList = ct.addressof(attrs)
+                pi = api.PI()
+                cmd = ct.create_unicode_buffer(subprocess.list2cmdline(
+                    [_wj_interpreter(), "-I", "-S", "-B", "-c", _win_sandbox_boot()]))
+                # The node's environment stays with the node: the child gets SystemRoot
+                # and nothing else, so no key in an env var is one escape away.
+                env = ct.create_unicode_buffer("SystemRoot=%s\0" % os.environ.get("SystemRoot", r"C:\Windows"))
+                flags = (0x00080000       # EXTENDED_STARTUPINFO_PRESENT
+                         | 0x00000004     # CREATE_SUSPENDED: no instruction runs before the job
+                         | 0x08000000     # CREATE_NO_WINDOW
+                         | 0x00000400)    # CREATE_UNICODE_ENVIRONMENT
+                created = k.CreateProcessW(None, cmd, None, None, True, flags, env,
+                                           tempfile.gettempdir(), ct.byref(si), ct.byref(pi))
+                create_error = ct.get_last_error()
+            finally:
+                k.DeleteProcThreadAttributeList(attrs)
+        finally:
+            os.close(in_r)                       # the parent's copies of the child's ends:
+            os.close(out_w)                      # EOF is real once the child is gone
+        if not created:
+            return refused("CreateProcess failed (error %d)" % create_error)
+        hproc, hthread = pi.hProcess, pi.hThread
+        if not k.AssignProcessToJobObject(job, hproc):
+            k.TerminateProcess(hproc, 1)
+            return refused("AssignProcessToJobObject failed (error %d)" % ct.get_last_error())
+        inside = w.BOOL()
+        if not (k.IsProcessInJob(hproc, job, ct.byref(inside)) and inside.value):
+            k.TerminateProcess(hproc, 1)
+            return refused("the child is not inside the job it was assigned to")
+        if k.ResumeThread(hthread) == 0xFFFFFFFF:
+            k.TerminateProcess(hproc, 1)
+            return refused("ResumeThread failed (error %d)" % ct.get_last_error())
+
+        reader, out_r = _SandboxPipeReader(out_r), None          # the reader owns it now
+        first = reader.line(time.monotonic() + _WJ_STARTUP_SECONDS)
+        if first != b"READY":
+            k.TerminateJobObject(job, 1)
+            return refused("the child did not report itself inside the job: %r"
+                           % ((first or b"").decode("utf-8", "replace")[:200] or reader.tail()))
+        payload = json.dumps({"builtins": names, "source": source}).encode("utf-8")
+        feeder, in_w = threading.Thread(target=_sandbox_feed, args=(in_w, payload),
+                                        name="a274-sandbox-feed", daemon=True), None
+        deadline = time.monotonic() + timeout
+        feeder.start()
+        line = reader.line(deadline)
+        while line is not None and not line.startswith(b"RESULT "):
+            line = reader.line(deadline)
+        if line is None and not reader.eof:                       # the wall-time limit
+            k.TerminateJobObject(job, 1)
+            k.WaitForSingleObject(hproc, 5000)
+            return {"ran": True, "timed_out": True, "ok": False, "error": f"exceeded {timeout}s",
+                    "pid": pi.dwProcessId, "peak_memory": seen(job)[1]}
+        k.WaitForSingleObject(hproc, 5000)
+        if line is not None:
+            try:
+                result = json.loads(line[len(b"RESULT "):].decode("utf-8"))
+            except ValueError:
+                result = None
+            if not isinstance(result, dict):
+                result = {"ok": False, "error": "unreadable report from the child: %r" % line[:200]}
+            return {"ran": True, "timed_out": False, "ok": result.get("ok") is True,
+                    "error": result.get("error"), "pid": pi.dwProcessId, "peak_memory": seen(job)[1]}
+        code = w.DWORD()
+        k.GetExitCodeProcess(hproc, ct.byref(code))
+        return {"ran": True, "timed_out": False, "ok": False,
+                "error": "child exited without reporting (exitcode=%d) %s" % (code.value, reader.tail()[-200:]),
+                "pid": pi.dwProcessId, "peak_memory": seen(job)[1]}
+    except Exception as e:               # W2's lesson: an escaping error became a bare 500
+        if hproc:
+            k.TerminateProcess(hproc, 1)
+        return refused("%s: %s" % (type(e).__name__, e))
+    finally:
+        if in_w is not None:
+            os.close(in_w)
+        if out_r is not None:
+            os.close(out_r)
+        for h in (hthread, hproc):
+            if h:
+                k.CloseHandle(h)
+        k.CloseHandle(job)                       # kill-on-close: nothing started here outlives this call
 
 
 class CovenantGuardian:
@@ -9625,7 +10060,7 @@ class CovenantAPI:
             dead = self.node.dead_peer_count()   # A12
             if dead:
                 warnings.append(f"{dead} peer(s) unreachable -- heartbeats backed off")
-            if not SANDBOX_FORK_AVAILABLE:                            # W2 (v8.30)
+            if not SANDBOX_AVAILABLE:                                 # W2 (v8.30), A274
                 warnings.append(
                     "code sandbox unavailable -- " + SANDBOX_UNAVAILABLE_REASON +
                     "; /propose_code refuses every proposal on this platform")
@@ -9707,7 +10142,7 @@ class CovenantAPI:
                     "trading_bridge": self.node.trading_bridge is not None,
                     "neural_bridge": getattr(self.node, "neural_bridge", None) is not None,
                     "brainflow": getattr(self.node, "brainflow_available", False),
-                    "code_sandbox": SANDBOX_FORK_AVAILABLE,           # W2 (v8.30)
+                    "code_sandbox": SANDBOX_AVAILABLE,                # W2 (v8.30), A274
                 },
                 "anomaly_kinds": sorted(mon.get("per_kind", {})),
                 "spike_detected": mon.get("spike_detected", False),

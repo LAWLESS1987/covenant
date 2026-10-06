@@ -485,6 +485,11 @@ SUITES = [
     ("test_r1_lora_frame.py",            120,  "JUDGE"),
     ("test_w1_wsgi.py",                  300,  "HTTP"),
     ("test_w2_sandbox_platform.py",      180,  "HTTP"),
+    # A274 (2026-10-06), registered in the change that created it: the sandbox's Windows path
+    # (a Job Object) holds memory, process count and wall time against real code, and each of
+    # eight mutations that drops one limit from a copy of the core turns its group red. ~105 s
+    # measured on win32 with the mutations; off win32 only its X group runs.
+    ("test_a274_win_job_sandbox.py",     300,  "SECURITY"),
     ("test_d3_daily_guards.py",          180,  "DAILY + GUARDS"),
     ("test_backtest_guardrails.py",      180,  "DAILY + GUARDS"),
     ("test_3node_config.py",             120,  "DEPLOYMENT"),

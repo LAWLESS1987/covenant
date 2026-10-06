@@ -611,6 +611,9 @@ run test_a259_dashboard_redact.py 120
 # A263 (2026-10-05): an ask marked private is answered on this PC and never queued for the
 # teacher panel, which runs on the public repository's runner. Stub model; redirected paths.
 run test_a263_private_teacher.py 180
+# A274 (2026-10-06): the code sandbox's Windows path (a Job Object) and the refusal that stays
+# because nothing on Windows bounds file size. Off win32 only its X group runs.
+run test_a274_win_job_sandbox.py 300
 # A265 (2026-10-05): the model keeper's stop counts only when the server stops answering; a refused
 # kill keeps the state and logs STOP FAILED. Every kill is a recorder; nothing real is stopped.
 run test_a265_model_stop.py 120

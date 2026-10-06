@@ -874,6 +874,29 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it."
+  },
+  {
+   "id": "A274-DEGRADED-ANY-WARNING-2026-10-06",
+   "claim": "That a node's /health reports degraded whenever any warning exists, so the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green while the win32 code-sandbox warning stands -- written in a Claude session note on 2026-10-06 (the 'greenlight' memory) and carried from there into the request that became A274.",
+   "refuted_by": "covenant_unified_v8.py's /health builds `warnings` as one list and `degraded` from four booleans -- keyless, insecure, own_genesis, crisis_mode -- and no warning sets any of them. Measured on A, B and C on 2026-10-06 before any change: degraded=True on all three with judge_keyless=True, judge_insecure=False, crisis_mode=False; the sandbox warning was one of two warnings on each and decided nothing.",
+   "truth": "A node orb is amber when /health is degraded, and today every node is degraded because its ethics seat has no provider key (judge_keyless). The code-sandbox warning is shown under 'why' on the orb but does not make it amber; changing the sandbox cannot turn the orbs green. Whether to seat a keyed provider is his.",
+   "verbatim": [
+    "node orbs amber whenever /health is degraded (any warning)",
+    "Because /health reports degraded whenever any warning exists, the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green on this PC."
+   ],
+   "patterns": [
+    "degraded \\(any warning\\)",
+    "degraded whenever any warning exists"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Never written in the repository, so there is no tree to hold on a branch: the claim as written stays in the session note it came from, marked corrected beside this id. docs/KNOWN_ISSUES.md is NOT exempt: its A274 entry quotes the old wording beside this id and restates it."
   }
  ]
 }

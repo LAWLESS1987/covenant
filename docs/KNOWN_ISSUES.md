@@ -189,6 +189,11 @@ on this platform (win32)"; `/propose_code` refuses every proposal here. And
 "ethics gate has no provider key and is failing CLOSED" — which is the
 intended posture without a key, not a fault.
 
+*A274, 2026-10-06:* the sandbox warning now names the file-size limit alone ("no per-process
+file-size limit on this platform (win32)"); memory, process count and wall time have a Windows
+path, a Job Object, which stays shut while one limit is missing. Proposals are still refused. And
+neither warning makes a node degraded: that is keyless, insecure, own_genesis or crisis_mode only.
+
 ### 13. Stopping the learning loop may not stop a pass in flight
 
 On 2026-09-05 the loop was stopped at about 01:07 and a promotion is
@@ -7295,6 +7300,78 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 **What still needs him:** a full scan has never run on this machine
 (`Start-MpScan -ScanType FullScan`), and it is his to start.
+
+---
+
+### A274. [The code sandbox had no Windows path: a Job Object now holds memory, process count and wall time against real code, and proposals stay refused because nothing on Windows bounds file size] 2026-10-06. His request. ENFORCED for three limits of four, the refusal KEPT and narrowed to the fourth, every limit driven both ways
+
+**Asked.** Design a Windows path that enforces the same limits as the fork path -- memory, process
+count, file size, wall time -- with a Job Object, and "if one limit cannot be enforced on Windows,
+keep refusing and say which, rather than claiming parity".
+
+**The premise, measured first, was wrong (A274-DEGRADED-ANY-WARNING-2026-10-06).** The request said
+"Because /health reports degraded whenever any warning exists" the node orbs could never be green.
+`degraded` is keyless or insecure or own_genesis or crisis_mode; no warning sets it. On A, B and C,
+before any change: degraded=True, judge_keyless=True, insecure and crisis False. So this change does
+not turn the orbs green; the keyless ethics seat keeps them amber, and seating a key is his. The
+claim came from a Claude session note, now corrected; the tombstone keeps it out of the record.
+
+**Measured on this PC** (Store Python 3.12, Windows 11, not elevated):
+- *memory* -- ProcessMemoryLimit and JobMemoryLimit at 256 MiB. A gradual allocation stops in
+  MemoryError with the job's peak at 267,124,736 of 268,435,456 bytes. ENFORCED.
+- *processes* -- ActiveProcessLimit = 1 was NOT enough. The interpreter is MSIX-packaged, and the
+  cmd.exe a jailed child started was in no job at all; a second Python was refused 1816. The
+  desktop-app policy BREAKAWAY_DISABLE_PROCESS_TREE, set at creation, keeps the children inside:
+  then Popen of cmd.exe is refused 1816, os.system returns -1, and Python is refused 1816.
+  (CHILD_PROCESS_RESTRICTED was tried too: the interpreter cannot start under it, exit 3221225794.)
+  ENFORCED by the two together.
+- *the launcher* -- the venv's python.exe is a redirector. The real interpreter started as a second
+  process before the job was assigned, and ran outside it. The base interpreter is one process. The
+  child is created suspended, assigned, checked by the parent (IsProcessInJob) and by itself
+  (QueryInformationJobObject on its own job) before it reads a byte of the proposal.
+- *wall time* -- TerminateJobObject at the deadline (2.25 s for the 2 s limit). Kill-on-close ends
+  the child when the process holding the job dies. ENFORCED.
+- *file size* -- a job has no file-size limit and Windows has no per-process one. The two nearest
+  things are not bounds. A Low-integrity token refused a write to %TEMP% but put 1,768,030,208
+  bytes into LocalLow in 3 s. A job I/O rate cap of 64 KiB/s was accepted, and 2,781,347,840 bytes
+  still landed in 3 s. NOT ENFORCED.
+
+**Changed.** `_win_job_run()` in the core is the path. `SANDBOX_WIN_UNENFORCEABLE = ("file_size",)`
+keeps it shut, so /propose_code still refuses on win32. The /health warning now names the file-size
+limit alone instead of "memory, process and file-size". The child's environment is SystemRoot and
+nothing else. `SANDBOX_AVAILABLE` (fork, or a Windows path with nothing unenforceable) now drives the
+warning and `subsystems.code_sandbox`; it has the same value as before on every platform.
+
+**Driven both ways.** `test_a274_win_job_sandbox.py` runs real code in 9 groups (26 checks), then 8
+mutations, each on a COPY of the core in a temp dir. Each mutation drops one limit and requires a
+[FAIL] from the group that pins it; a copy that fails to import does not count as red. Dropping
+the memory flags let the allocation reach a peak of 424,316,928 bytes. Dropping ActiveProcessLimit
+ran all three children. Dropping the breakaway policy let cmd.exe run (7) while Python was still
+refused (1816). Dropping the deadline hung W. Dropping kill-on-close left the child alive after its
+holder died. Dropping the child's own check ran the proposal outside any job. Dropping the
+assignment refused everything. Opening the gate let run_sandboxed run proposals. Result: 34/34 in
+103 s. F pins the gap itself: a 1 MiB write from an escaped snippet lands, so the day something
+bounds file size, F goes red and the reason has to change with it.
+
+**Found on the way.**
+1. My first probe of the process limit was a fake pass. "cmd" was refused with error 2 because the
+   child's environment has no PATH, and os.system returned -1 because there is no COMSPEC. Both were
+   the environment, not the job. P now uses absolute paths and requires 1816, and P0 runs the same
+   snippet OUTSIDE the job as a control that must start all three. This is A65's shape: a check
+   that passes for a reason other than the one it names.
+2. The same shape on the fork path, NOT fixed here. W2.6b, "the file-size limit is still applied",
+   writes with `open`, which the restricted builtins do not contain, so it passes as a NameError
+   whatever RLIMIT_FSIZE is (B3 shows the NameError). The security audit's `[0] * (10**10)`,
+   "contained by RLIMIT_AS", is UNDETERMINED: an 80 GB single allocation may be refused with no
+   limit at all (on Windows it is, which is why M4 here is labelled parity-only). Both need a fork
+   platform to drive.
+
+**What it does not cover.** /propose_code never reaches this path; only its suite does, so it has no
+field record. The parent's IsProcessInJob re-check is not driven alone, because this harness cannot
+make an assignment succeed without assigning; S drives the child's check instead. The child runs as
+the same user at the same integrity level, as the forked child shares the node's uid; neither path
+restricts sockets. The breakaway finding is about a packaged interpreter: with a python.org build
+the policy should be a no-op, but none is installed here, so that was not measured.
 
 ---
 
