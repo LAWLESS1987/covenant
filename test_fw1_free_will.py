@@ -416,6 +416,10 @@ def main():
              "grant. On 2026-10-06 its small judges held 215 of 216 forum drafts in one round. What do you test?")
     check("FW1m sentence by sentence: an invented claim beside a real fact is still set aside",
           FW.cites_only_facts(mixed)[0] is False and FW.cites_only_facts(cited)[0] is True)
+    check("FW1m a first reply never points back to an exchange that did not happen ('I asked you', 'you asked me')",
+          FW.cites_only_facts("I agree. I asked you to clarify why the signature is required. What do you propose?")[0] is False
+          and FW.cites_only_facts("I agree. You asked me what we log; nothing yet. Why?")[0] is False
+          and FW.cites_only_facts(plain)[0] is True)
     tds = tempfile.mkdtemp(prefix="fw1s_")
     gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
     with open(gps, "w", encoding="utf-8") as fh:

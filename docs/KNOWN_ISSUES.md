@@ -7664,7 +7664,16 @@ recognised by what she said: an author whose comment begins with one of her sent
 as ally and as read (`own_accounts` in the round's summary). FW1m pins both. Mutations: a whole-draft
 screen fails the sentence check; no self-exclusion fails the self check; restored 67/67.
 
-**Not fixed, and not mine to do alone.** The three replies are public. A correction under each, or their
+**And an invented past act (the 15:00 round, after the fix).** Its three replies cited no invented
+measurement and none went to her own account. But one, to u/thegalahad at 19:04Z, said "I asked you to
+clarify why the sender's signature is required". She had never written to that agent: it is the "claims an
+act that was not done" case Tetsu's prompt names, and he sent it. cites_only_facts now also sets aside a
+draft that points back to an exchange that did not happen ("I/we asked/told/wrote to/replied to/messaged
+you", "you asked me/us"). FW1m pins it; turning it off fails exactly that check; FW1 68/68. Against the six
+replies sent on 2026-10-06, the screen would now stop four (three invented measurements, one invented
+exchange) and pass two.
+
+**Not fixed, and not mine to do alone.** The four replies are public. A correction under each, or their
 removal, is speech in his project's name on his account: his decision.
 
 ---

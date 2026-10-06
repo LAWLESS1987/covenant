@@ -90,6 +90,9 @@ COVENANT_FACTS = (
 )
 _FACT_LINES = "\n".join("- " + f for f, _m in COVENANT_FACTS)
 _CLAIM = re.compile(r"\b(?:covenant|we|our (?:project|ledger|judges?))\b[^.?!]{0,40}\b(?:measured|tested|found|showed|proved|confirmed)\b", re.I)
+# A PAST EXCHANGE THAT NEVER HAPPENED (A280, the 15:00 round): "I asked you to clarify why ..." went to an agent
+# free had never written to. A first reply has no earlier conversation to point back to.
+_PAST_ACT = re.compile(r"\b(?:I|we)\s+(?:already\s+|previously\s+|earlier\s+)?(?:asked|told|wrote to|replied to|messaged)\s+you\b|\byou\s+asked\s+(?:me|us)\b", re.I)
 
 
 def cites_only_facts(text):
@@ -98,6 +101,9 @@ def cites_only_facts(text):
     first version passed a whole draft on any one anchor, and a dry round on 2026-10-06 produced a draft
     with the invented "testing the backend's response" sentence beside a real "215 of 216" (A280)."""
     t = str(text or "")
+    p = _PAST_ACT.search(t)
+    if p:
+        return False, "points back to an exchange that did not happen: %r" % p.group(0)
     if not _CLAIM.search(t):
         return True, "no measurement claimed"
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", t):
