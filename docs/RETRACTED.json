@@ -827,6 +827,28 @@
    "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151). ops/public_ci.json is allowed: the public-CI listener's own gitignored cache, which records the failing check's annotation verbatim -- a record of what CI said, not a claim."
   },
   {
+   "id": "SW-CONTRIB-2026-10-06",
+   "claim": "That an empty contribution_symbols was one of the reasons the Sentinel-Witness trader planned no orders on 2026-10-05 -- listed among them in docs/SENTINEL_WITNESS.md (2f6b184) and, in Sentinel-Witness's trader/README.md, as 'the weekly contribution has nothing to buy'.",
+   "refuted_by": "The code it describes: covenant_trader.plan() selects R6 contributions with `(not wanted or p[\"sym\"] in wanted)`, so an EMPTY list means every held asset under the cap and above its 200-day line qualifies. The 2026-10-05 plan's own R6 note named the only blocker: cash under the 10% floor. Found by Claude while reading plan() to build the operator's 2026-10-06 operation rules.",
+   "truth": "An empty contribution_symbols restricts nothing; the weekly contribution was blocked by cash alone.",
+   "verbatim": [
+    "Cash is below the 10% floor, XRP is at its frozen floor, `contribution_symbols` is empty, and no daily plan has been approved here since 2026-09-19."
+   ],
+   "patterns": [
+    "contribution_symbols`?\\s+is\\s+empty"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The document as first written is preserved on branch sentinel-witness-contribution-claim-as-written-2026-10-06 (at b502ba5). The sentence stays in docs/SENTINEL_WITNESS.md beside this id and its restatement."
+  },
+  {
    "id": "A269-SLOT-SPLIT-2026-10-06",
    "claim": "That llama-server's default 4 parallel slots DIVIDED -c 8192 between them, so each request had about 2048 tokens, and that this per-request limit is why every ask through Tetsu's door failed with HTTP 500 on 2026-10-06 -- stated in docs/KNOWN_ISSUES.md A269, the comment above covenant_model.start()'s args, test_a269_model_one_slot.py's docstring, and the subject of commit 03d4d29.",
    "refuted_by": "Measured the same morning by the session running the private X-video batch through the same 4-slot servers: 13 asks of about 27,000 characters each (compose_system(AGENT_SYSTEM) 11,813 characters, verified by Claude; history about 11,963; item about 3,261), roughly 7,000 tokens, SUCCEEDED -- impossible under a 2048-token cap. The probe that failed was 2,521 tokens (counted by the server's /tokenize), sent while other slots were processing. /slots reported n_ctx 8192 on every slot.",

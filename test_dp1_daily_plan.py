@@ -257,6 +257,54 @@ def main():
         check("D22c ...and the two are not the same sentence",
               crashed["no_action_reason"] != quiet["no_action_reason"], "")
 
+        # D23 (2026-10-06). The plan is written by the trader that TRADES. With
+        # an executor_home (the Sentinel-Witness trader/ folder) the orders,
+        # caps, armed flag and halt come from that trader; when it cannot be
+        # asked the plan says NOT ASKED and never falls back to this folder's
+        # trader, whose old rules would read as today's. Driven with a stub
+        # runner and a real folder; the real subprocess is driven once below.
+        _ex = _tf.mkdtemp(prefix="dp1_d23_")
+        for _f in ("covenant_trader.py", "witness.py"):
+            open(os.path.join(_ex, _f), "w").close()
+        _sw = {"ran": True, "armed": True, "halt": False,
+               "caps": {"max_order_usd": 25.0, "max_orders_per_day": 2},
+               "results": [{"sym": "TOSHI", "side": "sell", "usd": 25.0, "status": "PLAN ONLY",
+                            "rule": "R3 below the 200d line"}], "tail": []}
+        g_sw = DP.gather(say=lambda *a, **k: None,
+                         cfg={"executor_home": _ex, "armed": False, "max_order_usd": 100.0},
+                         runner=lambda home: dict(_sw))
+        check("D23a with executor_home, the plan's orders are the EXECUTOR's, under its name",
+              g_sw["proposed_orders"] == _sw["results"] and "sentinel-witness" in g_sw["planner"],
+              (g_sw["planner"], g_sw["proposed_orders"]))
+        check("D23b ...and so are its caps and its armed flag, not this folder's",
+              g_sw["armed"] is True and g_sw["caps"].get("max_order_usd") == 25.0,
+              (g_sw["armed"], g_sw["caps"]))
+        g_ref = DP.gather(say=lambda *a, **k: None, cfg={"executor_home": _ex},
+                          runner=lambda home: {"ran": False, "tail": ["REFUSING THIS CYCLE", "no covenant_home"]})
+        check("D23c an executor that refused its cycle is NOT ASKED, with its reason -- not 'nothing to do'",
+              g_ref["planner"].startswith("planner unavailable") and "no covenant_home" in g_ref["planner"]
+              and g_ref["proposed_orders"] == [], g_ref["planner"][:120])
+        g_none = DP.gather(say=lambda *a, **k: None, cfg={"executor_home": _tf.mkdtemp(prefix="dp1_d23e_")},
+                           runner=lambda home: dict(_sw))
+        check("D23d an executor_home that holds no trader is NOT ASKED -- the stub runner is never consulted",
+              g_none["planner"].startswith("planner unavailable") and "has no covenant_trader.py" in g_none["planner"],
+              g_none["planner"][:120])
+        _w = DP.write(day="2099-01-03", say=lambda *a, **k: None, plan_dir=_td,
+                      gatherer=lambda say=print: g_none)
+        check("D23e ...and the written plan says NOT ASKED out loud, so it is not approved as a quiet day",
+              "NOT ASKED" in _w["no_action_reason"], _w["no_action_reason"][:80])
+        _real = os.path.join(_ex, "covenant_trader.py")
+        with open(_real, "w", encoding="utf-8") as fh:
+            fh.write("HALT = 'nope'\ndef load_config():\n    return {'armed': False, 'max_order_usd': 7.0}\n"
+                     "def run_once(cfg, plan_only=False):\n    print('chatter the plan must ignore')\n"
+                     "    return [{'sym': 'ADA', 'side': 'sell', 'usd': 7.0, 'status': 'PLAN ONLY'}]\n")
+        _out = DP.ask_executor(_ex)
+        check("D23f the real subprocess asks the executor IN ITS FOLDER and reads only its last line",
+              _out.get("ran") and _out["results"] == [{"sym": "ADA", "side": "sell", "usd": 7.0, "status": "PLAN ONLY"}]
+              and _out["caps"].get("max_order_usd") == 7.0, _out)
+        check("D23g with no executor_home the old planner is used, unchanged",
+              DP.executor_home({}) is None and DP.executor_home({"executor_home": _ex}) == os.path.abspath(_ex))
+
     n = sum(1 for r in results if r)
     print("\nDP1: %d/%d passed" % (n, len(results)))
     return 0 if n == len(results) else 1

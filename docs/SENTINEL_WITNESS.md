@@ -106,6 +106,11 @@ $50/day, 2 orders/day and the XRP/LINK/HBAR floors kept).
   account, on `private/RESERVE.json` and on the gitignored approvals ledger, and
   none of those is ever published. What is public is the code that reads them,
   and the sealed decision's commitment on the operator's node.
+  **RETRACTED in part (SW-CONTRIB-2026-10-06, docs/RETRACTED.json):** the
+  `contribution_symbols` fact is true, but it was not a reason. An empty list
+  restricts nothing. `plan()` reads it as "every held asset under the cap and above
+  its line", and the weekly contribution was blocked by cash alone. The document as
+  first written is on branch `sentinel-witness-contribution-claim-as-written-2026-10-06`.
 
 **What retiring this repository's copy has to do first.** Sentinel-Witness's
 seal call and this repository's `sentinel_witness/seal_service.py` both import

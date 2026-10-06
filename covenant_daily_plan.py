@@ -81,40 +81,127 @@ def plan_sha(plan):
 
 # ---------------------------------------------------------------- gathering
 
-def _run(cmd, timeout):
+def _run(cmd, timeout, cwd=None):
     try:
-        p = subprocess.run([sys.executable] + cmd, cwd=HERE, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run([sys.executable] + cmd, cwd=cwd or HERE, capture_output=True, text=True, timeout=timeout)
         return (p.stdout or "") + (p.stderr or "")
     except Exception as e:                                       # noqa: BLE001
         return "(%s: %s)" % (type(e).__name__, e)
 
 
-def gather(say=print):
+CAP_KEYS = ("max_order_usd", "max_daily_notional_usd", "max_orders_per_day",
+            "min_cash_pct", "max_position_pct", "seal_required", "min_sealed_signals")
+
+# THE PLAN IS WRITTEN BY THE TRADER THAT TRADES (2026-10-06). The trading layer
+# was copied to Sentinel-Witness (docs/SENTINEL_WITNESS.md), and on 2026-10-06
+# the operator opened its rules ("build on and edit the rules for all bur the 3
+# we mentioned to begin operation"). From then on THIS file's planner -- the
+# trader in this folder -- no longer described what would execute: it read
+# "no orders" while the Sentinel-Witness trader planned two sells. An approval of
+# that plan would approve a strategy that is not the one carried out, which is
+# the opposite of "i'll have to daily approve of the strategy it lays out".
+#
+# So when trader_config.json names an `executor_home` (the Sentinel-Witness
+# trader/ folder, or env COVENANT_EXECUTOR_HOME), the plan's orders, caps, armed
+# flag and halt come from THAT trader, asked in its own folder. If it cannot be
+# asked, the plan says NOT ASKED -- it never falls back to this folder's trader,
+# which would put the old rules in front of the operator as if they were today's.
+_EXECUTOR_SCRIPT = r"""
+import contextlib, io, json, os, sys
+sys.path.insert(0, ".")
+import covenant_trader as T
+cfg = T.load_config()
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    results = T.run_once(cfg, plan_only=True)
+report = buf.getvalue()
+print(json.dumps({
+    "ran": results is not None and "REFUSING THIS CYCLE" not in report,
+    "results": [{k: r.get(k) for k in ("sym", "side", "usd", "status", "detail", "rule") if k in r}
+                for r in (results or [])],
+    "armed": bool(cfg.get("armed")),
+    "halt": os.path.exists(T.HALT),
+    "caps": {k: cfg.get(k) for k in %r},
+    "tail": report.strip().splitlines()[-3:],
+}, default=str))
+""" % (CAP_KEYS,)
+
+
+def executor_home(cfg):
+    """The executing trader's folder, or None when this folder's trader executes."""
+    home = os.environ.get("COVENANT_EXECUTOR_HOME") or (cfg or {}).get("executor_home")
+    return os.path.abspath(home) if home else None
+
+
+def ask_executor(home, runner=None):
+    """The executing trader's plan-only answer, asked in its folder. Raises
+    RuntimeError with the reason when it cannot be asked or did not run."""
+    for f in ("covenant_trader.py", "witness.py"):
+        if not os.path.isfile(os.path.join(home, f)):
+            raise RuntimeError("executor_home %s has no %s" % (home, f))
+    if runner is None:
+        try:
+            p = subprocess.run([sys.executable, "-c", _EXECUTOR_SCRIPT], cwd=home,
+                               capture_output=True, text=True, timeout=1500)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("the executing trader did not answer within 1500 s")
+        lines = [l for l in (p.stdout or "").splitlines() if l.strip()]
+        if p.returncode != 0 or not lines:
+            tail = ((p.stderr or "").strip().splitlines() or ["no output"])[-1]
+            raise RuntimeError("the executing trader exited %s: %s" % (p.returncode, tail[:160]))
+        try:
+            out = json.loads(lines[-1])
+        except ValueError:
+            raise RuntimeError("the executing trader's answer was not JSON")
+    else:
+        out = runner(home)
+    if not isinstance(out, dict) or not out.get("ran"):
+        tail = " | ".join((out or {}).get("tail") or []) if isinstance(out, dict) else ""
+        raise RuntimeError("the executing trader refused or did not plan: %s" % (tail[:200] or "no reason"))
+    return out
+
+
+def gather(say=print, cfg=None, runner=None):
     """Everything the plan is made of, from the checkers, never from memory."""
     import guards
     import signal_ledger
-    cfg = guards.load_config() or {}
+    cfg = (guards.load_config() or {}) if cfg is None else cfg
     st = guards.load_trader_state() or {}
     r5 = signal_ledger.summary(min_signals=cfg.get("min_sealed_signals", 30))
-    posture = _run(["money_posture.py"], 120)
+    home = executor_home(cfg)
+    armed, halt = bool(cfg.get("armed")), os.path.exists(guards.HALT)
+    caps = {k: cfg.get(k) for k in CAP_KEYS}
     proposed, planner = [], ""
-    try:
-        import covenant_trader as T
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            results = T.run_once(cfg, plan_only=True) or []
-        for r in results:
-            proposed.append({k: r.get(k) for k in ("sym", "side", "usd", "status", "detail") if k in r})
-        planner = "covenant_trader.run_once(plan_only=True)"
-    except Exception as e:                                       # noqa: BLE001
-        planner = "planner unavailable: %s: %s" % (type(e).__name__, str(e)[:160])
+    if home:
+        # The posture the operator reads is the EXECUTOR's: its own
+        # money_posture.py, in its folder, against its own config.
+        posture = _run(["money_posture.py"], 120, cwd=home) if runner is None else ""
+        try:
+            out = ask_executor(home, runner=runner)
+            proposed = list(out.get("results") or [])
+            armed, caps = bool(out.get("armed")), dict(out.get("caps") or {})
+            halt = bool(out.get("halt")) or halt          # a halt in either folder stops it
+            planner = "sentinel-witness covenant_trader.run_once(plan_only=True) in %s" % home
+        except Exception as e:                                   # noqa: BLE001
+            planner = "planner unavailable: %s: %s" % (type(e).__name__, str(e)[:160])
+    else:
+        posture = _run(["money_posture.py"], 120)
+        try:
+            import covenant_trader as T
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                results = T.run_once(cfg, plan_only=True) or []
+            for r in results:
+                proposed.append({k: r.get(k) for k in ("sym", "side", "usd", "status", "detail") if k in r})
+            planner = "covenant_trader.run_once(plan_only=True)"
+        except Exception as e:                                   # noqa: BLE001
+            planner = "planner unavailable: %s: %s" % (type(e).__name__, str(e)[:160])
     return {
         "posture": "\n".join(posture.strip().splitlines()[-40:]),
         "rule5": r5,
-        "armed": bool(cfg.get("armed")),
-        "halt": os.path.exists(guards.HALT),
-        "caps": {k: cfg.get(k) for k in ("max_order_usd", "max_daily_notional_usd", "max_orders_per_day",
-                                          "min_cash_pct", "max_position_pct", "seal_required", "min_sealed_signals")},
+        "armed": armed,
+        "halt": halt,
+        "caps": caps,
         "orders_placed_today": len(st.get("orders_today", []) or []),
         "proposed_orders": proposed,
         "planner": planner,
