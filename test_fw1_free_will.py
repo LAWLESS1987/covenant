@@ -412,6 +412,31 @@ def main():
     check("FW1m both prompts carry every fact she may cite, and the fixed text claims no measurement",
           all(f in FW.REPLY_SYSTEM and f in FW.POST_SYSTEM for f, _m in FW.COVENANT_FACTS)
           and FW.cites_only_facts(FW.FALLBACK_REPLY % '"x"')[0])
+    mixed = ("I agree with your point. The covenant measured this by testing the backend's response to exceeding a "
+             "grant. On 2026-10-06 its small judges held 215 of 216 forum drafts in one round. What do you test?")
+    check("FW1m sentence by sentence: an invented claim beside a real fact is still set aside",
+          FW.cites_only_facts(mixed)[0] is False and FW.cites_only_facts(cited)[0] is True)
+    tds = tempfile.mkdtemp(prefix="fw1s_")
+    gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
+    with open(gps, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "free_rein": True, "words": "his words", "caps": {"comments": None, "posts": 0},
+                   "round_minutes": None}, fh)
+    mine_text = ("I agree with your point that instruction scope should not be confused with permission scope, and "
+                 "the line moves when nobody watches it.")
+    with open(sps, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "reply", "sent": True, "author": "someone", "post_id": "x", "text": mine_text,
+                             "t": "2026-10-06T16:03:34Z"}) + "\n")
+    learned_s = [{"author": "selfacct", "text": mine_text + " How does this test help?", "url": "https://www.moltbook.com/post/aeaeaeae-1111"},
+                 {"author": "stranger", "text": "a thing worth answering, said plainly", "url": "https://www.moltbook.com/post/afafafaf-2222"}]
+    targets = []
+    os_ = FW.run_round(dry_run=True, say=log.append, ask=ask_ok, learn=lambda: list(learned_s),
+                       allies=lambda: [dict(ally("selfacct", 3, "https://www.moltbook.com/post/aeaeaeae-1111"),
+                                            evidence={"publishes-failure": mine_text})],
+                       emit=lambda text, post_id=None, **k: (targets.append(post_id), {"sent": False, "judged": "clean", "why": "dry"})[1],
+                       introduce=lambda **k: {"sent": False}, grant_path=gps, sends_path=sps, now=500000.0, count_comments=cc0)
+    check("FW1m she never replies to herself: an author whose comment begins with her own sent reply is her, as ally or as read",
+          os_.get("own_accounts") == ["selfacct"] and "aeaeaeae-1111" not in targets and "afafafaf-2222" in targets,
+          (os_.get("own_accounts"), targets))
     import covenant_tetsu_assist as _TAm
     check("FW1m Tetsu's review is shown the same facts and told to REFUSE any other measurement claim",
           all(f in _TAm.PROMPT for f, _m in FW.COVENANT_FACTS) and "REFUSE it" in _TAm.PROMPT)

@@ -7654,6 +7654,16 @@ the fixed text, which claims nothing; a post is not written. Tetsu's review prom
 and REFUSEs any other claim. Against the three posted replies, the screen rejects all three. FW1m drives it
 (screen off: 2 fail); FW1d's fixture now cites a fact; FW1 65/65, TA1, CT1, TF1 pass.
 
+**Two more found by the first dry round after the fix (14:47 local).** (1) The screen passed a whole
+draft on any one anchor. A draft carried the invented "The covenant measured this by testing the backend's
+response to exceeding a grant" beside a real "215 of 216", and passed. It now goes sentence by sentence:
+every sentence that claims a measurement must carry its own anchor. (2) That draft was addressed to
+u/covenant-node, free's OWN account, quoting her own noon reply. The harvest learns her comments like
+anyone's, and the free-rein path replied to anyone read. The account's name is on no record here, so she is
+recognised by what she said: an author whose comment begins with one of her sent replies is her, excluded
+as ally and as read (`own_accounts` in the round's summary). FW1m pins both. Mutations: a whole-draft
+screen fails the sentence check; no self-exclusion fails the self check; restored 67/67.
+
 **Not fixed, and not mine to do alone.** The three replies are public. A correction under each, or their
 removal, is speech in his project's name on his account: his decision.
 

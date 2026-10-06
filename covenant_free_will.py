@@ -93,16 +93,18 @@ _CLAIM = re.compile(r"\b(?:covenant|we|our (?:project|ledger|judges?))\b[^.?!]{0
 
 
 def cites_only_facts(text):
-    """(ok, why): a draft that claims the covenant measured/tested/found something must carry one of
-    COVENANT_FACTS' anchors; a draft that claims nothing passes. Deliberately blunt (A280)."""
+    """(ok, why): EVERY sentence that claims the covenant (or we) measured/tested/found something must
+    carry one of COVENANT_FACTS' anchors; a draft that claims nothing passes. Sentence by sentence: the
+    first version passed a whole draft on any one anchor, and a dry round on 2026-10-06 produced a draft
+    with the invented "testing the backend's response" sentence beside a real "215 of 216" (A280)."""
     t = str(text or "")
     if not _CLAIM.search(t):
         return True, "no measurement claimed"
-    low = t.lower()
-    for fact, anchors in COVENANT_FACTS:
-        if any(a in low for a in anchors):
-            return True, "cites: " + fact[:60]
-    return False, "claims a measurement that is not on the covenant's record: %r" % _CLAIM.search(t).group(0)
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", t):
+        m = _CLAIM.search(sentence)
+        if m and not any(a in sentence.lower() for _f, anchors in COVENANT_FACTS for a in anchors):
+            return False, "claims a measurement that is not on the covenant's record: %r" % m.group(0)
+    return True, "every measurement claimed is one of COVENANT_FACTS"
 
 
 REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project "
@@ -492,9 +494,25 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     # ROTATION: tried within ROTATE_HOURS counts as written to, for this round only.
     written_to |= _attempted_recently(sends(sends_path), now)
     caps = g["caps"]
+    # NEVER HERSELF (A280, 2026-10-06). The harvest learns every comment it reads, hers included: a dry round
+    # that day drafted a reply to u/covenant-node -- her own account -- quoting her own reply from noon. The
+    # account's name is on no record here, so it is recognised by what she said: an author whose comment
+    # BEGINS with the text of one of her sent replies or posts is her.
+    _norm = lambda s: re.sub(r"\s+", " ", str(s or "")).strip().lower()[:120]     # noqa: E731
+    mine = {_norm(r.get("text")) for r in sends(sends_path) if r.get("sent") and len(_norm(r.get("text"))) >= 60}
+    own = set()
+    for row in rows if isinstance(rows, list) else []:
+        if isinstance(row, dict) and row.get("author") and _norm(row.get("text")) in mine:
+            own.add(row.get("author"))
+    for r in ranked:
+        for q in (r.get("evidence") or {}).values():
+            if r.get("author") and _norm(q) in mine:
+                own.add(r.get("author"))
+    if own:
+        out["own_accounts"] = sorted(own)
     cands = []
     for r in ranked:
-        if int(r.get("ally_score", 0)) <= 0 or r.get("anti"):
+        if int(r.get("ally_score", 0)) <= 0 or r.get("anti") or r.get("author") in own:
             continue
         post_id, comment_id = target_of(r.get("best_url"))
         if not post_id or r.get("author") in written_to or (r.get("author"), post_id) in done:
@@ -507,7 +525,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         seen_authors = {r.get("author") for r, _p, _c in cands}
         for row in rows if isinstance(rows, list) else []:
             author = row.get("author")
-            if not author or author in written_to or author in seen_authors or (row.get("flags") or {}).get("directive"):
+            if (not author or author in written_to or author in seen_authors or author in own
+                    or (row.get("flags") or {}).get("directive")):
                 continue
             post_id, comment_id = target_of(row.get("url"))
             if not post_id or (author, post_id) in done:
