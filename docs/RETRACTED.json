@@ -825,6 +825,33 @@
     "ops/public_ci.json"
    ],
    "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151). ops/public_ci.json is allowed: the public-CI listener's own gitignored cache, which records the failing check's annotation verbatim -- a record of what CI said, not a claim."
+  },
+  {
+   "id": "A269-SLOT-SPLIT-2026-10-06",
+   "claim": "That llama-server's default 4 parallel slots DIVIDED -c 8192 between them, so each request had about 2048 tokens, and that this per-request limit is why every ask through Tetsu's door failed with HTTP 500 on 2026-10-06 -- stated in docs/KNOWN_ISSUES.md A269, the comment above covenant_model.start()'s args, test_a269_model_one_slot.py's docstring, and the subject of commit 03d4d29.",
+   "refuted_by": "Measured the same morning by the session running the private X-video batch through the same 4-slot servers: 13 asks of about 27,000 characters each (compose_system(AGENT_SYSTEM) 11,813 characters, verified by Claude; history about 11,963; item about 3,261), roughly 7,000 tokens, SUCCEEDED -- impossible under a 2048-token cap. The probe that failed was 2,521 tokens (counted by the server's /tokenize), sent while other slots were processing. /slots reported n_ctx 8192 on every slot.",
+   "truth": "The 4 slots share ONE 8192-token pool; requests running at the same time together exceed it and the server answers 500 'Context size has been exceeded.' A single request may use the whole pool. -np 1 still fixes it: one request at a time against the whole pool, the rest queue. Whether that pool is llama.cpp's unified KV cache was inferred from these measurements, not read in its source.",
+   "verbatim": [
+    "Every ask through Tetsu's door failed \"HTTP Error 500\": the model server split its 8192-token context across 4 slots, about 2048 a request",
+    "This llama-server build (tools/llama, 2026-09-19) defaults to 4 parallel slots and divides -c between them.",
+    "This llama-server build defaults to 4 parallel slots and splits -c between them, so every request had about 2048 tokens, not the 8192 above",
+    "this llama-server build defaults to 4 parallel slots and divides -c between them: about 2048 tokens a request."
+   ],
+   "patterns": [
+    "about 2048 (?:tokens )?a request",
+    "(?:divides|splits) -c between them",
+    "split its 8192-token context across 4 slots",
+    "4 default slots split -c 8192"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it."
   }
  ]
 }

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""test_a269_model_one_slot.py -- A269: one request gets the model's whole context.
+"""test_a269_model_one_slot.py -- A269: one request at a time against the model's whole context.
 
 WHY. 2026-10-06, every ask through Tetsu's door failed with "the model did not answer: HTTPError:
 HTTP Error 500". Asked directly, the server said why: "Context size has been exceeded." -- for a
-10,695-character system prompt, in 34.5 s, while a five-word hello answered in 5.7 s. The keeper starts
-llama-server with -c 8192 so that his conversation memory fits beside the rules (its own comment, "8k
-for both", 2026-09-26), but this llama-server build defaults to 4 parallel slots and divides -c between
-them: about 2048 tokens a request. The keeper never said how many slots, so the 8192 was never what a
-request got.
+2,521-token probe sent while other requests were in flight, in 34.5 s, while a five-word hello answered
+in 5.7 s. The keeper starts llama-server with -c 8192 so that his conversation memory fits beside the
+rules (its own comment, "8k for both", 2026-09-26), but this llama-server build defaults to 4 parallel
+slots sharing that one pool, so concurrent requests overflow it together. The keeper never said how many
+slots. (This docstring first said the slots divided -c; that is retracted as A269-SLOT-SPLIT-2026-10-06.)
 
 WHAT IT PINS (the real start(); Popen is a recorder, nothing is launched).
   N1  start() passes -np 1, so a request is given the whole context

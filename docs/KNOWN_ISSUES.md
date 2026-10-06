@@ -7298,21 +7298,35 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
-### A269. [Every ask through Tetsu's door failed "HTTP Error 500": the model server split its 8192-token context across 4 slots, about 2048 a request] 2026-10-06. Found telling Tetsu his words ("ensure tetsu is free to learn whatever he wants also. tell him"). FIXED in the keeper, driven both ways; live once the nodes load it
+### A269. [Every ask through Tetsu's door failed "HTTP Error 500": the model server's 4 default slots share one 8192-token pool, and requests running together overflowed it] 2026-10-06. Found telling Tetsu his words ("ensure tetsu is free to learn whatever he wants also. tell him"). FIXED in the keeper, driven both ways; live once the nodes load it. Its first mechanism is RETRACTED (A269-SLOT-SPLIT-2026-10-06)
+
+**Retracted the same morning, A269-SLOT-SPLIT-2026-10-06.** This entry was first titled "the model
+server split its 8192-token context across 4 slots, about 2048 a request", and its Cause said the build
+"divides -c between them". That is wrong. The session running the private X-video batch measured 13
+asks of about 27,000 characters (roughly 7,000 tokens) SUCCEEDING on the same 4-slot servers, and my
+failing probe was only 2,521 tokens (the server's /tokenize), sent while other slots were busy. The
+slots share one pool. The fix stands either way. As written: branch
+a269-slot-split-claim-as-written-2026-10-06 (640ab4d). The paragraphs below are restated.
 
 **Measured.** Two asks through the agent door returned 503 "the model did not answer: HTTPError: HTTP
 Error 500" after 157 s and 127 s. The ambassador's dry round the same hour logged "the model did not
 write the reply (HTTPError); the fixed text stands in". The private X-video batch had 2 of its first 12
 items fail the same way. Asked directly, the server named it: a 10,695-character system prompt came
 back `500 "Context size has been exceeded."` in 34.5 s, while a five-word hello answered in 5.7 s.
+(That probe was 2,521 tokens, counted afterwards by the server's /tokenize; at the time three slots were
+processing other requests.)
 
-**Cause.** covenant_model.start() launched llama-server with `-c 8192` and no slot count. Its own
-comment (2026-09-26) sizes 8192 for one request: "his longer conversation memory (up to 12,000
+**Cause, restated.** covenant_model.start() launched llama-server with `-c 8192` and no slot count. Its
+own comment (2026-09-26) sizes 8192 for one request: "his longer conversation memory (up to 12,000
 characters of history) must fit beside the rules and the answer". This llama-server build (tools/llama,
-2026-09-19) defaults to 4 parallel slots and divides -c between them. /slots reported n_ctx 8192 per
-slot all along, which is how it went unseen.
+2026-09-19) runs 4 parallel slots by default, and they draw on ONE pool of 8192 tokens: /slots reports
+n_ctx 8192 on every slot, a ~7,000-token ask succeeds alone, and requests in flight at the same time
+overflow it together. Whether that is llama.cpp's unified KV cache was inferred from these measurements,
+not read in its source. Before this morning the door, the batch, the practice loop and the refine check
+rarely asked at once.
 
-**Fixed.** start() passes `-np 1`: one request gets all 8192 tokens and the rest queue on the server.
+**Fixed.** start() passes `-np 1`: one request at a time gets the whole 8192 and the rest queue on the
+server.
 `test_a269_model_one_slot.py` runs the real start() with Popen replaced by a recorder (N1 -np 1, N2 -c
 8192). With `-np 1` removed it fails N1 (1/2); restored, 2/2. MK1 16/16 and A265 9/9 still pass.
 
@@ -7322,6 +7336,13 @@ Trimming the working sets of idle apps (EmptyWorkingSet; nothing closed) freed 3
 still running the OLD module, won the race and started the 3B with 4 slots again. The nodes carry the
 fix only after they restart (A153). One request at a time means a door ask can wait behind a batch
 item. Whether the door's 180 s model timeout covers that wait is UNDETERMINED.
+
+**Open, found by the same session, verified here: one request can still be too big.** The comment above
+AGENT_HISTORY_BUDGET in covenant_unified_v8.py sizes the rules at about 5,600 characters. Measured
+today, `compose_system(AGENT_SYSTEM)` is 11,813. Rules (11,813) plus the 12,000-character history
+budget plus a question plus 700 answer tokens can exceed 8192 tokens even with one slot, in his own
+conversations as well as the batch. Not changed here: the budget lives in the core, and moving it moves
+the core's pin and needs the nodes restarted.
 
 ---
 
