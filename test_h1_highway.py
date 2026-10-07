@@ -1560,6 +1560,38 @@ def main():
         _CMk.ASKS = _real_asks
     check("H1ak no ledger here is UNKNOWN, never ABSENT", r_noledger == H.UNKNOWN, r_noledger)
 
+    # ---- H1tf: the covenant witnesses threefold (A294, 2026-10-07). A stand-in reader; nothing is fetched.
+    import hashlib as _hlt
+    _G = "0" * 64
+
+    def _chain(n, break_at=None):
+        lines, prev = [], None
+        import sys as _s
+        _s.path.insert(0, os.path.join(HERE, "ai_memory_system"))
+        import memory_store as _ms
+        prev = _ms.GENESIS
+        for i in range(n):
+            rec = {"at": i, "action": "put", "name": "m%d" % i, "agent": "t", "sha256": "x", "prev": prev if i != break_at else "f" * 64}
+            ln = json.dumps(rec, sort_keys=True)
+            lines.append(ln)
+            prev = _hlt.sha256(ln.encode("utf-8")).hexdigest()
+        return "\n".join(lines) + "\n"
+    _files0 = ["task-a.md", "jlens-a.md", "task-b.md", "task-b-ocr.md", "jlens-b.md", "task-old.md", ".trash/task-z.md"]
+    _tfc = os.path.join(tempfile.mkdtemp(prefix="h1tf_"), "tf.json")
+    r0 = H.detect_threefold_witness(read=lambda repo: (_chain(5), _files0), now=1000.0, cache=_tfc)
+    r1 = H.detect_threefold_witness(read=lambda repo: (_chain(6), _files0 + ["task-c.md", "jlens-c.md"]), now=5000.0, cache=_tfc)
+    r2 = H.detect_threefold_witness(read=lambda repo: (_chain(7), _files0 + ["task-d.md"]), now=9000.0, cache=_tfc)
+    r3 = H.detect_threefold_witness(read=lambda repo: (_chain(7, break_at=3), _files0), now=13000.0, cache=_tfc)
+    r4 = H.detect_threefold_witness(read=lambda repo: (_ for _ in ()).throw(OSError("offline")), now=17000.0, cache=_tfc)
+    check("H1tf threefold_witness: a verifying chain with only the first reading's gaps ABSENT (the gap named); a complete new "
+          "task ABSENT; a NEW task without its JLens leg PRESENT; a broken chain PRESENT naming the line; unreadable UNKNOWN",
+          r0["state"] == H.ABSENT and r0["measured"]["known_gaps"] == ["old"] and r1["state"] == H.ABSENT
+          and r2["state"] == H.PRESENT and r2["measured"]["new_gaps"] == ["d"]
+          and r3["state"] == H.PRESENT and r3["measured"]["chain_ok"] is False and r3["measured"]["broken_at"] == 4
+          and r4["state"] == H.UNKNOWN, (r0, r1, r2, r3, r4))
+    check("H1tf no remedy: the repository and its code are his and Grok's",
+          [n for n, r in H.REMEDIES.items() if "threefold_witness" in (r.get("for") or [])] == [])
+
     # ---- H1st: Moltbook strikes (A283, 2026-10-06). Stand-in ledger rows.
     _ts = 1_900_000_000.0
     _v = lambda req, sol, ab=False, ago=3600: {"t": "x", "at": _ts - ago, "author": "a", "verification":  # noqa: E731

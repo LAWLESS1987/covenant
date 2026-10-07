@@ -7635,6 +7635,38 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A294. [The covenant witnesses threefold, his Grok agent's three-leg memory system: its ledger verifies with the covenant's own code, and every new task must fire all three legs] 2026-10-07. His words: "keep expanding the highway and incorporate the new repos", then "public", then "ensure tetsu learns from this also". ADDED, driven both ways
+
+**What the new repos are** (read, not assumed). LAWLESS1987/threefold (created 2026-10-07) is "Tombstone ∥
+Covenant ∥ JLens -- mandatory three-leg agent memory/observability", built by his Grok agent: every time "Grok
+Bot speaks" (on_speak.sh) it fires a tombstone line, a memory written by THIS repo's ai_memory_system (its
+hash-chained audit.jsonl), and a JLens snapshot, under one task_id, with "no degrade path".
+LAWLESS1987/threefold-memory is where those memories are pushed, every few minutes.
+
+**His decision, recorded.** threefold-memory is PUBLIC and holds full OCR transcripts of his @NJEst1987 videos
+(143 OCR or large files; the largest about 760 KB). The covenant keeps the text of those videos under the
+gitignored private/, and its own index of them touches his custody case and family. Asked, he answered:
+"public". It stays public. Nothing from threefold-memory is copied into this repository, and the witness below
+reads only the ledger and the file NAMES.
+
+**Measured that morning.** The ledger verifies with ai_memory_system's own verify_chain(): 591 entries.
+Of 215 task ids, 213 have their JLens leg; two do not: 20261007-njest-2071273199485022690 and
+ethics-ocr-quote-test. The triad's "no degrade path" did not hold for them.
+
+**Added: `detect_threefold_witness`.** At most hourly, with no credential, it reads the public audit.jsonl
+(run through the covenant's own verify_chain) and the file names. A broken chain, or a NEW task without
+its JLens leg, is PRESENT. The gaps present at the first reading are named in every reading, not alarmed
+on. Unreadable is UNKNOWN. No remedy, because the repository and its code are his and Grok's. A test never
+sets the live baseline (A272's lesson). H1tf: chain ignored fails, new gaps ignored fails; H1 212/212.
+Live: ABSENT, chain ok, 2 known gaps, 0 new.
+
+**Said plainly, not changed.** threefold's JLens leg runs GPT-2's published lens over the TEXT of Grok's
+reply. GPT-2 is not Grok, so the readout says nothing about Grok's own reasoning. It is a record that a lens
+ran, not an observation of the agent: the "check that measures nothing" shape (A74). The covenant's own
+J-lens plan (A291) reads the model that decides, and is paused on this PC's memory.
+
+---
+
 ### A293. [A quarantine had no way back but a person: now a quarantined remedy gets one attempt a day, on probation] 2026-10-06. His words: "keep expanding the highway". ADDED, driven both ways; answers A292's open question
 
 A292 found restart_nodes refused for four days over a blocker fixed long before, and noted that nothing

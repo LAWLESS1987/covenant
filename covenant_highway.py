@@ -892,6 +892,86 @@ def detect_schedule_stalled(health=None, tasks=None, now=None):
     return {"state": PRESENT if stalled else ABSENT, "measured": measured}
 
 
+THREEFOLD_REPO = "LAWLESS1987/threefold-memory"
+THREEFOLD_EVERY_S = 3600
+THREEFOLD_CACHE = os.path.join(HERE, "ops", "threefold_witness.json")     # gitignored: readings and the first-seen gaps
+
+
+def _threefold_read(repo):
+    """(audit.jsonl text, [file paths]) from the PUBLIC repo -- no credential, no content beyond the ledger and names."""
+    raw = urllib.request.urlopen(urllib.request.Request(
+        "https://raw.githubusercontent.com/%s/HEAD/audit.jsonl" % repo, headers={"User-Agent": "covenant-highway"}),
+        timeout=60).read().decode("utf-8", "replace")
+    tree = json.loads(urllib.request.urlopen(urllib.request.Request(
+        "https://api.github.com/repos/%s/git/trees/HEAD?recursive=1" % repo,
+        headers={"User-Agent": "covenant-highway", "Accept": "application/vnd.github+json"}), timeout=60).read().decode("utf-8"))
+    return raw, [x["path"] for x in tree.get("tree", []) if x.get("type") == "blob"]
+
+
+def _verify_chain_text(text):
+    """The covenant's own ai_memory_system verify_chain(), run on a copy of the ledger text."""
+    import sys as _sys
+    import tempfile
+    amd = os.path.join(HERE, "ai_memory_system")
+    if amd not in _sys.path:
+        _sys.path.insert(0, amd)
+    from memory_store import MemoryStore
+    d = tempfile.mkdtemp(prefix="threefold_chain_")
+    with open(os.path.join(d, "audit.jsonl"), "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+    return MemoryStore(d).verify_chain()
+
+
+def detect_threefold_witness(health=None, read=None, now=None, cache=None):
+    """The covenant witnesses threefold: its memory ledger still verifies, and every new task fired all three legs.
+
+    A294 (2026-10-07, his words: "keep expanding the highway and incorporate the new repos"). His Grok agent's
+    threefold fires a triad on every reply -- tombstone, a memory written by the covenant's own ai_memory_system
+    (hash-chained audit.jsonl), and a JLens snapshot -- and says there is "no degrade path". Both are checkable from
+    the public repo: the chain with the covenant's own verify_chain(), the triad by every task-<id> having its
+    jlens-<id>. Read at most hourly, without a credential, and nothing but the ledger and the file NAMES (the
+    memories themselves are never read here). The gaps present at the first reading are kept and named in every
+    reading; a NEW task without its JLens leg, or a broken chain, is PRESENT. UNKNOWN when it cannot be read. No
+    remedy: the repository and its code are his and Grok's."""
+    import re as _re
+    now = time.time() if now is None else now
+    path = cache or THREEFOLD_CACHE
+    try:
+        st = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        st = {}
+    if read is None and st.get("at") and now - float(st["at"]) < THREEFOLD_EVERY_S and st.get("last"):
+        return st["last"]
+    try:
+        text, files = (read or _threefold_read)(THREEFOLD_REPO)
+        chain = _verify_chain_text(text)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"repo": THREEFOLD_REPO, "error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    live = [f for f in files if not f.startswith(".trash/")]
+    tasks = {_re.sub(r"-ocr$", "", f[5:-3]) for f in live if f.startswith("task-") and f.endswith(".md")}
+    lens = {f[6:-3] for f in live if f.startswith("jlens-") and f.endswith(".md")}
+    gaps = sorted(tasks - lens)
+    known = st.get("known_gaps")
+    if known is None:
+        known = gaps                                              # the first reading's gaps: named, not alarmed on
+    new_gaps = [g for g in gaps if g not in known]
+    measured = {"repo": THREEFOLD_REPO, "chain_ok": bool(chain.get("ok")), "entries": chain.get("entries"),
+                "tasks": len(tasks), "jlens": len(lens), "known_gaps": known, "new_gaps": new_gaps[:10]}
+    if not chain.get("ok"):
+        measured["broken_at"] = chain.get("broken_at")
+    state = PRESENT if (not chain.get("ok") or new_gaps) else ABSENT
+    out = {"state": state, "measured": measured}
+    import sys as _sys
+    _test = os.path.basename(str(_sys.argv[0] if _sys.argv else "")).startswith("test_")
+    if cache or (read is None and not _test):        # a test never sets the LIVE baseline (A272's lesson)
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"at": now, "known_gaps": known, "last": out}, fh)
+        except OSError:
+            pass
+    return out
+
+
 STRIKES_WINDOW_S = 7 * 86400
 
 
@@ -1740,6 +1820,7 @@ DETECTORS = {
     "ambassador_stalled": detect_ambassador_stalled,
     "schedule_stalled": detect_schedule_stalled,
     "moltbook_strikes": detect_moltbook_strikes,
+    "threefold_witness": detect_threefold_witness,
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,
