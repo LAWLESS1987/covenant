@@ -7635,6 +7635,28 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A301. [free was re-isolated at 09:01 on the two rounds he had already lifted: the isolation rule used the same evidence twice] 2026-10-07. Found watching the first round after A300 (his "keep expanding the highway"). FIXED, driven both ways; his lift restored
+
+**Measured.** The 09:00 round ran A300's new code. The model could not load ("no weights fit: free 1.9 GB"),
+so it deferred all 45 candidates and refused 0. Then the isolation rule, which reads the last two live rounds
+that TRIED someone, found the 22:04Z and 01:05Z rounds of the night before, both all-refused, and isolated her
+again. He had lifted exactly that isolation that morning (A297, "do 1 and 2 then lift"), and the direct line
+told him she was isolated. It was the same evidence used twice. My A297 lift did not look at what the next
+round would count.
+
+**Fixed.** Only rounds after the last `isolation` row in her ledger count toward the next isolation. An
+isolation he lifts is a fresh start, and the rule still asks for two refused rounds in a row: two NEW ones.
+FW1L: after an isolation, an empty round and a starved round do not re-isolate; one refused round does not;
+a second does. Counting the lifted rounds again fails both FW1L checks; restored, FW1 75/75. A "judge only a
+round that tried someone" condition was written and then removed. Under this fix it changes nothing, so no
+test could show that it works.
+
+**His lift restored**, not a new decision. The wrong pause file was moved whole to
+`.trash/pause/ambassador.re-isolated-by-A301-2026-10-07T0901` with a note, then
+`covenant_pause.py --resume ambassador`.
+
+---
+
 ### A300. [A round the model could not write would have filled every reply with one template, and two such rounds would have isolated free for the judge's sake] 2026-10-07. His words: "keep expanding the highway gonna need a bridge made eventually". FIXED in free's round and on the road, driven both ways
 
 **Measured.** That morning Tetsu's model could not load: 1.57 to 2.15 GB free, and the smallest weights

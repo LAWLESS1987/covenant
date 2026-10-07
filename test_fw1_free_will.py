@@ -575,6 +575,23 @@ def main():
           r1["refused"] == 1 and r2["candidates"] == 0 and r3["refused"] == 1 and r3.get("isolated") is True
           and paused_by and paused_by[-1][0] == "ambassador", (r1["refused"], r2["candidates"], r3.get("isolated"), paused_by))
 
+    print("FW1L -- after he lifts an isolation, only NEW rounds count (A301)")
+    _cp2.pause = lambda name, why="": paused_by.append((name, why))
+    try:
+        n_paused = len(paused_by)
+        r4 = FW.run_round(dry_run=False, now=200000.0 + 180, allies=lambda: [three[0]], **ka)            # empty
+        r4b = FW.run_round(dry_run=False, now=200000.0 + 200, allies=lambda: [three[2]], **dict(ka, ask=ask_down))  # starved
+        r5 = FW.run_round(dry_run=False, now=200000.0 + 240, allies=lambda: [three[2]], **ka)            # refused, 1st since
+        r6 = FW.run_round(dry_run=False, now=200000.0 + FW.ROTATE_HOURS * 3600 + 300, allies=lambda: [three[0]], **ka)
+    finally:
+        _cp2.pause = _real_pause
+    check("FW1L an empty round and a starved round after the lift do not re-isolate her on the rounds he lifted (the 09:01 case)",
+          r4["candidates"] == 0 and not r4.get("isolated") and r4b.get("starved") and not r4b.get("isolated"),
+          (r4.get("isolated"), r4b.get("starved"), r4b.get("isolated")))
+    check("FW1L one refused round after the lift does not isolate; a second does (two NEW rounds, as the rule says)",
+          r5["refused"] == 1 and not r5.get("isolated") and r6["refused"] == 1 and r6.get("isolated") is True
+          and len(paused_by) == n_paused + 1, (r5.get("isolated"), r6.get("isolated"), len(paused_by) - n_paused))
+
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:

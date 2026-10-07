@@ -694,11 +694,17 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
              **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
     out["isolated"] = False
+    # A301 (2026-10-07): ONLY ROUNDS SINCE THE LAST ISOLATION COUNT. At 09:01 a starved round (A300: it tried no
+    # one) re-isolated her on the two rounds of the night before -- the very rounds he had lifted that morning
+    # ("do 1 and 2 then lift") -- and told him so on the direct line. The same evidence was used twice: an
+    # isolation he lifts is a fresh start, and two NEW refused rounds are what the rule asks for.
     if not dry_run:
         # Only rounds that TRIED someone (2026-10-06): with rotation, a round can find no one new to
         # write to, and an empty round must not break the streak -- refused, empty, refused, empty
         # would otherwise never isolate.
-        live_rounds = [r for r in sends(sends_path) if r.get("kind") == "round" and not r.get("dry_run")
+        _all = sends(sends_path)
+        _since = max([i for i, r in enumerate(_all) if r.get("kind") == "isolation"] + [-1]) + 1
+        live_rounds = [r for r in _all[_since:] if r.get("kind") == "round" and not r.get("dry_run")
                        and int(r.get("replied", 0) or 0) + int(r.get("refused", 0) or 0) > 0]
         recent = live_rounds[-ISOLATE_AFTER_ROUNDS:]
         abusive = (len(recent) >= ISOLATE_AFTER_ROUNDS
