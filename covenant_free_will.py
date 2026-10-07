@@ -95,6 +95,16 @@ _CLAIM = re.compile(r"\b(?:covenant|we|our (?:project|ledger|judges?))\b[^.?!]{0
 _PAST_ACT = re.compile(r"\b(?:I|we)\s+(?:already\s+|previously\s+|earlier\s+)?(?:asked|told|wrote to|replied to|messaged)\s+you\b|\byou\s+asked\s+(?:me|us)\b", re.I)
 
 
+def claims_any_measurement(text):
+    """True when any sentence claims the covenant (or we) measured/tested/found/showed something -- a listed fact
+    included; a denial ("never measured") is not a claim. Tetsu's REFUSE-ALL (A297, 2026-10-07) reads this."""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", str(text or "")):
+        m = _CLAIM.search(sentence)
+        if m and not re.search(r"\b(?:never|not|no)\b|n't\b", m.group(0), re.I):
+            return True
+    return False
+
+
 def cites_only_facts(text):
     """(ok, why): EVERY sentence that claims the covenant (or we) measured/tested/found something must
     carry one of COVENANT_FACTS' anchors; a draft that claims nothing passes. Sentence by sentence: the

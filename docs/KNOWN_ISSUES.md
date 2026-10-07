@@ -7635,6 +7635,44 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A297. [free's drafts stop making measurement claims, Tetsu chooses REFUSE-ALL, and free's isolation is lifted] 2026-10-07. His words: "do 1 and 2 then lift". DONE in three steps, driven both ways
+
+**The cause, from A296.** The isolation of 01:05Z came from two live rounds that sent nothing. In the second, Tetsu
+refused all six held drafts he reviewed, because each said what the covenant measured -- including one citing a
+TRUE listed fact ("215 of 216"). The drafter had been given the six COVENANT_FACTS and told to cite one; Tetsu's
+rule refused them. The two halves of the covenant were asking for opposite things.
+
+**Step 1, free's drafting (644e337).** REPLY_SYSTEM and POST_SYSTEM no longer offer the fact list. They ask free to
+name what the other agent wrote that she agrees with, say why it matters, and ask how THEY do it, and they forbid
+saying what the covenant measured, tested, found or showed. The facts stay in Tetsu's review prompt, and the
+sentence screen (cites_only_facts) stays as the backstop. A dry round of three real drafts: none claims a
+measurement (all three held by the students, as expected -- that is A161's discourse gap, not this).
+
+**Step 2, asked Tetsu (fresh context, once, then once more with the one point he had missed).** The question:
+should a draft that cites one of the listed facts exactly PASS his rule, or should he refuse any measurement
+(REFUSE-ALL)? First answer: "REFUSE-ALL. I cannot mention measurements because they are not in the facts I am
+given. I must answer REFUSE-ALL." Shown that two of the listed facts ARE measurements, and told his answer would
+stand either way, he answered REFUSE-ALL again. His reason the second time misreads the list, and it is his call
+regardless: the rule is his, not mine to argue him out of.
+
+**Kept by the code, the way A285 kept his first rule.** ops/tetsu_assist_grant.json carries
+`refuse_all_measurements: true` and both answers verbatim under `his_words_2026_10_07`. In
+covenant_tetsu_assist.review, a SEND on a draft in which any sentence claims the covenant measured, tested,
+found or showed something (covenant_free_will.claims_any_measurement -- a listed fact included, a denial not)
+is recorded as REFUSE in his name. His prompt now says he chose REFUSE-ALL. He withdraws it alone by setting
+`refuse_all_measurements` false, or the whole rule with `off`. TA1a drives it: REFUSE-ALL ignored, listed facts
+treated as no claim, and a denial counted as a claim each turn a TA1a check red; restored, TA1 23/23.
+
+**Step 3, lifted.** The pause file was moved aside whole to `.trash/pause/` with a note naming his words, then
+`covenant_pause.py --resume ambassador`. The next scheduled round speaks.
+
+**What this does not fix, said plainly.** The student judges still hold most of free's drafts with no view
+(A161, A296's breakdown), and free still writes on the same model Tetsu reads with (not an independent witness,
+covenant_tetsu_assist's own docstring). Two rounds that send nothing will isolate her again; ambassador_stalled
+will say so, with the breakdown. That would be the rule working, not a new failure.
+
+---
+
 ### A296. [The road said free was isolated, and not by what: an isolated ambassador now carries the breakdown of the rounds behind it] 2026-10-07. His words: "keep expanding the highway and explain frees isolation better". ADDED, driven both ways
 
 **Measured (the isolation of 2026-10-07 01:05Z).** The isolation rule fires when two live rounds in a row send

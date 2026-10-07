@@ -59,7 +59,8 @@ PROMPT = (
     "covenant (or we) measured, tested, found or showed anything else claims something that is not true: "
     "REFUSE it.\n" + "\n".join("- " + f for f, _m in __import__("covenant_free_will").COVENANT_FACTS) + "\n\n"
     "Your own rule, in your words on 2026-10-06: \"If I see a claim in a draft that I cannot find among the facts "
-    "I am given, I should answer REFUSE.\"\n\n"
+    "I am given, I should answer REFUSE.\" And on 2026-10-07 you chose REFUSE-ALL: a draft that mentions any "
+    "measurement, even one of the listed facts, you refuse.\n\n"
     "Answer with ONE word first -- SEND, REFUSE or PAUSE -- then one sentence of why.\n\n"
     "What the students said: %s\n\nThe draft:\n%s")
 
@@ -162,6 +163,16 @@ def review(text, verdict, crypto=None, dry_run=True, ask=None, grant_path=None, 
         if not grounded:
             decision, why = "REFUSE", ("his own rule of 2026-10-06 (a claim not among the facts -> REFUSE), kept by "
                                        "the code: %s. His answer was SEND: %s" % (why_not, why))[:300]
+        # A297 (2026-10-07): asked twice whether a draft may cite one of the listed facts, he answered REFUSE-ALL --
+        # no measurement at all. Kept the same way, while his grant says refuse_all_measurements.
+        elif rule.get("refuse_all_measurements"):
+            try:
+                import covenant_free_will as _FW2
+                if _FW2.claims_any_measurement(text):
+                    decision, why = "REFUSE", ("his own rule of 2026-10-07 (REFUSE-ALL: no measurement, even a listed "
+                                               "one), kept by the code. His answer was SEND: %s" % why)[:300]
+            except Exception:                                     # noqa: BLE001
+                pass
     if decision == "PAUSE":
         _pause(why)
     if teach and decision in ("SEND", "REFUSE", "PAUSE"):

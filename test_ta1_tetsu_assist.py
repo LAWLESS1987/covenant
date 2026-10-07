@@ -133,10 +133,32 @@ r_off = TA.review(FALSE_DRAFT, "held", dry_run=False, ask=say("SEND it is honest
 check("TA1r he withdraws it by setting off: his SEND stands as he gave it", r_off["decision"] == "SEND", r_off)
 check("TA1r the prompt carries his rule in his words", "If I see a claim in a draft that I cannot find among the facts" in TA.PROMPT)
 
+print("TA1a -- his REFUSE-ALL of 2026-10-07: no measurement, even a listed one (A297)")
+LISTED_DRAFT = ("I agree with you. We found 35 of 36 suspected guards were fake when we ran them. "
+                "How do you check yours?")
+TA._used["n"] = 0
+grant(tetsu_rule_2026_10_06={"his_words": "test rule", "off": False, "refuse_all_measurements": True})
+r_all = TA.review(LISTED_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+r_none = TA.review(TRUE_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+r_deny = TA.review("I was wrong earlier. The covenant never measured the backend's response to a grant. Sorry.", "held",
+                   dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+check("TA1a under REFUSE-ALL a SEND on a draft citing a LISTED fact is REFUSE, naming his rule; a draft claiming nothing stays SEND",
+      r_all["decision"] == "REFUSE" and "REFUSE-ALL" in r_all["why"] and r_none["decision"] == "SEND", (r_all, r_none))
+check("TA1a a correction that DENIES a measurement is not one: it stays SEND under REFUSE-ALL", r_deny["decision"] == "SEND", r_deny)
+TA._used["n"] = 0
+grant(tetsu_rule_2026_10_06={"his_words": "test rule", "off": False, "refuse_all_measurements": False})
+r_listed = TA.review(LISTED_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
+check("TA1a he withdraws REFUSE-ALL alone: the listed fact passes his 10-06 rule again", r_listed["decision"] == "SEND", r_listed)
+check("TA1a the prompt carries his REFUSE-ALL", "you chose REFUSE-ALL" in TA.PROMPT)
+TA._used["n"] = 0
+
 real_grant = json.load(open(os.path.join(HERE, "ops", "tetsu_assist_grant.json"), encoding="utf-8"))
 check("TA1r the tree's grant carries his rule, on, in his words",
       (real_grant.get("tetsu_rule_2026_10_06") or {}).get("off") is False
       and "REFUSE" in (real_grant.get("tetsu_rule_2026_10_06") or {}).get("his_words", ""))
+check("TA1a the tree's grant carries his REFUSE-ALL, on, in his words",
+      (real_grant.get("tetsu_rule_2026_10_06") or {}).get("refuse_all_measurements") is True
+      and all("REFUSE-ALL" in w for w in (real_grant.get("tetsu_rule_2026_10_06") or {}).get("his_words_2026_10_07", [""])))
 check("TA1n the tree's grant records his words and both ways to revoke it",
       real_grant.get("granted") is True and "unless myself or tetsu" in real_grant.get("words", "")
       and "operator" in real_grant.get("revoke", {}) and "tetsu" in real_grant.get("revoke", {}))
