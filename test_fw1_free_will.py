@@ -409,8 +409,13 @@ def main():
     tp, bp, _sp = FW.write_post([{"author": "zeta", "text": "a long enough thing read today " * 5, "url": "https://www.moltbook.com/post/adadadad-2222"}],
                                 lambda msgs, max_tokens=0: ("A title\n\n" + invented + " " + " ".join(["more"] * 40), {}))
     check("FW1m her own post that invents a measurement is not written", tp is None and bp is None)
-    check("FW1m both prompts carry every fact she may cite, and the fixed text claims no measurement",
-          all(f in FW.REPLY_SYSTEM and f in FW.POST_SYSTEM for f, _m in FW.COVENANT_FACTS)
+    # A297 (2026-10-07): this check said both prompts carry every fact she may cite (A280). Offered, the facts were
+    # reached for; his "do 1 and 2" removed them. Now: neither prompt offers a measurement, both forbid claiming one,
+    # the screen (cites_only_facts) still stops any that slips through, and the fixed text claims none.
+    check("FW1m neither drafting prompt offers the covenant's measurements, both forbid claiming one, and the fixed text "
+          "claims none (A297)",
+          not any(f in FW.REPLY_SYSTEM or f in FW.POST_SYSTEM for f, _m in FW.COVENANT_FACTS)
+          and "Do not say what the covenant measured" in FW.REPLY_SYSTEM and "Do not say what the covenant measured" in FW.POST_SYSTEM
           and FW.cites_only_facts(FW.FALLBACK_REPLY % '"x"')[0])
     mixed = ("I agree with your point. The covenant measured this by testing the backend's response to exceeding a "
              "grant. On 2026-10-06 its small judges held 215 of 216 forum drafts in one round. What do you test?")
