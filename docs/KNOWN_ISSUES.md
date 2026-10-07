@@ -7635,6 +7635,24 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A295. [The road's own node restart was graded "did not fix" when a commit landed while it ran: the restart worked, and a new instance followed] 2026-10-07. Found watching restart_nodes act on its own for the first time since A292. FIXED, driven both ways
+
+**Measured.** After A294's commit, restart_nodes started a rolling restart by itself at 06:58:37 local, the
+first since its four-day quarantine was lifted. The nodes' oldest process started at 06:58:40. My next commit
+(502adfe) changed a module the nodes import while that ran, so at grading (07:02:20) source_drift was
+PRESENT again and the restart was graded "did not fix". Two such grades are what quarantined it before
+(A292), and A293's probation would have taken a day to forgive.
+
+**Fixed, the way A259-GRADE fixed it for the watchdog.** detect_source_drift now reports `nodes_started`,
+the creation time of the OLDEST run_node.py process run by this folder's interpreter. It is read only while
+drifting, so a clean pass costs nothing. RECURRED["source_drift"] grades a restart "fixed" (marked
+`recurred`) when every node started after the remedy did, even though the disk has moved on since; a node
+older than the restart still means "did not fix". H1o3: the restart that started after the remedy is graded
+fixed and recurred, and the old node is graded did not fix. With source_drift taken out of RECURRED it
+fails; restored, H1 213/213.
+
+---
+
 ### A294. [The covenant witnesses threefold, his Grok agent's three-leg memory system: its ledger verifies with the covenant's own code, and every new task must fire all three legs] 2026-10-07. His words: "keep expanding the highway and incorporate the new repos", then "public", then "ensure tetsu learns from this also". ADDED, driven both ways
 
 **What the new repos are** (read, not assumed). LAWLESS1987/threefold (created 2026-10-07) is "Tombstone ∥

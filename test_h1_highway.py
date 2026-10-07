@@ -1840,6 +1840,27 @@ def main():
     check("H1o3 mutation: the old watchdog is still the oldest running -> did not fix (the remedy did not work)",
           len(got) == 1 and got[0]["outcome"] == "did not fix" and not got[0].get("recurred"),
           str([(g["outcome"], g.get("recurred")) for g in got]))
+    # A295 (2026-10-07): the same for restart_nodes. At 06:58:37 the road restarted the nodes after a commit; they
+    # started at 06:58:40; a second commit moved the imports mid-restart, and the restart was graded "did not fix".
+    NREM = "restart_nodes"
+    NWIN = float(H.REMEDIES[NREM].get("grade_after_s") or H.GRADE_AFTER_S)
+    tn = NOW - NWIN - 60
+
+    def nd_now(nodes_started):
+        return {"source_drift": {"state": H.PRESENT, "measured": {
+            "disk": "abc", "live": {"A": "abc"}, "drifted": ["A"], "imports_disk": "new", "imports_drifted": ["A"],
+            "nodes_started": nodes_started}}}
+    led = tmp_ledger()
+    started_row(led, tn, detector="source_drift", remedy=NREM)
+    got = H.grade_started(nd_now(tn + 3), ledger=led, now=NOW, dry_run=True)
+    led2 = tmp_ledger()
+    started_row(led2, tn, detector="source_drift", remedy=NREM)
+    got2 = H.grade_started(nd_now(tn - 900), ledger=led2, now=NOW, dry_run=True)
+    check("H1o3 source_drift: every node started after the restart began -> fixed, marked recurred; a node older than "
+          "the restart -> did not fix (A295)",
+          len(got) == 1 and got[0]["outcome"] == "fixed" and got[0].get("recurred") is True
+          and len(got2) == 1 and got2[0]["outcome"] == "did not fix" and not got2[0].get("recurred"),
+          (str([(g["outcome"], g.get("recurred")) for g in got]), str([(g["outcome"], g.get("recurred")) for g in got2])))
     led = tmp_ledger()
     for k in range(2):
         started_row(led, t0 - 7200 * (1 - k), detector="watchdog_stale", remedy=WREM)

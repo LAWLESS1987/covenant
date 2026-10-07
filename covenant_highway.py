@@ -202,9 +202,33 @@ def detect_source_drift(health=None):
     imp = {k: str(v.get("imports_sha12") or "")[:12] for k, v in h.items()
            if isinstance(v, dict) and "http" not in v}
     off_imp = sorted(k for k, s in live.items() if disk_imp and s == disk and imp.get(k) and imp[k] != disk_imp)
-    return {"state": PRESENT if (off or off_imp) else ABSENT,
-            "measured": {"disk": disk, "live": live, "drifted": sorted(set(off) | set(off_imp)),
-                         "imports_disk": disk_imp, "imports_drifted": off_imp}}
+    measured = {"disk": disk, "live": live, "drifted": sorted(set(off) | set(off_imp)),
+                "imports_disk": disk_imp, "imports_drifted": off_imp}
+    if off or off_imp:
+        # A295 (2026-10-07): when the nodes drift, when did the OLDEST of them start? restart_nodes is graded on it
+        # (RECURRED): a node set that restarted after the remedy started, and drifts again because the disk moved on
+        # meanwhile, is a new instance -- the remedy worked. Read only while drifting; a clean pass costs nothing.
+        ns = _nodes_started()
+        if ns is not None:
+            measured["nodes_started"] = ns
+    return {"state": PRESENT if (off or off_imp) else ABSENT, "measured": measured}
+
+
+def _nodes_started():
+    """The creation time (epoch) of the OLDEST run_node.py process run by this folder's interpreter, or None."""
+    import datetime
+    import subprocess
+    like = os.path.join(HERE, ".venv").replace("'", "''") + "*run_node.py*"
+    ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\" |"
+          " Where-Object { $_.CommandLine -like '*" + like + "' } |"
+          " ForEach-Object { $_.CreationDate.ToUniversalTime().ToString('o') }")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        stamps = [x.strip() for x in (p.stdout or "").splitlines() if x.strip()]
+        return round(min(datetime.datetime.fromisoformat(s).timestamp() for s in stamps), 1) if stamps else None
+    except Exception:                                            # noqa: BLE001
+        return None
 
 
 def detect_mesh_source_split(health=None):
@@ -2979,7 +3003,14 @@ def _watchdog_restarted_since(measured, started_at):
 
 # A259-GRADE: per detector, "PRESENT now, but the remedy measurably worked and this is a new
 # instance". Only detectors whose measurement can show that are listed; the rest keep the old rule.
-RECURRED = {"watchdog_stale": _watchdog_restarted_since}
+def _nodes_restarted_since(measured, started_at):
+    """source_drift (A295): the remedy worked when the OLDEST running node started after it did -- every node was
+    restarted -- even though the disk has moved on since and they drift again (a commit landed mid-restart)."""
+    ns = (measured or {}).get("nodes_started")
+    return isinstance(ns, (int, float)) and float(ns) >= float(started_at)
+
+
+RECURRED = {"watchdog_stale": _watchdog_restarted_since, "source_drift": _nodes_restarted_since}
 
 
 def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
