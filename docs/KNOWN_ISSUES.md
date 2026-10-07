@@ -7635,6 +7635,25 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A296. [The road said free was isolated, and not by what: an isolated ambassador now carries the breakdown of the rounds behind it] 2026-10-07. His words: "keep expanding the highway and explain frees isolation better". ADDED, driven both ways
+
+**Measured (the isolation of 2026-10-07 01:05Z).** The isolation rule fires when two live rounds in a row send
+nothing ("refused every reply in the last 2 rounds"). The last four live rounds, from the sends ledger:
+16:20Z tried 103, sent 2 (held with no view 90, convicted 7, rate-limited 3); 19:09Z tried 20, sent 3
+(held 10, convicted 5, rate-limited 1); 22:04Z tried 13, sent 0 (held 7, convicted 5, 1 other);
+01:05Z tried 13, sent 0 (held 11, convicted 2). In the last round Tetsu reviewed six held drafts and refused
+all six. In his words, they cited measurements; one ("215 of 216") cites a TRUE fact from COVENANT_FACTS.
+His own rule (A285) is now reading every measurement as a claim. His SENDs that evening were the five
+approved corrections, plus one draft at 22:03Z that a later layer stopped.
+
+**Added.** While isolated, ambassador_stalled's measurement carries `last_rounds`: for each of the last two
+live rounds, tried, sent, held with no view, convicted, rate-limited, other, and what Tetsu reviewed and
+refused. free now keeps Tetsu's decision on each reply (`tetsu`), so from now on a hold he refused is told
+apart from one he never saw. Older rows carry none and count as unreviewed. H1am: refusals not counted
+fails it, and so do convictions counted as holds; restored, H1 214/214; FW1 70/70.
+
+---
+
 ### A295. [The road's own node restart was graded "did not fix" when a commit landed while it ran: the restart worked, and a new instance followed] 2026-10-07. Found watching restart_nodes act on its own for the first time since A292. FIXED, driven both ways
 
 **Measured.** After A294's commit, restart_nodes started a rolling restart by itself at 06:58:37 local, the

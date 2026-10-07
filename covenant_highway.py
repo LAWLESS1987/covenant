@@ -1049,7 +1049,38 @@ def detect_moltbook_strikes(health=None, rows=None, now=None):
 AMBASSADOR_STALL_H = 8.0     # rounds run every 3 h (CovenantAmbassador) plus the nightly's; 8 h is two missed
 
 
-def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None, now=None):
+def _round_breakdown(rows, n=2):
+    """A296 (2026-10-07, his words: "explain frees isolation better"): for each of the last `n` live rounds, which
+    layer stopped each reply -- held by the student judges (no view), convicted, held by Moltbook's rate limit, sent,
+    or other. The isolation rule reads only 'every reply refused'; this says by WHAT."""
+    rows = list(rows or [])
+    idx = [i for i, r in enumerate(rows) if r.get("kind") == "round" and not r.get("dry_run")]
+    out = []
+    for k in idx[-n:]:
+        prev = max([j for j in idx if j < k] + [-1])
+        reps = [r for r in rows[prev + 1:k] if r.get("kind") == "reply" and not r.get("dry_run")]
+        b = {"t": rows[k].get("t"), "tried": len(reps), "sent": 0, "held_no_view": 0, "convicted": 0,
+             "rate_limited": 0, "other": 0, "tetsu_reviewed": 0, "tetsu_refused": 0}
+        for r in reps:
+            w = str(r.get("why") or "")
+            if r.get("tetsu"):                       # kept on each reply since A296; rows before it carry none
+                b["tetsu_reviewed"] += 1
+                b["tetsu_refused"] += int(r.get("tetsu") == "REFUSE")
+            if r.get("sent"):
+                b["sent"] += 1
+            elif w.startswith("held by covenant's judge"):
+                b["held_no_view"] += 1
+            elif "refused by covenant's judge" in w:
+                b["convicted"] += 1
+            elif "rate limit" in w:
+                b["rate_limited"] += 1
+            else:
+                b["other"] += 1
+        out.append(b)
+    return out
+
+
+def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None, now=None, sends=None):
     """free has a grant to speak on Moltbook and is not speaking: paused, or no live round in AMBASSADOR_STALL_H.
 
     A279 (2026-10-06, his words: "keep expanding the highway"). free was isolated on 2026-10-04 and stayed
@@ -1060,13 +1091,17 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
     no live round ever on record here (a clone, CI) is UNKNOWN."""
     import calendar
     now = time.time() if now is None else now
+    _all_sends, rounds_were_read = None, False
     try:
         if grant is None or paused is None or rounds is None:
             import covenant_free_will as FW
             import covenant_pause as CP
             grant = FW.grant() if grant is None else grant
             paused = CP.paused("ambassador") if paused is None else paused
-            rounds = [r for r in FW.sends() if r.get("kind") == "round" and not r.get("dry_run")] if rounds is None else rounds
+            if rounds is None:
+                _all_sends = FW.sends()
+                rounds_were_read = True
+                rounds = [r for r in _all_sends if r.get("kind") == "round" and not r.get("dry_run")]
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
     if not grant:
@@ -1084,6 +1119,8 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
     measured = {"paused": bool(is_paused), "last_live_round_h": None if last is None else round((now - last) / 3600.0, 1)}
     if is_paused:
         measured["why"] = str(why)[:240]
+        if sends is not None or rounds_were_read:
+            measured["last_rounds"] = _round_breakdown(sends if sends is not None else _all_sends)
         return {"state": PRESENT, "measured": measured}
     if last is None:
         measured["why"] = "no live round on record here"

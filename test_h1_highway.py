@@ -1534,6 +1534,19 @@ def main():
           am["no_grant"] == H.ABSENT and am["paused"]["state"] == H.PRESENT and "isolated" in am["paused"]["measured"]["why"]
           and am["fresh"] == H.ABSENT and am["stale"]["state"] == H.PRESENT and am["stale"]["measured"]["last_live_round_h"] == 9.0
           and am["never"] == H.UNKNOWN, am)
+    _rws = [{"kind": "reply", "sent": True}, {"kind": "round", "t": "r1"},
+            {"kind": "reply", "why": "held by covenant's judge (no view -- not an objection)", "tetsu": "REFUSE"},
+            {"kind": "reply", "why": "held by covenant's judge (no view -- not an objection)"},
+            {"kind": "reply", "why": "refused by covenant's judge: quorum=violates"},
+            {"kind": "reply", "why": "HELD by Moltbook's own rate limit -- 1 comment per 20s"},
+            {"kind": "reply", "sent": True, "tetsu": "SEND"}, {"kind": "round", "t": "r2"}]
+    _iso = H.detect_ambassador_stalled(grant=_g, paused=(True, "isolated"), rounds=[{"at": _n - 600}], now=_n, sends=_rws)
+    _lr = _iso["measured"].get("last_rounds") or []
+    check("H1am when isolated, the road says BY WHAT: per round, held with no view, convicted, rate-limited, sent, and "
+          "what Tetsu reviewed and refused (A296)",
+          len(_lr) == 2 and _lr[0]["sent"] == 1 and _lr[1] == {"t": "r2", "tried": 5, "sent": 1, "held_no_view": 2, "convicted": 1,
+                                                                "rate_limited": 1, "other": 0, "tetsu_reviewed": 2, "tetsu_refused": 1},
+          _lr)
     _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
     check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
 

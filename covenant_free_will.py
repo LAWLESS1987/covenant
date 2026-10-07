@@ -613,7 +613,9 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         except Exception as e:                                    # noqa: BLE001
             res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
         sent = bool(res.get("sent"))
-        _record({"kind": "reply", "at": now, "verification": _ver(res), "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
+        _record({"kind": "reply", "at": now, "verification": _ver(res),
+                 "tetsu": (res.get("tetsu") or {}).get("decision") if isinstance(res.get("tetsu"), dict) else None,  # A296
+                 "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
                  "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
