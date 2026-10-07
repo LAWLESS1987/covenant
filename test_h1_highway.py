@@ -1664,6 +1664,40 @@ def main():
           and kept.get("entries") == 6 and w2b["state"] == H.PRESENT
           and w3["state"] == H.PRESENT and "history_rewritten" in w3["measured"],
           (w1["state"], w2, kept, w2b["state"], w3["state"]))
+    # ---- H1pe: a public commit naming a real address (A306, 2026-10-07). Stand-in API answers; nothing fetched.
+    _REAL = "someone.private@example.org"
+    _NR = "1+u@users.noreply.github.com"
+
+    def _cm(sha, author, committer):
+        return {"sha": sha + "0" * 33, "commit": {"author": {"email": author, "date": "2026-10-07T10:00:00Z"},
+                                                   "committer": {"email": committer}}}
+    _api = {"repos": [{"name": "a"}, {"name": "b"}, {"name": "c", "private": True}, {"name": "d", "fork": True}],
+            "a": [_cm("aaaaaaa", _REAL, _NR), _cm("aaaaaab", _NR, "noreply@github.com")], "b": [_cm("bbbbbbb", _NR, _NR)],
+            "c": [_cm("ccccccc", _REAL, _REAL)], "d": [_cm("ddddddd", _REAL, _REAL)], "e": [_cm("eeeeeee", _NR, _REAL)]}
+    _asked = []
+
+    def _get(path):
+        _asked.append(path)
+        if path.startswith("/users/"):
+            return list(_api["repos"])
+        return list(_api[path.split("/")[3]])
+    _pec = os.path.join(tempfile.mkdtemp(prefix="h1pe_"), "pe.json")
+    p0 = H.detect_public_email_exposure(get=_get, now=1000.0, cache=_pec)
+    _api["a"].insert(0, _cm("aaaaaac", _REAL, _REAL))
+    _api["repos"].append({"name": "e"})
+    p1 = H.detect_public_email_exposure(get=_get, now=9000.0, cache=_pec)
+    p2 = H.detect_public_email_exposure(get=lambda p: (_ for _ in ()).throw(OSError("offline")), now=17000.0, cache=_pec)
+    check("H1pe public_email_exposure: repos DISCOVERED (private and forks skipped, never read); the first reading's "
+          "exposure counted, not alarmed (ABSENT); a NEW exposed commit PRESENT, including a repo that appeared later "
+          "and a committer-only exposure; the API unreadable UNKNOWN",
+          p0["state"] == H.ABSENT and p0["measured"]["repos"] == ["a", "b"] and p0["measured"]["known"] == 1
+          and not any("/c/" in a or "/d/" in a for a in _asked)
+          and p1["state"] == H.PRESENT and p1["measured"]["new"] == ["a@aaaaaac", "e@eeeeeee"]
+          and p1["measured"]["newest"]["e"]["fields"] == ["committer"] and p2["state"] == H.UNKNOWN, (p0, p1, p2))
+    check("H1pe the address itself is never copied into a reading or the cache -- only repo, sha, field and date",
+          _REAL not in json.dumps([p0, p1]) and _REAL not in open(_pec, encoding="utf-8").read())
+    check("H1pe no remedy: history is his to rewrite, and another agent's commit settings are that agent's",
+          [n for n, r in H.REMEDIES.items() if "public_email_exposure" in (r.get("for") or [])] == [])
     check("H1tf no remedy: the repository and its code are his and Grok's",
           [n for n, r in H.REMEDIES.items() if "threefold_witness" in (r.get("for") or [])] == [])
 

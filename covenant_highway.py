@@ -1037,6 +1037,74 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
     return out
 
 
+IDENTITY_OWNER = "LAWLESS1987"
+IDENTITY_EVERY_S = 7200          # at most one reading per 2 h: one listing plus one page of commits per public repo
+IDENTITY_CACHE = os.path.join(HERE, "ops", "public_identity.json")   # gitignored: readings and the first-seen exposures
+
+
+def _identity_safe(email):
+    """GitHub's private forms: <id>+<user>@users.noreply.github.com, and noreply@github.com for web-flow commits."""
+    e = str(email or "").strip().lower()
+    return e.endswith("@users.noreply.github.com") or e == "noreply@github.com"
+
+
+def detect_public_email_exposure(health=None, get=None, now=None, cache=None):
+    """A commit in one of his PUBLIC repositories names an email address that is not a GitHub noreply address.
+
+    A306 (2026-10-07, his words: "keep expanding the highway"). His rule since August: the repositories are
+    public and his address stays masked; this clone's commits use the noreply address and its pre-push guard
+    reads what a push sends. Commits made ELSEWHERE pass neither -- another agent's connector, the web editor, a
+    bot that auto-pushes. Measured that day over the last 30 commits of each public repo: covenant 1
+    (5f66791), Sentinel-Witness 1, threefold 1, threefold-memory 30 of 30 (its triad auto-pushes every memory).
+
+    A READ, without a token, at most every IDENTITY_EVERY_S: the owner's public repositories are DISCOVERED from
+    the API (never a list), then each one's newest 30 commits. The address itself is never copied into the
+    reading -- only repo, sha, which field, and the date. The exposures seen at the first reading are kept and
+    counted (they are already public; rewriting history is his call); a NEW one is PRESENT, so an ongoing leak
+    stays red until its source is fixed. UNKNOWN when the API cannot be read. No remedy: history is his to
+    rewrite, and another agent's commit settings are that agent's. NOT MEASURED: private repositories (no
+    token here), and anything older than the newest 30 commits of a repo."""
+    import sys as _sys
+    now = time.time() if now is None else now
+    path = cache or IDENTITY_CACHE
+    try:
+        st = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        st = {}
+    if get is None and st.get("at") and 0 <= now - float(st["at"]) < IDENTITY_EVERY_S and st.get("last"):
+        return st["last"]
+    g = get or _ci_get
+    try:
+        repos = sorted(r["name"] for r in g("/users/%s/repos?per_page=100&type=owner" % IDENTITY_OWNER)
+                       if not r.get("private") and not r.get("fork"))
+        exposed = {}
+        for name in repos:
+            for c in g("/repos/%s/%s/commits?per_page=30" % (IDENTITY_OWNER, name)):
+                commit = c.get("commit") or {}
+                fields = [f for f in ("author", "committer") if not _identity_safe((commit.get(f) or {}).get("email"))]
+                if fields:
+                    exposed.setdefault(name, []).append({"sha": str(c.get("sha", ""))[:7], "fields": fields,
+                                                         "date": str((commit.get("author") or {}).get("date") or "")[:10]})
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"owner": IDENTITY_OWNER, "error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    seen = sorted("%s@%s" % (n, x["sha"]) for n, xs in exposed.items() for x in xs)
+    known = st.get("known")
+    if known is None:
+        known = seen                                             # the first reading's exposures: counted, not alarmed on
+    new = [s for s in seen if s not in known]
+    measured = {"owner": IDENTITY_OWNER, "repos": repos, "exposed_recent": {n: len(xs) for n, xs in exposed.items()},
+                "newest": {n: xs[0] for n, xs in exposed.items()}, "known": len(known), "new": new[:20]}
+    out = {"state": PRESENT if new else ABSENT, "measured": measured}
+    _test = os.path.basename(str(_sys.argv[0] if _sys.argv else "")).startswith("test_")
+    if cache or (get is None and not _test):          # a test never sets the LIVE baseline (A272's lesson)
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"at": now, "known": known, "last": out}, fh)
+        except OSError:
+            pass
+    return out
+
+
 STRIKES_WINDOW_S = 7 * 86400
 
 
@@ -1935,6 +2003,7 @@ DETECTORS = {
     "schedule_stalled": detect_schedule_stalled,
     "moltbook_strikes": detect_moltbook_strikes,
     "threefold_witness": detect_threefold_witness,
+    "public_email_exposure": detect_public_email_exposure,
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,

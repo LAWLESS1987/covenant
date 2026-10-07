@@ -7635,6 +7635,33 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A306. [Commits made outside this clone put a real email address into his public history, and nothing watched for it] 2026-10-07. His words: "keep expanding the highway". ADDED: public_email_exposure, read-only, driven both ways
+
+**Measured (the last 30 commits of each public repository, discovered from the API).** Commits whose author
+or committer is not a GitHub noreply address: covenant 1 (5f66791, REPLICATION.md, made by another agent);
+Sentinel-Witness 1 (1127ecf); threefold 1 (0aea972); threefold-memory 30 of 30. Its triad auto-pushes every
+memory with that identity, so the exposure grows with each reply. His rule since August is a masked address
+in public repositories. This clone's commits use the noreply address, and the pre-push guard reads what a push
+from HERE sends; commits made elsewhere (another agent's connector, the web editor, an auto-pushing bot) pass
+neither.
+
+**Added.** `detect_public_email_exposure`, a read without a token, at most every 2 h. It discovers the owner's
+public repositories (private ones and forks skipped and never read) and reads each one's newest 30 commits.
+A reading names repo, sha, field and date, **never the address**. The first reading's 33 exposures are kept
+as known: counted, not alarmed on, because they are already public and rewriting history is his call. A new
+one is PRESENT, so threefold-memory's ongoing leak will read red until its source is fixed. UNKNOWN when the
+API cannot be read. No remedy. H1pe: discovery, the baseline, a new exposure (including a repo that appeared
+later, and a committer-only exposure), UNKNOWN, and a check that the address is never copied into a reading or
+the cache. Mutations: every address treated as safe; private repos and forks read; the baseline moved at each
+reading; the address copied into the reading. Each fails H1pe. Restored, H1 220/220. The first live reading
+is ABSENT with 33 known; a scan of its cache finds no address.
+
+**Not measured.** Private repositories (no token here), and anything older than a repo's newest 30
+commits. **The fix is not the road's:** the auto-pushing triad's git identity is Tien's setup, and rewriting
+history is his.
+
+---
+
 ### A305. [A127.Q2 restated over 20 splits with a margin of one was refuted BEFORE commit: on another legitimate example set the gap is two. Not applied; Q2 stays red (A299)] 2026-10-07. The collective's review round 1, item 3, admitted on condition of a second machine's run. NEGATIVE RESULT, on record
 
 **What was tried.** Round 1 admitted, conditionally, a restatement of Q2: "within ONE right answer of
