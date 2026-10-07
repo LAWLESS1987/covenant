@@ -201,6 +201,40 @@ def a_chain(st, root):
           after["head"] != head_before,
           f"{head_before[:12]} -> {after['head'][:12]}")
 
+    # A8c -- THE LIMITATION IS WIDER THAN THE NEWEST RECORD (A304-CHAIN-SPLICE-2026-10-07). Found by an
+    # independent multi-agent review on 2026-10-07 and reproduced by two reviewers with the same heads: rewrite
+    # a MIDDLE record and recompute every later link, and the walk still verifies. The docstring that said
+    # verify_chain() "proves the ledger has not been reordered or spliced" is retracted for this.
+    import memory_store as _MS
+    import tempfile as _tf
+    croot = _tf.mkdtemp(prefix="a8c_")
+    cst = MemoryStore(croot)
+
+    def _write(recs):
+        out, prev = [], _MS.GENESIS
+        for r in recs:
+            r["prev"] = prev
+            ln = json.dumps(r, sort_keys=True)
+            out.append(ln)
+            prev = _MS._sha(ln)
+        open(cst.audit, "w", encoding="utf-8", newline="\n").write("\n".join(out) + "\n")
+    recs = [{"at": i, "action": "put", "name": "m%d" % i, "agent": "a", "sha256": "x%d" % i} for i in range(5)]
+    _write(recs)
+    honest = cst.verify_chain()
+    _l = open(cst.audit, encoding="utf-8").read().splitlines()
+    witnessed = (3, _MS._sha(_l[2]))         # a witness kept the head of the first 3 lines at that time
+    recs[1]["sha256"] = "FORGED"
+    _write(recs)
+    forged = cst.verify_chain()
+    check("A8c a MIDDLE record rewritten, with every later link recomputed, still 'verifies' -- the walk "
+          "alone cannot tell the two files apart (A304)",
+          honest["ok"] and forged["ok"] and honest["entries"] == forged["entries"] == 5
+          and honest["head"] != forged["head"], (honest, forged))
+    _l2 = open(cst.audit, encoding="utf-8").read().splitlines()
+    check("A8d ...and a witness that kept the head of the first N lines catches it: the same N lines no "
+          "longer hash to what was witnessed",
+          _MS._sha(_l2[witnessed[0] - 1]) != witnessed[1])
+
 
 # ------------------------------------------------------------- tombstoning
 def t_tombstone(st, root):

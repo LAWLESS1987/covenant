@@ -960,9 +960,10 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
     leg, or a broken chain, is PRESENT. UNKNOWN when it cannot be read. No remedy: the repository and its code are
     his and Grok's.
 
-    NOT MEASURED HERE: verify_chain() proves each line links to the one before it. A history rewritten with every
-    later link recomputed also verifies; only a head witnessed between readings would catch that, and this
-    witness keeps none yet."""
+    verify_chain() proves each line links to the one before it. A history rewritten with every later link
+    recomputed also verifies, so since A304 this witness keeps the head it saw (entries, head) and checks the next
+    reading against it. NOT MEASURED HERE: a rewrite made before the first reading this PC took, or one that only
+    appends; the head is witnessed on this PC alone, not published."""
     import re as _re
     now = time.time() if now is None else now
     path = cache or THREEFOLD_CACHE
@@ -1002,14 +1003,35 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
                 "known_gaps": known, "new_gaps": new_gaps[:10]}
     if not chain.get("ok"):
         measured["broken_at"] = chain.get("broken_at")
-    state = PRESENT if (not chain.get("ok") or new_gaps) else ABSENT
+    # A WITNESSED HEAD (A304, 2026-10-07; the collective's review, finding A, admitted with Tetsu). verify_chain()
+    # passes a history rewritten with every later link recomputed -- this witness's own blind spot, named in its
+    # docstring under A302. So each reading keeps (entries, head); the next must still hash its first `entries`
+    # lines to that head. A mismatch, or fewer lines than were witnessed, is "history rewritten": PRESENT, and the
+    # witness is NOT moved, so it stays visible until a person accepts it (delete head_witness in the cache).
+    witness = st.get("head_witness") if isinstance(st.get("head_witness"), dict) else None
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    rewritten = None
+    if chain.get("ok") and witness and witness.get("entries"):
+        n_w = int(witness["entries"])
+        if len(lines) < n_w:
+            rewritten = "the ledger has %d entries; %d were witnessed" % (len(lines), n_w)
+        else:
+            import memory_store as _ms                    # importable: _verify_chain_text put it on the path
+            if _ms._sha(lines[n_w - 1].rstrip("\n")) != witness.get("head"):
+                rewritten = "its first %d entries no longer hash to the head witnessed then" % n_w
+    if rewritten:
+        measured["history_rewritten"] = {"why": rewritten, "witnessed": witness}
+        new_witness = witness
+    else:
+        new_witness = {"entries": chain.get("entries"), "head": chain.get("head")} if chain.get("ok") else witness
+    state = PRESENT if (not chain.get("ok") or new_gaps or rewritten) else ABSENT
     out = {"state": state, "measured": measured}
     import sys as _sys
     _test = os.path.basename(str(_sys.argv[0] if _sys.argv else "")).startswith("test_")
     if cache or (read is None and not _test):        # a test never sets the LIVE baseline (A272's lesson)
         try:
             with open(path, "w", encoding="utf-8") as fh:
-                json.dump({"at": now, "known_gaps": known, "last": out}, fh)
+                json.dump({"at": now, "known_gaps": known, "last": out, "head_witness": new_witness}, fh)
         except OSError:
             pass
     return out

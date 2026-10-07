@@ -214,6 +214,11 @@ believes, and anyone who can write it can change what every reader concludes.
   a chain walk — nothing points at it yet. The head hash must be witnessed
   outside the file for the last write to be tamper-evident. Pinned by check A8
   in the suite.
+- **Wider than first written (A304-CHAIN-SPLICE-2026-10-07):** not only the newest
+  record. Any record can be rewritten and still pass a chain walk if every later
+  link is recomputed (check A8c). The same remedy covers both: keep the head of
+  the first N lines outside the file, and check that the next copy still hashes to
+  it (A8d).
 
 ## Tests
 

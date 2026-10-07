@@ -920,6 +920,31 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Never written in the repository, so there is no tree to hold on a branch: the claim as written stays in the session note it came from, marked corrected beside this id. docs/KNOWN_ISSUES.md is NOT exempt: its A274 entry quotes the old wording beside this id and restates it."
+  },
+  {
+   "id": "A304-CHAIN-SPLICE-2026-10-07",
+   "claim": "That ai_memory_system's verify_chain() proves the audit ledger has not been reordered or spliced (memory_store.py, the verify_integrity docstring; restated in state_root's docstring as 'this node's ledger was not reordered', and in server.py's comment 'The chain proves the ledger was not reordered'). The README stated the known limit only for an edit to the newest record.",
+   "refuted_by": "An independent multi-agent review of this repository, round 1, 2026-10-07, reproduced by two reviewers on two systems with the same heads: a 5-line ledger with record 2 rewritten and every later prev recomputed returns {ok: True, entries: 5} from verify_chain(); only the head differs (47cd855f... honest, b4f3efba... forged). Pinned as check A8c in ai_memory_system/test_memory_system.py.",
+   "truth": "verify_chain() proves each line links to the one before it. A rewrite that recomputes every later link verifies too; only a head witnessed outside the file (A8b, A8d) shows that history was rewritten. The newest-record case (A8) is one instance of this, not the whole limit.",
+   "verbatim": [
+    "verify_chain() proves the ledger has not been reordered or spliced.",
+    "verify_chain()  this node's ledger was not reordered   (local, timed)",
+    "The chain proves the ledger was not reordered"
+   ],
+   "patterns": [
+    "proves the ledger has not been reordered or spliced",
+    "verify_chain\\(\\)\\s+this node's ledger was not reordered",
+    "chain proves the\\s+(?:#\\s*)?ledger was not reordered"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a304-verify-chain-claim-as-written-2026-10-07 (at d3c10fa). The three live places it was written now quote it beside this id and the restated limit; docs/KNOWN_ISSUES.md is NOT exempt and cites this id beside its quotation."
   }
  ]
 }

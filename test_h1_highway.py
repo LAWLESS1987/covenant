@@ -1636,6 +1636,34 @@ def main():
           "the leg names seen are reported; a reading cached in the future is not reused (A302)",
           q0["state"] == H.ABSENT and q1["state"] == H.PRESENT and q1["measured"]["new_gaps"] == ["g"]
           and q1["measured"]["legs"] == {"jlens": 1, "jspace": 1, "lspace": 1} and q2["state"] == H.ABSENT, (q1, q2))
+    # A304: a witnessed head -- a rewritten middle with every later link recomputed verifies, and is still caught.
+    def _chain_forged(n, forge_at):
+        import sys as _s
+        _s.path.insert(0, os.path.join(HERE, "ai_memory_system"))
+        import memory_store as _ms
+        lines, prev = [], _ms.GENESIS
+        for i in range(n):
+            rec = {"at": i, "action": "put", "name": "m%d" % i, "agent": "t", "sha256": "FORGED" if i == forge_at else "x",
+                   "prev": prev}
+            ln = json.dumps(rec, sort_keys=True)
+            lines.append(ln)
+            prev = _hlt.sha256(ln.encode("utf-8")).hexdigest()
+        return "\n".join(lines) + "\n"
+    _tfc3 = os.path.join(tempfile.mkdtemp(prefix="h1tf3_"), "tf.json")
+    w0 = H.detect_threefold_witness(read=lambda repo: (_chain(5), _files2), now=1000.0, cache=_tfc3)
+    w1 = H.detect_threefold_witness(read=lambda repo: (_chain(6), _files2), now=5000.0, cache=_tfc3)
+    w2 = H.detect_threefold_witness(read=lambda repo: (_chain_forged(6, 1), _files2), now=9000.0, cache=_tfc3)
+    kept = json.load(open(_tfc3, encoding="utf-8")).get("head_witness") or {}
+    w2b = H.detect_threefold_witness(read=lambda repo: (_chain_forged(6, 1), _files2), now=11000.0, cache=_tfc3)
+    w3 = H.detect_threefold_witness(read=lambda repo: (_chain(3), _files2), now=13000.0, cache=_tfc3)
+    check("H1tf a witnessed head (A304): an extended history ABSENT; a middle rewritten with every later link "
+          "recomputed -- which verify_chain passes -- PRESENT 'history rewritten'; the witness is not moved by it; "
+          "a shortened ledger PRESENT",
+          w0["state"] == H.ABSENT and w1["state"] == H.ABSENT
+          and w2["state"] == H.PRESENT and w2["measured"]["chain_ok"] is True and "history_rewritten" in w2["measured"]
+          and kept.get("entries") == 6 and w2b["state"] == H.PRESENT
+          and w3["state"] == H.PRESENT and "history_rewritten" in w3["measured"],
+          (w1["state"], w2, kept, w2b["state"], w3["state"]))
     check("H1tf no remedy: the repository and its code are his and Grok's",
           [n for n, r in H.REMEDIES.items() if "threefold_witness" in (r.get("for") or [])] == [])
 

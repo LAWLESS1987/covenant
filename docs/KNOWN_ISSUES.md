@@ -7635,6 +7635,42 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A304. [verify_chain() was said to prove the ledger "has not been reordered or spliced"; a rewrite with every later link recomputed verifies. Retracted, the limit stated, the road's witness now keeps the head it saw, and the memory suite finally runs] 2026-10-07. Found by the collective's independent scientific review (round 1, finding A); reproduced by two reviewers (Claude, Tien) with the same heads; admitted with Tetsu. TOMBSTONED and FIXED, driven both ways
+
+**Measured.** In a 5-line ledger, record 2 was rewritten and every later `prev` recomputed. `verify_chain()`
+returned `{ok: True, entries: 5}` for both the honest and the forged file; only the head differed (47cd855f…
+honest, b4f3efba… forged). The same heads were reproduced independently on a Linux clone. The claim lived in
+three places: memory_store.py (the verify_integrity docstring, and "this node's ledger was not reordered"
+in state_root's) and server.py ("The chain proves the ledger was not reordered"). The README stated the limit
+only for an edit to the NEWEST record (A8).
+
+**Tombstoned (CLAUDE.md rule 10).** Branch `a304-verify-chain-claim-as-written-2026-10-07` (at d3c10fa)
+holds the wording as written. `docs/RETRACTED.json` carries `A304-CHAIN-SPLICE-2026-10-07`, with the three
+wordings verbatim and three patterns. Each live place now quotes its wording beside that id and the restated
+limit; the README states the wider limit beside A8. R1 117/117. Driven both ways: a probe file with each of
+the three wordings and no id turned R1 red (116/117, three separate runs); removed, 117/117.
+
+**The limit as executable checks.** A8c: a middle record rewritten and re-linked still verifies. A8d: a
+witness that kept the head of the first N lines catches it. The memory suite reads M1 184/184.
+
+**The suite had no runner, which was a second finding.** `ai_memory_system/test_memory_system.py` (182 checks
+before today) was run by nothing: covenant_one runs suites from the root and names each log
+`logs/<suite>.log`, and test_r2 only lists the file's path. Its guards, A8 included, had never been observed
+by the sweep or by public CI. `test_m1_memory_system.py` runs it unchanged and passes its tally through.
+Registered; staged run: ok, M1 184/184. Every store it builds is a temp dir.
+
+**The road's own exposure, closed.** The threefold witness (A294) checked `verify_chain()` only, so a
+rewritten threefold-memory history read ABSENT. A302 named this in its docstring. Each reading now keeps
+`(entries, head)`, and the next must hash its first `entries` lines to that head. A mismatch, or fewer lines,
+is PRESENT "history rewritten". The witness is not moved by it, so it stays visible until a person accepts
+it. H1tf: an extended history reads ABSENT; a re-linked middle rewrite reads PRESENT; a re-read of the same
+forged file stays PRESENT; a shortened ledger reads PRESENT. Mutations: the head check off fails H1tf; the
+witness moved by the rewrite fails H1tf; the shortening check off crashes the suite (caught, as a crash).
+Restored, H1 217/217 in the tree. Not measured: a rewrite before this PC's first reading, and the head is
+witnessed on this PC only, not published.
+
+---
+
 ### A303. [A misconfigured semantic veto switched itself off: a misspelled semantic judge, or a threshold above the semantic seats, admitted what a semantic judge refused] 2026-10-07. Found by the collective's independent scientific review (round 1, Codex's CXR-1). Reproduced by Claude on a second OS; admitted by Claude and Tetsu, with Tetsu's dissent on the trade recorded. FIXED, driven both ways
 
 **Measured (Codex's isolated reproducer, then Claude's run of it on this PC at 2fabfed: 8/8).** QuorumJudge
