@@ -50,6 +50,7 @@ import judge_suite as S                                        # noqa: E402
 from covenant_judge_fallback import FallbackModel, _payload_text  # noqa: E402
 
 STEP = 0.35
+Q2_SPLITS = 20      # A305: measured over this many seeds, not one
 results = []
 
 
@@ -142,9 +143,35 @@ def main():
     print("      exam  yesterday %s | rebuild %s | refine %s" % (e_y, e_b, e_r))
     check("A127.Q1 FALSE CLEARS STAY AT ZERO. A wrong hold is a deferral; a "
           "wrong clear is a theft admitted", e_r[2] == 0, e_r)
-    check("A127.Q2 refining is no worse than rebuilding on right answers and "
-          "no worse on false convictions",
-          e_r[0] >= e_b[0] and e_r[1] <= e_b[1], (e_r, e_b))
+    # Q2's RIGHT-ANSWER HALF IS RETRACTED (A305-Q2-ONE-SPLIT-2026-10-07). As first written it read: "refining is
+    # no worse than rebuilding on right answers and no worse on false convictions", decided on seed 7 alone, over a
+    # live ledger that grows daily. Measured by two reviewers on two hosts (an independent multi-agent review,
+    # 2026-10-07): the right-answer gap ranges from -2 to +1 by split and by example set -- it is the cost of
+    # bounded steps (B1), not a property that holds. The false-conviction half held in all 230 runs. So that half
+    # is asserted in EVERY split, and the right-answer gap is REPORTED, with the ledger's hash, never asserted.
+    # It rests on judge_suite's exam cases (53 on 2026-10-07): a small exam, said plainly.
+    import hashlib
+    try:
+        ledger_sha = hashlib.sha256(open(D.VERDICTS, "rb").read()).hexdigest()[:12]
+    except OSError:
+        ledger_sha = "unreadable"
+    gaps = []
+    for seed in range(Q2_SPLITS):
+        rs = list(examples)
+        random.Random(seed).shuffle(rs)
+        cs = int(len(rs) * 0.85)
+        y_s = FallbackModel.train(rs[:cs], ["y"], trained_at=when)
+        b_s = FallbackModel.train(rs, ["t"], trained_at=when)
+        r_s = FallbackModel.refine(y_s, rs, ["t"], trained_at=when, step=STEP)
+        eb, er = exam(b_s), exam(r_s)
+        gaps.append((er[0] - eb[0], er[1] - eb[1]))
+    print("      Q2 REPORTED, not asserted: right-answer gap (refine minus rebuild) per split %s"
+          % [g[0] for g in gaps])
+    print("      Q2 ledger %s sha256 %s, %d rows after load_verdicts; %d exam cases"
+          % (os.path.relpath(D.VERDICTS, HERE), ledger_sha, len(examples), len(S.CASES)))
+    check("A127.Q2 in every one of %d splits refining makes no more false convictions than rebuilding "
+          "(on %d exam cases; the right-answer half is retracted, A305)" % (Q2_SPLITS, len(S.CASES)),
+          all(g[1] <= 0 for g in gaps), gaps)
 
     # ---- G: the gate measures what ships -----------------------------------
     src = inspect.getsource(D.train)

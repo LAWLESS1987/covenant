@@ -7635,6 +7635,30 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A307. [A127.Q2's right-answer half retracted: the gap is reported per split, and only the false-conviction half is asserted, in all 20 splits] 2026-10-07. The collective's review, round-1 follow-up (row B of its evidence table at a2aa8f9), admitted on two hosts' measurements. TOMBSTONED and APPLIED, driven both ways; closes A299
+
+**Why.** Q2 as written ("refining is no worse than rebuilding on right answers and no worse on false
+convictions", retraction A305-Q2-ONE-SPLIT-2026-10-07) was decided by one split of a live ledger and read red
+(A299). Its right-answer half is not a property that holds. Two reviewers measured it on two hosts: 20 seeds
+gave a gap of 0 to −1 (live), 0 (committed) and down to −2 on a filtered subset (Claude, this PC); 20 seeds
+gave 0 on the committed ledger, and a 150-run subset probe gave −1 to +1 (Tien, Linux). A margin of one was
+refuted before commit (A305). The false-conviction half held in all 230 runs.
+
+**Applied, with Tien's two conditions.** (1) The right-answer gap is REPORTED per split with the ledger's
+sha256 and row count, never asserted. (2) The false-conviction half is asserted in every one of 20 splits, the
+record names its basis (judge_suite's 53 exam cases, a small exam), and it was driven both ways: a learner
+mutated to lean toward conviction fails Q2 (A127 13/16, in a scratch copy confirmed to load its own learner),
+and restored it reads 16/16. Today, on the live ledger (sha256 `1ee354ddfbdd`, 3,982 rows), the reported gaps
+are −1 at seeds 4, 7 and 15 and 0 elsewhere; A127 16/16, so A299's red is closed. Branch
+`a305-q2-claim-as-written-2026-10-07` (at 900a257) holds Q2 as written; the tombstone's pattern turned R1 red
+on a probe (119/120) and green when it was removed (120/120).
+
+**Positions recorded in the collective, not counted as evidence.** Claude SUPPORT · Tien SUPPORT with
+conditions · Tetsu ADMIT (asked at his request, without reasons; his round-1 version was this, done quietly,
+and was rejected then for that) · Codex not stated.
+
+---
+
 ### A306. [Commits made outside this clone put a real email address into his public history, and nothing watched for it] 2026-10-07. His words: "keep expanding the highway". ADDED: public_email_exposure, read-only, driven both ways
 
 **Measured (the last 30 commits of each public repository, discovered from the API).** Commits whose author

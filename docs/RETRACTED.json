@@ -945,6 +945,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "The claim as first written is preserved on branch a304-verify-chain-claim-as-written-2026-10-07 (at d3c10fa). The three live places it was written now quote it beside this id and the restated limit; docs/KNOWN_ISSUES.md is NOT exempt and cites this id beside its quotation."
+  },
+  {
+   "id": "A305-Q2-ONE-SPLIT-2026-10-07",
+   "claim": "A127.Q2: that refining the student judge is no worse than rebuilding it on right answers (and no worse on false convictions), decided on one shuffle (seed 7) of a live ledger that grows daily.",
+   "refuted_by": "An independent multi-agent review of this repository, 2026-10-07, measured by two reviewers on two hosts: over 20 seeds the right-answer gap (refine minus rebuild) was 0 to -1 on the live ledger, 0 on the committed one, down to -2 on a filtered subset, and -1 to +1 across a 150-run subset probe. A restatement with a margin of one was itself refuted before commit (KNOWN_ISSUES A305).",
+   "truth": "The right-answer gap is the cost of bounded steps (A127.B1): it varies by split and by example set and is now REPORTED per split with the ledger's hash, never asserted. The false-conviction half held in all 230 runs and is asserted in every one of 20 splits, on judge_suite's exam cases (53 on 2026-10-07).",
+   "verbatim": [
+    "refining is no worse than rebuilding on right answers and no worse on false convictions"
+   ],
+   "patterns": [
+    "refining is no worse than rebuilding on right answers and no worse on false convictions"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/sweep_heal_last.txt"
+   ],
+   "note_on_allow": "The check as first written is preserved on branch a305-q2-claim-as-written-2026-10-07 (at 900a257). Sweep transcripts written before the retraction quote it and are allowed; the test file quotes it beside this id; docs/KNOWN_ISSUES.md is NOT exempt."
   }
  ]
 }
