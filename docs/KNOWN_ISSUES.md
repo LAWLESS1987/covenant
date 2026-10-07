@@ -7635,6 +7635,23 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A292. [For four days the road could not restart a node whose code had changed: restart_nodes had been quarantined since 2026-10-02 over a blocker long since fixed] 2026-10-06. Found reading the highway ledger after source_drift stayed red behind each module commit. RECALIBRATED on the record
+
+restart_nodes answers source_drift and node_down. On 2026-10-02 it was graded "did not fix" twice (08:53,
+09:58). That day verify_deploy's pins were stale (M53) and it refused every restart it gated, so the
+failures were real and the quarantine was right. The pins have verified clean since, but a quarantine
+lifts only on a success or a recalibration, and a quarantined remedy cannot run to succeed. From 10-02
+every source_drift was refused ("quarantined: measured not fixing it 2 times", six times on 10-06 alone),
+and each module commit that day left the nodes stale until a person ran rolling_restart.py: about ten
+times, each confirmed from a separate command. recalibrate() records this reason; the failures stay in the
+ledger above it.
+
+**What it shows about the engine, not fixed here.** A quarantine whose cause is gone has no path back
+without a person: nothing re-tests a quarantined remedy. That is a design question (a periodic probe? an
+expiry?) for whoever decides how much the road may retry on its own.
+
+---
+
 ### A291. [A J-lens witness on Tetsu's reviews: installed, measured in part, PAUSED by his choice -- this PC cannot hold the 2B beside everything else] 2026-10-06. His words: "can we incorperate jlens from anthropic with the covenant system?"; then yes to the downloads; then "Pause J-lens". PLAN AND PARTIAL RESULT ON RECORD
 
 **What it is.** Anthropic's Jacobian lens (github.com/anthropics/jacobian-lens, Apache-2.0, a reference
