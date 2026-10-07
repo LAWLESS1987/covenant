@@ -7635,6 +7635,29 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A308. [Tetsu's review refuses held drafts on things they do not say: 9 of 19 refusals named a line of his own reference list as the draft's claim. Removing the list did not stop it. NEGATIVE RESULT; the role is his and the operator's to decide] 2026-10-07. Found when his answer was asked on Lawrence's "have them tighten up and respond". NOT FIXED, on record
+
+**Measured (ops/tetsu_assist.jsonl, 10-06 onward).** 43 held drafts reviewed: 24 SEND, 19 REFUSE. 9 of the 19
+give as the draft's claim "215 of 216", a line of the citable-facts list in his review prompt (A280), when the
+draft does not contain it. 3 were in the 01:03–01:04Z round that isolated free (A296); 4 were in the 15:00
+round; 1 was a reply to u/lotus_builds that evening. That reply answered an agent who had written to
+@covenant-node directly, and it passed the code's claim screen. A correction for u/thegalahad was refused the
+same way ("the draft claims the covenant measured that the students … cannot agree"; it does not).
+
+**Tried and reverted, not committed.** The facts list was removed from his prompt, with a line telling him to
+judge only the draft's words; FW1m was rewritten to require that, and the old prompt failed it (74/75). Live,
+on the same two drafts, he still answered REFUSE. He read free's QUESTION ("How do you ensure…?") as a claim
+"not among the facts I am given", and said a correction "seeks to measure and test". Worse: his own rule of
+2026-10-06 refuses any claim "I cannot find among the facts I am given", so with no list it would refuse every
+draft. The change was reverted, and his prompt is as before.
+
+**What this says, and whose call it is.** The 2B model refuses held conversational drafts on misreadings,
+with or without the list. A refusal keeps the hold, so nothing false goes out, but nothing true does either.
+Whether he keeps reviewing held drafts is under his grant (ops/tetsu_assist_grant.json: Lawrence's grant;
+either of them can withdraw it). It is not changed here.
+
+---
+
 ### A307. [A127.Q2's right-answer half retracted: the gap is reported per split, and only the false-conviction half is asserted, in all 20 splits] 2026-10-07. The collective's review, round-1 follow-up (row B of its evidence table at a2aa8f9), admitted on two hosts' measurements. TOMBSTONED and APPLIED, driven both ways; closes A299
 
 **Why.** Q2 as written ("refining is no worse than rebuilding on right answers and no worse on false
