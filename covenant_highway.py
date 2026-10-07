@@ -2462,22 +2462,40 @@ REMEDIES = {
 }
 
 
-def quarantined(name, ledger=None):
-    """A remedy measured failing QUARANTINE_AFTER times is not offered.
+PROBATION_AFTER_S = 86400     # A293: a quarantined remedy may try once more a day after its last failure
 
-    Reset by a measured success, or by an explicit `recalibrated` row -- see
-    recalibrate(). Never by deleting history: a counter you can clear by
-    forgetting is not a counter.
-    """
-    fails = 0
+
+def quarantine_state(name, ledger=None, now=None):
+    """('ok' | 'quarantined' | 'probation', time of the last counted failure or None).
+
+    A remedy measured failing QUARANTINE_AFTER times is quarantined. Reset by a measured success, or by an
+    explicit `recalibrated` row -- see recalibrate(). Never by deleting history.
+
+    PROBATION (A293, 2026-10-06, his words: "keep expanding the highway"). A quarantine had no way back but a
+    person: restart_nodes, quarantined on 2026-10-02 over stale pins fixed days before, refused every
+    source_drift for four days (A292). Now, PROBATION_AFTER_S after its last failure, a quarantined remedy is
+    offered ONE attempt: a success clears it as any success does; a failure renews the quarantine for another
+    day. At most one retry a day, each marked in the ledger. Every other refusal still applies."""
+    now = time.time() if now is None else now
+    fails, last_fail = 0, None
     for row in read_ledger(ledger):
         if row.get("remedy") != name:
             continue
         if row.get("outcome") in ("fixed", "recalibrated"):
-            fails = 0
+            fails, last_fail = 0, None
         elif row.get("outcome") == "did not fix":
             fails += 1
-    return fails >= QUARANTINE_AFTER
+            last_fail = float(row.get("at") or 0) or last_fail
+    if fails < QUARANTINE_AFTER:
+        return "ok", last_fail
+    if last_fail is not None and now - last_fail >= PROBATION_AFTER_S:
+        return "probation", last_fail
+    return "quarantined", last_fail
+
+
+def quarantined(name, ledger=None, now=None):
+    """A remedy measured failing QUARANTINE_AFTER times is not offered -- except on probation (A293)."""
+    return quarantine_state(name, ledger, now)[0] == "quarantined"
 
 
 def recalibrate(name, why, ledger=None):
@@ -2715,9 +2733,13 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         row.update(outcome="refused", why="changes state with no undo on record")
         return write_ledger(row, ledger)
 
-    if quarantined(name, ledger):
+    qstate, qlast = quarantine_state(name, ledger)
+    if qstate == "quarantined":
         row.update(outcome="refused", why="quarantined: measured not fixing it %d times" % QUARANTINE_AFTER)
         return write_ledger(row, ledger)
+    if qstate == "probation":
+        row["probation"] = ("quarantined after %d failures, the last at %s; one attempt a day until it works (A293)"
+                            % (QUARANTINE_AFTER, time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(qlast))))
 
     before = (condition or {}).get("state")
     ok, detail = r["fn"]((condition or {}).get("measured"), dry_run=dry_run)

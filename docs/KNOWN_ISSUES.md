@@ -7635,6 +7635,21 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A293. [A quarantine had no way back but a person: now a quarantined remedy gets one attempt a day, on probation] 2026-10-06. His words: "keep expanding the highway". ADDED, driven both ways; answers A292's open question
+
+A292 found restart_nodes refused for four days over a blocker fixed long before, and noted that nothing
+re-tests a quarantined remedy. `quarantine_state()` now returns 'ok', 'quarantined' or 'probation'. Once
+PROBATION_AFTER_S (a day) has passed since a quarantined remedy's last counted failure, it is offered ONE
+attempt. apply_remedy marks that row `probation` with the count and the date. A success clears the
+quarantine, as any success does; a failure renews it for another day. Every other refusal still applies:
+class, NEVER_AUTOMATIC, the operator's choices, stateless-or-undo, budgets and cooldowns. `quarantined()`
+keeps its meaning for its callers (true only when not on probation); its consumers were grepped first, and
+the standing table reads the ledger itself and is unchanged. H1qp: a day-old quarantine runs once, marked; a
+failure renews it; a success clears it; an hour-old one stays refused. Mutations: no probation fails it, and
+so does a probation that never renews; H1 210/210. At commit, no remedy is quarantined.
+
+---
+
 ### A292. [For four days the road could not restart a node whose code had changed: restart_nodes had been quarantined since 2026-10-02 over a blocker long since fixed] 2026-10-06. Found reading the highway ledger after source_drift stayed red behind each module commit. RECALIBRATED on the record
 
 restart_nodes answers source_drift and node_down. On 2026-10-02 it was graded "did not fix" twice (08:53,

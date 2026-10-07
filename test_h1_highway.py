@@ -171,6 +171,27 @@ def main():
     H.write_ledger({"remedy": "rotate_log", "outcome": "fixed"}, led)
     check("H1e mutation: a later success clears the quarantine", not H.quarantined("rotate_log", led))
 
+    # ---- H1qp: probation (A293). A quarantine whose last failure is a day old gets ONE attempt a day.
+    ledp = tmp_ledger()
+    _old = time.time() - H.PROBATION_AFTER_S - 600
+    for k in range(2):
+        H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix", "at": _old + k}, ledp)
+    st_old, _ = H.quarantine_state("rotate_log", ledp)
+    rowp = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=ledp, choices={}, cooldown_s=0)
+    H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix", "at": time.time()}, ledp)
+    st_failed, _ = H.quarantine_state("rotate_log", ledp)
+    H.write_ledger({"remedy": "rotate_log", "outcome": "fixed", "at": time.time()}, ledp)
+    st_fixed, _ = H.quarantine_state("rotate_log", ledp)
+    ledr = tmp_ledger()
+    for k in range(2):
+        H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix", "at": time.time() - 3600 + k}, ledr)
+    st_recent, _ = H.quarantine_state("rotate_log", ledr)
+    check("H1qp a quarantine a day old is on probation: one attempt runs, marked as such; a failure renews the "
+          "quarantine; a success clears it; failures an hour old stay quarantined",
+          st_old == "probation" and rowp.get("outcome") != "refused" and "A293" in str(rowp.get("probation"))
+          and st_failed == "quarantined" and st_fixed == "ok" and st_recent == "quarantined",
+          (st_old, rowp.get("outcome"), rowp.get("probation"), st_failed, st_fixed, st_recent))
+
     # ---- H1f: the registry audits
     bad_undo = [n for n, r in H.REMEDIES.items()
                 if r["klass"] == H.AUTO_REVERSIBLE and r.get("kind") != "stateless" and not r.get("undo")]
