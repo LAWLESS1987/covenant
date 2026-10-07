@@ -587,6 +587,35 @@ def main():
     finally:
         H.REMEDIES["dispatch_phone_build"] = real_d
 
+    # ---- H1nz: a remedy's own noise window (A286, 2026-10-06) -----------------
+    calls_w = []
+    real_w = dict(H.REMEDIES["schedule_watchdog_restart"])
+    try:
+        H.REMEDIES["schedule_watchdog_restart"] = dict(real_w, fn=spy_remedy(calls_w))
+        led_w = tmp_ledger()
+
+        def _age(led, s):
+            rows_ = H.read_ledger(led)
+            rows_[-1]["at"] = rows_[-1]["at"] - s
+            with open(led, "w", encoding="utf-8") as fh:
+                for r_ in rows_:
+                    fh.write(json.dumps(r_) + chr(10))
+        H.apply_remedy("schedule_watchdog_restart", present(), "watchdog_stale", dry_run=False, ledger=led_w, choices={})
+        _age(led_w, 600)
+        soon = H.apply_remedy("schedule_watchdog_restart", present(), "watchdog_stale", dry_run=False, ledger=led_w, choices={})
+        _age(led_w, 400)
+        later = H.apply_remedy("schedule_watchdog_restart", present(), "watchdog_stale", dry_run=False, ledger=led_w, choices={})
+        check("H1nz the watchdog restart waits out its own 15 min (not the engine's hour): 10 min later a repeat, 16 min later it runs",
+              soon.get("repeat") is True and later.get("repeat") is not True and len(calls_w) == 2,
+              (soon.get("repeat"), later.get("repeat"), len(calls_w)))
+        led_r = tmp_ledger()
+        H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led_r, choices={})
+        _age(led_r, 1000)
+        r_hour = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led_r, choices={})
+        check("H1nz ...while a remedy that declares none keeps the engine's hour", r_hour.get("repeat") is True, r_hour.get("repeat"))
+    finally:
+        H.REMEDIES["schedule_watchdog_restart"] = real_w
+
     # ---- H1n: a quarantine is cleared on the record, never by forgetting
     led = tmp_ledger()
     for _ in range(2):
@@ -1562,8 +1591,33 @@ def main():
           (("orphan", _orphan), ("up", _up), ("mem", _mem), ("broken", _broken))}
     check("H1tt model_unmanaged: a server the keeper has no record of PRESENT; managed or nothing up ABSENT; "
           "unreadable UNKNOWN", mu == {"orphan": H.PRESENT, "up": H.ABSENT, "mem": H.ABSENT, "broken": H.UNKNOWN}, mu)
-    _tt_paired = [n for n, r in H.REMEDIES.items() if set(r.get("for") or []) & {"tetsu_cannot_answer", "model_unmanaged"}]
-    check("H1tt neither Tetsu condition has a remedy: they are read and reported, a person acts", _tt_paired == [], _tt_paired)
+    # A287 (2026-10-06): this check said neither condition has a remedy, "freeing memory is his". A252 -- his own
+    # words, "find a way to safely ensure tetsus operation" -- left CLOSING to him; a trim closes nothing. So
+    # tetsu_cannot_answer now has exactly one remedy, the trim, and model_unmanaged still has none.
+    _tt_paired = sorted((n, f) for n, r in H.REMEDIES.items() for f in (r.get("for") or [])
+                        if f in ("tetsu_cannot_answer", "model_unmanaged"))
+    check("H1tt the only Tetsu remedy is trim_idle_apps, for tetsu_cannot_answer; model_unmanaged has none",
+          _tt_paired == [("trim_idle_apps", "tetsu_cannot_answer")], _tt_paired)
+    _tr = H.REMEDIES["trim_idle_apps"]
+    _crossed = [w for w in H.NEVER_AUTOMATIC for t in _tr.get("touches", []) if w in t.lower()]
+    check("H1tt the trim is AUTO_REVERSIBLE, stateless, at most once an hour, and touches no NEVER_AUTOMATIC subject",
+          _tr["klass"] == H.AUTO_REVERSIBLE and _tr["kind"] == "stateless" and _tr.get("cooldown_s", 0) >= 3600 and not _crossed,
+          (_tr, _crossed))
+    _real_runner = H._trim_runner
+    try:
+        _ran = []
+        H._trim_runner = lambda names, dry: (_ran.append((tuple(names), dry)), {"trimmed": 5, "foreground": "Code",
+                                                                                "before_gb": 1.6, "after_gb": 3.3})[1]
+        ok_nm, why_nm = H.remedy_trim_idle_apps({"verdict": "FAIL", "why": "no runtime"}, dry_run=False)
+        ok_tr, why_tr = H.remedy_trim_idle_apps({"free_gb": 1.6, "needs_gb": 2.1}, dry_run=False)
+    finally:
+        H._trim_runner = _real_runner
+    if os.name == "nt":
+        check("H1tt the trim declines outside the memory case and, in it, trims and says what it freed and what it spared",
+              ok_nm is False and not any(not d for _n, d in _ran[:0]) and ok_tr is True and "1.6 -> 3.3" in why_tr
+              and "not Code" in why_tr and len(_ran) == 1, (why_nm, why_tr, _ran))
+    check("H1tt the trim's list is background apps only -- never Python (the nodes, the watchdog) or the model server",
+          not any(n.lower().startswith(("python", "llama", "pythonw")) for n in H.TRIM_APPS), H.TRIM_APPS)
     check("H1tt both are registered, so sense() runs them every pass",
           H.DETECTORS.get("tetsu_cannot_answer") is H.detect_tetsu_cannot_answer
           and H.DETECTORS.get("model_unmanaged") is H.detect_model_unmanaged)

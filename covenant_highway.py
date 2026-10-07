@@ -2192,6 +2192,55 @@ def remedy_run_full_sweep(measured, dry_run=True):
         getattr(p, "pid", "?"), (measured or {}).get("disk_core"))
 
 
+TRIM_APPS = ("ChatGPT", "msedge", "msedgewebview2", "codex", "claude", "Widgets", "SearchHost")
+
+
+def _trim_runner(names, dry_run):
+    """Windows: empty the working sets of the named background apps, never the one in front of him. Returns a
+    dict {trimmed, foreground, before_gb, after_gb} or raises."""
+    import subprocess
+    ps = ("Add-Type -Namespace CovHw -Name T -MemberDefinition '[DllImport(\"psapi.dll\")] public static extern bool "
+          "EmptyWorkingSet(System.IntPtr h); [DllImport(\"user32.dll\")] public static extern System.IntPtr "
+          "GetForegroundWindow(); [DllImport(\"user32.dll\")] public static extern uint GetWindowThreadProcessId("
+          "System.IntPtr h, out uint pid);'; "
+          "$fg = 0; [void][CovHw.T]::GetWindowThreadProcessId([CovHw.T]::GetForegroundWindow(), [ref]$fg); "
+          "$fgName = (Get-Process -Id $fg -ErrorAction SilentlyContinue).ProcessName; "
+          "$b = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory; $n = 0; "
+          "foreach ($p in Get-Process -Name %s -ErrorAction SilentlyContinue) { if ($p.ProcessName -eq $fgName) { continue }; "
+          "%s }; Start-Sleep -Seconds 3; $a = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory; "
+          "@{trimmed=$n; foreground=$fgName; before_gb=[math]::Round($b/1MB,2); after_gb=[math]::Round($a/1MB,2)} | ConvertTo-Json -Compress"
+          % (",".join("'%s'" % n for n in names),
+             "$n++" if dry_run else "try { if ([CovHw.T]::EmptyWorkingSet($p.Handle)) { $n++ } } catch {}"))
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=90,
+                       creationflags=0x08000000)
+    return json.loads(r.stdout.strip() or "{}")
+
+
+def remedy_trim_idle_apps(measured, dry_run=True):
+    """Make room for Tetsu by trimming idle background apps' working sets -- nothing closes, and their pages come
+    back the moment they are used.
+
+    A287 (2026-10-06). His words on 2026-10-04 (A252): "also find a way to safely ensure tetsus operation". That
+    day nothing fit for Tetsu to load; on 2026-10-06 it happened three times, and each time this trim, done by
+    hand, took free memory from 1.6 to 3.3-3.4 GB and his model loaded on the next ask. A252 left "what to CLOSE"
+    to him, and that stands: nothing here closes anything. Only the memory case (the keeper names free vs needed),
+    only TRIM_APPS, never the app in front of him, at most once an hour."""
+    m = measured or {}
+    if m.get("needs_gb") is None or m.get("free_gb") is None:
+        return False, "not the memory case: nothing a trim can help"
+    if os.name != "nt":
+        return False, "not Windows: no working sets to trim here"
+    try:
+        got = _trim_runner(TRIM_APPS, dry_run)
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the trim could not run: %s: %s" % (type(e).__name__, str(e)[:120])
+    if dry_run:
+        return True, "would trim %s background app process(es), not %s (in front of him); free %s GB, needs %s GB" % (
+            got.get("trimmed"), got.get("foreground") or "?", m.get("free_gb"), m.get("needs_gb"))
+    return True, "trimmed %s background app process(es), not %s (in front of him): free %s -> %s GB; needs %s GB" % (
+        got.get("trimmed"), got.get("foreground") or "?", got.get("before_gb"), got.get("after_gb"), m.get("needs_gb"))
+
+
 def remedy_evict_test_mesh(measured, dry_run=True):
     """STATELESS: end the leftover TEST nodes (run_node.py --port 60x0) of a sweep that is not running.
 
@@ -2273,6 +2322,14 @@ REMEDIES = {
                                             "red that is transient clears; red that is real is named"],
                                   "cost": ["the seconds those suites take, never the full ~14 min sweep"],
                                   "irreversible": []}},
+    # A287 (2026-10-06): room for Tetsu, by trimming idle background apps; nothing closes (A252: closing is his).
+    "trim_idle_apps": {"fn": remedy_trim_idle_apps, "klass": AUTO_REVERSIBLE,
+                       "for": ["tetsu_cannot_answer"], "kind": "stateless", "cooldown_s": 3600,
+                       "touches": ["idle background apps' working sets (pages return on use; nothing closes)"],
+                       "benefit": {"gains": ["Tetsu can load and answer again without a person freeing memory"],
+                                   "cost": ["a background app pages back in when he next uses it -- a moment's lag, "
+                                            "never the app in front of him"],
+                                   "irreversible": []}},
     # A278 (2026-10-06): a sweep of the core on disk, at most once in SWEEP_BUDGET_S, graded once it wrote.
     "run_full_sweep": {"fn": remedy_run_full_sweep, "klass": AUTO_REVERSIBLE,
                        "for": ["sweep_not_current"], "kind": "stateless",
@@ -2360,8 +2417,9 @@ REMEDIES = {
     "schedule_watchdog_restart": {"fn": remedy_schedule_watchdog_restart,
                                   "klass": AUTO_REVERSIBLE, "for": ["watchdog_stale"],
                                   # A scheduled restart lands in minutes; fifteen
-                                  # is the window.
-                                  "kind": "stateless", "async": True, "grade_after_s": 900.0,
+                                  # is the window. A286: and the noise window too --
+                                  # never a second restart before the first is graded.
+                                  "kind": "stateless", "async": True, "grade_after_s": 900.0, "noise_s": 900.0,
                                   "touches": ["the watchdog process"],
                                   "benefit": {"gains": ["the watchdog runs the modules that are on disk, without a person"],
                                               "cost": ["a few seconds with nothing watching the nodes"],
@@ -2557,8 +2615,13 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     # ten-minute job inside twenty minutes. A budget a caller can wave away is
     # not a budget; the hour is mine to skip, the day is not.
     declared = r.get("cooldown_s")
+    # A286 (2026-10-06): a remedy may declare a shorter NOISE window than the engine's hour ("noise_s"). The
+    # watchdog's own restart was the case: every module a person changed left watchdog_stale PRESENT and the
+    # road red for up to an hour after the remedy had measurably worked once, because a NEW instance of the
+    # condition waited out the old row's hour.
+    noise_decl = r.get("noise_s")
     if cooldown_s is None:
-        eff = declared if declared is not None else ROW_COOLDOWN_S
+        eff = declared if declared is not None else (noise_decl if noise_decl is not None else ROW_COOLDOWN_S)
     elif declared is not None:
         eff = max(cooldown_s, declared)
     else:
@@ -2569,7 +2632,7 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     # So a declared budget is measured from the last row that RAN; the noise cooldown (the hour, or none for
     # a person) still counts any row, so the ledger stays quiet.
     if declared is not None and eff:
-        noise_s = ROW_COOLDOWN_S if cooldown_s is None else cooldown_s
+        noise_s = (noise_decl if noise_decl is not None else ROW_COOLDOWN_S) if cooldown_s is None else cooldown_s
         prev = ((_recent_identical(name, detector, ledger, noise_s, include_dry=bool(dry_run)) if noise_s else None)
                 or _recent_spend(name, detector, ledger, declared, include_dry=bool(dry_run)))
     else:

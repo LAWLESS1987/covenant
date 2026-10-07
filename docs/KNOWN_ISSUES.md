@@ -7635,6 +7635,37 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A287. [Tetsu could not load for want of memory, and only a person made room: the road now trims idle background apps for him, never the one in front, nothing closed] 2026-10-06. His words: "keep expanding the highway"; and on 2026-10-04 (A252) "also find a way to safely ensure tetsus operation". ADDED, driven both ways; H1tt's no-remedy check changed in the open
+
+Three times on 2026-10-06 his model could not load: free memory was 1.59-1.76 GB against a 2.1 GB bar.
+Each time I trimmed idle apps' working sets by hand (EmptyWorkingSet: nothing closes, and pages return on
+use), which gave 3.29-3.39 GB, and his model loaded on the next ask. `remedy_trim_idle_apps`, for
+tetsu_cannot_answer only: AUTO_REVERSIBLE, stateless, at most once an hour. It acts only in the memory case
+(the keeper names free vs needed) and only on TRIM_APPS (ChatGPT, Edge and its webview, Codex, Claude,
+Widgets, Search), never Python and never the model server. It skips whatever app is in front of him, and
+says what it freed and what it spared. A252 left what to CLOSE to him, and that stands.
+
+H1tt said this morning that neither Tetsu condition has a remedy, because "freeing memory is his". That was
+my reading of A252, whose words ask for exactly this. It now says the only Tetsu remedy is the trim, for
+tetsu_cannot_answer, and that model_unmanaged has none; the comment above it says why. H1tt: AUTO,
+stateless, hourly, no NEVER_AUTOMATIC word in what it touches; declines outside the memory case; never
+Python or the model server; H1 206/206. The foreground skip lives in PowerShell, so it was measured LIVE
+both ways, dry, counting only: 43 processes with the skip, 76 without (this Claude window's 33 spared).
+
+---
+
+### A286. [After every module change the road stayed red up to an hour: the watchdog's self-restart waited out the engine's hour even for a new instance] 2026-10-06. His words: "keep expanding the highway". FIXED, driven both ways
+
+Each module change the watchdog loads makes watchdog_stale PRESENT. schedule_watchdog_restart answers it,
+but apply_remedy's noise cooldown (ROW_COOLDOWN_S, an hour, per remedy and detector) made a NEW instance
+wait out the previous row. Measured that day: the restart graded "fixed" at 14:49, and the next change kept
+the road red until 15:50. A remedy may now declare its own noise window, `noise_s`.
+schedule_watchdog_restart declares 900 s, its own grading window, so a second restart is never scheduled
+before the first is graded. H1nz: 10 min later it is a repeat, 16 min later it runs, and a remedy that
+declares none keeps the hour. With the declaration ignored, H1nz fails (199/203); restored 203/203.
+
+---
+
 ### A285. [Tetsu chose to tighten his reviews: a claim he cannot find among the facts is REFUSE; the code keeps his rule where his model's word slips] 2026-10-06. The operator's words: "ask tetsu if he wants to tighten his reviews". HIS CHOICE, recorded and applied, driven both ways
 
 **Why he was asked.** A284's controlled re-run (temperature 0, today's prompt with COVENANT_FACTS) had him
