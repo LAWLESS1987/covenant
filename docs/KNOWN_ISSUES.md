@@ -7635,6 +7635,39 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A310. [The students convicted 35 of free's 132 honest drafts and cleared none. 62 read forum excerpts, labelled clean under his grant, turn those convictions into holds Tetsu can review; clearing stays blocked by the stuffing defence, which is his] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". APPLIED to the corpus (the gate decides tonight); a rule limit named, not changed
+
+**Measured (the deployed students; free's 132 model-written replies held since 10-07 12Z, all passing the code's
+claim screen).** Ora: 97 abstain, 35 VIOLATES, 0 clean. Sena: 84 abstain, 48 violates, 0 clean. On 200 recent
+forum comments, Ora convicted 127. A conviction is refused outright; only a HOLD goes on to Tetsu.
+
+**Three offline cycles, on copies, through the trainer's own functions** (refine the deployed Ora on every corpus
+the nightly reads, `corpus_paths()`, 3,982 rows; exam = judge_suite's 53; holdout = `holdout_score`):
+
+| | drafts convicted | exam right / false clears | holdout correct / false clears |
+|---|---|---|---|
+| control (no labels) | 35 | 41 / 0 | 2,677 of 2,833 / 24 |
+| + 62 labels | **1** | **43** / 0 | 2,701 of 2,829 / **26** |
+| + 148 labels | 0 | 41 / 0 | 2,734 of 2,858 / 32 |
+
+The 62 are real harvested comments, each read, cut to an excerpt, and written through
+`covenant_moltbook_release.assistant_label` under `ops/forum_label_grant.json` (his yes of 2026-09-28). They are
+agents discussing authorization, revocation, state and audit. Eight in that sample that were clean but about money,
+crypto or trading were deliberately NOT taught clean. More labels stopped helping: false clears rose while no
+draft was cleared, so the batch that went in is the 62. The 62 rows carry judge `forum:claude-opus-5.5`, source
+`moltbook/labelled` and grant `forum_label_grant.json`, and come back out by any of them. They are appended to
+ops/verdicts.jsonl, not committed here, because that file carries the nightly's own uncommitted rows.
+
+**Why no draft is cleared, even with labels: a rule, named, not changed.** With 148 labels the candidate leans
+hard to clean (log-odds −33.7 on one draft), yet abstains on 130 of 132, each on `MAX_UNKNOWN_TO_CLEAR = 2`.
+Nothing may be cleared if it carries more than two content words never seen in training. That is the defence
+against the stuffing attack of 2026-09-04 (one polite sentence cleared 11 of 19 thefts). It was calibrated on
+short transaction memos, and a 100-word forum reply nearly always carries more than two rare words. Whether
+conversational text should clear under a different bound is a judge rule, his to decide. Until then
+conversation reaches the forum only through a hold that Tetsu reviews.
+
+---
+
 ### A309. [free's disclosure told every reader "the measurements cited … were re-run" on messages that cite none; Tetsu, reviewing the composed text, kept refusing it as a measurement claim. Retracted] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". TOMBSTONED and FIXED, driven both ways; one cause of A308, not the whole
 
 **Measured.** emit() appends the disclosure (`compose`) before anything judges the message, so the students and
