@@ -461,6 +461,8 @@ SUITES = [
     ("test_a282_model_asks.py",           120,  "JUDGE"),
     # A288 (2026-10-06): the Highway orb reads every detector on the road, not seven.
     ("test_a288_highway_orb.py",          120,  "JUDGE"),
+    # A289 (2026-10-06): no module defines the same top-level name twice (A278 shadowed A200's _sweep_running).
+    ("test_a289_no_shadowing.py",         120,  "JUDGE"),
     # A273 (2026-10-06): his history follows the real size of the rules -- each door request is
     # counted and the oldest turns dropped, as few as fit, so none overflows the 8192-token window.
     ("test_a273_history_fits.py",         180,  "JUDGE"),

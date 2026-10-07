@@ -7656,6 +7656,11 @@ existing consumers. Now `_sweep_cmdlines` is mine and `_sweep_running` is A200's
 `_sweep_running` and requires True/False/None and a different function from mine; restoring the shadowing
 fails it. H1 208/208.
 
+**The guard where the step is forgotten (rule 10).** `test_a289_no_shadowing.py` parses every .py in the
+tree (skipping .git, .venv, .claude worktrees, .trash and the untracked runtimes) and fails, naming the
+module, on any top-level function or class name defined twice. Measured first: 0 of 498 modules do. With a
+probe module defining `f` twice it fails; with the probe removed it passes again (499 read).
+
 ---
 
 ### A288. ["Highway green" was a reading of 7 detectors of 25: the orb never saw public_ci_red, mesh_source_split, or anything added that day] 2026-10-06. His words: "keep expanding the highway". FIXED, driven both ways
