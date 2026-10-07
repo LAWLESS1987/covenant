@@ -327,6 +327,25 @@ TRACKS = {
                     ("tell_points(['unknown', 'red', 'unknown', 'red', 'green'])", [1, 4]), ("tell_points([])", []),
                     ("tell_points(['green', 'green'])", []),
                     ("tell_points(['red', 'unknown', 'green', 'unknown', 'green'])", [0, 2])]},
+        # A294 (2026-10-07, his words: "ensure tetsu learns from this also"): the check the covenant now runs on
+        # threefold every hour, and on its own memory ledger, as an exercise of his health choice.
+        {"id": "health_chain", "builds_on": [], "forbid": [],
+         "ask": "Write verify_chain(lines): lines is a list of (text, prev) pairs, oldest first -- text is one ledger "
+                "line exactly as written, prev is the hash that line says came before it. The first line's prev must be "
+                "64 '0' characters; every later line's prev must be the hashlib.sha256 hex digest of the PREVIOUS line's "
+                "text (UTF-8). Return {'ok': True, 'entries': n} when every link holds, else {'ok': False, 'broken_at': i} "
+                "with i the 1-based number of the first line whose prev is wrong. This is how the covenant's "
+                "ai_memory_system proves its memory ledger was not edited or reordered -- and how it checks the ledger of "
+                "threefold, his Grok agent's memory system, every hour (A294).",
+         "checks": [("verify_chain([])", {"ok": True, "entries": 0}),
+                    ("verify_chain([('put m1', '0' * 64), ('put m2', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5'), "
+                     "('put m3', '90f891857865e7ce3b421c108e63ce14f4432fe21ba341affbb043e7e84074d6')])", {"ok": True, "entries": 3}),
+                    ("verify_chain([('put m1', '0' * 64), ('put m2', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5'), "
+                     "('put m3', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5')])", {"ok": False, "broken_at": 3}),
+                    ("verify_chain([('put m2', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5')])",
+                     {"ok": False, "broken_at": 1}),
+                    ("verify_chain([('put m1', '0' * 64), ('put m3', '90f891857865e7ce3b421c108e63ce14f4432fe21ba341affbb043e7e84074d6'), "
+                     "('put m2', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5')])", {"ok": False, "broken_at": 2})]},
     ],
 }
 TRACK_IDS = {t["id"]: name for name, ts in TRACKS.items() for t in ts}

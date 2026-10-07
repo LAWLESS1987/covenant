@@ -143,6 +143,20 @@ def tell_points(readings):
             told_red = False
     return out
 ''',
+    "health_chain": '''
+import hashlib
+
+
+def verify_chain(lines):
+    prev = "0" * 64
+    n = 0
+    for i, (text, said_prev) in enumerate(lines, 1):
+        if said_prev != prev:
+            return {"ok": False, "broken_at": i}
+        prev = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        n += 1
+    return {"ok": True, "entries": n}
+''',
 }
 FLATTEN = '''
 def flatten(x):
@@ -188,7 +202,9 @@ wrong = [("paper_backtest", REF["paper_backtest"].replace("positions[i - 1] * (p
          ("paper_walk_forward", REF["paper_walk_forward"].replace("(1 if b < extra else 0)", "(1 if b >= k + 1 - extra else 0)"),
           "walk_forward(11, 2)", "folds with the larger blocks last"),
          ("health_tell_once", REF["health_tell_once"].replace('if r == "red" and not told_red:', 'if r == "red":'),
-          "tell_points(['green', 'red', 'red'", "a listener that tells every red reading, not once per streak")]
+          "tell_points(['green', 'red', 'red'", "a listener that tells every red reading, not once per streak"),
+         ("health_chain", REF["health_chain"].replace("if said_prev != prev:", "if i > 1 and said_prev != prev:"),
+          "verify_chain([('put m2'", "a chain that trusts its first line (a ledger that starts mid-way passes)")]
 for tid, code, first, what in wrong:
     t = next(x for x in written if x["id"] == tid)
     res, stop = PR.attempt(t, code, gate=gate_clean, workshop=WS, hands_ledger=HL)

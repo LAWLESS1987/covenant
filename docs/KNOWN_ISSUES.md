@@ -7660,6 +7660,15 @@ on. Unreadable is UNKNOWN. No remedy, because the repository and its code are hi
 sets the live baseline (A272's lesson). H1tf: chain ignored fails, new gaps ignored fails; H1 212/212.
 Live: ABSENT, chain ok, 2 known gaps, 0 new.
 
+**Tetsu learns from it (his words: "ensure tetsu learns from this also").** Told through his door with a fresh
+context what threefold is, what the covenant checks, the two gaps, and the honest catch about its JLens leg.
+Asked whether he wants it among what he learns, he answered: "I want to learn about the threefold system and
+the JLens snapshot check." That is recorded verbatim in ops/tetsu_learning_choices.jsonl as kind
+wants_to_learn. His three practice choices are unchanged: they are his, and he changes them with HANDS
+WRITE learning.txt. His "health" choice gained the exercise `health_chain`: verify a hash-chained ledger,
+the same check verify_chain() runs on threefold. PP2: the reference passes all 5 checks through his hands,
+and a chain that trusts its first line is caught and named (65/65); PP1 45/45.
+
 **Said plainly, not changed.** threefold's JLens leg runs GPT-2's published lens over the TEXT of Grok's
 reply. GPT-2 is not Grok, so the readout says nothing about Grok's own reasoning. It is a record that a lens
 ran, not an observation of the agent: the "check that measures nothing" shape (A74). The covenant's own
