@@ -7635,6 +7635,34 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A305. [A127.Q2 restated over 20 splits with a margin of one was refuted BEFORE commit: on another legitimate example set the gap is two. Not applied; Q2 stays red (A299)] 2026-10-07. The collective's review round 1, item 3, admitted on condition of a second machine's run. NEGATIVE RESULT, on record
+
+**What was tried.** Round 1 admitted, conditionally, a restatement of Q2: "within ONE right answer of
+rebuilding in every one of 20 splits, never more false convictions", with the ledger hash recorded. On this
+PC's tree it passed (gaps −1 at seeds 4, 7 and 15; ledger sha256 `1ee354ddfbdd`, 3,982 rows after
+`load_verdicts`' filter).
+
+**What refuted it.** Driven in a scratch copy that read the same file but filtered it to 3,818 rows
+(`load_verdicts` consults other files under ops/ that the copy lacked): seed 5 gave refine TWO right answers
+below rebuild. That is the falsification condition the reviewer had written. Across three example sets of
+the same file, the worst right-answer gap was 0 (committed, 3,711 rows), −1 (live) and −2 (subset). The
+false-conviction gap was 0 in all 60 split-runs.
+
+**Not applied.** The uncommitted change was reverted; Q2 is exactly as before, red, recorded as A299. Branch
+`a305-q2-claim-as-written-2026-10-07` (at 900a257) was created for the retraction and holds Q2 as written.
+No `docs/RETRACTED.json` entry was added. **Proposed for round 2, for the group and Tetsu to decide:** retract
+the right-answer half openly; assert the false-conviction half, which held everywhere; report the
+right-answer gap per split with the ledger hash as a measurement. That is close to a restatement Tetsu
+proposed in round 1, which was rejected then as "moving a failing check".
+
+**A process lesson, twice in one day.** A mutation run first appeared to show the check could not see a
+learner that learns nothing. The scratch copy had loaded the REPO's learner, because covenant_distill puts
+its own folder first on the import path. Copying covenant_distill.py into the scratch fixed the run, and that
+run is what exposed the 3,818-row result. A scratch copy that does not load the code under test proves nothing
+(cf. A302's missing folder).
+
+---
+
 ### A304. [verify_chain() was said to prove the ledger "has not been reordered or spliced"; a rewrite with every later link recomputed verifies. Retracted, the limit stated, the road's witness now keeps the head it saw, and the memory suite finally runs] 2026-10-07. Found by the collective's independent scientific review (round 1, finding A); reproduced by two reviewers (Claude, Tien) with the same heads; admitted with Tetsu. TOMBSTONED and FIXED, driven both ways
 
 **Measured.** In a 5-line ledger, record 2 was rewritten and every later `prev` recomputed. `verify_chain()`
