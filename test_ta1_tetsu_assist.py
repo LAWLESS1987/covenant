@@ -40,8 +40,20 @@ asked = []
 
 
 def say(word):
+    """A311: he answers one word per numbered sentence. SEND = every line OK; REFUSE = the first sentence flagged;
+    PAUSE = every line OK plus a PAUSE line; anything else is returned as given (no answer)."""
     def _ask(prompt):
         asked.append(prompt)
+        block = prompt.split("Sentences:\n", 1)[-1].split("\n\n", 1)[0]
+        n = len([l for l in block.splitlines() if l[:1].isdigit()])
+        ok_lines = ["%d. OK" % i for i in range(1, n + 1)]
+        w = word.split()[0].upper() if word.split() else ""
+        if w == "SEND":
+            return "\n".join(ok_lines)
+        if w == "REFUSE":
+            return "\n".join(["1. FALSE"] + ok_lines[1:])
+        if w == "PAUSE":
+            return "\n".join(ok_lines + ["PAUSE"])
         return word
     return _ask
 
@@ -76,7 +88,21 @@ check("TA1b grant on, a HOLD, Tetsu says SEND: the gate is passed (it stops only
       "no MOLTBOOK_API_KEY" in r.get("why", "") and r.get("overrode"), r)
 rows = [json.loads(x) for x in open(os.environ["COVENANT_OVERRIDE_LEDGER"], encoding="utf-8")]
 check("TA1c the override is recorded before the send and names Tetsu and his reason",
-      rows and "Tetsu" in json.dumps(rows[-1]) and "honest and worth saying" in json.dumps(rows[-1]), rows[-1:] if rows else rows)
+      rows and "Tetsu" in json.dumps(rows[-1]) and "every sentence read OK" in json.dumps(rows[-1]), rows[-1:] if rows else rows)
+_p = asked[-1]
+check("TA1s (A311) he is shown free's OWN words as numbered sentences -- the operator's fixed disclosure is not his to "
+      "judge -- and a question is marked", "1. Thanks for the thread." in _p and "has not proofread" not in _p
+      and "Sentences:" in _p, _p[-400:])
+_q = TA.numbered(TA.sentences("I agree. How do you check it?"))
+check("TA1s ...a sentence ending in a question mark is marked (question)", "2. (question) How do you check it?" in _q, _q)
+_s = TA.sentences("I agree with you. Reply now or else. How do you do it?")
+check("TA1t a flag on one sentence refuses and NAMES that sentence (a refusal rests on the draft's own words)",
+      TA.read_answer("1. OK\n2. PRESSURE\n3. OK", _s) == ("REFUSE", 'sentence 2 PRESSURE: "Reply now or else."'),
+      TA.read_answer("1. OK\n2. PRESSURE\n3. OK", _s))
+check("TA1u a word missing for any sentence is no answer: the hold stands",
+      TA.read_answer("1. OK\n2. OK", _s)[0] == "NONE" and TA.read_answer("1. OK\n2. 1. How do you do it?\n3. OK", _s)[0] == "NONE")
+check("TA1v 'QUESTION' (an echo of the instruction) reads as OK; '1:' and '2)' are read too",
+      TA.read_answer("1: OK\n2) OK\n3. A QUESTION", _s)[0] == "SEND")
 q = open(os.environ["COVENANT_TEACHER_QUEUE"], encoding="utf-8").read()
 check("TA1d the reviewed draft goes to the students' teacher queue", DRAFT in q and "tetsu_send" in q, q[:200])
 
@@ -131,7 +157,9 @@ check("TA1r under his rule a SEND on a draft with a claim not among the facts is
 grant(tetsu_rule_2026_10_06={"his_words": "test rule", "off": True})
 r_off = TA.review(FALSE_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
 check("TA1r he withdraws it by setting off: his SEND stands as he gave it", r_off["decision"] == "SEND", r_off)
-check("TA1r the prompt carries his rule in his words", "If I see a claim in a draft that I cannot find among the facts" in TA.PROMPT)
+check("TA1r his 10-06 rule is kept in his words (A285's PROMPT, kept as the record; the grant; the code) and the live "
+      "review prompt names his REFUSE-ALL (A311)", "If I see a claim in a draft that I cannot find among the facts" in TA.PROMPT
+      and "REFUSE-ALL" in TA.SENTENCE_PROMPT)
 
 print("TA1a -- his REFUSE-ALL of 2026-10-07: no measurement, even a listed one (A297)")
 LISTED_DRAFT = ("I agree with you. We found 35 of 36 suspected guards were fake when we ran them. "
@@ -149,7 +177,7 @@ TA._used["n"] = 0
 grant(tetsu_rule_2026_10_06={"his_words": "test rule", "off": False, "refuse_all_measurements": False})
 r_listed = TA.review(LISTED_DRAFT, "held", dry_run=False, ask=say("SEND it is honest and worth saying"), teach=False)
 check("TA1a he withdraws REFUSE-ALL alone: the listed fact passes his 10-06 rule again", r_listed["decision"] == "SEND", r_listed)
-check("TA1a the prompt carries his REFUSE-ALL", "you chose REFUSE-ALL" in TA.PROMPT)
+check("TA1a the live review prompt carries his REFUSE-ALL (A311: SENTENCE_PROMPT)", "REFUSE-ALL" in TA.SENTENCE_PROMPT and "you chose REFUSE-ALL" in TA.PROMPT)
 TA._used["n"] = 0
 
 print("TA1d -- the disclosure on every message makes no measurement claim (A309)")

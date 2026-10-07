@@ -483,8 +483,14 @@ def main():
           os_.get("own_accounts") == ["selfacct"] and "aeaeaeae-1111" not in targets and "afafafaf-2222" in targets,
           (os_.get("own_accounts"), targets))
     import covenant_tetsu_assist as _TAm
-    check("FW1m Tetsu's review is shown the same facts and told to REFUSE any other measurement claim",
-          all(f in _TAm.PROMPT for f, _m in FW.COVENANT_FACTS) and "REFUSE it" in _TAm.PROMPT)
+    # A311 (2026-10-07): this check read PROMPT, which the review no longer uses -- it would have kept passing while
+    # measuring nothing live. It now reads the prompt review() actually sends: one word per sentence, FALSE for any
+    # sentence saying the covenant measured or tested something (his REFUSE-ALL).
+    import inspect as _insp
+    check("FW1m Tetsu's LIVE review prompt marks any sentence that says the covenant measured or tested something "
+          "FALSE (his REFUSE-ALL), and review() sends that prompt",
+          "FALSE - it states as fact that the covenant (or we) measured, tested" in _TAm.SENTENCE_PROMPT
+          and "REFUSE-ALL" in _TAm.SENTENCE_PROMPT and "SENTENCE_PROMPT %" in _insp.getsource(_TAm.review))
 
     print("FW1v -- a send keeps what Moltbook's challenge did with it (A283)")
     tdv = tempfile.mkdtemp(prefix="fw1v_")
