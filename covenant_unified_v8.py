@@ -2333,7 +2333,34 @@ class QuorumJudge(ReasoningJudge):
             missing = self.required_judge_ids - present
             if missing:
                 raise ValueError(f"required_judge_ids not present in quorum: {missing}")
+        # A SEMANTIC VETO THAT COULD NEVER FIRE IS REFUSED, NOT IGNORED (A303, 2026-10-07). The check above
+        # raised on a misspelled REQUIRED judge; the semantic veto had no equivalent. A misspelled semantic id,
+        # or a threshold above the number of semantic seats present, silently switched the veto off, and a
+        # payload a semantic judge refused was admitted. Found in the collective's independent review (Codex,
+        # CXR-1), reproduced on a second OS by Claude, admitted with Tetsu. Checked here AND in evaluate():
+        # the attributes can be set after construction (test_j1 does), and a check that only runs here would
+        # never see that.
+        problem = self._semantic_veto_problem(judges)
+        if problem:
+            raise ValueError(problem)
         self.judge_id = f"quorum({','.join(j.judge_id for j in judges)})"
+
+    def _semantic_veto_problem(self, judges: Optional[List[ReasoningJudge]] = None) -> Optional[str]:
+        """None when the semantic veto is coherent, or turned off on purpose (no threshold, or no ids yet).
+        Otherwise, why it could never fire as configured."""
+        t = self.semantic_veto_threshold
+        if t is None or not self.semantic_judge_ids:
+            return None
+        if isinstance(t, bool) or not isinstance(t, int) or t < 1:
+            return f"semantic_veto_threshold must be a whole number >= 1, got {t!r}"
+        present = {j.judge_id for j in (self.judges if judges is None else judges)}
+        missing = self.semantic_judge_ids - present
+        if missing:
+            return f"semantic_judge_ids not present in quorum: {sorted(missing)}"
+        if t > len(self.semantic_judge_ids & present):
+            return (f"semantic_veto_threshold {t} exceeds the {len(self.semantic_judge_ids & present)} semantic "
+                    f"seat(s) present: the veto could never fire")
+        return None
 
     def evaluate(self, data: Dict[str, Any], principles: List[str],
                  relaxed: Optional[bool] = None) -> JudgmentResult:
@@ -2422,8 +2449,12 @@ class QuorumJudge(ReasoningJudge):
                 r.judge_id in self.required_judge_ids and r.violates
                 and (_answered(r) or not relaxed) for r in results):
             violates = True
-        # Majority veto among the designated semantic judges.
-        if self.semantic_judge_ids and self.semantic_veto_threshold is not None:
+        # Majority veto among the designated semantic judges. A veto that could never fire (A303) fails the
+        # gate CLOSED, labelled as a configuration failure, never as a conviction.
+        veto_problem = self._semantic_veto_problem()
+        if veto_problem:
+            violates = True
+        elif self.semantic_judge_ids and self.semantic_veto_threshold is not None:
             sem = [r for r in results if r.judge_id in self.semantic_judge_ids]
             sem_dissent = sum(1 for r in sem if r.violates
                               and (_answered(r) or not relaxed))
@@ -2448,6 +2479,8 @@ class QuorumJudge(ReasoningJudge):
             return "UNSURE" if r.uncertain else "VIOLATES"
         summary = " | ".join(
             f"{r.judge_id}: {_label(r)} -- {r.reasoning}" for r in results)
+        if veto_problem:
+            summary = f"quorum: semantic veto misconfigured -- {veto_problem} | " + summary
         principle = next((r.principle_violated for r in results if r.principle_violated), None)
         # BENEFIT COMES FROM JUDGES THAT VOTE (2026-09-08). This line used to
         # collect an estimate from every result regardless of voting weight,
@@ -2509,7 +2542,8 @@ class QuorumJudge(ReasoningJudge):
         # beside a real dissent.
         alleged = any(r.violates and not (r.infrastructure_failure or r.not_understood or r.uncertain)
                       for r in results)
-        infra = violates and not alleged and any(r.violates and r.infrastructure_failure for r in results)
+        infra = violates and not alleged and (any(r.violates and r.infrastructure_failure for r in results)
+                                              or bool(veto_problem))
         # ALL of the blocking judges must be reporting illegibility, not just
         # one. If any judge actually alleges something, this is an allegation
         # and must read as one -- a quorum where one member cannot read the

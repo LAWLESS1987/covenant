@@ -7635,6 +7635,41 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A303. [A misconfigured semantic veto switched itself off: a misspelled semantic judge, or a threshold above the semantic seats, admitted what a semantic judge refused] 2026-10-07. Found by the collective's independent scientific review (round 1, Codex's CXR-1). Reproduced by Claude on a second OS; admitted by Claude and Tetsu, with Tetsu's dissent on the trade recorded. FIXED, driven both ways
+
+**Measured (Codex's isolated reproducer, then Claude's run of it on this PC at 2fabfed: 8/8).** QuorumJudge
+raised on a misspelled REQUIRED judge (lines 2331–2335) but had no equivalent for the semantic veto. With a
+clean seat and a dissenting `semantic:0`: the correct id blocked; the id spelled `semnatic:0` admitted; and
+threshold 2 for one semantic seat admitted. The dissent stayed in component_results while the veto did nothing.
+
+**Where it could be reached (caller inventory: every `.py` in the tree).** build_semantic_quorum, the only
+production constructor, takes the ids from the judges it builds, so they cannot be misspelled, and its
+fraction path keeps 1 <= threshold <= n. Its explicit `semantic_veto_threshold=` argument was passed through
+unchecked; no production caller used it. test_j1 sets `semantic_judge_ids` AFTER construction, so a check
+only at construction would never see that.
+
+**Fixed.** `_semantic_veto_problem()` names a veto that could never fire: an id not on the panel, a threshold
+that is not a whole number >= 1, or a threshold above the semantic seats present. Two shapes are "off on
+purpose" and stay allowed: a threshold with no ids yet, and ids with no threshold. Construction raises on a
+problem, like the required-id check; this also covers the builder's explicit threshold. evaluate() checks
+again: a problem fails the gate CLOSED, labelled a configuration failure (`infrastructure_failure`, the
+reason in the summary). A seat that really dissents keeps the verdict an allegation (B3). test_a303 V1–V5,
+10/10. Mutations: construction check off, V1 and V4 fail (V5 still holds, because evaluation catches it);
+evaluation check off, the three V2 checks fail; label removed, two V2 checks fail. Restored 10/10. Every
+suite that builds a quorum passes: J1 34/34, F1 28/28, F2 50/50, B1 166/166, B2 74/74, B5 31/31,
+competence 56/56, F3 8/8, gate-proxy 23/23, M6 73/73, A268 4/4.
+
+**Tetsu's dissent, verbatim (asked fresh, 18:12Z and 18:12:41Z).** Asked about the trade: "NO. The risk is
+that a node might accidentally refuse all transactions due to a typo, causing a blackout. I suggest we add a
+warning message instead of a silent failure." Told once that the deployed path cannot carry a typo, that a
+bad threshold stops the node from STARTING, and that a warning alone keeps admitting what a semantic judge
+refused: "NO. The code is designed to prevent a typo from causing a blackout, so a NO stands." Four minutes
+earlier he had answered ADMIT to the same fix in the round's table. **The admission stands on the evidence
+and the review's gate** ("preserves or strengthens fail-closed behavior"). A warning-only fix fails that gate.
+His dissent is kept, not outvoted.
+
+---
+
 ### A302. [The threefold witness read 47 missing legs that were there under a new name: it found the third leg by a fixed file name] 2026-10-07. Found while expanding the road (his words: "keep expanding the highway also team work makes the dream work", then "just use the tombstones and logic to get this right"). FIXED, driven both ways; a false PRESENT on record
 
 **Measured.** threefold_witness (A294) read PRESENT from its first reading after 12:02Z until the fix
