@@ -310,6 +310,33 @@ def page_sha(page=None):
     return hashlib.sha256((page or current_page()).encode("utf-8")).hexdigest()[:12]
 
 
+HIGHWAY_CORE = ("node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh",
+                "phone_build_behind_core")
+
+
+def highway_detail(H):
+    """({detector: 'present'|'absent'|'unknown'} for EVERY registered detector, note or None).
+
+    A288 (2026-10-06, his words: "keep expanding the highway"). The orb read seven fixed detectors; the road had
+    grown to 25, and eighteen of them -- public_ci_red, mesh_source_split, every one added that day (Tetsu's two,
+    sweep currency, a stalled ambassador, the scheduler, Moltbook strikes, failing asks) -- never reached the orb:
+    "Highway green" was a reading of 7 of 25. Now: every detector, from the watchdog's own last pass when it is
+    fresh (sensing all of them here is most of a cold read, profiled 2026-09-25). When that pass is stale or
+    predates a detector, the seven core ones are sensed here and the rest are UNKNOWN -- amber, which is also how
+    a watchdog that stopped sensing shows. LOWER-CASE whatever arrives (PC1z6: the page colours by 'present')."""
+    names = list(H.DETECTORS)
+    seen = H.last_sense()
+    if seen is not None and all(k in seen for k in names):
+        return {k: str(seen[k] or "unknown").lower() for k in names}, None
+    sensed = H.sense(only=list(HIGHWAY_CORE))
+    out = {k: str((v or {}).get("state") or "unknown").lower() for k, v in sensed.items()}
+    rest = [k for k in names if k not in out]
+    for k in rest:
+        out[k] = "unknown"
+    return out, ("the watchdog's full pass is not fresh here (stale, or older than %d detector(s)); the %d core "
+                 "detectors were read now and the rest are unknown" % (len(rest), len(sensed)))
+
+
 FORUM_KINDS = ("reply", "own_post", "tetsu_reply", "tetsu_post", "intro")
 FORUM_WINDOW_S = 86400
 
@@ -466,18 +493,9 @@ def register(api, caller, refused, cov):
             pass
         try:
             import covenant_highway
-            want = ["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"]
-            # What the watchdog's own last pass saw, when it is fresh (2026-09-25: sensing again
-            # here was 95% of a cold read, profiled); sense only when there is no fresh pass.
-            # LOWER-CASE, whatever arrives (2026-09-26): the watchdog writes the detector constants
-            # ("PRESENT"), the page colours by 'present' -- so a Highway with node_down PRESENT was
-            # drawn GREEN, and the test fixtures, written in lower case, never saw it. PC1z6.
-            seen = covenant_highway.last_sense()
-            if seen is not None and all(k in seen for k in want):
-                out["detail"]["highway"] = {k: str(seen[k] or "unknown").lower() for k in want}
-            else:
-                sensed = covenant_highway.sense(only=want)
-                out["detail"]["highway"] = {k: str((v or {}).get("state") or "unknown").lower() for k, v in sensed.items()}
+            out["detail"]["highway"], note = highway_detail(covenant_highway)
+            if note:
+                out["detail"]["highway_note"] = note
         except Exception:                                        # noqa: BLE001
             pass
         try:

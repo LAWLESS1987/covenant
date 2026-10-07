@@ -144,7 +144,10 @@ def main():
     snap = tempfile.mktemp(suffix="_pc1_last_sense.json")
     os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = snap
     calls, real_sense, real_ttl = [], HW.sense, P3.STATE_TTL
-    want = ["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"]
+    # A288 (2026-10-06): the watchdog's pass carries EVERY registered detector, and the page now reads them all;
+    # a pass holding only the old seven is not a fresh full pass. The fixtures write what the watchdog writes.
+    want = list(HW.DETECTORS)
+    core = list(P3.HIGHWAY_CORE)
     try:
         P3.STATE_TTL = -1
         HW.sense = lambda only=None, **kw: (calls.append(1), {k: {"state": "absent"} for k in (only or want)})[1]
@@ -174,9 +177,11 @@ def main():
             json.dump({"at": _t.time() - 3600, "conditions": {}}, fh)
         hw2 = ((get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("detail") or {}).get("highway")
         check("PC1z6 the watchdog's own state constants reach the page as the lower-case words it colours by "
-              "(a PRESENT drawn green was the bug), from a fresh pass and from sensing alike",
+              "(a PRESENT drawn green was the bug), from a fresh pass and from sensing alike (A288: sensing reads the "
+              "core seven; the rest is unknown without the watchdog's pass)",
               hw and hw.get("sweep_red") == "present" and hw.get("node_down") == "unknown" and hw.get("source_drift") == "absent"
-              and hw2 and set(hw2.values()) == {"present"}, (hw, hw2))
+              and hw2 and {hw2[k] for k in core} == {"present"} and all(hw2[k] == "unknown" for k in want if k not in core),
+              (hw, hw2))
     finally:
         HW.sense, P3.STATE_TTL = real_sense, real_ttl
         os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)

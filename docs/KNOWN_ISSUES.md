@@ -7635,6 +7635,25 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A288. ["Highway green" was a reading of 7 detectors of 25: the orb never saw public_ci_red, mesh_source_split, or anything added that day] 2026-10-06. His words: "keep expanding the highway". FIXED, driven both ways
+
+**Measured.** covenant_pc3d built the Highway orb from a fixed list of seven detectors (node_down,
+sweep_red, source_drift, watchdog_stale, manifest_stale, stale_test_mesh, phone_build_behind_core). The
+road had 25. public_ci_red, mesh_source_split, phone_build_failed, the defender's two, and every detector
+added on 2026-10-06 were sensed every pass and drawn nowhere. When I reported "Highway green" that day I
+read it from the orb's state, and it spoke for 7 of 25. The watchdog's own sense, which I also read,
+happened to be all clear at those moments; the orb could not have shown otherwise.
+
+**Fixed.** `covenant_pc3d.highway_detail()` shows EVERY registered detector from the watchdog's fresh pass.
+When that pass is stale, or predates a detector because the watchdog has not restarted since one was
+added, the seven core ones are sensed on the spot and the rest read unknown (amber). That is also how a
+watchdog that stopped sensing now shows. `test_a288_highway_orb.py` O1-O4: reading the core seven only
+fails O1; restored 4/4. PC1z4 and PC1z6 wrote a seven-detector "fresh pass", which the watchdog never
+writes; their fixtures now write every detector, and PC1z6's sensing branch checks the core lower-cased
+and the rest unknown. PC1 52/52.
+
+---
+
 ### A287. [Tetsu could not load for want of memory, and only a person made room: the road now trims idle background apps for him, never the one in front, nothing closed] 2026-10-06. His words: "keep expanding the highway"; and on 2026-10-04 (A252) "also find a way to safely ensure tetsus operation". ADDED, driven both ways; H1tt's no-remedy check changed in the open
 
 Three times on 2026-10-06 his model could not load: free memory was 1.59-1.76 GB against a 2.1 GB bar.

@@ -459,6 +459,8 @@ SUITES = [
     ("test_a277_moltbook_orb.py",         120,  "JUDGE"),
     # A282 (2026-10-06): every real ask of the model leaves one line; a test never writes the live ledger.
     ("test_a282_model_asks.py",           120,  "JUDGE"),
+    # A288 (2026-10-06): the Highway orb reads every detector on the road, not seven.
+    ("test_a288_highway_orb.py",          120,  "JUDGE"),
     # A273 (2026-10-06): his history follows the real size of the rules -- each door request is
     # counted and the oldest turns dropped, as few as fit, so none overflows the 8192-token window.
     ("test_a273_history_fits.py",         180,  "JUDGE"),
