@@ -7663,7 +7663,8 @@ history is his.
 **Retired the same day, by his choice.** His words, 2026-10-07: "they aren't issues idgaf". What counts as
 an issue is his call (CLAUDE.md rule 5). The lane is removed from DETECTORS, so the road never runs it. Its
 code and H1pe stay as a record. Its cache moved to `.trash/public_identity.json` with a note. The request
-left for Tien in the collective was withdrawn.
+left for Tien in the collective was withdrawn. His next words, the same day: "not trash more like bilboards". His address in a public
+commit is visibility he welcomes, not a leak. This entry's word "exposure" is his view no longer.
 
 ---
 
