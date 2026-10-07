@@ -1615,6 +1615,27 @@ def main():
           and r2["state"] == H.PRESENT and r2["measured"]["new_gaps"] == ["d"]
           and r3["state"] == H.PRESENT and r3["measured"]["chain_ok"] is False and r3["measured"]["broken_at"] == 4
           and r4["state"] == H.UNKNOWN, (r0, r1, r2, r3, r4))
+    # A302: the third leg by discovery -- renamed legs (jspace-, lspace-) count; a reading cached in the future is not used.
+    _tfc2 = os.path.join(tempfile.mkdtemp(prefix="h1tf2_"), "tf.json")
+    _files2 = ["task-a.md", "jlens-a.md", "task-old.md"]
+    q0 = H.detect_threefold_witness(read=lambda repo: (_chain(5), _files2), now=1000.0, cache=_tfc2)
+    q1 = H.detect_threefold_witness(read=lambda repo: (_chain(6), _files2 + ["task-e.md", "lspace-e.md", "task-f.md",
+                                                                              "jspace-f.md", "task-g.md"]), now=5000.0, cache=_tfc2)
+    with open(_tfc2, "w", encoding="utf-8") as _fh:
+        json.dump({"at": time.time() + 99999, "known_gaps": ["old"], "last": {"state": "STALE", "measured": {}}}, _fh)
+    _real_tfc = H.THREEFOLD_CACHE
+    try:
+        H.THREEFOLD_CACHE = _tfc2
+        _orig_read = H._threefold_read
+        H._threefold_read = lambda repo: (_chain(5), _files2)
+        q2 = H.detect_threefold_witness(now=time.time())
+    finally:
+        H.THREEFOLD_CACHE = _real_tfc
+        H._threefold_read = _orig_read
+    check("H1tf a leg under a new name (lspace-, jspace-) is a leg; only a task with no sibling leg at all is a gap, and "
+          "the leg names seen are reported; a reading cached in the future is not reused (A302)",
+          q0["state"] == H.ABSENT and q1["state"] == H.PRESENT and q1["measured"]["new_gaps"] == ["g"]
+          and q1["measured"]["legs"] == {"jlens": 1, "jspace": 1, "lspace": 1} and q2["state"] == H.ABSENT, (q1, q2))
     check("H1tf no remedy: the repository and its code are his and Grok's",
           [n for n, r in H.REMEDIES.items() if "threefold_witness" in (r.get("for") or [])] == [])
 

@@ -952,11 +952,17 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
     A294 (2026-10-07, his words: "keep expanding the highway and incorporate the new repos"). His Grok agent's
     threefold fires a triad on every reply -- tombstone, a memory written by the covenant's own ai_memory_system
     (hash-chained audit.jsonl), and a JLens snapshot -- and says there is "no degrade path". Both are checkable from
-    the public repo: the chain with the covenant's own verify_chain(), the triad by every task-<id> having its
-    jlens-<id>. Read at most hourly, without a credential, and nothing but the ledger and the file NAMES (the
-    memories themselves are never read here). The gaps present at the first reading are kept and named in every
-    reading; a NEW task without its JLens leg, or a broken chain, is PRESENT. UNKNOWN when it cannot be read. No
-    remedy: the repository and its code are his and Grok's."""
+    the public repo: the chain with the covenant's own verify_chain(), the triad by every task-<id> having a third-leg
+    file with the same id. That leg was named jlens-<id> until 2026-10-07 12:02Z, then jspace- and lspace-; since
+    A302 it is found by discovery (any non-task sibling), and the names seen are reported. Read at most hourly,
+    without a credential, and nothing but the ledger and the file NAMES (the memories themselves are never read
+    here). The gaps present at the first reading are kept and named in every reading; a NEW task without a third
+    leg, or a broken chain, is PRESENT. UNKNOWN when it cannot be read. No remedy: the repository and its code are
+    his and Grok's.
+
+    NOT MEASURED HERE: verify_chain() proves each line links to the one before it. A history rewritten with every
+    later link recomputed also verifies; only a head witnessed between readings would catch that, and this
+    witness keeps none yet."""
     import re as _re
     now = time.time() if now is None else now
     path = cache or THREEFOLD_CACHE
@@ -964,7 +970,10 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
         st = json.load(open(path, encoding="utf-8"))
     except (OSError, ValueError):
         st = {}
-    if read is None and st.get("at") and now - float(st["at"]) < THREEFOLD_EVERY_S and st.get("last"):
+    # A cached reading stamped in the FUTURE is not a reading (A302): a manual call with a test clock wrote one on
+    # 2026-10-07, and a second such call reused it. A live pass (the real clock) never reuses a reading from
+    # its future. Not guarded: a manual call that passes a future `now` can still write such a stamp.
+    if read is None and st.get("at") and 0 <= now - float(st["at"]) < THREEFOLD_EVERY_S and st.get("last"):
         return st["last"]
     try:
         text, files = (read or _threefold_read)(THREEFOLD_REPO)
@@ -972,15 +981,25 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
     except Exception as e:                                       # noqa: BLE001
         return {"state": UNKNOWN, "measured": {"repo": THREEFOLD_REPO, "error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
     live = [f for f in files if not f.startswith(".trash/")]
-    tasks = {_re.sub(r"-ocr$", "", f[5:-3]) for f in live if f.startswith("task-") and f.endswith(".md")}
-    lens = {f[6:-3] for f in live if f.startswith("jlens-") and f.endswith(".md")}
+    # THE THIRD LEG BY DISCOVERY, NOT BY NAME (A302, 2026-10-07). The first version counted only `jlens-<id>.md`;
+    # at 12:02Z threefold began writing the leg as `jspace-` and `lspace-` (Tien's brief: "tombstone ∥ covenant ∥
+    # LSpace"), and the witness read 47 legs missing that were there under a new name. A task's leg is now any
+    # sibling `<prefix>-<id>.md` that is not a task file; the prefixes seen are reported, so a rename is news.
+    by_prefix = {}
+    for f in live:
+        m = _re.match(r"^([a-z]+)-(.+?)(?:-ocr)?\.md$", f)
+        if m:
+            by_prefix.setdefault(m.group(1), set()).add(m.group(2))
+    tasks = by_prefix.get("task", set())
+    lens = set().union(*[ids for p, ids in by_prefix.items() if p != "task"]) if len(by_prefix) > 1 else set()
     gaps = sorted(tasks - lens)
     known = st.get("known_gaps")
     if known is None:
         known = gaps                                              # the first reading's gaps: named, not alarmed on
     new_gaps = [g for g in gaps if g not in known]
     measured = {"repo": THREEFOLD_REPO, "chain_ok": bool(chain.get("ok")), "entries": chain.get("entries"),
-                "tasks": len(tasks), "jlens": len(lens), "known_gaps": known, "new_gaps": new_gaps[:10]}
+                "tasks": len(tasks), "jlens": len(lens), "legs": {p: len(i) for p, i in sorted(by_prefix.items()) if p != "task"},
+                "known_gaps": known, "new_gaps": new_gaps[:10]}
     if not chain.get("ok"):
         measured["broken_at"] = chain.get("broken_at")
     state = PRESENT if (not chain.get("ok") or new_gaps) else ABSENT

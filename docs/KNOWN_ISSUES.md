@@ -7635,6 +7635,40 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A302. [The threefold witness read 47 missing legs that were there under a new name: it found the third leg by a fixed file name] 2026-10-07. Found while expanding the road (his words: "keep expanding the highway also team work makes the dream work", then "just use the tombstones and logic to get this right"). FIXED, driven both ways; a false PRESENT on record
+
+**Measured.** threefold_witness (A294) read PRESENT from its first reading after 12:02Z until the fix
+(17:2x local). It named tasks from 12:02Z on as having no third leg. Reading the public tree: 283 task ids;
+`jlens-` 234, `jspace-` 16, `lspace-` 33. The leg had been renamed (Tien's brief: "tombstone ∥ covenant ∥
+LSpace"). The witness matched only `jlens-`, a name chosen by recall. By discovery (any non-task sibling with
+the same id), 279 of 283 tasks have a leg. **The PRESENT was false for every task it named.** The road showed
+it red; it has no remedy and does not tell him on the direct line, so nothing acted on it.
+
+**What remains PRESENT, and is true by the witness's own rule:** two new ids with no leg under any name,
+`session-call-20261007-cl-lawrence` and its `-index`. Whether a session-call record should fire the triad is
+a question for threefold's owners. The witness names it; it does not decide it.
+
+**Fixed.** The third leg is any sibling `<prefix>-<id>.md` that is not a task file, and the reading reports
+the prefixes it saw (`legs`), so the next rename shows up as information, not an alarm. This is CLAUDE.md
+rule 2 (enumerate by discovery, never by a name pattern), broken by me in A294.
+
+**A second fault, mine, found during the same check.** I called the live detector with a test clock in the
+future. It wrote that future time into its live cache (ops/threefold_witness.json), and a second such call
+reused the stale reading. A live pass now never reuses a reading stamped in its future. The cache was reset
+by hand, with its known-gaps baseline kept.
+
+**Driven both ways, and one guard thrown out.** A first scratch run showed both mutations failing; the
+scratch copy lacked ai_memory_system/, the same gap as A298, so those runs proved nothing. With the folder in
+place: the fixed-name mutation fails the new H1tf check; restored, H1 216/216. The first future-cache guard
+had two clauses, and removing the second ("not stamped in the future") left the test green: it was
+unobservable, so it was removed, as in A301. With the one remaining clause, removing it fails H1tf.
+
+**Not changed, and on record instead.** The witness's docstring now says what it does not measure: a history
+rewritten with every later link recomputed also passes verify_chain(), and this witness keeps no head between
+readings. Witnessing the head is a correction under outside review and is not made here.
+
+---
+
 ### A301. [free was re-isolated at 09:01 on the two rounds he had already lifted: the isolation rule used the same evidence twice] 2026-10-07. Found watching the first round after A300 (his "keep expanding the highway"). FIXED, driven both ways; his lift restored
 
 **Measured.** The 09:00 round ran A300's new code. The model could not load ("no weights fit: free 1.9 GB"),
