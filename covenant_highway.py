@@ -2142,9 +2142,17 @@ def remedy_rerun_unclean(measured, dry_run=True):
                   "sweep; this only closes the gap." % was)
 
 
-def _sweep_running():
+SWEEP_HEAL = os.path.join(HERE, "ops", "sweep_heal_last.txt")   # rerun_unclean's targeted re-run transcript
+
+
+def _sweep_cmdlines():
     """Command lines of a covenant_one.py already running on this PC (any caller: the daily, a person,
-    this remedy). Windows only; elsewhere [] -- and the remedy below runs only where it can look."""
+    this remedy). Windows only; elsewhere [] -- and the remedy below runs only where it can look.
+
+    A289 (2026-10-06): this was first written (A278) under the name _sweep_running, which A200-A203 already
+    defined above, returning True/False/None. The later definition replaced it for every caller, and
+    remedy_evict_test_mesh's `_sweep_running() is not False` saw an empty list, never False: from 2c6eb3c until
+    this rename, it refused every eviction as though a sweep owned the test nodes. Its own name now."""
     try:
         import covenant_daily
         return covenant_daily._processes("covenant_one.py")
@@ -2168,12 +2176,28 @@ def remedy_run_full_sweep(measured, dry_run=True):
     already running, when it cannot tell, when it is called from a test or from inside a sweep, and off
     Windows, where it cannot look for a running one."""
     import sys as _sys
+    m = measured or {}
+    if "verdict" in m:
+        # A289 (2026-10-06): serving sweep_red -- ONLY a red a clean targeted re-run has already shown transient.
+        # rerun_unclean proves it ("clean on a targeted re-run ... Full verdict still needs a full sweep") and
+        # nothing started that sweep, so a 504 from a public website held the road red until the next morning.
+        import re as _re
+        art = os.path.join(HERE, str(m.get("artifact") or "ONE_RUN.txt"))
+        try:
+            fresh = os.path.getmtime(SWEEP_HEAL) > os.path.getmtime(art)
+            heal = io.open(SWEEP_HEAL, encoding="utf-8", errors="replace").read() if fresh else ""
+        except OSError:
+            fresh, heal = False, ""
+        if not fresh:
+            return False, "sweep_red: no targeted re-run since this sweep -- rerun_unclean speaks first"
+        if not _re.search(r"^\s*suites not clean\s+0\b", heal, _re.M):
+            return False, "sweep_red: the targeted re-run was not clean -- a real failure is not a full sweep's to paper over"
     if os.name != "nt":
         return False, "not on Windows: cannot see whether a sweep is already running, so none is started"
     prog = os.path.basename(str(_sys.argv[0] if _sys.argv else "") or "")
     if prog.startswith("test_") or os.environ.get("COVENANT_ONE_TRANSCRIPT") or os.environ.get("COVENANT_INSECURE_MOCK_JUDGE"):
         return False, "called from a test or from inside a sweep; a sweep is never started from there"
-    running = _sweep_running()
+    running = _sweep_cmdlines()
     if running is None:
         return False, "could not list running processes; not starting a second sweep blind"
     if running:
@@ -2332,7 +2356,7 @@ REMEDIES = {
                                    "irreversible": []}},
     # A278 (2026-10-06): a sweep of the core on disk, at most once in SWEEP_BUDGET_S, graded once it wrote.
     "run_full_sweep": {"fn": remedy_run_full_sweep, "klass": AUTO_REVERSIBLE,
-                       "for": ["sweep_not_current"], "kind": "stateless",
+                       "for": ["sweep_not_current", "sweep_red"], "kind": "stateless",
                        "async": True, "cooldown_s": 6 * 3600, "grade_after_s": 3600.0,
                        "touches": ["the sweep's transcript (ONE_RUN.txt)", "this PC's CPU for ~40 min"],
                        "benefit": {"gains": ["the road's verdict speaks for the code that is running",

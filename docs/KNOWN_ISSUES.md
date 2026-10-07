@@ -7635,6 +7635,29 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A289. [A transient red waited for the next morning: a clean targeted re-run proved it and nothing started the full sweep. And my A278 had silently disabled the test-mesh eviction by redefining a name] 2026-10-06. His words: "keep expanding the highway". ADDED one, FIXED one, both driven both ways
+
+**The expansion.** A278's remedy started a full sweep by itself at 18:30 for the A284 core, as designed. It
+read FAIL on one check: WB1.14 reads a real public page and got HTTP 504 from Project Gutenberg. WB1 re-run
+by hand: 30/30. rerun_unclean already proves this case ("clean on a targeted re-run ... Full verdict still
+needs a full sweep"), but nothing started that sweep, so the road stayed red until the daily cycle.
+run_full_sweep now also serves sweep_red, ONLY when ops/sweep_heal_last.txt (rerun_unclean's targeted
+re-run) is newer than the failed sweep and reads "suites not clean 0". A real failure, a re-run not yet
+made, or one older than the sweep all decline. Same 6 h budget, same refusals (a running sweep, a test,
+inside a sweep). H1tr: without the clean-re-run precondition it fails.
+
+**The regression, mine.** A278 named its process lister `_sweep_running`, a name A200-A203 had already
+defined above it, returning True/False/None. In Python the later definition replaces the earlier one for
+every caller. remedy_evict_test_mesh asks `_sweep_running() is not False`, and an empty list is never False.
+So from 2c6eb3c (about 12:40 local) until this commit, it refused every eviction, as though a sweep owned
+the test nodes. H1's eviction checks stub `_sweep_running`, so they never called the real one, and nothing
+noticed. This is CLAUDE.md rule 6, which I did not follow: I named the capability without grepping its
+existing consumers. Now `_sweep_cmdlines` is mine and `_sweep_running` is A200's again. H1sr calls the REAL
+`_sweep_running` and requires True/False/None and a different function from mine; restoring the shadowing
+fails it. H1 208/208.
+
+---
+
 ### A288. ["Highway green" was a reading of 7 detectors of 25: the orb never saw public_ci_red, mesh_source_split, or anything added that day] 2026-10-06. His words: "keep expanding the highway". FIXED, driven both ways
 
 **Measured.** covenant_pc3d built the Highway orb from a fixed list of seven detectors (node_down,

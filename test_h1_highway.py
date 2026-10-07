@@ -1461,29 +1461,30 @@ def main():
           and r_old["measured"]["disk_core"] == _disk and r_partial == H.PRESENT and r_new["state"] == H.ABSENT,
           (r_none, r_old, r_partial, r_new))
     _rs = H.REMEDIES.get("run_full_sweep") or {}
-    check("H1sc run_full_sweep is paired with sweep_not_current alone: AUTO_REVERSIBLE, stateless, async, at most once in 6 h",
-          _rs.get("for") == ["sweep_not_current"] and _rs.get("klass") == H.AUTO_REVERSIBLE and _rs.get("kind") == "stateless"
+    # A289: and sweep_red, but only once a clean targeted re-run has shown the red transient (H1tr below)
+    check("H1sc run_full_sweep is paired with sweep_not_current and sweep_red: AUTO_REVERSIBLE, stateless, async, at most once in 6 h",
+          _rs.get("for") == ["sweep_not_current", "sweep_red"] and _rs.get("klass") == H.AUTO_REVERSIBLE and _rs.get("kind") == "stateless"
           and _rs.get("async") is True and _rs.get("cooldown_s", 0) >= 6 * 3600, _rs)
-    _real_sc = (H._sweep_running, H._sweep_launch, sys.argv[0],
+    _real_sc = (H._sweep_cmdlines, H._sweep_launch, sys.argv[0],
                 {k: os.environ.get(k) for k in ("COVENANT_ONE_TRANSCRIPT", "COVENANT_INSECURE_MOCK_JUDGE")})
     _launched = []
     try:
         H._sweep_launch = lambda cmd, log: (_launched.append(cmd), type("P", (), {"pid": 4242})())[1]
-        H._sweep_running = lambda: []
+        H._sweep_cmdlines = lambda: []
         ok_test, why_test = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)   # argv[0] is this suite
         sys.argv[0] = "covenant_watchdog.py"
         for k in _real_sc[3]:
             os.environ.pop(k, None)
-        H._sweep_running = lambda: ["4711 python covenant_one.py"]
+        H._sweep_cmdlines = lambda: ["4711 python covenant_one.py"]
         ok_busy, why_busy = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
-        H._sweep_running = lambda: None
+        H._sweep_cmdlines = lambda: None
         ok_blind, why_blind = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
-        H._sweep_running = lambda: []
+        H._sweep_cmdlines = lambda: []
         ok_dry, why_dry = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=True)
         n_before = len(_launched)
         ok_go, why_go = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
     finally:
-        H._sweep_running, H._sweep_launch, sys.argv[0] = _real_sc[0], _real_sc[1], _real_sc[2]
+        H._sweep_cmdlines, H._sweep_launch, sys.argv[0] = _real_sc[0], _real_sc[1], _real_sc[2]
         for k, v in _real_sc[3].items():
             if v is not None:
                 os.environ[k] = v
@@ -1572,6 +1573,48 @@ def main():
           and sk["unread"] == H.UNKNOWN, sk)
     check("H1sk no remedy: the scheduler's configuration is his",
           [n for n, r in H.REMEDIES.items() if "schedule_stalled" in (r.get("for") or [])] == [])
+
+    # ---- H1tr: a red shown transient gets its full sweep (A289); a real failure never does.
+    _tr_dir = tempfile.mkdtemp(prefix="h1tr_")
+    _art = os.path.join(_tr_dir, "ONE_RUN.txt")
+    _heal = os.path.join(_tr_dir, "sweep_heal_last.txt")
+    open(_art, "w").write("RESULT: FAIL")
+    _real_tr = (H.SWEEP_HEAL, H._sweep_cmdlines, H._sweep_launch, sys.argv[0],
+                {k: os.environ.get(k) for k in ("COVENANT_ONE_TRANSCRIPT", "COVENANT_INSECURE_MOCK_JUDGE")})
+    _launched_tr = []
+    _red = {"verdict": "FAIL", "artifact": _art, "unclean": ["test_wb1_web.py"]}
+    try:
+        H.SWEEP_HEAL = _heal
+        H._sweep_cmdlines = lambda: []
+        H._sweep_launch = lambda cmd, log: (_launched_tr.append(cmd), type("P", (), {"pid": 77})())[1]
+        sys.argv[0] = "covenant_watchdog.py"
+        for k in _real_tr[4]:
+            os.environ.pop(k, None)
+        no_heal = H.remedy_run_full_sweep(_red, dry_run=False)
+        open(_heal, "w").write("  suites not clean    1  -> test_wb1_web.py" + chr(10))
+        os.utime(_heal, (os.path.getmtime(_art) + 60,) * 2)
+        unclean = H.remedy_run_full_sweep(_red, dry_run=False)
+        open(_heal, "w").write("  suites not clean    0" + chr(10))
+        os.utime(_heal, (os.path.getmtime(_art) + 60,) * 2)
+        clean = H.remedy_run_full_sweep(_red, dry_run=False)
+        os.utime(_heal, (os.path.getmtime(_art) - 60,) * 2)
+        stale = H.remedy_run_full_sweep(_red, dry_run=False)
+    finally:
+        H.SWEEP_HEAL, H._sweep_cmdlines, H._sweep_launch, sys.argv[0] = _real_tr[0], _real_tr[1], _real_tr[2], _real_tr[3]
+        for k, v in _real_tr[4].items():
+            if v is not None:
+                os.environ[k] = v
+    if os.name == "nt":
+        check("H1tr for sweep_red: no re-run yet declines; an unclean re-run declines; a clean re-run newer than the sweep "
+              "starts exactly one full sweep; a clean re-run OLDER than the sweep declines",
+              no_heal[0] is False and unclean[0] is False and "real failure" in unclean[1] and clean[0] is True
+              and stale[0] is False and len(_launched_tr) == 1, (no_heal, unclean, clean, stale, _launched_tr))
+
+    # ---- H1sr: the original _sweep_running is itself again (A289). A278 redefined the name; the eviction remedy's
+    # `is not False` then saw [] and refused every eviction. The REAL function is called here, not a stub.
+    _r = H._sweep_running()
+    check("H1sr _sweep_running (A200) answers True/False/None, and the full-sweep remedy's lister is a different function",
+          (_r is True or _r is False or _r is None) and H._sweep_running is not H._sweep_cmdlines, (_r, H._sweep_running))
 
     # ---- H1tt: Tetsu on the road (A276, 2026-10-06, his words: "get the road green and start expanding
     # the highway"). Two READS of covenant_model.readiness(), driven with a stand-in, each way. No remedy
