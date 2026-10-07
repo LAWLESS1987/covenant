@@ -942,16 +942,37 @@ def stage(say):
                 shutil.copy2(p, work)
             except OSError:
                 pass
-    for d in ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness"):
+    for d in STAGE_DIRS:
         s = os.path.join(HERE, d)
         if os.path.isdir(s):
             # A201 (2026-09-21): the untracked runtimes under tools/ (llama, sd -- binaries and an
             # 18 MB zip) are never staged: a staged copy of one tripped Defender, and no suite
             # runs them (the model and image doors are stubbed in every suite).
             shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools" else None)
+                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools"
+                            else shutil.ignore_patterns("__pycache__"))
     say("   staged into %s" % work)
     return work
+
+
+# WHICH FOLDERS THE COPY CARRIES, AND WHY THE OTHERS ARE LEFT OUT (A298, 2026-10-07).
+# The fourth time the scratch copy was not the repository: root .md files (2026-09-10), CONTRIBUTING.md for
+# G1, conformance_indep/ for N2 (CI found it, 2026-09-03), and now ai_memory_system/. A294's threefold witness
+# verifies a ledger with ai_memory_system's own verify_chain(); staged, it could not import it, read UNKNOWN,
+# and H1tf failed on public CI from 2512aec on, while it passed in the folder and in a WSL copy of HEAD.
+# Each time the fix was one more name. test_a298_stage_covers_tree.py (in place, it needs git) now fails when
+# a TRACKED top-level folder is in neither list below -- a new folder is a decision, not a silent absence.
+STAGE_DIRS = ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness",
+              "ai_memory_system")
+NOT_STAGED = {
+    "mobile": "read in place by test_m3_mobile.py, test_m4_usb_link.py and test_a93_clone_seats_the_student.py",
+    "conformance_indep": "read in place by test_n2_independent_root.py (the independent builds share no code with this tree)",
+    "phone": "the phone's Termux shell scripts; no suite runs them (not measured whether a staged suite reads one)",
+    "vendor": "third-party files (three.min.js, a waitress wheel), skipped by the scanners on purpose (A92)",
+    ".github": "the public CI workflow: it runs this sweep, and nothing in the sweep runs it",
+    ".claude": "Claude Code's settings and hooks: they run in the folder, never from a copy",
+    ".well-known": "one public text file (peace.txt); no suite was found that reads it (grep, 2026-10-07)",
+}
 
 
 def clean_dbs(work):
@@ -1255,6 +1276,12 @@ IN_PLACE = [
     ("test_a255_runtime_outputs.py", 300,
      "every tracked ledger is classified, G1 cannot be blocked by a ledger write, and the "
      "pre-commit hook never writes uncommitted bytes into the manifest -- a claim about the FOLDER"),
+    # A298 (2026-10-07), registered in the change that created it. In place: it asks git which folders the
+    # repository tracks, and the scratch copy has no .git -- then it stages a copy and runs the threefold
+    # witness's chain check THERE, the path that failed on public CI.
+    ("test_a298_stage_covers_tree.py", 300,
+     "every tracked top-level folder is staged or excused with a reason, and the staged copy can verify a chain "
+     "-- a claim about what the FOLDER's copy carries"),
 ]
 
 

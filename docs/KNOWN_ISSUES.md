@@ -7635,6 +7635,38 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A298. [Public CI went red on my own threefold test: the sweep's copy did not carry ai_memory_system/, the fourth folder the copy has lacked] 2026-10-07. Found by the road (public_ci_red) while expanding it on his "keep expanding the highway". FIXED, with a guard at the place the step is forgotten, driven both ways
+
+**Measured.** public_ci_red PRESENT: the newest finished run on main (fc183c0) failed, red since 2512aec, two
+red runs. The one unclean suite was test_h1_highway.py at 210/211, and the failing check was H1tf (A294's
+threefold witness). H1 passed 211/211 in a WSL copy of HEAD, and in the folder. The difference is where the
+runner runs it: covenant_one.stage() copies a FIXED list of folders into a scratch directory, and
+ai_memory_system/ was not on it. The witness verifies threefold's ledger with ai_memory_system's own
+verify_chain(); in the copy that import failed, the detector read UNKNOWN, and H1tf failed. This is the
+memory "run it where the runner runs it" again: I ran H1 in the folder before pushing A294, not staged.
+
+**A recurrence, the fourth of one shape.** Root .md files were missing from the copy (2026-09-10),
+CONTRIBUTING.md for G1, conformance_indep/ for N2 (CI found it, 2026-09-03), now ai_memory_system/. Each fix
+added one name or moved one suite in place. None left anything behind that would fail when the NEXT folder
+was added without a decision, so nothing stopped this one.
+
+**Fixed.** ai_memory_system/ is staged (its __pycache__ left out). The folder list is now a named constant,
+covenant_one.STAGE_DIRS. Beside it, NOT_STAGED gives each excused folder a reason: mobile/,
+conformance_indep/, phone/, vendor/, .github/, .claude/, .well-known/. The phone/ and .well-known/ reasons say
+what was NOT measured.
+
+**The guard: test_a298_stage_covers_tree.py, in place, because it asks git.** S1: every top-level folder git
+tracks (15 today, discovered by git ls-files, never by a list) is staged or excused with a non-empty reason.
+S2: a planted folder is named. S3: a real stage() copy carries every staged folder, and IN THE COPY the
+witness's chain check runs, which is the path that failed. Driven in a detached worktree. ai_memory_system
+dropped from the list: 2/6. A reason dropped: 4/6. stage() not reading the list: 4/6. Restored: 6/6. H1
+staged through covenant_one --only: 214/214.
+
+**What it cannot see.** A suite in the copy that reads a file inside an excused folder and passes VACUOUSLY
+(G1's P4 lesson). The guard makes each absence a written decision, not a measured one.
+
+---
+
 ### A297. [free's drafts stop making measurement claims, Tetsu chooses REFUSE-ALL, and free's isolation is lifted] 2026-10-07. His words: "do 1 and 2 then lift". DONE in three steps, driven both ways
 
 **The cause, from A296.** The isolation of 01:05Z came from two live rounds that sent nothing. In the second, Tetsu
