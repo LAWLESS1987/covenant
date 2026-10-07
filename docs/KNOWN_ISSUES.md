@@ -7635,6 +7635,27 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A299. [The local sweep is red on A127.Q2: on today's live verdict ledger, refining the student answers one exam case fewer than rebuilding it] 2026-10-07. Found by the road (sweep_red, unclean test_a127_refine_not_rebuild.py) while expanding it. OPEN, measured, the check NOT moved
+
+**Measured.** A127 simulates a night on the live ledger (ops/verdicts.jsonl, 3982 rows read after the pair
+filter). On 2026-10-07 the exam (judge_suite's cases) reads: yesterday (39, 1, 0, 13), rebuild (41, 1, 0, 11),
+refine (40, 1, 0, 12) -- right, wrong convictions, wrong clears, abstentions. Q2 claims refining is no worse
+than rebuilding on right answers; refine is one fewer, an abstention where rebuild decides. Q1 (false clears
+stay zero) and every other check pass: A127 15/16. Public CI runs on the COMMITTED ledger and did not flag it;
+the next commit of the nightly ledger (as e635ad9 did) would carry it there.
+
+**Not data loss -- checked, because the ledger's diff looked like it.** git showed 192 committed lines gone.
+By (t, text): all 4140 committed rows are present. 231 were changed in place (a `precept` field added) and
+119 rows were appended. A line diff is not a row diff.
+
+**Not mine to settle.** Q2 is a claim about the learner: a night may sharpen a view by at most STEP (0.35, B1),
+so refining can trail rebuilding by a case while the ledger grows. Three honest answers, all his or a second
+operator's (refinements only): keep the red as the record of that cost; restate Q2 with a margin, through the
+tombstone system (branch + RETRACTED), never in place; or change the learner. Until then the sweep reads red
+on this and the road says so; rerun_unclean will rerun it and the red will stand, which is the rule working.
+
+---
+
 ### A298. [Public CI went red on my own threefold test: the sweep's copy did not carry ai_memory_system/, the fourth folder the copy has lacked] 2026-10-07. Found by the road (public_ci_red) while expanding it on his "keep expanding the highway". FIXED, with a guard at the place the step is forgotten, driven both ways
 
 **Measured.** public_ci_red PRESENT: the newest finished run on main (fc183c0) failed, red since 2512aec, two
