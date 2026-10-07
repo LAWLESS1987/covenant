@@ -2003,7 +2003,8 @@ DETECTORS = {
     "schedule_stalled": detect_schedule_stalled,
     "moltbook_strikes": detect_moltbook_strikes,
     "threefold_witness": detect_threefold_witness,
-    "public_email_exposure": detect_public_email_exposure,
+    # "public_email_exposure" RETIRED the day it was added (A306), his words 2026-10-07: "they aren't issues idgaf".
+    # The detector and its tests stay, as a record; the road does not run it.
     "public_ci_red": detect_public_ci_red,
     "phone_build_failed": detect_phone_build_failed,
     "source_drift": detect_source_drift,
