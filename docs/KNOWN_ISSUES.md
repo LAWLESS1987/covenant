@@ -7635,6 +7635,24 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A290. [rerun_unclean was quarantined for not doing what it cannot do alone, and the quarantine then blocked A289's chain] 2026-10-06. Found reading the highway ledger after A289 went live. FIXED, driven both ways; the quarantine recalibrated on the record
+
+rerun_unclean re-runs the unclean suites. A clean re-run proves a red transient, but it cannot clear
+sweep_red, which reads the newest FULL transcript. The engine graded it at once against sweep_red, so every
+run read "did not fix", and two of those quarantined it ("measured not fixing it 2 times", refused at
+21:59). With A289, its clean re-run is what lets run_full_sweep act ("rerun_unclean speaks first", 21:49),
+so the quarantine blocked the whole chain. This is the fetch_build shape recalibrate() was written for: right
+about the pairing, wrong about the remedy. rerun_unclean is now graded asynchronously for sweep_red, after
+grade_after_s 5400 (the targeted re-run plus a ~45 min full sweep). The quarantine is cleared with
+recalibrate() and a stated reason; the failures stay in the ledger above it. H1tr: grading at once fails
+it (205/209); restored 209/209.
+
+Seen working live the same evening: trim_idle_apps ran on its own at 21:49 (62 processes trimmed, Edge
+spared because it was in front of him, free 2.04 -> 3.28 GB, graded fixed), and schedule_watchdog_restart
+was graded within its 15-minute window (A286).
+
+---
+
 ### A289. [A transient red waited for the next morning: a clean targeted re-run proved it and nothing started the full sweep. And my A278 had silently disabled the test-mesh eviction by redefining a name] 2026-10-06. His words: "keep expanding the highway". ADDED one, FIXED one, both driven both ways
 
 **The expansion.** A278's remedy started a full sweep by itself at 18:30 for the A284 core, as designed. It

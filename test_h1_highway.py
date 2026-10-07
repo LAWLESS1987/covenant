@@ -1610,6 +1610,10 @@ def main():
               no_heal[0] is False and unclean[0] is False and "real failure" in unclean[1] and clean[0] is True
               and stale[0] is False and len(_launched_tr) == 1, (no_heal, unclean, clean, stale, _launched_tr))
 
+    _ru = H.REMEDIES["rerun_unclean"]
+    check("H1tr rerun_unclean is graded after the full sweep it hands on has had time (A290), not at once",
+          "sweep_red" in (_ru.get("async_for") or []) and _ru.get("grade_after_s", 0) >= 3600, _ru)
+
     # ---- H1sr: the original _sweep_running is itself again (A289). A278 redefined the name; the eviction remedy's
     # `is not False` then saw [] and refused every eviction. The REAL function is called here, not a stub.
     _r = H._sweep_running()

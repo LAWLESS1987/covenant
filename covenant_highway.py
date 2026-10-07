@@ -2341,6 +2341,10 @@ REMEDIES = {
                                     "irreversible": []}},
     "rerun_unclean": {"fn": remedy_rerun_unclean, "klass": AUTO_REVERSIBLE,
                       "for": ["sweep_red"], "kind": "stateless",
+                      # A290 (2026-10-06): its clean re-run cannot clear sweep_red by itself -- only the full sweep
+                      # it now hands to run_full_sweep (A289) can. Graded at once, it read "did not fix" every time
+                      # and was quarantined, which then blocked the chain. Graded after the full sweep has had time.
+                      "async_for": ["sweep_red"], "grade_after_s": 5400.0,
                       "touches": ["ops/sweep_heal_last.txt"],
                       "benefit": {"gains": ["a suite that measured NOTHING is made to measure",
                                             "red that is transient clears; red that is real is named"],
