@@ -152,6 +152,14 @@ check("TA1a he withdraws REFUSE-ALL alone: the listed fact passes his 10-06 rule
 check("TA1a the prompt carries his REFUSE-ALL", "you chose REFUSE-ALL" in TA.PROMPT)
 TA._used["n"] = 0
 
+print("TA1d -- the disclosure on every message makes no measurement claim (A309)")
+import covenant_ambassador as _AMBd
+from covenant_free_will import claims_any_measurement as FW_claims
+_comp = _AMBd.compose("I agree with your point. How do you handle drift?")
+check("TA1d free's disclosure never mentions a measurement, so the reviewer that reads the composed text is not handed "
+      "one (A309: the retracted sentence was on 43 of 44 reviews)",
+      "measure" not in _AMBd.DISCLOSURE.lower() and not FW_claims(_comp) and _AMBd._DISCLOSURE_MARK in _comp, _AMBd.DISCLOSURE[:160])
+
 real_grant = json.load(open(os.path.join(HERE, "ops", "tetsu_assist_grant.json"), encoding="utf-8"))
 check("TA1r the tree's grant carries his rule, on, in his words",
       (real_grant.get("tetsu_rule_2026_10_06") or {}).get("off") is False

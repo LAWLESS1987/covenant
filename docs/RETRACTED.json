@@ -967,6 +967,27 @@
     "ops/sweep_heal_last.txt"
    ],
    "note_on_allow": "The check as first written is preserved on branch a305-q2-claim-as-written-2026-10-07 (at 900a257). Sweep transcripts written before the retraction quote it and are allowed; the test file quotes it beside this id; docs/KNOWN_ISSUES.md is NOT exempt."
+  },
+  {
+   "id": "A309-DISCLOSURE-MEASUREMENTS-2026-10-07",
+   "claim": "The sentence in free's disclosure, attached to every Moltbook message: that the measurements the message cited were from the operator's machine and were re-run before sending.",
+   "refuted_by": "Since A297 (2026-10-07) free's drafts are told to cite no measurement and the code refuses any that does, so the messages carried no measurements for the sentence to describe. Measured the same day: 43 of 44 of Tetsu's reviews since 10-06 saw the sentence, and 15 of his 20 refusals named 'measure'.",
+   "truth": "free's messages cite no measurements. The disclosure now says who wrote the message and how (she read the forum, scored the post, wrote the words), plus the operator's grant paragraph, unchanged.",
+   "verbatim": [
+    "The measurements cited are from that machine and were re-run before sending."
+   ],
+   "patterns": [
+    "The measurements cited are from that machine and were\\s+re-run before\\s+sending"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written it is preserved on branch a309-disclosure-claim-as-written-2026-10-07 (at d0cf3aa). covenant_ambassador.py cites this id beside the corrected disclosure; docs/KNOWN_ISSUES.md is NOT exempt. ops/GREEN_THAT_MEANT_NOTHING_FINAL.md and ops/MOLTBOOK_POST_DRAFT.md carry different sentences about posts that did cite numbers, and are not matched."
   }
  ]
 }

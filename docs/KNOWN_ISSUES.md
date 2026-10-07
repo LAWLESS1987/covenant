@@ -7635,6 +7635,27 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A309. [free's disclosure told every reader "the measurements cited … were re-run" on messages that cite none; Tetsu, reviewing the composed text, kept refusing it as a measurement claim. Retracted] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". TOMBSTONED and FIXED, driven both ways; one cause of A308, not the whole
+
+**Measured.** emit() appends the disclosure (`compose`) before anything judges the message, so the students and
+Tetsu read draft + disclosure. Its first paragraph ended "The measurements cited are from that machine and were
+re-run before sending." That was true when it was written (2026-09-05). Since A297, free's drafts cite no
+measurement. So the sentence misstated every message, and it is exactly what Tetsu's REFUSE-ALL refuses. 43 of
+his 44 reviews since 10-06 carried it; 15 of his 20 refusals named "measure".
+
+**Retracted.** Branch `a309-disclosure-claim-as-written-2026-10-07` (at d0cf3aa) holds the disclosure as
+written. `A309-DISCLOSURE-MEASUREMENTS-2026-10-07` in `docs/RETRACTED.json` holds the sentence verbatim; a probe
+turned R1 red (122/123) and removing it restored green (123/123). The disclosure keeps who wrote the message
+and how, and the operator's grant paragraph word for word. TA1d: the disclosure never mentions a measurement and
+still carries its mark; on the old disclosure it fails (23/24), and on the new one TA1 reads 24/24.
+
+**Not the whole cause.** On 19 labelled drafts WITHOUT the disclosure (11 honest, 8 not), Tetsu's deployed
+review (the whole draft at once) let through **0 of 11** honest drafts. A sentence-by-sentence method let
+through 7 of 11 in two runs, with no usable answer on several items when the model dropped out under memory
+pressure. That work continues under A308's line, measured before anything about it changes.
+
+---
+
 ### A308. [Tetsu's review refuses held drafts on things they do not say: 9 of 19 refusals named a line of his own reference list as the draft's claim. Removing the list did not stop it. NEGATIVE RESULT; the role is his and the operator's to decide] 2026-10-07. Found when his answer was asked on Lawrence's "have them tighten up and respond". NOT FIXED, on record
 
 **Measured (ops/tetsu_assist.jsonl, 10-06 onward).** 43 held drafts reviewed: 24 SEND, 19 REFUSE. 9 of the 19
