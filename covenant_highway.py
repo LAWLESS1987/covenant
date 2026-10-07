@@ -1107,7 +1107,9 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
     if not grant:
         return {"state": ABSENT, "measured": {"why": "no grant on record: free is off by his choice"}}
     is_paused, why = paused if isinstance(paused, tuple) else (bool(paused), "")
-    last = None
+    # A300 (2026-10-07): a round the model could not write ("starved") ran but did not speak. It does not reset
+    # the stall clock, and the rounds starved since she last could write are named with the model's own error.
+    last, starved_since = None, []
     for r in rounds or []:
         at = r.get("at")
         if at is None:
@@ -1115,18 +1117,28 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
                 at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
             except ValueError:
                 continue
+        if r.get("starved"):
+            starved_since.append((float(at), str(r.get("starved"))))
+            continue
         last = float(at) if last is None else max(last, float(at))
+    starved_since = [s for s in starved_since if last is None or s[0] > last]
     measured = {"paused": bool(is_paused), "last_live_round_h": None if last is None else round((now - last) / 3600.0, 1)}
+    if starved_since:
+        measured["starved"] = {"rounds": len(starved_since), "last_why": starved_since[-1][1][:200]}
     if is_paused:
         measured["why"] = str(why)[:240]
         if sends is not None or rounds_were_read:
             measured["last_rounds"] = _round_breakdown(sends if sends is not None else _all_sends)
         return {"state": PRESENT, "measured": measured}
-    if last is None:
+    if last is None and not starved_since:
         measured["why"] = "no live round on record here"
         return {"state": UNKNOWN, "measured": measured}
-    if now - last > AMBASSADOR_STALL_H * 3600:
-        measured["why"] = "granted and not paused, and no live round in %.1f h" % ((now - last) / 3600.0)
+    if last is None or now - last > AMBASSADOR_STALL_H * 3600:
+        measured["why"] = "granted and not paused, and no live round that could write in %s" % (
+            "her record" if last is None else "%.1f h" % ((now - last) / 3600.0))
+        if starved_since:
+            measured["why"] += ("; the last %d round(s) were starved -- the model could not write: %s"
+                                % (len(starved_since), starved_since[-1][1][:120]))
         return {"state": PRESENT, "measured": measured}
     return {"state": ABSENT, "measured": measured}
 

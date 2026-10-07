@@ -504,6 +504,22 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             ask = covenant_model.ask
         except Exception:                                         # noqa: BLE001
             ask = None
+    # A ROUND THE MODEL CANNOT WRITE IS DEFERRED, NOT FILLED WITH A TEMPLATE (A300, 2026-10-07). When the model
+    # failed, write_reply's fixed text stood in for every ally -- measured that day: 100 fixed-text replies tried,
+    # 0 sent (the judges hold a template), each counted "refused". Two such rounds isolate her with "the judge
+    # refused every reply" when the cause was a model that could not load (1.6 GB free of the 2.1 its smallest
+    # weights need). So a failing ask is counted, and the round stops replying at the first one: the rest wait.
+    starved = {"n": 0, "why": ""}
+    if ask is not None:
+        _model_ask = ask
+
+        def ask(msgs, **kw):                                      # noqa: F811 -- the same ask, its failures counted
+            try:
+                return _model_ask(msgs, **kw)
+            except Exception as e:                                # noqa: BLE001
+                starved["n"] += 1
+                starved["why"] = "%s: %s" % (type(e).__name__, str(e)[:160])
+                raise
     rows = []
     try:
         rows = learn() or []
@@ -605,7 +621,13 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             out["deferred"] = len(todo) - i
             say("free: this round's %g minutes are spent; %d candidate(s) wait for the next round" % (budget, out["deferred"]))
             break
+        n_failed = starved["n"]
         text, how = write_reply(r, ask)
+        if starved["n"] > n_failed:
+            out["deferred"], out["starved"] = len(todo) - i, starved["why"]
+            say("free: the model could not write (%s); %d candidate(s) wait for the next round -- a template no "
+                "judge has passed is not sent in her name (A300)" % (starved["why"][:100], out["deferred"]))
+            break
         try:
             then_n = count_comments(post_id, r.get("author"))
         except Exception:                                         # noqa: BLE001
@@ -669,7 +691,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
              "deferred": out.get("deferred", 0),
-             "answered": out.get("answered", 0), "accounted": out.get("accounted", 0)}, sends_path)
+             "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
+             **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
     out["isolated"] = False
     if not dry_run:
         # Only rounds that TRIED someone (2026-10-06): with rotation, a round can find no one new to

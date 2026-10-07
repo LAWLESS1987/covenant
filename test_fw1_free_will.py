@@ -374,6 +374,39 @@ def main():
     check("FW1t round_minutes null is no budget, and the default is DEFAULT_ROUND_MINUTES",
           FW.DEFAULT_ROUND_MINUTES == 40 and o1.get("deferred") == 0, (FW.DEFAULT_ROUND_MINUTES, o1.get("deferred")))
 
+    print("FW1s -- a round the model cannot write is deferred, not filled with a template (A300)")
+    tds = tempfile.mkdtemp(prefix="fw1s_")
+    gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
+    with open(gps, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}}, fh)
+    emitted_s, logs = [], []
+
+    def emit_s(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw2):
+        emitted_s.append(text)
+        return {"sent": False, "judged": "hold", "why": "held by covenant's judge (no view)"}
+
+    def ask_down(msgs, max_tokens=260):
+        raise RuntimeError("could not start: no weights fit: free 1.6 GB")
+    kws = dict(say=logs.append, ask=ask_down, learn=lambda: [], allies=lambda: list(three), emit=emit_s,
+               introduce=lambda **k: {"sent": False}, grant_path=gps, sends_path=sps, count_comments=cc0)
+    s1 = FW.run_round(dry_run=False, now=70000.0, **kws)
+    s2 = FW.run_round(dry_run=False, now=70000.0 + FW.ROTATE_HOURS * 3600 + 60, **kws)
+    rows_s = [r for r in FW.sends(sps) if r.get("kind") == "round"]
+    check("FW1s the model failing: nothing is emitted, all three wait (deferred 3, refused 0), the round row names "
+          "the model's error, and it is said out loud",
+          not emitted_s and s1["refused"] == 0 and s1.get("deferred") == 3 and "no weights fit" in (s1.get("starved") or "")
+          and rows_s and "no weights fit" in (rows_s[0].get("starved") or "")
+          and any("could not write" in l for l in logs), (s1, emitted_s[:1], rows_s[:1]))
+    check("FW1s two starved rounds do not isolate her (no one was tried): no isolation row in her ledger",
+          not s1.get("isolated") and not s2.get("isolated")
+          and not [r for r in FW.sends(sps) if r.get("kind") == "isolation"], (s1.get("isolated"), s2.get("isolated")))
+    held_s = []
+    o_ok = FW.run_round(dry_run=False, now=70000.0 + 3 * FW.ROTATE_HOURS * 3600, **dict(kws, ask=ask_ok,
+                        emit=lambda text, **k: held_s.append(text) or {"sent": False, "judged": "hold",
+                                                                      "why": "held by covenant's judge (no view)"}))
+    check("FW1s with the model back, the same allies are drafted and judged as before",
+          len(held_s) == 3 and o_ok["refused"] == 3 and not o_ok.get("starved"), (o_ok, len(held_s)))
+
     print("FW1k -- one live round at a time (the nightly's and a scheduled one)")
     lockp = os.path.join(tdt, "ambassador_round.lock")
     open(lockp, "w").close()

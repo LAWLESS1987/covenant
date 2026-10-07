@@ -1547,6 +1547,19 @@ def main():
           len(_lr) == 2 and _lr[0]["sent"] == 1 and _lr[1] == {"t": "r2", "tried": 5, "sent": 1, "held_no_view": 2, "convicted": 1,
                                                                 "rate_limited": 1, "other": 0, "tetsu_reviewed": 2, "tetsu_refused": 1},
           _lr)
+    # A300 (2026-10-07): a starved round (the model could not write) ran but did not speak.
+    _sv = lambda h, w="RuntimeError: no weights fit: free 1.6 GB": {"at": _n - h * 3600, "starved": w}  # noqa: E731
+    am_s = {
+        "starved_after": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 9 * 3600}, _sv(6), _sv(3)], now=_n),
+        "only_starved": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[_sv(1)], now=_n),
+        "spoke_since": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[_sv(6), {"at": _n - 3 * 3600}], now=_n),
+    }
+    check("H1am a starved round does not reset the stall clock and is named with the model's error; one that spoke "
+          "after it clears it (A300)",
+          am_s["starved_after"]["state"] == H.PRESENT and am_s["starved_after"]["measured"]["starved"]["rounds"] == 2
+          and "could not write" in am_s["starved_after"]["measured"]["why"] and "no weights fit" in am_s["starved_after"]["measured"]["why"]
+          and am_s["only_starved"]["state"] == H.PRESENT and am_s["spoke_since"]["state"] == H.ABSENT
+          and "starved" not in am_s["spoke_since"]["measured"], am_s)
     _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
     check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
 

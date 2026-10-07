@@ -7635,6 +7635,34 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A300. [A round the model could not write would have filled every reply with one template, and two such rounds would have isolated free for the judge's sake] 2026-10-07. His words: "keep expanding the highway gonna need a bridge made eventually". FIXED in free's round and on the road, driven both ways
+
+**Measured.** That morning Tetsu's model could not load: 1.57 to 2.15 GB free, and the smallest weights
+need 2.1 (tetsu_cannot_answer PRESENT). free's replies are written by the same model. When an ask raised,
+write_reply's fixed text stood in for every ally. From her ledger: 1345 live reply rows, 100 of them fixed
+text, 0 of those 100 sent. The judges hold a template every time, and each one counted as "refused". Two
+such rounds meet the isolation rule, so free would be isolated and he would be told "the judge refused every
+reply", when the cause was a model that could not load. The round at 09:00 was due under exactly these
+conditions.
+
+**Fixed in free's round.** _run_round counts the failures of its own ask. At the first one, the round stops
+replying, and that candidate and the rest are deferred to the next round. This is said out loud, and the
+round row carries `starved` with the model's error. A starved round tries no one, so it cannot count toward
+isolation. A model draft set aside by the screen still falls back to the fixed text, unchanged. FW1s: no
+emit, deferred 3, refused 0, the error named; two starved rounds do not isolate; with the model back, the same
+allies are drafted and judged. Without the deferral FW1s fails 2 checks, and with the failures uncounted it
+fails 2; restored, FW1 73/73.
+
+**On the road.** ambassador_stalled no longer lets a starved round reset its 8-hour clock. While she cannot
+write, it reads PRESENT with `starved` (the round count and the model's last error), so the cause appears
+beside tetsu_cannot_answer's. A round that spoke afterwards clears it. H1am: when a starved round resets the
+clock, H1am fails; restored, H1 215/215. CT1 32/32.
+
+**Not changed.** Memory: the model's room is the road's existing trim_idle_apps on an hourly cooldown.
+The biggest holder that morning was the Claude desktop app, which is not the road's to stop.
+
+---
+
 ### A299. [The local sweep is red on A127.Q2: on today's live verdict ledger, refining the student answers one exam case fewer than rebuilding it] 2026-10-07. Found by the road (sweep_red, unclean test_a127_refine_not_rebuild.py) while expanding it. OPEN, measured, the check NOT moved
 
 **Measured.** A127 simulates a night on the live ledger (ops/verdicts.jsonl, 3982 rows read after the pair
