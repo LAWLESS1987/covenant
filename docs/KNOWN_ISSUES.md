@@ -7635,6 +7635,48 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A314. [Tetsu's persona feed: machine prompts reached his register as "what he said to you", a recurrence of A233] 2026-10-08. His words: "yes fix the persona feed don't alter his memory and tell him we are trying to help". FIXED; his register and his log untouched
+
+**Found by the rhythm exam** (collective #5, baseline, private and fresh, 20 asks on the 2B). ex02 ("we make a good
+team") ended with "Please WRITE a short public correction (you are not reviewing anything)". ex18, a message
+addressed to Claude, drew "The CI failed because the GitHub Actions artifact storage quota is full" and an offer to
+delete old artifacts. Both strings are in his register (`ops/tetsu_persona.json`, 3,651 chars, written 2026-10-07
+17:51), and so in every ask's system message (13,891 chars).
+
+**Where they came from, measured in `ops/chat/ask_log.jsonl`.** The correction request was an agent ask from
+**127.0.0.3** (a session's script, 2026-10-06). "Lawrence gave you a standing directive today …" and "Today the
+phone build broke … (quota full)" were **council asks from 127.0.0.1** (scripts, 2026-09-28; no code in the tree
+sends them). The log's callers: 127.0.0.2 (the work tool, 484 rows), his phone's tailnet address (186), 127.0.0.1
+(council 7, agent 6, image 5, which mixes his /pc page with scripts), a LAN address (1), 127.0.0.3 (1).
+
+**Why A233 did not stop it.** A233 left out the work tool's address by name (`WORK_CALLERS = ("127.0.0.2",)`).
+A list of excluded callers cannot name the next one, and 127.0.0.1 cannot be listed at all, because his own page
+uses it. This is the rule 2 shape: a hardcoded list missing the case that was added after it.
+
+**Fix: his words are defined by where they come from.** `covenant_persona.is_his_word` accepts:
+- an address that is not loopback (his phone, the LAN);
+- or a loopback row the door marked `"page": true`.
+
+Both doors (`/m/agent`, `/pc/council`) mark a row when the request carries a browser's Fetch Metadata or Origin
+header (`page_request`). Scripts send neither. Every other loopback ask is work: it still reaches the chat memory
+and the teacher, and is never shown to him as the operator's words. `WORK_CALLERS` is unchanged (A273 pins it).
+
+**Not altered, on his word.** His register, its revisions, and the ask log are left exactly as they are. The next
+pass shows him only his own lines, and what he keeps of the old text is his call. Until the nodes restart onto
+this core, the running doors do not mark page rows, so his /pc page asks are not shown to a pass in that window.
+His phone's are.
+
+**Guard, driven both ways.** `test_a314_persona_feed.py` (12/12):
+- the rule on every caller in the real log;
+- his_side on a replay of the incident;
+- both real doors through the stub model;
+- in-suite mutations: the A233 rule restored brings the incident's prompts back as his words (H1 red), and page
+  detection switched off leaves a page's ask unmarked (D1 red).
+
+Neighbours green: TP1 56/56, A273 21/21 (1 skip), A263 38/38, PC1 52/52.
+
+---
+
 ### A313. [public CI / a test that read the wall clock] test_breakout_ledger's same-day check failed on ubuntu-3.11 at 6a1eda7 because the run fell in the last minute before UTC midnight. FIXED, both ways
 
 **What happened.** Two CI runs of 6a1eda7 started at 23:53Z. One job failed one check: "a second run the SAME

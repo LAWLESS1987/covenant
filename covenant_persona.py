@@ -459,6 +459,39 @@ def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):
 # reaches the chat memory and the teacher; it is only never presented to Tetsu as the operator's words.
 WORK_CALLERS = ("127.0.0.2",)
 
+# WHO HIS WORDS COME FROM, NOT WHO THEY DO NOT (A314, 2026-10-08; his words: "fix the persona feed don't alter his
+# memory"). A233 left out one machine address by name, and a list cannot name the next caller. Machine prompts then
+# reached a pass from 127.0.0.3 (a session's correction request, 2026-10-06) and from scripts posting to /pc/council
+# on 127.0.0.1 (2026-09-28), and his register copied them word for word ("Please WRITE a short public correction",
+# "Today the phone build broke ..."). So his words are now defined by where they come from: his phone or the LAN
+# (any address that is not loopback), or a browser page on this PC, whose rows the doors mark "page": true. Every
+# other loopback ask is work. It still reaches the chat memory and the teacher, but it is never shown to him as
+# the operator's words. Rows already in the log, and his register, are left exactly as they are.
+LOOPBACK_PREFIXES = ("127.", "::1", "localhost")
+
+
+def page_request(headers):
+    """True when an ask came from a browser page. Browsers send Fetch Metadata (Sec-Fetch-Mode) and Origin with a
+    POST fetch; scripts (urllib, curl, tools/tetsu_work.py) send neither."""
+    try:
+        return bool(headers.get("Sec-Fetch-Mode") or headers.get("Origin"))
+    except Exception:                                             # noqa: BLE001 -- a label, never a gate
+        return False
+
+
+def is_his_word(row):
+    """A row of the ask log that a refinement pass may show as what the operator said."""
+    if row.get("kind") not in ("agent", "council"):
+        return False
+    addr = str(row.get("from") or "").strip()
+    if addr.startswith("::ffff:"):
+        addr = addr[len("::ffff:"):]
+    if not addr or addr in WORK_CALLERS:
+        return False
+    if addr.startswith(LOOPBACK_PREFIXES):
+        return row.get("page") is True
+    return True
+
 
 def his_side(log_path=None, hours=24, limit=40):
     """The operator's side of the recent conversations, from the ask log: texts only, bounded."""
@@ -472,7 +505,7 @@ def his_side(log_path=None, hours=24, limit=40):
             r = json.loads(line)
         except ValueError:
             continue
-        if r.get("kind") not in ("agent", "council") or r.get("from") in WORK_CALLERS:
+        if not is_his_word(r):
             continue
         try:
             at = time.mktime(time.strptime(str(r.get("t", ""))[:19], "%Y-%m-%dT%H:%M:%S"))

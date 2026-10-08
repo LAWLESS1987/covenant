@@ -9141,6 +9141,11 @@ class CovenantAPI:
             if fresh:
                 _row.update(fresh=True)
                 _out.update(fresh=True)
+            try:                                                  # A314: a browser page's ask is his word
+                if importlib.import_module("covenant_persona").page_request(request.headers):
+                    _row.update(page=True)
+            except Exception:                                     # noqa: BLE001 -- a label, never a gate
+                pass
             try:
                 _ask_log_row(_row)
             except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate

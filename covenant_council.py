@@ -411,6 +411,11 @@ def register(api):
                 "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
                 "message": str(message)[:2000], "model": steps[-1].get("model") if steps else None,
                 "fit": [s["fit"] for s in steps if s.get("fit")]}
+        try:                                                      # A314: a browser page's ask is his word
+            if importlib.import_module("covenant_persona").page_request(request.headers):
+                _row["page"] = True
+        except Exception:                                         # noqa: BLE001 -- a label, never a gate
+            pass
         _out = {"status": "success", "answer": "" if withheld else final, "withheld": withheld,
                 "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
                 "judge": getattr(result, "judge_id", "") if result is not None else "",

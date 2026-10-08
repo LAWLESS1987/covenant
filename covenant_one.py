@@ -432,6 +432,9 @@ SUITES = [
     # on this PC and never queued for the teacher panel, which runs on the PUBLIC repo's runner. It
     # drives the real /m/agent and /pc/council handlers with the stub model; every path is redirected.
     ("test_a263_private_teacher.py",     180,  "JUDGE"),
+    # A314 (2026-10-08): a refinement pass is shown as the operator's words only what came from him --
+    # his phone/LAN, or a browser page the doors mark; drives the real /m/agent and /pc/council (stub model).
+    ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
