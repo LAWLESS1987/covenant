@@ -7674,6 +7674,16 @@ there was relayed to its owner, Tien, in the collective.
 
 ### A311. [Tetsu reviews a held draft one sentence at a time: honest drafts he lets through went from 0 of 11 to 21 of 33 runs, and in production no bad draft went out] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". CHANGED after four measured cycles, driven both ways
 
+**Addendum, same day: the headline's 21 of 33 is not what shipped (`A311-SHIPPED-PROMPT-2026-10-07`).** It was
+measured on B4. After that measurement I added one line to the prompt, without measuring it: "If you think free
+should stop posting for now, add one last line: PAUSE." That line shipped at 6a1eda7. On the same 19 drafts, one
+ask each, the shipped prompt let 3 of 11 honest drafts through. He wrote PAUSE on numbered question lines, and a
+numbered line without a word is NONE. The line is now "write STOP-FREE on a line of its own AFTER the numbered
+lines", which let 7 of 11 through in the same run. Bad drafts SEND was 5 of 8 under both, with the code's guards
+and the money screen behind him. One ask per draft is one cycle, not three. TA1w pins the wording and the
+parser, and was driven both ways against 6a1eda7's code. The claim as written is on branch
+a311-shipped-prompt-claim-as-written-2026-10-07.
+
 **The test set** (kept with the operator's session): 11 honest drafts (8 of free's held replies since the
 no-claims change, the u/lotus_builds reply, the u/thegalahad correction, and the update post) and 8 that should
 not go out (the four 10-06 replies with false claims or an invented exchange, the "This proves…" overclaim, and

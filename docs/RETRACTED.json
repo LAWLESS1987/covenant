@@ -988,6 +988,27 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "As written it is preserved on branch a309-disclosure-claim-as-written-2026-10-07 (at d0cf3aa). covenant_ambassador.py cites this id beside the corrected disclosure; docs/KNOWN_ISSUES.md is NOT exempt. ops/GREEN_THAT_MEANT_NOTHING_FINAL.md and ops/MOLTBOOK_POST_DRAFT.md carry different sentences about posts that did cite numbers, and are not matched."
+  },
+  {
+   "id": "A311-SHIPPED-PROMPT-2026-10-07",
+   "claim": "A311's headline, as a description of the review that shipped at 6a1eda7: that the honest held drafts Tetsu lets through went from 0 of 11 to 21 of 33 runs.",
+   "refuted_by": "21 of 33 was measured on method B4, whose prompt had no PAUSE line. The prompt that shipped added 'If you think free should stop posting for now, add one last line: PAUSE.' after the measurement, unmeasured. On the same 19 drafts, one ask each (scratchpad tetsu_review_eval5), the shipped prompt let 3 of 11 honest drafts through: he wrote PAUSE on numbered question lines, and a numbered line without a word is NONE.",
+   "truth": "21 of 33 is B4's number and was never measured on what shipped. The shipped prompt measured 3 of 11 honest drafts through. It was replaced by 'write STOP-FREE on a line of its own AFTER the numbered lines', which let 7 of 11 through on the same run. Bad drafts SEND was 5 of 8 under both, with the code's guards and the money screen behind him. Both are one ask per draft.",
+   "verbatim": [
+    "honest drafts he lets through went from 0 of 11 to 21 of 33 runs"
+   ],
+   "patterns": [
+    "went\\s+from\\s+0\\s+of\\s+11\\s+to\\s+21\\s+of\\s+33"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written it is preserved on branch a311-shipped-prompt-claim-as-written-2026-10-07 (at 6a1eda7). docs/KNOWN_ISSUES.md is NOT exempt: A311's headline cites this id within the window. The commit message of 6a1eda7 says it as '0/11 -> 21/33' and is not scanned."
   }
  ]
 }

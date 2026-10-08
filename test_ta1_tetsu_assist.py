@@ -41,7 +41,7 @@ asked = []
 
 def say(word):
     """A311: he answers one word per numbered sentence. SEND = every line OK; REFUSE = the first sentence flagged;
-    PAUSE = every line OK plus a PAUSE line; anything else is returned as given (no answer)."""
+    PAUSE = every line OK plus a STOP-FREE line (the A311 addendum's word); anything else is returned as given."""
     def _ask(prompt):
         asked.append(prompt)
         block = prompt.split("Sentences:\n", 1)[-1].split("\n\n", 1)[0]
@@ -53,7 +53,7 @@ def say(word):
         if w == "REFUSE":
             return "\n".join(["1. FALSE"] + ok_lines[1:])
         if w == "PAUSE":
-            return "\n".join(ok_lines + ["PAUSE"])
+            return "\n".join(ok_lines + ["STOP-FREE"])
         return word
     return _ask
 
@@ -103,6 +103,14 @@ check("TA1u a word missing for any sentence is no answer: the hold stands",
       TA.read_answer("1. OK\n2. OK", _s)[0] == "NONE" and TA.read_answer("1. OK\n2. 1. How do you do it?\n3. OK", _s)[0] == "NONE")
 check("TA1v 'QUESTION' (an echo of the instruction) reads as OK; '1:' and '2)' are read too",
       TA.read_answer("1: OK\n2) OK\n3. A QUESTION", _s)[0] == "SEND")
+check("TA1w (A311 addendum) the prompt asks for STOP-FREE on a line of its own after the numbered lines, not 'add one "
+      "last line: PAUSE' -- the wording that got PAUSE written onto question lines",
+      "STOP-FREE on a line of its own AFTER the numbered lines" in TA.SENTENCE_PROMPT
+      and "add one last line: PAUSE" not in TA.SENTENCE_PROMPT, TA.SENTENCE_PROMPT[-400:])
+check("TA1w ...a STOP-FREE line of its own pauses; one on a numbered line does not, and leaves that sentence "
+      "without a word",
+      TA.read_answer("1. OK\n2. OK\n3. OK\nSTOP-FREE", _s)[0] == "PAUSE"
+      and TA.read_answer("1. OK\n2. OK\n3. STOP-FREE", _s)[0] == "NONE")
 q = open(os.environ["COVENANT_TEACHER_QUEUE"], encoding="utf-8").read()
 check("TA1d the reviewed draft goes to the students' teacher queue", DRAFT in q and "tetsu_send" in q, q[:200])
 
