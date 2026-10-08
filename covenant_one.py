@@ -432,6 +432,9 @@ SUITES = [
     # on this PC and never queued for the teacher panel, which runs on the PUBLIC repo's runner. It
     # drives the real /m/agent and /pc/council handlers with the stub model; every path is redirected.
     ("test_a263_private_teacher.py",     180,  "JUDGE"),
+    # A314 (2026-10-08): a refinement pass is shown as the operator's words only what came from him --
+    # his phone/LAN, or a browser page the doors mark; drives the real /m/agent and /pc/council (stub model).
+    ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
@@ -448,6 +451,33 @@ SUITES = [
     # A265 (2026-10-05), registered in the change that created it: the keeper's stop is a stop only
     # when the server stops answering. The first suite to run the real stop(); every kill is a recorder.
     ("test_a265_model_stop.py",           120,  "JUDGE"),
+    # A268 (2026-10-06), registered in the change that created it: an in-place suite runs without
+    # the deployed gate's env (in_place_env); M6 died on an inherited 'deferring' provider.
+    ("test_a268_in_place_env.py",         240,  "JUDGE"),
+    # A269 (2026-10-06): the model keeper starts llama-server with one slot, so a request gets all of -c.
+    ("test_a269_model_one_slot.py",       120,  "JUDGE"),
+    # A272 (2026-10-06): covenant_pause refuses a test suite on the LIVE switch (FW1 paused free for real).
+    ("test_a272_pause_guard.py",          120,  "JUDGE"),
+    # A277 (2026-10-06): the Moltbook orb counts what went out over a day, not the last six attempts.
+    ("test_a277_moltbook_orb.py",         120,  "JUDGE"),
+    # A282 (2026-10-06): every real ask of the model leaves one line; a test never writes the live ledger.
+    ("test_a282_model_asks.py",           120,  "JUDGE"),
+    # A288 (2026-10-06): the Highway orb reads every detector on the road, not seven.
+    ("test_a288_highway_orb.py",          120,  "JUDGE"),
+    # A289 (2026-10-06): no module defines the same top-level name twice (A278 shadowed A200's _sweep_running).
+    ("test_a289_no_shadowing.py",         120,  "JUDGE"),
+    # A303 (2026-10-07): a semantic veto that could never fire is refused at construction and fails closed at
+    # evaluation -- the collective's review, Codex's CXR-1, admitted with Tetsu.
+    ("test_a303_semantic_veto_config.py", 300,  "JUDGE"),
+    # A304 (2026-10-07): the memory system's own suite (the chain's limits as checks, A8-A8d) had no runner.
+    ("test_m1_memory_system.py",          900,  "SECURITY"),
+    # A273 (2026-10-06): his history follows the real size of the rules -- each door request is
+    # counted and the oldest turns dropped, as few as fit, so none overflows the 8192-token window.
+    ("test_a273_history_fits.py",         180,  "JUDGE"),
+    # A284 (2026-10-06), registered in the change that created it: {"fresh": true} at /m/agent replays
+    # nothing and is replayed into nothing; Tetsu's reviews and round updates ask that way, and every
+    # caller of tools/tetsu_work.ask must be declared fresh or shared (found by parsing the tree).
+    ("test_a284_fresh_context.py",        180,  "JUDGE"),
     ("test_rl1_refine_loop.py",           120,  "JUDGE"),
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
@@ -480,6 +510,11 @@ SUITES = [
     ("test_r1_lora_frame.py",            120,  "JUDGE"),
     ("test_w1_wsgi.py",                  300,  "HTTP"),
     ("test_w2_sandbox_platform.py",      180,  "HTTP"),
+    # A274 (2026-10-06), registered in the change that created it: the sandbox's Windows path
+    # (a Job Object) holds memory, process count and wall time against real code, and each of
+    # eight mutations that drops one limit from a copy of the core turns its group red. ~105 s
+    # measured on win32 with the mutations; off win32 only its X group runs.
+    ("test_a274_win_job_sandbox.py",     300,  "SECURITY"),
     ("test_d3_daily_guards.py",          180,  "DAILY + GUARDS"),
     ("test_backtest_guardrails.py",      180,  "DAILY + GUARDS"),
     ("test_3node_config.py",             120,  "DEPLOYMENT"),
@@ -626,15 +661,19 @@ SUITES = [
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
     ("test_pp1_tetsu_practice.py", 240, "JUDGE"),
+    # PP2 (2026-10-06, A275, his words: "ensure tetsu is free to learn whatever he wants also. tell him"): one slot a night
+    # drawn from Tetsu's OWN recorded choices, after the curriculum and on its own clock; he changes them by HANDS WRITE
+    # learning.txt; paper stays paper (a whole night loads no module but the practice and his hands). Real runs.
+    ("test_pp2_tetsu_choice.py", 240, "JUDGE"),
     # FL1 (2026-09-28, his words: "Yes, label them"): the assistant labels harvested forum rows only under
     # ops/forum_label_grant.json, through covenant_moltbook_release's one door -- excerpts of real eligible posts,
     # the exam-contamination filter applied, once each; without the grant it refuses as before.
     ("test_fl1_forum_labels.py", 180, "JUDGE"),
     ("test_ta1_tetsu_assist.py", 180, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
-    # PC2 (2026-10-03, the core's pin; 2026-10-06, A267, the other four through tools/pin_deploy.py): every
+    # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
     # deploy pin moves in the same commit as its file, after its judges pass; the hook driven end to end in a
-    # scratch repository both ways. Also in run_all_tests.sh since A267.
+    # scratch repository both ways. Also in run_all_tests.sh since A315.
     ("test_pc2_pin_core.py", 120, "JUDGE"),
     ("test_cp1_compact.py", 120, "JUDGE"),
     ("test_ca1_check_adjust.py", 120, "JUDGE"),
@@ -914,16 +953,37 @@ def stage(say):
                 shutil.copy2(p, work)
             except OSError:
                 pass
-    for d in ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness"):
+    for d in STAGE_DIRS:
         s = os.path.join(HERE, d)
         if os.path.isdir(s):
             # A201 (2026-09-21): the untracked runtimes under tools/ (llama, sd -- binaries and an
             # 18 MB zip) are never staged: a staged copy of one tripped Defender, and no suite
             # runs them (the model and image doors are stubbed in every suite).
             shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools" else None)
+                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools"
+                            else shutil.ignore_patterns("__pycache__"))
     say("   staged into %s" % work)
     return work
+
+
+# WHICH FOLDERS THE COPY CARRIES, AND WHY THE OTHERS ARE LEFT OUT (A298, 2026-10-07).
+# The fourth time the scratch copy was not the repository: root .md files (2026-09-10), CONTRIBUTING.md for
+# G1, conformance_indep/ for N2 (CI found it, 2026-09-03), and now ai_memory_system/. A294's threefold witness
+# verifies a ledger with ai_memory_system's own verify_chain(); staged, it could not import it, read UNKNOWN,
+# and H1tf failed on public CI from 2512aec on, while it passed in the folder and in a WSL copy of HEAD.
+# Each time the fix was one more name. test_a298_stage_covers_tree.py (in place, it needs git) now fails when
+# a TRACKED top-level folder is in neither list below -- a new folder is a decision, not a silent absence.
+STAGE_DIRS = ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness",
+              "ai_memory_system")
+NOT_STAGED = {
+    "mobile": "read in place by test_m3_mobile.py, test_m4_usb_link.py and test_a93_clone_seats_the_student.py",
+    "conformance_indep": "read in place by test_n2_independent_root.py (the independent builds share no code with this tree)",
+    "phone": "the phone's Termux shell scripts; no suite runs them (not measured whether a staged suite reads one)",
+    "vendor": "third-party files (three.min.js, a waitress wheel), skipped by the scanners on purpose (A92)",
+    ".github": "the public CI workflow: it runs this sweep, and nothing in the sweep runs it",
+    ".claude": "Claude Code's settings and hooks: they run in the folder, never from a copy",
+    ".well-known": "one public text file (peace.txt); no suite was found that reads it (grep, 2026-10-07)",
+}
 
 
 def clean_dbs(work):
@@ -1114,6 +1174,29 @@ def phase_coverage(say):
     return absent, orphans, missing_deps, sorted(ignored_by)
 
 
+# A268 (2026-10-06). The deployed gate's wiring, as covenant_judge_defer.apply_policy
+# writes it. A process that judged an outbound post (covenant_moltbook) applies the
+# policy to its OWN os.environ, and the daily cycle's sweep inherited it: on
+# 2026-10-06 test_m6_mobile_door.py died before its first node check with
+# "unknown judge provider: 'deferring'" -- the node's provider, named to a suite that
+# never imports the module that registers it -- and the sweep read FAIL with 0
+# checks failed. By hand, from a clean shell, it was 73/73. That shape is recorded
+# under A117 (test_a114_own_genesis inherited the sweep's provider); that fix repaired
+# the one suite and left nothing to stop the next one. This is the thing that stops it: the in-place suites run with these keys removed, so
+# each reads its own default, exactly as a person running it by hand would.
+DEPLOYED_GATE_ENV = ("COVENANT_JUDGE_PROVIDERS", "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
+                     "COVENANT_SILENCE_IS_NOT_DISSENT", "COVENANT_RELAX_VALUELESS_FOR")
+
+
+def in_place_env(base=None):
+    """The environment an in-place suite runs with: the caller's, minus the deployed
+    gate's wiring (DEPLOYED_GATE_ENV, A268)."""
+    env = dict(os.environ if base is None else base)
+    for k in DEPLOYED_GATE_ENV:
+        env.pop(k, None)
+    return env
+
+
 IN_PLACE = [
     # (file, seconds, why it may not be run from a scratch copy)
     ("verify_bundle.py", 120,
@@ -1204,6 +1287,12 @@ IN_PLACE = [
     ("test_a255_runtime_outputs.py", 300,
      "every tracked ledger is classified, G1 cannot be blocked by a ledger write, and the "
      "pre-commit hook never writes uncommitted bytes into the manifest -- a claim about the FOLDER"),
+    # A298 (2026-10-07), registered in the change that created it. In place: it asks git which folders the
+    # repository tracks, and the scratch copy has no .git -- then it stages a copy and runs the threefold
+    # witness's chain check THERE, the path that failed on public CI.
+    ("test_a298_stage_covers_tree.py", 300,
+     "every tracked top-level folder is staged or excused with a reason, and the staged copy can verify a chain "
+     "-- a claim about what the FOLDER's copy carries"),
 ]
 
 
@@ -1230,7 +1319,7 @@ def phase_integrity(say, transported=False):
             say("    ABSENT -- not on disk. NOT measured, and not a pass.")
             out.append((name, "ABSENT"))
             continue
-        rc = run_open(say, [sys.executable, name], timeout=tmo)
+        rc = run_open(say, [sys.executable, name], timeout=tmo, env=in_place_env())
         out.append((name, "ok" if rc == 0 else "FAIL rc=%s" % rc))
 
     # THE RULES THEMSELVES. Added 2026-08-30, on discovering that NOTHING ran

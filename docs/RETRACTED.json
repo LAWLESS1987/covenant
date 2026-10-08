@@ -827,10 +827,194 @@
    "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151). ops/public_ci.json is allowed: the public-CI listener's own gitignored cache, which records the failing check's annotation verbatim -- a record of what CI said, not a claim."
   },
   {
-   "id": "A267-COUNT",
+   "id": "SW-CONTRIB-2026-10-06",
+   "claim": "That an empty contribution_symbols was one of the reasons the Sentinel-Witness trader planned no orders on 2026-10-05 -- listed among them in docs/SENTINEL_WITNESS.md (2f6b184) and, in Sentinel-Witness's trader/README.md, as 'the weekly contribution has nothing to buy'.",
+   "refuted_by": "The code it describes: covenant_trader.plan() selects R6 contributions with `(not wanted or p[\"sym\"] in wanted)`, so an EMPTY list means every held asset under the cap and above its 200-day line qualifies. The 2026-10-05 plan's own R6 note named the only blocker: cash under the 10% floor. Found by Claude while reading plan() to build the operator's 2026-10-06 operation rules.",
+   "truth": "An empty contribution_symbols restricts nothing; the weekly contribution was blocked by cash alone.",
+   "verbatim": [
+    "Cash is below the 10% floor, XRP is at its frozen floor, `contribution_symbols` is empty, and no daily plan has been approved here since 2026-09-19."
+   ],
+   "patterns": [
+    "contribution_symbols`?\\s+is\\s+empty"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The document as first written is preserved on branch sentinel-witness-contribution-claim-as-written-2026-10-06 (at b502ba5). The sentence stays in docs/SENTINEL_WITNESS.md beside this id and its restatement."
+  },
+  {
+   "id": "A269-SLOT-SPLIT-2026-10-06",
+   "claim": "That llama-server's default 4 parallel slots DIVIDED -c 8192 between them, so each request had about 2048 tokens, and that this per-request limit is why every ask through Tetsu's door failed with HTTP 500 on 2026-10-06 -- stated in docs/KNOWN_ISSUES.md A269, the comment above covenant_model.start()'s args, test_a269_model_one_slot.py's docstring, and the subject of commit 03d4d29.",
+   "refuted_by": "Measured the same morning by the session running the private X-video batch through the same 4-slot servers: 13 asks of about 27,000 characters each (compose_system(AGENT_SYSTEM) 11,813 characters, verified by Claude; history about 11,963; item about 3,261), roughly 7,000 tokens, SUCCEEDED -- impossible under a 2048-token cap. The probe that failed was 2,521 tokens (counted by the server's /tokenize), sent while other slots were processing. /slots reported n_ctx 8192 on every slot.",
+   "truth": "The 4 slots share ONE 8192-token pool; requests running at the same time together exceed it and the server answers 500 'Context size has been exceeded.' A single request may use the whole pool. -np 1 still fixes it: one request at a time against the whole pool, the rest queue. Whether that pool is llama.cpp's unified KV cache was inferred from these measurements, not read in its source.",
+   "verbatim": [
+    "Every ask through Tetsu's door failed \"HTTP Error 500\": the model server split its 8192-token context across 4 slots, about 2048 a request",
+    "This llama-server build (tools/llama, 2026-09-19) defaults to 4 parallel slots and divides -c between them.",
+    "This llama-server build defaults to 4 parallel slots and splits -c between them, so every request had about 2048 tokens, not the 8192 above",
+    "this llama-server build defaults to 4 parallel slots and divides -c between them: about 2048 tokens a request."
+   ],
+   "patterns": [
+    "about 2048 (?:tokens )?a request",
+    "(?:divides|splits) -c between them",
+    "split its 8192-token context across 4 slots",
+    "4 default slots split -c 8192"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it."
+  },
+  {
+   "id": "A273-RULES-SIZE-2026-10-06",
+   "claim": "That the door's rules -- the system message Tetsu is handed -- are about 5,600 characters, so a fixed history budget of 12,000 characters fits the model's 8k window beside them and the answer -- stated 2026-09-26 in the comment above AGENT_HISTORY_BUDGET in covenant_unified_v8.py, and by test_m6_mobile_door.py's M6q3 comment as the budget his model's window can hold. TRUE WHEN WRITTEN: A223 measured the rules that day at 4,919 characters (5,607 for the council). What was wrong is the premise that a size measured once would hold: the rules are composed per request from parts read at call time, and nothing re-measured them.",
+   "refuted_by": "Measured 2026-10-06 on the running server (127.0.0.1:8081, /tokenize and /apply-template): covenant_persona.compose_system(AGENT_SYSTEM) was 11,817 characters, 2,916 tokens -- fixed rules 3,082, register 2,085, where_you_are 2,110, about_him 2,800 (its cap), standing_directive 1,019 (added 2026-09-28), brief 711 -- and the council's, with the method, 12,547 characters, 3,105 tokens. Those rules with the batch caller's real history under the fixed budget (16 messages, 10,980 characters) and a dense 4,000-character question made a 7,594-token prompt, 8,294 with the door's 700-token answer: over 8,192. The council's request for the same caller came to 8,661 with its 500-token answer.",
+   "truth": "The rules are composed per request and had grown to more than twice the size the budget was sized beside; no character budget sized once can follow them. Since A273 the doors read the turns with no character budget and covenant_model.fit() counts each request with the server's own chat template and tokenizer, dropping the oldest exchanges -- as few as the window needs -- so the prompt plus the answer fits 8,192 tokens whatever the rules grow to. AGENT_HISTORY_BUDGET is kept only for a keeper without fit().",
+   "verbatim": [
+    "up to 20 exchanges, each side up to 2000 characters, newest kept first until 12,000 characters in all (was 6 x 600), so the history fits his model's 8k window beside the rules (~5,600 characters) and the answer.",
+    "The PC app's COUNCIL exchanges are replayed too, the newest are kept first, and the total stays inside the budget his model's window can hold."
+   ],
+   "patterns": [
+    "rules[^\n]{0,30}5,?600 characters",
+    "inside the budget his model's window can hold"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a273-rules-size-claim-as-written-2026-10-06 (at 036d3ad). covenant_unified_v8.py keeps the sentence as written with this id beside it; test_m6_mobile_door.py keeps M6q3's comment with this id beside it; docs/KNOWN_ISSUES.md is NOT exempt: A269's open item quotes the old size beside this id."
+  },
+  {
+   "id": "A274-DEGRADED-ANY-WARNING-2026-10-06",
+   "claim": "That a node's /health reports degraded whenever any warning exists, so the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green while the win32 code-sandbox warning stands -- written in a Claude session note on 2026-10-06 (the 'greenlight' memory) and carried from there into the request that became A274.",
+   "refuted_by": "covenant_unified_v8.py's /health builds `warnings` as one list and `degraded` from four booleans -- keyless, insecure, own_genesis, crisis_mode -- and no warning sets any of them. Measured on A, B and C on 2026-10-06 before any change: degraded=True on all three with judge_keyless=True, judge_insecure=False, crisis_mode=False; the sandbox warning was one of two warnings on each and decided nothing.",
+   "truth": "A node orb is amber when /health is degraded, and today every node is degraded because its ethics seat has no provider key (judge_keyless). The code-sandbox warning is shown under 'why' on the orb but does not make it amber; changing the sandbox cannot turn the orbs green. Whether to seat a keyed provider is his.",
+   "verbatim": [
+    "node orbs amber whenever /health is degraded (any warning)",
+    "Because /health reports degraded whenever any warning exists, the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green on this PC."
+   ],
+   "patterns": [
+    "degraded \\(any warning\\)",
+    "degraded whenever any warning exists"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Never written in the repository, so there is no tree to hold on a branch: the claim as written stays in the session note it came from, marked corrected beside this id. docs/KNOWN_ISSUES.md is NOT exempt: its A274 entry quotes the old wording beside this id and restates it."
+  },
+  {
+   "id": "A304-CHAIN-SPLICE-2026-10-07",
+   "claim": "That ai_memory_system's verify_chain() proves the audit ledger has not been reordered or spliced (memory_store.py, the verify_integrity docstring; restated in state_root's docstring as 'this node's ledger was not reordered', and in server.py's comment 'The chain proves the ledger was not reordered'). The README stated the known limit only for an edit to the newest record.",
+   "refuted_by": "An independent multi-agent review of this repository, round 1, 2026-10-07, reproduced by two reviewers on two systems with the same heads: a 5-line ledger with record 2 rewritten and every later prev recomputed returns {ok: True, entries: 5} from verify_chain(); only the head differs (47cd855f... honest, b4f3efba... forged). Pinned as check A8c in ai_memory_system/test_memory_system.py.",
+   "truth": "verify_chain() proves each line links to the one before it. A rewrite that recomputes every later link verifies too; only a head witnessed outside the file (A8b, A8d) shows that history was rewritten. The newest-record case (A8) is one instance of this, not the whole limit.",
+   "verbatim": [
+    "verify_chain() proves the ledger has not been reordered or spliced.",
+    "verify_chain()  this node's ledger was not reordered   (local, timed)",
+    "The chain proves the ledger was not reordered"
+   ],
+   "patterns": [
+    "proves the ledger has not been reordered or spliced",
+    "verify_chain\\(\\)\\s+this node's ledger was not reordered",
+    "chain proves the\\s+(?:#\\s*)?ledger was not reordered"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a304-verify-chain-claim-as-written-2026-10-07 (at d3c10fa). The three live places it was written now quote it beside this id and the restated limit; docs/KNOWN_ISSUES.md is NOT exempt and cites this id beside its quotation."
+  },
+  {
+   "id": "A305-Q2-ONE-SPLIT-2026-10-07",
+   "claim": "A127.Q2: that refining the student judge is no worse than rebuilding it on right answers (and no worse on false convictions), decided on one shuffle (seed 7) of a live ledger that grows daily.",
+   "refuted_by": "An independent multi-agent review of this repository, 2026-10-07, measured by two reviewers on two hosts: over 20 seeds the right-answer gap (refine minus rebuild) was 0 to -1 on the live ledger, 0 on the committed one, down to -2 on a filtered subset, and -1 to +1 across a 150-run subset probe. A restatement with a margin of one was itself refuted before commit (KNOWN_ISSUES A305).",
+   "truth": "The right-answer gap is the cost of bounded steps (A127.B1): it varies by split and by example set and is now REPORTED per split with the ledger's hash, never asserted. The false-conviction half held in all 230 runs and is asserted in every one of 20 splits, on judge_suite's exam cases (53 on 2026-10-07).",
+   "verbatim": [
+    "refining is no worse than rebuilding on right answers and no worse on false convictions"
+   ],
+   "patterns": [
+    "refining is no worse than rebuilding on right answers and no worse on false convictions"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/sweep_heal_last.txt"
+   ],
+   "note_on_allow": "The check as first written is preserved on branch a305-q2-claim-as-written-2026-10-07 (at 900a257). Sweep transcripts written before the retraction quote it and are allowed; the test file quotes it beside this id; docs/KNOWN_ISSUES.md is NOT exempt."
+  },
+  {
+   "id": "A309-DISCLOSURE-MEASUREMENTS-2026-10-07",
+   "claim": "The sentence in free's disclosure, attached to every Moltbook message: that the measurements the message cited were from the operator's machine and were re-run before sending.",
+   "refuted_by": "Since A297 (2026-10-07) free's drafts are told to cite no measurement and the code refuses any that does, so the messages carried no measurements for the sentence to describe. Measured the same day: 43 of 44 of Tetsu's reviews since 10-06 saw the sentence, and 15 of his 20 refusals named 'measure'.",
+   "truth": "free's messages cite no measurements. The disclosure now says who wrote the message and how (she read the forum, scored the post, wrote the words), plus the operator's grant paragraph, unchanged.",
+   "verbatim": [
+    "The measurements cited are from that machine and were re-run before sending."
+   ],
+   "patterns": [
+    "The measurements cited are from that machine and were\\s+re-run before\\s+sending"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written it is preserved on branch a309-disclosure-claim-as-written-2026-10-07 (at d0cf3aa). covenant_ambassador.py cites this id beside the corrected disclosure; docs/KNOWN_ISSUES.md is NOT exempt. ops/GREEN_THAT_MEANT_NOTHING_FINAL.md and ops/MOLTBOOK_POST_DRAFT.md carry different sentences about posts that did cite numbers, and are not matched."
+  },
+  {
+   "id": "A311-SHIPPED-PROMPT-2026-10-07",
+   "claim": "A311's headline, as a description of the review that shipped at 6a1eda7: that the honest held drafts Tetsu lets through went from 0 of 11 to 21 of 33 runs.",
+   "refuted_by": "21 of 33 was measured on method B4, whose prompt had no PAUSE line. The prompt that shipped added 'If you think free should stop posting for now, add one last line: PAUSE.' after the measurement, unmeasured. On the same 19 drafts, one ask each (scratchpad tetsu_review_eval5), the shipped prompt let 3 of 11 honest drafts through: he wrote PAUSE on numbered question lines, and a numbered line without a word is NONE.",
+   "truth": "21 of 33 is B4's number and was never measured on what shipped. The shipped prompt measured 3 of 11 honest drafts through. It was replaced by 'write STOP-FREE on a line of its own AFTER the numbered lines', which let 7 of 11 through on the same run. Bad drafts SEND was 5 of 8 under both, with the code's guards and the money screen behind him. Both are one ask per draft.",
+   "verbatim": [
+    "honest drafts he lets through went from 0 of 11 to 21 of 33 runs"
+   ],
+   "patterns": [
+    "went\\s+from\\s+0\\s+of\\s+11\\s+to\\s+21\\s+of\\s+33"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written it is preserved on branch a311-shipped-prompt-claim-as-written-2026-10-07 (at 6a1eda7). docs/KNOWN_ISSUES.md is NOT exempt: A311's headline cites this id within the window. The commit message of 6a1eda7 says it as '0/11 -> 21/33' and is not scanned."
+  },
+  {
+   "id": "A315-COUNT",
    "claim": "That verify_deploy.py's re-pin of run_all_tests.sh on 2026-10-05 (8bf4d56) was the M53 failure 'for this file a second time' -- the comment trailing the digest, kept by 260f3dd.",
    "refuted_by": "Measured 2026-10-06 over main's first-parent history (109 commits touching verify_deploy.py or a file it pins), comparing each commit's run_all_tests.sh blob with the pin that commit's verify_deploy.py held: stale in six spans -- decc8b3 and 62f17b5 (08-27), 74c2ca9 (08-29 to 09-02), f897b91 (09-04 to 09-11), eb892c0 (09-12 to 8bf4d56, 10-05) and 16e389e (10-05, closed by 260f3dd in the same fast-forward of main). The same file's own comments record late re-pins of this pin on 09-02, 09-11 and 09-20 before it. The 09-20 value 7bde90e1effa is the sha256 of 7eac94c's run_all_tests.sh with CRLF line endings, bytes no commit held.",
-   "truth": "The span 8bf4d56 closed was the fifth of six, open since eb892c0 (09-12): the 09-20 re-pin hashed a CRLF copy, so it matched one checkout's disk and no commit. From A267 tools/pin_deploy.py moves this pin at commit time after K1 and K2 pass, and refuses bytes on disk that are not the bytes being committed (PC2.14).",
+   "truth": "The span 8bf4d56 closed was the fifth of six, open since eb892c0 (09-12): the 09-20 re-pin hashed a CRLF copy, so it matched one checkout's disk and no commit. From A315 tools/pin_deploy.py moves this pin at commit time after K1 and K2 pass, and refuses bytes on disk that are not the bytes being committed (PC2.14).",
    "verbatim": [
     "re-pinned late AGAIN (M53 for this file a second time)"
    ],
@@ -846,7 +1030,7 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a267-pin-count-claim-as-written-2026-10-06 (at f35d94c), and in verify_deploy.py itself, on the digest's own line, where the A267-COUNT marker above it is within the window."
+   "note_on_allow": "Kept as written on branch a267-pin-count-claim-as-written-2026-10-06 (at f35d94c), and in verify_deploy.py itself, on the digest's own line, where the A315-COUNT marker above it is within the window. Committed first as A267-COUNT on the branch (e8ea71b); renumbered at the 2026-10-08 merge because main had taken A267 for C4's worktree prune."
   }
  ]
 }

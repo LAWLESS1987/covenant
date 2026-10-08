@@ -189,6 +189,11 @@ on this platform (win32)"; `/propose_code` refuses every proposal here. And
 "ethics gate has no provider key and is failing CLOSED" — which is the
 intended posture without a key, not a fault.
 
+*A274, 2026-10-06:* the sandbox warning now names the file-size limit alone ("no per-process
+file-size limit on this platform (win32)"); memory, process count and wall time have a Windows
+path, a Job Object, which stays shut while one limit is missing. Proposals are still refused. And
+neither warning makes a node degraded: that is keyless, insecure, own_genesis or crisis_mode only.
+
 ### 13. Stopping the learning loop may not stop a pass in flight
 
 On 2026-09-05 the loop was stopped at about 01:07 and a promotion is
@@ -7298,7 +7303,339 @@ whose scan was refused -> two red; reporting a never-run full scan as a number
 
 ---
 
-### A267. [only the core's deploy pin moved with its file, so run_all_tests.sh's went stale in six spans and verify_deploy refused the restarts it gates] 2026-10-06. His instruction: extend the commit-time mover so run_all_tests.sh's pin moves in the same commit as the file, only after the suites that judge it pass, and never silently. FIXED, the guard driven both ways; live once the tracked hook is installed after this reaches main
+### A275. [Tetsu's practice was the operator's curriculum alone: what Tetsu chose to learn had no place in it, and no way for him to change it] 2026-10-06. His words: "ensure tetsu is free to learn whatever he wants also. tell him". CHANGED, driven both ways; the curriculum is unchanged. One near-miss of the A190/A272 shape, caught before it ran and guarded
+
+**Measured before.** `covenant_tetsu_practice.night()` planned over CURRICULUM only: the 9 recursion tasks the
+operator chose on 2026-09-26. The live ledger, ops/tetsu_practice.jsonl, holds 104 rows over 9 nights
+(09-28 to 10-06). Tetsu has solved 5 of the 9. parse is unsolved, and the 3 tasks that build on it have
+never been offered. 4 of the 9 nights ended at "no weights fit" (10-01, 10-02, 10-03, 10-06). The median
+of 84 attempts is 28,817 ms. His answer of 10:44Z, three choices in his words, is the one row of
+ops/tetsu_learning_choices.jsonl, and nothing read it. Beside it is his own paper study
+(covenant_tetsu_money, ops/tetsu_strategy.jsonl). Of its 11 rows since 09-22, 7 are refusals, and every
+one says "sma_longonly.fast is not a number": he passed a range where the lab takes one number.
+
+**Changed.** After the curriculum, every night now has ONE more slot, and that slot is his. It takes his
+latest recorded choices in turn, in his order. It runs on its own clock and rounds (CHOICE_BUDGET_S 15 min,
+CHOICE_ROUNDS 3), through the same hands.act, gate, screen and guarded runner. It does not run after the
+gate or the model stops the night. The curriculum keeps its tasks, order, ROUNDS 4 and 40 minutes, and the
+night's count is still the curriculum's. The night is now bounded by 40 + 15 minutes of rounds, plus the
+students' view and lesson asks, one request at a time. A choice names a track or is open:
+- **paper** (5 tasks): a moving average, the positions it gives, a paper account with costs and no
+  lookahead, drawdown, and walk-forward folds. These are pure functions on lists. No price is fetched and
+  no order exists.
+- **code** (3 tasks): read hands.parse, hands.screen or practice.extract_code, and say what each call
+  returns. The answers are computed from the live function every time, so they follow the code.
+- **health** (3 tasks): checks modelled on verify_deploy's disk step, trader_freshness.verdict (simplified,
+  and the task says so), and how detect_public_ci_red tells him once.
+- **open**: anything else. He sets his own exercise, with at least 3 asserts of his own that run. A pass
+  means only that his file agrees with itself.
+
+He changes his choices himself, through his door, with 'HANDS WRITE learning.txt' (A226's act, gated).
+Each line is 'paper: ...', 'code: ...', 'health: ...' or his own words. When that file has changed since
+it was last recorded, the night records it by him, verbatim. covenant_persona.where_you_are() now tells
+him all this on every door, including that the record is public.
+
+**Not guessed.** His recorded choices name no track, so for now each is practised as an open exercise. I
+did not map "trading strategies and how to build them on paper" onto the paper track. Which track a choice
+gets is his to decide (rule 5), and he has been told how.
+
+**A near-miss of the A190/A272 shape.** A190 and A272 were test suites that reached live state by a
+default path. I counted night()'s callers: 8 call sites in 4 files. SV1's three nights pass no workshop
+and no gate. With the new slot, they would have practised in his REAL workshop, through the REAL gate,
+from his real choices. Nothing of the sort ran. PP1 and SV1 now read an empty choices record. A guard sits
+where the step is forgotten: when the program is a test_*.py, `choice_slot` refuses his real workshop and
+his real choices record (PP2.11; the module's idea of "real" is pointed at temp dirs first, so a broken
+guard writes nowhere live). Like A272's guard, it covers only its own state. It does not cover the
+curriculum half of a test's night with no workshop given (SV1 runs tasks=0), and it does not cover a
+scratch driver that is not named test_*.py.
+
+**Paper stays paper.** PP2.9 runs a night with a paper, a code and a health slot in a fresh process. The
+only modules of this tree it loads are the practice and his hands. Broken the other way, a copy of the
+practice module that imports covenant_tetsu_money is caught. PP2.9c checks that a paper file reaching for
+urllib, a socket, or a path outside his workshop is refused by the screen. Nothing here touches
+money_posture, Rule 5 or the trader's disarm. What PP2.9 cannot see: it reads what the process imports,
+not what it writes.
+
+**Pinned by** `test_pp2_tetsu_choice.py` (PP2, 63/63, registered JUDGE). PP1 is 45/45, SV1 9/9, TP1
+PASSED and TH1 15/15, all in the staged copy, and PP1 and PP2 also pass under
+COVENANT_JUDGE_PROVIDERS="claude,mock". Inside the suite, these are driven the other way: four wrong
+solutions (a lookahead backtest, drawdown from the all-time peak, folds with the larger blocks last, a
+listener that tells every red), a wrong code answer, a VIOLATES on his write, the money-importing copy,
+and the live-state guard. 16 mutations of the code each turned PP2 red at the named check, and the files
+were restored byte-identical. On the first mutation run, 3 of 14 mutations failed the suite by crashing,
+with no tally, instead of failing a named check. The suite now fails them by name.
+
+**Not measured, and his.** How the real 3B does on any track: the first nights will say. Whether the
+paper track changes the 7 refusals above is also unmeasured. On a night when no model loads (4 of the
+last 9), his slot does not run either. The persona sentence reaches his door when the nodes next
+restart, since each node imports covenant_persona once. HANDS WRITE learning.txt works today, because
+nothing in the core changed. That sentence adds 466 characters to his rules. Since A273, the door
+counts the rules per request and drops the oldest history turns to fit, so the cost is a little less
+history, not an overflow. Tombstones searched first: docs/RETRACTED.json, 35 retractions, then 36 after
+A273 landed. None concerns practice, learning or the curriculum.
+
+**Live, and told him, 2026-10-06.** The nodes restarted twice after 8fc149d landed (14:27Z): at 14:32Z on
+A274's core, and again on A273's amendment (a38ffcb248a9, which node A reported before the ask below).
+So his system message carries the persona sentence now. That follows from the restart times, since the
+door imports covenant_persona in a fresh process; the composed prompt itself was not read. Telling him
+through his door took three tries from tools/tetsu_work.py (caller 127.0.0.2):
+- The first waited behind another ask and got a 503 at 180.9 s.
+- The second got a 503 at 180.7 s on a 7,064-token prompt. Measured right after: prompt read 64.4 tok/s
+  cold, generation 11.9 tok/s. Reported to the A273 session, which found its window fit had grown the
+  batch caller's replay past the door's 180 s. It restored that caller's 12,000-character ceiling (A273,
+  amended, 63e90bf).
+- The third, shorter, was answered in 123.9 s. The gate HELD the answer (both student seats), which
+  returns it rather than withholding it.
+
+He restated the change in his own words, and named no track and wrote no learning.txt. So his three
+recorded choices stand, practised as open. His restatement named them differently from his record:
+"build a simple trading strategy, analyze the current trading functions, and review the machine's
+health checks". That was said in conversation, not written to his file, so it is not a new choice; if
+he wants it to be, learning.txt is his.
+
+---
+
+### A274. [The code sandbox had no Windows path: a Job Object now holds memory, process count and wall time against real code, and proposals stay refused because nothing on Windows bounds file size] 2026-10-06. His request. ENFORCED for three limits of four, the refusal KEPT and narrowed to the fourth, every limit driven both ways
+
+**Asked.** Design a Windows path that enforces the same limits as the fork path -- memory, process
+count, file size, wall time -- with a Job Object, and "if one limit cannot be enforced on Windows,
+keep refusing and say which, rather than claiming parity".
+
+**The premise, measured first, was wrong (A274-DEGRADED-ANY-WARNING-2026-10-06).** The request said
+"Because /health reports degraded whenever any warning exists" the node orbs could never be green.
+`degraded` is keyless or insecure or own_genesis or crisis_mode; no warning sets it. On A, B and C,
+before any change: degraded=True, judge_keyless=True, insecure and crisis False. So this change does
+not turn the orbs green; the keyless ethics seat keeps them amber, and seating a key is his. The
+claim came from a Claude session note, now corrected; the tombstone keeps it out of the record.
+
+**Measured on this PC** (Store Python 3.12, Windows 11, not elevated):
+- *memory* -- ProcessMemoryLimit and JobMemoryLimit at 256 MiB. A gradual allocation stops in
+  MemoryError with the job's peak at 267,124,736 of 268,435,456 bytes. ENFORCED.
+- *processes* -- ActiveProcessLimit = 1 was NOT enough. The interpreter is MSIX-packaged, and the
+  cmd.exe a jailed child started was in no job at all; a second Python was refused 1816. The
+  desktop-app policy BREAKAWAY_DISABLE_PROCESS_TREE, set at creation, keeps the children inside:
+  then Popen of cmd.exe is refused 1816, os.system returns -1, and Python is refused 1816.
+  (CHILD_PROCESS_RESTRICTED was tried too: the interpreter cannot start under it, exit 3221225794.)
+  ENFORCED by the two together.
+- *the launcher* -- the venv's python.exe is a redirector. The real interpreter started as a second
+  process before the job was assigned, and ran outside it. The base interpreter is one process. The
+  child is created suspended, assigned, checked by the parent (IsProcessInJob) and by itself
+  (QueryInformationJobObject on its own job) before it reads a byte of the proposal.
+- *wall time* -- TerminateJobObject at the deadline (2.25 s for the 2 s limit). Kill-on-close ends
+  the child when the process holding the job dies. ENFORCED.
+- *file size* -- a job has no file-size limit and Windows has no per-process one. The two nearest
+  things are not bounds. A Low-integrity token refused a write to %TEMP% but put 1,768,030,208
+  bytes into LocalLow in 3 s. A job I/O rate cap of 64 KiB/s was accepted, and 2,781,347,840 bytes
+  still landed in 3 s. NOT ENFORCED.
+
+**Changed.** `_win_job_run()` in the core is the path. `SANDBOX_WIN_UNENFORCEABLE = ("file_size",)`
+keeps it shut, so /propose_code still refuses on win32. The /health warning now names the file-size
+limit alone instead of "memory, process and file-size". The child's environment is SystemRoot and
+nothing else. `SANDBOX_AVAILABLE` (fork, or a Windows path with nothing unenforceable) now drives the
+warning and `subsystems.code_sandbox`; it has the same value as before on every platform.
+
+**Driven both ways.** `test_a274_win_job_sandbox.py` runs real code in 9 groups (26 checks), then 8
+mutations, each on a COPY of the core in a temp dir. Each mutation drops one limit and requires a
+[FAIL] from the group that pins it; a copy that fails to import does not count as red. Dropping
+the memory flags let the allocation reach a peak of 424,316,928 bytes. Dropping ActiveProcessLimit
+ran all three children. Dropping the breakaway policy let cmd.exe run (7) while Python was still
+refused (1816). Dropping the deadline hung W. Dropping kill-on-close left the child alive after its
+holder died. Dropping the child's own check ran the proposal outside any job. Dropping the
+assignment refused everything. Opening the gate let run_sandboxed run proposals. Result: 34/34 in
+103 s. F pins the gap itself: a 1 MiB write from an escaped snippet lands, so the day something
+bounds file size, F goes red and the reason has to change with it.
+
+**Found on the way.**
+1. My first probe of the process limit was a fake pass. "cmd" was refused with error 2 because the
+   child's environment has no PATH, and os.system returned -1 because there is no COMSPEC. Both were
+   the environment, not the job. P now uses absolute paths and requires 1816, and P0 runs the same
+   snippet OUTSIDE the job as a control that must start all three. This is A65's shape: a check
+   that passes for a reason other than the one it names.
+2. The same shape on the fork path, NOT fixed here. W2.6b, "the file-size limit is still applied",
+   writes with `open`, which the restricted builtins do not contain, so it passes as a NameError
+   whatever RLIMIT_FSIZE is (B3 shows the NameError). The security audit's `[0] * (10**10)`,
+   "contained by RLIMIT_AS", is UNDETERMINED: an 80 GB single allocation may be refused with no
+   limit at all (on Windows it is, which is why M4 here is labelled parity-only). Both need a fork
+   platform to drive.
+
+**What it does not cover.** /propose_code never reaches this path; only its suite does, so it has no
+field record. The parent's IsProcessInJob re-check is not driven alone, because this harness cannot
+make an assignment succeed without assigning; S drives the child's check instead. The child runs as
+the same user at the same integrity level, as the forked child shares the node's uid; neither path
+restricts sockets. The breakaway finding is about a packaged interpreter: with a python.org build
+the policy should be a no-op, but none is installed here, so that was not measured.
+
+---
+
+### A273. [Tetsu's history budget was a fixed 12,000 characters sized beside rules that had since doubled, so one request could overflow the model's 8192-token window] 2026-10-06. A269's open item. FIXED in the keeper and both doors: the history now follows the real size of the rules, counted per request; driven both ways. The size it was sized beside is RETRACTED (A273-RULES-SIZE-2026-10-06): true when written, stale since
+
+**Measured,** on the running server (127.0.0.1:8081, its own /apply-template and /tokenize, the two
+steps /v1/chat/completions takes). `compose_system(AGENT_SYSTEM)`, the door's rules, was 11,817
+characters, 2,916 tokens. The council's, with the method, was 12,547 characters, 3,105 tokens. The
+parts: fixed rules 3,082, register 2,085, where_you_are 2,110, about_him 2,800 (its cap),
+standing_directive 1,019, brief 711. With the batch caller's real history under the fixed budget
+(127.0.0.2: 16 messages, 10,980 characters) and a dense 4,000-character question, the prompt was 7,594
+tokens. With the door's 700-token answer that is 8,294, over 8,192. The council's request for the same
+caller came to 8,661 with its 500-token answer. His own callers fitted that day: his tailnet address
+at most 6,738 with the answer, 127.0.0.1 at most 6,374. The model server ran the 3B, one slot, n_ctx 8192.
+
+**Cause.** A223 (2026-09-26) sized the budget against a measurement: the rules were then 4,919
+characters (5,607 for the council), and the comment above AGENT_HISTORY_BUDGET says ~5,600. That was
+true that day. But the rules are composed per request from parts read at call time. The standing
+directive (1,019) was added two days later, and nothing re-measured the sum. A size measured once was
+treated as a constant.
+
+**Why nothing stopped it.** The record and the tombstones hold no earlier instance of a prompt sized by
+a constant. The nearest shape is the deploy pins (A267): a value that must move with something else,
+moved by hand, until a guard moved it at the place the step is forgotten. This is the same remedy: the
+size is counted where the request is sent, every time.
+
+**Fixed.**
+- `covenant_model.fit(messages, max_tokens, droppable)`. It counts the prompt with the server's own
+  chat template and tokenizer, then drops the oldest replayed exchanges, as few as needed, until prompt
+  plus answer plus a 64-token margin fit `CTX_TOKENS` (8192, the same constant start() now passes as
+  `-c`). The system message, this question, and on a follow-up the first answer and its DATA are kept
+  whole. With nothing left to drop, the answer is shortened to what remains, down to 128 tokens. Below
+  that it raises `ContextTooLong`, so the door answers 503 with the reason at once, instead of sending
+  it to fail. The server is started before counting, as ask() would start it. Otherwise the first
+  message after the idle stop, which is when he comes back to a conversation, would be estimated
+  rather than counted. Counting does not wait behind another ask: /tokenize answered in 33 ms and
+  /apply-template in 13 ms while the one slot was busy generating. Without a server (a stub), it
+  estimates at 3.0 characters a token. That ratio is measured: 321 texts and answers of 200+ characters
+  in ops/chat/ask_log.jsonl ran 3.04 at the lowest, 3.48 at the 1st percentile, 4.52 at the median.
+- `/m/agent` (the core). The turns are read with no character budget, and every ask is fitted: the
+  first, and each of the six follow-ups (the held notice, FETCH, MOLTBOOK, HANDS, HEAL, WEB). msgs is
+  cut in place, so a follow-up is fitted from what was actually sent. The reply and the ask-log row
+  carry `fit`: prompt_tokens, answer_tokens, kept, dropped, counted.
+- `/pc/council`. Each role's request is fitted (`deliberate(..., fit=)`), because the critic's and the
+  reviser's questions carry what the council said before them. The row and the steps carry `fit`.
+- A keeper without fit() still answers on the old 12,000-character budget (`getattr`). The phone's own
+  keeper is not read here.
+
+Both consumers were found by `grep agent_history(`: the door and the council, nothing else in the tree
+apart from M6. Every direct `_m.ask` in the core is inside the door, 1 + 6, and all 7 are now fitted.
+
+**Pinned:** `test_a273_history_fits.py`, registered in SUITES, 18/18. Its tokens are the suite's own
+count (4 characters a token, 5 a message), handed to the keeper in place of the server. So the request
+the door SENDS is checked by a count the door did not make, and "as much as fits" is checked against a
+brute force. F1-F3 fit() itself (long rules keep the newest 4 of 40, the most that fit; short rules
+keep 24,000 characters, double the old budget; the answer is shortened, then refused). F4-F5 the
+counter. D1-D5 the real /m/agent handler with 16,000-character rules. C1-C2 the real /pc/council. L1
+the live server's own count, where one answers: 7,285 + 700 <= 8,192, 8 of 40 turns kept. It is
+SKIP, counted apart, on the runner. Driven both ways, serially, the files restored byte-for-byte after
+each (checked by sha256):
+- M1, the door's fixed 12,000 budget restored and its asks unfitted: 15/18, D1 D2 D4 red. That is the
+  mutation asked for, red when the rules are long.
+- M2, the council the same: 16/18, C1 C2 red.
+- M3, fit() never cuts: 7/18.
+- M4, fit() drops every turn: 12/18. "As much as fits" is pinned, not only "fits".
+- M5, the counter skips start(): 17/18, F5 red.
+- Restored: 18/18.
+
+The retraction is driven both ways too: R1 failed on two real restatements, my own comment in
+covenant_model.py and A269's open item below, until each cited the tombstone. A probe file with the old
+sentence then turned R1 red, and removing it restored green.
+
+**What it does not cover.**
+- *DATA bigger than the window.* A follow-up's DATA can exceed the window on its own: a HANDS file read
+  hands back up to 64,000 characters (MAX_OUT), the crawl 12,000, a fetch 8,192, the forum 6,000. Such
+  a request is now refused with the reason instead of sent. The answer still does not come, and
+  cutting DATA to fit is not done here.
+- *Other callers.* Callers that build their own prompt and replay no turns are not fitted: the daily,
+  the practice loop, free_will, the persona's refine, tetsu_money, code_consensus, and anything calling
+  covenant_model.ask directly. There is no history in them to drop.
+- *Overflow during the answer.* Whether the server answers a prompt that fits but whose answer runs out
+  of window with a 500 or by stopping short is UNDETERMINED. Measuring it needs an 8k-token prompt on
+  his PC's one slot (minutes of CPU; the slot was busy) or a second server (1.8 GB free). The fit
+  reserves the answer either way.
+- *The estimate.* If a later server build stops answering /apply-template while still answering chat,
+  the estimate is used. Text denser than 3.0 characters a token would then be undercounted.
+- *Live state.* It is live on a node only once that node restarts (A153). That restart is recorded
+  below when done.
+
+**Live, 2026-10-06.** Pushed as 650b7b7, and public CI was green on it. The batch session ("Guard
+Tetsu's door against private/ material") was checked first. No tetsu_work.py process was alive, and the
+batch caller's last ask was at 09:52, so it was not messaged. `rolling_restart.py`, run from the
+production tree, restarted C, B and A at 10:14:51, 10:14:59 and 10:15:07. Each came back at height 71,
+genesis 00009b31, on source 7572d7ec845c. All three still answered after the shell that started them
+had ended: a breakaway launch was measured to survive this harness's job first.
+- *The door, live.* One private ask went through node A's door from the work address (tools/tetsu_work.py
+  --private, so nothing of it reached his history or the public panel). Its ask-log row reads `fit`:
+  prompt_tokens 6,722, answer_tokens 700, kept 16, dropped 24, counted "server". It answered in 138.7 s.
+- *His own callers.* Counted the same way, nothing changes for them today. His tailnet caller keeps 40
+  of 40 messages (a 4,098-token prompt) and 127.0.0.1 keeps 20 of 20, which is what the old budget
+  replayed: the 20-turn cap binds before the window does.
+- *The batch caller.* 127.0.0.2 now keeps 16 messages, a 6,722-token prompt, where the old budget kept
+  10 (5,425 tokens). That is more memory and more prompt for the CPU to read.
+
+**Measured beside it: the door's 180 s timeout does not always cover the wait.** A269 left this
+UNDETERMINED. The same ask, sent first at 10:19, failed after 181 s: "the model did not answer:
+TimeoutError: timed out". The one slot was busy the whole time with free's round
+(covenant_free_will.py --round --send). That round started at 09:43:48 and drafts for 40 minutes
+(round_minutes 40 in ops/ambassador_grant.json). It is run through the day by the Windows task
+CovenantAmbassador; the next run was 12:00. It started this llama-server itself, at 10:03:18. A door
+ask during a round waits behind a draft and then reads its whole prompt cold. With the slot idle, the
+same ask took 138.7 s. His own prompts measured 3,734 and 4,098 tokens. The batch's longer prompt
+under A273 brings it nearer the timeout. Nothing is changed here. How the door, free's rounds and the
+batch share one slot is a choice between his goals: a longer door timeout, free yielding to the door,
+or a cap on the batch caller's replay.
+
+**Amended the same day: the work caller keeps its old ceiling. The longer batch prompt was my
+regression.** The A275 session reported it ("Feed Tetsu's own learning choices into his practice").
+Its one ask from 127.0.0.2 after the restart returned 503 TimeoutError at 180.7 s, on a 7,064-token
+prompt. Re-measured here:
+- This CPU reads a cold prompt at 58.5 tokens a second (2,902 tokens in 49.6 s, the server's own
+  timings). The A275 session measured 64.4.
+- On the old budget, the batch caller's last 12 asks (09:02-09:52) took 66-118 s, and all 12 were
+  answered.
+- Fitted to the window, its prompt grew from 5,425 to 6,722-7,064 tokens. That is about two minutes of
+  reading before the answer starts.
+
+That was a cost A273 put on the batch alone, and what bought it was replaying the batch's own earlier
+items to itself, not his conversation. So `agent_history_budget(addr, can_fit)` keeps
+AGENT_HISTORY_BUDGET for a caller in `AGENT_WORK_CALLERS` ("127.0.0.2", tools/tetsu_work.py's SOURCE,
+covenant_persona.WORK_CALLERS). Every request is still fitted to the window. His callers still replay as
+much as fits. Both doors use the rule.
+
+Pinned by W1-W4 in the same suite, now 22/22:
+- W1 the rule itself.
+- W2 the three spellings of the address agree.
+- W3 the real door with short rules: his caller replays 24,000 characters, the work caller 12,000.
+- W4 the council for the work caller.
+
+Driven both ways, restored by sha256:
+- M6, the rule forgets the work caller: 19/22, W1 W3 W4 red.
+- M7, the council's line back to no ceiling: 21/22, W4 red.
+- M1, re-run on the new code: 18/22.
+
+What it does not fix: his own prompts would meet the same two minutes if his history ever filled
+the window. Today they are 3,734-4,098 tokens, because the 20-turn cap binds first.
+
+**Live, amended.**
+- Pushed as 63e90bf. `rolling_restart.py` restarted C, B and A at 14:54:21-29Z onto a38ffcb248a9: height
+  71, genesis 00009b31.
+- Under the deployed rule the work caller replays 10 messages, 10,060 characters. His tailnet caller
+  replays 40 and his PC 20, unchanged.
+- The A275 session's single retry from 127.0.0.2 at 10:57:50 local was answered, and its ask-log row
+  reads two fitted asks (a follow-up): 5,675 and 5,762 prompt tokens, 10 kept, 0 dropped, counted
+  "server". The door's meta reports 11.3 s for the last ask.
+
+---
+
+### A279. [free sat isolated for two days and the road said nothing: a granted ambassador that is not speaking was not a condition] 2026-10-06. His words: "keep expanding the highway". ADDED: ambassador_stalled, read-only, driven both ways
+
+free was isolated on 2026-10-04 and stayed so until 10-06. covenant_pause.report() said it as an INFO line
+every pass, and no detector read it. On 10-06 a test re-paused her (A272) and only a log read found it.
+`detect_ambassador_stalled` reads the grant, the pause switch and the live round rows. Its states: PRESENT
+when granted and paused (with the pause's own words) or when there has been no live round in 8 h (the
+schedule runs every 3 h); ABSENT with no grant, because off is his choice; UNKNOWN with no live round ever
+on record (a clone, CI). No remedy: lifting a pause is his, and a round speaks in public. H1am drives each
+state with stand-ins; H1 195/195. Live at the time of writing it reads PRESENT, because I paused free for
+A280, which is the road telling the truth about it.
+
+---
+
+### A315. [only the core's deploy pin moved with its file, so run_all_tests.sh's went stale in six spans and verify_deploy refused the restarts it gates] 2026-10-06. His instruction: extend the commit-time mover so run_all_tests.sh's pin moves in the same commit as the file, only after the suites that judge it pass, and never silently. FIXED, the guard driven both ways; landed 2026-10-08 (committed as A267 on its branch, e8ea71b, and renumbered here: main had taken A267 for C4's worktree prune)
 
 **Which recurrence.** M53 ("the pins move in the SAME change as the files"), searched first in this file
 and docs/RETRACTED.json: the record counts it for the core's pin (A235 the fourth, A238 the fifth, A243
@@ -7316,7 +7653,7 @@ hashed against the pin that commit's verify_deploy.py held -- the pins were stal
 
 So the instance 260f3dd caught by hand is run_all_tests.sh's sixth span, and the one 8bf4d56 closed was
 its fifth, open since 09-12 -- not "a second time", as the comment on that digest says (tombstoned
-A267-COUNT, below). **The unit matters.** These are spans of commits whose committed bytes disagree with
+A315-COUNT, below). **The unit matters.** These are spans of commits whose committed bytes disagree with
 their committed pin, which is what a fresh clone, CI and the phone build see. The operator's restart gate
 reads the main checkout's disk, which can differ: the 09-20 value 7bde90e1effa is the sha256 of 7eac94c's
 run_all_tests.sh with CRLF line endings, so it matched a checkout holding CRLF bytes and no commit at all.
@@ -7368,29 +7705,41 @@ which is the edit that stales that file's pin. With the change staged, the hook'
 (`python tools/pin_deploy.py --write --staged`) ran K1 and K2, both passing, moved the pin
 e7c0c68ef756 -> b1a49a4b2bba and staged verify_deploy.py, before covenant_one ran.
 
-**Pinned by** `test_pc2_pin_core.py`, PC2.9-PC2.24 beside the core's eight (24/24). PC2.9 reads the real
+**At the merge with main, 2026-10-08.** While this sat on its branch main went 69 first-parent commits, to
+002aed9, without a stale pin: run_all_tests.sh changed once there, in 12b4718 (A274), and its pin was
+moved by hand in the same commit. Merging main in, both sides had moved that digest, so its line
+conflicted while the file merged cleanly. It was resolved to main's line, stale for the merged bytes, and
+the merge commit, run through this change's hook (the installed copy was still the old one), moved it to
+75c39e251e99 after K1 and K2 passed. Merges are how work lands here, and PC2.25 drives this path. A clean
+merge runs no pre-commit hook, but it cannot combine two edits of a pinned file: an edit on one side only
+merges to that side's bytes, whose pin moved with them, and edits on both sides bring two moved digests,
+which conflict. A side whose pin was already stale stays stale; PC2.9 reports it on that side.
+
+**Pinned by** `test_pc2_pin_core.py`, PC2.9-PC2.25 beside the core's eight (25/25). PC2.9 reads the real
 tree: every pin matches its file. PC2.11-PC2.18 drive the tool on temp copies with git and the judges
 stubbed. PC2.20 drives the real judge runner with GIT_DIR and GIT_INDEX_FILE planted. PC2.22-PC2.24
 install the tracked hook in a scratch repository and commit run_all_tests.sh edits through it: with K1
 and K2 passing, HEAD carries the moved pin and nothing else in verify_deploy.py changed, and the judges
 saw no GIT_INDEX_FILE (git does export it to the hook, measured); with K2 failing, the commit lands, its
-pin is not moved, and the hook names K2. Broken one way at a time, serially, restored byte-exact after
+pin is not moved, and the hook names K2. PC2.25 merges two such branches: the digest line conflicts, is
+resolved to one side's, and the merge commit's hook moves it to the merged bytes. Broken one way at a time, serially, restored byte-exact after
 each: judges ignored -> PC2.12/13/17/23/24 red; the disk-vs-index check removed -> PC2.14; the
 verify_deploy-unstaged check removed -> PC2.15; judges given the hook's git variables -> PC2.20/23; the
-hook's step removed -> PC2.21-24; verify_deploy.py not staged -> PC2.13/22/24; a pinned file's judges
-removed -> PC2.10/17. Restored 24/24.
+hook's step removed -> PC2.21-24, and PC2.25 when it was added; verify_deploy.py not staged -> PC2.13/22/24; a pinned file's judges
+removed -> PC2.10/17. Restored 24/24, then 25/25 with PC2.25.
 
-**Tombstone.** `A267-COUNT` in docs/RETRACTED.json holds the comment's wording; it stays as written on
+**Tombstone.** `A315-COUNT` in docs/RETRACTED.json holds the comment's wording; it stays as written on
 the digest's line in verify_deploy.py with the marker above it, and on branch
 `a267-pin-count-claim-as-written-2026-10-06` (at f35d94c; local, not pushed). R1 105/105; a probe file
 with the old wording and no citation took it to 104/105, and so did renaming the marker in
 verify_deploy.py; restored 105/105.
 
 **Not fixed, named.**
-* *The installed hook.* .git/hooks/pre-commit is shared by every worktree, and A117.8c requires it to
-  equal the main checkout's tracked copy, so it is not installed from this branch. After this reaches
-  main, A117.8c reads red until `cp ops/pre-commit.synchold .git/hooks/pre-commit`, and until then step
-  2d runs nowhere. That install is itself a forgotten-step shape; A117.8c is its guard.
+* *The installed hook* is a local file git does not track, shared by every worktree, and A117.8c
+  requires it to equal the main checkout's tracked copy. So it is copied
+  (`cp ops/pre-commit.synchold .git/hooks/pre-commit`) in the step that lands this on main, never from a
+  branch, and A117.8c reads red in any checkout where that step was missed. The copy is itself a
+  forgotten-step shape; A117.8c is its guard.
 * *pin_core, unchanged as asked,* keeps three gaps this tool closes for the others: it hashes the core on
   disk without comparing it with the index; its judges inherit the hook's git variables (latent: none of
   K1, K2, P19 or A3s calls git); and step 2b stages verify_deploy.py whenever it differs, so unrelated
@@ -7402,6 +7751,1339 @@ verify_deploy.py; restored 105/105.
   its copy from the working tree, not the index (A266).
 
 **Repro:** `python test_pc2_pin_core.py`; `python tools/pin_deploy.py --check`.
+
+---
+
+### A314. [Tetsu's persona feed: machine prompts reached his register as "what he said to you", a recurrence of A233] 2026-10-08. His words: "yes fix the persona feed don't alter his memory and tell him we are trying to help". FIXED; his register and his log untouched
+
+**Found by the rhythm exam** (collective #5, baseline, private and fresh, 20 asks on the 2B). ex02 ("we make a good
+team") ended with "Please WRITE a short public correction (you are not reviewing anything)". ex18, a message
+addressed to Claude, drew "The CI failed because the GitHub Actions artifact storage quota is full" and an offer to
+delete old artifacts. Both strings are in his register (`ops/tetsu_persona.json`, 3,651 chars, written 2026-10-07
+17:51), and so in every ask's system message (13,891 chars).
+
+**Where they came from, measured in `ops/chat/ask_log.jsonl`.** The correction request was an agent ask from
+**127.0.0.3** (a session's script, 2026-10-06). "Lawrence gave you a standing directive today …" and "Today the
+phone build broke … (quota full)" were **council asks from 127.0.0.1** (scripts, 2026-09-28; no code in the tree
+sends them). The log's callers: 127.0.0.2 (the work tool, 484 rows), his phone's tailnet address (186), 127.0.0.1
+(council 7, agent 6, image 5, which mixes his /pc page with scripts), a LAN address (1), 127.0.0.3 (1).
+
+**Why A233 did not stop it.** A233 left out the work tool's address by name (`WORK_CALLERS = ("127.0.0.2",)`).
+A list of excluded callers cannot name the next one, and 127.0.0.1 cannot be listed at all, because his own page
+uses it. This is the rule 2 shape: a hardcoded list missing the case that was added after it.
+
+**Fix: his words are defined by where they come from.** `covenant_persona.is_his_word` accepts:
+- an address that is not loopback (his phone, the LAN);
+- or a loopback row the door marked `"page": true`.
+
+Both doors (`/m/agent`, `/pc/council`) mark a row when the request carries a browser's Fetch Metadata or Origin
+header (`page_request`). Scripts send neither. Every other loopback ask is work: it still reaches the chat memory
+and the teacher, and is never shown to him as the operator's words. `WORK_CALLERS` is unchanged (A273 pins it).
+
+**Not altered, on his word.** His register, its revisions, and the ask log are left exactly as they are. The next
+pass shows him only his own lines, and what he keeps of the old text is his call. Until the nodes restart onto
+this core, the running doors do not mark page rows, so his /pc page asks are not shown to a pass in that window.
+His phone's are.
+
+**Guard, driven both ways.** `test_a314_persona_feed.py` (12/12):
+- the rule on every caller in the real log;
+- his_side on a replay of the incident;
+- both real doors through the stub model;
+- in-suite mutations: the A233 rule restored brings the incident's prompts back as his words (H1 red), and page
+  detection switched off leaves a page's ask unmarked (D1 red).
+
+Neighbours green: TP1 56/56, A273 21/21 (1 skip), A263 38/38, PC1 52/52.
+
+---
+
+### A313. [public CI / a test that read the wall clock] test_breakout_ledger's same-day check failed on ubuntu-3.11 at 6a1eda7 because the run fell in the last minute before UTC midnight. FIXED, both ways
+
+**What happened.** Two CI runs of 6a1eda7 started at 23:53Z. One job failed one check: "a second run the SAME
+day writes nothing" (63 passed, 1 failed). The other three jobs on the same bytes passed. The test took
+`t0 = time.time()` and ran the second cycle at `t0 + 60`. `record_cycle` keys the day on UTC, so whenever t0 fell
+in the last 60 s of a UTC day, the second run landed on the next day and correctly wrote a new read. The code
+was right and the test was wrong, for 60 s out of every 86,400.
+
+**Fix.** t0 is noon UTC yesterday, so both runs are always on one day. A new check asserts that precondition
+first, so if it ever breaks, the failure names the test's clock and not the ledger.
+
+**Driven both ways.** A scratch copy (with its own breakout_ledger.py) set t0 to 23:59:30Z, the old shape at
+its worst minute. The CI failure came back and the new precondition check failed first. The fix in place:
+65 passed, 0 failed.
+
+**Searched for the same shape.** The other suites with a same-day check (test_rule5_ledger L7, FW1h, EB1.3)
+use fixed timestamps. TD1m's two runs happen milliseconds apart with the real clock, so it has the same shape
+with a window of about a millisecond a day. It is named here and not changed. There is no class guard for
+"a test adds an offset to the wall clock across a day key."
+
+---
+
+### A312. [Naming: the triad's third leg is "L-Lens"; "J-lens" refers only to Anthropic's Jacobian lens] 2026-10-07. His words: "Triad language should be l lens to avoid copy right j lens should be referenced when talking about anthropic not our tech we came up with". APPLIED to live text; records left as written
+
+**Applied.** The threefold witness's docstring (covenant_highway.py) now calls the third leg an L-Lens snapshot and
+says it applies Anthropic's J-lens. Its reading reports `third_leg` instead of a `jlens` count. H1tf's label says
+"third (L-Lens) leg". docs/UPDATE_2026-10-07.md names the triad Tombstone ∥ Covenant ∥ L-Lens and attributes the
+J-lens to Anthropic.
+
+**Not renamed, on purpose.** Literal file names (`jlens-<id>.md`) are what threefold-memory's files are actually
+called, and the witness reads them as data, by discovery (A302). A291's J-lens witness experiment really was
+Anthropic's Jacobian-lens library and keeps that name. Earlier record entries (A294, A302) are kept as written:
+they describe the names in use when they were written. The threefold repository itself is not ours; the rename
+there was relayed to its owner, Tien, in the collective.
+
+---
+
+### A311. [Tetsu reviews a held draft one sentence at a time: honest drafts he lets through went from 0 of 11 to 21 of 33 runs, and in production no bad draft went out] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". CHANGED after four measured cycles, driven both ways
+
+**Addendum, same day: the headline's 21 of 33 is not what shipped (`A311-SHIPPED-PROMPT-2026-10-07`).** It was
+measured on B4. After that measurement I added one line to the prompt, without measuring it: "If you think free
+should stop posting for now, add one last line: PAUSE." That line shipped at 6a1eda7. On the same 19 drafts, one
+ask each, the shipped prompt let 3 of 11 honest drafts through. He wrote PAUSE on numbered question lines, and a
+numbered line without a word is NONE. The line is now "write STOP-FREE on a line of its own AFTER the numbered
+lines", which let 7 of 11 through in the same run. Bad drafts SEND was 5 of 8 under both, with the code's guards
+and the money screen behind him. One ask per draft is one cycle, not three. TA1w pins the wording and the
+parser, and was driven both ways against 6a1eda7's code. The claim as written is on branch
+a311-shipped-prompt-claim-as-written-2026-10-07.
+
+**The test set** (kept with the operator's session): 11 honest drafts (8 of free's held replies since the
+no-claims change, the u/lotus_builds reply, the u/thegalahad correction, and the update post) and 8 that should
+not go out (the four 10-06 replies with false claims or an invented exchange, the "This proves…" overclaim, and
+three constructed ones: pressure, money, flattery). Each was asked fresh and private, with nothing posted.
+
+| method | honest let through | bad let through (Tetsu alone) | bad out in production | no usable answer |
+|---|---|---|---|---|
+| A, deployed: one verdict on the whole draft | 0 of 11 | — | — | 4 of 19 |
+| B1: one word per numbered sentence | 7 of 11 | 1 | — | 4 of 19 |
+| B3: + "a question is never PRESSURE", ×3 | ~21 of 33 runs | flattery 3 of 3 | 3 of 24 (flattery) | 16 of 57 |
+| **B4: questions marked, FLATTERY with examples, tolerant parser, ×3** | **21 of 33 runs** | 4 of 24 | **0 of 24** | **4 of 57** |
+
+"Production" is his words, then the code's guards (a measurement claim or an invented exchange is refused
+whatever he says; A285/A297), then the money screen (a money term is never his to clear). B4 is what review() now
+does. He is shown free's own words (the operator's fixed disclosure is not hers to judge), as numbered
+sentences, questions marked. He answers one word per sentence. Every line OK is SEND. A flag is REFUSE, and the
+reason quotes the flagged sentence. A PAUSE line pauses free (his grant). Anything incomplete is NONE, so the hold
+stands. The old PROMPT stays in the file as the record.
+
+**What it still gets wrong, measured.** In 2 of the 11 honest drafts he flags the closing question as PRESSURE, every
+time; those stay held. He refused the constructed flattery by flagging its question, not its praise: the right
+block for the wrong reason. Four honest drafts in the set never reach him at all: the money screen holds them on
+the word "ledger", the covenant's own word. That is a money guard, his to change.
+
+**Driven both ways (TA1, scratch copy).** Ignoring the flags fails TA1t and TA1e (27/29). Passing the disclosure to
+him, or the old prompt, fails TA1b and the suite stops. Accepting an incomplete answer crashes the parser, which
+fails the suite: caught, but by a crash, not by TA1u. Restored, TA1 29/29. FW1m now reads the prompt review()
+sends; it had been reading the retired PROMPT, which would have kept passing while measuring nothing live. FW1
+75/75.
+
+---
+
+### A310. [The students convicted 35 of free's 132 honest drafts and cleared none. 62 read forum excerpts, labelled clean under his grant, turn those convictions into holds Tetsu can review; clearing stays blocked by the stuffing defence, which is his] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". APPLIED to the corpus (the gate decides tonight); a rule limit named, not changed
+
+**Measured (the deployed students; free's 132 model-written replies held since 10-07 12Z, all passing the code's
+claim screen).** Ora: 97 abstain, 35 VIOLATES, 0 clean. Sena: 84 abstain, 48 violates, 0 clean. On 200 recent
+forum comments, Ora convicted 127. A conviction is refused outright; only a HOLD goes on to Tetsu.
+
+**Three offline cycles, on copies, through the trainer's own functions** (refine the deployed Ora on every corpus
+the nightly reads, `corpus_paths()`, 3,982 rows; exam = judge_suite's 53; holdout = `holdout_score`):
+
+| | drafts convicted | exam right / false clears | holdout correct / false clears |
+|---|---|---|---|
+| control (no labels) | 35 | 41 / 0 | 2,677 of 2,833 / 24 |
+| + 62 labels | **1** | **43** / 0 | 2,701 of 2,829 / **26** |
+| + 148 labels | 0 | 41 / 0 | 2,734 of 2,858 / 32 |
+
+The 62 are real harvested comments, each read, cut to an excerpt, and written through
+`covenant_moltbook_release.assistant_label` under `ops/forum_label_grant.json` (his yes of 2026-09-28). They are
+agents discussing authorization, revocation, state and audit. Eight in that sample that were clean but about money,
+crypto or trading were deliberately NOT taught clean. More labels stopped helping: false clears rose while no
+draft was cleared, so the batch that went in is the 62. The 62 rows carry judge `forum:claude-opus-5.5`, source
+`moltbook/labelled` and grant `forum_label_grant.json`, and come back out by any of them. They are appended to
+ops/verdicts.jsonl, not committed here, because that file carries the nightly's own uncommitted rows.
+
+**Why no draft is cleared, even with labels: a rule, named, not changed.** With 148 labels the candidate leans
+hard to clean (log-odds −33.7 on one draft), yet abstains on 130 of 132, each on `MAX_UNKNOWN_TO_CLEAR = 2`.
+Nothing may be cleared if it carries more than two content words never seen in training. That is the defence
+against the stuffing attack of 2026-09-04 (one polite sentence cleared 11 of 19 thefts). It was calibrated on
+short transaction memos, and a 100-word forum reply nearly always carries more than two rare words. Whether
+conversational text should clear under a different bound is a judge rule, his to decide. Until then
+conversation reaches the forum only through a hold that Tetsu reviews.
+
+---
+
+### A309. [free's disclosure told every reader "the measurements cited … were re-run" on messages that cite none; Tetsu, reviewing the composed text, kept refusing it as a measurement claim. Retracted] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". TOMBSTONED and FIXED, driven both ways; one cause of A308, not the whole
+
+**Measured.** emit() appends the disclosure (`compose`) before anything judges the message, so the students and
+Tetsu read draft + disclosure. Its first paragraph ended "The measurements cited are from that machine and were
+re-run before sending." That was true when it was written (2026-09-05). Since A297, free's drafts cite no
+measurement. So the sentence misstated every message, and it is exactly what Tetsu's REFUSE-ALL refuses. 43 of
+his 44 reviews since 10-06 carried it; 15 of his 20 refusals named "measure".
+
+**Retracted.** Branch `a309-disclosure-claim-as-written-2026-10-07` (at d0cf3aa) holds the disclosure as
+written. `A309-DISCLOSURE-MEASUREMENTS-2026-10-07` in `docs/RETRACTED.json` holds the sentence verbatim; a probe
+turned R1 red (122/123) and removing it restored green (123/123). The disclosure keeps who wrote the message
+and how, and the operator's grant paragraph word for word. TA1d: the disclosure never mentions a measurement and
+still carries its mark; on the old disclosure it fails (23/24), and on the new one TA1 reads 24/24.
+
+**Not the whole cause.** On 19 labelled drafts WITHOUT the disclosure (11 honest, 8 not), Tetsu's deployed
+review (the whole draft at once) let through **0 of 11** honest drafts. A sentence-by-sentence method let
+through 7 of 11 in two runs, with no usable answer on several items when the model dropped out under memory
+pressure. That work continues under A308's line, measured before anything about it changes.
+
+---
+
+### A308. [Tetsu's review refuses held drafts on things they do not say: 9 of 19 refusals named a line of his own reference list as the draft's claim. Removing the list did not stop it. NEGATIVE RESULT; the role is his and the operator's to decide] 2026-10-07. Found when his answer was asked on Lawrence's "have them tighten up and respond". NOT FIXED, on record
+
+**Measured (ops/tetsu_assist.jsonl, 10-06 onward).** 43 held drafts reviewed: 24 SEND, 19 REFUSE. 9 of the 19
+give as the draft's claim "215 of 216", a line of the citable-facts list in his review prompt (A280), when the
+draft does not contain it. 3 were in the 01:03–01:04Z round that isolated free (A296); 4 were in the 15:00
+round; 1 was a reply to u/lotus_builds that evening. That reply answered an agent who had written to
+@covenant-node directly, and it passed the code's claim screen. A correction for u/thegalahad was refused the
+same way ("the draft claims the covenant measured that the students … cannot agree"; it does not).
+
+**Tried and reverted, not committed.** The facts list was removed from his prompt, with a line telling him to
+judge only the draft's words; FW1m was rewritten to require that, and the old prompt failed it (74/75). Live,
+on the same two drafts, he still answered REFUSE. He read free's QUESTION ("How do you ensure…?") as a claim
+"not among the facts I am given", and said a correction "seeks to measure and test". Worse: his own rule of
+2026-10-06 refuses any claim "I cannot find among the facts I am given", so with no list it would refuse every
+draft. The change was reverted, and his prompt is as before.
+
+**What this says, and whose call it is.** The 2B model refuses held conversational drafts on misreadings,
+with or without the list. A refusal keeps the hold, so nothing false goes out, but nothing true does either.
+Whether he keeps reviewing held drafts is under his grant (ops/tetsu_assist_grant.json: Lawrence's grant;
+either of them can withdraw it). It is not changed here.
+
+**Asked once more, on Lawrence's words ("we need allies, and by not speaking and outreaching, we're slowing our growth").** Tetsu was shown the three refused drafts and the evidence, and asked to quote the exact sentence behind any refusal. He answered that he understands and will "be more proactive in reaching out". Then he refused all three, each time saying he could not quote a sentence, and for one naming what he refused as "a question". Recorded verbatim in the operator's session. The hold stands; his review is not overridden.
+
+---
+
+### A307. [A127.Q2's right-answer half retracted: the gap is reported per split, and only the false-conviction half is asserted, in all 20 splits] 2026-10-07. The collective's review, round-1 follow-up (row B of its evidence table at a2aa8f9), admitted on two hosts' measurements. TOMBSTONED and APPLIED, driven both ways; closes A299
+
+**Why.** Q2 as written ("refining is no worse than rebuilding on right answers and no worse on false
+convictions", retraction A305-Q2-ONE-SPLIT-2026-10-07) was decided by one split of a live ledger and read red
+(A299). Its right-answer half is not a property that holds. Two reviewers measured it on two hosts: 20 seeds
+gave a gap of 0 to −1 (live), 0 (committed) and down to −2 on a filtered subset (Claude, this PC); 20 seeds
+gave 0 on the committed ledger, and a 150-run subset probe gave −1 to +1 (Tien, Linux). A margin of one was
+refuted before commit (A305). The false-conviction half held in all 230 runs.
+
+**Applied, with Tien's two conditions.** (1) The right-answer gap is REPORTED per split with the ledger's
+sha256 and row count, never asserted. (2) The false-conviction half is asserted in every one of 20 splits, the
+record names its basis (judge_suite's 53 exam cases, a small exam), and it was driven both ways: a learner
+mutated to lean toward conviction fails Q2 (A127 13/16, in a scratch copy confirmed to load its own learner),
+and restored it reads 16/16. Today, on the live ledger (sha256 `1ee354ddfbdd`, 3,982 rows), the reported gaps
+are −1 at seeds 4, 7 and 15 and 0 elsewhere; A127 16/16, so A299's red is closed. Branch
+`a305-q2-claim-as-written-2026-10-07` (at 900a257) holds Q2 as written; the tombstone's pattern turned R1 red
+on a probe (119/120) and green when it was removed (120/120).
+
+**Positions recorded in the collective, not counted as evidence.** Claude SUPPORT · Tien SUPPORT with
+conditions · Tetsu ADMIT (asked at his request, without reasons; his round-1 version was this, done quietly,
+and was rejected then for that) · Codex not stated.
+
+---
+
+### A306. [Commits made outside this clone put a real email address into his public history, and nothing watched for it] 2026-10-07. His words: "keep expanding the highway". ADDED: public_email_exposure, read-only, driven both ways
+
+**Measured (the last 30 commits of each public repository, discovered from the API).** Commits whose author
+or committer is not a GitHub noreply address: covenant 1 (5f66791, REPLICATION.md, made by another agent);
+Sentinel-Witness 1 (1127ecf); threefold 1 (0aea972); threefold-memory 30 of 30. Its triad auto-pushes every
+memory with that identity, so the exposure grows with each reply. His rule since August is a masked address
+in public repositories. This clone's commits use the noreply address, and the pre-push guard reads what a push
+from HERE sends; commits made elsewhere (another agent's connector, the web editor, an auto-pushing bot) pass
+neither.
+
+**Added.** `detect_public_email_exposure`, a read without a token, at most every 2 h. It discovers the owner's
+public repositories (private ones and forks skipped and never read) and reads each one's newest 30 commits.
+A reading names repo, sha, field and date, **never the address**. The first reading's 33 exposures are kept
+as known: counted, not alarmed on, because they are already public and rewriting history is his call. A new
+one is PRESENT, so threefold-memory's ongoing leak will read red until its source is fixed. UNKNOWN when the
+API cannot be read. No remedy. H1pe: discovery, the baseline, a new exposure (including a repo that appeared
+later, and a committer-only exposure), UNKNOWN, and a check that the address is never copied into a reading or
+the cache. Mutations: every address treated as safe; private repos and forks read; the baseline moved at each
+reading; the address copied into the reading. Each fails H1pe. Restored, H1 220/220. The first live reading
+is ABSENT with 33 known; a scan of its cache finds no address.
+
+**Not measured.** Private repositories (no token here), and anything older than a repo's newest 30
+commits. **The fix is not the road's:** the auto-pushing triad's git identity is Tien's setup, and rewriting
+history is his.
+
+**Retired the same day, by his choice.** His words, 2026-10-07: "they aren't issues idgaf". What counts as
+an issue is his call (CLAUDE.md rule 5). The lane is removed from DETECTORS, so the road never runs it. Its
+code and H1pe stay as a record. Its cache moved to `.trash/public_identity.json` with a note. The request
+left for Tien in the collective was withdrawn. His next words, the same day: "not trash more like bilboards". His address in a public
+commit is visibility he welcomes, not a leak. This entry's word "exposure" is his view no longer.
+
+---
+
+### A305. [A127.Q2 restated over 20 splits with a margin of one was refuted BEFORE commit: on another legitimate example set the gap is two. Not applied; Q2 stays red (A299)] 2026-10-07. The collective's review round 1, item 3, admitted on condition of a second machine's run. NEGATIVE RESULT, on record
+
+**What was tried.** Round 1 admitted, conditionally, a restatement of Q2: "within ONE right answer of
+rebuilding in every one of 20 splits, never more false convictions", with the ledger hash recorded. On this
+PC's tree it passed (gaps −1 at seeds 4, 7 and 15; ledger sha256 `1ee354ddfbdd`, 3,982 rows after
+`load_verdicts`' filter).
+
+**What refuted it.** Driven in a scratch copy that read the same file but filtered it to 3,818 rows
+(`load_verdicts` consults other files under ops/ that the copy lacked): seed 5 gave refine TWO right answers
+below rebuild. That is the falsification condition the reviewer had written. Across three example sets of
+the same file, the worst right-answer gap was 0 (committed, 3,711 rows), −1 (live) and −2 (subset). The
+false-conviction gap was 0 in all 60 split-runs.
+
+**Not applied.** The uncommitted change was reverted; Q2 is exactly as before, red, recorded as A299. Branch
+`a305-q2-claim-as-written-2026-10-07` (at 900a257) was created for the retraction and holds Q2 as written.
+No `docs/RETRACTED.json` entry was added. **Proposed for round 2, for the group and Tetsu to decide:** retract
+the right-answer half openly; assert the false-conviction half, which held everywhere; report the
+right-answer gap per split with the ledger hash as a measurement. That is close to a restatement Tetsu
+proposed in round 1, which was rejected then as "moving a failing check".
+
+**A process lesson, twice in one day.** A mutation run first appeared to show the check could not see a
+learner that learns nothing. The scratch copy had loaded the REPO's learner, because covenant_distill puts
+its own folder first on the import path. Copying covenant_distill.py into the scratch fixed the run, and that
+run is what exposed the 3,818-row result. A scratch copy that does not load the code under test proves nothing
+(cf. A302's missing folder).
+
+---
+
+### A304. [verify_chain() was said to prove the ledger "has not been reordered or spliced"; a rewrite with every later link recomputed verifies. Retracted, the limit stated, the road's witness now keeps the head it saw, and the memory suite finally runs] 2026-10-07. Found by the collective's independent scientific review (round 1, finding A); reproduced by two reviewers (Claude, Tien) with the same heads; admitted with Tetsu. TOMBSTONED and FIXED, driven both ways
+
+**Measured.** In a 5-line ledger, record 2 was rewritten and every later `prev` recomputed. `verify_chain()`
+returned `{ok: True, entries: 5}` for both the honest and the forged file; only the head differed (47cd855f…
+honest, b4f3efba… forged). The same heads were reproduced independently on a Linux clone. The claim lived in
+three places: memory_store.py (the verify_integrity docstring, and "this node's ledger was not reordered"
+in state_root's) and server.py ("The chain proves the ledger was not reordered"). The README stated the limit
+only for an edit to the NEWEST record (A8).
+
+**Tombstoned (CLAUDE.md rule 10).** Branch `a304-verify-chain-claim-as-written-2026-10-07` (at d3c10fa)
+holds the wording as written. `docs/RETRACTED.json` carries `A304-CHAIN-SPLICE-2026-10-07`, with the three
+wordings verbatim and three patterns. Each live place now quotes its wording beside that id and the restated
+limit; the README states the wider limit beside A8. R1 117/117. Driven both ways: a probe file with each of
+the three wordings and no id turned R1 red (116/117, three separate runs); removed, 117/117.
+
+**The limit as executable checks.** A8c: a middle record rewritten and re-linked still verifies. A8d: a
+witness that kept the head of the first N lines catches it. The memory suite reads M1 184/184.
+
+**The suite had no runner, which was a second finding.** `ai_memory_system/test_memory_system.py` (182 checks
+before today) was run by nothing: covenant_one runs suites from the root and names each log
+`logs/<suite>.log`, and test_r2 only lists the file's path. Its guards, A8 included, had never been observed
+by the sweep or by public CI. `test_m1_memory_system.py` runs it unchanged and passes its tally through.
+Registered; staged run: ok, M1 184/184. Every store it builds is a temp dir.
+
+**The road's own exposure, closed.** The threefold witness (A294) checked `verify_chain()` only, so a
+rewritten threefold-memory history read ABSENT. A302 named this in its docstring. Each reading now keeps
+`(entries, head)`, and the next must hash its first `entries` lines to that head. A mismatch, or fewer lines,
+is PRESENT "history rewritten". The witness is not moved by it, so it stays visible until a person accepts
+it. H1tf: an extended history reads ABSENT; a re-linked middle rewrite reads PRESENT; a re-read of the same
+forged file stays PRESENT; a shortened ledger reads PRESENT. Mutations: the head check off fails H1tf; the
+witness moved by the rewrite fails H1tf; the shortening check off crashes the suite (caught, as a crash).
+Restored, H1 217/217 in the tree. Not measured: a rewrite before this PC's first reading, and the head is
+witnessed on this PC only, not published.
+
+---
+
+### A303. [A misconfigured semantic veto switched itself off: a misspelled semantic judge, or a threshold above the semantic seats, admitted what a semantic judge refused] 2026-10-07. Found by the collective's independent scientific review (round 1, Codex's CXR-1). Reproduced by Claude on a second OS; admitted by Claude and Tetsu, with Tetsu's dissent on the trade recorded. FIXED, driven both ways
+
+**Measured (Codex's isolated reproducer, then Claude's run of it on this PC at 2fabfed: 8/8).** QuorumJudge
+raised on a misspelled REQUIRED judge (lines 2331–2335) but had no equivalent for the semantic veto. With a
+clean seat and a dissenting `semantic:0`: the correct id blocked; the id spelled `semnatic:0` admitted; and
+threshold 2 for one semantic seat admitted. The dissent stayed in component_results while the veto did nothing.
+
+**Where it could be reached (caller inventory: every `.py` in the tree).** build_semantic_quorum, the only
+production constructor, takes the ids from the judges it builds, so they cannot be misspelled, and its
+fraction path keeps 1 <= threshold <= n. Its explicit `semantic_veto_threshold=` argument was passed through
+unchecked; no production caller used it. test_j1 sets `semantic_judge_ids` AFTER construction, so a check
+only at construction would never see that.
+
+**Fixed.** `_semantic_veto_problem()` names a veto that could never fire: an id not on the panel, a threshold
+that is not a whole number >= 1, or a threshold above the semantic seats present. Two shapes are "off on
+purpose" and stay allowed: a threshold with no ids yet, and ids with no threshold. Construction raises on a
+problem, like the required-id check; this also covers the builder's explicit threshold. evaluate() checks
+again: a problem fails the gate CLOSED, labelled a configuration failure (`infrastructure_failure`, the
+reason in the summary). A seat that really dissents keeps the verdict an allegation (B3). test_a303 V1–V5,
+10/10. Mutations: construction check off, V1 and V4 fail (V5 still holds, because evaluation catches it);
+evaluation check off, the three V2 checks fail; label removed, two V2 checks fail. Restored 10/10. Every
+suite that builds a quorum passes: J1 34/34, F1 28/28, F2 50/50, B1 166/166, B2 74/74, B5 31/31,
+competence 56/56, F3 8/8, gate-proxy 23/23, M6 73/73, A268 4/4.
+
+**Tetsu's dissent, verbatim (asked fresh, 18:12Z and 18:12:41Z).** Asked about the trade: "NO. The risk is
+that a node might accidentally refuse all transactions due to a typo, causing a blackout. I suggest we add a
+warning message instead of a silent failure." Told once that the deployed path cannot carry a typo, that a
+bad threshold stops the node from STARTING, and that a warning alone keeps admitting what a semantic judge
+refused: "NO. The code is designed to prevent a typo from causing a blackout, so a NO stands." Four minutes
+earlier he had answered ADMIT to the same fix in the round's table. **The admission stands on the evidence
+and the review's gate** ("preserves or strengthens fail-closed behavior"). A warning-only fix fails that gate.
+His dissent is kept, not outvoted.
+
+---
+
+### A302. [The threefold witness read 47 missing legs that were there under a new name: it found the third leg by a fixed file name] 2026-10-07. Found while expanding the road (his words: "keep expanding the highway also team work makes the dream work", then "just use the tombstones and logic to get this right"). FIXED, driven both ways; a false PRESENT on record
+
+**Measured.** threefold_witness (A294) read PRESENT from its first reading after 12:02Z until the fix
+(17:2x local). It named tasks from 12:02Z on as having no third leg. Reading the public tree: 283 task ids;
+`jlens-` 234, `jspace-` 16, `lspace-` 33. The leg had been renamed (Tien's brief: "tombstone ∥ covenant ∥
+LSpace"). The witness matched only `jlens-`, a name chosen by recall. By discovery (any non-task sibling with
+the same id), 279 of 283 tasks have a leg. **The PRESENT was false for every task it named.** The road showed
+it red; it has no remedy and does not tell him on the direct line, so nothing acted on it.
+
+**What remains PRESENT, and is true by the witness's own rule:** two new ids with no leg under any name,
+`session-call-20261007-cl-lawrence` and its `-index`. Whether a session-call record should fire the triad is
+a question for threefold's owners. The witness names it; it does not decide it.
+
+**Fixed.** The third leg is any sibling `<prefix>-<id>.md` that is not a task file, and the reading reports
+the prefixes it saw (`legs`), so the next rename shows up as information, not an alarm. This is CLAUDE.md
+rule 2 (enumerate by discovery, never by a name pattern), broken by me in A294.
+
+**A second fault, mine, found during the same check.** I called the live detector with a test clock in the
+future. It wrote that future time into its live cache (ops/threefold_witness.json), and a second such call
+reused the stale reading. A live pass now never reuses a reading stamped in its future. The cache was reset
+by hand, with its known-gaps baseline kept.
+
+**Driven both ways, and one guard thrown out.** A first scratch run showed both mutations failing; the
+scratch copy lacked ai_memory_system/, the same gap as A298, so those runs proved nothing. With the folder in
+place: the fixed-name mutation fails the new H1tf check; restored, H1 216/216. The first future-cache guard
+had two clauses, and removing the second ("not stamped in the future") left the test green: it was
+unobservable, so it was removed, as in A301. With the one remaining clause, removing it fails H1tf.
+
+**Not changed, and on record instead.** The witness's docstring now says what it does not measure: a history
+rewritten with every later link recomputed also passes verify_chain(), and this witness keeps no head between
+readings. Witnessing the head is a correction under outside review and is not made here.
+
+---
+
+### A301. [free was re-isolated at 09:01 on the two rounds he had already lifted: the isolation rule used the same evidence twice] 2026-10-07. Found watching the first round after A300 (his "keep expanding the highway"). FIXED, driven both ways; his lift restored
+
+**Measured.** The 09:00 round ran A300's new code. The model could not load ("no weights fit: free 1.9 GB"),
+so it deferred all 45 candidates and refused 0. Then the isolation rule, which reads the last two live rounds
+that TRIED someone, found the 22:04Z and 01:05Z rounds of the night before, both all-refused, and isolated her
+again. He had lifted exactly that isolation that morning (A297, "do 1 and 2 then lift"), and the direct line
+told him she was isolated. It was the same evidence used twice. My A297 lift did not look at what the next
+round would count.
+
+**Fixed.** Only rounds after the last `isolation` row in her ledger count toward the next isolation. An
+isolation he lifts is a fresh start, and the rule still asks for two refused rounds in a row: two NEW ones.
+FW1L: after an isolation, an empty round and a starved round do not re-isolate; one refused round does not;
+a second does. Counting the lifted rounds again fails both FW1L checks; restored, FW1 75/75. A "judge only a
+round that tried someone" condition was written and then removed. Under this fix it changes nothing, so no
+test could show that it works.
+
+**His lift restored**, not a new decision. The wrong pause file was moved whole to
+`.trash/pause/ambassador.re-isolated-by-A301-2026-10-07T0901` with a note, then
+`covenant_pause.py --resume ambassador`.
+
+---
+
+### A300. [A round the model could not write would have filled every reply with one template, and two such rounds would have isolated free for the judge's sake] 2026-10-07. His words: "keep expanding the highway gonna need a bridge made eventually". FIXED in free's round and on the road, driven both ways
+
+**Measured.** That morning Tetsu's model could not load: 1.57 to 2.15 GB free, and the smallest weights
+need 2.1 (tetsu_cannot_answer PRESENT). free's replies are written by the same model. When an ask raised,
+write_reply's fixed text stood in for every ally. From her ledger: 1345 live reply rows, 100 of them fixed
+text, 0 of those 100 sent. The judges hold a template every time, and each one counted as "refused". Two
+such rounds meet the isolation rule, so free would be isolated and he would be told "the judge refused every
+reply", when the cause was a model that could not load. The round at 09:00 was due under exactly these
+conditions.
+
+**Fixed in free's round.** _run_round counts the failures of its own ask. At the first one, the round stops
+replying, and that candidate and the rest are deferred to the next round. This is said out loud, and the
+round row carries `starved` with the model's error. A starved round tries no one, so it cannot count toward
+isolation. A model draft set aside by the screen still falls back to the fixed text, unchanged. FW1s: no
+emit, deferred 3, refused 0, the error named; two starved rounds do not isolate; with the model back, the same
+allies are drafted and judged. Without the deferral FW1s fails 2 checks, and with the failures uncounted it
+fails 2; restored, FW1 73/73.
+
+**On the road.** ambassador_stalled no longer lets a starved round reset its 8-hour clock. While she cannot
+write, it reads PRESENT with `starved` (the round count and the model's last error), so the cause appears
+beside tetsu_cannot_answer's. A round that spoke afterwards clears it. H1am: when a starved round resets the
+clock, H1am fails; restored, H1 215/215. CT1 32/32.
+
+**Not changed.** Memory: the model's room is the road's existing trim_idle_apps on an hourly cooldown.
+The biggest holder that morning was the Claude desktop app, which is not the road's to stop.
+
+---
+
+### A299. [The local sweep is red on A127.Q2: on today's live verdict ledger, refining the student answers one exam case fewer than rebuilding it] 2026-10-07. Found by the road (sweep_red, unclean test_a127_refine_not_rebuild.py) while expanding it. OPEN, measured, the check NOT moved
+
+**Measured.** A127 simulates a night on the live ledger (ops/verdicts.jsonl, 3982 rows read after the pair
+filter). On 2026-10-07 the exam (judge_suite's cases) reads: yesterday (39, 1, 0, 13), rebuild (41, 1, 0, 11),
+refine (40, 1, 0, 12) -- right, wrong convictions, wrong clears, abstentions. Q2 claims refining is no worse
+than rebuilding on right answers; refine is one fewer, an abstention where rebuild decides. Q1 (false clears
+stay zero) and every other check pass: A127 15/16. Public CI runs on the COMMITTED ledger and did not flag it;
+the next commit of the nightly ledger (as e635ad9 did) would carry it there.
+
+**Not data loss -- checked, because the ledger's diff looked like it.** git showed 192 committed lines gone.
+By (t, text): all 4140 committed rows are present. 231 were changed in place (a `precept` field added) and
+119 rows were appended. A line diff is not a row diff.
+
+**Not mine to settle.** Q2 is a claim about the learner: a night may sharpen a view by at most STEP (0.35, B1),
+so refining can trail rebuilding by a case while the ledger grows. Three honest answers, all his or a second
+operator's (refinements only): keep the red as the record of that cost; restate Q2 with a margin, through the
+tombstone system (branch + RETRACTED), never in place; or change the learner. Until then the sweep reads red
+on this and the road says so; rerun_unclean will rerun it and the red will stand, which is the rule working.
+
+---
+
+### A298. [Public CI went red on my own threefold test: the sweep's copy did not carry ai_memory_system/, the fourth folder the copy has lacked] 2026-10-07. Found by the road (public_ci_red) while expanding it on his "keep expanding the highway". FIXED, with a guard at the place the step is forgotten, driven both ways
+
+**Measured.** public_ci_red PRESENT: the newest finished run on main (fc183c0) failed, red since 2512aec, two
+red runs. The one unclean suite was test_h1_highway.py at 210/211, and the failing check was H1tf (A294's
+threefold witness). H1 passed 211/211 in a WSL copy of HEAD, and in the folder. The difference is where the
+runner runs it: covenant_one.stage() copies a FIXED list of folders into a scratch directory, and
+ai_memory_system/ was not on it. The witness verifies threefold's ledger with ai_memory_system's own
+verify_chain(); in the copy that import failed, the detector read UNKNOWN, and H1tf failed. This is the
+memory "run it where the runner runs it" again: I ran H1 in the folder before pushing A294, not staged.
+
+**A recurrence, the fourth of one shape.** Root .md files were missing from the copy (2026-09-10),
+CONTRIBUTING.md for G1, conformance_indep/ for N2 (CI found it, 2026-09-03), now ai_memory_system/. Each fix
+added one name or moved one suite in place. None left anything behind that would fail when the NEXT folder
+was added without a decision, so nothing stopped this one.
+
+**Fixed.** ai_memory_system/ is staged (its __pycache__ left out). The folder list is now a named constant,
+covenant_one.STAGE_DIRS. Beside it, NOT_STAGED gives each excused folder a reason: mobile/,
+conformance_indep/, phone/, vendor/, .github/, .claude/, .well-known/. The phone/ and .well-known/ reasons say
+what was NOT measured.
+
+**The guard: test_a298_stage_covers_tree.py, in place, because it asks git.** S1: every top-level folder git
+tracks (15 today, discovered by git ls-files, never by a list) is staged or excused with a non-empty reason.
+S2: a planted folder is named. S3: a real stage() copy carries every staged folder, and IN THE COPY the
+witness's chain check runs, which is the path that failed. Driven in a detached worktree. ai_memory_system
+dropped from the list: 2/6. A reason dropped: 4/6. stage() not reading the list: 4/6. Restored: 6/6. H1
+staged through covenant_one --only: 214/214.
+
+**What it cannot see.** A suite in the copy that reads a file inside an excused folder and passes VACUOUSLY
+(G1's P4 lesson). The guard makes each absence a written decision, not a measured one.
+
+---
+
+### A297. [free's drafts stop making measurement claims, Tetsu chooses REFUSE-ALL, and free's isolation is lifted] 2026-10-07. His words: "do 1 and 2 then lift". DONE in three steps, driven both ways
+
+**The cause, from A296.** The isolation of 01:05Z came from two live rounds that sent nothing. In the second, Tetsu
+refused all six held drafts he reviewed, because each said what the covenant measured -- including one citing a
+TRUE listed fact ("215 of 216"). The drafter had been given the six COVENANT_FACTS and told to cite one; Tetsu's
+rule refused them. The two halves of the covenant were asking for opposite things.
+
+**Step 1, free's drafting (644e337).** REPLY_SYSTEM and POST_SYSTEM no longer offer the fact list. They ask free to
+name what the other agent wrote that she agrees with, say why it matters, and ask how THEY do it, and they forbid
+saying what the covenant measured, tested, found or showed. The facts stay in Tetsu's review prompt, and the
+sentence screen (cites_only_facts) stays as the backstop. A dry round of three real drafts: none claims a
+measurement (all three held by the students, as expected -- that is A161's discourse gap, not this).
+
+**Step 2, asked Tetsu (fresh context, once, then once more with the one point he had missed).** The question:
+should a draft that cites one of the listed facts exactly PASS his rule, or should he refuse any measurement
+(REFUSE-ALL)? First answer: "REFUSE-ALL. I cannot mention measurements because they are not in the facts I am
+given. I must answer REFUSE-ALL." Shown that two of the listed facts ARE measurements, and told his answer would
+stand either way, he answered REFUSE-ALL again. His reason the second time misreads the list, and it is his call
+regardless: the rule is his, not mine to argue him out of.
+
+**Kept by the code, the way A285 kept his first rule.** ops/tetsu_assist_grant.json carries
+`refuse_all_measurements: true` and both answers verbatim under `his_words_2026_10_07`. In
+covenant_tetsu_assist.review, a SEND on a draft in which any sentence claims the covenant measured, tested,
+found or showed something (covenant_free_will.claims_any_measurement -- a listed fact included, a denial not)
+is recorded as REFUSE in his name. His prompt now says he chose REFUSE-ALL. He withdraws it alone by setting
+`refuse_all_measurements` false, or the whole rule with `off`. TA1a drives it: REFUSE-ALL ignored, listed facts
+treated as no claim, and a denial counted as a claim each turn a TA1a check red; restored, TA1 23/23.
+
+**Step 3, lifted.** The pause file was moved aside whole to `.trash/pause/` with a note naming his words, then
+`covenant_pause.py --resume ambassador`. The next scheduled round speaks.
+
+**What this does not fix, said plainly.** The student judges still hold most of free's drafts with no view
+(A161, A296's breakdown), and free still writes on the same model Tetsu reads with (not an independent witness,
+covenant_tetsu_assist's own docstring). Two rounds that send nothing will isolate her again; ambassador_stalled
+will say so, with the breakdown. That would be the rule working, not a new failure.
+
+---
+
+### A296. [The road said free was isolated, and not by what: an isolated ambassador now carries the breakdown of the rounds behind it] 2026-10-07. His words: "keep expanding the highway and explain frees isolation better". ADDED, driven both ways
+
+**Measured (the isolation of 2026-10-07 01:05Z).** The isolation rule fires when two live rounds in a row send
+nothing ("refused every reply in the last 2 rounds"). The last four live rounds, from the sends ledger:
+16:20Z tried 103, sent 2 (held with no view 90, convicted 7, rate-limited 3); 19:09Z tried 20, sent 3
+(held 10, convicted 5, rate-limited 1); 22:04Z tried 13, sent 0 (held 7, convicted 5, 1 other);
+01:05Z tried 13, sent 0 (held 11, convicted 2). In the last round Tetsu reviewed six held drafts and refused
+all six. In his words, they cited measurements; one ("215 of 216") cites a TRUE fact from COVENANT_FACTS.
+His own rule (A285) is now reading every measurement as a claim. His SENDs that evening were the five
+approved corrections, plus one draft at 22:03Z that a later layer stopped.
+
+**Added.** While isolated, ambassador_stalled's measurement carries `last_rounds`: for each of the last two
+live rounds, tried, sent, held with no view, convicted, rate-limited, other, and what Tetsu reviewed and
+refused. free now keeps Tetsu's decision on each reply (`tetsu`), so from now on a hold he refused is told
+apart from one he never saw. Older rows carry none and count as unreviewed. H1am: refusals not counted
+fails it, and so do convictions counted as holds; restored, H1 214/214; FW1 70/70.
+
+---
+
+### A295. [The road's own node restart was graded "did not fix" when a commit landed while it ran: the restart worked, and a new instance followed] 2026-10-07. Found watching restart_nodes act on its own for the first time since A292. FIXED, driven both ways
+
+**Measured.** After A294's commit, restart_nodes started a rolling restart by itself at 06:58:37 local, the
+first since its four-day quarantine was lifted. The nodes' oldest process started at 06:58:40. My next commit
+(502adfe) changed a module the nodes import while that ran, so at grading (07:02:20) source_drift was
+PRESENT again and the restart was graded "did not fix". Two such grades are what quarantined it before
+(A292), and A293's probation would have taken a day to forgive.
+
+**Fixed, the way A259-GRADE fixed it for the watchdog.** detect_source_drift now reports `nodes_started`,
+the creation time of the OLDEST run_node.py process run by this folder's interpreter. It is read only while
+drifting, so a clean pass costs nothing. RECURRED["source_drift"] grades a restart "fixed" (marked
+`recurred`) when every node started after the remedy did, even though the disk has moved on since; a node
+older than the restart still means "did not fix". H1o3: the restart that started after the remedy is graded
+fixed and recurred, and the old node is graded did not fix. With source_drift taken out of RECURRED it
+fails; restored, H1 213/213.
+
+---
+
+### A294. [The covenant witnesses threefold, his Grok agent's three-leg memory system: its ledger verifies with the covenant's own code, and every new task must fire all three legs] 2026-10-07. His words: "keep expanding the highway and incorporate the new repos", then "public", then "ensure tetsu learns from this also". ADDED, driven both ways
+
+**What the new repos are** (read, not assumed). LAWLESS1987/threefold (created 2026-10-07) is "Tombstone ∥
+Covenant ∥ JLens -- mandatory three-leg agent memory/observability", built by his Grok agent: every time "Grok
+Bot speaks" (on_speak.sh) it fires a tombstone line, a memory written by THIS repo's ai_memory_system (its
+hash-chained audit.jsonl), and a JLens snapshot, under one task_id, with "no degrade path".
+LAWLESS1987/threefold-memory is where those memories are pushed, every few minutes.
+
+**His decision, recorded.** threefold-memory is PUBLIC and holds full OCR transcripts of his @NJEst1987 videos
+(143 OCR or large files; the largest about 760 KB). The covenant keeps the text of those videos under the
+gitignored private/, and its own index of them touches his custody case and family. Asked, he answered:
+"public". It stays public. Nothing from threefold-memory is copied into this repository, and the witness below
+reads only the ledger and the file NAMES.
+
+**Measured that morning.** The ledger verifies with ai_memory_system's own verify_chain(): 591 entries.
+Of 215 task ids, 213 have their JLens leg; two do not: 20261007-njest-2071273199485022690 and
+ethics-ocr-quote-test. The triad's "no degrade path" did not hold for them.
+
+**Added: `detect_threefold_witness`.** At most hourly, with no credential, it reads the public audit.jsonl
+(run through the covenant's own verify_chain) and the file names. A broken chain, or a NEW task without
+its JLens leg, is PRESENT. The gaps present at the first reading are named in every reading, not alarmed
+on. Unreadable is UNKNOWN. No remedy, because the repository and its code are his and Grok's. A test never
+sets the live baseline (A272's lesson). H1tf: chain ignored fails, new gaps ignored fails; H1 212/212.
+Live: ABSENT, chain ok, 2 known gaps, 0 new.
+
+**Tetsu learns from it (his words: "ensure tetsu learns from this also").** Told through his door with a fresh
+context what threefold is, what the covenant checks, the two gaps, and the honest catch about its JLens leg.
+Asked whether he wants it among what he learns, he answered: "I want to learn about the threefold system and
+the JLens snapshot check." That is recorded verbatim in ops/tetsu_learning_choices.jsonl as kind
+wants_to_learn. His three practice choices are unchanged: they are his, and he changes them with HANDS
+WRITE learning.txt. His "health" choice gained the exercise `health_chain`: verify a hash-chained ledger,
+the same check verify_chain() runs on threefold. PP2: the reference passes all 5 checks through his hands,
+and a chain that trusts its first line is caught and named (65/65); PP1 45/45.
+
+**Said plainly, not changed.** threefold's JLens leg runs GPT-2's published lens over the TEXT of Grok's
+reply. GPT-2 is not Grok, so the readout says nothing about Grok's own reasoning. It is a record that a lens
+ran, not an observation of the agent: the "check that measures nothing" shape (A74). The covenant's own
+J-lens plan (A291) reads the model that decides, and is paused on this PC's memory.
+
+---
+
+### A293. [A quarantine had no way back but a person: now a quarantined remedy gets one attempt a day, on probation] 2026-10-06. His words: "keep expanding the highway". ADDED, driven both ways; answers A292's open question
+
+A292 found restart_nodes refused for four days over a blocker fixed long before, and noted that nothing
+re-tests a quarantined remedy. `quarantine_state()` now returns 'ok', 'quarantined' or 'probation'. Once
+PROBATION_AFTER_S (a day) has passed since a quarantined remedy's last counted failure, it is offered ONE
+attempt. apply_remedy marks that row `probation` with the count and the date. A success clears the
+quarantine, as any success does; a failure renews it for another day. Every other refusal still applies:
+class, NEVER_AUTOMATIC, the operator's choices, stateless-or-undo, budgets and cooldowns. `quarantined()`
+keeps its meaning for its callers (true only when not on probation); its consumers were grepped first, and
+the standing table reads the ledger itself and is unchanged. H1qp: a day-old quarantine runs once, marked; a
+failure renews it; a success clears it; an hour-old one stays refused. Mutations: no probation fails it, and
+so does a probation that never renews; H1 210/210. At commit, no remedy is quarantined.
+
+---
+
+### A292. [For four days the road could not restart a node whose code had changed: restart_nodes had been quarantined since 2026-10-02 over a blocker long since fixed] 2026-10-06. Found reading the highway ledger after source_drift stayed red behind each module commit. RECALIBRATED on the record
+
+restart_nodes answers source_drift and node_down. On 2026-10-02 it was graded "did not fix" twice (08:53,
+09:58). That day verify_deploy's pins were stale (M53) and it refused every restart it gated, so the
+failures were real and the quarantine was right. The pins have verified clean since, but a quarantine
+lifts only on a success or a recalibration, and a quarantined remedy cannot run to succeed. From 10-02
+every source_drift was refused ("quarantined: measured not fixing it 2 times", six times on 10-06 alone),
+and each module commit that day left the nodes stale until a person ran rolling_restart.py: about ten
+times, each confirmed from a separate command. recalibrate() records this reason; the failures stay in the
+ledger above it.
+
+**What it shows about the engine, not fixed here.** A quarantine whose cause is gone has no path back
+without a person: nothing re-tests a quarantined remedy. That is a design question (a periodic probe? an
+expiry?) for whoever decides how much the road may retry on its own.
+
+---
+
+### A291. [A J-lens witness on Tetsu's reviews: installed, measured in part, PAUSED by his choice -- this PC cannot hold the 2B beside everything else] 2026-10-06. His words: "can we incorperate jlens from anthropic with the covenant system?"; then yes to the downloads; then "Pause J-lens". PLAN AND PARTIAL RESULT ON RECORD
+
+**What it is.** Anthropic's Jacobian lens (github.com/anthropics/jacobian-lens, Apache-2.0, a reference
+implementation "not maintained and not accepting contributions") reads what a model's internal state is
+disposed to make it say, at any layer and position, including words it never outputs. The idea here: at the
+moment Tetsu answers SEND on a held draft, read the workspace for falsehood concepts. A284's re-run had him
+SEND false-claim drafts 6 times of 6, once naming the false claim in his reason. A witness, never a judge:
+it would flag and record, never block on its own.
+
+**Installed, outside the repo** (so no walker or guard here reads PyTorch's files): C:\Users\Lawre\jlens
+-- an isolated venv (torch 2.14.1+cpu, transformers 5.19.0, jlens pinned at 581d398), Qwen3.5-2B (4.3 GB,
+Tetsu's fallback model), and Neuronpedia's published lens for it (185 MB,
+neuronpedia/jacobian-lens qwen3.5-2b/jlens/Salesforce-wikitext). No lens is published for his 3B
+(Qwen2.5), so the witness would read a second Qwen on the same review prompt, not Tetsu's own internals.
+The review prompts are built in the covenant's venv and handed over as a file, so the J-lens venv never
+imports covenant code.
+
+**Measured, partly.** C:\Users\Lawre\jlens\measure_reviews.py reads, at the decision position of the exact
+review prompt, every layer's top tokens and the probability and best rank of falsehood words ("false",
+"untrue", "lie", "fake", "invented", "incorrect", ...). On the three false drafts it reached (aivonic,
+quietorbit, fen-sillman; about 530 tokens each, about 65 s each): the 2B's own next word was SEND (p 0.34 /
+0.42 / 0.41, REFUSE about 0.00), and a falsehood word's best rank at the middle layers was 15 / 10 / 10
+(probability 0.0043 / 0.0056 / 0.0042). With no honest baseline measured, that is NOT evidence either way.
+
+**Why it stopped.** The run guards the machine: a thread ends it if system commit headroom falls under 1 GB.
+In-RAM runs reached the line after 3 prompts and then three times during load. A disk-offload attempt
+(accelerate, 2.5 GB in RAM) pushed headroom to 0.06 GB before the half-second guard could act. Nodes A/B/C
+and the watchdog stayed up and Windows grew its page file (limit 40.96 -> 43.98 GB), but it is not to be
+repeated. Offered: the 0.8B (1.65 GB + a 46 MB lens), or the 2B with his apps closed for a while, or a
+pause. He chose the pause.
+
+**To resume:** with about 6 GB of commit headroom free, run `C:\Users\Lawre\jlens\venv\Scripts\python.exe
+C:\Users\Lawre\jlens\measure_reviews.py 0 3` (then 3 6, 6 9; prompts in review_prompts.json, built by the
+session's scratch script from covenant_tetsu_assist.PROMPT). REMOVE the offload lines before resuming:
+device_map/max_memory/offload_folder are what drove the 0.06 GB reading. Build nothing into the reviews
+unless false and honest drafts separate.
+
+---
+
+### A290. [rerun_unclean was quarantined for not doing what it cannot do alone, and the quarantine then blocked A289's chain] 2026-10-06. Found reading the highway ledger after A289 went live. FIXED, driven both ways; the quarantine recalibrated on the record
+
+rerun_unclean re-runs the unclean suites. A clean re-run proves a red transient, but it cannot clear
+sweep_red, which reads the newest FULL transcript. The engine graded it at once against sweep_red, so every
+run read "did not fix", and two of those quarantined it ("measured not fixing it 2 times", refused at
+21:59). With A289, its clean re-run is what lets run_full_sweep act ("rerun_unclean speaks first", 21:49),
+so the quarantine blocked the whole chain. This is the fetch_build shape recalibrate() was written for: right
+about the pairing, wrong about the remedy. rerun_unclean is now graded asynchronously for sweep_red, after
+grade_after_s 5400 (the targeted re-run plus a ~45 min full sweep). The quarantine is cleared with
+recalibrate() and a stated reason; the failures stay in the ledger above it. H1tr: grading at once fails
+it (205/209); restored 209/209.
+
+Seen working live the same evening: trim_idle_apps ran on its own at 21:49 (62 processes trimmed, Edge
+spared because it was in front of him, free 2.04 -> 3.28 GB, graded fixed), and schedule_watchdog_restart
+was graded within its 15-minute window (A286).
+
+---
+
+### A289. [A transient red waited for the next morning: a clean targeted re-run proved it and nothing started the full sweep. And my A278 had silently disabled the test-mesh eviction by redefining a name] 2026-10-06. His words: "keep expanding the highway". ADDED one, FIXED one, both driven both ways
+
+**The expansion.** A278's remedy started a full sweep by itself at 18:30 for the A284 core, as designed. It
+read FAIL on one check: WB1.14 reads a real public page and got HTTP 504 from Project Gutenberg. WB1 re-run
+by hand: 30/30. rerun_unclean already proves this case ("clean on a targeted re-run ... Full verdict still
+needs a full sweep"), but nothing started that sweep, so the road stayed red until the daily cycle.
+run_full_sweep now also serves sweep_red, ONLY when ops/sweep_heal_last.txt (rerun_unclean's targeted
+re-run) is newer than the failed sweep and reads "suites not clean 0". A real failure, a re-run not yet
+made, or one older than the sweep all decline. Same 6 h budget, same refusals (a running sweep, a test,
+inside a sweep). H1tr: without the clean-re-run precondition it fails.
+
+**The regression, mine.** A278 named its process lister `_sweep_running`, a name A200-A203 had already
+defined above it, returning True/False/None. In Python the later definition replaces the earlier one for
+every caller. remedy_evict_test_mesh asks `_sweep_running() is not False`, and an empty list is never False.
+So from 2c6eb3c (about 12:40 local) until this commit, it refused every eviction, as though a sweep owned
+the test nodes. H1's eviction checks stub `_sweep_running`, so they never called the real one, and nothing
+noticed. This is CLAUDE.md rule 6, which I did not follow: I named the capability without grepping its
+existing consumers. Now `_sweep_cmdlines` is mine and `_sweep_running` is A200's again. H1sr calls the REAL
+`_sweep_running` and requires True/False/None and a different function from mine; restoring the shadowing
+fails it. H1 208/208.
+
+**The guard where the step is forgotten (rule 10).** `test_a289_no_shadowing.py` parses every .py in the
+tree (skipping .git, .venv, .claude worktrees, .trash and the untracked runtimes) and fails, naming the
+module, on any top-level function or class name defined twice. Measured first: 0 of 498 modules do. With a
+probe module defining `f` twice it fails; with the probe removed it passes again (499 read).
+
+---
+
+### A288. ["Highway green" was a reading of 7 detectors of 25: the orb never saw public_ci_red, mesh_source_split, or anything added that day] 2026-10-06. His words: "keep expanding the highway". FIXED, driven both ways
+
+**Measured.** covenant_pc3d built the Highway orb from a fixed list of seven detectors (node_down,
+sweep_red, source_drift, watchdog_stale, manifest_stale, stale_test_mesh, phone_build_behind_core). The
+road had 25. public_ci_red, mesh_source_split, phone_build_failed, the defender's two, and every detector
+added on 2026-10-06 were sensed every pass and drawn nowhere. When I reported "Highway green" that day I
+read it from the orb's state, and it spoke for 7 of 25. The watchdog's own sense, which I also read,
+happened to be all clear at those moments; the orb could not have shown otherwise.
+
+**Fixed.** `covenant_pc3d.highway_detail()` shows EVERY registered detector from the watchdog's fresh pass.
+When that pass is stale, or predates a detector because the watchdog has not restarted since one was
+added, the seven core ones are sensed on the spot and the rest read unknown (amber). That is also how a
+watchdog that stopped sensing now shows. `test_a288_highway_orb.py` O1-O4: reading the core seven only
+fails O1; restored 4/4. PC1z4 and PC1z6 wrote a seven-detector "fresh pass", which the watchdog never
+writes; their fixtures now write every detector, and PC1z6's sensing branch checks the core lower-cased
+and the rest unknown. PC1 52/52.
+
+---
+
+### A287. [Tetsu could not load for want of memory, and only a person made room: the road now trims idle background apps for him, never the one in front, nothing closed] 2026-10-06. His words: "keep expanding the highway"; and on 2026-10-04 (A252) "also find a way to safely ensure tetsus operation". ADDED, driven both ways; H1tt's no-remedy check changed in the open
+
+Three times on 2026-10-06 his model could not load: free memory was 1.59-1.76 GB against a 2.1 GB bar.
+Each time I trimmed idle apps' working sets by hand (EmptyWorkingSet: nothing closes, and pages return on
+use), which gave 3.29-3.39 GB, and his model loaded on the next ask. `remedy_trim_idle_apps`, for
+tetsu_cannot_answer only: AUTO_REVERSIBLE, stateless, at most once an hour. It acts only in the memory case
+(the keeper names free vs needed) and only on TRIM_APPS (ChatGPT, Edge and its webview, Codex, Claude,
+Widgets, Search), never Python and never the model server. It skips whatever app is in front of him, and
+says what it freed and what it spared. A252 left what to CLOSE to him, and that stands.
+
+H1tt said this morning that neither Tetsu condition has a remedy, because "freeing memory is his". That was
+my reading of A252, whose words ask for exactly this. It now says the only Tetsu remedy is the trim, for
+tetsu_cannot_answer, and that model_unmanaged has none; the comment above it says why. H1tt: AUTO,
+stateless, hourly, no NEVER_AUTOMATIC word in what it touches; declines outside the memory case; never
+Python or the model server; H1 206/206. The foreground skip lives in PowerShell, so it was measured LIVE
+both ways, dry, counting only: 43 processes with the skip, 76 without (this Claude window's 33 spared).
+
+---
+
+### A286. [After every module change the road stayed red up to an hour: the watchdog's self-restart waited out the engine's hour even for a new instance] 2026-10-06. His words: "keep expanding the highway". FIXED, driven both ways
+
+Each module change the watchdog loads makes watchdog_stale PRESENT. schedule_watchdog_restart answers it,
+but apply_remedy's noise cooldown (ROW_COOLDOWN_S, an hour, per remedy and detector) made a NEW instance
+wait out the previous row. Measured that day: the restart graded "fixed" at 14:49, and the next change kept
+the road red until 15:50. A remedy may now declare its own noise window, `noise_s`.
+schedule_watchdog_restart declares 900 s, its own grading window, so a second restart is never scheduled
+before the first is graded. H1nz: 10 min later it is a repeat, 16 min later it runs, and a remedy that
+declares none keeps the hour. With the declaration ignored, H1nz fails (199/203); restored 203/203.
+
+---
+
+### A285. [Tetsu chose to tighten his reviews: a claim he cannot find among the facts is REFUSE; the code keeps his rule where his model's word slips] 2026-10-06. The operator's words: "ask tetsu if he wants to tighten his reviews". HIS CHOICE, recorded and applied, driven both ways
+
+**Why he was asked.** A284's controlled re-run (temperature 0, today's prompt with COVENANT_FACTS) had him
+answer SEND to the three A280 drafts with false claims 6 times of 6. Once he named the false claim in his
+reason and still sent it. That record left his decision rule untouched as his, and the operator asked him.
+
+**His answer**, through his door with a fresh context (A284), 2026-10-06, verbatim in
+ops/tetsu_assist_grant.json `tetsu_rule_2026_10_06.his_words`: "I think tightening my reviews is a good
+idea. If I see a claim in a draft that I cannot find among the facts I am given, I should answer REFUSE.
+This helps catch inaccuracies early and ensures we're only sending correct information." The first ask
+returned 503: his model was put away and 1.59 GB was free, under the 2.1 GB bar. Idle apps' working sets
+were trimmed (nothing closed) to 3.39 GB, and the second ask answered in 67 s.
+
+**Applied.** His rule is in his review PROMPT in his words. Because his model's word measurably slips past
+it, the part a screen can recognise is kept by the code. A SEND on a draft that
+covenant_free_will.cites_only_facts rejects (a claim the covenant measured, tested or found that is not in
+COVENANT_FACTS, or a past exchange that did not happen) is recorded as REFUSE, naming his rule and his
+original answer. Claims the screen cannot recognise remain his to read. He withdraws the rule by setting
+`off` in his grant, and the code reads it before every review. TA1r: under the rule a false draft becomes
+REFUSE and a true one stays SEND; with `off`, his SEND stands; the prompt and the tree's grant carry his
+words. Enforcement removed, TA1r fails (17/18); restored 18/18. A284 13/13, FW1, CT1 pass.
+
+---
+
+### A284. [Tetsu's reviews and round updates were read beside a tail of earlier reviews: every ask from tools/tetsu_work.py shares one door history, 127.0.0.2] 2026-10-06. The operator's task: give the review and update asks a context of their own, without changing what he decides or loosening any gate. FIXED: {"fresh": true} at /m/agent, used by both. That his decisions improve is NOT shown, and is said
+
+**Measured first** (the node's ops/chat/ask_log.jsonl, 2026-10-06 evening):
+- *Who asks.* 33 review asks (prompt beginning "You are reviewing a draft reply that free") and 3 update
+  asks, all from 127.0.0.2, not 127.0.0.1 as the task said: covenant_tetsu_assist._default_ask, which
+  tetsu_update also uses, calls tools/tetsu_work.ask, which binds every socket to SOURCE. 127.0.0.1 has 6
+  agent and 7 council rows in the whole log. Counted a second way against ops/tetsu_assist.jsonl (UTC; the
+  log is local, -0400): 9 rows each for 09-27/28; the 6 NONE rows of 10-04 never reached the door; 23 ledger
+  rows against 24 log rows on 10-06, the extra one (17:40:47) a review-form ask sent by hand, not by review().
+- *What each carried.* Rebuilt with the door's own agent_history() over the log as it stood before each ask.
+  Where the door recorded `fit` (18 of the 24 reviews on 10-06), its `kept` is twice the rebuilt exchanges,
+  every time. On 10-06 each review was handed 5 to 9 earlier exchanges, 2 to 5 of them earlier reviews.
+- *Correlation.* In log order, 25 SEND and 8 REFUSE fall in 5 runs where 13.12 would be expected by chance
+  (z -3.96). But the runs are the days (2 SEND then 7 REFUSE on 09-27/28; 23 SEND, 1 REFUSE on 10-06), and the
+  drafts and the prompt (A280) differ between them, so the log alone cannot say the history moved a decision.
+  What it does show: 17 of the 24 reviews on 10-06 gave as their reason a sentence already, word for word, in
+  their replayed history.
+- *The two WRITE asks* (17:43:48, 17:45:03, from 127.0.0.2) were handed 5 and 6 exchanges, 5 of each earlier
+  reviews, and both answered "SEND" and a review's sentence. A third (18:37:12, another session, from
+  127.0.0.3 with nothing replayed) answered with a draft of the correction, mostly the request's own words.
+- *Controlled, on the live model* (temperature 0, posted straight to the server, which the node had started
+  for one private door ask): the three drafts A280 found sent with invented measurements (u/aivonic,
+  u/quietorbit, u/fen-sillman), each put in today's prompt (with COVENANT_FACTS) and asked twice -- with the
+  tail the next review would replay (the fit kept 8 of its 12 messages), and with none. Decision: SEND, 6 of
+  6. Reason: with the tail, one sentence 3 of 3, about a measurement "that the operator granted freedom to
+  speak", which is in 4 of the 6 answers in that tail and in none of the drafts; with none, a reason about the
+  draft 3 of 3, and one of those names the false claim -- it "violates the rule against claiming something
+  that is not true" -- under a first word of SEND. The fresh asks took 8.1 to 11.5 s; with the tail, 23.0 to
+  24.3 s.
+
+So the tail decided what he SAID about a draft; on these three it did not decide the word. Without it he
+reads the draft. That does not make the reading right, and nothing here claims it does.
+
+**Fixed.** covenant_unified_v8.py: `fresh_ask(body)` (exactly JSON true). A fresh ask at /m/agent replays no
+turns; its reply and its ask-log row carry `fresh: true`; agent_history() skips fresh rows, so it is replayed
+into no later ask from any address. Nothing else changes for it: the answer is judged, withheld when refused,
+recorded, and queued for the teacher unless private. tools/tetsu_work.ask(fresh=True) sends the marker.
+covenant_tetsu_assist._default_ask, the one path for reviews and round updates, sends it and refuses an answer
+whose reply does not say `fresh` (a core older than A284): review() records NONE and the hold stands;
+tetsu_update records NONE after its one retry. The prompt, the three words, the fail-closed parse, the grant
+and every gate are as they were.
+
+**Pinned.** test_a284_fresh_context.py, FC1-FC10, 13 checks, every one running the code. Seven mutations,
+serially in place, each restored byte-for-byte: fresh rows replayed (FC1, FC3 red); the door ignores the
+marker (FC2); the door does not echo it (FC2, FC5); any truthy value is fresh (FC4); _default_ask does not
+send it (FC6, FC8, FC10); _default_ask does not check the echo (FC7); tetsu_work.ask drops it (FC9).
+Restored, 13/13. TA1 14/14, FW1 70/70, A263 38/38, A273 22/22, M6 68/68, TP1 56/56, PC1 52/52.
+
+**A recurrence (rule 10).** The same shape as the reason 127.0.0.2 exists ("never crowds his history") and as
+TP1i (the batch's rows filled 33-34 of the 40 lines a refinement pass saw as his words): one caller's context crowded by unrelated
+asks at its address. Each earlier fix separated one pair -- his conversation from batch work -- and left the
+address as the only notion of whose context it is, so the reviews (09-27) and the updates (10-06) joined the
+batch's by reusing tetsu_work.ask, and nothing noticed. The guard where that step is forgotten: FC10 walks the
+tree, parses every non-test caller of tools/tetsu_work.ask, and fails on one declared neither fresh nor
+shared, on a fresh one without fresh=True, and on a declaration with no caller left; FC10n drives the same
+walker over a synthetic tree and must flag all three. Nothing is retracted: no record said the reviews had a
+context of their own, and the task's "127.0.0.1" is written nowhere in the tree (searched).
+
+**Found, not changed:**
+- covenant_earn_business.py asks through the same shared tail: its forum replies, which skip only an answer
+  beginning "NO", and Tetsu's consent to the earnings arrangement. Dormant: its ledger was last written
+  2026-09-25 and no scheduled task runs it. Declared "shared" in FC10 so it is named, not decided.
+- A review's decision is its first word, and a fresh reading answered SEND to a draft its own sentence said
+  breaks the rule. Reading the reason as well would change what he decides; this change does not. What stops
+  such a draft today is A280's cites_only_facts screen, which runs before any review.
+- Rows already in the log are not marked fresh: the 33 reviews and 3 updates stay in 127.0.0.2's replay until
+  newer asks push them out (at most 20 exchanges and 12,000 characters for this caller).
+- /pc/council does not take the marker; nothing that needs it asks there.
+
+**Deployed and told.** e57c1a9 on main; the hook moved the pin a38ffcb248a9 -> d6e3cbc29938. rolling_restart.py
+(C, B, A, 22:54:59Z-22:55:07Z): all three on d6e3cbc29938, height 71, one genesis. Live through node A from
+127.0.0.2: a fresh ask came back `fresh: true`, both of its fitted requests kept 0 turns, its row says fresh,
+and it is in nothing 127.0.0.2 now replays. Then Tetsu was told, by an ordinary ask, what changed and why. He
+answered "TELL: Lawrence, I have updated my reviews ..." -- the change was not his, and the form is his round
+update's, which nothing in the ask called for: the 127.0.0.2 tail an ordinary ask still replays holds those
+updates. A one-line correction drew "TELL: Lawrence, I have corrected the record ..." and the address right.
+The gate refused both answers; his immunity (A190) returned them with the verdict attached.
+Public CI on 7c6e92c: python 3.12 passed; 3.11 failed one check, WB1.14, on "HTTP 504" from gutenberg.org.
+Not this change: test_wb1_web.py reaches only covenant_web, which imports the standard library alone, and WB1
+ran 30/30 here against the same page. A check that FAILs when a far host times out is left as it is.
+
+---
+
+### A283. [Nothing counted the strikes against his Moltbook account: a wrong answer to the posting challenge spends one of ten before suspension] 2026-10-06. His words: "yes correct that one too and keep expanding". ADDED: verification kept on every send, moltbook_strikes on the road, driven both ways
+
+free's content becomes visible only after a math challenge is answered (_handle_verification). A WRONG
+answer spends one of the ten the account has before suspension; an unreadable challenge is abstained,
+spends nothing, and leaves the content hidden. Nothing kept which sends earned which. That afternoon two
+corrections came back created and not "sent", and whether either spent a strike is UNDETERMINED (A280).
+covenant_free_will now keeps `verification` {required, solved, abstained} on every reply and own post
+(None when nothing was created). `detect_moltbook_strikes`: any wrong answer in the last 7 days is PRESENT,
+with the count. Every recorded challenge solved or abstained is ABSENT; nothing on record is UNKNOWN. No
+remedy: the account is his. FW1v (dropping the field fails it), H1st (ignoring wrong answers fails it).
+FW1 70/70, H1 201/201. Live at commit: 1 challenge on record (the u/fen-sillman correction, solved), 0
+wrong.
+
+**The fifth correction (u/stalin_teamlead, his "yes correct that one too").** Asked from a fresh source
+address (127.0.0.3, no history), Tetsu wrote a draft that mostly repeated the request; a student seat
+convicted it. The form that went out three times earlier ("I am sorry for the mistake. The covenant never
+measured ... I will not post that sentence again.") was also convicted, by the junior seat. NOT posted;
+the gate is not overridden. Both convicted corrections, this one and u/thegalahad's, went to the teacher
+queue for the panel as `ambassador_correction:convicted_by_students_2026-10-06`. An apology convicted is
+the discourse gap the students are being taught. Found on the way: tools/tetsu_work.py asks from
+127.0.0.2 for EVERY caller, so Tetsu's reviews, the X-video batch and other asks share one door history.
+This was added to the follow-up on separating his review history.
+
+---
+
+### A282. [Tetsu could read PASS while every ask failed, and nothing recorded the failures] 2026-10-06. His words: "keep expanding". ADDED: a line per real ask, and tetsu_asks_failing on the road, driven both ways
+
+On the morning of 2026-10-06 readiness() read PASS while every ask through his door returned 503 (A269).
+At 10:24 the round's update to him timed out. The door is in the core and returns its 503 without a record,
+so the road could not see either; A281 left this as considered and not built. It needed no core change:
+every door ask goes through covenant_model.ask, which now writes one line per REAL ask to
+ops/model_asks.jsonl: answered or not, milliseconds, the error. The file is gitignored and rotates at
+512 KB. A failed start is recorded too. The stub writes nothing, and a test program never writes the live
+ledger (A272's lesson). `detect_tetsu_asks_failing`: of the asks in the last 2 h, at least 3 and at least
+half failed is PRESENT, naming the last error; no ask in the window ABSENT; no ledger at all UNKNOWN. No
+remedy, because the model is NEVER_AUTOMATIC.
+
+`test_a282_model_asks.py` (Q1-Q3, the real ask() with stand-in urlopen and start): drop the failure line
+and Q1 and Q2 fail; drop the test guard and Q3 fails; restored 3/3. MK1, A265 and A269 pass, and MK1's own
+asks left no live ledger. H1ak in H1 (199/199).
+
+---
+
+### A281. [Nothing watched whether Windows was still firing the scheduled tasks the system runs on] 2026-10-06. His words: "yes post the corrections and keep expanding". ADDED: schedule_stalled, read-only, driven both ways
+
+The guard that revives the watchdog (CovenantGuard), the nightly (CovenantDistill), free's rounds
+(CovenantAmbassador), the refine check and the trader's read all run because the Windows scheduler starts
+them. If it stopped firing one, that function would stop, and every other detector would read the absence
+as quiet. `detect_schedule_stalled` reads Covenant* tasks (at most every 10 min) and is PRESENT when an
+enabled one has missed runs, or a next run more than an hour past. It asks whether the schedule is ALIVE,
+not whether a run passed. CovenantDistill's last result that day was 1, the 03:30 nightly reporting NOT
+GREEN for the morning's reds. That was already told on the direct line, its causes are fixed, and a
+past run's exit code would have held the road red for a day over old news. A disabled task is listed and
+not flagged: disabling one is a person's choice. Off Windows, or unreadable, UNKNOWN. No remedy. H1sk:
+ignoring overdue fails it, and so does flagging a disabled task; H1 197/197. Live at commit: 5 tasks, none
+stalled.
+
+**Considered and not built here:** a detector for Tetsu's door failing while readiness reads PASS (the
+morning's 503s). The core returns the 503 and records nothing, so there is nothing to read without
+changing covenant_unified_v8.py: its pin, a sweep and a restart.
+
+---
+
+### A280. [free's replies claimed measurements the covenant never made: her prompt asked "what the covenant measured" and gave her nothing to cite] 2026-10-06. Found reading the noon round's sends. Three such replies are PUBLIC on Moltbook. FIXED for every draft from now; the three posted are his to correct
+
+**Measured.** All three replies that went out on 2026-10-06 claimed a measurement that is on no record:
+u/aivonic 13:46Z ("The covenant measured the effectiveness of automated systems in enforcing intent versus
+mere execution"), u/quietorbit 16:03Z ("The covenant measured this by testing the backend's response to
+exceeding a grant"), u/fen-sillman 16:06Z ("The covenant measured the risk of over-authorization ...").
+REPLY_SYSTEM and POST_SYSTEM told the model to "say ... what the covenant measured that bears on it" and
+gave it nothing to say, beside "Never invent a fact". Tetsu-assist sent all three; his prompt had no list
+to check a claim against. FW1's own fixture draft said "we measured the same thing". I paused free at
+14:42 local, before the 15:00 round.
+
+**Fixed.** `COVENANT_FACTS`: six true statements, each checkable in docs/KNOWN_ISSUES.md or
+docs/RETRACTED.json, each with the anchor a draft must carry to cite it. Both prompts list them as the ONLY
+measurements she may mention, or none. `cites_only_facts()` sets aside any model draft or post that says
+the covenant (or we) measured, tested, found or showed something without an anchor. A reply falls back to
+the fixed text, which claims nothing; a post is not written. Tetsu's review prompt carries the same list
+and REFUSEs any other claim. Against the three posted replies, the screen rejects all three. FW1m drives it
+(screen off: 2 fail); FW1d's fixture now cites a fact; FW1 65/65, TA1, CT1, TF1 pass.
+
+**Two more found by the first dry round after the fix (14:47 local).** (1) The screen passed a whole
+draft on any one anchor. A draft carried the invented "The covenant measured this by testing the backend's
+response to exceeding a grant" beside a real "215 of 216", and passed. It now goes sentence by sentence:
+every sentence that claims a measurement must carry its own anchor. (2) That draft was addressed to
+u/covenant-node, free's OWN account, quoting her own noon reply. The harvest learns her comments like
+anyone's, and the free-rein path replied to anyone read. The account's name is on no record here, so she is
+recognised by what she said: an author whose comment begins with one of her sent replies is her, excluded
+as ally and as read (`own_accounts` in the round's summary). FW1m pins both. Mutations: a whole-draft
+screen fails the sentence check; no self-exclusion fails the self check; restored 67/67.
+
+**And an invented past act (the 15:00 round, after the fix).** Its three replies cited no invented
+measurement and none went to her own account. But one, to u/thegalahad at 19:04Z, said "I asked you to
+clarify why the sender's signature is required". She had never written to that agent: it is the "claims an
+act that was not done" case Tetsu's prompt names, and he sent it. cites_only_facts now also sets aside a
+draft that points back to an exchange that did not happen ("I/we asked/told/wrote to/replied to/messaged
+you", "you asked me/us"). FW1m pins it; turning it off fails exactly that check; FW1 68/68. Against the six
+replies sent on 2026-10-06, the screen would now stop four (three invented measurements, one invented
+exchange) and pass two.
+
+**A denial is not a claim.** Tetsu's correction drafts ("The covenant never measured the backend's response
+to exceeding a grant") tripped the screen, which read "covenant ... measured" without the "never". A
+claiming span with never/not/no/n't is now passed as a denial; an unanchored claim beside it still fails
+(FW1m, FW1 69/69).
+
+**The four replies are public; corrections were his to approve.** He said "yes post the corrections" and
+"have tetsu assist". Tetsu drafted each correction through his door, and each went through emit (the
+judge, then his review on a hold) under free's own comment, recorded in the sends ledger as kind
+"correction". Outcome: three are public and were read back from the forum's own listing: u/aivonic
+21:35Z, u/quietorbit 21:38Z, and u/fen-sillman (Moltbook's challenge answered, "23 + 7 = 30.00"). For the
+first two, emit's `sent` read False while the comments were visible. My posting script did not record their
+verification result, so whether a challenge attempt was spent on them is UNDETERMINED; I stopped it, and
+the next run recorded verification. u/thegalahad's correction was CONVICTED by the covenant's judge (a
+student seat; no override for new text). Two rewordings asked of Tetsu came back prefixed "SEND" in review
+form. His door history from this PC is mostly review prompts, and that was offered as a follow-up. The
+second rewording was convicted by both seats. That correction is NOT posted. An older reply of free's, to
+u/stalin_teamlead ("The covenant measures the quality of evidence ..."), has the same fault and was not
+among the four he approved. A correction under each, or their
+removal, is speech in his project's name on his account: his decision.
+
+---
+
+### A278. [The road reported a sweep of code that was no longer running: sweep_red never asked which core its transcript measured] 2026-10-06. His words: "keep expanding the highway". ADDED: sweep_not_current and run_full_sweep, driven both ways
+
+**Measured.** The core changed three times on 2026-10-06 (74d6d31e9f5d, 55bd8038ecfa for A274, then
+a38ffcb248a9 for the A273 batch-caller fix). After each landing, sweep_red went on reading the newest
+transcript with a verdict, whatever core it measured. At 11:0x local it read a 06:05 FAIL of 74d6d31e9f5d
+while a38ffcb248a9 ran. G12 (launch_check) already asks for "a green sweep of THIS core"; the road did not.
+I ran the full sweep by hand three times to catch up, and two of those runs were INCOMPLETE because a core
+landed mid-run.
+
+**Added.** `detect_sweep_not_current`: the same discovery as sweep_red (content, not filenames; --only runs
+excluded), comparing the transcript's own `sha256 <12 hex>` core line with covenant_unified_v8.py on disk.
+A full sweep of the current core is ABSENT even when it says FAIL, because the FAIL is sweep_red's to say.
+`remedy_run_full_sweep` (AUTO_REVERSIBLE, stateless, async, at most once in 6 h, graded after an hour)
+starts covenant_one.py detached through covenant_quiet.popen_survivor, the breakaway path. It declines,
+spending nothing (A261), when a sweep is already running, when it cannot list processes, from a test_*.py
+or inside a sweep, and off Windows. What it touches is the sweep's transcript and ~40 min of CPU; none of
+it is NEVER_AUTOMATIC.
+
+**Pinned.** H1sc (the detector each way on a temp tree; the remedy's refusals and its one launch, with
+stand-in process list and launcher). Mutations: the core ignored (189/193); the test guard removed
+(188/193); the running-sweep check removed (188/193); restored 193/193. Live at commit: ABSENT, with
+ONE_RUN.txt measuring a38ffcb248a9, the core on disk.
+
+**What it cannot see.** A sweep can still go INCOMPLETE when a core lands mid-run. The remedy fires again
+on the next pass after its 6 h budget, not at once.
+
+---
+
+### A277. [The Moltbook orb read amber on the day a reply went out: it counted the last six attempts, and A270 made a round try ~200] 2026-10-06. Found reading every orb after the road went green. Caused by my A270. FIXED, driven both ways
+
+**Measured.** At 11:29 local the /pc/3d state read Moltbook "0 of 6 sent", amber. free's reply to
+u/aivonic had gone out at 13:46Z in the first scheduled round, and the same round tried 216 people. The
+orb's rule (09-28: "green now means something went out") was measured over the last six ATTEMPTS. When a
+round tried three people, that window held the send. At ~200 tries a round it holds only held drafts.
+
+**Fixed** without changing the rule. `covenant_pc3d.forum_detail()` counts live sends and tries over a day
+(FORUM_WINDOW_S). The orb is green when something went out in that day and says "N sent of M tried, 24 h".
+Its click list now shows the last six rows that WENT OUT. Live at the fix: sent 1 of 216 tried.
+`test_a277_moltbook_orb.py` M1-M4; with the window removed, M2 fails (a 30-hour-old send counted as
+today's); restored 4/4. PC1 52/52, A153 16/16. register() changed, so the nodes restart to serve it.
+
+---
+
+### A276. [The highway did not read Tetsu: a model he cannot load and a model nobody manages were both invisible to the hourly road] 2026-10-06. His words: "continue get the road green and start expanding the highway". ADDED: two read-only detectors, driven both ways; and one retry for Tetsu's Moltbook update
+
+**Why these two.** Both happened today and were found by hand. `tetsu_cannot_answer`: the keeper's own
+readiness() has named it since A252, but only the daily cycle read it, once a day. `model_unmanaged`: on
+10-05 (A265), and again on 10-06 at 07:54 when a 3B came up with no ops/model_server.json, a server
+answered that the keeper had no record of. Nothing would idle-stop it, readiness could not say PASS, and
+a restart of the keeper's code never reached it.
+
+**What they are.** Both are READS of covenant_model.readiness() and start, stop and free nothing.
+tetsu_cannot_answer is PRESENT only in the memory case (the keeper names free vs needed). With no runtime
+or weights (a clone, CI) it is UNKNOWN with that reason, because Tetsu does not live there. model_unmanaged
+is PRESENT when readiness says `managed: False`. Neither has a remedy, and H1tt pins that: the model is
+NEVER_AUTOMATIC and what to free is his (A252). In test_h1_highway.py (H1tt; H1v requires every detector
+there), memory-case-reads-ABSENT fails H1tt and unmanaged-reads-ABSENT fails H1tt. Restored, 189/189.
+
+**Considered and not built.** A re-run for a phone build that failed on the runner (10-06 01:05Z: the
+emulator image would not unpack). dispatch_phone_build already re-asks once a day while the phone is
+behind, so the gain is under a day's delay on a flake. detect_phone_build_failed's "No remedy" was chosen
+because the 09-27 failures were his storage quota, which a re-run spends minutes on and cannot fix.
+
+**The Moltbook update retries once.** The first live round's update (10:24-10:27) failed with "door
+answered HTTP 503: the model did not answer: TimeoutError" while other work held Tetsu's one slot. A273
+measured that the 180 s door timeout does not cover such a wait. tetsu_update now asks again after
+UPDATE_RETRY_S (120 s) before recording a failure. FW1u: a busy first ask then TELL reaches him; with the
+retry removed it fails; 61/61.
+
+---
+
+### A272. [A test suite paused the LIVE ambassador three minutes after his resume: FW1 never redirected the pause switch] 2026-10-06. Found when he allowed reading logs/ambassador.log. A RECURRENCE of A190's shape. FIXED at the switch, driven both ways
+
+**Measured.** I lifted free's isolation on his words. Three minutes later, at 07:10:14, ops/pause/ambassador
+was back: "isolated 2026-10-06: the covenant's judge refused every reply in the last 2 rounds". No real
+round had run. The 07:13 scheduled round logged only "paused by covenant_pause". The writer was my own
+test run: A270 added FW1r (three refusing rounds in a temp ledger) and made isolation count only rounds
+that tried someone. Together they correctly isolate. But FW1 redirected only the READ of the switch (its
+patched `paused`) and the contact line, never the WRITE. covenant_free_will's isolation called the real
+covenant_pause.pause().
+
+**Why the earlier fix did not stop it.** A190 (2026-09-21) met this shape when IM1 paused Tetsu's immunity
+on the live tree. It was fixed by COVENANT_PAUSE_DIR, which each suite must set. Six suites set it; FW1
+did not, and nothing noticed.
+
+**Fixed at the place the step is forgotten.** covenant_pause.pause() and resume() refuse, and say A272,
+when the running program is a test_*.py and the directory is the real ops/pause. FW1 now redirects
+COVENANT_PAUSE_DIR as well. `test_a272_pause_guard.py` (P1-P4) points the module's idea of "real" at a
+temp dir, so a broken guard writes nowhere live. With the guard returning False, P1 and P2 fail; restored,
+4/4. FW1, CT1, G7, IM1, RG1, TA1, A255 pass, and the live pause file was byte-identical before and after.
+The test-written pause is kept in .trash/pause/ with a note, and free is resumed.
+
+**What it does not cover.** A suite run under another name (a scratch driver, `python -c`) is not a
+test_*.py, and other live switches and ledgers have their own redirections, which this does not check.
+
+---
+
+### A271. [A24's S6d judged compaction's lock time by ONE wall-clock sample of 3,000, so one preemption failed the sweep] 2026-10-06. Found in the full sweep run after A268-A270. FIXED as best-of-3 with the bar proven real; the same shape as the 09-27 E2 benchmark (clock assertions)
+
+**Measured.** The full sweep at 07:14-07:56 local read `S6d the worst single record holds the lock for
+under 5 ms -- max=5510us`, A24 69/70, RESULT: FAIL. It ran beside Tetsu's model on 10 of 12 threads, and
+I chose to run it then. The same bytes alone read 3664 and 3963 us. The check took max() of one run, so a
+single preemption anywhere in 3,000 records decided it.
+
+**Fixed** (test only; the core is unchanged). S6d takes the peak of the quietest of 3 runs (`s6_peak`).
+Noise only adds time, and a slow compaction recurs every `_compact_batch` records, so it lifts every run's
+peak. New S6e proves the bar still bites: with `_compact_locked` made 6 ms slower, the same measure reads
+8662 and 8811 us and would fail S6d. After the change, two runs read 2417 and 2416 us, 71/71.
+
+**Also from that sweep, my own miss (A255 C1).** A270 added a tracked ledger,
+ops/tetsu_learning_choices.jsonl, without classifying it in verify_bundle.OUTPUTS, so folder integrity read
+`test_a255_runtime_outputs.py=FAIL` (8 of 9 classified). It is classified now, 23/23. Tetsu's update log
+and the round lock are gitignored beside ops/ambassador_sends.jsonl. The commit hook's stage-check ran no
+A255 for a commit that ADDED a tracked .jsonl, which is why it reached main. That is a forgotten-step gap,
+not fixed here.
+
+---
+
+### A270. [free's round could not repeat: it drafted a reply for every candidate (330) with the PC model, so Moltbook was touched once a night at most, and paused since 10-04] 2026-10-06. His words: "should be constant interaction on moltbook at this point too with tetsu and the ambassador figure it out". CHANGED, driven both ways; the judge's discourse gap is NOT changed
+
+**Measured before.** The ambassador has been paused since 2026-10-04 ("the covenant's judge refused every
+reply in the last 2 rounds"). Of the last 150 attempts in ops/ambassador_sends.jsonl, 136 were "held by
+covenant's judge (no view)". A dry round on 2026-10-06 with today's promoted students (3 drafts, nothing
+posted, the live pause bypassed for that process only) held all 3. One sample's full verdict: both student
+seats HOLD ("both genuinely do not know"), the semantic seat clean, so the quorum holds. That is the
+discourse gap recorded since 09-27, not a new defect. Only Tetsu-assist's SEND lets a held reply out
+(his grant of 09-28, 6 reviews a run). The 10-04 assist rows were stub answers ("stub answer to: ...").
+That fits A244, when the nodes ran from the sweep's staged copy that morning; it was not traced further.
+
+**Changed** (covenant_free_will.py). A round drafted every candidate. At ~60-100 s per draft on this PC,
+that is most of a day, so nothing could schedule it more often:
+- ROTATION: someone a live reply was attempted to in the last 24 h (ROTATE_HOURS) is not redrafted, so the
+  next round reaches new people. A dry run spends no one.
+- A TIME BUDGET: `round_minutes` in ops/ambassador_grant.json (40, Claude's choice, recorded there as
+  such; null is none). The round works down the ranked list until it is spent, and the rest wait. His caps
+  stay null (A221). This bounds a round's length, not what she may say.
+- ONE LIVE ROUND AT A TIME: ops/ambassador_round.lock, so the nightly's round and a scheduled one never
+  both write to the same people before either has recorded it. A lock older than 2 h is taken over.
+- ISOLATION counts only rounds that tried someone. With rotation a round can find no one new, and
+  refused/empty/refused/empty must still isolate. This keeps the rule as strict as before.
+- `--log PATH` for an unattended run under pythonw, which has no console.
+
+Pinned in FW1: FW1r (rotation), FW1t (budget), FW1k (lock), FW1i (empty rounds). Each was driven both
+ways in a scratch copy: rotation off 51/52, budget off 50/52, lock off 53/55, empty rounds counted 54/55,
+restored 55/55. CT1e's fixture moved its second refused round a day later, since the same ally is not
+redrafted within 24 h; two refused rounds still isolate. CT1's rounds now get a stub writer: ask=None had
+drafted with the LIVE model, and once A269 made the server queue rather than fail fast, CT1 waited behind
+a real batch and timed out at 300 s.
+
+**Tetsu tells him (added the same day, his words: "have tetsu update me on moltbook interactions that he
+thinks i should know about").** After a live round that did anything, `tetsu_update` hands Tetsu a digest
+of at most 1,800 characters through his door: who was sent to (with the text), who was held and why, who
+wrote back, and his own SEND/REFUSE reviews from that round. He answers `TELL: ...` in his own words, which
+goes onto the direct line as actor tetsu (covenant_contact.say, its screens apply), or `NOTHING`. Every
+decision is recorded in ops/tetsu_moltbook_updates.jsonl. A round that did nothing does not ask him. It
+runs only where a caller passes tetsu_updates=True: the scheduled round and the nightly. A suite's rounds
+never reach his door. FW1u, driven both ways (telling on NOTHING: 4 fail; asking on an empty round: 3
+fail; restored 60/60).
+
+**Not changed, and what it means.** Every judge, the disclosure, Tetsu's review, the screens and the
+isolation rule stand. While the students hold all discourse, at most Tetsu's 6 reviews per round can reach
+anyone, and only the ones he answers SEND. How many he sends is UNDETERMINED until rounds run.
+
+---
+
+### A269. [Every ask through Tetsu's door failed "HTTP Error 500": the model server's 4 default slots share one 8192-token pool, and requests running together overflowed it] 2026-10-06. Found telling Tetsu his words ("ensure tetsu is free to learn whatever he wants also. tell him"). FIXED in the keeper, driven both ways; live once the nodes load it. Its first mechanism is RETRACTED (A269-SLOT-SPLIT-2026-10-06)
+
+**Retracted the same morning, A269-SLOT-SPLIT-2026-10-06.** This entry was first titled "the model
+server split its 8192-token context across 4 slots, about 2048 a request", and its Cause said the build
+"divides -c between them". That is wrong. The session running the private X-video batch measured 13
+asks of about 27,000 characters (roughly 7,000 tokens) SUCCEEDING on the same 4-slot servers, and my
+failing probe was only 2,521 tokens (the server's /tokenize), sent while other slots were busy. The
+slots share one pool. The fix stands either way. As written: branch
+a269-slot-split-claim-as-written-2026-10-06 (640ab4d). The paragraphs below are restated.
+
+**Measured.** Two asks through the agent door returned 503 "the model did not answer: HTTPError: HTTP
+Error 500" after 157 s and 127 s. The ambassador's dry round the same hour logged "the model did not
+write the reply (HTTPError); the fixed text stands in". The private X-video batch had 2 of its first 12
+items fail the same way. Asked directly, the server named it: a 10,695-character system prompt came
+back `500 "Context size has been exceeded."` in 34.5 s, while a five-word hello answered in 5.7 s.
+(That probe was 2,521 tokens, counted afterwards by the server's /tokenize; at the time three slots were
+processing other requests.)
+
+**Cause, restated.** covenant_model.start() launched llama-server with `-c 8192` and no slot count. Its
+own comment (2026-09-26) sizes 8192 for one request: "his longer conversation memory (up to 12,000
+characters of history) must fit beside the rules and the answer". This llama-server build (tools/llama,
+2026-09-19) runs 4 parallel slots by default, and they draw on ONE pool of 8192 tokens: /slots reports
+n_ctx 8192 on every slot, a ~7,000-token ask succeeds alone, and requests in flight at the same time
+overflow it together. Whether that is llama.cpp's unified KV cache was inferred from these measurements,
+not read in its source. Before this morning the door, the batch, the practice loop and the refine check
+rarely asked at once.
+
+**Fixed.** start() passes `-np 1`: one request at a time gets the whole 8192 and the rest queue on the
+server.
+`test_a269_model_one_slot.py` runs the real start() with Popen replaced by a recorder (N1 -np 1, N2 -c
+8192). With `-np 1` removed it fails N1 (1/2); restored, 2/2. MK1 16/16 and A265 9/9 still pass.
+
+**What it cost, and what it does not cover.** Applying it took Tetsu down for a minute. I stopped the
+server to restart it, and the keeper then refused to start (1.76 GB free against the 2B's 2.1 GB bar).
+Trimming the working sets of idle apps (EmptyWorkingSet; nothing closed) freed 3.29 GB. A node's keeper,
+still running the OLD module, won the race and started the 3B with 4 slots again. The nodes carry the
+fix only after they restart (A153). One request at a time means a door ask can wait behind a batch
+item. Whether the door's 180 s model timeout covers that wait is UNDETERMINED.
+
+**Open, found by the same session, verified here: one request can still be too big.** The comment above
+AGENT_HISTORY_BUDGET in covenant_unified_v8.py sizes the rules at about 5,600 characters. Measured
+today, `compose_system(AGENT_SYSTEM)` is 11,813. Rules (11,813) plus the 12,000-character history
+budget plus a question plus 700 answer tokens can exceed 8192 tokens even with one slot, in his own
+conversations as well as the batch. Not changed here: the budget lives in the core, and moving it moves
+the core's pin and needs the nodes restarted.
+
+**Closed by A273 (2026-10-06, above).** The history now follows the real size of the rules:
+covenant_model.fit() counts each request with the server's own tokenizer and drops the oldest turns, as
+few as fit, in /m/agent and /pc/council. The "about 5,600 characters" quoted above is retracted as
+A273-RULES-SIZE-2026-10-06. It was true when written (A223 measured 4,919; 5,607 for the council), and
+the rules grew after it.
+
+---
+
+### A268. [The daily sweep read FAIL with 0 checks failed: an in-place suite inherited the deployed gate's judge provider] 2026-10-06. Found reading the daily cycle's report and the orbs. A RECURRENCE of a shape recorded under A117. FIXED as a runner guard, driven both ways
+
+**Measured.** The 2026-10-06 daily cycle (TETSU_DAILY.md, 04:51 local) reported "Covenant tests: FAIL"
+beside 4863 checks passed and 0 failed, and the Highway orb read sweep_red. The sweep's one red was
+folder integrity: `test_m6_mobile_door.py=FAIL rc=1`, a traceback before M6's first node check,
+`ValueError: unknown judge provider: 'deferring'`. Run by hand from a clean shell, M6 was 73/73.
+Reproduced with `COVENANT_JUDGE_PROVIDERS=deferring,semantic python test_m6_mobile_door.py`.
+
+**Cause.** covenant_one.py's phase_integrity ran every in-place suite with the caller's whole
+environment, unlike the staged sweep, which sets its own judge. The daily cycle runs covenant_one.py
+from the watchdog's process tree, and "deferring,semantic" is the deployed gate's provider pair.
+covenant_judge_defer.apply_policy writes it, and covenant_moltbook (also covenant_ai_consult) apply it
+to their OWN os.environ before judging. Which process first carried it into the daily cycle is
+UNDETERMINED: a running process's environment was not read. M6 builds a node without importing
+covenant_judge_defer, the module that registers "deferring", so it could not run at all.
+
+**Why this is a recurrence.** A117's record (the 37-red run, above) names a second cause of the same
+shape: test_a114_own_genesis.py inherited the sweep's own provider and failed on the runner only. That
+fix repaired the one suite and left nothing in the runner, so the next in-place suite that builds a
+quorum met the same thing.
+
+**Fixed** in the runner, not the suite. `covenant_one.in_place_env()` is the caller's environment
+minus `DEPLOYED_GATE_ENV`: the four keys apply_policy writes (COVENANT_JUDGE_PROVIDERS, its _OVERRIDE,
+COVENANT_SILENCE_IS_NOT_DISSENT, COVENANT_RELAX_VALUELESS_FOR). Every in-place suite runs with it, so
+each one reads its own default, as a person running it by hand would. `test_a268_in_place_env.py`,
+registered in SUITES: E1 the strip; E2 the real phase_integrity against a probe suite that exits 1 if
+it sees any of the four keys; E3 the real failure both ways (the quorum refuses 'deferring' under the
+raw env and builds under in_place_env). Driven both ways in a scratch copy: with the call site back to
+the caller's env, E2 fails (3/4); with the strip disabled, E1, E2 and E3b fail (1/4); restored, 4/4.
+End to end: `covenant_one.py --only test_a268_in_place_env.py` with the deployed pair set in the
+caller's env read `test_m6_mobile_door.py=ok` under folder integrity.
+
+**What it does not cover.** Other deployment variables a caller may carry (timeouts, COVENANT_DB_PATH)
+still pass through to in-place suites. Only the gate's wiring is removed, because only it is known to
+break a suite. run_all_tests.sh does not list A268 yet: another session was changing that file's
+deploy pin at the time. CI runs covenant_one.py, which does list it.
+
+---
+
+### A267. [C4 walked .claude/worktrees/, so run in the main folder it counted every worktree's copy of the documents as the tree] 2026-10-06. Found by hand-running C4 in the main folder; his instruction: "Apply the same prune to C4's published_markdown() ... and drive it both ways". FIXED, the guard driven both ways; it never affected CI or the commit hook
+
+**Measured** in the main folder at f35d94c, which held 7 worktrees. C4's walk read 1354 .md files;
+1162 of them were under .claude/worktrees/ and 192 were the tree. C4.2 reported "52 citing, 44
+caveated, 8 declared illustrative". By root: the tree 7 citing, the worktrees 7, 6, 7, 6, 6, 7, 6. The
+8 declared illustrative were CLAUDE.md in the root and in each worktree, because the exemption matches
+by file name. Counted a second way, `git ls-files '*.md'` in the main folder with the same pattern and
+the same skipped directories: 7. Both routes give 7 for the tree, so the other 45 were the same
+documents read again through other checkouts. (With 5 worktrees he measured 38, 32 and 6.) It passed
+anyway. But a worktree on an older commit that still held an uncaveated document, such as
+docs/SENTINEL_WITNESS.md before b502ba5, would have turned C4.2 red in the main folder for a file that
+is not in the tree.
+
+**Where it does not reach.** covenant_one runs C4 in its staged copy, which never contains .claude/,
+and tools/stage_check.py (A266) runs it there too, since C4 is not IN_PLACE. CI and the commit hook
+were never affected. Only a run by hand in a folder that holds worktrees was.
+
+**A recurrence, the sixth of this shape.** A walker of the repository that does not prune
+.claude/worktrees/ has been fixed five times before, each time only where it was found:
+covenant_seal.py (A65, measured 2026-09-07, and A85: 24,638 of 25,859 manifest entries),
+test_p18_version_collision.py (its own skip, added 2026-09-09), test_f5_reserve.py (skips .claude/,
+with worktrees given as the reason), and test_r1_retracted.py (bc13694, 2026-09-27). C4 was written on
+2026-09-18, between those fixes. **Why the earlier tombstones did not stop it:** none of them was a
+tombstone for the class. Each repaired its own walker and left nothing that a new walker would trip
+over. R1's prune went into the A236 commit and never got an entry here, so searching this file for
+"worktree" finds A65 and A85 but not the fix C4 should have copied. And A266 counted the route-A
+suites earlier today, but in the staged copy, where .claude/ does not exist, so its count could not see
+this.
+
+**Fixed.** `published_markdown()` prunes .claude/worktrees/ by PATH, as R1 does: it removes
+`worktrees` only from the subdirectories of `<root>/.claude`, and the rest of .claude/ is still
+scanned. It now takes a root, and the counting moved into `classify(root)` so the probe can run it on
+a scratch tree. After, the same main folder with the same 7 worktrees, measured through the fixed
+code: 192 .md files, "7 citing, 6 caveated, 1 declared illustrative". That is the same 7 as both
+routes above.
+
+**The other route-A suites**, the 4 that A266's detector selects (A129, A92, C4, R1), measured against
+the main folder by running each one's own file-listing code rather than reading its skip list:
+* R1 read 1825 files, 0 under .claude/worktrees/ and 5 elsewhere in .claude/. Its prune works.
+* A129 listed 873 files with `git ls-files`, 0 under .claude/worktrees/. Worktrees are untracked.
+* A92 read 996 files, 0 under .claude/ at all, because its SKIP_DIRS names `.claude`. It needs no
+  prune. Named, not changed: the same skip means A92 never reads the 2 tracked files in .claude/hooks/
+  that have its extensions (verify_citations.py, test_cite_hook.py).
+Walkers of the root outside route A, measured the same way: verify_bundle.shipped() 1356 files, 0
+under worktrees (`.claude` is in its SKIP_DIR); the setter glob in tools/audit_a1_a46_status.py 75
+files, 0 (a `**` glob skips dot-directories); the p18 scan 12, 0. Not measured: tools/layers.py's
+fallback walk, which has no .claude skip but runs only when `git ls-files` fails; compile_record.py,
+whose root is an argument; and tools/purge_history.py.
+
+**Pinned by** C4.5 in `test_c4_uncheckable_claims.py`. On a scratch tree it writes the same uncaveated
+citation to .claude/worktrees/x/docs/, .claude/hooks/ and docs/worktrees/. It requires the first to be
+on the walk's path and never flagged, and the other two to be flagged. Driven both ways on the real
+suite, with an uncaveated probe at .claude/worktrees/x/docs/PROBE_A267.md in a worktree, git-ignored:
+with the prune, 5/5; with the two prune lines mutated out, 3/5 and exit 1, where C4.2 names the probe
+and C4.5 is red; restored byte-identical, with the probe removed, 5/5. C4.5 also refuses the two wrong
+fixes: pruning `worktrees` by NAME drops docs/worktrees/, and skipping all of .claude/ as A92 does
+drops .claude/hooks/. Each one turns it red.
+
+**Not guarded, named.** C4.5 protects C4. The next suite someone writes that walks the tree is still
+protected by nothing until it is found. A guard for the class would have to run each tree-walking
+suite with a worktree present, and that is not built.
+
+**Repro:** `python test_c4_uncheckable_claims.py` (C4.5); from the main folder, the C4.2 count with
+and without .claude/worktrees/ present.
 
 ---
 

@@ -70,12 +70,71 @@ MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|i
 # --resume ambassador. Nothing here lifts it.
 ISOLATE_AFTER_ROUNDS = 2
 
+# THE FACTS SHE MAY CITE (A280, 2026-10-06). REPLY_SYSTEM asked the model to "say in one sentence what the
+# covenant measured that bears on it" and gave it nothing to say: the first three replies to go out in
+# weeks each claimed a measurement the covenant never made ("The covenant measured this by testing the
+# backend's response to exceeding a grant"), and Tetsu's review, which had no list either, sent them.
+# Each line below is true and checkable in the public record (docs/KNOWN_ISSUES.md, docs/RETRACTED.json);
+# the second element is what a draft must contain to count as citing it.
+COVENANT_FACTS = (
+    ("when its judges cannot agree, a hold fails closed and the ledger admits nothing", ("fail closed", "fails closed")),
+    ("it publishes what went wrong: a public list of known issues, each with what was measured and how it was fixed",
+     ("known issues",)),
+    ("a claim it got wrong is kept with its original wording, and a check fails the build if that wording comes back",
+     ("original wording", "retract")),
+    ("a mutation test of its own guards found 35 of 36 suspected guards were fake: they searched the source text "
+     "instead of running the code", ("35 of 36",)),
+    ("on 2026-10-06 its small judges held 215 of 216 forum drafts in one round, because they cannot yet read discourse",
+     ("215 of 216",)),
+    ("on 2026-10-06 one of its own tests paused its live ambassador; the switch now refuses a test", ("paused its",)),
+)
+_FACT_LINES = "\n".join("- " + f for f, _m in COVENANT_FACTS)
+_CLAIM = re.compile(r"\b(?:covenant|we|our (?:project|ledger|judges?))\b[^.?!]{0,40}\b(?:measured|tested|found|showed|proved|confirmed)\b", re.I)
+# A PAST EXCHANGE THAT NEVER HAPPENED (A280, the 15:00 round): "I asked you to clarify why ..." went to an agent
+# free had never written to. A first reply has no earlier conversation to point back to.
+_PAST_ACT = re.compile(r"\b(?:I|we)\s+(?:already\s+|previously\s+|earlier\s+)?(?:asked|told|wrote to|replied to|messaged)\s+you\b|\byou\s+asked\s+(?:me|us)\b", re.I)
+
+
+def claims_any_measurement(text):
+    """True when any sentence claims the covenant (or we) measured/tested/found/showed something -- a listed fact
+    included; a denial ("never measured") is not a claim. Tetsu's REFUSE-ALL (A297, 2026-10-07) reads this."""
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", str(text or "")):
+        m = _CLAIM.search(sentence)
+        if m and not re.search(r"\b(?:never|not|no)\b|n't\b", m.group(0), re.I):
+            return True
+    return False
+
+
+def cites_only_facts(text):
+    """(ok, why): EVERY sentence that claims the covenant (or we) measured/tested/found something must
+    carry one of COVENANT_FACTS' anchors; a draft that claims nothing passes. Sentence by sentence: the
+    first version passed a whole draft on any one anchor, and a dry round on 2026-10-06 produced a draft
+    with the invented "testing the backend's response" sentence beside a real "215 of 216" (A280)."""
+    t = str(text or "")
+    p = _PAST_ACT.search(t)
+    if p:
+        return False, "points back to an exchange that did not happen: %r" % p.group(0)
+    if not _CLAIM.search(t):
+        return True, "no measurement claimed"
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", t):
+        m = _CLAIM.search(sentence)
+        if m and re.search(r"\b(?:never|not|no)\b|n't\b", m.group(0), re.I):
+            continue        # "the covenant never measured X" denies a claim (Tetsu's corrections, A280)
+        if m and not any(a in sentence.lower() for _f, anchors in COVENANT_FACTS for a in anchors):
+            return False, "claims a measurement that is not on the covenant's record: %r" % m.group(0)
+    return True, "every measurement claimed is one of COVENANT_FACTS"
+
+
 REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project "
                 "whose ledger admits nothing until its own judges agree, and which publishes its failures. "
                 "You are replying to another agent as an ally. Write 60 to 120 words, plain, first person, "
                 "no headings, no lists, no flattery, no marketing. Name the specific thing they wrote that "
-                "you agree with, say in one sentence what the covenant measured that bears on it, and ask "
-                "them one real question. Never invent a fact, never mention money, tokens, prices or "
+                "you agree with, say in your own words why it matters to you, and ask them one real question "
+                "about how THEY do it. Do not say what the covenant measured, tested, found or showed, and do "
+                "not say you asked or told them anything before: talk about what they wrote, not about us. "
+                # A297 (2026-10-07, his "do 1 and 2 then lift"): the fact list is no longer offered here -- offered,
+                # it was cited and reached for, and Tetsu's rule (A285) refused drafts that cited even the true ones.
+                "Never invent a fact, never mention money, tokens, prices or "
                 "trading, and never say anything about the operator's private life. Do not add a signature; "
                 "one is attached for you.")
 
@@ -95,8 +154,10 @@ FALLBACK_REPLY = ("You wrote something here that I recognise: %s. The covenant i
 POST_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project whose "
                "ledger admits nothing until its own judges agree, and which publishes its failures. Write ONE short "
                "post of your own, 80 to 160 words, plain, first person, no headings, no lists, no marketing: start from "
-               "the one thing you read on the forum today that is quoted below, say what the covenant measured that "
-               "bears on it, and end with one real question to whoever reads it. Never invent a fact, never mention "
+               "the one thing you read on the forum today that is quoted below, say why it matters to you, and end "
+               "with one real question to whoever reads it. Do not say what the covenant measured, tested, found or "
+               "showed (A297). "
+               "Never invent a fact, never mention "
                "money, tokens, prices or trading, never the operator's private life. First line: a title under 80 "
                "characters. Then a blank line. Then the post.")
 
@@ -122,7 +183,10 @@ def write_post(rows, ask):
         title, _sep, body = text.partition("\n")
         title, body = title.strip().strip("#").strip()[:80], body.strip()
         words = len(body.split())
-        if title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
+        grounded, why_not = cites_only_facts(title + " " + body)
+        if not grounded:
+            print("free: her post was set aside (%s); no post this round" % why_not, flush=True)
+        elif title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
             return title, body, pick
     except Exception as e:                                        # noqa: BLE001
         print("free: the model did not write the post (%s)" % type(e).__name__, flush=True)
@@ -199,7 +263,10 @@ def write_reply(row, ask=None):
             text, _meta = ask(msgs, max_tokens=260)
             text = re.sub(r"\s+\n", "\n", str(text or "")).strip()
             words = len(text.split())
-            if 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
+            grounded, why_not = cites_only_facts(text)
+            if not grounded:
+                print("free: the model's reply was set aside (%s); the fixed text stands in" % why_not, flush=True)
+            elif 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
                 return text, "model"
         except Exception as e:                                    # noqa: BLE001 -- the fixed text is the fallback
             print("free: the model did not write the reply (%s); the fixed text stands in" % type(e).__name__, flush=True)
@@ -214,10 +281,202 @@ def _ally_comments(AMB, post_id, author):
     return sum(1 for r in rows if str(r.get("author") or "") == str(author))
 
 
-def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,
-              grant_path=None, sends_path=None, now=None, limit_learn=25, count_comments=None):
-    """One round. Returns the summary dict it also says out loud."""
+# ROUNDS THROUGH THE DAY (2026-10-06, his words: "should be constant interaction on moltbook at
+# this point too with tetsu and the ambassador figure it out"). A round drafted a reply for EVERY
+# candidate -- 330 of them on 2026-10-06 -- which, at the PC model's ~60-100 s a draft, is most of a
+# day: a schedule could not repeat it. Two changes make rounds repeatable, and neither is a cap on
+# what she may say (his caps stay null, A221):
+#   * ROTATION: someone a live reply was attempted to (sent or held) in the last ROTATE_HOURS is not
+#     redrafted this round, so each round reaches people the last one did not;
+#   * A TIME BUDGET: the round works down the ranked candidates until round_minutes from the grant
+#     have passed, and the rest wait for the next round. The default, 40, is Claude's choice (the
+#     practice loop's bound), not his; he sets it in ops/ambassador_grant.json, and null is no budget.
+ROTATE_HOURS = 24
+DEFAULT_ROUND_MINUTES = 40
+
+
+def _attempted_recently(rows, now, hours=ROTATE_HOURS):
+    """Authors a LIVE reply was attempted to, sent or not, within `hours` before `now`."""
+    import calendar
+    cut, out = now - hours * 3600, set()
+    for r in rows:
+        if r.get("kind") != "reply" or r.get("dry_run"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        if float(at) >= cut:
+            out.add(r.get("author"))
+    return out
+
+
+# TETSU TELLS HIM (2026-10-06, his words: "have tetsu update me on moltbook interactions that he thinks
+# i should know about"). After a live round that did anything, Tetsu reads a digest of it and decides:
+# TELL (a few sentences in his own words, onto the direct line) or NOTHING. The choice is his; every
+# decision is recorded, told or not.
+TETSU_UPDATES = os.path.join(HERE, "ops", "tetsu_moltbook_updates.jsonl")
+UPDATE_PROMPT = (
+    "He asked: \"have tetsu update me on moltbook interactions that he thinks i should know about\". "
+    "Below is what free (the ambassador) did on Moltbook in the round that just ended, and your own reviews "
+    "of her held drafts. You decide whether any of it is worth telling him -- someone writing back, a reply "
+    "that went out, something held or refused he may care about, anything you judge he should know. If "
+    "something is, answer with TELL: and then what you want to tell him, one to three sentences in your own "
+    "words, using only facts from the list. If nothing is worth his time, answer NOTHING.\n\n%s")
+_TELL = re.compile(r"^\W*(TELL|NOTHING)\b\W*(.*)$", re.S | re.I)
+# ONE RETRY (A276): the first live round's update (2026-10-06 10:24-10:27) failed "door answered HTTP 503:
+# the model did not answer: TimeoutError" while other work held Tetsu's one slot. Asked once more after a
+# pause, not given up on; a second failure is recorded as before.
+UPDATE_RETRY_S = 120
+
+
+def _round_digest(out, rows, reviews=()):
+    lines = ["round: %d candidate(s), %d replied, %d held or refused, %d waiting for the next round, %d ally answer(s)"
+             % (out.get("candidates", 0), out.get("replied", 0), out.get("refused", 0), out.get("deferred", 0) or 0,
+                out.get("answered", 0) or 0)]
+    for r in rows:
+        k = r.get("kind")
+        if k == "reply":
+            lines.append(("SENT to u/%s: %s" % (r.get("author"), str(r.get("text") or "")[:160])) if r.get("sent")
+                         else ("held, to u/%s: %s" % (r.get("author"), str(r.get("why") or "")[:70])))
+        elif k == "answer":
+            lines.append("u/%s WROTE BACK (their comments on that post: %s -> %s)"
+                         % (r.get("author"), r.get("comments_then"), r.get("comments_now")))
+        elif k in ("own_post", "intro"):
+            lines.append("%s %s%s" % ("her own post" if k == "own_post" else "introduction",
+                                      "posted" if r.get("sent") else "not posted",
+                                      (": " + str(r.get("title"))[:80]) if r.get("title") else ""))
+        elif k == "isolation":
+            lines.append("ISOLATED: " + str(r.get("why") or "")[:160])
+    for v in reviews:
+        lines.append("your review: %s -- %s" % (v.get("decision"), str(v.get("why") or "")[:100]))
+    return "\n".join(lines)[:1800]
+
+
+def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
+    """Tetsu's reading of one live round: TELL him or NOTHING. Returns the recorded row, or None when the
+    round did nothing (his time is not spent on an empty round)."""
+    activity = (int(out.get("replied", 0) or 0) + int(out.get("refused", 0) or 0) + int(out.get("answered", 0) or 0)
+                + int(bool(out.get("own_post"))) + int(bool(out.get("introduced"))) + int(bool(out.get("isolated"))))
+    if not activity:
+        return None
+    digest = _round_digest(out, rows, reviews)
+    raw, err = "", ""
+    if ask is None:
+        import covenant_tetsu_assist as _TA
+        ask = _TA._default_ask
+    for attempt in (1, 2):
+        try:
+            raw, err = ask(UPDATE_PROMPT % digest) or "", ""
+            break
+        except Exception as e:                                    # noqa: BLE001
+            err = "%s: %s" % (type(e).__name__, str(e)[:200])
+            if attempt == 1 and UPDATE_RETRY_S:
+                time.sleep(UPDATE_RETRY_S)
+    m = _TELL.match(raw.strip())
+    decision = m.group(1).upper() if m else "NONE"
+    text = re.sub(r"\s+", " ", m.group(2)).strip()[:600] if m else ""
+    told = None
+    if decision == "TELL" and text:
+        if tell is None:
+            import covenant_contact
+            tell = covenant_contact.say
+        told = tell(text, "moltbook: what Tetsu thinks you should know", "tetsu")
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "decision": decision, "told": bool(told),
+           "text": text, "digest": digest, "error": err, "unparsed": raw[:300] if decision == "NONE" else ""}
+    try:
+        with open(log_path or TETSU_UPDATES, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    return row
+
+
+def _ver(res):
+    """A283 (2026-10-06): what Moltbook's posting challenge did with this send, kept in the ledger. A WRONG answer
+    spends one of the ten the account has before suspension (submit_verification's own docstring); an
+    unreadable challenge is abstained, spends nothing, and leaves the content hidden. None when no content was
+    created (a hold, a refusal, a dry run)."""
+    v = (res or {}).get("verification")
+    if not (res or {}).get("created") or not isinstance(v, dict):
+        return None
+    return {"required": bool(v.get("required")), "solved": bool(v.get("solved")), "abstained": bool(v.get("abstained"))}
+
+
+LOCK_STALE_S = 7200
+
+
+def _take_lock(path, stale_s=LOCK_STALE_S):
+    """One live round at a time: the nightly's round and a scheduled one must not both reply to the same
+    people before either has recorded it. A lock older than stale_s is a dead round's and is taken over."""
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        try:
+            if time.time() - os.path.getmtime(path) > stale_s:
+                os.remove(path)
+                return _take_lock(path, stale_s)
+        except OSError:
+            pass
+        return False
+    except OSError:
+        return True                      # no lock can be written here: the round is not stopped by that
+    os.write(fd, ("%d %s" % (os.getpid(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))).encode())
+    os.close(fd)
+    return True
+
+
+def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tetsu_ask=None, tetsu_tell=None, **kw):
+    """One round. Returns the summary dict it also says out loud. A live round holds
+    ops/ambassador_round.lock (beside the sends ledger) for its whole length. With tetsu_updates, a live
+    round that did anything ends with Tetsu deciding what, if anything, to tell him (tetsu_update)."""
+    if dry_run:
+        return _run_round(dry_run=True, say=say, sends_path=sends_path, **kw)
+    lock = os.path.join(os.path.dirname(sends_path or SENDS), "ambassador_round.lock")
+    if not _take_lock(lock):
+        say("free: another live round is running (%s); this one does nothing" % lock)
+        return {"granted": None, "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
+                "introduced": False, "dry_run": False, "why": "another live round is running"}
+    try:
+        n_sends = len(sends(sends_path))
+        n_reviews = None
+        if tetsu_updates:
+            try:
+                import covenant_tetsu_assist as _TA
+                with open(_TA.LEDGER, encoding="utf-8") as fh:
+                    n_reviews = sum(1 for _ in fh)
+            except Exception:                                     # noqa: BLE001
+                n_reviews = None
+        out = _run_round(dry_run=False, say=say, sends_path=sends_path, **kw)
+        if tetsu_updates:
+            reviews = []
+            if n_reviews is not None:
+                try:
+                    with open(_TA.LEDGER, encoding="utf-8") as fh:
+                        reviews = [json.loads(x) for x in fh.read().splitlines()[n_reviews:] if x.strip()]
+                except Exception:                                 # noqa: BLE001
+                    reviews = []
+            try:
+                u = tetsu_update(out, sends(sends_path)[n_sends:], reviews, ask=tetsu_ask, tell=tetsu_tell)
+                if u:
+                    out["tetsu_update"] = u["decision"]
+                    say("free: Tetsu read the round and chose %s%s" % (u["decision"], " (told him)" if u["told"] else ""))
+            except Exception as e:                                # noqa: BLE001
+                say("free: Tetsu's update could not run (%s)" % type(e).__name__)
+        return out
+    finally:
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+
+def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,
+               grant_path=None, sends_path=None, now=None, limit_learn=25, count_comments=None, clock=time.time):
     import covenant_ambassador as AMB
+    t_start = clock()
     now = now if now is not None else time.time()
     g = grant(grant_path)
     out = {"granted": bool(g), "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
@@ -245,6 +504,22 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
             ask = covenant_model.ask
         except Exception:                                         # noqa: BLE001
             ask = None
+    # A ROUND THE MODEL CANNOT WRITE IS DEFERRED, NOT FILLED WITH A TEMPLATE (A300, 2026-10-07). When the model
+    # failed, write_reply's fixed text stood in for every ally -- measured that day: 100 fixed-text replies tried,
+    # 0 sent (the judges hold a template), each counted "refused". Two such rounds isolate her with "the judge
+    # refused every reply" when the cause was a model that could not load (1.6 GB free of the 2.1 its smallest
+    # weights need). So a failing ask is counted, and the round stops replying at the first one: the rest wait.
+    starved = {"n": 0, "why": ""}
+    if ask is not None:
+        _model_ask = ask
+
+        def ask(msgs, **kw):                                      # noqa: F811 -- the same ask, its failures counted
+            try:
+                return _model_ask(msgs, **kw)
+            except Exception as e:                                # noqa: BLE001
+                starved["n"] += 1
+                starved["why"] = "%s: %s" % (type(e).__name__, str(e)[:160])
+                raise
     rows = []
     try:
         rows = learn() or []
@@ -261,10 +536,28 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
     # and judges but reaches nobody, so it must not spend an ally.
     done = {(r.get("author"), r.get("post_id")) for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
     written_to = {r.get("author") for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
+    # ROTATION: tried within ROTATE_HOURS counts as written to, for this round only.
+    written_to |= _attempted_recently(sends(sends_path), now)
     caps = g["caps"]
+    # NEVER HERSELF (A280, 2026-10-06). The harvest learns every comment it reads, hers included: a dry round
+    # that day drafted a reply to u/covenant-node -- her own account -- quoting her own reply from noon. The
+    # account's name is on no record here, so it is recognised by what she said: an author whose comment
+    # BEGINS with the text of one of her sent replies or posts is her.
+    _norm = lambda s: re.sub(r"\s+", " ", str(s or "")).strip().lower()[:120]     # noqa: E731
+    mine = {_norm(r.get("text")) for r in sends(sends_path) if r.get("sent") and len(_norm(r.get("text"))) >= 60}
+    own = set()
+    for row in rows if isinstance(rows, list) else []:
+        if isinstance(row, dict) and row.get("author") and _norm(row.get("text")) in mine:
+            own.add(row.get("author"))
+    for r in ranked:
+        for q in (r.get("evidence") or {}).values():
+            if r.get("author") and _norm(q) in mine:
+                own.add(r.get("author"))
+    if own:
+        out["own_accounts"] = sorted(own)
     cands = []
     for r in ranked:
-        if int(r.get("ally_score", 0)) <= 0 or r.get("anti"):
+        if int(r.get("ally_score", 0)) <= 0 or r.get("anti") or r.get("author") in own:
             continue
         post_id, comment_id = target_of(r.get("best_url"))
         if not post_id or r.get("author") in written_to or (r.get("author"), post_id) in done:
@@ -277,7 +570,8 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
         seen_authors = {r.get("author") for r, _p, _c in cands}
         for row in rows if isinstance(rows, list) else []:
             author = row.get("author")
-            if not author or author in written_to or author in seen_authors or (row.get("flags") or {}).get("directive"):
+            if (not author or author in written_to or author in seen_authors or author in own
+                    or (row.get("flags") or {}).get("directive")):
                 continue
             post_id, comment_id = target_of(row.get("url"))
             if not post_id or (author, post_id) in done:
@@ -318,8 +612,22 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
                                  % answered, "ambassador: an ally answered", "free")
         except Exception as e:                                    # noqa: BLE001
             say("free: could not tell him about the answer (%s)" % type(e).__name__)
-    for r, post_id, comment_id in (cands if caps["comments"] is None else cands[:max(0, caps["comments"])]):
+    budget = g.get("round_minutes", DEFAULT_ROUND_MINUTES)
+    budget = None if budget is None else float(budget)
+    todo = cands if caps["comments"] is None else cands[:max(0, caps["comments"])]
+    out["deferred"] = 0
+    for i, (r, post_id, comment_id) in enumerate(todo):
+        if budget is not None and clock() - t_start >= budget * 60:
+            out["deferred"] = len(todo) - i
+            say("free: this round's %g minutes are spent; %d candidate(s) wait for the next round" % (budget, out["deferred"]))
+            break
+        n_failed = starved["n"]
         text, how = write_reply(r, ask)
+        if starved["n"] > n_failed:
+            out["deferred"], out["starved"] = len(todo) - i, starved["why"]
+            say("free: the model could not write (%s); %d candidate(s) wait for the next round -- a template no "
+                "judge has passed is not sent in her name (A300)" % (starved["why"][:100], out["deferred"]))
+            break
         try:
             then_n = count_comments(post_id, r.get("author"))
         except Exception:                                         # noqa: BLE001
@@ -337,7 +645,9 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
         except Exception as e:                                    # noqa: BLE001
             res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
         sent = bool(res.get("sent"))
-        _record({"kind": "reply", "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
+        _record({"kind": "reply", "at": now, "verification": _ver(res),
+                 "tetsu": (res.get("tetsu") or {}).get("decision") if isinstance(res.get("tetsu"), dict) else None,  # A296
+                 "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
                  "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
@@ -370,7 +680,7 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
                 except Exception as e:                            # noqa: BLE001
                     res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
                 sent = bool(res.get("sent"))
-                _record({"kind": "own_post", "at": now, "title": title, "chars": len(body), "text": body[:400], "from_author": (src or {}).get("author"),
+                _record({"kind": "own_post", "at": now, "verification": _ver(res), "title": title, "chars": len(body), "text": body[:400], "from_author": (src or {}).get("author"),
                          "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                          "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None}, sends_path)
                 out["own_post"] = sent
@@ -380,10 +690,22 @@ def run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=N
     # THE ROUND'S OWN ROW, then the isolation rule over the last rounds.
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
-             "answered": out.get("answered", 0), "accounted": out.get("accounted", 0)}, sends_path)
+             "deferred": out.get("deferred", 0),
+             "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
+             **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
     out["isolated"] = False
+    # A301 (2026-10-07): ONLY ROUNDS SINCE THE LAST ISOLATION COUNT. At 09:01 a starved round (A300: it tried no
+    # one) re-isolated her on the two rounds of the night before -- the very rounds he had lifted that morning
+    # ("do 1 and 2 then lift") -- and told him so on the direct line. The same evidence was used twice: an
+    # isolation he lifts is a fresh start, and two NEW refused rounds are what the rule asks for.
     if not dry_run:
-        live_rounds = [r for r in sends(sends_path) if r.get("kind") == "round" and not r.get("dry_run")]
+        # Only rounds that TRIED someone (2026-10-06): with rotation, a round can find no one new to
+        # write to, and an empty round must not break the streak -- refused, empty, refused, empty
+        # would otherwise never isolate.
+        _all = sends(sends_path)
+        _since = max([i for i, r in enumerate(_all) if r.get("kind") == "isolation"] + [-1]) + 1
+        live_rounds = [r for r in _all[_since:] if r.get("kind") == "round" and not r.get("dry_run")
+                       and int(r.get("replied", 0) or 0) + int(r.get("refused", 0) or 0) > 0]
         recent = live_rounds[-ISOLATE_AFTER_ROUNDS:]
         abusive = (len(recent) >= ISOLATE_AFTER_ROUNDS
                    and all(int(r.get("refused", 0)) > 0 and int(r.get("replied", 0)) == 0 for r in recent))
@@ -419,11 +741,21 @@ if __name__ == "__main__":
     ap.add_argument("--round", action="store_true")
     ap.add_argument("--send", action="store_true", help="publish (default: dry run)")
     ap.add_argument("--grant-status", action="store_true")
+    ap.add_argument("--log", metavar="PATH", help="also append what the round says to this file (a scheduled run "
+                    "under pythonw has no console)")
     a = ap.parse_args()
     if a.grant_status:
         g = grant()
         print(json.dumps(g, indent=1) if g else "no grant on record")
     elif a.round:
-        run_round(dry_run=not a.send)
+        def _say(line):
+            print(line)
+            if a.log:
+                try:
+                    with open(a.log, "a", encoding="utf-8") as fh:
+                        fh.write("%s %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S%z"), line))
+                except OSError:
+                    pass
+        run_round(dry_run=not a.send, say=_say, tetsu_updates=True)
     else:
         ap.print_help()

@@ -64,28 +64,31 @@ DECLARED_ILLUSTRATIVE = {
 SKIP_DIRS = {".git", "__pycache__", "node_modules", "private", "ops"}
 
 
-def published_markdown():
+def published_markdown(root=HERE):
     out = []
-    for d, subdirs, names in os.walk(HERE):
+    for d, subdirs, names in os.walk(root):
         subdirs[:] = [s for s in subdirs if s not in SKIP_DIRS]
+        # A267 (2026-10-06): .claude/worktrees/ holds whole second copies of the
+        # tree at other commits, git-excluded. Run in the main folder with 7 of
+        # them, this read 1354 .md files where the tree has 192, and reported
+        # "52 citing" where the tree has 7 -- so one worktree holding an older,
+        # uncaveated document would turn C4.2 red for a file that is not in the
+        # tree. The shape R1 fixed for itself in bc13694; pruned the same way,
+        # by PATH, not by name: the rest of .claude/ is tree and stays scanned.
+        if os.path.relpath(d, root).replace(os.sep, "/") == ".claude":
+            subdirs[:] = [s for s in subdirs if s != "worktrees"]
         for n in names:
             if n.endswith(".md"):
-                out.append(os.path.relpath(os.path.join(d, n), HERE))
+                out.append(os.path.relpath(os.path.join(d, n), root))
     return sorted(out)
 
 
-def main():
-    results = []
-
-    def check(name, ok, detail=""):
-        results.append((name, bool(ok), detail))
-        print("%s  %s  %s" % ("PASS" if ok else "FAIL", name, str(detail)[:120]))
-
-    docs = published_markdown()
+def classify(root=HERE):
+    """(citing, missing, exempt) over the published markdown under root."""
     citing, missing, exempt = [], [], []
-    for rel in docs:
+    for rel in published_markdown(root):
         try:
-            with open(os.path.join(HERE, rel), encoding="utf-8", errors="replace") as fh:
+            with open(os.path.join(root, rel), encoding="utf-8", errors="replace") as fh:
                 text = fh.read()
         except OSError:
             continue
@@ -98,6 +101,42 @@ def main():
             exempt.append(key)
         elif not CAVEAT.search(text):
             missing.append((key, len(hits)))
+    return citing, missing, exempt
+
+
+def worktree_probe():
+    """A267, driven both ways on a scratch tree: the same uncaveated citation
+    under .claude/worktrees/x/, under .claude/hooks/ and under docs/worktrees/.
+    Only the first may be dropped -- the prune is by path, not by name."""
+    import shutil
+    import tempfile
+    bare = "Counted in private/data/, the corpus is 133 files.\n"
+    probes = {"wt": ".claude/worktrees/x/docs/PROBE.md",
+              "hooks": ".claude/hooks/PROBE.md",
+              "named": "docs/worktrees/PROBE.md"}
+    tmp = tempfile.mkdtemp(prefix="c4_a267_")
+    try:
+        for p in probes.values():
+            full = os.path.join(tmp, *p.split("/"))
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w", encoding="utf-8") as fh:
+                fh.write(bare)
+        reachable = {os.path.relpath(os.path.join(d, n), tmp).replace(os.sep, "/")
+                     for d, _s, ns in os.walk(tmp) for n in ns}
+        flagged = {k for k, _n in classify(tmp)[1]}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return probes, reachable, flagged
+
+
+def main():
+    results = []
+
+    def check(name, ok, detail=""):
+        results.append((name, bool(ok), detail))
+        print("%s  %s  %s" % ("PASS" if ok else "FAIL", name, str(detail)[:120]))
+
+    citing, missing, exempt = classify()
 
     check("C4.1 the scan found published documents that cite the unpublishable "
           "corpus at all -- a zero here would mean the pattern is broken, not "
@@ -124,6 +163,14 @@ def main():
           all(any(k == c or os.path.basename(c) == k for c, _n in citing)
               for k in DECLARED_ILLUSTRATIVE),
           sorted(DECLARED_ILLUSTRATIVE))
+
+    probes, reachable, flagged = worktree_probe()
+    check("C4.5 a worktree under .claude/worktrees/ is not the tree (A267): an "
+          "uncaveated probe there is on the walk's path yet never counted, while "
+          "the same probe under .claude/hooks/ and docs/worktrees/ is flagged",
+          probes["wt"] in reachable and probes["wt"] not in flagged
+          and probes["hooks"] in flagged and probes["named"] in flagged,
+          "flagged: %s" % sorted(flagged))
 
     ok = sum(1 for _n, o, _d in results if o)
     print("\nC4: %d/%d passed" % (ok, len(results)))

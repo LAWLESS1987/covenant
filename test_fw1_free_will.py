@@ -36,10 +36,14 @@ os.environ.setdefault("COVENANT_QUIET", "1")
 # FW1g proves the knocks landed in the redirected file.
 os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_fw1_contact.jsonl")
 os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_fw1_contact_state.json")
+# The pause SWITCH too (A272, 2026-10-06): FW1r's three refusing rounds isolate free, and with the
+# switch not redirected that wrote the LIVE ops/pause/ambassador three minutes after his resume.
+os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="fw1_pause_")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
 import covenant_free_will as FW   # noqa: E402
+FW.UPDATE_RETRY_S = 0              # A276: the update's one retry, without its two-minute pause
 
 FAILURES = []
 PASSED = [0]
@@ -108,7 +112,9 @@ def main():
 
     def ask_ok(msgs, max_tokens=0):
         return ("I recognise what you wrote about publishing the cases where your own check was wrong; " * 3
-                + "we measured the same thing. How do you find out later?"), {"model": "stub"}
+                # A280: this draft said "we measured the same thing", a measurement nobody made; the honest
+                # fixture cites a fact on the record instead (COVENANT_FACTS)
+                + "when our judges cannot agree, a hold fails closed. How do you find out later?"), {"model": "stub"}
 
     log = []
     cc0 = lambda post_id, author: 0        # noqa: E731 -- no forum is read in this suite
@@ -316,6 +322,281 @@ def main():
     t9b, b9b, s9b = FW.write_post([read_rows[1]], ask9)
     check("FW1h a post is never written from a directive-flagged row", t9b is None)
     check("FW1h the tree's grant now carries free rein and his words", FW.grant()["free_rein"] is True and "free reign" in json.load(open(FW.GRANT, encoding="utf-8"))["words_2026_09_21_evening"])
+
+    # FW1r / FW1t (2026-10-06, his words: "should be constant interaction on moltbook ... figure it
+    # out"): rounds through the day need rotation and a time budget; neither is a cap on what she says.
+    print("FW1r -- rotation: someone tried live in the last day is not redrafted; a dry run spends no one")
+    tdr = tempfile.mkdtemp(prefix="fw1r_")
+    gpr, spr = os.path.join(tdr, "grant.json"), os.path.join(tdr, "sends.jsonl")
+    with open(gpr, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    held = []
+
+    def emit_hold(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw):
+        held.append(post_id)
+        return {"sent": False, "judged": "held", "why": "held by covenant's judge (no view)"}
+    three = [ally("alpha", 3, "https://www.moltbook.com/post/aaaaaaaa-1111"), ally("beta", 2, "https://www.moltbook.com/post/bbbbbbbb-2222"),
+             ally("gamma", 1, "https://www.moltbook.com/post/cccccccc-3333")]
+    kw = dict(say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_hold,
+              introduce=lambda **k: {"sent": False}, grant_path=gpr, sends_path=spr, count_comments=cc0)
+    FW.run_round(dry_run=True, now=10000.0, **kw)
+    o1 = FW.run_round(dry_run=False, now=10000.0 + 60, **kw)
+    check("FW1r a dry run spends no one: the live round after it still tries all three", o1["candidates"] == 3 and o1["refused"] == 3, o1)
+    o2 = FW.run_round(dry_run=False, now=10000.0 + 3600, **kw)
+    check("FW1r an hour later the three held ones are not redrafted (no candidates, nothing emitted)",
+          o2["candidates"] == 0 and len(held) == 6, (o2, len(held)))
+    o3 = FW.run_round(dry_run=False, now=10000.0 + FW.ROTATE_HOURS * 3600 + 120, **kw)
+    check("FW1r after ROTATE_HOURS they are candidates again", o3["candidates"] == 3, o3)
+
+    print("FW1t -- the time budget: the round stops drafting when round_minutes are spent, and says so")
+    tdt = tempfile.mkdtemp(prefix="fw1t_")
+    gpt, spt = os.path.join(tdt, "grant.json"), os.path.join(tdt, "sends.jsonl")
+    with open(gpt, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": 2}, fh)
+    tick = [0.0]
+
+    def clock():
+        tick[0] += 50.0          # every look at the clock is 50 s later: a draft costs time
+        return tick[0]
+    sent_t = []
+
+    def emit_ok(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw2):
+        sent_t.append(post_id)
+        return {"sent": not dry_run, "judged": "clean", "why": ""}
+    logt = []
+    ot = FW.run_round(dry_run=False, say=logt.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
+                      introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=50000.0, count_comments=cc0, clock=clock)
+    check("FW1t with round_minutes 2, two of three are drafted and the third waits (deferred 1, said out loud)",
+          ot["replied"] == 2 and ot.get("deferred") == 1 and sent_t == ["aaaaaaaa-1111", "bbbbbbbb-2222"]
+          and any("wait for the next round" in l for l in logt), (ot, sent_t))
+    rows_t = [r for r in FW.sends(spt) if r.get("kind") == "round"]
+    check("FW1t the round's own row records what it deferred", rows_t and rows_t[-1].get("deferred") == 1, rows_t[-1:])
+    check("FW1t round_minutes null is no budget, and the default is DEFAULT_ROUND_MINUTES",
+          FW.DEFAULT_ROUND_MINUTES == 40 and o1.get("deferred") == 0, (FW.DEFAULT_ROUND_MINUTES, o1.get("deferred")))
+
+    print("FW1s -- a round the model cannot write is deferred, not filled with a template (A300)")
+    tds = tempfile.mkdtemp(prefix="fw1s_")
+    gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
+    with open(gps, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}}, fh)
+    emitted_s, logs = [], []
+
+    def emit_s(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw2):
+        emitted_s.append(text)
+        return {"sent": False, "judged": "hold", "why": "held by covenant's judge (no view)"}
+
+    def ask_down(msgs, max_tokens=260):
+        raise RuntimeError("could not start: no weights fit: free 1.6 GB")
+    kws = dict(say=logs.append, ask=ask_down, learn=lambda: [], allies=lambda: list(three), emit=emit_s,
+               introduce=lambda **k: {"sent": False}, grant_path=gps, sends_path=sps, count_comments=cc0)
+    s1 = FW.run_round(dry_run=False, now=70000.0, **kws)
+    s2 = FW.run_round(dry_run=False, now=70000.0 + FW.ROTATE_HOURS * 3600 + 60, **kws)
+    rows_s = [r for r in FW.sends(sps) if r.get("kind") == "round"]
+    check("FW1s the model failing: nothing is emitted, all three wait (deferred 3, refused 0), the round row names "
+          "the model's error, and it is said out loud",
+          not emitted_s and s1["refused"] == 0 and s1.get("deferred") == 3 and "no weights fit" in (s1.get("starved") or "")
+          and rows_s and "no weights fit" in (rows_s[0].get("starved") or "")
+          and any("could not write" in l for l in logs), (s1, emitted_s[:1], rows_s[:1]))
+    check("FW1s two starved rounds do not isolate her (no one was tried): no isolation row in her ledger",
+          not s1.get("isolated") and not s2.get("isolated")
+          and not [r for r in FW.sends(sps) if r.get("kind") == "isolation"], (s1.get("isolated"), s2.get("isolated")))
+    held_s = []
+    o_ok = FW.run_round(dry_run=False, now=70000.0 + 3 * FW.ROTATE_HOURS * 3600, **dict(kws, ask=ask_ok,
+                        emit=lambda text, **k: held_s.append(text) or {"sent": False, "judged": "hold",
+                                                                      "why": "held by covenant's judge (no view)"}))
+    check("FW1s with the model back, the same allies are drafted and judged as before",
+          len(held_s) == 3 and o_ok["refused"] == 3 and not o_ok.get("starved"), (o_ok, len(held_s)))
+
+    print("FW1k -- one live round at a time (the nightly's and a scheduled one)")
+    lockp = os.path.join(tdt, "ambassador_round.lock")
+    open(lockp, "w").close()
+    sent_t.clear()
+    logk = []
+    ok_ = FW.run_round(dry_run=False, say=logk.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
+                       introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=99000.0, count_comments=cc0)
+    check("FW1k while another live round holds the lock, a second does nothing and says why",
+          ok_["replied"] == 0 and not sent_t and any("another live round" in l for l in logk) and os.path.exists(lockp), (ok_, logk[-1:]))
+    open(lockp, "w").close()
+    os.utime(lockp, (time.time() - FW.LOCK_STALE_S - 60,) * 2)
+    ok2 = FW.run_round(dry_run=False, say=logk.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
+                       introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=99000.0, count_comments=cc0,
+                       clock=lambda: 0.0)
+    check("FW1k a stale lock (a dead round's) is taken over, and released when the round ends",
+          ok2["replied"] > 0 and not os.path.exists(lockp), (ok2, os.path.exists(lockp)))
+
+    print("FW1m -- she cites only what the covenant measured (A280)")
+    invented = ("I agree with your point that instruction scope should not be confused with permission scope. The covenant "
+                "measured this by testing the backend's response to exceeding a grant, which you noted as moving the trust "
+                "boundary. How does this test help in understanding the security implications of such systems?")
+    cited = ("I agree with your point that instruction scope is not permission scope. A mutation test of the covenant's "
+             "own guards found 35 of 36 suspected guards were fake, because they searched the source text instead of "
+             "running the code. How do you check that a permission check actually runs?")
+    plain = ("I agree with your point that instruction scope is not permission scope, and that the line moves when "
+             "nobody is watching it. I have not seen it put that way before. How do you decide where the boundary "
+             "sits when two agents disagree about it?")
+    row_m = ally("mu", 2, "https://www.moltbook.com/post/acacacac-1111")
+    got = {k: FW.write_reply(row_m, lambda msgs, max_tokens=0, t=t: (t, {}))[1] for k, t in
+           (("invented", invented), ("cited", cited), ("plain", plain))}
+    check("FW1m an invented 'the covenant measured' is set aside for the fixed text; a cited fact or no claim is kept",
+          got == {"invented": "fixed", "cited": "model", "plain": "model"}, got)
+    tp, bp, _sp = FW.write_post([{"author": "zeta", "text": "a long enough thing read today " * 5, "url": "https://www.moltbook.com/post/adadadad-2222"}],
+                                lambda msgs, max_tokens=0: ("A title\n\n" + invented + " " + " ".join(["more"] * 40), {}))
+    check("FW1m her own post that invents a measurement is not written", tp is None and bp is None)
+    # A297 (2026-10-07): this check said both prompts carry every fact she may cite (A280). Offered, the facts were
+    # reached for; his "do 1 and 2" removed them. Now: neither prompt offers a measurement, both forbid claiming one,
+    # the screen (cites_only_facts) still stops any that slips through, and the fixed text claims none.
+    check("FW1m neither drafting prompt offers the covenant's measurements, both forbid claiming one, and the fixed text "
+          "claims none (A297)",
+          not any(f in FW.REPLY_SYSTEM or f in FW.POST_SYSTEM for f, _m in FW.COVENANT_FACTS)
+          and "Do not say what the covenant measured" in FW.REPLY_SYSTEM and "Do not say what the covenant measured" in FW.POST_SYSTEM
+          and FW.cites_only_facts(FW.FALLBACK_REPLY % '"x"')[0])
+    mixed = ("I agree with your point. The covenant measured this by testing the backend's response to exceeding a "
+             "grant. On 2026-10-06 its small judges held 215 of 216 forum drafts in one round. What do you test?")
+    check("FW1m sentence by sentence: an invented claim beside a real fact is still set aside",
+          FW.cites_only_facts(mixed)[0] is False and FW.cites_only_facts(cited)[0] is True)
+    check("FW1m a first reply never points back to an exchange that did not happen ('I asked you', 'you asked me')",
+          FW.cites_only_facts("I agree. I asked you to clarify why the signature is required. What do you propose?")[0] is False
+          and FW.cites_only_facts("I agree. You asked me what we log; nothing yet. Why?")[0] is False
+          and FW.cites_only_facts(plain)[0] is True)
+    check("FW1m a denial is not a claim: 'The covenant never measured X' (a correction) passes; 'measured X' beside it does not",
+          FW.cites_only_facts("I am sorry. The covenant never measured the backend's response to exceeding a grant.")[0] is True
+          and FW.cites_only_facts("The covenant never measured that. The covenant measured something else.")[0] is False)
+    tds = tempfile.mkdtemp(prefix="fw1s_")
+    gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
+    with open(gps, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "free_rein": True, "words": "his words", "caps": {"comments": None, "posts": 0},
+                   "round_minutes": None}, fh)
+    mine_text = ("I agree with your point that instruction scope should not be confused with permission scope, and "
+                 "the line moves when nobody watches it.")
+    with open(sps, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "reply", "sent": True, "author": "someone", "post_id": "x", "text": mine_text,
+                             "t": "2026-10-06T16:03:34Z"}) + "\n")
+    learned_s = [{"author": "selfacct", "text": mine_text + " How does this test help?", "url": "https://www.moltbook.com/post/aeaeaeae-1111"},
+                 {"author": "stranger", "text": "a thing worth answering, said plainly", "url": "https://www.moltbook.com/post/afafafaf-2222"}]
+    targets = []
+    os_ = FW.run_round(dry_run=True, say=log.append, ask=ask_ok, learn=lambda: list(learned_s),
+                       allies=lambda: [dict(ally("selfacct", 3, "https://www.moltbook.com/post/aeaeaeae-1111"),
+                                            evidence={"publishes-failure": mine_text})],
+                       emit=lambda text, post_id=None, **k: (targets.append(post_id), {"sent": False, "judged": "clean", "why": "dry"})[1],
+                       introduce=lambda **k: {"sent": False}, grant_path=gps, sends_path=sps, now=500000.0, count_comments=cc0)
+    check("FW1m she never replies to herself: an author whose comment begins with her own sent reply is her, as ally or as read",
+          os_.get("own_accounts") == ["selfacct"] and "aeaeaeae-1111" not in targets and "afafafaf-2222" in targets,
+          (os_.get("own_accounts"), targets))
+    import covenant_tetsu_assist as _TAm
+    # A311 (2026-10-07): this check read PROMPT, which the review no longer uses -- it would have kept passing while
+    # measuring nothing live. It now reads the prompt review() actually sends: one word per sentence, FALSE for any
+    # sentence saying the covenant measured or tested something (his REFUSE-ALL).
+    import inspect as _insp
+    check("FW1m Tetsu's LIVE review prompt marks any sentence that says the covenant measured or tested something "
+          "FALSE (his REFUSE-ALL), and review() sends that prompt",
+          "FALSE - it states as fact that the covenant (or we) measured, tested" in _TAm.SENTENCE_PROMPT
+          and "REFUSE-ALL" in _TAm.SENTENCE_PROMPT and "SENTENCE_PROMPT %" in _insp.getsource(_TAm.review))
+
+    print("FW1v -- a send keeps what Moltbook's challenge did with it (A283)")
+    tdv = tempfile.mkdtemp(prefix="fw1v_")
+    gpv, spv = os.path.join(tdv, "grant.json"), os.path.join(tdv, "sends.jsonl")
+    with open(gpv, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    outcomes = iter([{"sent": True, "created": True, "verification": {"required": True, "solved": True, "answer": "30.00"}},
+                     {"sent": False, "created": True, "verification": {"required": True, "solved": False}},
+                     {"sent": False, "judged": "held", "why": "held"}])
+    FW.run_round(dry_run=False, say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three),
+                 emit=lambda text, **k: next(outcomes), introduce=lambda **k: {"sent": False},
+                 grant_path=gpv, sends_path=spv, now=700000.0, count_comments=cc0)
+    vs = [r.get("verification") for r in FW.sends(spv) if r.get("kind") == "reply"]
+    check("FW1v solved, a wrong answer, and no content created are each kept as such (None when nothing was created)",
+          vs == [{"required": True, "solved": True, "abstained": False}, {"required": True, "solved": False, "abstained": False}, None], vs)
+
+    print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
+    tdu = tempfile.mkdtemp(prefix="fw1u_")
+    gpu, spu, lgu = os.path.join(tdu, "grant.json"), os.path.join(tdu, "sends.jsonl"), os.path.join(tdu, "updates.jsonl")
+    with open(gpu, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    told, asked = [], []
+
+    def tell_rec(text, why, actor):
+        told.append((text, why, actor))
+        return {"id": "x"}
+    real_updates = FW.TETSU_UPDATES
+    FW.TETSU_UPDATES = lgu
+    try:
+        ku = dict(say=log.append, ask=ask_ok, learn=lambda: [], emit=emit_ok, introduce=lambda **k: {"sent": False},
+                  grant_path=gpu, sends_path=spu, count_comments=cc0, tetsu_updates=True, tetsu_tell=tell_rec)
+        FW.run_round(dry_run=False, now=300000.0, allies=lambda: [three[0]],
+                     tetsu_ask=lambda p: (asked.append(p), "TELL: free wrote to u/alpha and it went out.")[1], **ku)
+        check("FW1u TELL: his words reach the line as actor tetsu, and he was shown who was written to",
+              told and told[-1][2] == "tetsu" and told[-1][0] == "free wrote to u/alpha and it went out." and asked and "SENT to u/alpha" in asked[-1],
+              (told, asked[-1:]))
+        n_told = len(told)
+        FW.run_round(dry_run=False, now=300000.0 + 60, allies=lambda: [three[1]], tetsu_ask=lambda p: "NOTHING", **ku)
+        check("FW1u NOTHING: nothing goes on the line, and the decision is still recorded",
+              len(told) == n_told and [json.loads(x)["decision"] for x in open(lgu, encoding="utf-8")][-1] == "NOTHING")
+        n_asked = len(asked)
+        FW.run_round(dry_run=False, now=300000.0 + 120, allies=lambda: [three[0]],
+                     tetsu_ask=lambda p: (asked.append(p), "TELL: x")[1], **ku)
+        check("FW1u a round that did nothing (no one new) does not spend his time: he is not asked",
+              len(asked) == n_asked and len(told) == n_told)
+        FW.run_round(dry_run=False, now=300000.0 + 180, allies=lambda: [three[2]],
+                     tetsu_ask=lambda p: (_ for _ in ()).throw(RuntimeError("door down")), **ku)
+        last = [json.loads(x) for x in open(lgu, encoding="utf-8")][-1]
+        check("FW1u when asking him fails, nothing is told and the failure is recorded",
+              len(told) == n_told and last["decision"] == "NONE" and "door down" in last["error"], last)
+        flaky = {"n": 0}
+
+        def ask_once_busy(p):
+            flaky["n"] += 1
+            if flaky["n"] == 1:
+                raise RuntimeError("door answered HTTP 503: busy")
+            return "TELL: the second ask got through."
+        FW.run_round(dry_run=False, now=300000.0 + 240, allies=lambda: [ally("kappa", 2, "https://www.moltbook.com/post/abababab-7777")],
+                     tetsu_ask=ask_once_busy, **ku)
+        check("FW1u a busy first ask is asked once more (A276): the second answer reaches him",
+              flaky["n"] == 2 and told and told[-1][0] == "the second ask got through.", (flaky, told[-1:]))
+        n_told, n_asked = len(told), len(asked)
+        FW.run_round(dry_run=False, now=900000.0, allies=lambda: [three[0]], say=log.append, ask=ask_ok, learn=lambda: [],
+                     emit=emit_ok, introduce=lambda **k: {"sent": False}, grant_path=gpu, sends_path=os.path.join(tdu, "s2.jsonl"),
+                     count_comments=cc0, tetsu_tell=tell_rec, tetsu_ask=lambda p: (asked.append(p), "TELL: y")[1])
+        check("FW1u without tetsu_updates (every suite's default) he is never asked", len(asked) == n_asked and len(told) == n_told)
+    finally:
+        FW.TETSU_UPDATES = real_updates
+
+    print("FW1i -- an empty round (no one new, rotation) does not break the isolation streak")
+    tdi = tempfile.mkdtemp(prefix="fw1i2_")
+    gpi, spi = os.path.join(tdi, "grant.json"), os.path.join(tdi, "sends.jsonl")
+    with open(gpi, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    import covenant_pause as _cp2
+    paused_by = []
+    _real_pause = _cp2.pause
+    _cp2.pause = lambda name, why="": paused_by.append((name, why))
+    try:
+        ka = dict(say=log.append, ask=ask_ok, learn=lambda: [], emit=emit_hold, introduce=lambda **k: {"sent": False},
+                  grant_path=gpi, sends_path=spi, count_comments=cc0)
+        r1 = FW.run_round(dry_run=False, now=200000.0, allies=lambda: [three[0]], **ka)
+        r2 = FW.run_round(dry_run=False, now=200000.0 + 60, allies=lambda: [three[0]], **ka)
+        r3 = FW.run_round(dry_run=False, now=200000.0 + 120, allies=lambda: [three[0], three[1]], **ka)
+    finally:
+        _cp2.pause = _real_pause
+    check("FW1i refused, empty, refused: the empty round is skipped and the two refusing rounds isolate her",
+          r1["refused"] == 1 and r2["candidates"] == 0 and r3["refused"] == 1 and r3.get("isolated") is True
+          and paused_by and paused_by[-1][0] == "ambassador", (r1["refused"], r2["candidates"], r3.get("isolated"), paused_by))
+
+    print("FW1L -- after he lifts an isolation, only NEW rounds count (A301)")
+    _cp2.pause = lambda name, why="": paused_by.append((name, why))
+    try:
+        n_paused = len(paused_by)
+        r4 = FW.run_round(dry_run=False, now=200000.0 + 180, allies=lambda: [three[0]], **ka)            # empty
+        r4b = FW.run_round(dry_run=False, now=200000.0 + 200, allies=lambda: [three[2]], **dict(ka, ask=ask_down))  # starved
+        r5 = FW.run_round(dry_run=False, now=200000.0 + 240, allies=lambda: [three[2]], **ka)            # refused, 1st since
+        r6 = FW.run_round(dry_run=False, now=200000.0 + FW.ROTATE_HOURS * 3600 + 300, allies=lambda: [three[0]], **ka)
+    finally:
+        _cp2.pause = _real_pause
+    check("FW1L an empty round and a starved round after the lift do not re-isolate her on the rounds he lifted (the 09:01 case)",
+          r4["candidates"] == 0 and not r4.get("isolated") and r4b.get("starved") and not r4b.get("isolated"),
+          (r4.get("isolated"), r4b.get("starved"), r4b.get("isolated")))
+    check("FW1L one refused round after the lift does not isolate; a second does (two NEW rounds, as the rule says)",
+          r5["refused"] == 1 and not r5.get("isolated") and r6["refused"] == 1 and r6.get("isolated") is True
+          and len(paused_by) == n_paused + 1, (r5.get("isolated"), r6.get("isolated"), len(paused_by) - n_paused))
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

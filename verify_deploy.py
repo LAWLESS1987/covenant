@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 12854   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
+EXPECTED_LINES = 13394   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -124,7 +124,7 @@ MANIFEST = {
     # P19 23/23 and A3s 51/51 were run against THESE bytes BEFORE this line
     # moved, the order the b969 lesson below requires.
     "covenant_unified_v8.py":
-        "74d6d31e9f5db1884774df0024e2d0ab7d3ef5fe55ee778f005a1c85fa7dbca4",
+        "ac886cc2ce70c1de3dbdb421cb1b4e4e863e2e9d1d79226462617fc0b0d6ae89",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
@@ -150,17 +150,17 @@ MANIFEST = {
     # gates joined this runner, run_local_sweep.SUITES and covenant_one's
     # list in the SAME change. K1 20/20, K2 25/25, P19 23/23 against these
     # bytes before this pin moved.
-    # 2026-10-06 (A267): from here this digest, like every pin here but the core's,
+    # 2026-10-06 (A315): from here this digest, like every pin here but the core's,
     # is moved at commit time by tools/pin_deploy.py, which the pre-commit hook runs:
     # K1 and K2 first, on the bytes being committed, no move if either fails. The comment
     # trailing the digest records the last HAND move and the tool never edits it.
-    # [A267-COUNT: its "M53 for this file a second time" is kept as written and is
+    # [A315-COUNT: its "M53 for this file a second time" is kept as written and is
     # wrong. Measured over main's first-parent history, this pin was stale in six
     # spans; the one 8bf4d56 closed was the fifth, open since eb892c0 (09-12),
     # because the 09-20 value 7bde90e1effa was the digest of a CRLF copy of
     # 7eac94c's file, which no commit held.]
     "run_all_tests.sh":
-        "b1a49a4b2bba2cd05f2c3a1585cab67401d8f875a08eac0c85dc5e94f1408acb",   # 2026-10-05 evening: moved WITH the file, before it reached main (16e389e added the A265 suite line); K1 20/20, K2 25/25 against these bytes first. Was 7eed13de808b: 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
+        "75c39e251e992e8dc2eef892ef9a016d78631a73a330b243931cb419d9777262",   # 2026-10-06: moved WITH the file (A274 added its suite line); K1 20/20, K2 25/25 against these bytes first. Was e7c0c68ef756: 2026-10-05 evening: moved WITH the file, before it reached main (16e389e added the A265 suite line); K1 20/20, K2 25/25 against these bytes first. Was 7eed13de808b: 2026-10-05: re-pinned late AGAIN (M53 for this file a second time); moved by 2f86cc3, 0bfa90c, 0dd9a23 (10-04/05) without the pin, so verify_deploy read FAIL and refused every restart it gates; K1 20/20, K2 25/25 against these bytes before this line moved. Was 7bde90e1effa (09-20: moved by c64a33c, bf77dd2, 1fca761, 7eac94c without the pin)
     # run_local_sweep.py re-pinned 2026-08-29 ~08:00Z with the P19 overlay
     # guard. NOTE: the pin it replaces (07786e6ca851...) did not match the
     # project's own 00:55Z copy (2405768bee5e...) either -- the 08-29 00:40
@@ -182,7 +182,7 @@ MANIFEST = {
     # model files or SEM4's pristine source -- the candidate overlay had
     # since 00:40Z, and the first v8.40 deployed sweep went red on all four
     # semantic suites from that asymmetry. P19 23/23 after each move.
-    # 2026-10-06 (A267): moved at commit time by tools/pin_deploy.py after P19
+    # 2026-10-06 (A315): moved at commit time by tools/pin_deploy.py after P19
     # passes; test_p19_overlay_guard.py below and test_a3s_send_bounds.py above
     # after each passes itself.
     "run_local_sweep.py":

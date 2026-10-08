@@ -230,8 +230,9 @@ for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\
 const ph=d.phone&&d.phone.last_checkin_hours;
 items.push({name:'Phone',color:ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK,sub:ph!=null?'checked in '+ago(ph):'no check-in on record',detail:d.phone,kind:'phone'});
 // Moltbook was green whenever a row existed, sent or not (measured 2026-09-28: 6 rows, 0 sent); green now means something went out
-const fr=d.forum||[],fs=fr.filter(r=>r.sent).length;
-items.push({name:'Moltbook',color:fs?OK:UNK,sub:fr.length?fs+' of '+fr.length+' sent':'nothing on record',detail:d.forum,kind:'forum'});
+// A277 (2026-10-06): the same rule over a day, not over the last six attempts -- a round now tries ~200
+const fd=d.forum_day||{},fs=fd.sent||0,ft=fd.tried||0;
+items.push({name:'Moltbook',color:fs?OK:UNK,sub:ft?fs+' sent of '+ft+' tried, '+(fd.window_h||24)+' h':'nothing tried in '+(fd.window_h||24)+' h',detail:d.forum,kind:'forum'});
 items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money'});
 const hp=Object.keys(hw).filter(k=>hw[k]==='present'),hu=Object.keys(hw).filter(k=>hw[k]==='unknown');
 items.push({name:'Highway',color:hp.length?BAD:(hu.length?UNK:OK),sub:hp.length?hp.length+' need attention':(hu.length?hu.length+' not known':'all clear'),detail:hw,kind:'highway'});
@@ -270,7 +271,7 @@ canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.
 if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent===u.name)info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
 if(u.name==='Tetsu'){info.textContent='Tetsu — the one you talk with.\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');}
 else if(u.kind==='node'){const x=u.detail||{};if(x.peer){info.textContent=u.name+'\\n'+x.peer+'\\n'+x.note;}else{info.textContent=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN':'');}}
-else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last sends (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
+else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last replies that went out (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
 else{info.textContent=u.name+'\\n'+fmt(u.detail);}});
 function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
 let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.userData.swarm.position.y=tetsu.position.y;tetsu.rotation.y+=0.004;
@@ -307,6 +308,69 @@ def current_page():
 def page_sha(page=None):
     import hashlib
     return hashlib.sha256((page or current_page()).encode("utf-8")).hexdigest()[:12]
+
+
+HIGHWAY_CORE = ("node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh",
+                "phone_build_behind_core")
+
+
+def highway_detail(H):
+    """({detector: 'present'|'absent'|'unknown'} for EVERY registered detector, note or None).
+
+    A288 (2026-10-06, his words: "keep expanding the highway"). The orb read seven fixed detectors; the road had
+    grown to 25, and eighteen of them -- public_ci_red, mesh_source_split, every one added that day (Tetsu's two,
+    sweep currency, a stalled ambassador, the scheduler, Moltbook strikes, failing asks) -- never reached the orb:
+    "Highway green" was a reading of 7 of 25. Now: every detector, from the watchdog's own last pass when it is
+    fresh (sensing all of them here is most of a cold read, profiled 2026-09-25). When that pass is stale or
+    predates a detector, the seven core ones are sensed here and the rest are UNKNOWN -- amber, which is also how
+    a watchdog that stopped sensing shows. LOWER-CASE whatever arrives (PC1z6: the page colours by 'present')."""
+    names = list(H.DETECTORS)
+    seen = H.last_sense()
+    if seen is not None and all(k in seen for k in names):
+        return {k: str(seen[k] or "unknown").lower() for k in names}, None
+    sensed = H.sense(only=list(HIGHWAY_CORE))
+    out = {k: str((v or {}).get("state") or "unknown").lower() for k, v in sensed.items()}
+    rest = [k for k in names if k not in out]
+    for k in rest:
+        out[k] = "unknown"
+    return out, ("the watchdog's full pass is not fresh here (stale, or older than %d detector(s)); the %d core "
+                 "detectors were read now and the rest are unknown" % (len(rest), len(sensed)))
+
+
+FORUM_KINDS = ("reply", "own_post", "tetsu_reply", "tetsu_post", "intro")
+FORUM_WINDOW_S = 86400
+
+
+def forum_detail(rows, now=None):
+    """(the last 6 SENT forum rows, {sent, tried, window_h}) over the last FORUM_WINDOW_S.
+
+    A277 (2026-10-06). The Moltbook orb read the last 6 ATTEMPTS and was green when one of them went out
+    (the 09-28 rule: "green now means something went out"). A270 made a round try ~200 people, so the last 6
+    were nearly always held: on the day free's first reply in weeks went out (13:46Z), the orb read
+    "0 of 6 sent" amber. The rule stands; the window it is measured over is now a day, not six rows. Live
+    sends only -- a dry run reaches no one."""
+    import calendar
+    import time as _t
+    now = _t.time() if now is None else now
+    sent_rows, sent, tried = [], 0, 0
+    for r in rows or []:
+        if r.get("kind") not in FORUM_KINDS or r.get("dry_run"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(_t.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                at = None
+        if r.get("sent"):
+            sent_rows.append(r)
+        if at is not None and now - float(at) <= FORUM_WINDOW_S:
+            tried += 1
+            sent += bool(r.get("sent"))
+    shown = [{"t": r.get("t"), "kind": r.get("kind"), "actor": r.get("actor", "free"), "sent": True,
+              "to": r.get("author") or r.get("target") or r.get("title"), "text": str(r.get("text") or "")[:160]}
+             for r in sent_rows[-6:]]
+    return shown, {"sent": sent, "tried": tried, "window_h": FORUM_WINDOW_S // 3600}
 
 
 def register(api, caller, refused, cov):
@@ -429,18 +493,9 @@ def register(api, caller, refused, cov):
             pass
         try:
             import covenant_highway
-            want = ["node_down", "sweep_red", "source_drift", "watchdog_stale", "manifest_stale", "stale_test_mesh", "phone_build_behind_core"]
-            # What the watchdog's own last pass saw, when it is fresh (2026-09-25: sensing again
-            # here was 95% of a cold read, profiled); sense only when there is no fresh pass.
-            # LOWER-CASE, whatever arrives (2026-09-26): the watchdog writes the detector constants
-            # ("PRESENT"), the page colours by 'present' -- so a Highway with node_down PRESENT was
-            # drawn GREEN, and the test fixtures, written in lower case, never saw it. PC1z6.
-            seen = covenant_highway.last_sense()
-            if seen is not None and all(k in seen for k in want):
-                out["detail"]["highway"] = {k: str(seen[k] or "unknown").lower() for k in want}
-            else:
-                sensed = covenant_highway.sense(only=want)
-                out["detail"]["highway"] = {k: str((v or {}).get("state") or "unknown").lower() for k, v in sensed.items()}
+            out["detail"]["highway"], note = highway_detail(covenant_highway)
+            if note:
+                out["detail"]["highway_note"] = note
         except Exception:                                        # noqa: BLE001
             pass
         try:
@@ -461,9 +516,7 @@ def register(api, caller, refused, cov):
             pass
         try:
             import covenant_free_will
-            rows = [r for r in covenant_free_will.sends() if r.get("kind") in ("reply", "own_post", "tetsu_reply", "tetsu_post", "intro")][-6:]
-            out["detail"]["forum"] = [{"t": r.get("t"), "kind": r.get("kind"), "actor": r.get("actor", "free"), "sent": bool(r.get("sent")),
-                                       "to": r.get("author") or r.get("target") or r.get("title"), "text": str(r.get("text") or "")[:160]} for r in rows]
+            out["detail"]["forum"], out["detail"]["forum_day"] = forum_detail(covenant_free_will.sends())
         except Exception:                                        # noqa: BLE001
             pass
         try:

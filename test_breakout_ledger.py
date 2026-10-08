@@ -25,7 +25,11 @@ check("a flat series is not", bl.signal(FLAT + [9.0]) is False)
 check("the window is 100, as tested", bl.WINDOW == 100)
 
 sec("B. sealing and settling")
-p = newp("basic"); t0 = time.time()
+# Noon UTC yesterday, not the wall clock: t0 = time.time() put both runs on two days whenever the suite ran in
+# the last minute before UTC midnight, and public CI went red at 6a1eda7 (A313).
+p = newp("basic"); t0 = (time.time() // 86400 - 1) * 86400 + 43200
+check("the two runs below fall on one UTC day (the test's own precondition)",
+      time.gmtime(t0)[:3] == time.gmtime(t0 + 60)[:3], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0)))
 bl.record_cycle([q("AAA", RISE, 22.0)], now=t0, path=p)
 rows = bl._read(p)
 check("a new high opens a call", any(r["payload"]["kind"] == "open" for r in rows))

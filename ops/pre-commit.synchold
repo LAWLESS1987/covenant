@@ -79,7 +79,7 @@ if git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"
   fi
 fi
 
-# ---- 2d. every other deploy pin follows its file, in the same commit (2026-10-06, A267: 2b covered one pin of
+# ---- 2d. every other deploy pin follows its file, in the same commit (2026-10-06, A315: 2b covered one pin of
 # five, and run_all_tests.sh's went stale in six spans of main's history, the last 16e389e). tools/pin_deploy.py
 # reads which files verify_deploy.py pins, acts on the ones this commit stages, runs the suites that judge each
 # first, and moves a pin -- and stages verify_deploy.py itself -- only when they pass and the file on disk is the

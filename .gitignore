@@ -395,6 +395,15 @@ ops/mycelium.jsonl
 ops/security_threats.jsonl
 ops/contact_state.json
 ops/ambassador_sends.jsonl
+# A270 (2026-10-06): free's round lock and Tetsu's per-round decisions, runtime records beside the sends ledger
+ops/ambassador_round.lock
+ops/tetsu_moltbook_updates.jsonl
+# A282 (2026-10-06): one line per real ask of the model, and its rotation
+ops/model_asks.jsonl
+ops/model_asks.jsonl.prev
+# A294 (2026-10-07): the threefold witness's readings and its first-seen gaps
+ops/threefold_witness.json
+ops/public_identity.json
 coinbase_balance.prev.json
 
 # A211b (2026-09-21): the assistant's `git add -A` swept its own scratch

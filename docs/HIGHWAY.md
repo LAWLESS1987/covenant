@@ -219,3 +219,12 @@ money, and Android still asks the person holding the phone. First live dispatch:
 133 minutes behind.
 
 `test_h1_highway.py` is 47 checks.
+
+## Tetsu on the road (2026-10-06, A276)
+
+His words: "continue get the road green and start expanding the highway". Two detectors read
+Tetsu's own keeper every pass: `tetsu_cannot_answer` (nothing is loaded and the smallest weights
+do not fit in free memory) and `model_unmanaged` (a model server answers that the keeper has no
+record of starting). Both are reads. Neither has a remedy: anything touching the model is
+`NEVER_AUTOMATIC`, and what to close to free memory is his. They make the road say what the daily
+cycle used to say once a day. The phone stays off this road until he and I go over it, as he asked.

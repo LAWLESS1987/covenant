@@ -484,7 +484,7 @@ def main():
     try:
         if a.ambassador > 0:
             import covenant_free_will as FW
-            FW.run_round(dry_run=False, say=say)
+            FW.run_round(dry_run=False, say=say, tetsu_updates=True)   # A270: Tetsu decides what to tell him
     except Exception as e:                                       # noqa: BLE001
         say("ambassador FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 

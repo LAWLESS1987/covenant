@@ -11,6 +11,10 @@ gate, written to the chat memory (ops/chat/ask_log.jsonl) and queued for the tea
 THE ADDRESS. Each door replays the last turns of the SAME caller (agent_history). His own
 conversations with Tetsu on this PC come from 127.0.0.1, so batch work is sent from
 127.0.0.2 -- also loopback, also admitted by tailnet_ok -- and never crowds his history.
+But everything sent from here shares 127.0.0.2's history with everything else sent from here
+(A284): batches, ad-hoc asks, and until 2026-10-06 his reviews of free's drafts and his round
+updates, each read beside a tail of earlier reviews. An ask that must be read on its own passes
+ask(fresh=True): no turns replayed into it, and it is replayed into none.
 
 WHAT IT ADDS: NOTHING THAT LIMITS. It stays under the limits the doors already have (30
 asks per 10 minutes per caller; the API limiter answers 429 on a burst) by pacing, and
@@ -62,11 +66,15 @@ class _SourceConn(http.client.HTTPConnection):
         self.sock = socket.create_connection((self.host, self.port), self.timeout, source_address=(SOURCE, 0))
 
 
-def ask(text, door="agent", host="127.0.0.1", port=5000, timeout=600, private=False):
-    """One exchange. Returns (status_code, body_dict). `private` sends {"private": true} (A263)."""
+def ask(text, door="agent", host="127.0.0.1", port=5000, timeout=600, private=False, fresh=False):
+    """One exchange. Returns (status_code, body_dict). `private` sends {"private": true} (A263);
+    `fresh` sends {"fresh": true} (A284): the door replays none of this address's earlier turns into
+    it, and replays it into none of theirs. The door's reply says "fresh": true when it honoured that."""
     payload = {"text": text}
     if private:
         payload["private"] = True
+    if fresh:
+        payload["fresh"] = True
     body = json.dumps(payload).encode("utf-8")
     c = _SourceConn(host, port, timeout=timeout)
     try:

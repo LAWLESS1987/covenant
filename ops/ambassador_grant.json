@@ -23,5 +23,7 @@
   "python covenant_pause.py --pause ambassador stops the round; deleting this file or setting granted to false revokes the grant"
  ],
  "recorded_by": "covenant_free_will.py, which reads this file before every round and does nothing without it",
- "caps_AUTHOR": "A211: the earlier comments 12 / posts 3 were chosen by Claude, not by the operator, whose words are 'free rein'. LIFTED 2026-09-25 on his words 'lift the immunity cap and the other four limits' (A221): null = no cap (0 would switch that kind off). The forum's own rate limits and every judge in emit still apply. He may set any number here, and the code reads this file."
+ "caps_AUTHOR": "A211: the earlier comments 12 / posts 3 were chosen by Claude, not by the operator, whose words are 'free rein'. LIFTED 2026-09-25 on his words 'lift the immunity cap and the other four limits' (A221): null = no cap (0 would switch that kind off). The forum's own rate limits and every judge in emit still apply. He may set any number here, and the code reads this file.",
+ "round_minutes": 40,
+ "round_minutes_AUTHOR": "2026-10-06, on his words 'should be constant interaction on moltbook at this point too with tetsu and the ambassador figure it out': rounds now run through the day (Windows task CovenantAmbassador) instead of once a night. 40 is how long ONE round drafts before the rest of the ranked candidates wait for the next round. Claude chose 40 (the practice loop's bound), not the operator: he may set any number here, and null is no budget. It caps nothing he lifted -- caps stay null -- and someone tried in the last 24 h is not redrafted (rotation)."
 }

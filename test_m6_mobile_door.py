@@ -373,6 +373,10 @@ def main():
     # Tetsu, asked: "yes, because it helps me keep the context and remember the flow of the
     # conversation better"). The PC app's COUNCIL exchanges are replayed too, the newest are kept
     # first, and the total stays inside the budget his model's window can hold.
+    # RETRACTED, A273-RULES-SIZE-2026-10-06: the line above is kept as written; 12,000 characters
+    # did not always fit beside the rules (2,916 tokens, measured 2026-10-06). M6q3 still pins
+    # agent_history's own character budget, which the doors now use only without covenant_model.fit;
+    # the window itself is pinned by test_a273_history_fits.py.
     hp = tempfile.mktemp(suffix="_m6q3.jsonl")
     with open(hp, "w", encoding="utf-8") as fh:
         for i in range(30):

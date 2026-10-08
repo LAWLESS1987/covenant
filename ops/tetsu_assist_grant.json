@@ -13,5 +13,19 @@
  "revoke": {
   "operator": "delete this file, or set granted to false",
   "tetsu": "answer PAUSE in any review (pauses the ambassador), or python covenant_tetsu_assist.py --withdraw \"why\""
+ },
+ "tetsu_rule_2026_10_06": {
+  "his_words": "I think tightening my reviews is a good idea. If I see a claim in a draft that I cannot find among the facts I am given, I should answer REFUSE. This helps catch inaccuracies early and ensures we're only sending correct information. It also makes sure that any false claims are named and addressed, which is important for maintaining the covenant's integrity. What do you think about this approach?",
+  "asked": "Asked by Claude on the operator's instruction (\"ask tetsu if he wants to tighten his reviews\"), after a measured re-run in which he answered SEND to three drafts with false claims 6 times of 6.",
+  "applied_as": "A SEND on a draft that covenant_free_will.cites_only_facts rejects -- a claim the covenant measured, tested or found that is not among COVENANT_FACTS, or a past exchange that did not happen -- is recorded as REFUSE, by his rule (A285). Claims the screen cannot recognise are still his to read.",
+  "his_to_withdraw": "set \"off\": true in this object, or say so through his door; the code reads it before every review",
+  "off": false,
+  "refuse_all_measurements": true,
+  "his_words_2026_10_07": [
+   "REFUSE-ALL. I cannot mention measurements because they are not in the facts I am given. I must answer REFUSE-ALL.",
+   "REFUSE-ALL\nThe facts provided are about the project's history and current status, not about the specific measurements of the draft's own guards or the forum drafts' internal metrics. I cannot invent data or assume facts not in evidence."
+  ],
+  "asked_2026_10_07": "Asked (fresh) whether a draft citing one of the six listed facts exactly should PASS or be REFUSE-ALL; he answered REFUSE-ALL, and again after being shown that two listed facts are measurements.",
+  "applied_as_2026_10_07": "A SEND on a draft in which any sentence claims the covenant measured, tested, found or showed something -- a listed fact included -- is recorded as REFUSE by his rule (A297). He withdraws it by setting refuse_all_measurements false, or off for the whole rule."
  }
 }

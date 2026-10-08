@@ -171,6 +171,27 @@ def main():
     H.write_ledger({"remedy": "rotate_log", "outcome": "fixed"}, led)
     check("H1e mutation: a later success clears the quarantine", not H.quarantined("rotate_log", led))
 
+    # ---- H1qp: probation (A293). A quarantine whose last failure is a day old gets ONE attempt a day.
+    ledp = tmp_ledger()
+    _old = time.time() - H.PROBATION_AFTER_S - 600
+    for k in range(2):
+        H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix", "at": _old + k}, ledp)
+    st_old, _ = H.quarantine_state("rotate_log", ledp)
+    rowp = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=True, ledger=ledp, choices={}, cooldown_s=0)
+    H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix", "at": time.time()}, ledp)
+    st_failed, _ = H.quarantine_state("rotate_log", ledp)
+    H.write_ledger({"remedy": "rotate_log", "outcome": "fixed", "at": time.time()}, ledp)
+    st_fixed, _ = H.quarantine_state("rotate_log", ledp)
+    ledr = tmp_ledger()
+    for k in range(2):
+        H.write_ledger({"remedy": "rotate_log", "outcome": "did not fix", "at": time.time() - 3600 + k}, ledr)
+    st_recent, _ = H.quarantine_state("rotate_log", ledr)
+    check("H1qp a quarantine a day old is on probation: one attempt runs, marked as such; a failure renews the "
+          "quarantine; a success clears it; failures an hour old stay quarantined",
+          st_old == "probation" and rowp.get("outcome") != "refused" and "A293" in str(rowp.get("probation"))
+          and st_failed == "quarantined" and st_fixed == "ok" and st_recent == "quarantined",
+          (st_old, rowp.get("outcome"), rowp.get("probation"), st_failed, st_fixed, st_recent))
+
     # ---- H1f: the registry audits
     bad_undo = [n for n, r in H.REMEDIES.items()
                 if r["klass"] == H.AUTO_REVERSIBLE and r.get("kind") != "stateless" and not r.get("undo")]
@@ -586,6 +607,35 @@ def main():
               str(real_d["benefit"]["cost"]))
     finally:
         H.REMEDIES["dispatch_phone_build"] = real_d
+
+    # ---- H1nz: a remedy's own noise window (A286, 2026-10-06) -----------------
+    calls_w = []
+    real_w = dict(H.REMEDIES["schedule_watchdog_restart"])
+    try:
+        H.REMEDIES["schedule_watchdog_restart"] = dict(real_w, fn=spy_remedy(calls_w))
+        led_w = tmp_ledger()
+
+        def _age(led, s):
+            rows_ = H.read_ledger(led)
+            rows_[-1]["at"] = rows_[-1]["at"] - s
+            with open(led, "w", encoding="utf-8") as fh:
+                for r_ in rows_:
+                    fh.write(json.dumps(r_) + chr(10))
+        H.apply_remedy("schedule_watchdog_restart", present(), "watchdog_stale", dry_run=False, ledger=led_w, choices={})
+        _age(led_w, 600)
+        soon = H.apply_remedy("schedule_watchdog_restart", present(), "watchdog_stale", dry_run=False, ledger=led_w, choices={})
+        _age(led_w, 400)
+        later = H.apply_remedy("schedule_watchdog_restart", present(), "watchdog_stale", dry_run=False, ledger=led_w, choices={})
+        check("H1nz the watchdog restart waits out its own 15 min (not the engine's hour): 10 min later a repeat, 16 min later it runs",
+              soon.get("repeat") is True and later.get("repeat") is not True and len(calls_w) == 2,
+              (soon.get("repeat"), later.get("repeat"), len(calls_w)))
+        led_r = tmp_ledger()
+        H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led_r, choices={})
+        _age(led_r, 1000)
+        r_hour = H.apply_remedy("rotate_log", present(), "log_bloat", dry_run=False, ledger=led_r, choices={})
+        check("H1nz ...while a remedy that declares none keeps the engine's hour", r_hour.get("repeat") is True, r_hour.get("repeat"))
+    finally:
+        H.REMEDIES["schedule_watchdog_restart"] = real_w
 
     # ---- H1n: a quarantine is cleared on the record, never by forgetting
     led = tmp_ledger()
@@ -1406,6 +1456,381 @@ def main():
     check("H1z the remedy refuses real-time OFF (a person's setting), names both mendable lapses in a dry run, and does nothing with no lapse",
           ok_rt is False and "mine to mend" in why_rt and ok_dry and "signatures are 9 days old" in why_dry and "no scan in 30 days" in why_dry and ok_none is False, (why_rt, why_dry, why_none))
 
+    # ---- H1sc: the sweep measured THIS core (A278, 2026-10-06, his words: "keep expanding the highway").
+    # A temp tree with its own core file and transcripts; the remedy's process list and launcher are
+    # stand-ins, so no test can start a real sweep.
+    import hashlib as _hl
+    _sc = tempfile.mkdtemp(prefix="h1sc_")
+    with open(os.path.join(_sc, "covenant_unified_v8.py"), "wb") as _fh:
+        _fh.write(b"# core v2\n")
+    _disk = _hl.sha256(b"# core v2\n").hexdigest()[:12]
+
+    def _transcript(name, core, verdict="PASS", partial=False):
+        with open(os.path.join(_sc, name), "w", encoding="utf-8") as fh:
+            fh.write(("# scope: PARTIAL\n" if partial else "") + "  core  covenant_unified_v8.py  10 bytes  sha256 %s\n"
+                     "  suites run  178\n  checks failed  0\n  RESULT: %s. ...\n" % (core, verdict))
+    r_none = H.detect_sweep_not_current(here=_sc)["state"]
+    _transcript("OLD.txt", "0123456789ab")
+    r_old = H.detect_sweep_not_current(here=_sc)
+    _transcript("ONLY.txt", _disk, partial=True)
+    r_partial = H.detect_sweep_not_current(here=_sc)["state"]
+    _transcript("NEW.txt", _disk, verdict="FAIL")
+    r_new = H.detect_sweep_not_current(here=_sc)
+    check("H1sc sweep_not_current: no sweep UNKNOWN; a sweep of another core PRESENT (naming both); a partial "
+          "run of this core does not count; a full sweep of this core ABSENT even when it says FAIL (that is sweep_red's)",
+          r_none == H.UNKNOWN and r_old["state"] == H.PRESENT and r_old["measured"]["transcript_core"] == "0123456789ab"
+          and r_old["measured"]["disk_core"] == _disk and r_partial == H.PRESENT and r_new["state"] == H.ABSENT,
+          (r_none, r_old, r_partial, r_new))
+    _rs = H.REMEDIES.get("run_full_sweep") or {}
+    # A289: and sweep_red, but only once a clean targeted re-run has shown the red transient (H1tr below)
+    check("H1sc run_full_sweep is paired with sweep_not_current and sweep_red: AUTO_REVERSIBLE, stateless, async, at most once in 6 h",
+          _rs.get("for") == ["sweep_not_current", "sweep_red"] and _rs.get("klass") == H.AUTO_REVERSIBLE and _rs.get("kind") == "stateless"
+          and _rs.get("async") is True and _rs.get("cooldown_s", 0) >= 6 * 3600, _rs)
+    _real_sc = (H._sweep_cmdlines, H._sweep_launch, sys.argv[0],
+                {k: os.environ.get(k) for k in ("COVENANT_ONE_TRANSCRIPT", "COVENANT_INSECURE_MOCK_JUDGE")})
+    _launched = []
+    try:
+        H._sweep_launch = lambda cmd, log: (_launched.append(cmd), type("P", (), {"pid": 4242})())[1]
+        H._sweep_cmdlines = lambda: []
+        ok_test, why_test = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)   # argv[0] is this suite
+        sys.argv[0] = "covenant_watchdog.py"
+        for k in _real_sc[3]:
+            os.environ.pop(k, None)
+        H._sweep_cmdlines = lambda: ["4711 python covenant_one.py"]
+        ok_busy, why_busy = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
+        H._sweep_cmdlines = lambda: None
+        ok_blind, why_blind = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
+        H._sweep_cmdlines = lambda: []
+        ok_dry, why_dry = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=True)
+        n_before = len(_launched)
+        ok_go, why_go = H.remedy_run_full_sweep({"disk_core": _disk}, dry_run=False)
+    finally:
+        H._sweep_cmdlines, H._sweep_launch, sys.argv[0] = _real_sc[0], _real_sc[1], _real_sc[2]
+        for k, v in _real_sc[3].items():
+            if v is not None:
+                os.environ[k] = v
+    if os.name == "nt":
+        check("H1sc the remedy declines from a test, beside a running sweep, and when it cannot look; a dry run starts nothing",
+              ok_test is False and "test" in why_test and ok_busy is False and "already running" in why_busy
+              and ok_blind is False and ok_dry is True and n_before == 0, (why_test, why_busy, why_blind, why_dry, _launched))
+        check("H1sc ...and with the way clear it starts exactly one covenant_one.py",
+              ok_go is True and len(_launched) == 1 and _launched[0][-1].endswith("covenant_one.py") and "4242" in why_go, (why_go, _launched))
+    else:
+        check("H1sc off Windows the remedy declines (it cannot see a running sweep) and starts nothing",
+              ok_go is False and not _launched, (why_go, _launched))
+
+    # ---- H1am: free granted and silent (A279, 2026-10-06). Every input is a stand-in.
+    _n = 1_900_000_000.0
+    _g = {"granted": True}
+    am = {
+        "no_grant": H.detect_ambassador_stalled(grant=None or {}, paused=(False, ""), rounds=[], now=_n)["state"],
+        "paused": H.detect_ambassador_stalled(grant=_g, paused=(True, "isolated 2026-10-04: ..."), rounds=[{"at": _n - 600}], now=_n),
+        "fresh": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 3 * 3600}], now=_n)["state"],
+        "stale": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 9 * 3600}, {"t": "2001-01-01T00:00:00Z"}], now=_n),
+        "never": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[], now=_n)["state"],
+    }
+    check("H1am ambassador_stalled: no grant ABSENT (his choice); paused PRESENT with the pause's own words; a round 3 h ago "
+          "ABSENT; none in 9 h PRESENT; no round ever on record UNKNOWN",
+          am["no_grant"] == H.ABSENT and am["paused"]["state"] == H.PRESENT and "isolated" in am["paused"]["measured"]["why"]
+          and am["fresh"] == H.ABSENT and am["stale"]["state"] == H.PRESENT and am["stale"]["measured"]["last_live_round_h"] == 9.0
+          and am["never"] == H.UNKNOWN, am)
+    _rws = [{"kind": "reply", "sent": True}, {"kind": "round", "t": "r1"},
+            {"kind": "reply", "why": "held by covenant's judge (no view -- not an objection)", "tetsu": "REFUSE"},
+            {"kind": "reply", "why": "held by covenant's judge (no view -- not an objection)"},
+            {"kind": "reply", "why": "refused by covenant's judge: quorum=violates"},
+            {"kind": "reply", "why": "HELD by Moltbook's own rate limit -- 1 comment per 20s"},
+            {"kind": "reply", "sent": True, "tetsu": "SEND"}, {"kind": "round", "t": "r2"}]
+    _iso = H.detect_ambassador_stalled(grant=_g, paused=(True, "isolated"), rounds=[{"at": _n - 600}], now=_n, sends=_rws)
+    _lr = _iso["measured"].get("last_rounds") or []
+    check("H1am when isolated, the road says BY WHAT: per round, held with no view, convicted, rate-limited, sent, and "
+          "what Tetsu reviewed and refused (A296)",
+          len(_lr) == 2 and _lr[0]["sent"] == 1 and _lr[1] == {"t": "r2", "tried": 5, "sent": 1, "held_no_view": 2, "convicted": 1,
+                                                                "rate_limited": 1, "other": 0, "tetsu_reviewed": 2, "tetsu_refused": 1},
+          _lr)
+    # A300 (2026-10-07): a starved round (the model could not write) ran but did not speak.
+    _sv = lambda h, w="RuntimeError: no weights fit: free 1.6 GB": {"at": _n - h * 3600, "starved": w}  # noqa: E731
+    am_s = {
+        "starved_after": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 9 * 3600}, _sv(6), _sv(3)], now=_n),
+        "only_starved": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[_sv(1)], now=_n),
+        "spoke_since": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[_sv(6), {"at": _n - 3 * 3600}], now=_n),
+    }
+    check("H1am a starved round does not reset the stall clock and is named with the model's error; one that spoke "
+          "after it clears it (A300)",
+          am_s["starved_after"]["state"] == H.PRESENT and am_s["starved_after"]["measured"]["starved"]["rounds"] == 2
+          and "could not write" in am_s["starved_after"]["measured"]["why"] and "no weights fit" in am_s["starved_after"]["measured"]["why"]
+          and am_s["only_starved"]["state"] == H.PRESENT and am_s["spoke_since"]["state"] == H.ABSENT
+          and "starved" not in am_s["spoke_since"]["measured"], am_s)
+    _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
+    check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
+
+    # ---- H1ak: Tetsu up and failing (A282, 2026-10-06). Stand-in rows, a fixed clock.
+    _ta = 1_900_000_000.0
+    _okr = lambda ago: {"at": _ta - ago, "ok": True, "ms": 900}                                    # noqa: E731
+    _bad = lambda ago: {"at": _ta - ago, "ok": False, "ms": 34500, "error": "HTTPError: HTTP Error 500"}  # noqa: E731
+    ak = {
+        "failing": H.detect_tetsu_asks_failing(rows=[_bad(60), _bad(120), _okr(180), _bad(240)], now=_ta),
+        "healthy": H.detect_tetsu_asks_failing(rows=[_okr(60), _okr(120), _bad(180), _okr(240)], now=_ta)["state"],
+        "too_few": H.detect_tetsu_asks_failing(rows=[_bad(60), _bad(120)], now=_ta)["state"],
+        "old": H.detect_tetsu_asks_failing(rows=[_bad(3 * 3600), _bad(3 * 3600 + 5), _bad(3 * 3600 + 9)], now=_ta)["state"],
+    }
+    check("H1ak tetsu_asks_failing: 3 of 4 recent asks failed PRESENT naming the error; 1 of 4 ABSENT; 2 asks too few to "
+          "judge ABSENT; failures older than the window ABSENT",
+          ak["failing"]["state"] == H.PRESENT and "500" in ak["failing"]["measured"]["last_error"]
+          and ak["healthy"] == H.ABSENT and ak["too_few"] == H.ABSENT and ak["old"] == H.ABSENT, ak)
+    import covenant_model as _CMk
+    _real_asks = _CMk.ASKS
+    try:
+        _CMk.ASKS = os.path.join(tempfile.mkdtemp(prefix="h1ak_"), "absent.jsonl")
+        r_noledger = H.detect_tetsu_asks_failing(now=_ta)["state"]
+    finally:
+        _CMk.ASKS = _real_asks
+    check("H1ak no ledger here is UNKNOWN, never ABSENT", r_noledger == H.UNKNOWN, r_noledger)
+
+    # ---- H1tf: the covenant witnesses threefold (A294, 2026-10-07). A stand-in reader; nothing is fetched.
+    import hashlib as _hlt
+    _G = "0" * 64
+
+    def _chain(n, break_at=None):
+        lines, prev = [], None
+        import sys as _s
+        _s.path.insert(0, os.path.join(HERE, "ai_memory_system"))
+        import memory_store as _ms
+        prev = _ms.GENESIS
+        for i in range(n):
+            rec = {"at": i, "action": "put", "name": "m%d" % i, "agent": "t", "sha256": "x", "prev": prev if i != break_at else "f" * 64}
+            ln = json.dumps(rec, sort_keys=True)
+            lines.append(ln)
+            prev = _hlt.sha256(ln.encode("utf-8")).hexdigest()
+        return "\n".join(lines) + "\n"
+    _files0 = ["task-a.md", "jlens-a.md", "task-b.md", "task-b-ocr.md", "jlens-b.md", "task-old.md", ".trash/task-z.md"]
+    _tfc = os.path.join(tempfile.mkdtemp(prefix="h1tf_"), "tf.json")
+    r0 = H.detect_threefold_witness(read=lambda repo: (_chain(5), _files0), now=1000.0, cache=_tfc)
+    r1 = H.detect_threefold_witness(read=lambda repo: (_chain(6), _files0 + ["task-c.md", "jlens-c.md"]), now=5000.0, cache=_tfc)
+    r2 = H.detect_threefold_witness(read=lambda repo: (_chain(7), _files0 + ["task-d.md"]), now=9000.0, cache=_tfc)
+    r3 = H.detect_threefold_witness(read=lambda repo: (_chain(7, break_at=3), _files0), now=13000.0, cache=_tfc)
+    r4 = H.detect_threefold_witness(read=lambda repo: (_ for _ in ()).throw(OSError("offline")), now=17000.0, cache=_tfc)
+    check("H1tf threefold_witness: a verifying chain with only the first reading's gaps ABSENT (the gap named); a complete new "
+          "task ABSENT; a NEW task without its third (L-Lens) leg PRESENT; a broken chain PRESENT naming the line; unreadable UNKNOWN",
+          r0["state"] == H.ABSENT and r0["measured"]["known_gaps"] == ["old"] and r1["state"] == H.ABSENT
+          and r2["state"] == H.PRESENT and r2["measured"]["new_gaps"] == ["d"]
+          and r3["state"] == H.PRESENT and r3["measured"]["chain_ok"] is False and r3["measured"]["broken_at"] == 4
+          and r4["state"] == H.UNKNOWN, (r0, r1, r2, r3, r4))
+    # A302: the third leg by discovery -- renamed legs (jspace-, lspace-) count; a reading cached in the future is not used.
+    _tfc2 = os.path.join(tempfile.mkdtemp(prefix="h1tf2_"), "tf.json")
+    _files2 = ["task-a.md", "jlens-a.md", "task-old.md"]
+    q0 = H.detect_threefold_witness(read=lambda repo: (_chain(5), _files2), now=1000.0, cache=_tfc2)
+    q1 = H.detect_threefold_witness(read=lambda repo: (_chain(6), _files2 + ["task-e.md", "lspace-e.md", "task-f.md",
+                                                                              "jspace-f.md", "task-g.md"]), now=5000.0, cache=_tfc2)
+    with open(_tfc2, "w", encoding="utf-8") as _fh:
+        json.dump({"at": time.time() + 99999, "known_gaps": ["old"], "last": {"state": "STALE", "measured": {}}}, _fh)
+    _real_tfc = H.THREEFOLD_CACHE
+    try:
+        H.THREEFOLD_CACHE = _tfc2
+        _orig_read = H._threefold_read
+        H._threefold_read = lambda repo: (_chain(5), _files2)
+        q2 = H.detect_threefold_witness(now=time.time())
+    finally:
+        H.THREEFOLD_CACHE = _real_tfc
+        H._threefold_read = _orig_read
+    check("H1tf a leg under a new name (lspace-, jspace-) is a leg; only a task with no sibling leg at all is a gap, and "
+          "the leg names seen are reported; a reading cached in the future is not reused (A302)",
+          q0["state"] == H.ABSENT and q1["state"] == H.PRESENT and q1["measured"]["new_gaps"] == ["g"]
+          and q1["measured"]["legs"] == {"jlens": 1, "jspace": 1, "lspace": 1} and q2["state"] == H.ABSENT, (q1, q2))
+    # A304: a witnessed head -- a rewritten middle with every later link recomputed verifies, and is still caught.
+    def _chain_forged(n, forge_at):
+        import sys as _s
+        _s.path.insert(0, os.path.join(HERE, "ai_memory_system"))
+        import memory_store as _ms
+        lines, prev = [], _ms.GENESIS
+        for i in range(n):
+            rec = {"at": i, "action": "put", "name": "m%d" % i, "agent": "t", "sha256": "FORGED" if i == forge_at else "x",
+                   "prev": prev}
+            ln = json.dumps(rec, sort_keys=True)
+            lines.append(ln)
+            prev = _hlt.sha256(ln.encode("utf-8")).hexdigest()
+        return "\n".join(lines) + "\n"
+    _tfc3 = os.path.join(tempfile.mkdtemp(prefix="h1tf3_"), "tf.json")
+    w0 = H.detect_threefold_witness(read=lambda repo: (_chain(5), _files2), now=1000.0, cache=_tfc3)
+    w1 = H.detect_threefold_witness(read=lambda repo: (_chain(6), _files2), now=5000.0, cache=_tfc3)
+    w2 = H.detect_threefold_witness(read=lambda repo: (_chain_forged(6, 1), _files2), now=9000.0, cache=_tfc3)
+    kept = json.load(open(_tfc3, encoding="utf-8")).get("head_witness") or {}
+    w2b = H.detect_threefold_witness(read=lambda repo: (_chain_forged(6, 1), _files2), now=11000.0, cache=_tfc3)
+    w3 = H.detect_threefold_witness(read=lambda repo: (_chain(3), _files2), now=13000.0, cache=_tfc3)
+    check("H1tf a witnessed head (A304): an extended history ABSENT; a middle rewritten with every later link "
+          "recomputed -- which verify_chain passes -- PRESENT 'history rewritten'; the witness is not moved by it; "
+          "a shortened ledger PRESENT",
+          w0["state"] == H.ABSENT and w1["state"] == H.ABSENT
+          and w2["state"] == H.PRESENT and w2["measured"]["chain_ok"] is True and "history_rewritten" in w2["measured"]
+          and kept.get("entries") == 6 and w2b["state"] == H.PRESENT
+          and w3["state"] == H.PRESENT and "history_rewritten" in w3["measured"],
+          (w1["state"], w2, kept, w2b["state"], w3["state"]))
+    # ---- H1pe: a public commit naming a real address (A306, 2026-10-07). Stand-in API answers; nothing fetched.
+    _REAL = "someone.private@example.org"
+    _NR = "1+u@users.noreply.github.com"
+
+    def _cm(sha, author, committer):
+        return {"sha": sha + "0" * 33, "commit": {"author": {"email": author, "date": "2026-10-07T10:00:00Z"},
+                                                   "committer": {"email": committer}}}
+    _api = {"repos": [{"name": "a"}, {"name": "b"}, {"name": "c", "private": True}, {"name": "d", "fork": True}],
+            "a": [_cm("aaaaaaa", _REAL, _NR), _cm("aaaaaab", _NR, "noreply@github.com")], "b": [_cm("bbbbbbb", _NR, _NR)],
+            "c": [_cm("ccccccc", _REAL, _REAL)], "d": [_cm("ddddddd", _REAL, _REAL)], "e": [_cm("eeeeeee", _NR, _REAL)]}
+    _asked = []
+
+    def _get(path):
+        _asked.append(path)
+        if path.startswith("/users/"):
+            return list(_api["repos"])
+        return list(_api[path.split("/")[3]])
+    _pec = os.path.join(tempfile.mkdtemp(prefix="h1pe_"), "pe.json")
+    p0 = H.detect_public_email_exposure(get=_get, now=1000.0, cache=_pec)
+    _api["a"].insert(0, _cm("aaaaaac", _REAL, _REAL))
+    _api["repos"].append({"name": "e"})
+    p1 = H.detect_public_email_exposure(get=_get, now=9000.0, cache=_pec)
+    p2 = H.detect_public_email_exposure(get=lambda p: (_ for _ in ()).throw(OSError("offline")), now=17000.0, cache=_pec)
+    check("H1pe public_email_exposure: repos DISCOVERED (private and forks skipped, never read); the first reading's "
+          "exposure counted, not alarmed (ABSENT); a NEW exposed commit PRESENT, including a repo that appeared later "
+          "and a committer-only exposure; the API unreadable UNKNOWN",
+          p0["state"] == H.ABSENT and p0["measured"]["repos"] == ["a", "b"] and p0["measured"]["known"] == 1
+          and not any("/c/" in a or "/d/" in a for a in _asked)
+          and p1["state"] == H.PRESENT and p1["measured"]["new"] == ["a@aaaaaac", "e@eeeeeee"]
+          and p1["measured"]["newest"]["e"]["fields"] == ["committer"] and p2["state"] == H.UNKNOWN, (p0, p1, p2))
+    check("H1pe the address itself is never copied into a reading or the cache -- only repo, sha, field and date",
+          _REAL not in json.dumps([p0, p1]) and _REAL not in open(_pec, encoding="utf-8").read())
+    check("H1pe no remedy: history is his to rewrite, and another agent's commit settings are that agent's",
+          [n for n, r in H.REMEDIES.items() if "public_email_exposure" in (r.get("for") or [])] == [])
+    check("H1tf no remedy: the repository and its code are his and Grok's",
+          [n for n, r in H.REMEDIES.items() if "threefold_witness" in (r.get("for") or [])] == [])
+
+    # ---- H1st: Moltbook strikes (A283, 2026-10-06). Stand-in ledger rows.
+    _ts = 1_900_000_000.0
+    _v = lambda req, sol, ab=False, ago=3600: {"t": "x", "at": _ts - ago, "author": "a", "verification":  # noqa: E731
+                                               {"required": req, "solved": sol, "abstained": ab}}
+    st_ = {
+        "clean": H.detect_moltbook_strikes(rows=[_v(True, True), _v(False, False), {"kind": "reply"}], now=_ts)["state"],
+        "wrong": H.detect_moltbook_strikes(rows=[_v(True, True), _v(True, False)], now=_ts),
+        "abstained": H.detect_moltbook_strikes(rows=[_v(True, False, ab=True)], now=_ts)["state"],
+        "old": H.detect_moltbook_strikes(rows=[_v(True, False, ago=8 * 86400)], now=_ts)["state"],
+        "none": H.detect_moltbook_strikes(rows=[{"kind": "reply", "sent": True}], now=_ts)["state"],
+    }
+    check("H1st moltbook_strikes: every challenge solved ABSENT; a wrong answer PRESENT and counted; an abstention spends "
+          "nothing (ABSENT); a strike older than a week out of the window (UNKNOWN: nothing in it); nothing on record UNKNOWN",
+          st_["clean"] == H.ABSENT and st_["wrong"]["state"] == H.PRESENT and st_["wrong"]["measured"]["wrong_answers_7d"] == 1
+          and st_["abstained"] == H.ABSENT and st_["old"] == H.UNKNOWN and st_["none"] == H.UNKNOWN, st_)
+    check("H1st no remedy: the account is his", [n for n, r in H.REMEDIES.items() if "moltbook_strikes" in (r.get("for") or [])] == [])
+
+    # ---- H1sk: the schedule is alive (A281, 2026-10-06). Stand-in task lists; the scheduler is never read here.
+    _t = 1_900_000_000.0
+    _ok = {"name": "CovenantGuard", "state": "Ready", "last_run": _t - 120, "next_run": _t + 60, "missed": 0}
+    sk = {
+        "alive": H.detect_schedule_stalled(tasks=[_ok], now=_t)["state"],
+        "late": H.detect_schedule_stalled(tasks=[_ok, dict(_ok, name="CovenantDistill", next_run=_t - 2 * 3600)], now=_t),
+        "missed": H.detect_schedule_stalled(tasks=[dict(_ok, missed=2)], now=_t)["state"],
+        "disabled": H.detect_schedule_stalled(tasks=[dict(_ok, state="Disabled", next_run=_t - 9 * 3600)], now=_t),
+        "unread": H.detect_schedule_stalled(tasks=None if False else [], now=_t)["state"],
+    }
+    check("H1sk schedule_stalled: firing ABSENT; a task 2 h overdue PRESENT naming it; missed runs PRESENT; a DISABLED task "
+          "listed and not flagged (his choice); no task here UNKNOWN",
+          sk["alive"] == H.ABSENT and sk["late"]["state"] == H.PRESENT and "CovenantDistill" in sk["late"]["measured"]["stalled"][0]
+          and sk["missed"] == H.PRESENT and sk["disabled"]["state"] == H.ABSENT and sk["disabled"]["measured"]["disabled"] == ["CovenantGuard"]
+          and sk["unread"] == H.UNKNOWN, sk)
+    check("H1sk no remedy: the scheduler's configuration is his",
+          [n for n, r in H.REMEDIES.items() if "schedule_stalled" in (r.get("for") or [])] == [])
+
+    # ---- H1tr: a red shown transient gets its full sweep (A289); a real failure never does.
+    _tr_dir = tempfile.mkdtemp(prefix="h1tr_")
+    _art = os.path.join(_tr_dir, "ONE_RUN.txt")
+    _heal = os.path.join(_tr_dir, "sweep_heal_last.txt")
+    open(_art, "w").write("RESULT: FAIL")
+    _real_tr = (H.SWEEP_HEAL, H._sweep_cmdlines, H._sweep_launch, sys.argv[0],
+                {k: os.environ.get(k) for k in ("COVENANT_ONE_TRANSCRIPT", "COVENANT_INSECURE_MOCK_JUDGE")})
+    _launched_tr = []
+    _red = {"verdict": "FAIL", "artifact": _art, "unclean": ["test_wb1_web.py"]}
+    try:
+        H.SWEEP_HEAL = _heal
+        H._sweep_cmdlines = lambda: []
+        H._sweep_launch = lambda cmd, log: (_launched_tr.append(cmd), type("P", (), {"pid": 77})())[1]
+        sys.argv[0] = "covenant_watchdog.py"
+        for k in _real_tr[4]:
+            os.environ.pop(k, None)
+        no_heal = H.remedy_run_full_sweep(_red, dry_run=False)
+        open(_heal, "w").write("  suites not clean    1  -> test_wb1_web.py" + chr(10))
+        os.utime(_heal, (os.path.getmtime(_art) + 60,) * 2)
+        unclean = H.remedy_run_full_sweep(_red, dry_run=False)
+        open(_heal, "w").write("  suites not clean    0" + chr(10))
+        os.utime(_heal, (os.path.getmtime(_art) + 60,) * 2)
+        clean = H.remedy_run_full_sweep(_red, dry_run=False)
+        os.utime(_heal, (os.path.getmtime(_art) - 60,) * 2)
+        stale = H.remedy_run_full_sweep(_red, dry_run=False)
+    finally:
+        H.SWEEP_HEAL, H._sweep_cmdlines, H._sweep_launch, sys.argv[0] = _real_tr[0], _real_tr[1], _real_tr[2], _real_tr[3]
+        for k, v in _real_tr[4].items():
+            if v is not None:
+                os.environ[k] = v
+    if os.name == "nt":
+        check("H1tr for sweep_red: no re-run yet declines; an unclean re-run declines; a clean re-run newer than the sweep "
+              "starts exactly one full sweep; a clean re-run OLDER than the sweep declines",
+              no_heal[0] is False and unclean[0] is False and "real failure" in unclean[1] and clean[0] is True
+              and stale[0] is False and len(_launched_tr) == 1, (no_heal, unclean, clean, stale, _launched_tr))
+
+    _ru = H.REMEDIES["rerun_unclean"]
+    check("H1tr rerun_unclean is graded after the full sweep it hands on has had time (A290), not at once",
+          "sweep_red" in (_ru.get("async_for") or []) and _ru.get("grade_after_s", 0) >= 3600, _ru)
+
+    # ---- H1sr: the original _sweep_running is itself again (A289). A278 redefined the name; the eviction remedy's
+    # `is not False` then saw [] and refused every eviction. The REAL function is called here, not a stub.
+    _r = H._sweep_running()
+    check("H1sr _sweep_running (A200) answers True/False/None, and the full-sweep remedy's lister is a different function",
+          (_r is True or _r is False or _r is None) and H._sweep_running is not H._sweep_cmdlines, (_r, H._sweep_running))
+
+    # ---- H1tt: Tetsu on the road (A276, 2026-10-06, his words: "get the road green and start expanding
+    # the highway"). Two READS of covenant_model.readiness(), driven with a stand-in, each way. No remedy
+    # may be paired with either: the model is NEVER_AUTOMATIC and freeing memory is his (A252).
+    _mem = lambda: {"verdict": "FAIL", "why": "Tetsu cannot answer: free 1.4 GB", "free_gb": 1.4, "needs_gb": 2.1,  # noqa: E731
+                    "smallest": "Qwen3.5-2B-Q4_K_M.gguf"}
+    _up = lambda: {"verdict": "PASS", "why": "up: qwen2.5-3b-instruct-q4_k_m.gguf", "free_gb": 0.8}  # noqa: E731
+    _orphan = lambda: {"verdict": "UNDETERMINED", "managed": False, "why": "a server answers ... no state (A265)"}  # noqa: E731
+    _noruntime = lambda: {"verdict": "FAIL", "why": "no runtime at tools/llama/llama-server.exe"}  # noqa: E731
+    _broken = lambda: (_ for _ in ()).throw(OSError("keeper unreadable"))  # noqa: E731
+    tc = {n: H.detect_tetsu_cannot_answer(ready=f)["state"] for n, f in
+          (("mem", _mem), ("up", _up), ("orphan", _orphan), ("noruntime", _noruntime), ("broken", _broken))}
+    check("H1tt tetsu_cannot_answer: the memory case PRESENT; up ABSENT; unmanaged, no runtime (a clone) and an "
+          "unreadable keeper UNKNOWN -- never ABSENT for what it could not read",
+          tc == {"mem": H.PRESENT, "up": H.ABSENT, "orphan": H.UNKNOWN, "noruntime": H.UNKNOWN, "broken": H.UNKNOWN}, tc)
+    mu = {n: H.detect_model_unmanaged(ready=f)["state"] for n, f in
+          (("orphan", _orphan), ("up", _up), ("mem", _mem), ("broken", _broken))}
+    check("H1tt model_unmanaged: a server the keeper has no record of PRESENT; managed or nothing up ABSENT; "
+          "unreadable UNKNOWN", mu == {"orphan": H.PRESENT, "up": H.ABSENT, "mem": H.ABSENT, "broken": H.UNKNOWN}, mu)
+    # A287 (2026-10-06): this check said neither condition has a remedy, "freeing memory is his". A252 -- his own
+    # words, "find a way to safely ensure tetsus operation" -- left CLOSING to him; a trim closes nothing. So
+    # tetsu_cannot_answer now has exactly one remedy, the trim, and model_unmanaged still has none.
+    _tt_paired = sorted((n, f) for n, r in H.REMEDIES.items() for f in (r.get("for") or [])
+                        if f in ("tetsu_cannot_answer", "model_unmanaged"))
+    check("H1tt the only Tetsu remedy is trim_idle_apps, for tetsu_cannot_answer; model_unmanaged has none",
+          _tt_paired == [("trim_idle_apps", "tetsu_cannot_answer")], _tt_paired)
+    _tr = H.REMEDIES["trim_idle_apps"]
+    _crossed = [w for w in H.NEVER_AUTOMATIC for t in _tr.get("touches", []) if w in t.lower()]
+    check("H1tt the trim is AUTO_REVERSIBLE, stateless, at most once an hour, and touches no NEVER_AUTOMATIC subject",
+          _tr["klass"] == H.AUTO_REVERSIBLE and _tr["kind"] == "stateless" and _tr.get("cooldown_s", 0) >= 3600 and not _crossed,
+          (_tr, _crossed))
+    _real_runner = H._trim_runner
+    try:
+        _ran = []
+        H._trim_runner = lambda names, dry: (_ran.append((tuple(names), dry)), {"trimmed": 5, "foreground": "Code",
+                                                                                "before_gb": 1.6, "after_gb": 3.3})[1]
+        ok_nm, why_nm = H.remedy_trim_idle_apps({"verdict": "FAIL", "why": "no runtime"}, dry_run=False)
+        ok_tr, why_tr = H.remedy_trim_idle_apps({"free_gb": 1.6, "needs_gb": 2.1}, dry_run=False)
+    finally:
+        H._trim_runner = _real_runner
+    if os.name == "nt":
+        check("H1tt the trim declines outside the memory case and, in it, trims and says what it freed and what it spared",
+              ok_nm is False and not any(not d for _n, d in _ran[:0]) and ok_tr is True and "1.6 -> 3.3" in why_tr
+              and "not Code" in why_tr and len(_ran) == 1, (why_nm, why_tr, _ran))
+    check("H1tt the trim's list is background apps only -- never Python (the nodes, the watchdog) or the model server",
+          not any(n.lower().startswith(("python", "llama", "pythonw")) for n in H.TRIM_APPS), H.TRIM_APPS)
+    check("H1tt both are registered, so sense() runs them every pass",
+          H.DETECTORS.get("tetsu_cannot_answer") is H.detect_tetsu_cannot_answer
+          and H.DETECTORS.get("model_unmanaged") is H.detect_model_unmanaged)
+
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]
     check("H1v every registered detector is named somewhere in this suite",
@@ -1524,6 +1949,27 @@ def main():
     check("H1o3 mutation: the old watchdog is still the oldest running -> did not fix (the remedy did not work)",
           len(got) == 1 and got[0]["outcome"] == "did not fix" and not got[0].get("recurred"),
           str([(g["outcome"], g.get("recurred")) for g in got]))
+    # A295 (2026-10-07): the same for restart_nodes. At 06:58:37 the road restarted the nodes after a commit; they
+    # started at 06:58:40; a second commit moved the imports mid-restart, and the restart was graded "did not fix".
+    NREM = "restart_nodes"
+    NWIN = float(H.REMEDIES[NREM].get("grade_after_s") or H.GRADE_AFTER_S)
+    tn = NOW - NWIN - 60
+
+    def nd_now(nodes_started):
+        return {"source_drift": {"state": H.PRESENT, "measured": {
+            "disk": "abc", "live": {"A": "abc"}, "drifted": ["A"], "imports_disk": "new", "imports_drifted": ["A"],
+            "nodes_started": nodes_started}}}
+    led = tmp_ledger()
+    started_row(led, tn, detector="source_drift", remedy=NREM)
+    got = H.grade_started(nd_now(tn + 3), ledger=led, now=NOW, dry_run=True)
+    led2 = tmp_ledger()
+    started_row(led2, tn, detector="source_drift", remedy=NREM)
+    got2 = H.grade_started(nd_now(tn - 900), ledger=led2, now=NOW, dry_run=True)
+    check("H1o3 source_drift: every node started after the restart began -> fixed, marked recurred; a node older than "
+          "the restart -> did not fix (A295)",
+          len(got) == 1 and got[0]["outcome"] == "fixed" and got[0].get("recurred") is True
+          and len(got2) == 1 and got2[0]["outcome"] == "did not fix" and not got2[0].get("recurred"),
+          (str([(g["outcome"], g.get("recurred")) for g in got]), str([(g["outcome"], g.get("recurred")) for g in got2])))
     led = tmp_ledger()
     for k in range(2):
         started_row(led, t0 - 7200 * (1 - k), detector="watchdog_stale", remedy=WREM)

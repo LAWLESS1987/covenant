@@ -452,7 +452,10 @@ class MemoryStore:
     def verify_integrity(self) -> Dict[str, Any]:
         """Do the MEMORIES still say what the ledger says they said?
 
-        verify_chain() proves the ledger has not been reordered or spliced.
+        verify_chain() proves each line links to the one before it -- no more. RETRACTED
+        (A304-CHAIN-SPLICE-2026-10-07), as first written: "verify_chain() proves the ledger has not been
+        reordered or spliced." A rewrite that recomputes every later link still verifies (A8c); only a head
+        witnessed outside the file shows it (A8b, A8d).
         It proves nothing about the .md files, and until 2026-08-29 nothing
         else did either: the per-write digest was recorded and never read
         back, so editing a memory body on disk was undetectable. The chain
@@ -544,6 +547,10 @@ class MemoryStore:
 
           verify_chain()  this node's ledger was not reordered   (local, timed)
           state_root()    what this node believes                (shared, untimed)
+
+        (A304-CHAIN-SPLICE-2026-10-07: the first line overstates. verify_chain() shows each line links to
+        the one before it; a reordering that recomputes every later link passes it unless the head was
+        witnessed outside the file.)
 
         STATE, NOT SEQUENCE. This is a Merkle root over the sorted set of
         (name, content_digest) pairs, so it is independent of the ORDER writes

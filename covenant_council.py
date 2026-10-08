@@ -78,19 +78,27 @@ def _log_row(row):
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def deliberate(question, history, ask, system):
-    """Run the roles in turn. Returns (steps, final). Pure apart from `ask`."""
+def deliberate(question, history, ask, system, fit=None):
+    """Run the roles in turn. Returns (steps, final). Pure apart from `ask` and `fit`.
+    fit (A273, covenant_model.fit): each role's request is cut to the model's window before it is
+    sent -- the oldest replayed turns go first, as few as fit -- because each role's question carries
+    more of what the council has said than the one before it."""
     steps = []
     prior = ""
     for role, brief in ROLES:
         user = question if not prior else question + "\n\nWhat the council has said so far:\n" + prior
         msgs = [{"role": "system", "content": system + "\n\n" + brief}] + list(history) + \
                [{"role": "user", "content": user}]
+        n, info = MAX_TOKENS_PER_ROLE, None
+        if fit is not None:
+            msgs, n, info = fit(msgs, max_tokens=MAX_TOKENS_PER_ROLE, droppable=len(history))
         t0 = time.time()
-        answer, meta = ask(msgs, max_tokens=MAX_TOKENS_PER_ROLE)
+        answer, meta = ask(msgs, max_tokens=n)
         answer = (answer or "").strip()
         steps.append({"role": role, "content": answer[:4000], "in_chars": sum(len(m["content"]) for m in msgs),
                       "ms": int((time.time() - t0) * 1000), "model": (meta or {}).get("model")})
+        if info is not None:
+            steps[-1]["fit"] = info
         prior += "%s: %s\n" % (role, answer[:1500])
     final = steps[-1]["content"] if steps else ""
     return steps, final
@@ -350,7 +358,10 @@ def register(api):
             _m = importlib.import_module("covenant_model")
         except Exception as e:                                    # noqa: BLE001
             return jsonify({"status": "error", "message": "no model keeper on this node: %s" % e}), 503
-        history = cov.agent_history(_log_path(), addr, include_private=private)
+        # A273: no character budget where the keeper can count; deliberate() fits each role's request.
+        _fit = getattr(_m, "fit", None)
+        history = cov.agent_history(_log_path(), addr, budget=cov.agent_history_budget(addr, _fit is not None),
+                                    include_private=private)
         # A210 ("Free browser access"): a URL in the question is read through the
         # web door, read-only and on record, and handed to the council as data.
         # A263: not for a private ask -- the address is part of the private text, and
@@ -376,7 +387,7 @@ def register(api):
             except Exception as _pe:                              # noqa: BLE001
                 print("council: fixed rules only this council (%s)" % type(_pe).__name__, flush=True)
                 _system = cov.AGENT_SYSTEM
-            steps, final = deliberate(text, history, _m.ask, _system)
+            steps, final = deliberate(text, history, _m.ask, _system, fit=_fit)
         except Exception as e:                                    # noqa: BLE001
             return jsonify({"status": "error", "message": "the council did not answer: %s: %s" % (type(e).__name__, str(e)[:300])}), 503
         tx = cov.Transaction(sender_pubkey="model", receiver="collective",
@@ -398,7 +409,13 @@ def register(api):
         _row = {"kind": "council", "from": addr, "text": text, "answer": "" if withheld else final[:4000],
                 "steps": [{"role": s["role"], "content": s["content"][:1500], "ms": s["ms"]} for s in steps],
                 "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
-                "message": str(message)[:2000], "model": steps[-1].get("model") if steps else None}
+                "message": str(message)[:2000], "model": steps[-1].get("model") if steps else None,
+                "fit": [s["fit"] for s in steps if s.get("fit")]}
+        try:                                                      # A314: a browser page's ask is his word
+            if importlib.import_module("covenant_persona").page_request(request.headers):
+                _row["page"] = True
+        except Exception:                                         # noqa: BLE001 -- a label, never a gate
+            pass
         _out = {"status": "success", "answer": "" if withheld else final, "withheld": withheld,
                 "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
                 "judge": getattr(result, "judge_id", "") if result is not None else "",

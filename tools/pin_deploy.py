@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/pin_deploy.py -- every deploy pin besides the core's moves in the SAME commit as its file (A267, M53).
+"""tools/pin_deploy.py -- every deploy pin besides the core's moves in the SAME commit as its file (A315, M53).
 
 WHY. verify_deploy.py pins five files by sha256. tools/pin_core.py (2026-10-03) moves the core's pin when
 the core is committed; nothing moved the other four, so its tombstone covered one pin of five. Measured over

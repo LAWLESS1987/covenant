@@ -390,7 +390,9 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass
             # Both checks, never merged into one verdict. The chain proves the
-            # ledger was not reordered; `content` proves the memories still
+            # ledger was not reordered (A304-CHAIN-SPLICE-2026-10-07: overstated -- it shows
+            # each line links to the one before; a re-linked rewrite passes unless the head
+            # was witnessed outside the file); `content` proves the memories still
             # say what the ledger says they said. A store can pass the first
             # and fail the second -- that was the real state of this system
             # until 2026-08-29, and test I4b pins it.

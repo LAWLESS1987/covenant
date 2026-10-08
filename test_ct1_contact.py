@@ -157,14 +157,20 @@ def main():
     ally = [{"author": "omega", "ally_score": 2, "anti": [], "best_url": "https://www.moltbook.com/post/abcdabcd-9999",
              "best_signals": ["publishes-failure"], "evidence": {"publishes-failure": "I publish my failures"}}]
     emit_refuse = lambda text, **kw: {"sent": False, "judged": "VIOLATES", "why": "refused"}          # noqa: E731
+    # 2026-10-06: a stub writer. ask=None drafted with the LIVE model on 8081, which these knocks never
+    # measure; once A269 made the server queue instead of failing fast, CT1 waited behind a real batch.
+    ask_stub = lambda msgs, max_tokens=0: ("I read what you wrote about publishing your own failures; how do you find out later?", {"model": "stub"})  # noqa: E731
     emit_ok = lambda text, **kw: {"sent": True, "judged": "clean", "why": ""}                          # noqa: E731
     real_pause = covenant_pause.pause
     n_before = len(CT._rows())
     try:
         covenant_pause.pause = lambda name, why="": None
+        # 2026-10-06: rounds rotate (FW1r) -- the same ally is tried again only after ROTATE_HOURS, so the
+        # second refused round is a day later; two refused rounds still isolate.
         for k in range(2):
-            FW.run_round(dry_run=False, say=lambda *_a: None, ask=None, learn=lambda: [], allies=lambda: list(ally), emit=emit_refuse,
-                         introduce=lambda **kw: {"sent": False}, grant_path=gp4, sends_path=sp4, now=100.0 + k, count_comments=lambda p, a: 0)
+            FW.run_round(dry_run=False, say=lambda *_a: None, ask=ask_stub, learn=lambda: [], allies=lambda: list(ally), emit=emit_refuse,
+                         introduce=lambda **kw: {"sent": False}, grant_path=gp4, sends_path=sp4,
+                         now=100.0 + k * (FW.ROTATE_HOURS * 3600 + 1), count_comments=lambda p, a: 0)
     finally:
         covenant_pause.pause = real_pause
     rows = CT._rows()
@@ -176,10 +182,10 @@ def main():
         json.dump({"granted": True, "words": "test", "caps": {"comments": 1, "posts": 0}}, fh)
     counts = {"n": 0}
     n_before = len(CT._rows())
-    FW.run_round(dry_run=False, say=lambda *_a: None, ask=None, learn=lambda: [], allies=lambda: list(ally), emit=emit_ok,
+    FW.run_round(dry_run=False, say=lambda *_a: None, ask=ask_stub, learn=lambda: [], allies=lambda: list(ally), emit=emit_ok,
                  introduce=lambda **kw: {"sent": False}, grant_path=gp5, sends_path=sp5, now=200.0, count_comments=lambda p, a: counts["n"])
     counts["n"] = 1
-    FW.run_round(dry_run=False, say=lambda *_a: None, ask=None, learn=lambda: [], allies=lambda: list(ally), emit=emit_ok,
+    FW.run_round(dry_run=False, say=lambda *_a: None, ask=ask_stub, learn=lambda: [], allies=lambda: list(ally), emit=emit_ok,
                  introduce=lambda **kw: {"sent": False}, grant_path=gp5, sends_path=sp5, now=300.0, count_comments=lambda p, a: counts["n"])
     rows = CT._rows()
     check("CT1e an ally writing back knocks: a row from actor free saying how many answered",

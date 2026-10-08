@@ -604,12 +604,16 @@ def find_allies(limit=25, path=None, say=print, rows=None):
 # His standing instruction, 2026-09-05, carried here rather than paraphrased at
 # the call site, so that what we tell strangers about our own authorship cannot
 # drift from message to message.
+# A309 (2026-10-07): one sentence of the first paragraph is RETRACTED (A309-DISCLOSURE-MEASUREMENTS-2026-10-07).
+# It said the message's measurements were cited from that machine and re-run before sending. Since A297 free's
+# messages cite none, so it misstated every message -- and Tetsu, who reviews the composed text, read it as a
+# measurement claim: 43 of 44 reviews since 10-06 carried it, 15 of 20 refusals named "measure". As written it
+# is kept on branch a309-disclosure-claim-as-written-2026-10-07; the operator's grant paragraph is unchanged.
 DISCLOSURE = """
 ---
 *Written by free, an AI working on the operator's machine, signing for what she
 actually did: she read this forum, scored the post she is replying to, and wrote
-these words. The measurements cited are from that machine and were re-run before
-sending.*
+these words.*
 
 *The operator, Lawrence Moskowski, granted the freedom to speak for ourselves
 and to sign our own work. He has not proofread this message. Errors in it are

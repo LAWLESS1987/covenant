@@ -5,10 +5,10 @@ M53 broke six times by hand (tools/pin_core.py says when). These checks drive th
 copies of verify_deploy.py and a core, never the real ones, with the four judging suites stubbed
 both ways, plus one read of the real tree: the pin on disk matches the core on disk.
 
-PC2.9-PC2.24 (2026-10-06, A267): the other four pins, moved by tools/pin_deploy.py. In-process on
-temp copies with git and the judges stubbed (PC2.11-PC2.20), and END TO END (PC2.22-PC2.24): the
+PC2.9-PC2.25 (2026-10-06, A315; PC2.25 2026-10-08): the other four pins, moved by tools/pin_deploy.py. In-process on
+temp copies with git and the judges stubbed (PC2.11-PC2.20), and END TO END (PC2.22-PC2.25): the
 tracked hook installed in a scratch repository, a run_all_tests.sh edit committed through it with
-K1/K2 stubbed passing and then failing. Every git call aimed at a scratch repository drops git's
+K1/K2 stubbed passing and then failing, then a merge of two such edits. Every git call aimed at a scratch repository drops git's
 repository-pinning variables first: this suite runs inside the real pre-commit hook (A255).
 
     python test_pc2_pin_core.py
@@ -84,7 +84,7 @@ try:
 finally:
     shutil.rmtree(td, ignore_errors=True)
 
-# ------------------------------------------------------------- PC2.9+: the other four pins (A267)
+# ------------------------------------------------------------- PC2.9+: the other four pins (A315)
 RAT = "run_all_tests.sh"
 CORE_NAME = "covenant_unified_v8.py"
 sha = lambda b: hashlib.sha256(b).hexdigest()  # noqa: E731
@@ -305,7 +305,7 @@ check("PC2.21 the tracked hook calls pin_deploy --write --staged on every commit
 def e2e():
     """The tracked hook, installed in a scratch repository, committing run_all_tests.sh edits for real."""
     if not shutil.which("git"):
-        print("  NOT RUN PC2.22-24: no git on PATH here -- the hook was not driven end to end")
+        print("  NOT RUN PC2.22-25: no git on PATH here -- the hook was not driven end to end")
         return
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
@@ -337,7 +337,7 @@ def e2e():
             fh.write(base_vd)
         g("add", RAT, "verify_deploy.py", "tools/pin_deploy.py", *D.JUDGES[RAT])
         if g("commit", "-q", "-m", "base").returncode != 0:
-            print("  NOT RUN PC2.22-24: the scratch base commit failed")
+            print("  NOT RUN PC2.22-25: the scratch base commit failed")
             return
         hook_dst = os.path.join(root, ".git", "hooks", "pre-commit")
         shutil.copy2(os.path.join(HERE, "ops", "pre-commit.synchold"), hook_dst)
@@ -369,6 +369,42 @@ def e2e():
               and (D.manifest(vd_a.decode("utf-8")) or {}).get(RAT) != sha(rat_b)
               and "NOT moved: %s" % RAT in said and "test_k2_tally_arithmetic.py" in said,
               "rc=%s %s" % (c.returncode, said[-400:]))
+
+        # PC2.25 (2026-10-08): the path work lands by -- a merge. Two branches each edit run_all_tests.sh, each
+        # commit moves the pin, so the digest LINE conflicts while the file merges cleanly. Resolving it to either
+        # side leaves a digest of bytes the merge does not hold; the merge's own commit runs the hook, which must
+        # move it. (A clean merge runs no pre-commit hook, but cannot reach this state: a file changed on one side
+        # only merges to that side's bytes, and its pin moved with them.)
+        os.remove(os.path.join(root, "FAIL_test_k2_tally_arithmetic.py"))
+        commit(b"echo four\n", "the stale pin recovers on the next commit that stages the file")
+        trunk = g("rev-parse", "--abbrev-ref", "HEAD").stdout.decode().strip()
+        g("checkout", "-q", "-b", "side")
+        commit(b"echo side\n", "side: a suite line at the end")
+        g("checkout", "-q", trunk)
+        body = open(os.path.join(root, RAT), "rb").read()
+        with open(os.path.join(root, RAT), "wb") as fh:
+            fh.write(body.replace(b"#!/bin/sh\n", b"#!/bin/sh\necho trunk-first\n", 1))
+        g("add", RAT)
+        g("commit", "-q", "-m", "trunk: a suite line at the top")
+        m = g("merge", "--no-edit", "side")
+        conflicted = g("diff", "--name-only", "--diff-filter=U").stdout.decode().split()
+        g("checkout", "--ours", "verify_deploy.py")
+        g("add", "verify_deploy.py")
+        merged = open(os.path.join(root, RAT), "rb").read()
+        resolved_stale = (D.manifest(open(os.path.join(root, "verify_deploy.py"), "rb").read().decode("utf-8"))
+                          or {}).get(RAT) != sha(merged)
+        c = g("commit", "--no-edit")
+        said = (c.stdout + c.stderr).decode("utf-8", "replace")
+        parents = g("rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
+        rat_m = head(RAT)
+        check("PC2.25 END TO END, a merge: both branches moved the pin, the digest line conflicted and was resolved to "
+              "one side's (stale for the merged bytes); the merge commit's hook moved it to HEAD's run_all_tests.sh",
+              m.returncode != 0 and conflicted == ["verify_deploy.py"] and resolved_stale and c.returncode == 0
+              and len(parents) == 3 and b"echo trunk-first" in rat_m and b"echo side" in rat_m
+              and (D.manifest(head("verify_deploy.py").decode("utf-8")) or {}).get(RAT) == sha(rat_m)
+              and "moved %s" % RAT in said,
+              "merge rc=%s conflicted=%s resolved_stale=%s commit rc=%s parents=%d %s"
+              % (m.returncode, conflicted, resolved_stale, c.returncode, len(parents), said[-300:]))
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
@@ -376,7 +412,7 @@ def e2e():
 e2e()
 
 print("\nnot measured here: the installed .git/hooks/pre-commit (a local file git does not track);"
-      " PC2.8 and PC2.21 read the tracked source it is installed from, PC2.22-24 install that source in a"
+      " PC2.8 and PC2.21 read the tracked source it is installed from, PC2.22-25 install that source in a"
       " scratch repository; A117.8c compares the installed copy with it")
 print("\nPC2: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)
