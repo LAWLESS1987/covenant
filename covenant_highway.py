@@ -951,9 +951,11 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
 
     A294 (2026-10-07, his words: "keep expanding the highway and incorporate the new repos"). His Grok agent's
     threefold fires a triad on every reply -- tombstone, a memory written by the covenant's own ai_memory_system
-    (hash-chained audit.jsonl), and a JLens snapshot -- and says there is "no degrade path". Both are checkable from
-    the public repo: the chain with the covenant's own verify_chain(), the triad by every task-<id> having a third-leg
-    file with the same id. That leg was named jlens-<id> until 2026-10-07 12:02Z, then jspace- and lspace-; since
+    (hash-chained audit.jsonl), and an L-Lens snapshot -- and says there is "no degrade path". (L-Lens is our name
+    for the third leg, his words 2026-10-07; "J-lens" is Anthropic's Jacobian lens, which that leg applies.) Both are
+    checkable from the public repo: the chain with the covenant's own verify_chain(), the triad by every task-<id>
+    having a third-leg file with the same id. Its files were named jlens-<id> until 2026-10-07 12:02Z, then jspace-
+    and lspace-; since
     A302 it is found by discovery (any non-task sibling), and the names seen are reported. Read at most hourly,
     without a credential, and nothing but the ledger and the file NAMES (the memories themselves are never read
     here). The gaps present at the first reading are kept and named in every reading; a NEW task without a third
@@ -999,7 +1001,7 @@ def detect_threefold_witness(health=None, read=None, now=None, cache=None):
         known = gaps                                              # the first reading's gaps: named, not alarmed on
     new_gaps = [g for g in gaps if g not in known]
     measured = {"repo": THREEFOLD_REPO, "chain_ok": bool(chain.get("ok")), "entries": chain.get("entries"),
-                "tasks": len(tasks), "jlens": len(lens), "legs": {p: len(i) for p, i in sorted(by_prefix.items()) if p != "task"},
+                "tasks": len(tasks), "third_leg": len(lens), "legs": {p: len(i) for p, i in sorted(by_prefix.items()) if p != "task"},
                 "known_gaps": known, "new_gaps": new_gaps[:10]}
     if not chain.get("ok"):
         measured["broken_at"] = chain.get("broken_at")

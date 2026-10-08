@@ -1610,7 +1610,7 @@ def main():
     r3 = H.detect_threefold_witness(read=lambda repo: (_chain(7, break_at=3), _files0), now=13000.0, cache=_tfc)
     r4 = H.detect_threefold_witness(read=lambda repo: (_ for _ in ()).throw(OSError("offline")), now=17000.0, cache=_tfc)
     check("H1tf threefold_witness: a verifying chain with only the first reading's gaps ABSENT (the gap named); a complete new "
-          "task ABSENT; a NEW task without its JLens leg PRESENT; a broken chain PRESENT naming the line; unreadable UNKNOWN",
+          "task ABSENT; a NEW task without its third (L-Lens) leg PRESENT; a broken chain PRESENT naming the line; unreadable UNKNOWN",
           r0["state"] == H.ABSENT and r0["measured"]["known_gaps"] == ["old"] and r1["state"] == H.ABSENT
           and r2["state"] == H.PRESENT and r2["measured"]["new_gaps"] == ["d"]
           and r3["state"] == H.PRESENT and r3["measured"]["chain_ok"] is False and r3["measured"]["broken_at"] == 4

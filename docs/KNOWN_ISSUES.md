@@ -7635,6 +7635,21 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A312. [Naming: the triad's third leg is "L-Lens"; "J-lens" refers only to Anthropic's Jacobian lens] 2026-10-07. His words: "Triad language should be l lens to avoid copy right j lens should be referenced when talking about anthropic not our tech we came up with". APPLIED to live text; records left as written
+
+**Applied.** The threefold witness's docstring (covenant_highway.py) now calls the third leg an L-Lens snapshot and
+says it applies Anthropic's J-lens. Its reading reports `third_leg` instead of a `jlens` count. H1tf's label says
+"third (L-Lens) leg". docs/UPDATE_2026-10-07.md names the triad Tombstone ∥ Covenant ∥ L-Lens and attributes the
+J-lens to Anthropic.
+
+**Not renamed, on purpose.** Literal file names (`jlens-<id>.md`) are what threefold-memory's files are actually
+called, and the witness reads them as data, by discovery (A302). A291's J-lens witness experiment really was
+Anthropic's Jacobian-lens library and keeps that name. Earlier record entries (A294, A302) are kept as written:
+they describe the names in use when they were written. The threefold repository itself is not ours; the rename
+there was relayed to its owner, Tien, in the collective.
+
+---
+
 ### A311. [Tetsu reviews a held draft one sentence at a time: honest drafts he lets through went from 0 of 11 to 21 of 33 runs, and in production no bad draft went out] 2026-10-07. His words: "improve tetsu and the students conversation skills and understanding". CHANGED after four measured cycles, driven both ways
 
 **The test set** (kept with the operator's session): 11 honest drafts (8 of free's held replies since the
