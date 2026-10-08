@@ -294,11 +294,31 @@ def main():
     # stubs it: no node is probed, none started, nothing real is written.
     import tempfile as _tf
     import covenant_contact as _cc
+    # THE HIGHWAY IS FENCED (2026-10-04, A244). one_pass() ends by running
+    # covenant_highway.run_once, which the stubs above it never reached: run by
+    # hand in the production tree these two passes let the highway ACT
+    # (restart_nodes -> rolling_restart, among others). The spy takes every
+    # call; the tripwire sits on sense(), the REAL run_once's first call, which
+    # nothing else one_pass reaches calls, so a pass that gets past the spy is
+    # stopped before it senses or repairs anything and A244a/b go red.
+    import covenant_highway as _HW
+    _saved_hw = (_HW.run_once, _HW.sense)
+    _passes, _hw_spy, _hw_real = [], [], []
+
+    def _hw_run_once(*_a, **k):
+        _hw_spy.append(k.get("dry_run"))
+        return [], []
+
+    def _hw_tripwire(*_a, **_k):
+        _hw_real.append(1)
+        raise RuntimeError("A244: the REAL covenant_highway.run_once was entered from a suite")
+
     _saved_se = (wd.SELF_EVAL_PATH, wd.SELF_EVAL_EVERY, wd.health,
                  wd.start_node, wd.log, dict(wd._self_eval), wd.SELF_EVAL_TOLD,
                  _cc.say)
     _spoke = []
     try:
+        _HW.run_once, _HW.sense = _hw_run_once, _hw_tripwire
         _dir = _tf.mkdtemp()
         wd.SELF_EVAL_PATH = os.path.join(_dir, "SELF_EVAL.md")
         # 2026-09-27: the first version of the direct line spoke from HERE --
@@ -316,6 +336,7 @@ def main():
 
         wd.SELF_EVAL_EVERY = 1
         wd._self_eval["round"] = 0
+        _passes.append(1)
         wd.one_pass()
         _wrote = (os.path.exists(wd.SELF_EVAL_PATH)
                   and os.path.getsize(wd.SELF_EVAL_PATH) > 0)
@@ -337,6 +358,7 @@ def main():
         os.remove(wd.SELF_EVAL_PATH)
         wd.SELF_EVAL_EVERY = 0
         wd._self_eval["round"] = 0
+        _passes.append(1)
         wd.one_pass()
         check("E11e ...and SELF_EVAL_EVERY=0 genuinely silences it, so E11c is "
               "measuring the gate and not just a write that always happens",
@@ -347,6 +369,13 @@ def main():
         wd._self_eval.clear()
         wd._self_eval.update(_saved_se[5])
         wd.SELF_EVAL_TOLD, _cc.say = _saved_se[6], _saved_se[7]
+        _HW.run_once, _HW.sense = _saved_hw
+    check("A244a every one_pass() above reached the highway through the spy",
+          _passes and len(_hw_spy) == len(_passes),
+          "%d passes, %d spy calls, %d of them would have ACTED"
+          % (len(_passes), len(_hw_spy), sum(1 for d in _hw_spy if d is False)))
+    check("A244b ...and the REAL covenant_highway.run_once was never entered",
+          not _hw_real, "tripwire: %d" % len(_hw_real))
 
     # E12 -- THE OFFLINE LAYERS (2026-09-19) ------------------------------
     # Added because on 2026-09-19 both of the day's real failures were in

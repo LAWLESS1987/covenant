@@ -10,7 +10,7 @@ stops matching turns a documented non-event into permanent noise, which is how
 an operator learns to ignore alerts.
 
 Offline: `health` and `start_node` are stubbed, no node is contacted and none
-is started.
+is started, and the highway is fenced (A244, below).
 
 Run:  python test_watchdog_outage.py
 """
@@ -20,6 +20,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import covenant_watchdog as W          # noqa: E402
+import covenant_highway as _HW         # noqa: E402
 
 FAILS = []
 RAN = []
@@ -37,10 +38,35 @@ W.start_node = lambda n: _started.append(n["id"])
 W.log = lambda level, msg: None
 OK = {"warnings": [], "chain_height": 9, "peers": 1, "version": "v8.40", "judge": "quorum(x)"}
 
+# THE HIGHWAY IS FENCED (2026-10-04, A244). one_pass() ends by running
+# covenant_highway.run_once, and stubbing health and start_node does not reach
+# it: in the production tree, run by hand, that pass ACTS (restart_nodes ->
+# rolling_restart, among others). highway_may_act() keeps a staged copy dry;
+# nothing kept this tree's own hand run dry. The spy takes every call. The
+# tripwire sits on sense(), the REAL run_once's first call, which nothing else
+# one_pass reaches calls -- so a pass that gets past the spy is stopped before it
+# senses or repairs anything, and A244a/b say so.
+_passes, _hw_spy, _hw_real = [], [], []
+
+
+def _hw_run_once(*_a, **k):
+    _hw_spy.append(k.get("dry_run"))
+    return [], []
+
+
+def _hw_tripwire(*_a, **_k):
+    _hw_real.append(1)
+    raise RuntimeError("A244: the REAL covenant_highway.run_once was entered from a suite")
+
+
+_HW.run_once = _hw_run_once
+_HW.sense = _hw_tripwire
+
 
 def run(health):
     W.health = health
     _started.clear()
+    _passes.append(1)
     W.one_pass()
     return sorted(_started)
 
@@ -65,6 +91,16 @@ W._fail_counts = {n["id"]: 0 for n in W.NODES}
 run(one_down)
 run(lambda port, timeout=8: (dict(OK), None))
 check(run(one_down) == [], "O4 a node that comes back resets its own counter")
+
+# --- A244: the highway was reached only through the spy ---------------------
+_would_act = sum(1 for d in _hw_spy if d is False)
+check(_passes and len(_hw_spy) == len(_passes),
+      "A244a every one_pass() reached the highway through the spy "
+      "(%d passes, %d spy calls, %d of them would have ACTED)"
+      % (len(_passes), len(_hw_spy), _would_act))
+check(not _hw_real,
+      "A244b the REAL covenant_highway.run_once was never entered (tripwire: %d)"
+      % len(_hw_real))
 
 # --- F: the suppression list, matched as substrings ------------------------
 LIVE = [
@@ -108,4 +144,4 @@ if FAILS:
     for f in FAILS:
         print("  -", f)
     sys.exit(1)
-print(f"WATCHDOG OUTAGE: {len(RAN)}/{len(RAN)} passed (offline; no node contacted, none started)")
+print(f"WATCHDOG OUTAGE: {len(RAN)}/{len(RAN)} passed (offline; no node contacted, none started, highway fenced)")

@@ -339,9 +339,34 @@ def main():
         # the sweep runs this suite in a staged copy with no .venv (the first automatic cycle's TD1m
         # failure): the cycle's interpreter paths point at files that exist wherever the suite runs
         stubs["VENV_PY"] = sys.executable
+        # THE CHECK-ADJUST LOOP IS FENCED (2026-10-04, A244). run_cycle calls check_adjust_loop(), which
+        # senses through covenant_highway.sense and repairs through covenant_heal.heal(dry_run=False) ->
+        # covenant_highway.run_once -- with no highway_may_act() anywhere on that path, so in ANY tree,
+        # staged or not, this suite's loop could repair for real, and heal() appended its row to the running
+        # tree's ops/heal.jsonl. Now: the loop's preference and the heal ledger live in tmp; sense() is a fixture
+        # with one PRESENT condition, so the loop really reaches heal(); run_once is a spy; and the tripwire
+        # sits on save_last_sense, the REAL run_once's first write, which nothing else in the cycle calls --
+        # so a run past the spy is stopped before it repairs anything, and TD1m.H1/H2 go red.
+        import covenant_highway as _HW
+        _hw_spy, _hw_real = [], []
+
+        def _hw_run_once(*_a, **k):
+            _hw_spy.append(k.get("dry_run"))
+            return [], []
+
+        def _hw_tripwire(*_a, **_k):
+            _hw_real.append(1)
+            raise RuntimeError("A244: the REAL covenant_highway.run_once was entered from a suite")
+
+        stubs["LOOP_PREF"] = os.path.join(tmp, "loop.json")
+        realhw = (_HW.run_once, _HW.sense, _HW.save_last_sense)
+        realenv = os.environ.get("COVENANT_HEAL_LEDGER")
         realf = {k: getattr(D, k) for k in stubs}
         for k, f in stubs.items():
             setattr(D, k, f)
+        _HW.run_once, _HW.save_last_sense = _hw_run_once, _hw_tripwire
+        _HW.sense = lambda *_a, **_k: {"td1_fixture": {"state": _HW.PRESENT, "measured": {"fixture": 1}}}
+        os.environ["COVENANT_HEAL_LEDGER"] = os.path.join(tmp, "heal.jsonl")
         told = []
         try:
             if os.path.exists(D.HISTORY):
@@ -381,6 +406,21 @@ def main():
         finally:
             for k, f in realf.items():
                 setattr(D, k, f)
+            _HW.run_once, _HW.sense, _HW.save_last_sense = realhw
+            if realenv is None:
+                os.environ.pop("COVENANT_HEAL_LEDGER", None)
+            else:
+                os.environ["COVENANT_HEAL_LEDGER"] = realenv
+        # two counts that can disagree: heal() presses the cycles' own records say the loop made, and
+        # run_once calls the spy received
+        _heals = sum(len((((r or {}).get("status") or {}).get("check_adjust_loop") or {}).get("rounds") or [])
+                     for r in (row, row2))
+        check("TD1m.H1 the loop reached heal() and every heal reached the highway through the spy (A244)",
+              _heals > 0 and len(_hw_spy) == _heals,
+              "%d heal passes recorded, %d spy calls, %d of them would have ACTED"
+              % (_heals, len(_hw_spy), sum(1 for d in _hw_spy if d is False)))
+        check("TD1m.H2 ...and the REAL covenant_highway.run_once was never entered", not _hw_real,
+              "tripwire: %d" % len(_hw_real))
         check("TD1n a day whose judge got worse reads regression FAIL and leaves the last verified state as it was (review)",
               row2 and row2["status"]["regression_tests"]["verdict"] == "FAIL"
               and D._read_json(D.VERIFIED, {}) == before and row2["state"]["verified"] is False,

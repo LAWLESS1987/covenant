@@ -184,10 +184,41 @@ def main():
         # Drive the real one_pass. Only the two tending helpers are stubbed --
         # they mine the pending pool and tend a service, which is not what is
         # being measured and does touch real state.
+        #
+        # THE HIGHWAY IS FENCED TOO (2026-10-04, A244). one_pass() ends by
+        # running covenant_highway.run_once. The fake NODES below make
+        # highway_may_act() False, so since 0fdf6bb that pass runs DRY -- but
+        # dry still runs sense() and writes ops/highway_last_sense.json in
+        # whichever tree it runs from, and on 2026-09-20 (A164) this suite's
+        # copy in the artifact tree drove a highway that stopped and relaunched
+        # production nodes. A164 fenced that copy only; this file was never
+        # fenced. The spy takes every call; the tripwire sits on sense(), the
+        # REAL run_once's first call, which nothing else one_pass reaches
+        # calls, so a pass past the spy is stopped before it senses or repairs
+        # anything and A115.H1/H2 go red.
+        import covenant_highway as _HW
+        _passes, _hw_spy, _hw_real = [], [], []
+
+        def _hw_run_once(*_a, **k):
+            _hw_spy.append(k.get("dry_run"))
+            return [], []
+
+        def _hw_tripwire(*_a, **_k):
+            _hw_real.append(1)
+            raise RuntimeError("A244: the REAL covenant_highway.run_once was entered from a suite")
+
+        _real_one_pass = W.one_pass
+
+        def _counted_pass(*a, **k):
+            _passes.append(1)
+            return _real_one_pass(*a, **k)
+
         started = []
         orig = (W.NODES, W.start_node, W.tend_seal_service, W.tend_pending,
                 W.log, dict(W._fail_counts))
+        orig_hw = (_HW.run_once, _HW.sense)
         try:
+            _HW.run_once, _HW.sense, W.one_pass = _hw_run_once, _hw_tripwire, _counted_pass
             tended = []
             W.start_node = lambda n: started.append(n["id"])
             W.tend_seal_service = lambda: (tended.append("seal"), "up")[1]
@@ -302,6 +333,14 @@ def main():
         finally:
             (W.NODES, W.start_node, W.tend_seal_service, W.tend_pending,
              W.log, W._fail_counts) = orig
+            _HW.run_once, _HW.sense = orig_hw
+            W.one_pass = _real_one_pass
+        check("A115.H1 every one_pass() above reached the highway through the spy (A244)",
+              _passes and len(_hw_spy) == len(_passes),
+              "%d passes, %d spy calls, %d of them would have ACTED"
+              % (len(_passes), len(_hw_spy), sum(1 for d in _hw_spy if d is False)))
+        check("A115.H2 ...and the REAL covenant_highway.run_once was never entered",
+              not _hw_real, "tripwire: %d" % len(_hw_real))
     finally:
         srv429.shutdown()
         srv200.shutdown()

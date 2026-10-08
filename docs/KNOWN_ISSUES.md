@@ -10477,6 +10477,59 @@ outside the production tree, the runner's ports were free. The precondition is n
 the test (`port_busy` held for that block, restored after), so 13a/b/e measure the same thing on
 the PC and on the runner; their assertions are unchanged.
 
+*Dated note, 2026-10-04, later: the suites fence the highway themselves.* "Not fixed, and said"
+above is closed for the three suites it names, and for a fourth path found while checking them.
+Each now replaces `covenant_highway.run_once` with a spy around every `one_pass()`, and puts a
+tripwire on the REAL `run_once`'s first call (`sense()`, which nothing else `one_pass` reaches
+calls), so a pass that gets past the spy records itself and is stopped before it senses or
+repairs anything. Two counts that can disagree, per suite: passes made against calls the spy
+received, and tripwire hits. `test_watchdog_outage` A244a/b, `test_p20` A244a/b, `test_a115`
+A115.H1/H2, `test_td1_tetsu_daily` TD1m.H1/H2.
+
+- **TD1m leaked by its own door.** `run_cycle` -> `check_adjust_loop()` -> `covenant_heal.heal(
+  dry_run=False)` -> `HW.run_once(dry_run=..., cooldown_s=0)` (`covenant_daily.py`,
+  `covenant_heal.py`). No `highway_may_act()` is on that path, so this suite's loop could repair
+  for real in ANY tree, staged copies included, wherever the real `sense()` found a condition
+  present; it also read the running tree's `ops/tetsu_loop.json` and appended to its
+  `ops/heal.jsonl`. Now the loop's preference and the heal ledger are in the suite's temp dir,
+  `sense()` is a fixture with one PRESENT condition (so the loop really reaches `heal()` and the
+  check cannot pass vacuously), and the tripwire is on `save_last_sense`, the real `run_once`'s
+  first write, since `sense` is the fixture there. Whether this path contributed to the 10-03
+  rows in the staged ledger is UNDETERMINED: that ledger went with the staged folder.
+- **test_a115 was already dry here since 0fdf6bb**, read from the code: its fake `NODES`
+  (`unused.db`, `u.db`) fail `relaunch_missing`, so `highway_may_act()` is False even by hand in
+  this tree. Dry still runs `sense()` and writes `ops/highway_last_sense.json`; it is fenced like
+  the others.
+- **Measured in a staged copy** (`tools/stage_check.check`): outage 12/12 (7 passes, 7 spy calls),
+  P20 83/83 (2, 2), A115 34/34 (12, 12), TD1 74/74 (2 heal passes recorded, 2 spy calls), tripwire
+  0 in each. **Driven both ways**, each mutation applied to the staged copy only: M1, the spy not
+  installed -> exactly the two fence checks red in every suite (outage 2 failed, P20 81/83, A115
+  32 passed 2 failed, TD1 72/74), tripwire 7 / 2 / 12 / 2, so every real entry was stopped at its
+  first call; M2, the spy installed but `one_pass` and `heal` reaching `run_once` through a
+  reference captured in `covenant_highway` -> the same two red in each, same tripwire counts.
+  Unmutated -> green. No suite was run outside a staged copy, and the nodes on 5000/5020/5060
+  were not touched. What the spy saw as `dry_run` in THIS tree by hand (would the pass have
+  acted) is not measured here, by design.
+
+**Why A164's fix did not stop this (rule 10).** A164 (2026-09-20, `36913a0`) says "that suite
+fences the highway". That commit changed `MANIFEST.sha256`, `docs/KNOWN_ISSUES.md`,
+`ops/SELF_EVAL.md` and `rolling_restart.py` -- no test file. The fence went into the ARTIFACT
+tree's copy of `test_a115`; this repository's suite was never fenced, and nothing checked. So
+A244 is the second instance of A164's shape (a suite drives the real `one_pass`, and its
+highway acts), and P20's E11c message on his phone (2026-09-27, `_self_eval_tell`'s docstring)
+is the same shape reaching a different remedy.
+
+**Still not fixed, and said.** (1) These guards are per suite. A NEW suite that calls
+`one_pass()`, `run_cycle()` or `heal()` without the fence is caught by nothing: the forgotten
+step still has no guard where it is forgotten. A gate inside `one_pass` -- the highway acts only
+from the daemon's own loop, the pattern `_self_eval_tell` already uses for the direct line --
+would be that guard; it changes what `--once` does, so it is not done here. (2) `heal()` has no
+`highway_may_act()` of its own: the heal button pressed in a staged copy or a fresh clone
+repairs there. (3) `one_pass` reaches other real state these suites do not fence:
+`tend_seal_service`, `tend_earn_service` and `tend_pending` (A115 stubs seal and pending, and
+its own comment says they touch real state; outage and P20 stub none of them),
+`covenant_refine_loop.tick` and `push_alert`. Not examined for effect in this pass.
+
 ---
 
 ### A243. [a second checkout took the production ports, a sandbox widened every node key, and the key gate could not see it] 2026-10-03. His words: "make proper corrections to get everything green weve not had greenfull days in a week", then "you should use our tombstone system to not keep making the same errors". FIXED, with the guards that stop each recurring
