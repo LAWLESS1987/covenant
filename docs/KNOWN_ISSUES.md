@@ -7709,11 +7709,26 @@ e7c0c68ef756 -> b1a49a4b2bba and staged verify_deploy.py, before covenant_one ra
 002aed9, without a stale pin: run_all_tests.sh changed once there, in 12b4718 (A274), and its pin was
 moved by hand in the same commit. Merging main in, both sides had moved that digest, so its line
 conflicted while the file merged cleanly. It was resolved to main's line, stale for the merged bytes, and
-the merge commit, run through this change's hook (the installed copy was still the old one), moved it to
-75c39e251e99 after K1 and K2 passed. Merges are how work lands here, and PC2.25 drives this path. A clean
+the merge commit (46fbe4a), run through this change's hook (the installed copy was still the old one), moved
+it to 75c39e251e99 after K1 and K2 passed. Merges are how work lands here, and PC2.25 drives this path. A clean
 merge runs no pre-commit hook, but it cannot combine two edits of a pinned file: an edit on one side only
 merges to that side's bytes, whose pin moved with them, and edits on both sides bring two moved digests,
 which conflict. A side whose pin was already stale stays stale; PC2.9 reports it on that side.
+
+**Tetsu's part (2026-10-08, his words: "let tetsu assist to save tokens").** Two checkable items went
+through `tools/tetsu_work.py` to the agent door, not marked private, so both are queued for the teacher:
+* *Which conditions make `pin_deploy.main()` write verify_deploy.py, and which leave a stale pin
+  unwritten?* Wrong. He named `if "--write" not in argv` as the write path, which is the `--check` branch
+  and never writes. Of the ways a stale pin is left unwritten he named only `if not need`, where nothing was
+  asked of it, and none of the rest: no judges recorded, the file absent or not in the index, disk bytes
+  differing from the index, verify_deploy.py with unstaged changes, a failing judge, a refused rewrite, or
+  git or the MANIFEST unreadable. It writes only when at least one pin moved; PC2.11-PC2.18 and the
+  mutations above are the account. The students also
+  convicted the ask itself, a code question (both seats VIOLATES), and admitted nothing.
+* *Two sentences for the operator on what this does and does not do.* Right in substance, with one
+  overreach ("a pinned file" for the two pinned test files), and wrong in form: four sentences, opening
+  with a stray "SEND". The gate held it (both seats HOLD).
+Answers took 132 s and 147 s. Neither replaced the work here; both are what he learns from.
 
 **Pinned by** `test_pc2_pin_core.py`, PC2.9-PC2.25 beside the core's eight (25/25). PC2.9 reads the real
 tree: every pin matches its file. PC2.11-PC2.18 drive the tool on temp copies with git and the judges
