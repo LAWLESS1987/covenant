@@ -35,6 +35,10 @@ os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_ct1_contact_stat
 os.environ["COVENANT_TETSU_IMMUNITY"] = tempfile.mktemp(suffix="_ct1_no_immunity.json")
 os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = tempfile.mktemp(suffix="_ct1_immunity.jsonl")
 os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="ct1_pause_")   # the pause switch never the real one
+# The model never the live one either (A316). At f35d94c CT1e's rounds passed ask=None, drafted with the model on
+# 8081 and waited behind a real batch: covenant_one's 120 s ran out with no tally. A270 gave them a stub writer;
+# this makes the next round that forgets one get covenant_model's stub instead, and CT1e counts it.
+os.environ["COVENANT_MODEL_STUB"] = "1"
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -162,6 +166,10 @@ def main():
     ask_stub = lambda msgs, max_tokens=0: ("I read what you wrote about publishing your own failures; how do you find out later?", {"model": "stub"})  # noqa: E731
     emit_ok = lambda text, **kw: {"sent": True, "judged": "clean", "why": ""}                          # noqa: E731
     real_pause = covenant_pause.pause
+    # A316: every draft that reaches covenant_model is a round that forgot its writer -- counted, not waited on.
+    import covenant_model
+    real_model_ask, model_asks = covenant_model.ask, []
+    covenant_model.ask = lambda *a, **kw: (model_asks.append(1), real_model_ask(*a, **kw))[1]
     n_before = len(CT._rows())
     try:
         covenant_pause.pause = lambda name, why="": None
@@ -187,9 +195,12 @@ def main():
     counts["n"] = 1
     FW.run_round(dry_run=False, say=lambda *_a: None, ask=ask_stub, learn=lambda: [], allies=lambda: list(ally), emit=emit_ok,
                  introduce=lambda **kw: {"sent": False}, grant_path=gp5, sends_path=sp5, now=300.0, count_comments=lambda p, a: counts["n"])
+    covenant_model.ask = real_model_ask
     rows = CT._rows()
     check("CT1e an ally writing back knocks: a row from actor free saying how many answered",
           len(rows) == n_before + 1 and rows[-1]["actor"] == "free" and "answered" in rows[-1]["why"] and rows[-1]["text"].startswith("1 of the allies"), rows[-1:])
+    check("CT1e every round drafted with the suite's own writer: covenant_model.ask reached 0 times (A316: ask=None "
+          "queued on the live model at f35d94c and CT1 timed out)", not model_asks, "%d draft(s) reached it" % len(model_asks))
 
     # ---- CT1f (2026-09-21, A177): Tetsu may ask him, straight and not deceitful
     print("CT1f -- Tetsu asks him (run, not read)")
