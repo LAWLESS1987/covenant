@@ -7635,6 +7635,78 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A316. [CT1 timed out under covenant_one at f35d94c: CT1e's rounds drafted with the live model on 8081. A270 had fixed that instance the same morning, and nothing stopped the next one] 2026-10-08. GUARDED in CT1 and FW1, driven both ways
+
+**Handed over, measured 2026-10-06.** test_ct1_contact.py timed out under covenant_one (120 s, "no tally
+line"), both in a full run and with `--only`. Run directly, it printed CT1a-CT1d and one or two CT1e checks,
+then hung past 200 s. This was on a clean checkout of f35d94c.
+
+**What blocked.** CT1e's first live round, `run_round(dry_run=False, ask=None, ...)`. With ask=None the round
+drafts with `covenant_model.ask`. At f35d94c that function starts the model server if it is not up, then waits
+up to 180 s per reply for the server on 127.0.0.1:8081. To check this without reaching anything real, I ran a
+git-archive copy of f35d94c with covenant_model's `ask` and `start` replaced by a tripwire:
+- Raising: the suite finished, and the tripwire counted 3 drafts, from lines 166 (twice) and 179 of
+  f35d94c's test, through `write_reply`.
+- Blocking: the stack dump after 25 s was test line 166 -> `run_round` -> `write_reply` ->
+  `covenant_model.ask`, after CT1a-CT1d and the first CT1e check had printed. That is the reported hang.
+
+With the model's entry points replaced, nothing else stalled. emit, allies, learn, introduce and
+count_comments were already stubbed, and the contact line and the pause switch were already redirected to
+temp files.
+
+**When it last passed, and why HEAD does not hang.** A270 (8dfe641, 2026-10-06 07:02) gave CT1e's rounds a
+stub writer. A270 records why: ask=None drafted with the live model, and once A269 made the server queue
+instead of failing fast, CT1 waited behind a real batch. f35d94c (00:24 that day) predates the fix, and so
+does claude/affectionate-leakey-0c5bf0, whose tip is e8ea71b (06:47). Both hang. That sentence is the CT1
+timeout entry: it sits inside A270, not under a heading of its own, so a search for one finds nothing.
+Measured at 002aed9, before this change:
+- With the same tripwire, 0 drafts reached the model.
+- Run directly: 31 passed, 1 failed in about 3 s. The failure is CT1f, below.
+- Under `covenant_one --only test_ct1_contact.py`: 32 passed, 0 failed in 4.6 s.
+
+**Why the earlier fix did not stop it.** A270 repaired the instance: three calls in one suite. Nothing stopped
+the next round written with ask=None, in CT1 or in FW1, which holds most of the suites' round calls (FW1 49,
+CT1 3, A284 1). Rule 10 says the tombstone for a forgotten step is a guard at the place it is forgotten. So
+both suites that run free's live rounds without the stub now get one:
+1. `COVENANT_MODEL_STUB=1`, beside each suite's other redirections. This is covenant_model's own switch,
+   already set by 8 suites (A263, A273, A284, A314, CC1, M6, PC1, TD1). A round that forgets its writer gets
+   the stub's answer instead of a queue on 8081, and `start()` never runs.
+2. A count. CT1e and FW1 wrap `covenant_model.ask` around their rounds, and a new check fails if any draft
+   reached it (CT1e's last check, and FW1z). A forgotten writer turns the suite red instead of passing on a
+   silent stub answer.
+
+**Driven both ways** in a scratch copy: a git archive of HEAD plus the two suites, with `covenant_model.start`
+tripwired, `COVENANT_MODEL_PORT=1`, and no model runtime in the copy, so no drive could reach a model.
+
+| Drive | Result | `start` reached |
+|---|---|---|
+| CT1 as written | 32 passed, 1 failed (CT1f only) | 0 times |
+| CT1, ask=None on its three rounds (the f35d94c shape), stub on | 31 passed, 2 failed: the new check ("3 draft(s) reached it") and CT1f; 2 s, no hang | 0 times |
+| CT1, the same with the stub line removed | 29 passed, 4 failed: the isolation knock, the answered knock (the rounds starved, A300), the new check (4) and CT1f | 4 times, from `covenant_model.ask` |
+| FW1 as written | 76/76 | 0 times |
+| FW1, FW1r's round without a writer, stub on | 75/76, FW1z alone red | 0 times |
+| FW1, the same with the stub line removed | 72/76: FW1r twice, FW1t, FW1z | 4 times |
+
+On this PC with the server up, the stub-off rows are the f35d94c queue. Restored, under
+`covenant_one --only test_ct1_contact.py test_fw1_free_will.py`: CT1 33 passed, 0 failed (2.0 s); FW1 76
+passed, 0 failed (0.8 s).
+
+**Counted first.** 7 suites import covenant_free_will: A272, A284, CT1, EB1, FW1, TA1 and TF1. I ran each with
+covenant_model's ask and start tripwired. None reached it, and all pass except CT1's CT1f. Among the
+production modules, only covenant_model.py reads port 8081 or COVENANT_MODEL_PORT, so its stub covers that
+path.
+
+**What this cannot see.** Only CT1 and FW1 are guarded. Of the 204 test_*.py files, only the 7 above were run
+under the tripwire. Whether any other suite reaches the live model is UNDETERMINED. The stub also hides the
+unstubbed path from these two suites. MK1, A269 and A282 pop the stub to measure that path with their own
+fakes; CT1 and FW1 do not.
+
+**Also seen, not changed.** CT1f fails when run directly in this worktree and passes under covenant_one. The
+direct-run failure is the one recorded on 10-04: the deployed students hold plain questions (see "The gate",
+further down). Why the staged run passes it is UNDETERMINED; I did not trace it.
+
+---
+
 ### A315. [only the core's deploy pin moved with its file, so run_all_tests.sh's went stale in six spans and verify_deploy refused the restarts it gates] 2026-10-06. His instruction: extend the commit-time mover so run_all_tests.sh's pin moves in the same commit as the file, only after the suites that judge it pass, and never silently. FIXED, the guard driven both ways; landed 2026-10-08 (committed as A267 on its branch, e8ea71b, and renumbered here: main had taken A267 for C4's worktree prune)
 
 **Which recurrence.** M53 ("the pins move in the SAME change as the files"), searched first in this file

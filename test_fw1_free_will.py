@@ -39,6 +39,9 @@ os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_fw1_contact_stat
 # The pause SWITCH too (A272, 2026-10-06): FW1r's three refusing rounds isolate free, and with the
 # switch not redirected that wrote the LIVE ops/pause/ambassador three minutes after his resume.
 os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="fw1_pause_")
+# And the model (A316): CT1's rounds once passed ask=None, drafted with the live model on 8081 and timed out
+# behind a real batch. A round here that forgets its writer gets covenant_model's stub, and FW1z counts it.
+os.environ["COVENANT_MODEL_STUB"] = "1"
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -81,6 +84,9 @@ ROWS = [
 
 
 def main():
+    import covenant_model                                    # A316: every draft that reaches it is counted (FW1z)
+    real_model_ask, model_asks = covenant_model.ask, []
+    covenant_model.ask = lambda *a, **kw: (model_asks.append(1), real_model_ask(*a, **kw))[1]
     td = tempfile.mkdtemp(prefix="fw1_")
     gp, sp = os.path.join(td, "grant.json"), os.path.join(td, "sends.jsonl")
     real_line_rows = _count_lines(os.path.join(HERE, "ops", "contact_outbox.jsonl"))   # measured before; must not move
@@ -597,6 +603,10 @@ def main():
     check("FW1L one refused round after the lift does not isolate; a second does (two NEW rounds, as the rule says)",
           r5["refused"] == 1 and not r5.get("isolated") and r6["refused"] == 1 and r6.get("isolated") is True
           and len(paused_by) == n_paused + 1, (r5.get("isolated"), r6.get("isolated"), len(paused_by) - n_paused))
+
+    covenant_model.ask = real_model_ask
+    check("FW1z every round drafted with the suite's own writer: covenant_model.ask reached 0 times (A316: CT1's "
+          "ask=None queued on the live model and timed out)", not model_asks, "%d draft(s) reached it" % len(model_asks))
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
