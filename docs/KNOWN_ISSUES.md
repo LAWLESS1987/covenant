@@ -7635,6 +7635,28 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A313. [public CI / a test that read the wall clock] test_breakout_ledger's same-day check failed on ubuntu-3.11 at 6a1eda7 because the run fell in the last minute before UTC midnight. FIXED, both ways
+
+**What happened.** Two CI runs of 6a1eda7 started at 23:53Z. One job failed one check: "a second run the SAME
+day writes nothing" (63 passed, 1 failed). The other three jobs on the same bytes passed. The test took
+`t0 = time.time()` and ran the second cycle at `t0 + 60`. `record_cycle` keys the day on UTC, so whenever t0 fell
+in the last 60 s of a UTC day, the second run landed on the next day and correctly wrote a new read. The code
+was right and the test was wrong, for 60 s out of every 86,400.
+
+**Fix.** t0 is noon UTC yesterday, so both runs are always on one day. A new check asserts that precondition
+first, so if it ever breaks, the failure names the test's clock and not the ledger.
+
+**Driven both ways.** A scratch copy (with its own breakout_ledger.py) set t0 to 23:59:30Z, the old shape at
+its worst minute. The CI failure came back and the new precondition check failed first. The fix in place:
+65 passed, 0 failed.
+
+**Searched for the same shape.** The other suites with a same-day check (test_rule5_ledger L7, FW1h, EB1.3)
+use fixed timestamps. TD1m's two runs happen milliseconds apart with the real clock, so it has the same shape
+with a window of about a millisecond a day. It is named here and not changed. There is no class guard for
+"a test adds an offset to the wall clock across a day key."
+
+---
+
 ### A312. [Naming: the triad's third leg is "L-Lens"; "J-lens" refers only to Anthropic's Jacobian lens] 2026-10-07. His words: "Triad language should be l lens to avoid copy right j lens should be referenced when talking about anthropic not our tech we came up with". APPLIED to live text; records left as written
 
 **Applied.** The threefold witness's docstring (covenant_highway.py) now calls the third leg an L-Lens snapshot and
