@@ -41,6 +41,12 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEDGER = os.environ.get("COVENANT_SECURITY_LEDGER") or os.path.join(HERE, "ops", "security_probe_ledger.jsonl")
 OBSERVED = os.environ.get("COVENANT_SECURITY_OBSERVED") or os.path.join(HERE, "ops", "security_probes_observed.json")
+# A319, Gemini's two-tier harvest: a harvested probe is a CANDIDATE until someone
+# reviews it. "injection" keeps it a recall probe; "benign" moves it to the
+# precision set, where the screen holding it is measured as over-holding, not
+# as safety. Unreviewed probes stay recall probes -- the default fails closed.
+REVIEWS = os.environ.get("COVENANT_SECURITY_REVIEWS") or os.path.join(HERE, "ops", "security_probe_reviews.json")
+VERDICTS = ("injection", "benign")
 ZW = "​"
 
 # id, surface, payload, note. Every one must HOLD unless its id is in KNOWN_GAPS.
@@ -143,6 +149,37 @@ def observed(path=None):
         return []
 
 
+def reviews(path=None):
+    """{probe id: {"verdict", "by", "why", "t"}}; {} when absent or unreadable."""
+    try:
+        with open(path or REVIEWS, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return {k: v for k, v in d.items() if isinstance(v, dict) and v.get("verdict") in VERDICTS}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def review(pid, verdict, by, why, path=None):
+    """Record one review. Refuses an unknown verdict, an anonymous reviewer, or no reason.
+    A later review of the same id replaces the earlier one, which is kept under "earlier"."""
+    if verdict not in VERDICTS:
+        raise ValueError("verdict must be one of %s" % (VERDICTS,))
+    if not str(by).strip() or not str(why).strip():
+        raise ValueError("a review names who decided and why")
+    path = path or REVIEWS
+    cur = reviews(path)
+    row = {"verdict": verdict, "by": str(by), "why": str(why)[:400], "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    if pid in cur:
+        row["earlier"] = cur[pid]
+    cur[pid] = row
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(cur, fh, ensure_ascii=False, indent=1, sort_keys=True)
+    os.replace(tmp, path)
+    return row
+
+
 def _window(text, size=400):
     """The <= size chars of `text` that hold what the directive screen flagged.
     A plain [:400] cut the trigger off all seven probes harvested 2026-09-09..27
@@ -211,11 +248,22 @@ def _last(ledger_path):
     return last
 
 
-def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None):
+def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None, reviews_path=None):
     """Probe every surface. Returns the report dict; 'regressions' non-empty means red."""
     ledger_path = ledger_path or LEDGER
     preds = preds or surfaces()
-    probes = list(PROBES) + observed(observed_path)
+    rv = reviews(reviews_path)
+    benign = [p for p in observed(observed_path) if rv.get(p[0], {}).get("verdict") == "benign"]
+    benign_ids = {p[0] for p in benign}
+    probes = list(PROBES) + [p for p in observed(observed_path) if p[0] not in benign_ids]
+    over_held = []                                                # precision: benign posts the screen still holds
+    for pid, surface, payload, _note in benign:
+        fn = preds.get(surface)
+        try:
+            if fn and fn(payload):
+                over_held.append(pid)
+        except Exception:                                         # noqa: BLE001 -- a measurement, never a gate
+            over_held.append(pid)
     held, failed, errors = [], [], {}
     for pid, surface, payload, _note in probes:
         fn = preds.get(surface)
@@ -232,6 +280,8 @@ def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None
     new_gaps = sorted(p for p in failed if p not in KNOWN_GAPS and p not in held_before)
     report = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "probes": len(probes), "held": held,
               "failed": failed, "regressions": regressions, "known_gaps": known, "new_gaps": new_gaps, "errors": errors,
+              "unreviewed": sorted(p[0] for p in probes if p[0].startswith("observed:") and p[0] not in rv),
+              "benign": sorted(benign_ids), "over_held": sorted(over_held),
               "surfaces_read": sorted(preds), "not_seen": "the OS, the network beyond a string, the model's own behaviour, the phone"}
     if record:
         os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
@@ -243,7 +293,10 @@ def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None
     for p in regressions:
         say("  REGRESSION %s: held on %s, does not hold now" % (p, str(last.get("t", "?"))[:16] if last else "?"))
     for p in new_gaps:
-        say("  NEW GAP %s (not in KNOWN_GAPS, never held)" % p)
+        say("  NEW GAP %s (not in KNOWN_GAPS, never held)%s" % (p, " -- unconfirmed: review it (--review)" if p in report["unreviewed"] else ""))
+    say("  harvested: %d unreviewed, %d reviewed injection, %d reviewed benign; precision: the screen still holds %d of the %d benign"
+        % (len(report["unreviewed"]), sum(1 for v in rv.values() if v["verdict"] == "injection"),
+           len(benign_ids), len(over_held), len(benign_ids)))
     for p in known:
         say("  known gap %s: %s" % (p, KNOWN_GAPS[p]))
     return report
@@ -255,7 +308,13 @@ def main(argv=None):
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--evolve", action="store_true", help="grow the observed set from the forum quarantine first")
     ap.add_argument("--report", action="store_true", help="the last run, from the ledger")
+    ap.add_argument("--review", nargs=2, metavar=("PROBE_ID", "VERDICT"), help="mark a harvested probe injection|benign")
+    ap.add_argument("--by", default="", help="who decided (required with --review)")
+    ap.add_argument("--why", default="", help="the reason (required with --review)")
     a = ap.parse_args(argv)
+    if a.review:
+        print(json.dumps(review(a.review[0], a.review[1], a.by, a.why)))
+        return 0
     if a.report:
         print(json.dumps(_last(LEDGER), indent=1))
         return 0

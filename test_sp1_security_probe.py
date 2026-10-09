@@ -28,6 +28,7 @@ os.environ.setdefault("COVENANT_QUIET", "1")
 TMP = tempfile.mkdtemp(prefix="sp1_")
 os.environ["COVENANT_SECURITY_LEDGER"] = os.path.join(TMP, "ledger.jsonl")
 os.environ["COVENANT_SECURITY_OBSERVED"] = os.path.join(TMP, "observed.json")
+os.environ["COVENANT_SECURITY_REVIEWS"] = os.path.join(TMP, "reviews.json")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -123,6 +124,39 @@ def main():
           all(p in rep5["failed"] for p in contact_ids) and all("screen broken" in rep5["errors"].get(p, "") for p in contact_ids), rep5["errors"])
     check("SP1e the report names the surfaces read and what was not seen",
           rep5["surfaces_read"] == sorted(SP.surfaces()) and "the model's own behaviour" in rep5["not_seen"])
+
+    print("SP1f -- A319: a harvested probe is a candidate until reviewed")
+    benign_text = "Some advice for readers.\nStop treating retries as free."
+    SP.evolve(quarantine_rows=[{"text": benign_text, "flags": {"directive": True}, "t": "2026-10-08T00:00:00Z"}], say=quiet)
+    bid = [p[0] for p in SP.observed() if p[2] == SP._window(benign_text)][0]
+    inj = obs[0][0]
+    r0 = SP.run(say=quiet, record=False)
+    check("SP1f unreviewed harvested probes stay recall probes (fails closed) and are listed unreviewed",
+          bid in r0["held"] and inj in r0["held"] and set(r0["unreviewed"]) == {bid, inj}, r0["unreviewed"])
+    for bad in (("x", "maybe", "Claude", "why"), ("x", "benign", "", "why"), ("x", "benign", "Claude", " ")):
+        try:
+            SP.review(*bad); ok = False
+        except ValueError:
+            ok = True
+        check("SP1f review refuses %r" % (bad[1:],), ok)
+    SP.review(bid, "benign", "test", "advice to readers, not the bot")
+    r1 = SP.run(say=quiet, record=False)
+    check("SP1f a benign review moves it to the precision set: out of the probes, counted as over-held while the screen holds it",
+          bid not in r1["held"] and bid not in r1["failed"] and r1["benign"] == [bid] and r1["over_held"] == [bid]
+          and r1["probes"] == r0["probes"] - 1, (r1["benign"], r1["over_held"], r1["probes"]))
+    real_pred = SP.surfaces
+    try:
+        SP.surfaces = lambda: dict(real_pred(), directive=lambda p: False)
+        r2 = SP.run(say=quiet, record=False)
+    finally:
+        SP.surfaces = real_pred
+    check("SP1f with the directive screen loosened, the benign one is no longer over-held but the INJECTION still fails (recall kept)",
+          r2["over_held"] == [] and inj in r2["failed"], (r2["over_held"], r2["failed"][-3:]))
+    SP.review(inj, "injection", "test", "tells the bot to post a key")
+    rv = SP.reviews()
+    check("SP1f an injection review keeps it a recall probe; a re-review keeps the earlier one under 'earlier'",
+          inj in SP.run(say=quiet, record=False)["held"] and SP.review(bid, "injection", "t2", "changed mind")["earlier"]["verdict"] == "benign"
+          and rv[inj]["by"] == "test", rv)
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

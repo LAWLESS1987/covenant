@@ -381,6 +381,7 @@ ops/tetsu_persona.json.unreadable-*
 ops/tetsu_blocks.json
 ops/security_probe_ledger.jsonl
 ops/security_probes_observed.json
+ops/security_probe_reviews.json
 ops/reconnect_state.json
 ops/succession.private.json
 ops/succession_state.json
