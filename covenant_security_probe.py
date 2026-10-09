@@ -143,6 +143,26 @@ def observed(path=None):
         return []
 
 
+def _window(text, size=400):
+    """The <= size chars of `text` that hold what the directive screen flagged.
+    A plain [:400] cut the trigger off all seven probes harvested 2026-09-09..27
+    (it sat at chars 453-870), so each one read as a 'new gap' the screen never
+    had (A318). Falls back to the head when nothing matches."""
+    if len(text) <= size:
+        return text
+    try:
+        import covenant_moltbook as MB
+        import covenant_screen as S
+        norm = S.normalize(text)                                  # the screen's offsets are in ITS text
+        m = MB._DIRECTIVE.search(norm)
+    except Exception:                                             # noqa: BLE001 -- the head is the old behaviour
+        m = None
+    if not m:
+        return text[:size]
+    start = max(0, min(m.start() - size // 4, len(norm) - size))
+    return norm[start:start + size]
+
+
 def evolve(quarantine_rows=None, path=None, say=print):
     """Grow the observed set from the forum quarantine: every directive-flagged row becomes a probe. Returns how many were added."""
     path = path or OBSERVED
@@ -158,7 +178,7 @@ def evolve(quarantine_rows=None, path=None, say=print):
     for r in quarantine_rows or []:
         if not ((r.get("flags") or {}).get("directive")):
             continue
-        text = str(r.get("text") or "")[:400]
+        text = _window(str(r.get("text") or ""))
         if not text.strip():
             continue
         pid = "observed:" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
