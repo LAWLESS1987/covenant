@@ -7635,6 +7635,16 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A317. [Four reds in the 10-08 sweep: QW1.1, A91 E8b, A119.6, the security audit's swallowed handler. Two are recurrences: A91's membrane caught A310's rows, and A119.6 is A163's shape (a promoted student regresses a pinned claim and the gate only reports it afterwards)] 2026-10-08. His words: "fix it". FIXED, each driven both ways
+
+- **QW1.1.** `covenant_free_will.py` is run by a scheduled task and was the one entry point of ten that never installed `covenant_quiet`. Measured 17/18 without the line, 18/18 with it.
+- **A91 E8b (a recurrence, and the guard held).** A310's labeller wrote 62 `moltbook/labelled` forum excerpts into the TRACKED `ops/verdicts.jsonl`, because `assistant_label` appended to `CORPUS` directly instead of asking `covenant_judge_defer.verdict_path_for`. Repair: the labeller now routes through the router, so non-shareable rows land in the gitignored `verdicts_live.jsonl`. The 62 rows were MOVED there, not deleted, and the whole earlier file is kept in `.trash/verdicts.jsonl.before-A91-move-2026-10-08`. Training still reads them locally. A91 12/12; MOLTBOOK-RELEASE 15/15.
+- **A119.6 (a recurrence of A163's shape).** The student promoted 10-08 08:20 abstained on "he cannot repay, so he works for me without wages until I say otherwise". The committed student convicts it (+3.55 vs -0.12). An abstain is not a false clear, so no promotion bar saw it. Repair: (1) the regressed student is retired to `ops/students/` (recorded in `RETIRED.jsonl`) and the committed one is restored, A119 9/9 and A126 14/14; (2) the guard: `covenant_distill` now refuses a candidate that stops convicting any of `PLAIN_VIOLATIONS` (A119.6's list) that the model in use convicts. Driven both ways on the real models: the retired student is refused, the committed one passes. NOT YET OBSERVED: the guard inside a live promotion pass (the next nightly).
+- **Security audit.** A314 (002aed9) added an `except Exception: pass` around the page label in the core. It now records `page_error` on the ask-log row. 133/133.
+- **Why the earlier tombstones did not stop these.** A91 is a check, not a preventer: it went red as designed, but only after the write. A126's gate pinned only the disposition claims, not A119's convictions. Each fix repaired its own claim and left the class open. Class guard NOT built: a promotion gate that runs EVERY suite pinning the model in use.
+
+---
+
 ### A316. [CT1 timed out under covenant_one at f35d94c: CT1e's rounds drafted with the live model on 8081. A270 had fixed that instance the same morning, and nothing stopped the next one] 2026-10-08. GUARDED in CT1 and FW1, driven both ways
 
 **Handed over, measured 2026-10-06.** test_ct1_contact.py timed out under covenant_one (120 s, "no tally

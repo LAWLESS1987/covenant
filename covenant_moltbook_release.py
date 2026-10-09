@@ -243,16 +243,21 @@ def assistant_label(labels, dry_run=True, grant_path=None, corpus=CORPUS, quaran
     import covenant_distill as X
     ebags = X._exam_bags()
     by_sha = {r.get("sha256"): r for r in load_candidates(quarantine or _quarantine_path())}
+    target = corpus
+    if os.path.abspath(corpus) == os.path.abspath(CORPUS):    # A91: forum excerpts are not shareable; the router keeps them local
+        import covenant_judge_defer as D
+        target = D.verdict_path_for(LABELLED_SOURCE)
     known = set()
-    try:
-        with open(corpus, encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    known.add(_norm(json.loads(line).get("text")).lower())
-                except ValueError:
-                    continue
-    except OSError:
-        pass
+    for path in {corpus, target}:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        known.add(_norm(json.loads(line).get("text")).lower())
+                    except ValueError:
+                        continue
+        except OSError:
+            pass
     rows = []
     for lab in labels:
         cand = by_sha.get(lab.get("sha256"))
@@ -280,7 +285,7 @@ def assistant_label(labels, dry_run=True, grant_path=None, corpus=CORPUS, quaran
                     "grant": os.path.basename(grant_path or FORUM_LABEL_GRANT), "excerpt": True})
         rows.append(row)
     if not dry_run and rows:
-        with open(corpus, "a", encoding="utf-8", newline="\n") as fh:      # LF: text mode on Windows wrote CRLF into the ledger (measured 2026-09-28)
+        with open(target, "a", encoding="utf-8", newline="\n") as fh:      # LF: text mode on Windows wrote CRLF into the ledger (measured 2026-09-28)
             for row in rows:
                 fh.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
     out["written"] = 0 if dry_run else len(rows)

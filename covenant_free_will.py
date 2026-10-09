@@ -40,6 +40,7 @@ import os
 import re
 import time
 
+import covenant_quiet; covenant_quiet.install()   # A204: a scheduled-task entry point; every child windowless (QW1.1)
 import covenant_screen as _screen   # A176: every screen reads the text a reader sees
 
 HERE = os.path.dirname(os.path.abspath(__file__))

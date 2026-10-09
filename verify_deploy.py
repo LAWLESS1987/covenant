@@ -124,7 +124,7 @@ MANIFEST = {
     # P19 23/23 and A3s 51/51 were run against THESE bytes BEFORE this line
     # moved, the order the b969 lesson below requires.
     "covenant_unified_v8.py":
-        "ac886cc2ce70c1de3dbdb421cb1b4e4e863e2e9d1d79226462617fc0b0d6ae89",
+        "3101c19472e31f9801de4086ed874a9bcb02b177ad8828fed384d560a70fe7dc",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live
