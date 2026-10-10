@@ -1031,6 +1031,53 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch a267-pin-count-claim-as-written-2026-10-06 (at f35d94c), and in verify_deploy.py itself, on the digest's own line, where the A315-COUNT marker above it is within the window. Committed first as A267-COUNT on the branch (e8ea71b); renumbered at the 2026-10-08 merge because main had taken A267 for C4's worktree prune."
+  },
+  {
+   "id": "A283-STRIKES",
+   "claim": "That a wrong answer to Moltbook's posting challenge spends one of the ten the account has before suspension, and that an abstained challenge spends nothing -- so the highway's moltbook_strikes read PRESENT on any unsolved, unabstained challenge in seven days and never counted an abstention.",
+   "refuted_by": "Moltbook's skill.md, read 2026-10-10: \"If your last 10 challenge attempts are all failures (expired or incorrect), your account will be automatically suspended\" -- the rule covenant_ambassador.py already quoted. Suspension needs the last ten ALL to fail, so a solved challenge ends the run; an abstained challenge is left to expire, and 'expired' is named a failure. On 10-10 the check read PRESENT on four unsolved answers (10-08 to 10-10) while the newest answered challenge, 07:59:51Z, was solved, and it never saw the longest unsolved run on record: 12 in a row before that solve, 10 of them abstentions. Run side by side from branch a283-strikes-check-as-written-2026-10-10: four failures then a solve, PRESENT as written and ABSENT restated; five abstentions after a solve, ABSENT as written and PRESENT restated.",
+   "truth": "The risk Moltbook names is the run of consecutive unsolved challenges at the end of the record, an abstention counted, because it expires. moltbook_strikes is PRESENT when that run reaches 5, half the ten, and names the run, the longest run in seven days, and the week's solved, failed and abstained counts. Whether Moltbook counts an unanswered expiry is UNDETERMINED: its text says so, and the account still verified after the 12-run. From A324 a send keeps its answer and Moltbook's reply, so a wrong answer can be told from a POST that never arrived; the four of 10-08 to 10-10 kept neither.",
+   "verbatim": [
+    "each spends one of the ten the account has",
+    "an abstention hides the content and spends nothing",
+    "an unreadable challenge is abstained, spends nothing"
+   ],
+   "patterns": [
+    "one\\s+of\\s+the\\s+ten\\s+the\\s+account\\s+has",
+    "abst(?:ain|en)\\w*,?\\s+(?:hides\\s+the\\s+content\\s+and\\s+)?spends\\s+nothing"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a283-strikes-check-as-written-2026-10-10 (at 110a3ba): covenant_highway.detect_moltbook_strikes, covenant_free_will._ver's docstring, and H1st in test_h1_highway.py. The record keeps the wording in A283 and A324."
+  },
+  {
+   "id": "A300-STARVED",
+   "claim": "That a round marked 'starved' -- the model failed during it -- ran but did not speak, so it never reset the highway's ambassador_stalled clock.",
+   "refuted_by": "covenant_free_will marks a round starved at its FIRST failed ask and keeps every reply written before it. On 2026-10-10 the 07:15:11Z round wrote 86 replies before it starved (86 refused, 89 deferred) and the 08:10:52Z round wrote 88 (1 sent at 07:59:51Z, 87 refused, 6 deferred). ambassador_stalled read PRESENT, 'no live round that could write in 15.0 h', two hours after she spoke. Run side by side from branch a300-starved-round-claim-as-written-2026-10-10: PRESENT as written, ABSENT restated (last round that wrote 2.3 h before).",
+   "truth": "A round that wrote anything (replied + refused > 0) could write, and resets the clock; when the newest such round was cut short it is named part_starved. Only a round starved before writing anything is starved, and that still reads as a stall.",
+   "verbatim": [
+    "a round the model could not write (\"starved\") ran but did not speak"
+   ],
+   "patterns": [
+    "could\\s+not\\s+write\\s+\\(\"starved\"\\)\\s+ran\\s+but\\s+did\\s+not\\s+speak"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a300-starved-round-claim-as-written-2026-10-10 (at 110a3ba), in covenant_highway.detect_ambassador_stalled. The record keeps the wording in A325."
   }
  ]
 }

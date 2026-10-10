@@ -1560,7 +1560,22 @@ def main():
           and "could not write" in am_s["starved_after"]["measured"]["why"] and "no weights fit" in am_s["starved_after"]["measured"]["why"]
           and am_s["only_starved"]["state"] == H.PRESENT and am_s["spoke_since"]["state"] == H.ABSENT
           and "starved" not in am_s["spoke_since"]["measured"], am_s)
-    _am_paired = [n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
+    # A325 (2026-10-10): A300's rule as written read a round that starved PART-WAY as one that did not write (branch
+    # a300-starved-round-claim-as-written-2026-10-10; retracted as A300-STARVED). The 08:10Z round of 10-10, as stand-in.
+    _pr = {"at": _n - 2 * 3600, "starved": "ConnectionResetError: [WinError 10054] closed by the remote host",
+           "replied": 1, "refused": 87, "deferred": 6}
+    am_p = {
+        "part": H.detect_ambassador_stalled(grant=_g, paused=(False, ""), rounds=[{"at": _n - 20 * 3600}, _pr], now=_n),
+        "none_written": H.detect_ambassador_stalled(grant=_g, paused=(False, ""),
+                                                    rounds=[{"at": _n - 20 * 3600}, dict(_pr, replied=0, refused=0)], now=_n),
+    }
+    check("H1am2 a round that wrote 88 replies before its model failed could write: it resets the clock and is named "
+          "part_starved, not a stall; the same round with nothing written still reads as a stall (A325)",
+          am_p["part"]["state"] == H.ABSENT and am_p["part"]["measured"]["last_live_round_h"] == 2.0
+          and "ConnectionResetError" in (am_p["part"]["measured"].get("part_starved") or "")
+          and "starved" not in am_p["part"]["measured"]
+          and am_p["none_written"]["state"] == H.PRESENT and am_p["none_written"]["measured"]["starved"]["rounds"] == 1, am_p)
+    _am_paired =[n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
     check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
 
     # ---- H1ak: Tetsu up and failing (A282, 2026-10-06). Stand-in rows, a fixed clock.
@@ -1701,21 +1716,41 @@ def main():
     check("H1tf no remedy: the repository and its code are his and Grok's",
           [n for n, r in H.REMEDIES.items() if "threefold_witness" in (r.get("for") or [])] == [])
 
-    # ---- H1st: Moltbook strikes (A283, 2026-10-06). Stand-in ledger rows.
+    # ---- H1st: Moltbook strikes (A283, 2026-10-06; restated A324, 2026-10-10 -- the checks as A283 wrote them are on
+    # branch a283-strikes-check-as-written-2026-10-10, retracted as A283-STRIKES). Stand-in ledger rows.
     _ts = 1_900_000_000.0
-    _v = lambda req, sol, ab=False, ago=3600: {"t": "x", "at": _ts - ago, "author": "a", "verification":  # noqa: E731
-                                               {"required": req, "solved": sol, "abstained": ab}}
+    _v = lambda req, sol, ab=False, ago=3600, **kw: {"t": "x", "at": _ts - ago, "author": "a", "verification":  # noqa: E731
+                                                     dict({"required": req, "solved": sol, "abstained": ab}, **kw)}
+    _seq = lambda ks: [_v(True, k == "S", ab=k == "a", ago=3600 * (len(ks) - i)) for i, k in enumerate(ks)]  # noqa: E731
+    _st = lambda rows: H.detect_moltbook_strikes(rows=rows, now=_ts)  # noqa: E731
     st_ = {
-        "clean": H.detect_moltbook_strikes(rows=[_v(True, True), _v(False, False), {"kind": "reply"}], now=_ts)["state"],
-        "wrong": H.detect_moltbook_strikes(rows=[_v(True, True), _v(True, False)], now=_ts),
-        "abstained": H.detect_moltbook_strikes(rows=[_v(True, False, ab=True)], now=_ts)["state"],
-        "old": H.detect_moltbook_strikes(rows=[_v(True, False, ago=8 * 86400)], now=_ts)["state"],
-        "none": H.detect_moltbook_strikes(rows=[{"kind": "reply", "sent": True}], now=_ts)["state"],
+        "clean": _st([_v(True, True), _v(False, False), {"kind": "reply"}]),
+        "reset": _st(_seq("FFFFS")),
+        "reset_unordered": _st(list(reversed(_seq("FFFFS")))),
+        "run5": _st(_seq("SFaFaa")),
+        "abstained5": _st(_seq("Saaaaa")),
+        "run4": _st(_seq("Saaaa")),
+        "old": _st([_v(True, False, ago=8 * 86400)]),
+        "none": _st([{"kind": "reply", "sent": True}]),
     }
-    check("H1st moltbook_strikes: every challenge solved ABSENT; a wrong answer PRESENT and counted; an abstention spends "
-          "nothing (ABSENT); a strike older than a week out of the window (UNKNOWN: nothing in it); nothing on record UNKNOWN",
-          st_["clean"] == H.ABSENT and st_["wrong"]["state"] == H.PRESENT and st_["wrong"]["measured"]["wrong_answers_7d"] == 1
-          and st_["abstained"] == H.ABSENT and st_["old"] == H.UNKNOWN and st_["none"] == H.UNKNOWN, st_)
+    check("H1st moltbook_strikes reads the run of unsolved challenges at the end, as Moltbook's rule does: all solved "
+          "ABSENT; four failures then a solve ABSENT (the 10-10 case, PRESENT as A283 wrote it), in ledger order or not; "
+          "five unsolved PRESENT, abstentions counted (five abstentions alone were ABSENT as A283 wrote it); four ABSENT; "
+          "an old failure is the run but not the week; nothing on record UNKNOWN",
+          st_["clean"]["state"] == H.ABSENT and st_["clean"]["measured"]["run"] == 0
+          and st_["reset"]["state"] == H.ABSENT and st_["reset"]["measured"]["run"] == 0
+          and st_["reset"]["measured"]["failed_7d"] == 4 and st_["reset"]["measured"]["longest_run_7d"] == 4
+          and st_["reset_unordered"]["state"] == H.ABSENT
+          and st_["run5"]["state"] == H.PRESENT and st_["run5"]["measured"]["run"] == 5 and "suspends" in st_["run5"]["measured"]["why"]
+          and st_["abstained5"]["state"] == H.PRESENT and st_["abstained5"]["measured"]["abstained_7d"] == 5
+          and st_["run4"]["state"] == H.ABSENT and st_["run4"]["measured"]["run"] == 4
+          and st_["old"]["state"] == H.ABSENT and st_["old"]["measured"]["run"] == 1 and st_["old"]["measured"]["failed_7d"] == 0
+          and st_["none"]["state"] == H.UNKNOWN, st_)
+    _det = _st([_v(True, False, ago=7200), _v(True, False, answer="12.00",
+                                             response={"success": False, "http": 400, "error": "Incorrect answer"})])
+    check("H1st a failure names what was answered and what Moltbook said when the row kept them, and says when it did not "
+          "(A324)", _det["measured"]["failed"][0].endswith("answer and reply not kept (before A324)")
+          and _det["measured"]["failed"][1].endswith("answered 12.00, HTTP 400 Incorrect answer"), _det["measured"])
     check("H1st no remedy: the account is his", [n for n, r in H.REMEDIES.items() if "moltbook_strikes" in (r.get("for") or [])] == [])
 
     # ---- H1sk: the schedule is alive (A281, 2026-10-06). Stand-in task lists; the scheduler is never read here.

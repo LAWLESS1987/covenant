@@ -414,14 +414,23 @@ def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
 
 
 def _ver(res):
-    """A283 (2026-10-06): what Moltbook's posting challenge did with this send, kept in the ledger. A WRONG answer
-    spends one of the ten the account has before suspension (submit_verification's own docstring); an
-    unreadable challenge is abstained, spends nothing, and leaves the content hidden. None when no content was
-    created (a hold, a refusal, a dry run)."""
+    """A283 (2026-10-06): what Moltbook's posting challenge did with this send, kept in the ledger. Moltbook
+    suspends the account when its last 10 challenge attempts all failed, expired or incorrect; an unreadable
+    challenge is abstained and left to expire, which in their words is a failure too (A324; the wording this
+    replaced is retracted as A283-STRIKES). A324 (2026-10-10): the answer and Moltbook's reply are kept as well.
+    Without them a wrong answer could not be told from a POST that never arrived: the four unsolved answers of
+    10-08 to 10-10 kept neither. None when no content was created (a hold, a refusal, a dry run)."""
     v = (res or {}).get("verification")
     if not (res or {}).get("created") or not isinstance(v, dict):
         return None
-    return {"required": bool(v.get("required")), "solved": bool(v.get("solved")), "abstained": bool(v.get("abstained"))}
+    out = {"required": bool(v.get("required")), "solved": bool(v.get("solved")), "abstained": bool(v.get("abstained"))}
+    if v.get("answer") is not None:
+        out["answer"] = str(v["answer"])[:16]
+    resp = v.get("response")
+    if isinstance(resp, dict):
+        out["response"] = {k: (resp[k] if isinstance(resp[k], (bool, int)) else str(resp[k])[:200])
+                           for k in ("success", "http", "error", "message") if k in resp}
+    return out
 
 
 LOCK_STALE_S = 7200

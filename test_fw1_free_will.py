@@ -504,14 +504,22 @@ def main():
     with open(gpv, "w", encoding="utf-8") as fh:
         json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
     outcomes = iter([{"sent": True, "created": True, "verification": {"required": True, "solved": True, "answer": "30.00"}},
-                     {"sent": False, "created": True, "verification": {"required": True, "solved": False}},
+                     {"sent": False, "created": True, "verification": {"required": True, "solved": False, "answer": "12.00",
+                                                                      "verification_code": "vc_never_kept",
+                                                                      "response": {"success": False, "http": 400,
+                                                                                   "error": "Incorrect answer",
+                                                                                   "verification_code": "vc_never_kept"}}},
                      {"sent": False, "judged": "held", "why": "held"}])
     FW.run_round(dry_run=False, say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three),
                  emit=lambda text, **k: next(outcomes), introduce=lambda **k: {"sent": False},
                  grant_path=gpv, sends_path=spv, now=700000.0, count_comments=cc0)
     vs = [r.get("verification") for r in FW.sends(spv) if r.get("kind") == "reply"]
-    check("FW1v solved, a wrong answer, and no content created are each kept as such (None when nothing was created)",
-          vs == [{"required": True, "solved": True, "abstained": False}, {"required": True, "solved": False, "abstained": False}, None], vs)
+    check("FW1v solved, a wrong answer, and no content created are each kept as such (None when nothing was created); "
+          "A324: with the answer and Moltbook's reply, and never the verification code",
+          vs == [{"required": True, "solved": True, "abstained": False, "answer": "30.00"},
+                 {"required": True, "solved": False, "abstained": False, "answer": "12.00",
+                  "response": {"success": False, "http": 400, "error": "Incorrect answer"}}, None]
+          and "vc_never_kept" not in json.dumps(vs), vs)
 
     print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
     tdu = tempfile.mkdtemp(prefix="fw1u_")

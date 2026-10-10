@@ -7645,6 +7645,37 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A325. [The highway called free stalled two hours after she spoke: A300 read a round that starved PART-WAY as one that wrote nothing] 2026-10-10. His words: "the highways red", then "use the tombstone system and logic gained from doing so and your discernment". RETRACTED as A300-STARVED, restated, driven both ways
+
+- **What was said and was wrong.** In `covenant_highway.detect_ambassador_stalled`, A300 wrote: `a round the model could not write ("starved") ran but did not speak`. Kept as written on branch `a300-starved-round-claim-as-written-2026-10-10` (at 110a3ba).
+- **Measured.** `covenant_free_will` marks a round starved at its FIRST failed ask and keeps everything written before it. On 10-10:
+  - The 07:15:11Z round wrote 86 replies before the model's connection reset: 86 refused by the judges, 89 deferred.
+  - The 08:10:52Z round wrote 88: 1 sent (07:59:51Z), 87 refused, 6 deferred.
+  - The road read PRESENT, "no live round that could write in 15.0 h". As written it reads PRESENT on today's ledger. Restated it reads ABSENT: the last round that wrote was 2.3 h before, cut short by `ConnectionResetError`.
+- **Restated.** A round that wrote anything (replied + refused > 0) could write, and resets the clock. When the newest such round was cut short, it is named `part_starved`. A round starved before it wrote anything is still starved and still a stall (H1am, unchanged).
+- **Driven both ways.** H1am2: the 08:10Z round as a stand-in reads ABSENT and part_starved; the same round with nothing written reads PRESENT. H1 222/222.
+- **What stopped free from speaking is not a stall.** The judges refused 173 of the 174 replies written in those two rounds. That is A322's defect, recorded there, with its decision his.
+- **Why the earlier tombstone did not stop it.** A300 measured rounds that starved at their first ask (the model never loaded). A round whose model fails late was not a case it had seen.
+
+### A324. [The highway's Moltbook strike count read Moltbook's rule wrongly both ways: a failure is not a spent strike, and an abstention is not free] 2026-10-10. His words: "the highways red", then "use the tombstone system and logic gained from doing so and your discernment". RETRACTED as A283-STRIKES, restated, driven both ways
+
+- **What was said and was wrong.** A283 wrote that a wrong answer "spends one of the ten the account has before suspension", and that "an unreadable challenge is abstained, spends nothing". `detect_moltbook_strikes` read PRESENT on any unsolved, unabstained challenge in seven days and skipped abstentions. Its docstring said `an abstention hides the content and spends nothing`. Kept as written on branch `a283-strikes-check-as-written-2026-10-10` (at 110a3ba): the detector, `covenant_free_will._ver`'s docstring, and H1st.
+- **The rule, read from its source.** Moltbook's skill.md, read 2026-10-10: "If your last 10 challenge attempts are all failures (expired or incorrect), your account will be automatically suspended". This is the rule `covenant_ambassador.py` already quoted. Suspension needs the last ten ALL to fail, so a solved challenge ends the run. An abstained challenge is left to expire, and the rule names expired as a failure.
+- **Measured.** 35 challenges on record when read (10-06 21:42Z to 10-10 10:04Z), in time order (S solved, a abstained, F answered and not solved): `SSaaFaaaSaFaaSaaSaaaSaaaaaaaFaaaFSa`.
+  - The road read PRESENT on the four F while the newest answered challenge (07:59:51Z) was solved.
+  - It never saw the longest unsolved run, 12 in a row, 10 of them abstentions.
+  - The account still verified after that run. So whether Moltbook counts an unanswered expiry is UNDETERMINED: its text says it does, and the account's behaviour says it did not, or not yet.
+  - Read again after the change, with more challenges on record: run 3, longest 12, solved 7, failed 4, abstained 26 in the week. The solver abstains on most challenges, and abstained content stays hidden.
+- **The four F are not known to be wrong answers.** `_ver` kept three booleans and dropped the answer and Moltbook's reply. A wrong answer, an expired code and a POST that never arrived (the same hours saw `ConnectionResetError` on the model) all look the same in the ledger. UNDETERMINED, and now recorded: `_ver` keeps `answer` and `response` (success, http, error, message), never the verification code (FW1v).
+- **Restated.** The run is the consecutive unsolved challenges, failed or abstained, at the end of the record in time order. PRESENT when it reaches 5, half the ten. That level is my choice, his to move (`STRIKES_RUN_WARN`). The road always names the run, the longest run in the week, the solved, failed and abstained counts, and per failure what was answered and said, or that it was not kept.
+- **Driven both ways.** Side by side, the detector from the branch and the restated one:
+  - four failures then a solve: PRESENT as written, ABSENT restated;
+  - five abstentions after a solve: ABSENT as written, PRESENT restated;
+  - today's ledger: PRESENT as written, ABSENT restated (run 3).
+  - H1st pins the restated cases (H1 222/222).
+  - R1 was driven with a probe file holding the retracted wordings, and the first drive caught my own pattern. It read `abstain\w*`, and "abstention" is spelled abst-en-, so A283-STRIKES stayed green with the probe in place. The pattern is now `abst(?:ain|en)\w*`. Re-driven: with the probe, A283-STRIKES had 2 violations and A300-STARVED 1, 133/135; without it, 135/135.
+- **Why the earlier tombstone did not stop it.** No earlier check was on the rule itself. A283 cited "submit_verification's own docstring" for the ten, and that docstring (read 10-10) does not mention a limit. The rule's own words, "last 10 ... all failures", were quoted in the same file's comments, and nothing compared the detector with them.
+
 ### A323. [A322's commit turned the sweep and public CI red through two registries it never touched: A284 FC10 (an undeclared tetsu_work.ask caller) and A255 C1 (two unclassified tracked .jsonl). A recurrence of A266's shape; the commit-time check now covers it] 2026-10-10. His words: "had another red pass and the highways red", then "use the tombstone system and logic gained from doing so and your discernment". FIXED, the guard driven both ways; it reports and never blocks
 
 - **Measured.** Public CI failed all four jobs on 63c6747 (runs 38028554683, push, and 38030035342, schedule; Python 3.11 and 3.12; read from the GitHub API annotations). Each job had one suite and one check failing: `test_a284_fresh_context.py` 12/13, where FC10 named `tools/discourse_seat_eval.py` line 58 as a caller nobody declared; and A255 C1, 9 of 11 tracked .jsonl classified, the other two being `ops/discourse_seat_eval.jsonl` and `ops/discourse_seat_eval.run2.jsonl`. Locally, the 09:38Z heal pass read A255 FAIL in place. The highway read sweep_red, sweep_not_current and public_ci_red as PRESENT. Its sweep is the newest full transcript on disk, ONE_SWEEP.txt: 4 days old, a FAIL on test_ct1_contact.py (healed since, 33/33), of core 74d6d31e9f5d, where the core is now 3101c19472e3.

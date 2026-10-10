@@ -1108,19 +1108,47 @@ def detect_public_email_exposure(health=None, get=None, now=None, cache=None):
 
 
 STRIKES_WINDOW_S = 7 * 86400
+#: Moltbook suspends the account when its last 10 challenge attempts are ALL failures (their skill.md, read
+#: 2026-10-10). The road speaks at half of that, so rounds are left to act in -- my choice that day (A324), his to move.
+STRIKES_SUSPEND_AT = 10
+STRIKES_RUN_WARN = 5
+
+
+def _strike_detail(r, v):
+    """One failed challenge, with what was answered and what Moltbook said, when the row kept them (A324)."""
+    d = "%s u/%s" % (r.get("t", "?"), r.get("author"))
+    resp = v.get("response")
+    if "answer" not in v and not isinstance(resp, dict):
+        return d + ": answer and reply not kept (before A324)"
+    d += ": answered %s" % v.get("answer")
+    if isinstance(resp, dict):
+        d += ", %s%s" % ("HTTP %s " % resp["http"] if resp.get("http") else "no HTTP reply ",
+                         str(resp.get("error") or resp.get("message") or "")[:120])
+    return d
 
 
 def detect_moltbook_strikes(health=None, rows=None, now=None):
-    """A wrong answer to Moltbook's posting challenge in the last week: each spends one of the ten the account has
-    before suspension.
+    """The run of unsolved Moltbook posting challenges at the end of the record, against the ten that suspend.
 
-    A283 (2026-10-06, his words: "yes correct that one too and keep expanding"). free's sends answer a math
-    challenge before their content is visible (covenant_ambassador._handle_verification); a wrong answer is a
-    strike against his account, and nothing recorded which sends earned one -- that afternoon two corrections
-    came back created and not "sent", and whether either spent a strike is UNDETERMINED. Sends now carry their
-    verification (covenant_free_will._ver). PRESENT on any wrong answer in the window, naming the count; ABSENT
-    when every recorded challenge was solved or abstained (an abstention hides the content and spends nothing);
-    UNKNOWN before any verification is on record. No remedy: an account is his."""
+    A283 (2026-10-06, his words: "yes correct that one too and keep expanding"): free's sends answer a math
+    challenge before their content is visible (covenant_ambassador._handle_verification), and nothing recorded
+    which sends failed one. Sends now carry their verification (covenant_free_will._ver).
+
+    A324 (2026-10-10) -- THE CHECK AS A283 WROTE IT WAS WRONG, kept as written (branch
+    a283-strikes-check-as-written-2026-10-10; docs/RETRACTED.json A283-STRIKES). It read each unsolved answer as
+    using up one of a fixed ten, and an abstention as costing nothing. Moltbook's rule, read that day: "If your
+    last 10 challenge attempts are all failures (expired or incorrect), your account will be automatically
+    suspended." So a solved challenge ends the run, and an abstained one, left to expire, is a failure in their
+    words. That day it read PRESENT on four unsolved answers while the newest answered challenge was solved, and
+    it never saw the longest run on record: 12 unsolved in a row, 10 of them abstentions.
+
+    Restated: the run is the consecutive unsolved challenges (failed or abstained) at the end of everything on
+    record, in time order. PRESENT when it reaches STRIKES_RUN_WARN. It always names the run, the longest run in
+    the last week, and the week's solved, failed and abstained counts, plus what each recent failure answered and
+    what Moltbook said, where the row kept them (from A324; earlier rows kept neither). Whether Moltbook counts an
+    unanswered expiry is UNDETERMINED: their text says expired is a failure, and the account still verified after
+    the 12-run. The run counts it, which is the conservative reading. UNKNOWN before any challenge is on record.
+    No remedy: an account is his."""
     import calendar
     now = time.time() if now is None else now
     if rows is None:
@@ -1129,7 +1157,7 @@ def detect_moltbook_strikes(health=None, rows=None, now=None):
             rows = FW.sends()
         except Exception as e:                                   # noqa: BLE001
             return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
-    seen, wrong, abstained = 0, [], 0
+    seq = []
     for r in rows or []:
         v = r.get("verification")
         if not isinstance(v, dict) or not v.get("required"):
@@ -1140,20 +1168,32 @@ def detect_moltbook_strikes(health=None, rows=None, now=None):
                 at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
             except ValueError:
                 continue
-        if now - float(at) > STRIKES_WINDOW_S:
-            continue
-        seen += 1
-        if v.get("abstained"):
-            abstained += 1
-        elif not v.get("solved"):
-            wrong.append("%s u/%s" % (r.get("t", "?"), r.get("author")))
-    measured = {"challenges_7d": seen, "wrong_answers_7d": len(wrong), "abstained_7d": abstained}
-    if wrong:
-        measured["wrong"] = wrong[-5:]
+        kind = "solved" if v.get("solved") else "abstained" if v.get("abstained") else "failed"
+        seq.append((float(at), kind, r, v))
+    if not seq:
+        return {"state": UNKNOWN, "measured": {"why": "no challenge result on record"}}
+    seq.sort(key=lambda s: s[0])
+    run = 0
+    for _, kind, _, _ in reversed(seq):
+        if kind == "solved":
+            break
+        run += 1
+    week = [s for s in seq if now - s[0] <= STRIKES_WINDOW_S]
+    longest = cur = 0
+    for _, kind, _, _ in week:
+        cur = 0 if kind == "solved" else cur + 1
+        longest = max(longest, cur)
+    measured = {"run": run, "warn_at": STRIKES_RUN_WARN, "suspends_at": STRIKES_SUSPEND_AT, "longest_run_7d": longest,
+                "solved_7d": sum(1 for s in week if s[1] == "solved"),
+                "failed_7d": sum(1 for s in week if s[1] == "failed"),
+                "abstained_7d": sum(1 for s in week if s[1] == "abstained")}
+    failed = [s for s in week if s[1] == "failed"]
+    if failed:
+        measured["failed"] = [_strike_detail(r, v) for _, _, r, v in failed[-5:]]
+    if run >= STRIKES_RUN_WARN:
+        measured["why"] = ("the last %d challenge(s) went unsolved (failed, or abstained and left to expire); Moltbook "
+                           "suspends the account at %d in a row" % (run, STRIKES_SUSPEND_AT))
         return {"state": PRESENT, "measured": measured}
-    if not seen:
-        measured["why"] = "no challenge result on record in the window"
-        return {"state": UNKNOWN, "measured": measured}
     return {"state": ABSENT, "measured": measured}
 
 
@@ -1218,9 +1258,15 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
     if not grant:
         return {"state": ABSENT, "measured": {"why": "no grant on record: free is off by his choice"}}
     is_paused, why = paused if isinstance(paused, tuple) else (bool(paused), "")
-    # A300 (2026-10-07): a round the model could not write ("starved") ran but did not speak. It does not reset
-    # the stall clock, and the rounds starved since she last could write are named with the model's own error.
-    last, starved_since = None, []
+    # A300 (2026-10-07): a round that starved before the model wrote anything ran but did not speak. It does not
+    # reset the stall clock, and the rounds starved since she last could write are named with the model's own error.
+    # A325 (2026-10-10) -- A300's wording here was wrong for a round that starved PART-WAY, kept as written (branch
+    # a300-starved-round-claim-as-written-2026-10-10; docs/RETRACTED.json A300-STARVED). free marks a round starved
+    # at its FIRST failed ask and keeps what was written before it: that day the 07:15Z round wrote 86 replies
+    # and the 08:10Z round 88, one of them sent, and this read "no live round that could write in 15.0 h".
+    # Restated: a round that wrote anything (replied + refused > 0) could write, and resets the clock; when the
+    # newest such round was cut short it is named part_starved, never as a stall.
+    last, starved_since, part = None, [], None
     for r in rounds or []:
         at = r.get("at")
         if at is None:
@@ -1228,14 +1274,19 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
                 at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
             except ValueError:
                 continue
-        if r.get("starved"):
+        wrote = (r.get("replied") or 0) + (r.get("refused") or 0) > 0
+        if r.get("starved") and not wrote:
             starved_since.append((float(at), str(r.get("starved"))))
             continue
-        last = float(at) if last is None else max(last, float(at))
+        if last is None or float(at) >= last:
+            last = float(at)
+            part = str(r.get("starved")) if r.get("starved") else None
     starved_since = [s for s in starved_since if last is None or s[0] > last]
     measured = {"paused": bool(is_paused), "last_live_round_h": None if last is None else round((now - last) / 3600.0, 1)}
     if starved_since:
         measured["starved"] = {"rounds": len(starved_since), "last_why": starved_since[-1][1][:200]}
+    if part:
+        measured["part_starved"] = part[:200]
     if is_paused:
         measured["why"] = str(why)[:240]
         if sends is not None or rounds_were_read:
