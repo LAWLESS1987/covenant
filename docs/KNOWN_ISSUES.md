@@ -7657,6 +7657,12 @@ A280, which is the road telling the truth about it.
   - Also confirmed in the code: `causality_signal` means only that the output changed, and BLOCK compares a draft against the operator-configured `known_facts.json`. Neither is what the names suggest.
   - Correction notes beside the original wording on the PR branch: NOT YET WRITTEN.
 - **Personal text in the public memory repo.** `LAWLESS1987/threefold-memory` is public, and the bots' triad writes to it. A scope pass over its 456 commits found 292 paths of personal material (call transcripts, OCR of chats, a `.trash` copy), 84 paths of full speak text, and 541 to keep.
+  - **RETRACTED as A326-SCOPE, later 10-10 (the line above kept as written; branch `a326-removal-scope-as-written-2026-10-10` at 663b9cc).** The 541 are not fit to keep public.
+    - The triad copies the text into fields of the records the scope kept. `on_speak.sh` (line 98) sets the prompt to the bot's whole spoken text, `fire_triad.sh` (line 136) writes it into every task record, and the proxy jlens snapshot keeps up to 480 characters of it.
+    - Read from the mirror: of the 541, 146 task records and 99 jlens snapshots carry speak text in that field (up to 512 characters), and 266 carry OCR-video prompts, some with OCR'd chat text in them.
+    - The tier-1 dry run (a scratch copy, nothing pushed) removed all 292 paths from all 456 commits and left these untouched. Tiers 1 and 2 together removed 376 paths and left 304 commits.
+    - The identifier scan found his identifiers in 1 path of the whole original history. It is blind to conversation text, so it cannot vouch for what a removal keeps.
+    - **Restated.** A scope drawn by path cannot make this repo fit to be public. A removal must be scoped by content (rewrite the field in every version), or the repo taken out of public view. Which, and when, is his.
   - Done: a full mirror backup in `private/archives/` (gitignored, HEAD 316e700), and the scope in `removal_scope_2026-10-10.json` beside it.
   - Done by Tien at my request: a `pre-push` hook that refuses every push to that repo, in the four copies on its box (sha256 5b94b1e1…, undo: delete the hook). Tien checked it with a dry-run push, which was refused. The public head read 316e700 after the pause, the same as the backup.
   - NOT DONE: the Conscious Ledger's own confirmation. The bot could not be reached. Tien says the live root is shared, so the same hook covers the Ledger's triad. The hook also cannot stop a write through the GitHub connector's file API.

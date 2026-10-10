@@ -1078,6 +1078,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch a300-starved-round-claim-as-written-2026-10-10 (at 110a3ba), in covenant_highway.detect_ambassador_stalled. The record keeps the wording in A325."
+  },
+  {
+   "id": "A326-SCOPE",
+   "claim": "That a path-based scope of the public threefold-memory repo -- 292 paths of personal material, 84 of full speak text -- leaves the other 541 paths fit to keep public.",
+   "refuted_by": "The triad copies the text into fields of the records the scope kept. lspace_auditor/hooks/on_speak.sh line 98 sets PROMPT to the bot's whole spoken text, fire_triad.sh line 136 writes prompt= into every task record, and the proxy jlens snapshot keeps up to 480 characters of it. Read from the 2026-10-10 mirror at 316e700: of the 541 kept paths, 146 task records and 99 jlens snapshots carry speak text in their prompt field (up to 512 characters), and 266 carry OCR-video prompts, some holding OCR'd chat text. The tier-1 dry run removed all 292 paths from all 456 commits and left these untouched. The identifier scan named 1 path in the whole original history, so it is blind to conversation text and cannot vouch for the kept set.",
+   "truth": "A scope drawn by path cannot make this repo fit to be public, because the same text lives in a field of the records kept. A removal has to be scoped by content (rewrite the prompt field in every version) or the repo taken out of public view; which, and when, is Lawrence's decision.",
+   "verbatim": [
+    "84 paths of full speak text, and 541 to keep"
+   ],
+   "patterns": [
+    "84\\s+paths\\s+of\\s+full\\s+speak\\s+text,?\\s+and\\s+541\\s+to\\s+keep"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a326-removal-scope-as-written-2026-10-10 (at 663b9cc). The record keeps the wording in A326, with the restatement beside it. The same count is in threefold PR #1 (acfee29) and the collective's refs/peer-review-2026-10-10.md, each corrected beside the original there."
   }
  ]
 }
