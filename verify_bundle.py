@@ -120,6 +120,9 @@ OUTPUTS = {
     "tetsu_assist.jsonl",          # covenant_tetsu_assist.py
     "oa_sources.jsonl",            # covenant_study.py appends each open-access article it caches
     "tetsu_learning_choices.jsonl",  # 2026-10-06: Tetsu's own answers to "what do you want to learn?"
+    # A323 (2026-10-10): tools/discourse_seat_eval.py appends to its --out file; A322's three runs are
+    # its measurement record. Git keeps them; the manifest never hashed a file a tool rewrites.
+    "discourse_seat_eval.jsonl", "discourse_seat_eval.run2.jsonl", "discourse_seat_eval.run3.jsonl",
     # covenant_distill.py writes this whole every night (nights every bar
     # was met). A .json, so the .jsonl test above cannot see the next one.
     "RUN_WITHOUT.json",

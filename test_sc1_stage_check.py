@@ -125,6 +125,7 @@ try:
     def commit(readers=None):
         said = []
         res = S.for_commit(tests_run=lambda: PROBE + "\n", docs_run=lambda: PROBE + "\0", readers=readers,
+                           paths_run=lambda: PROBE + "\0",
                            stage=lambda say: work, clean=lambda w: None, run=only_c4, say=said.append)
         return res, said
 
@@ -149,6 +150,81 @@ try:
           "only) the same probe is NOT caught -- the 2f6b184 commit, which is why SC3.6 can fire",
           C4 not in res3 and res4 == {} and not any("FAIL" in s for s in said3 + said4)
           and any("NO registered suite" in s for s in said3), (res3, res4, said3, said4))
+finally:
+    shutil.rmtree(work, ignore_errors=True)
+
+# SC4 (A323, 2026-10-10): 63c6747 added tools/discourse_seat_eval.py and two tracked .jsonl files, carried
+# no suite that reads them, and CI failed A284 FC10 and A255 C1. A266's rule A, asked for one extension,
+# is now asked for the extension of every path the commit touches.
+print("\nSC4 -- a commit runs the suites that walk the tree for what it touches (A323)")
+got = S.staged_paths(run=lambda: "tools/new.py\0ops/run.jsonl\0gone.py\0docs/X.md\0")
+check("SC4.1 every path in the commit is taken, whatever its status", got ==
+      ["tools/new.py", "ops/run.jsonl", "gone.py", "docs/X.md"], got)
+
+SRC4 = {
+    "test_walk_py.py": "import os\nfor d, s, f in os.walk('.'):\n    [n for n in f if n.endswith('.py')]\n",
+    "test_lsfiles_jsonl.py": "import subprocess\nsubprocess.run(['git', 'ls-files'])\n"
+                             "x = [p for p in out if p.endswith(('.jsonl', '.json'))]\n",
+    "test_docstring_py.py": "'''walks the tree for *.py'''\nimport os\nos.walk('.')\n",
+    "test_no_walk.py": "EXT = ('.py',)\nopen('a.py')\n",
+    "test_ast_walk_py.py": "import ast\nEXT = ('.py',)\nast.walk(tree)\n",
+}
+r = S.walker_readers([".py", ".jsonl"], population=sorted(SRC4), read=SRC4.__getitem__)
+check("SC4.2 parsed, not grepped: a tree walk filtering .py (endswith) or .jsonl (an extension tuple) is "
+      "selected; '*.py' in a docstring, a filter with no walk, and ast.walk select nothing",
+      r == {"test_walk_py.py": "walks the tree for .py", "test_lsfiles_jsonl.py": "walks the tree for .jsonl"}, r)
+real_py, real_jsonl = S.walker_readers([".py"]), S.walker_readers([".jsonl"])
+check("SC4.3 over the runner's real registry, .py selects A284 and .jsonl selects A255 -- the two that "
+      "failed on 63c6747", "test_a284_fresh_context.py" in real_py and "test_a255_runtime_outputs.py" in real_jsonl,
+      (sorted(real_py), sorted(real_jsonl)))
+asked = []
+names = S.selection(["test_own.py"], [], paths=["tools/x.py", "ops/y.jsonl", "docs/Z.md", "LICENSE", "test_own.py"],
+                    walkers=lambda exts: asked.append(exts) or {"test_own.py": "w", "test_w.py": "w"},
+                    say=lambda s: None)
+check("SC4.4 the extensions asked are the commit's own (.md left to rule A, no extension skipped), and a "
+      "suite already chosen is not run twice", asked == [[".jsonl", ".py"]] and names == ["test_own.py", "test_w.py"],
+      (asked, names))
+
+# SC4.5-4.7: end to end in a REAL staged copy with the REAL A284 run there. The probe caller is written
+# into the staged copy only -- never into the tree being committed.
+A284 = "test_a284_fresh_context.py"
+PROBE4 = "tools/_sc4_probe.py"
+work = C1.stage(lambda m: None)
+try:
+    C1.clean_dbs(work)
+    probe_path = os.path.join(work, *PROBE4.split("/"))
+    with open(probe_path, "w", encoding="utf-8") as fh:
+        fh.write("import tetsu_work as TW\nTW.ask('a question', fresh=True)\n")
+
+    def only_a284(t, w):
+        if t == A284:
+            return subprocess.run([sys.executable, t], cwd=w, capture_output=True, text=True, timeout=180,
+                                  env=S.suite_env())
+        p = P()
+        p.returncode, p.stdout = 0, "(not run by SC4)"
+        return p
+
+    def commit4(walkers=None):
+        said = []
+        res = S.for_commit(tests_run=lambda: "", docs_run=lambda: "", paths_run=lambda: PROBE4 + "\0",
+                           walkers=walkers, stage=lambda say: work, clean=lambda w: None, run=only_a284,
+                           say=said.append)
+        return res, said
+
+    res, said = commit4()
+    check("SC4.5 a commit that only adds a tool calling tetsu_work.ask, undeclared, runs A284, and the real "
+          "A284 in the staged copy reports it FAIL, the commit said NOT blocked -- the 63c6747 commit",
+          res.get(A284, (True,))[0] is False and any("FAIL " + A284 in s for s in said)
+          and any("NOT blocked" in s for s in said), (res.get(A284), said[-3:]))
+    os.remove(probe_path)
+    res2, _ = commit4()
+    check("SC4.6 the same commit with the probe gone passes A284 there -- the FAIL above is the probe",
+          res2.get(A284, (False,))[0] is True, res2.get(A284))
+    with open(probe_path, "w", encoding="utf-8") as fh:
+        fh.write("import tetsu_work as TW\nTW.ask('a question', fresh=True)\n")
+    res3, said3 = commit4(walkers=lambda exts: {})
+    check("SC4.7 mutation: with the walker selection removed, the same probe is NOT caught -- the hook as it "
+          "was, which is why SC4.5 can fire", A284 not in res3 and not any("FAIL" in s for s in said3), (res3, said3))
 finally:
     shutil.rmtree(work, ignore_errors=True)
 

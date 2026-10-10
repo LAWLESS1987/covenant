@@ -36,6 +36,17 @@ comes back through ops/*.md is still caught only by CI; and a .md outside the di
 covenant_one stages (mobile/, phone/ ...), which no staged suite sees here or in CI. Rule B
 over-selects -- a fixture named README.md selects its suite -- which costs seconds, never a miss.
 
+TREE WALKERS, ANY EXTENSION (A323, 2026-10-10). A266's shape again, through code and ledgers rather than
+Markdown: 63c6747 (A322) added tools/discourse_seat_eval.py and two tracked .jsonl files, carried no
+suite that reads them, and both CI runners failed -- A284 FC10 (a tetsu_work.ask caller nobody declared)
+and A255 C1 (a tracked .jsonl in neither OUTPUTS nor INPUT_LEDGERS). A266 had fixed its instance's
+class for one extension. So rule A is now asked for the extension of EVERY path the commit touches
+(added, changed, deleted or renamed -- a deleted file leaves a registry's declaration stale): the
+registered suites that walk the tree AND filter on that extension run too. Measured that day over the
+runner's 200 suites: 9 walk for .py (about 70 s with A255, R1 alone 42 s, and R1 already runs for most
+commits through docs/KNOWN_ISSUES.md), 2 walk for .jsonl. The same blind spots as rule A, said plainly:
+a suite that hands its walk or its filter to a module, and a filter built at run time.
+
     python tools/stage_check.py                 # the staged (index) test files and documents
     python tools/stage_check.py test_x.py       # named files
     python tools/stage_check.py docs/X.md       # the suites that read a named document
@@ -106,18 +117,49 @@ def _walks_tree(tree):
     return False
 
 
-def _filters_md(tree, prose):
+def _filters_ext(tree, prose, ext):
     for n in ast.walk(tree):
-        if isinstance(n, (ast.Set, ast.Tuple, ast.List)) and any(_const(e) == ".md" for e in n.elts):
+        if isinstance(n, (ast.Set, ast.Tuple, ast.List)) and any(_const(e) == ext for e in n.elts):
             return True
         if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "endswith"
-                and any(_const(a) == ".md" for a in n.args)):
+                and any(_const(a) == ext for a in n.args)):
             return True
-        if isinstance(n, ast.Compare) and any(_const(c) == ".md" for c in [n.left] + n.comparators):
+        if isinstance(n, ast.Compare) and any(_const(c) == ext for c in [n.left] + n.comparators):
             return True
-        if (_const(n, prose) or "").endswith("*.md"):
+        if (_const(n, prose) or "").endswith("*" + ext):
             return True
     return False
+
+
+def _filters_md(tree, prose):
+    return _filters_ext(tree, prose, ".md")
+
+
+def staged_paths(run=None):
+    """Every path in the commit, whatever its status (A323): added, changed, deleted, and both sides of a
+    rename (--no-renames)."""
+    run = run or (lambda: subprocess.run(["git", "diff", "--cached", "--name-only", "--no-renames", "-z"],
+                                         cwd=HERE, capture_output=True, text=True).stdout)
+    return [p for p in run().split("\0") if p]
+
+
+def walker_readers(exts, population=None, read=None):
+    """{suite: why} -- the registered suites whose CODE walks the tree and filters on one of these extensions
+    (A323: rule A for any extension). Unreadable or unparseable suites are skipped: they fail their own run."""
+    read = read or (lambda t: open(os.path.join(HERE, t), encoding="utf-8").read())
+    out = {}
+    for t in (runner_suites() if population is None else population):
+        try:
+            tree = ast.parse(read(t))
+        except (OSError, SyntaxError, ValueError, UnicodeDecodeError):
+            continue
+        if not _walks_tree(tree):
+            continue
+        prose = _prose(tree)
+        hit = [e for e in exts if _filters_ext(tree, prose, e)]
+        if hit:
+            out[t] = "walks the tree for " + ", ".join(hit)
+    return out
 
 
 def doc_readers(docs, population=None, read=None):
@@ -142,9 +184,9 @@ def doc_readers(docs, population=None, read=None):
     return out
 
 
-def selection(tests, docs, readers=None, say=print):
+def selection(tests, docs, readers=None, say=print, paths=(), walkers=None):
     """The suites this commit runs: its own test files, then (A266) the suites that read its published
-    Markdown, each once."""
+    Markdown, then (A323) the suites that walk the tree for the extension of any path it touches, each once."""
     names = list(tests)
     if docs:
         found = (readers or doc_readers)(docs)
@@ -156,6 +198,13 @@ def selection(tests, docs, readers=None, say=print):
             say("stage-check: published markdown in this commit (%s), and NO registered suite was found that "
                 "reads it -- nothing checked it here" % shown)
         names += [t for t in sorted(found) if t not in names]
+    exts = sorted({os.path.splitext(p)[1].lower() for p in paths} - {"", ".md"})    # .md: rule A above
+    if exts:
+        found = {t: why for t, why in (walkers or walker_readers)(exts).items() if t not in names}
+        if found:
+            say("stage-check: this commit touches %s files -- also running the %d suite(s) that walk the tree "
+                "for them: %s" % (", ".join(exts), len(found), "; ".join(sorted(found))))
+        names += sorted(found)
     return names
 
 
@@ -222,15 +271,17 @@ def check(tests, stage=None, clean=None, run=None, say=print, timeout=300):
     return out
 
 
-def for_commit(tests_run=None, docs_run=None, readers=None, say=print, **kw):
+def for_commit(tests_run=None, docs_run=None, readers=None, say=print, paths_run=None, walkers=None, **kw):
     """The hook's whole path: what the commit stages, selected, then run where the runner runs it."""
-    return check(selection(staged_tests(tests_run), staged_docs(docs_run), readers, say), say=say, **kw)
+    return check(selection(staged_tests(tests_run), staged_docs(docs_run), readers, say,
+                           staged_paths(paths_run), walkers), say=say, **kw)
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
     if args:
-        check(selection([a for a in args if not a.endswith(".md")], [a for a in args if a.endswith(".md")]))
+        check(selection([a for a in args if not a.endswith(".md")], [a for a in args if a.endswith(".md")],
+                        paths=args))
     else:
         for_commit()
     sys.exit(0)

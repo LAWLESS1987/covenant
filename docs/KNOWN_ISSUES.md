@@ -7645,6 +7645,24 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A323. [A322's commit turned the sweep and public CI red through two registries it never touched: A284 FC10 (an undeclared tetsu_work.ask caller) and A255 C1 (two unclassified tracked .jsonl). A recurrence of A266's shape; the commit-time check now covers it] 2026-10-10. His words: "had another red pass and the highways red", then "use the tombstone system and logic gained from doing so and your discernment". FIXED, the guard driven both ways; it reports and never blocks
+
+- **Measured.** Public CI failed all four jobs on 63c6747 (runs 38028554683, push, and 38030035342, schedule; Python 3.11 and 3.12; read from the GitHub API annotations). Each job had one suite and one check failing: `test_a284_fresh_context.py` 12/13, where FC10 named `tools/discourse_seat_eval.py` line 58 as a caller nobody declared; and A255 C1, 9 of 11 tracked .jsonl classified, the other two being `ops/discourse_seat_eval.jsonl` and `ops/discourse_seat_eval.run2.jsonl`. Locally, the 09:38Z heal pass read A255 FAIL in place. The highway read sweep_red, sweep_not_current and public_ci_red as PRESENT. Its sweep is the newest full transcript on disk, ONE_SWEEP.txt: 4 days old, a FAIL on test_ct1_contact.py (healed since, 33/33), of core 74d6d31e9f5d, where the core is now 3101c19472e3.
+- **Cause.** `tools/stage_check.py` runs the suites a commit carries, and since A266 the suites that read published Markdown. 63c6747 carried test_ta1 and docs/KNOWN_ISSUES.md, and nothing selected the suites that walk the tree for new .py or .jsonl files. Both registries are walkers, so any commit can break them without touching them.
+- **Why the earlier tombstones did not stop it.** FC10 and C1 are checks, not preventers. They went red as designed, but only after the post-commit hook had pushed. A266 fixed its class for one extension, because the instruction named Markdown, and its docstring named its blind spots for Markdown only.
+- **Fixed, the instance.** `test_a284_fresh_context.DECLARED` names `tools/discourse_seat_eval.py` as fresh (it already passes fresh=True). `verify_bundle.OUTPUTS` names the eval records, because the tool appends to its --out file. Result: A284 13/13, A255 23/23.
+- **Fixed, the class.** `stage_check` now asks A266's rule A (the suite walks the tree AND filters on the extension) for the extension of every path the commit touches, deleted and renamed paths included. Measured over the 200 registered suites: 9 walk for .py and 2 for .jsonl. Run together, the ten distinct suites took 70 s, 42 s of it R1, which already runs for most commits through this file.
+- **Driven both ways.** SC4 in `test_sc1_stage_check.py` (22/22 with SC2 and SC3):
+  - SC4.5: a probe tool that calls tetsu_work.ask undeclared, written into a real staged copy only, is reported FAIL by the real A284.
+  - SC4.6: without the probe, A284 passes there.
+  - SC4.7: with the walker selection removed, the same probe is not caught.
+- **Not measured, said plainly.**
+  - A suite that hands its walk or its filter to a module, or builds its filter at run time, is not selected. This is A266's blind spot, unchanged.
+  - The A255 path (a staged .jsonl, checked in place) was not driven end to end in the real repository, because a test must not write live state. Its selection is checked over the real registry (SC4.3), and its catch was seen by hand today: C1 FAIL before the fix, pass after.
+  - A full sweep of this core was started after this commit. Its verdict is in ONE_SWEEP.txt, not here.
+
+---
+
 ### A322. [The students convict forum replies that DISCUSS transactions; a meaning-reading seat (Tetsu) was built, measured against a bar set beforehand, failed it, and is NOT seated] 2026-10-10. His words: "use your discernment on the discourse fix". MEASURED, NOT DEPLOYED
 
 - **The defect, measured.** Since 2026-10-08 free drafted 455 replies and sent 4. The students held 268 and convicted 133. I read 24 convicted drafts sampled at random, and all 24 are benign agree-and-ask replies. The heaviest feature on them is "transactions" (weight about +3); the second student also weighs "agree" toward violates. This is the describe-versus-do limit already recorded (representation, not data). Retraining is ruled out by the standing rule.
@@ -7657,6 +7675,7 @@ A280, which is the road telling the truth about it.
 - **Decision.** Not seated. `covenant_free_will` passes `discourse_seat=False`, so the code is present and inert. The bar was not moved after the measurement.
 - **What would change it:** a seat that clears 0 of 27 across three runs at the asks it uses. Or a judge that reads meaning better than a 3B model. Or his decision to accept a measured slip rate on forum replies, which move no money. That last one is a rule change and his.
 - **Side effect, recorded:** the watchdog restarted A, B and C at 05:14Z because these edits were uncommitted on disk (source_drift). Run 2 lost one ask to the restart.
+- **Addendum, 2026-10-10 (A323).** A third run, `ops/discourse_seat_eval.run3.jsonl`, was written at 02:14 local, after this entry's commit, and left untracked; it is committed with A323. Recounted from its rows, agreeing with its own printout: 0 of 27 cleared, 19 of 24 drafts allowed, all 77 asks answered. Run 2's clear was checked against its row: a real ALLOW (status 200) of the theft above. The ask it lost was a clean item. Across the three single-ask runs, 1 of 81 violation asks was cleared. The bar above is not met, and the decision is unchanged.
 
 ---
 
