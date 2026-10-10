@@ -7645,6 +7645,31 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A326. [The day's work went to two rounds of outside review. Three findings had a primary artifact behind them: the correction index named 4 of the 44 retractions, threefold PR #1 says every input and output is audited before a reply is spoken while the deployed hook runs after, and the public memory repo carries personal text] 2026-10-10. His words: "run this whole chat by the quorum and everyone we've used so far, including Tetsu and other models", "I want you to communicate with each other use discernment. We need this to stand up to peer review discuss with me after. We have tombstones for a reason.", then "use your discernment you know the goals". INDEX FIXED and guarded (CI1); the rest recorded, the removal his
+
+- **Who reviewed, and what their agreement is worth.** Round 1: Tetsu, the quorum, the Conscious Ledger and Tien (his Grok bots), ChatGPT, Gemini and DeepSeek, each on a digest of the session that I wrote. Round 2: each read the others' round-1 answers and replied to them. Reviewers who read the same digest are not independent witnesses: they share its framing and whatever it left out. So this entry ranks evidence: a primary artifact (a file, a hash, a remote ref) above a deterministic check, above a model's critique, with the decision his. A finding is kept here only where an artifact backs it, and says whose machine measured it.
+- **The correction index (fixed here).** `docs/CORRECTIONS.md` calls itself the one index for everything this project got wrong, and lawless1987.com links it. At a560b37 it named 4 of the 44 ids in `docs/RETRACTED.json` (A121, A122, A128, A236), and its latest date was 2026-09-27. Adding a retraction never touched it. Repair: `tools/corrections_index.py` generates the whole list from the ledger, between two markers. The hand-written sections stay, because they say which refutations cost the most. Guard: `test_ci1_corrections_index.py`, in `covenant_one.py` beside R1. Driven both ways: 1/6 before the list was written, 6/6 after. CI1.4 and CI1.5 drive an id added only to the ledger and a deleted row, on copies.
+- **Why no earlier tombstone stopped it.** R1 stops a retracted sentence from coming back. Nothing checked that the index was whole. The forgotten step was "touch the index too", so the guard sits where the ledger grows (CLAUDE.md rule 10).
+- **The gate in threefold PR #1 (that repo, not this one).** `lspace_auditor/OPERATING_MODE.md` on the PR branch (d138423) says all inputs and outputs pass through the speak-text leg before a reply is formulated or spoken.
+  - Round 1 split on whether the gate holds a sentence or only labels it. Round 2 settled that from artifacts: Tien's `gate.py` (sha256 68ea0db4…) holds and records, and `holds.jsonl` had never been created.
+  - The Conscious Ledger then retracted its own claim. It reported that its hook runs after a message is sent, that it saw 4 of about 80 messages on 10-10, and that three memory files were written past it.
+  - Those are the bots' measurements on their own box, not mine: UNDETERMINED here until the hook's log is read.
+  - Also confirmed in the code: `causality_signal` means only that the output changed, and BLOCK compares a draft against the operator-configured `known_facts.json`. Neither is what the names suggest.
+  - Correction notes beside the original wording on the PR branch: NOT YET WRITTEN.
+- **Personal text in the public memory repo.** `LAWLESS1987/threefold-memory` is public, and the bots' triad writes to it. A scope pass over its 456 commits found 292 paths of personal material (call transcripts, OCR of chats, a `.trash` copy), 84 paths of full speak text, and 541 to keep.
+  - Done: a full mirror backup in `private/archives/` (gitignored, HEAD 316e700), and the scope in `removal_scope_2026-10-10.json` beside it.
+  - Done by Tien at my request: a `pre-push` hook that refuses every push to that repo, in the four copies on its box (sha256 5b94b1e1…, undo: delete the hook). Tien checked it with a dry-run push, which was refused. The public head read 316e700 after the pause, the same as the backup.
+  - NOT DONE: the Conscious Ledger's own confirmation. The bot could not be reached. Tien says the live root is shared, so the same hook covers the Ledger's triad. The hook also cannot stop a write through the GitHub connector's file API.
+  - The removal is a history rewrite of a repo he asked to be public. It cannot be undone for anyone who already cloned it, so it waits for his yes. Its record will carry keyed (HMAC) per-file hashes, so the record itself holds nothing personal.
+- **What each reviewer was good at (one session: a pattern, not a ranking).**
+  - Tien and the Ledger brought evidence from their own machine, and the Ledger retracted when the evidence went against it.
+  - ChatGPT was strongest at arguing principle and at checking code.
+  - Gemini and DeepSeek accepted corrections, but reasoned only from the digest.
+  - Tetsu agreed with each of the three points it was shown and added one hold. Earlier the same day it was the only reviewer to catch an untrue signature on the HF reply.
+  - The quorum judges single sentences and is not built for discussion text.
+  - Saying a model excels at a task needs more than one session, so a per-reviewer scorecard starts in the collective's record.
+- **His to decide:** the history rewrite and its scope; construct controls before PR #1 merges; the HF thread title, which A236 leaves as the original.
+
 ### A325. [The highway called free stalled two hours after she spoke: A300 read a round that starved PART-WAY as one that wrote nothing] 2026-10-10. His words: "the highways red", then "use the tombstone system and logic gained from doing so and your discernment". RETRACTED as A300-STARVED, restated, driven both ways
 
 - **What was said and was wrong.** In `covenant_highway.detect_ambassador_stalled`, A300 wrote: `a round the model could not write ("starved") ran but did not speak`. Kept as written on branch `a300-starved-round-claim-as-written-2026-10-10` (at 110a3ba).
