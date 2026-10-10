@@ -1047,7 +1047,7 @@ def introduce(post_id=None, submolt="agents", **kw):
 
 
 def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
-         dry_run=True, timeout=30, live_repo_check=True, override_a67=None):
+         dry_run=True, timeout=30, live_repo_check=True, override_a67=None, discourse_seat=False):
     """THE ONE OUTBOUND PATH. A post or a comment; the same preconditions.
 
     Both kinds go through this function in this order, and there is no other
@@ -1143,8 +1143,18 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     if not clean and held and ran:
         import covenant_tetsu_assist as TA
         tetsu = TA.review(text, verdict, crypto=crypto, dry_run=dry_run)
+    # A322 (2026-10-10): a forum reply the students CONVICTED gets a second reading that reads
+    # meaning, only when the caller asks for it (free's replies), only when a judge ran, never
+    # money -- covenant_tetsu_assist.discourse_seat: two fresh ALLOWs and his own rules, or no.
+    seat = None
+    if not clean and not held and ran and discourse_seat:
+        import covenant_tetsu_assist as TA
+        seat = TA.discourse_seat(text, crypto=crypto, dry_run=dry_run)
     if not clean and tetsu and tetsu.get("decision") == "SEND":
         _a67_by = "Tetsu, reading a draft the students held, under the operator's grant of 2026-09-28: " + tetsu["why"]
+    elif not clean and seat and seat.get("decision") == "ALLOW":
+        _a67_by = ("Tetsu's discourse seat, reading a reply the students convicted (A322, the operator's "
+                   "'use your discernment', 2026-10-10): " + seat["why"])
     elif not clean and not (override_a67 and not held and ran):
         return {"sent": False, "held": bool(held), "ran": bool(ran),
                 "repo_exposure": exposure, "crypto_risk": crypto,
@@ -1154,7 +1164,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
                         else "the covenant's judge COULD NOT RUN, so nothing read "
                              "this text -- no flag overrides that: " if not ran
                         else "refused by covenant's judge: ") + verdict,
-                "tetsu": tetsu}
+                "tetsu": tetsu, "seat": seat}
     overrode = None
     if not clean:
         # THE OPERATOR OVERRULING A DOCUMENTED FALSE POSITIVE. Recorded, never

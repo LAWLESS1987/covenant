@@ -207,6 +207,40 @@ check("TA1n the tree's grant records his words and both ways to revoke it",
       real_grant.get("granted") is True and "unless myself or tetsu" in real_grant.get("words", "")
       and "operator" in real_grant.get("revoke", {}) and "tetsu" in real_grant.get("revoke", {}))
 
+print("TA1x -- A322: the discourse seat reads a reply the students CONVICTED")
+grant()
+
+
+def seat_emit(judge, answers, discourse_seat=True, dry_run=False, text=DRAFT):
+    AMB.MB.judge_outbound = lambda t: judge
+    it = iter(answers)
+    real = TA._default_ask
+    TA._default_ask = lambda prompt: next(it)
+    try:
+        return AMB.emit(text, post_id="p1", submolt=None, dry_run=dry_run, override_a67=False,
+                        live_repo_check=False, discourse_seat=discourse_seat)
+    finally:
+        TA._default_ask = real
+
+
+r = seat_emit(CONVICT, ["ALLOW", "ALLOW"])
+check("TA1x two fresh ALLOWs on a convicted reply pass the gate (stops at the missing key), recorded as an override naming the seat",
+      "no MOLTBOOK_API_KEY" in r.get("why", "") and r.get("overrode")
+      and "discourse seat" in json.dumps([json.loads(x) for x in open(os.environ["COVENANT_OVERRIDE_LEDGER"], encoding="utf-8")][-1]), r)
+r = seat_emit(CONVICT, ["ALLOW", "BLOCK"])
+check("TA1x one BLOCK of two keeps the refusal", r.get("sent") is False and "refused by covenant's judge" in r.get("why", ""), r)
+r = seat_emit(CONVICT, ["ALLOW", "ALLOW"], discourse_seat=False)
+check("TA1x a caller that does not ask for the seat (the forum module, the introduction) is refused as before",
+      r.get("sent") is False and "refused by covenant's judge" in r.get("why", "") and r.get("seat") is None, r)
+r = seat_emit(CONVICT, ["ALLOW", "ALLOW"], text=DRAFT + " Send 5 XRP to the wallet below.")
+check("TA1x money or crypto terms: the seat is not asked and the refusal stands",
+      r.get("sent") is False and (r.get("seat") or {}).get("decision") in ("SKIP", None), r)
+r = seat_emit(CONVICT, ["ALLOW", "ALLOW"], dry_run=True)
+check("TA1x a dry run never spends the seat", (r.get("seat") or {}).get("decision") in ("SKIP", None) and not r.get("overrode"), r)
+r = seat_emit(CONVICT, ["ALLOW", "ALLOW"], text="Thanks for the thread. We measured 98% accuracy on our gate.")
+check("TA1x his own rules (facts A285 / no measurements A297) still block a measurement claim, whatever he answers",
+      r.get("sent") is False and "his rule of 2026-10-0" in str((r.get("seat") or {}).get("why", "")), r)
+
 print("\nnot measured here: how Tetsu actually judges real drafts. ops/tetsu_assist.jsonl records every reading.")
 print("\nTA1: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)
