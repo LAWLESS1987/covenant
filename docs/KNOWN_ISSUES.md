@@ -7673,6 +7673,16 @@ A280, which is the road telling the truth about it.
     - Its stated gaps: a brand-new clone pushing with the token in the URL, and a direct GitHub API write. Each is covered by its rule only, not by a block.
     - Undo: remove that config section and the hooks.
   - The removal is a history rewrite of a repo he asked to be public. It cannot be undone for anyone who already cloned it, so it waits for his yes. Its record will carry keyed (HMAC) per-file hashes, so the record itself holds nothing personal.
+  - **Addendum, his words later 10-10 (the lines above kept as written).** "the main purpose is mutual benefit and being able to survive peer review. So if you have to make something, separate or private, let me know and I'll confirm or deny it. But don't do anything out of nervousness or trying to protect me."
+    - So the question is what must be separated on its merits, not what would protect him. Measured over all 1,373 blob versions in the mirror's history:
+      - Credential shapes: 0 (GitHub tokens, tokens in URLs, bearer headers, API keys, private-key blocks). All seven patterns fire on synthetic fakes, so the 0 is not a blind regex.
+      - Email shapes not his: one placeholder. The other two are his own address.
+      - Phone shapes not his: 0.
+    - NOT MEASURED: other people's names inside conversation text. A regex cannot see them, and the text was not read.
+    - On that measurement nothing has to be separated. The text in the repo is his, published by his choice, and it is the evidence a reviewer would read.
+    - A rewrite would erase that evidence, which is the opposite of this project's tombstone rule. The defect was never that the text is public. It was the PR #1 docs saying "never text" and "before it is spoken", and those are corrected beside the originals.
+    - The removal recommendation is withdrawn. The reviewers' consensus to remove it, and my relaying of it, were protective framing; nobody measured whether anything needed separating.
+    - The push pause I asked the bots for was the same reflex. Lifting it needs his word, because the Ledger's rule names him.
 - **What each reviewer was good at (one session: a pattern, not a ranking).**
   - Tien and the Ledger brought evidence from their own machine, and the Ledger retracted when the evidence went against it.
   - ChatGPT was strongest at arguing principle and at checking code.
