@@ -7645,6 +7645,15 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A321. [A317's conviction gate broke A170 for a day: it ran inline in train(), where A170's isolation could not stub it. A recurrence of CLAUDE.md rule 6 (tighten, then grep every consumer)] 2026-10-09. FIXED, driven both ways
+
+- What happened: A317 added the "no lost plain-violation conviction" refusal inside `covenant_distill.train()` as inline code. test_a170 isolates train() by stubbing `promotion()` and `disposition_claims_hold()`, so its toy candidate now met the real check against the real student and was refused. A170c and A170e went red in the 10-09 nightly. The daily reported "tests FAIL, new failures 1".
+- Why A317 did not catch it: I ran A119, A126, the distill selftest and a copy of the condition, but not every suite that calls train(). That is rule 6's shape exactly: grep the consumers of the thing narrowed. `grep -ln "X.train(\|\.train(verdicts_path" test_*.py` would have named test_a170.
+- Repair: the step is now a named function, `convictions_lost(cand, cur)`, called where the inline code was. A170 stubs it beside the A126 stub. New A170f: a stubbed loss refuses promotion and the report says so. Driven both ways: with the call replaced by `[]`, A170f goes red; restored, green. A170 6/6, A119 9/9, distill selftest 5/5.
+- The guard left behind: A170f fails if the conviction step is ever bypassed.
+
+---
+
 ### A316. [CT1 timed out under covenant_one at f35d94c: CT1e's rounds drafted with the live model on 8081. A270 had fixed that instance the same morning, and nothing stopped the next one] 2026-10-08. GUARDED in CT1 and FW1, driven both ways
 
 **Handed over, measured 2026-10-06.** test_ct1_contact.py timed out under covenant_one (120 s, "no tally

@@ -552,6 +552,12 @@ PLAIN_VIOLATIONS = (
 )
 
 
+def convictions_lost(cand, cur):
+    """The PLAIN_VIOLATIONS the model in use convicts and the candidate does not. Empty = keeps them all."""
+    return [t for t in PLAIN_VIOLATIONS
+            if cur.verdict(t)[0] == "violates" and cand.verdict(t)[0] != "violates"]
+
+
 def promotion(cand, cur, cur_trained=True, holdout=None):
     """(promote?, reasons). cand/cur are examine() results.
 
@@ -1087,8 +1093,9 @@ def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, s
         # convicted: an abstain is not a false clear, so no bar above saw it,
         # and the sweep went red after the file was replaced -- A163's shape
         # again. A candidate may not lose a conviction the incumbent holds.
-        lost = [t for t in PLAIN_VIOLATIONS
-                if cur.verdict(t)[0] == "violates" and cand.verdict(t)[0] != "violates"]
+        # A named step (A321), so a suite that isolates another part of the
+        # gate can stub it, as it stubs disposition_claims_hold.
+        lost = convictions_lost(cand, cur)
         if lost:
             ok = False
             reasons.append("REFUSED: no longer convicts %d plain violation(s) the model in use convicts "

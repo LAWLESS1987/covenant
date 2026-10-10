@@ -75,6 +75,7 @@ def main():
         for r in src_rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     real_promotion, real_hold, real_report = X.promotion, X.disposition_claims_hold, X.report
+    real_lost = X.convictions_lost            # A321: the A119.6 step, stubbed like the A126 one
     # train() also WRITES records at module paths: the held-out score of a promoted
     # candidate (write_holdout -> ops/HOLDOUT.json) and the run-without file
     # (ops/RUN_WITHOUT.json). Measured 2026-09-21: the first run of this suite
@@ -84,6 +85,7 @@ def main():
     said = []
     try:
         X.promotion = lambda cand, cur, cur_trained=True, holdout=None: (True, ["PROMOTED: stub"])
+        X.convictions_lost = lambda cand, cur: []
         X.report = lambda block: None
         X.write_holdout = lambda *a, **k: None
         X.HOLDOUT_RECORD = os.path.join(td, "HOLDOUT.json")
@@ -107,8 +109,17 @@ def main():
         kept = os.path.join(td, "ops", "students", "student.%s.json" % _hl.sha256(before).hexdigest()[:12])
         check("A170e the replaced student is kept beside it, byte for byte, under its digest (his lineage is not dropped)",
               os.path.isfile(kept) and io.open(kept, "rb").read() == before, kept)
+        # A321: the conviction step refuses on its own, whatever the rest of the gate says.
+        said.clear()
+        before_f = io.open(model_path, "rb").read()
+        X.convictions_lost = lambda cand, cur: ["a plain violation (stub)"]
+        ok_f, _st = X.train(verdicts_path=verdicts, model_path=model_path, candidate_path=cand_path, say=said.append)
+        check("A170f a candidate that loses a plain-violation conviction is not promoted, and the report says why",
+              ok_f is False and io.open(model_path, "rb").read() == before_f
+              and any("no longer convicts" in x for x in said), said[-1][:200] if said else "")
     finally:
         X.promotion, X.disposition_claims_hold, X.report = real_promotion, real_hold, real_report
+        X.convictions_lost = real_lost
         X.write_holdout, X.HOLDOUT_RECORD, X.RUN_WITHOUT = real_wh, real_hr, real_rw
     real_h = os.path.join(HERE, "ops", "HOLDOUT.json")
     check("A170b/c the real held-out record was not touched by this suite (it holds the deployed student's score, not a stub's)",
