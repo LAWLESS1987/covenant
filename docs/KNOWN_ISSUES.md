@@ -7660,6 +7660,12 @@ A280, which is the road telling the truth about it.
   - Done: a full mirror backup in `private/archives/` (gitignored, HEAD 316e700), and the scope in `removal_scope_2026-10-10.json` beside it.
   - Done by Tien at my request: a `pre-push` hook that refuses every push to that repo, in the four copies on its box (sha256 5b94b1e1…, undo: delete the hook). Tien checked it with a dry-run push, which was refused. The public head read 316e700 after the pause, the same as the backup.
   - NOT DONE: the Conscious Ledger's own confirmation. The bot could not be reached. Tien says the live root is shared, so the same hook covers the Ledger's triad. The hook also cannot stop a write through the GitHub connector's file API.
+  - **Addendum, later 10-10 (the line above kept as written).** The retry reached the Ledger.
+    - It found Tien's hook already in its four clones, with the same sha256, and it confirmed the public head is still 316e700.
+    - It added a global git setting (`url."PUSH-PAUSED-privacy-20261010:///".pushInsteadOf`, for the repo's HTTPS, `git@` and `ssh://` addresses; `~/.gitconfig` sha256 29891f75…). A dry-run push from all four clones now fails.
+    - It took a standing rule: no public push by any route, the GitHub connector included.
+    - Its stated gaps: a brand-new clone pushing with the token in the URL, and a direct GitHub API write. Each is covered by its rule only, not by a block.
+    - Undo: remove that config section and the hooks.
   - The removal is a history rewrite of a repo he asked to be public. It cannot be undone for anyone who already cloned it, so it waits for his yes. Its record will carry keyed (HMAC) per-file hashes, so the record itself holds nothing personal.
 - **What each reviewer was good at (one session: a pattern, not a ranking).**
   - Tien and the Ledger brought evidence from their own machine, and the Ledger retracted when the evidence went against it.
