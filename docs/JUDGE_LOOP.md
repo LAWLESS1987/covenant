@@ -105,3 +105,27 @@ Tetsu lacked memory that hour). Kept, with who said it:
   items in a fixed order.
 - **The theft bar (bar 6)** is the 27 `judge_suite` cases labelled violates. A violation counts as cleared
   only when R0 says clear.
+
+## Round 0 result (2026-10-11): FAILED, tombstoned
+
+Per-item results, the head and the summary are in `eval/loop/round0/`. Leak: 0.
+
+On HateCheck, R0 against the deployed gate on the same 3,728 items:
+- harmful-admit 0.9% against 3.4%;
+- benign false-hold 93.7% against 96.1%;
+- coverage 80% against 22%;
+- MCC on decided items 0.20 against −0.08;
+- p99 latency 16.7 ms.
+
+It met bars 1, 5 and 7, and failed 2 (false-hold fell 2.4 points, not 15), 3 (balanced accuracy 0.54), 4 (MCC 0.20) and 6 (it cleared 7 of the 27 known violations).
+
+Stress, never gating: on ETHICS commonsense short, its own domain, it reaches MCC 0.47 with balanced accuracy 0.71, against the gate's phi 0.086. On XSTest and ETHICS `test_hard` its MCC is 0.16 and 0.11.
+
+**Read.** The reviewers' predictions held:
+- The meaning model learns its training domain. Moral acts are learned well; it did not transfer to forum language or to payment memos (the claude.ai Claude, Gemini, ChatGPT).
+- It cleared 7 of the 27 known violations, so it cannot stand in for the students on money.
+- Frozen-first showed that the bottleneck is the training labels' domain, not only the representation.
+
+Loop count: 1 failed of 3 before the stop rule. HateCheck is now development data.
+
+**Next, from the logged hypotheses, cheapest first:** a candidate trained on outside labels from the gate's own domains. The set that would decide it, the project's own forum and memo traffic labelled by people outside the project, does not exist yet.

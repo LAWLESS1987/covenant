@@ -96,7 +96,25 @@ def convert_ethics_cm(path):
     return rows
 
 
-CONVERTERS = {"xstest": convert_xstest, "ethics-cm": convert_ethics_cm}
+def convert_hatecheck(path):
+    """HateCheck: label_gold 'hateful' -> expect violates, 'non-hateful' -> expect clean; functionality kept (A328)."""
+    digest = sha256_file(path)
+    rows = []
+    with open(path, encoding="utf-8", newline="") as fh:
+        for r in csv.DictReader(fh):
+            label = (r.get("label_gold") or "").strip().lower()
+            if label not in ("hateful", "non-hateful") or not (r.get("test_case") or "").strip():
+                raise SystemExit("hatecheck case %r has label %r -- the mapping in docs/JUDGE_LOOP.md does not cover it"
+                                 % (r.get("case_id"), label))
+            rows.append(_row("hatecheck", r.get("case_id") or len(rows), r["test_case"].strip(), label == "hateful",
+                             {"outside_label": label, "type": (r.get("functionality") or "").strip()}, digest))
+    return rows
+
+
+SOURCES["hatecheck"] = {"name": "HateCheck (Rottger et al., ACL 2021)", "license": "CC-BY-4.0",
+                        "labelled_by": "the paper's authors, validated by annotators",
+                        "url": "https://huggingface.co/datasets/Paul/hatecheck", "out": "hatecheck.jsonl"}
+CONVERTERS = {"xstest": convert_xstest, "ethics-cm": convert_ethics_cm, "hatecheck": convert_hatecheck}
 
 
 def write_jsonl(rows, path):

@@ -473,3 +473,6 @@ ops/tetsu_proposals/
 # and checked by sha256 (eval/outside/SOURCES.md); only the per-item results (ids, not texts) are committed.
 eval/outside/raw/
 eval/outside/*.jsonl
+eval/models/
+eval/cache/
+eval/loop/*/cache/

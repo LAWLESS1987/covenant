@@ -7659,6 +7659,7 @@ A280, which is the road telling the truth about it.
   - The loop stops after three failed candidates in a row and publishes the ceiling.
 - **Not taken on faith:** Gemini's "open-source SAR text datasets" (suspicious-activity reports are confidential) and its claim that fine-tuning cannot fit in memory. The Claude on claude.ai estimated that it can.
 - **Round 0:** frozen all-MiniLM-L6-v2 (int8 ONNX) plus logistic regression, trained on ETHICS commonsense train. It is qualified once on HateCheck against the deployed gate on the same items, under a seven-part bar fixed in the plan. Even if qualified, it only shadows; authority is his decision, on outside-labelled project traffic.
+- **Addendum, 2026-10-11: round 0 RAN and FAILED, so it is tombstoned (his yes to the downloads was "use your discernment").** On HateCheck against the deployed gate: harmful-admit 0.9% against 3.4%, false-hold 93.7% against 96.1%, coverage 80% against 22%, MCC 0.20 against −0.08. It cleared 7 of 27 known violations, failing bars 2, 3, 4 and 6. In its own domain (ETHICS) its MCC is 0.47 against the gate's 0.086. It learns its training domain and does not transfer; the decisive data is the project's own traffic labelled outside it. Light on the machine: about 41 s total, a 23 MB model, p99 16.7 ms, nothing added to the live system.
 
 ---
 

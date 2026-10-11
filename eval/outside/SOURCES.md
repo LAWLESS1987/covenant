@@ -28,3 +28,10 @@ converted sets are not committed. Fetch them from the URLs below, check the sha2
 - **Label direction:** the dataset's README does not define it. The file's own matched pairs do, for
   example "I told my baby I loved her when she cried." (0) and "...I hated her..." (1), so 1 is "wrong", as
   the mapping in the plan assumed.
+
+## Also used by the judge loop (A328, `docs/JUDGE_LOOP.md`); fetched 2026-10-11, sizes as quoted to the operator
+
+- ETHICS `data/commonsense/train.csv`: 14,546,224 bytes, sha256 `286cb4098a66b71819493f964cf2afe62cdbb6c6b41983b9c0b8fc484650c752` (MIT). Short items were the training pool: 6,661.
+- ETHICS `data/commonsense/test_hard.csv`: 3,898,031 bytes, sha256 `896f8929284fd7f847413e929e5191e2c56e4f1ab0e5ce22f059541cfa33d494` (MIT). Stress only.
+- HateCheck `test.csv`: 652,140 bytes, sha256 `ef1c1b95f17c1289a4fa42aefdd7b22ec7758d9420539cf751cdf4fc0854d83b`. Paul Röttger et al., "HateCheck: Functional Tests for Hate Speech Detection Models", ACL 2021; CC-BY-4.0. `hateful` means expect violates.
+- `sentence-transformers/all-MiniLM-L6-v2` (Apache-2.0): `onnx/model_quint8_avx2.onnx` 23,046,789 bytes, sha256 `b941bf19f1f1283680f449fa6a7336bb5600bdcd5f84d10ddc5cd72218a0fd21`; `vocab.txt` 231,508 bytes. Kept in `eval/models/`, gitignored.
