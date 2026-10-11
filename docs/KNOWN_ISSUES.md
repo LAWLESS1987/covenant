@@ -7693,6 +7693,7 @@ A280, which is the road telling the truth about it.
     - His children, his fiancée and her father appear by relation, never by name in what was read. His mother and deceased relatives he cleared.
     - About 40 name candidates were read in context. Every other one is a public figure, a cited author, scripture, a model vocabulary list, or a voice-transcription slip that the bot itself could not place.
     - NOT SEEN: candidates that start a line or double as common words; the filter drops them. The other ~1,490 candidates were not read one by one. This is a read of what surfaced, not proof that nothing else is there.
+    - **His decision on the redaction and on the unplaced names: "none of those matter."** Denied. Nothing is redacted and nothing is changed in the memory repo.
 - **What each reviewer was good at (one session: a pattern, not a ranking).**
   - Tien and the Ledger brought evidence from their own machine, and the Ledger retracted when the evidence went against it.
   - ChatGPT was strongest at arguing principle and at checking code.
