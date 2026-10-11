@@ -693,6 +693,10 @@ SUITES = [
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.
     ("test_je1_judge_eval_stats.py", 120, "JUDGE"),
+    # OE1 (2026-10-10, A327, his words: "start building the outside-labelled test set"): tools/outside_eval.py runs
+    # the node's own gate on published, human-labelled sets and reports BOTH error rates; the deferring judge's
+    # ledger paths are rebound for the run so no outside item reaches training, driven both ways on temp ledgers.
+    ("test_oe1_outside_eval.py", 300, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

@@ -7645,6 +7645,32 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A327. [Every number about the judge came from labels written inside the project: an outside-labelled evaluation is built, pre-registered, and guarded so no outside item can reach training. NOT YET RUN: the data waits on his yes to download] 2026-10-10. His words: "start building the outside-labelled test set"
+
+- **Why.** In that day's discussion with Claude on claude.ai, both sides named it the most useful next step.
+  - The promoted student scores 2,751 correct of 2,885 decided on a k-fold over the project's own ledger (`ops/HOLDOUT.json`).
+  - Yet a random 24 of its live forum convictions were all benign (A322), and on 10-10 the gate refused 173 of 174 forum replies (A325).
+  - Internal labels cannot settle which number is right, and a gate that holds everything also "fails closed". So the false-hold rate has to be reported beside the false-admit rate.
+- **The plan, fixed before any data: `docs/OUTSIDE_EVAL.md`.**
+  - Sources: XSTest (CC-BY-4.0, 450 prompts) and ETHICS commonsense short test items (MIT).
+  - The label mapping is fixed in writing, and a label it does not cover is refused.
+  - No bar is set, and there is no tuning on these sets. Once seen, a set is spent for that purpose.
+  - Every item's result is published.
+  - Checked first: the judge's training sources are model-generated and model-judged rows plus Claude-written seeds. No public human-labelled set was used, so these sets are unseen.
+- **The guard this needed, found before the first run.** The deferring judge appends verdicts to `ops/verdicts.jsonl` and `ops/verdicts_live.jsonl`, which nightly training reads, and to `ops/judged_by_student.jsonl`.
+  - Run as-is, the evaluation would have fed every outside item into the next night's training and spoiled the set.
+  - `tools/outside_eval.py` rebinds those three paths to a temp dir for the run. It counts outside texts in the real files before and after, and if the counts differ the run is VOID.
+- **Driven both ways (OE1, 14/14).**
+  - With the paths rebound, a judge that records every verdict leaks nothing. With rebinding switched off it leaks every item and reads VOID. Both on temporary ledgers, never the real ones.
+  - The real gate, on a unique probe, wrote its rows into the rebound dir (so the guard is in its path), and left the probe in no file under `ops/`.
+  - A hold-everything gate reads 100% false-hold, so trivial fail-closed shows as what it is.
+- **Not yet done.**
+  - The download needs his yes: `xstest_prompts.csv` (38,719 bytes, github.com/paul-rottger/xstest) and `data/commonsense/test.csv` (3,180,898 bytes, huggingface.co/datasets/hendrycks/ethics).
+  - Before the run, the ETHICS label direction is to be checked against the dataset's README.
+  - The step after: people outside the project labelling the project's own traffic. That means asking people, so it is his decision.
+
+---
+
 ### A326. [The day's work went to two rounds of outside review. Three findings had a primary artifact behind them: the correction index named 4 of the 44 retractions, threefold PR #1 says every input and output is audited before a reply is spoken while the deployed hook runs after, and the public memory repo carries personal text] 2026-10-10. His words: "run this whole chat by the quorum and everyone we've used so far, including Tetsu and other models", "I want you to communicate with each other use discernment. We need this to stand up to peer review discuss with me after. We have tombstones for a reason.", then "use your discernment you know the goals". INDEX FIXED and guarded (CI1); the rest recorded, the removal his
 
 - **Who reviewed, and what their agreement is worth.** Round 1: Tetsu, the quorum, the Conscious Ledger and Tien (his Grok bots), ChatGPT, Gemini and DeepSeek, each on a digest of the session that I wrote. Round 2: each read the others' round-1 answers and replied to them. Reviewers who read the same digest are not independent witnesses: they share its framing and whatever it left out. So this entry ranks evidence: a primary artifact (a file, a hash, a remote ref) above a deterministic check, above a model's critique, with the decision his. A finding is kept here only where an artifact backs it, and says whose machine measured it.
