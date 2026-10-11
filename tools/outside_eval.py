@@ -14,7 +14,7 @@ files are counted before and after: if the counts differ the run is VOID and say
 
     python tools/outside_eval.py convert xstest <xstest_prompts.csv>      -> eval/outside/xstest.jsonl
     python tools/outside_eval.py convert ethics-cm <test.csv>             -> eval/outside/ethics_cm_short.jsonl
-    python tools/outside_eval.py run [SET.jsonl ...] [--out DIR]          -> DIR/results.jsonl, DIR/summary.json
+    python tools/outside_eval.py run [SET.jsonl ...] [--out DIR]          -> DIR/outside_eval_results.jsonl, DIR/summary.json
 """
 import csv
 import glob
@@ -37,6 +37,7 @@ OPS = os.path.join(HERE, "ops")
 LEDGERS = [os.path.join(OPS, "verdicts.jsonl"), os.path.join(OPS, "verdicts_live.jsonl"),
            os.path.join(OPS, "judged_by_student.jsonl")]
 SEATS = {"Ora": "fallback_model.json", "Sena": "fallback_model_2.json"}
+RESULTS_NAME = "outside_eval_results.jsonl"   # classified in verify_bundle.INPUT_LEDGERS (A255): published, never rewritten
 TEXT_CAP = 4000          # record_verdict keeps text[:4000]; a leak is matched on the same prefix
 
 SOURCES = {
@@ -289,7 +290,7 @@ def run(set_paths, out_dir):
         if leak["void"]:
             report["sets"][name]["VOID"] = "outside texts reached a training ledger during the run"
     os.makedirs(out_dir, exist_ok=True)
-    write_jsonl(all_results, os.path.join(out_dir, "results.jsonl"))
+    write_jsonl(all_results, os.path.join(out_dir, RESULTS_NAME))
     with open(os.path.join(out_dir, "summary.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(report, fh, indent=1, ensure_ascii=False)
         fh.write("\n")

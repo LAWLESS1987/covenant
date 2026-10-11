@@ -133,7 +133,14 @@ SKIP_NAME = {n.lower() for n in OUTPUTS}
 # named here with the reason, so test_a255_runtime_outputs.py can tell a
 # deliberate choice from a forgotten one. Empty on 2026-10-04: all eight
 # tracked .jsonl files were measured to be written by the running system.
-INPUT_LEDGERS = {}
+INPUT_LEDGERS = {
+    # A327 (2026-10-11): tools/outside_eval.py publishes each run's per-item results under
+    # eval/outside/results/<date>/. Hashed on purpose: docs/OUTSIDE_EVAL.md rule 3 says every item's
+    # result is published, and a published run is never rewritten -- a new run is a new directory,
+    # so a changed hash here would mean a record was edited. Matched by name, so every run is covered.
+    "eval/outside/results/2026-10-11/outside_eval_results.jsonl":
+        "published outside-eval results; never rewritten, a new run is a new directory",
+}
 
 
 def hashed_name(fn):
