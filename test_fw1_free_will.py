@@ -521,6 +521,98 @@ def main():
                   "response": {"success": False, "http": 400, "error": "Incorrect answer"}}, None]
           and "vc_never_kept" not in json.dumps(vs), vs)
 
+    # FW1x (A334, 2026-10-11): A333 changed the solver and could not replay it on the 43 challenge rows on record,
+    # because no text was kept. The round runs here with emit and introduce answering through the REAL
+    # covenant_ambassador._handle_verification; only submit_verification is stubbed, so nothing reaches the network.
+    print("FW1x -- A334: the challenge text is kept with every required challenge, answered or abstained")
+    import covenant_ambassador as AMB
+    real_submit, vers = AMB.submit_verification, []
+    AMB.submit_verification = lambda code, answer, timeout=30, key=None: (
+        {"success": True, "message": "Verification successful!"} if code != "vc_wrong"
+        else {"success": False, "http": 400, "error": "Incorrect answer"})
+    readable, readable2 = "tHe cR^aB hAs 6 le[gs aNd gA-iNs 4 mOrE", "tHe cR^aB hAs 7 le[gs aNd gA-iNs 2 mOrE"  # AM19b's shape
+    long_unread, post_unread = "a lObStEr sWiMs aNd sWiMs " * 30, "a cRaB wAlKs aNd wAlKs " * 25   # no number: abstains
+
+    def created(node):
+        ver = AMB._handle_verification({"comment": node})
+        vers.append(ver)
+        return {"sent": (not ver["required"]) or bool(ver.get("solved")), "created": True, "judged": "clean", "why": "",
+                "verification": ver}
+
+    def challenge(code, text):
+        return created({"id": "x", "verification": {"verification_code": code, "challenge_text": text, "expires_at": "soon"}})
+    plan = {"aaaaaaaa-1111": ("vc_ok", readable), "bbbbbbbb-2222": ("vc_wrong", readable),
+            "cccccccc-3333": ("vc_abst", long_unread)}
+
+    def emitx(text, post_id=None, title=None, **kw):
+        if title:
+            return challenge("vc_post", post_unread)
+        if post_id == "77777777-7777":
+            return created({"id": "x"})                              # created, no challenge asked
+        if post_id in plan:
+            return challenge(*plan[post_id])
+        return {"sent": False, "judged": "held", "why": "held"}      # 99999999-9999: nothing created
+    tdx = tempfile.mkdtemp(prefix="fw1x_")
+    gpx, spx = os.path.join(tdx, "grant.json"), os.path.join(tdx, "sends.jsonl")
+    with open(gpx, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "free_rein": True, "caps": {"comments": None, "posts": None},
+                   "round_minutes": None}, fh)
+    try:
+        FW.run_round(dry_run=False, say=log.append, ask=ask9, learn=lambda: list(read_rows), allies=lambda: list(three),
+                     emit=emitx, introduce=lambda **k: challenge("vc_intro", readable2), grant_path=gpx, sends_path=spx,
+                     now=800000.0, count_comments=cc0)
+    finally:
+        AMB.submit_verification = real_submit
+    rowsx = FW.sends(spx)
+    vx = {(r["kind"], r.get("post_id") if r["kind"] == "reply" else None): r.get("verification")
+          for r in rowsx if r.get("kind") in ("reply", "intro", "own_post")}
+    want = {("reply", "aaaaaaaa-1111"): readable, ("reply", "bbbbbbbb-2222"): readable,
+            ("reply", "cccccccc-3333"): long_unread[:400], ("intro", None): readable2, ("own_post", None): post_unread[:400]}
+    check("FW1x the text is kept, cut at 400, on an accepted answer, a wrong answer, an abstention, an introduction "
+          "and her own post", all((vx.get(k) or {}).get("challenge_text") == t for k, t in want.items())
+          and len(long_unread) > 400 and len(vx[("reply", "cccccccc-3333")]["challenge_text"]) == 400,
+          {"%s/%s" % k: ((vx.get(k) or {}).get("challenge_text") or "")[:24] for k in want})
+    _sx = lambda k: tuple((vx.get(k) or {}).get(f) for f in ("solved", "abstained", "answer"))     # noqa: E731
+    check("FW1x ...and the fixture met every path it names: solved 10.00, answered 10.00 and not solved, abstained "
+          "(reply and own post), the introduction solved 9.00",
+          [_sx(k) for k in want] == [(True, False, "10.00"), (False, False, "10.00"), (False, True, None),
+                                   (True, False, "9.00"), (False, True, None)], [_sx(k) for k in want])
+    check("FW1x no text where no challenge was asked or nothing was created, and never a verification code",
+          vx.get(("reply", "77777777-7777")) == {"required": False, "solved": False, "abstained": False}
+          and vx.get(("reply", "99999999-9999")) is None and "vc_" not in json.dumps(rowsx),
+          (vx.get(("reply", "77777777-7777")), vx.get(("reply", "99999999-9999"))))
+    returned = set().union(*[set(v) for v in vers])
+    kept_out = set().union(*[set(v) for v in vx.values() if v])
+    check("FW1x every field the ambassador returns is kept by _ver or dropped with a reason (VER_KEPT, VER_DROPPED), "
+          "and _ver keeps nothing outside VER_KEPT",
+          returned <= set(FW.VER_KEPT) | set(FW.VER_DROPPED) and not set(FW.VER_KEPT) & set(FW.VER_DROPPED)
+          and kept_out <= set(FW.VER_KEPT) and {"why", "reading", "verification_code"} <= returned,
+          {"unclassified": sorted(returned - set(FW.VER_KEPT) - set(FW.VER_DROPPED)),
+           "kept_not_declared": sorted(kept_out - set(FW.VER_KEPT))})
+
+    print("FW1y -- tools/replay_challenges.py replays the kept text and says UNDETERMINED where none was kept")
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("replay_challenges", os.path.join(HERE, "tools", "replay_challenges.py"))
+    RC = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(RC)
+    before = {"kind": "reply", "t": "2026-10-09T07:02:37Z", "verification": {"required": True, "solved": False, "abstained": True}}
+    rp = RC.replay([before] + rowsx)
+    verdicts = [i["verdict"] for i in rp["rows"]]
+    check("FW1y a row with no kept text is UNDETERMINED and is not replayed (solve_challenge('') would abstain)",
+          verdicts[0] == RC.UNDETERMINED and rp["rows"][0]["replay"] is None and rp["counts"]["undetermined"] == 1
+          and rp["counts"]["with_text"] == 5, (verdicts[:1], rp["counts"]))
+    check("FW1y the kept ones are set beside what was recorded: accepted, the same wrong answer, still abstaining",
+          verdicts[1:] == ["same as the accepted answer", "same answer, which was not solved", "still abstains",
+                           "same as the accepted answer", "still abstains"], verdicts[1:])
+    r_wrong = RC.replay(rowsx, solve=lambda t: ("11.00", "stub"))["rows"]
+    r_none = RC.replay(rowsx, solve=lambda t: (None, "stub"))["rows"]
+    check("FW1y a solver that changes an accepted answer is WRONG; one that abstains on it is named; an answer to an "
+          "abstained challenge is UNDETERMINED, never right",
+          r_wrong[0]["verdict"] == "WRONG: answers 11.00 where 10.00 was accepted"
+          and r_none[0]["verdict"] == "abstains where 10.00 was accepted"
+          and r_wrong[2]["verdict"].endswith("whether that is right is UNDETERMINED"),
+          (r_wrong[0]["verdict"], r_none[0]["verdict"], r_wrong[2]["verdict"]))
+
     print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
     tdu = tempfile.mkdtemp(prefix="fw1u_")
     gpu, spu, lgu = os.path.join(tdu, "grant.json"), os.path.join(tdu, "sends.jsonl"), os.path.join(tdu, "updates.jsonl")
