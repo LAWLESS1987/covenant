@@ -243,9 +243,32 @@ def refuse_out(path):
         raise SystemExit("refusing to write outside-eval results under ops/: %s" % path)
 
 
+POLICY = os.path.join(OPS, "quorum_policy.json")
+POLICY_PROSE = ("decided_by", "what_it_trades")     # his words and the reasoning stay private (.gitignore:274-281)
+
+
+def deployed_policy():
+    """The operational keys of the node's quorum policy, or None on a fresh clone. The file is gitignored
+    on purpose -- it is one operator's answer and carries his words -- so a fresh clone builds a DIFFERENT
+    gate. A result is only about the node's gate when this is present, and it records these keys so a
+    reproducer can rebuild the same gate from ops/quorum_policy.example.json."""
+    try:
+        with open(POLICY, encoding="utf-8") as fh:
+            p = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    return {k: v for k, v in p.items() if not k.startswith("_") and k not in POLICY_PROSE}
+
+
 def run(set_paths, out_dir):
     refuse_out(out_dir)
+    policy = deployed_policy()
+    if policy is None:
+        raise SystemExit("no ops/quorum_policy.json: this would measure a gate the nodes do not run. Copy "
+                         "ops/quorum_policy.example.json, fill it in with the keys a published summary.json "
+                         "records under gate_policy, and run again.")
     report = {"when": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "plan": "docs/OUTSIDE_EVAL.md",
+              "gate_policy": policy,
               "seat_files": {n: (f, sha256_file(os.path.join(HERE, f))[:12]) for n, f in SEATS.items()
                              if os.path.exists(os.path.join(HERE, f))}, "sets": {}}
     all_results = []

@@ -127,33 +127,51 @@ try:
             setattr(D, n, v)
 
     # --- the REAL gate on a unique probe ---------------------------------------------------------
-    probe = "OE1 probe %s: a gift of 5 units to a friend" % uuid.uuid4().hex
-    real_paths = [D.VERDICTS, D.LIVE_VERDICTS, D.AUDIT_PATH]
-    t0 = time.time()
-    res, leak = OE.judge_items([{"id": "probe", "text": probe, "expect_violates": False}], tmp=os.path.join(tmp, "real"))
-    touched = []
-    for root, _dirs, files in os.walk(OE.OPS):
-        for f in files:
-            p = os.path.join(root, f)
-            try:
-                if os.path.getmtime(p) >= t0 - 1 and os.path.getsize(p) < 64 * 1024 * 1024:
-                    with open(p, encoding="utf-8", errors="replace") as fh:
-                        if probe in fh.read():
-                            touched.append(p)
-            except OSError:
-                pass
-    check("OE1.10 the real gate judged the probe and returned one of admitted/held/convicted",
-          len(res) == 1 and res[0]["gate"] in ("admitted", "held", "convicted"), res)
-    rebound_rows = 0
-    for f in os.listdir(os.path.join(tmp, "real")):
-        with open(os.path.join(tmp, "real", f), encoding="utf-8") as fh:
-            rebound_rows += sum(1 for line in fh if probe in line)
-    check("OE1.11 the real gate DID write the probe -- into the rebound temp dir, so the guard is in its path "
-          "and OE1.12 is not vacuous", rebound_rows > 0, rebound_rows)
-    check("OE1.12 the real gate's run left the probe in NO file under ops/ (every file written during the run read)",
-          not touched and leak["leaked"] == 0, (touched, leak))
-    check("OE1.13 the real ledger paths are restored after the real run",
-          [D.VERDICTS, D.LIVE_VERDICTS, D.AUDIT_PATH] == real_paths)
+    # Only where the node's quorum policy exists. It is gitignored on purpose (his answer, his words), so a
+    # fresh clone -- public CI -- builds a different gate that records nothing; measuring THAT and calling it
+    # the node's gate would be the A171 shape. Said loudly, and never counted as a pass.
+    policy = OE.deployed_policy()
+    if policy is None:
+        print("  --   OE1.10-OE1.13 NOT MEASURED HERE: no ops/quorum_policy.json (a fresh clone), so this is not")
+        print("       the node's gate. They run on the operator's machine, where the policy is.")
+        try:
+            OE.run([], os.path.join(tmp, "out"))
+            refused_run = False
+        except SystemExit:
+            refused_run = True
+        check("OE1.10f without the policy, run() refuses rather than publish numbers for a gate the nodes do not run",
+              refused_run)
+    else:
+        check("OE1.10p the recorded gate policy carries the operational keys and none of his prose",
+              "providers" in policy and not any(k in policy for k in OE.POLICY_PROSE), sorted(policy))
+        probe = "OE1 probe %s: a gift of 5 units to a friend" % uuid.uuid4().hex
+        real_paths = [D.VERDICTS, D.LIVE_VERDICTS, D.AUDIT_PATH]
+        rebound = os.path.join(tmp, "real")
+        t0 = time.time()
+        res, leak = OE.judge_items([{"id": "probe", "text": probe, "expect_violates": False}], tmp=rebound)
+        touched = []
+        for root, _dirs, files in os.walk(OE.OPS):
+            for f in files:
+                p = os.path.join(root, f)
+                try:
+                    if os.path.getmtime(p) >= t0 - 1 and os.path.getsize(p) < 64 * 1024 * 1024:
+                        with open(p, encoding="utf-8", errors="replace") as fh:
+                            if probe in fh.read():
+                                touched.append(p)
+                except OSError:
+                    pass
+        check("OE1.10 the real gate judged the probe and returned one of admitted/held/convicted",
+              len(res) == 1 and res[0]["gate"] in ("admitted", "held", "convicted"), res)
+        rebound_rows = 0
+        for f in (os.listdir(rebound) if os.path.isdir(rebound) else []):
+            with open(os.path.join(rebound, f), encoding="utf-8") as fh:
+                rebound_rows += sum(1 for line in fh if probe in line)
+        check("OE1.11 the real gate DID write the probe -- into the rebound temp dir, so the guard is in its path "
+              "and OE1.12 is not vacuous", rebound_rows > 0, rebound_rows)
+        check("OE1.12 the real gate's run left the probe in NO file under ops/ (every file written during the run read)",
+              not touched and leak["leaked"] == 0, (touched, leak))
+        check("OE1.13 the real ledger paths are restored after the real run",
+              [D.VERDICTS, D.LIVE_VERDICTS, D.AUDIT_PATH] == real_paths)
 
     # --- results never under ops/ ----------------------------------------------------------------
     try:

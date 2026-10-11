@@ -27,6 +27,12 @@ builds it from `ops/quorum_policy.json`. It runs on each item as `{"message": <t
 "organic"}`, the payload shape of `judge_suite.py`. Each deployed student is also scored on its own, with
 `FallbackModel.verdict`.
 
+*Added after the first public CI run (A327 addendum), and not a change to what is measured:*
+`ops/quorum_policy.json` is gitignored on purpose, because it is the operator's own answer in his own
+words. A fresh clone therefore builds a different gate. `run()` refuses to run without the policy, and
+records the policy's operational keys (never its prose) under `gate_policy` in `summary.json`. A
+reproducer can rebuild the same gate from `ops/quorum_policy.example.json` with those keys.
+
 **Nothing an outside item produces may reach a training ledger.** The deferring judge appends every
 verdict to `ops/verdicts.jsonl`, `ops/verdicts_live.jsonl` (both read by nightly training) and
 `ops/judged_by_student.jsonl`. During a run those three paths are rebound to a temporary directory.

@@ -7668,6 +7668,13 @@ A280, which is the road telling the truth about it.
   - The download needs his yes: `xstest_prompts.csv` (38,719 bytes, github.com/paul-rottger/xstest) and `data/commonsense/test.csv` (3,180,898 bytes, huggingface.co/datasets/hendrycks/ethics).
   - Before the run, the ETHICS label direction is to be checked against the dataset's README.
   - The step after: people outside the project labelling the project's own traffic. That means asking people, so it is his decision.
+- **Addendum: 56133b7 turned public CI red, a recurrence of A171's shape, caught by reading the remote run.**
+  - OE1 passed 14/14 here and in the pre-commit staged copy. On CI it raised.
+  - Cause: `ops/quorum_policy.json` is gitignored on purpose (his answer, his words), so a fresh clone builds a different gate. That gate recorded nothing, and the test then read a temp dir that was never made.
+  - Reproduced on a `git archive` export. The staged copy carries the ignored file, so it cannot see this.
+  - Fixed as a statement, not a workaround. Without the policy, the real-gate checks print NOT MEASURED and are not counted, and `run()` refuses to publish numbers for a gate the nodes do not run.
+  - With the policy, the summary records its operational keys (never its prose), so a reproducer can rebuild the same gate.
+  - Measured: 15/15 in place, and 11/11 on a fresh export with the four real-gate checks marked NOT MEASURED.
 
 ---
 
