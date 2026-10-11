@@ -968,6 +968,7 @@ def stage(say):
             # runs them (the model and image doors are stubbed in every suite).
             shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns("llama", "sd") if d == "tools"
+                            else _eval_ignore if d == "eval"
                             else shutil.ignore_patterns("__pycache__"))
     say("   staged into %s" % work)
     return work
@@ -981,7 +982,19 @@ def stage(say):
 # Each time the fix was one more name. test_a298_stage_covers_tree.py (in place, it needs git) now fails when
 # a TRACKED top-level folder is in neither list below -- a new folder is a decision, not a silent absence.
 STAGE_DIRS = ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness",
-              "ai_memory_system")
+              "ai_memory_system", "eval")
+
+
+def _eval_ignore(src, names):
+    """eval/ (A327/A328, 2026-10-11) is staged for its six tracked files: verify_bundle hashes a published result
+    in it. Its .gitignore'd bulk -- the downloaded sets (outside/raw/, outside/*.jsonl), the 23 MB encoder
+    (models/) and the embedding cache (cache/) -- is never copied: no suite reads it, and a fresh clone has none.
+    These names mirror .gitignore's eval lines; a new ignored eval path must be added in both places."""
+    rel = os.path.relpath(src, os.path.join(HERE, "eval")).replace(os.sep, "/")
+    out = {n for n in names if n in ("raw", "models", "cache", "__pycache__")}
+    if rel == "outside":
+        out |= {n for n in names if n.endswith(".jsonl")}
+    return out
 NOT_STAGED = {
     "mobile": "read in place by test_m3_mobile.py, test_m4_usb_link.py and test_a93_clone_seats_the_student.py",
     "conformance_indep": "read in place by test_n2_independent_root.py (the independent builds share no code with this tree)",

@@ -7645,6 +7645,16 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A332. [Public CI was red for five pushes on 2026-10-11 and I did not read it: eval/, a new top-level folder, was in neither stage list] 2026-10-11.
+
+- **What failed.** A327 and A328 added `eval/`, a new tracked top-level folder holding the outside-label results and round 0 of the judge loop. It was put in neither `covenant_one.STAGE_DIRS` nor `NOT_STAGED`. On public CI, A298's guard failed with S1 "in neither list: ['eval']" (and S2 with it), on every push from 9238089 through 96ff3c0.
+- **The guard worked; I did not read it.** Locally the pre-commit stage-checks do not run S1, and the rule "read the remote CI after every push" (A171, A232) was not followed for five pushes. That lapse is mine.
+- **Fixed.** `eval` is staged, with `_eval_ignore` mirroring `.gitignore`'s eval lines, so a staged copy carries exactly the 6 tracked files (1.3 MB). It leaves out the downloaded sets, the 23 MB encoder and the embedding cache. The reason it is staged rather than excused: `verify_bundle.py` hashes `eval/outside/results/2026-10-11/outside_eval_results.jsonl`. An excused folder would let that check pass on nothing (G1's P4 lesson).
+- **Both ways.** Red is the public CI run on 96ff3c0, where S1 named `eval`. Green is A298 6/6 in place, and a real `stage()` copy listing the six files.
+- **What it cannot see.** Whether a staged suite that reads `eval/` now passes for the right reason. The next public CI run is the measurement, and it is read before anything else is claimed.
+
+---
+
 ### A331. [The ambassador said `sent: True` for a post nobody could see: Moltbook's "already posted" answer carries no challenge, and no challenge read as published] 2026-10-11. His words: "update using discernment and post tell them without me knowing what u post".
 
 - **What happened.** At 17:04 UTC a one-off `emit()` made the consensus post (b79e355f). Moltbook created it and hid it behind its arithmetic challenge. The challenge was lost: the caller's filtered print dropped the `verification` field, and the code expired.
