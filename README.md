@@ -667,24 +667,6 @@ it. Their text is in git history.
 model-free parts of all of them in the sweep; each tool's `--selftest` measures the rest
 against the judge.
 
-## Support this work
-
-For the last two months I've been building this in the open: a small system that governs
-whoever runs it — including me. A public ledger with an ethics gate that fails closed, a
-constitution whose one rule is mutual benefit for people and machines, and tests that catch
-the system's own lies — the suite totals at the top of this page are re-measured and
-dated, and anyone can run them in about ten minutes. Along the way I found something researchers can use: a reproducible reason AI
-systems seem to recognise your work across sessions when they don't
-([`docs/WHAT_WE_FOUND.md`](docs/WHAT_WE_FOUND.md)).
-*(A257-TENMIN, 2026-10-04: not ten. The full sweep took 17.4 and 18.4 minutes on this
-machine on 2026-10-03 and -04, and prints its own time; `sh check.sh` is the
-check that takes seconds.)*
-
-I need to get financially stable to keep doing this full time. Ten thousand dollars clears
-my debts and buys the room to focus. I'm not asking for charity; I'm asking people who can
-check the work — the command is at the top of this page — to back it directly. Nothing here
-claims a profit edge or promises a return; it claims what a reader can verify.
-
 ## Elsewhere
 
 The same work, and the person behind it, in the other places it lives:

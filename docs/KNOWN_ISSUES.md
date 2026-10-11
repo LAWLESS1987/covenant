@@ -7645,6 +7645,15 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A330. [The README asked readers for money while saying "no fundraising" 250 lines earlier. The ask is removed] 2026-10-11. His words: "take out the request for 10k out of the read me thats counter intuitive no asks for funding". DONE
+
+- The "Support this work" section, 18 lines, held a request for ten thousand dollars. The README's own description of the project says "no token, no fundraising, no yield".
+- The section is removed; its text stays in git history, last at 8181129. The project's description and its links to `docs/WHAT_WE_FOUND.md` remain elsewhere in the README.
+- A git grep across the tracked tree found no other ask. Standing rule from his words: no asks for funding.
+- R1 138/138: A257-TENMIN, a retraction that lived in that section, still matches in its ledger.
+
+---
+
 ### A329. [The phone went silent for 53 hours and nothing told him: the road read every phone BUILD, never the phone. Tetsu was down for lack of 0.06 GB] 2026-10-11. His words: "you're supposed to ensure Tetsu stays running and communicating with the phone version but there's not been any communication in a long time ... we made the highway to operate in place of Tailscale, but neither's connecting. I'm super confused". DETECTOR ADDED; the phone itself is his to reconnect
 
 - **Measured.**
