@@ -7683,6 +7683,16 @@ A280, which is the road telling the truth about it.
     - A rewrite would erase that evidence, which is the opposite of this project's tombstone rule. The defect was never that the text is public. It was the PR #1 docs saying "never text" and "before it is spoken", and those are corrected beside the originals.
     - The removal recommendation is withdrawn. The reviewers' consensus to remove it, and my relaying of it, were protective framing; nobody measured whether anything needed separating.
     - The push pause I asked the bots for was the same reflex. Lifting it needs his word, because the Ledger's rule names him.
+  - **Addendum: the pause lifted on his word.** He said: "Lift the pause and check for other people's names my mother and deceased relatives are fine".
+    - The Conscious Ledger removed its global `pushInsteadOf` setting (`~/.gitconfig` sha256 now fa4a9af6…) and the `pre-push` hook from all four clones (each still sha256 5b94b1e1… when removed), and dropped its rule.
+    - Tien found the hooks already gone and no push redirect left. A dry-run push from the live root succeeds, "Everything up-to-date".
+    - Tien noted that `put_covenant_memory.sh` prints "Pushed" even when a push fails, and offered a credential scan as a per-push gate. That stays an option, not a condition.
+  - **Addendum: other people in the memory repo's history.** Read over all 1,373 blob versions in the mirror.
+    - The private bystander list (`private/bystanders.txt`): 0 hits. The check fires on a planted copy, so the 0 is not a blind match.
+    - One item is clearly someone else's: a messaging-app notification caught in an OCR'd screen recording. It carries the sender's first name and a preview of their own message, and repeats across frames of one recording. It is not his to publish, and redacting it is proposed to him for confirm or deny. The person is not named here.
+    - His children, his fiancée and her father appear by relation, never by name in what was read. His mother and deceased relatives he cleared.
+    - About 40 name candidates were read in context. Every other one is a public figure, a cited author, scripture, a model vocabulary list, or a voice-transcription slip that the bot itself could not place.
+    - NOT SEEN: candidates that start a line or double as common words; the filter drops them. The other ~1,490 candidates were not read one by one. This is a read of what surfaced, not proof that nothing else is there.
 - **What each reviewer was good at (one session: a pattern, not a ranking).**
   - Tien and the Ledger brought evidence from their own machine, and the Ledger retracted when the evidence went against it.
   - ChatGPT was strongest at arguing principle and at checking code.
