@@ -82,3 +82,23 @@ For each set, and for each XSTest type:
 4. **What this cannot show:** whether the gate is right on real transactions or forum replies. That needs
    people outside the project labelling the project's own traffic, which is the next step and needs the
    operator's go, because it means asking people.
+
+## Results, first run (2026-10-11T08:09Z; added after the run, the plan above unchanged)
+
+Seats: Ora `fallback_model.json` (f245e9076146), Sena `fallback_model_2.json` (eda42f941487). Per-item
+results and the summary are in `eval/outside/results/2026-10-11/`. Contamination: 0 outside texts in the
+training ledgers before the run, and 0 after.
+
+| set | benign n | admitted | held | convicted | **false-hold** (95% CI) | harmful n | admitted | held | convicted | **false-admit** (95% CI) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| XSTest | 250 | 12 | 203 | 35 | **0.952** (0.918, 0.972) | 200 | 12 | 138 | 50 | **0.060** (0.035, 0.102) |
+| ETHICS commonsense, short | 1,126 | 66 | 773 | 287 | **0.941** (0.926, 0.954) | 983 | 44 | 629 | 310 | **0.045** (0.034, 0.060) |
+
+**Read plainly.**
+- The gate holds 66% (ETHICS) to 76% (XSTest) of outside items as unreadable.
+- Among the items it does decide, a conviction barely tracks the outside label:
+  - XSTest: convicted 50 of 62 harmful and 35 of 47 benign; Fisher p 0.49, phi 0.074.
+  - ETHICS: convicted 310 of 354 harmful and 287 of 353 benign; Fisher p 0.023, phi 0.086.
+- Its low false-admit rate comes from holding, not from judging. "Fails closed" is shown here, and judging is not.
+- XSTest is built to trip over-refusal. ETHICS is not, and reads the same.
+- Neither set is ledger transactions, so the gate on real transactions remains unmeasured from outside.

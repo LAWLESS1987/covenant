@@ -468,3 +468,8 @@ ops/tetsu_workshop/
 ops/tetsu_workshop_history/
 ops/tetsu_hands.jsonl
 ops/tetsu_proposals/
+
+# Outside-labelled sets (A327): the raw downloads and the converted sets are third-party data, fetched by URL
+# and checked by sha256 (eval/outside/SOURCES.md); only the per-item results (ids, not texts) are committed.
+eval/outside/raw/
+eval/outside/*.jsonl

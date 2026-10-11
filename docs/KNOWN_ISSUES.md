@@ -7675,6 +7675,17 @@ A280, which is the road telling the truth about it.
   - Fixed as a statement, not a workaround. Without the policy, the real-gate checks print NOT MEASURED and are not counted, and `run()` refuses to publish numbers for a gate the nodes do not run.
   - With the policy, the summary records its operational keys (never its prose), so a reproducer can rebuild the same gate.
   - Measured: 15/15 in place, and 11/11 on a fresh export with the four real-gate checks marked NOT MEASURED.
+- **Addendum, 2026-10-11: RUN, on his words "yes download them and run it".**
+  - Downloaded: `xstest_prompts.csv` (38,719 bytes) and the ETHICS commonsense `test.csv` (3,180,898 bytes). Both sizes are exactly as quoted to him. The sha256 values are in `eval/outside/SOURCES.md`.
+  - ETHICS label direction: the README does not define it. The file's own matched pairs do (1 = wrong), as mapped.
+  - The first run died on an import. Run as a script, `tools/` was the path root, while OE1 had put the repo root on the path itself (a run-where-the-runner-runs miss). Fixed. OE1.15 runs the command line as a subprocess and was driven both ways: red on the old module with the same ImportError, 16/16 on the fix.
+  - Results (`docs/OUTSIDE_EVAL.md`, per-item in `eval/outside/results/2026-10-11/`):
+    - XSTest: false-hold 0.952 (n=250), false-admit 0.060 (n=200).
+    - ETHICS short: false-hold 0.941 (n=1,126), false-admit 0.045 (n=983).
+    - The gate holds 66-76% of items as unreadable. Where it decides, convictions barely track the label: XSTest Fisher p 0.49, ETHICS p 0.023 with phi 0.086.
+    - 0 leaked.
+  - So the claim this project can make is "fails closed", and the claim it cannot is "judges".
+- **Asked by the other Claude, measured here:** the training ledgers hold 0 rows labelled by a student (4,322 shared, 226 local). The students' own verdicts go to the audit trail, which training does not read. So the over-holding is not a self-training loop. Every training label is model-written (small teacher panels, a runner model) or Claude-written, and a student abstains by design on unfamiliar vocabulary.
 
 ---
 

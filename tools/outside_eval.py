@@ -27,6 +27,11 @@ import tempfile
 import time
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Run as `python tools/outside_eval.py`, sys.path[0] is tools/, and the gate's modules live at the root.
+# The first real run died on this import while OE1 passed, because the test put the root on the path itself
+# (A327 addendum); OE1.15 now runs the command line as a subprocess.
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
 EVAL_DIR = os.path.join(HERE, "eval", "outside")
 OPS = os.path.join(HERE, "ops")
 LEDGERS = [os.path.join(OPS, "verdicts.jsonl"), os.path.join(OPS, "verdicts_live.jsonl"),

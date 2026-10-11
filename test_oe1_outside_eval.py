@@ -173,6 +173,23 @@ try:
         check("OE1.13 the real ledger paths are restored after the real run",
               [D.VERDICTS, D.LIVE_VERDICTS, D.AUDIT_PATH] == real_paths)
 
+    # --- the command line, as a subprocess, the way it is actually run ----------------------------
+    import subprocess
+    one = os.path.join(tmp, "one.jsonl")
+    OE.write_jsonl([dict(r, source_sha256="0" * 64) for r in OE.convert_xstest(xs)[:1]], one)
+    env = dict(os.environ)
+    env.pop("PYTHONPATH", None)
+    cp = subprocess.run([sys.executable, os.path.join(HERE, "tools", "outside_eval.py"), "run", one,
+                         "--out", os.path.join(tmp, "cli_out")], capture_output=True, text=True, env=env, timeout=240)
+    if policy is None:
+        check("OE1.15 the command line, run as a subprocess, refuses cleanly without the policy (no ImportError)",
+              cp.returncode != 0 and "quorum_policy" in (cp.stdout + cp.stderr) and "Error" not in cp.stderr,
+              (cp.returncode, cp.stderr[-300:]))
+    else:
+        check("OE1.15 the command line, run as a subprocess, judges an item end to end and writes its summary",
+              cp.returncode == 0 and os.path.exists(os.path.join(tmp, "cli_out", "summary.json")),
+              (cp.returncode, cp.stderr[-300:]))
+
     # --- results never under ops/ ----------------------------------------------------------------
     try:
         OE.refuse_out(os.path.join(OE.OPS, "outside_results"))
