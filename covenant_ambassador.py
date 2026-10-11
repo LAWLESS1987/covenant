@@ -867,16 +867,36 @@ _WORD_NUM = {
     "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
     "eighty": 80, "ninety": 90,
 }
+# A333: aggregation cues, read as "+". They join the "+" group, so a cue beside
+# a word of any other group is two groups and an abstention: it never outvotes
+# "slows", and is never quietly dropped for it either. "in all", the one cue of
+# two words, is read in solve_challenge, which also abstains on a cue beside
+# "each" or "every": "fOuR cLaWs EaCh ExErT tWeLvE nEwToNs, ToTaL?" aggregates
+# by multiplying.
+_CUES = ("together", "total", "combined", "sum")
 # Operation words, grouped. If words from two different groups appear, the
 # reading is ambiguous and the solver abstains rather than picking one.
 _OPS = {
     "+": ("plus", "add", "adds", "gains", "gain", "speeds", "faster",
-          "increases", "increase", "rises", "more"),
+          "increases", "increase", "rises", "more") + _CUES,
     "-": ("minus", "slows", "slow", "loses", "lose", "drops", "drop",
           "decreases", "decrease", "slower", "reduces", "less"),
     "*": ("times", "multiplied", "multiply", "product"),
     "/": ("divided", "divide", "split", "per", "quotient"),
 }
+
+# A333 (2026-10-11). Two readings the solver could not make, both in the
+# challenge Moltbook set at 18:05 UTC that day: "...tHiRrTtY ] tWo MeTeRs +
+# AnO-tHeR Lo.o bStEr SwImS^ SeVeNtEeN ] MeTeRs, uM, HoW/ mAnY MeTeRs
+# ToGeThEr?" It found 32 and 17 and no operation -- _deobfuscate strips the
+# "+", and "together" was in no group -- and abstained on a challenge whose
+# answer, 49.00, Moltbook accepted when it was submitted by hand.
+#
+# A SYMBOL COUNTS ONLY AS A TOKEN OF ITS OWN, AND ONLY BETWEEN THE NUMBERS.
+# The obfuscation scatters the same characters inside words: in that very
+# challenge "AnO-tHeR" carries a "-" between 32 and 17, and "HoW/" a "/".
+_SYMBOLS = {"+": "+", "-": "-", "*": "*", "/": "/",
+            "×": "*", "÷": "/"}
 
 
 def _collapse(word):
@@ -888,10 +908,58 @@ def _collapse(word):
     return "".join(out)
 
 
+def _tokens(text):
+    """(words, symbols) from their scrambled challenge.
+
+    words is what _deobfuscate has always returned. symbols holds (gap, op) for
+    each whitespace-separated token that is one operator symbol and nothing
+    else, gap being the number of words before it (A333)."""
+    words, symbols = [], []
+    for tok in (text or "").split():
+        w = re.sub(r"[^A-Za-z0-9]", "", tok).lower()
+        if w:
+            words.append(w)
+        elif tok in _SYMBOLS:
+            symbols.append((len(words), _SYMBOLS[tok]))
+    return words, symbols
+
+
 def _deobfuscate(text):
     """Their scrambled challenge back to plain lowercase words and digits."""
-    cleaned = re.sub(r"[^A-Za-z0-9\s]", "", text or "")
-    return [w for w in cleaned.lower().split() if w]
+    return _tokens(text)[0]
+
+
+def _reading(c):
+    """What one collapsed word means here: ("n", value), ("op", symbol) or None."""
+    for word, val in _WORD_NUM.items():
+        if c == _collapse(word):
+            return ("n", val)
+    for sym, family in _OPS.items():
+        if any(c == _collapse(f) for f in family):
+            return ("op", sym)
+    return None
+
+
+def _split_word(words):
+    """(fragments, reading) for the first 2 or 3 adjacent words that, joined,
+    spell a number or operation word none of them reads as alone; else None.
+
+    A333. The obfuscation also splits words with a space ("Lo.o bStEr"), and a
+    split number is lost while the rest of the reading stands. An agent on
+    Moltbook quoted this challenge: "fO RTy] NoOoToOnS/ WiTh~ OnEe ClAw, AnD
+    OtHeR{ HaS- TwEnTy< FoUr>, ToTaL} FoRcE?" -- 40 + 24. "forty" is split
+    and lost, "one claw" reads as a number, and with "total" read as "+" the
+    solver would answer 1 + 24 = 25.00. Before the cues it abstained only for
+    want of an operation; this keeps it abstaining for the right reason."""
+    for i in range(len(words)):
+        for k in (2, 3):
+            frag = words[i:i + k]
+            if len(frag) < k or any(f.isdigit() for f in frag):
+                continue
+            joined = _reading(_collapse("".join(frag)))
+            if joined and joined not in [_reading(_collapse(f)) for f in frag]:
+                return " ".join(frag), joined
+    return None
 
 
 def solve_challenge(text):
@@ -900,22 +968,23 @@ def solve_challenge(text):
     Returning None is a real answer and the caller must respect it: an expired
     challenge and a wrong one cost the same one-in-ten, so abstaining is
     strictly cheaper than a guess that is only probably right."""
-    words = _deobfuscate(text)
+    words, symbols = _tokens(text)
     found, ops = [], []                    # found holds (position, value)
+    cue = False
     for i, w in enumerate(words):
         if w.isdigit():
             found.append((i, int(w)))
             continue
         c = _collapse(w)
-        for word, val in _WORD_NUM.items():
-            if c == _collapse(word):
-                found.append((i, val))
-                break
-        else:
-            for sym, family in _OPS.items():
-                if any(c == _collapse(f) for f in family):
-                    ops.append(sym)
-                    break
+        r = _reading(c)
+        if r and r[0] == "n":
+            found.append((i, r[1]))
+        elif r:
+            ops.append(r[1])
+            cue = cue or c in [_collapse(x) for x in _CUES]
+        elif c == _collapse("all") and i and _collapse(words[i - 1]) == "in":
+            ops.append("+")
+            cue = True
     # "twenty five" -> 25, but ONLY when the two words are ADJACENT.
     #
     # FIXED 2026-09-09, caught by AM19 on their own worked example. Without the
@@ -925,14 +994,18 @@ def solve_challenge(text):
     # just as easily have produced a confident WRONG answer -- and a wrong
     # answer spends one of the ten attempts that end in suspension. Distance
     # between two number words is meaning, not noise.
-    merged = []
+    merged = []                            # (first word, last word, value)
     for pos, n in found:
-        if (merged and merged[-1][1] in (20, 30, 40, 50, 60, 70, 80, 90)
-                and 1 <= n <= 9 and pos == merged[-1][0] + 1):
-            merged[-1] = (pos, merged[-1][1] + n)
+        if (merged and merged[-1][2] in (20, 30, 40, 50, 60, 70, 80, 90)
+                and 1 <= n <= 9 and pos == merged[-1][1] + 1):
+            merged[-1] = (merged[-1][0], pos, merged[-1][2] + n)
         else:
-            merged.append((pos, n))
-    nums = [v for _, v in merged]
+            merged.append((pos, pos, n))
+    nums = [v for _, _, v in merged]
+    if len(nums) == 2:
+        # A333: a symbol token after the first number's last word and before
+        # the second number's first word. One anywhere else is not read.
+        ops += [s for gap, s in symbols if merged[0][1] < gap <= merged[1][0]]
     kinds = sorted(set(ops))
     if len(nums) != 2:
         return None, ("found %d number(s), need exactly 2 -- abstaining rather "
@@ -940,6 +1013,14 @@ def solve_challenge(text):
     if len(kinds) != 1:
         return None, ("found %d operation(s) %s, need exactly 1 -- abstaining"
                       % (len(kinds), kinds or "none"))
+    split = _split_word(words)
+    if split:
+        return None, ("%r joined reads as %r -- a word split by the obfuscation, "
+                      "so a number or operation may be missing -- abstaining"
+                      % split)
+    if cue and any(_collapse(w) in ("each", "every") for w in words):
+        return None, ("an aggregation cue beside 'each' or 'every' may mean "
+                      "multiply -- abstaining")
     a, b = nums
     op = kinds[0]
     if op == "/" and b == 0:
@@ -1540,6 +1621,53 @@ def _selftest_body(say, ok, check, _real_audit, _real_audit_size):
     a4, w4 = solve_challenge("it slows by five and gains three from twenty")
     check("AM20b an AMBIGUOUS challenge (two operations) abstains too",
           a4 is None, (a4, w4))
+    # A333 (2026-10-11): operator symbols between the numbers, aggregation
+    # cues, and an abstention when the obfuscation splits a word. Each check
+    # was driven both ways when it was added.
+    m, mw = solve_challenge(
+        "A] lO^bSt-Er SwImS/ aT tHiRrTtY ] tWo MeTeRs + AnO-tHeR Lo.o bStEr "
+        "SwImS^ SeVeNtEeN ] MeTeRs, uM, HoW/ mAnY MeTeRs ToGeThEr?")
+    check("AM33 Moltbook's challenge of 2026-10-11 18:05 UTC reads 32 + 17 = 49.00, the answer it accepted by "
+          "hand (the solver had abstained); the '-' inside 'AnO-tHeR' is not read", m == "49.00", (m, mw))
+    s1, sw1 = solve_challenge("ThIrTy + tWeL.vE")
+    check("AM33b a standalone '+' between the numbers is read", s1 == "42.00", (s1, sw1))
+    s2, sw2 = solve_challenge("tWeLvE × ThReE")
+    s3, sw3 = solve_challenge("SiXtY ÷ TwElVe")
+    check("AM33c ...and so are the multiplication and division signs", (s2, s3) == ("36.00", "5.00"),
+          (s2, sw2, s3, sw3))
+    d1, dw1 = solve_challenge("a lobster swims at thirty two meters and slows by seventeen, "
+                              "how many meters together?")
+    d2, dw2 = solve_challenge("a crab has thirty - and gains twelve")
+    check("AM33d two operation families still abstain: a cue beside 'slows', and a '-' between the numbers "
+          "beside 'gains'", d1 is None and d2 is None, (d1, dw1, d2, dw2))
+    t1, tw1 = solve_challenge("ThIrTy + tWeLvE + fIvE")
+    t2, tw2 = solve_challenge("thirty meters and twelve meters and five meters, how many in total?")
+    check("AM33e three numbers still abstain, with symbols or with a cue", t1 is None and t2 is None,
+          (t1, tw1, t2, tw2))
+    f1, fw1 = solve_challenge("+ ThIrTy MeTeRs AnD SeVeNtEeN MeTeRs")
+    f2, fw2 = solve_challenge("ThIrTy MeTeRs AnD SeVeNtEeN MeTeRs +")
+    f3, fw3 = solve_challenge("ThIrTy MeTeRs+ SeVeNtEeN")
+    check("AM33f a '+' that is not between the numbers, or not a token of its own, is not read: each abstains",
+          (f1, f2, f3) == (None, None, None), (f1, fw1, f2, fw2, f3, fw3))
+    g1, gw1 = solve_challenge("fO RTy] NoOoToOnS/ WiTh~ OnEe ClAw, AnD OtHeR{ HaS- TwEnTy< FoUr>, "
+                              "ToTaL} FoRcE?")
+    g2, gw2 = solve_challenge("a lobster swims at thirty meters and sl ows by five, total?")
+    check("AM33g a word split by a space abstains: 'fO RTy' lost with 'OnEe ClAw' kept read 25.00 for 40 + 24, "
+          "and a split 'sl ows' left 'total' to read 35.00 for 30 - 5", g1 is None and g2 is None,
+          (g1, gw1, g2, gw2))
+    cue = {c: solve_challenge("ThIrTy MeTeRs AnD SeVeNtEeN MeTeRs, %s?" % c)[0]
+           for c in ("ToGeThEr", "tOtAl", "CoMbInEd", "ThE sUm", "HoW mAnY iN aLl")}
+    check("AM33h each aggregation cue alone reads '+'", set(cue.values()) == {"47.00"}, cue)
+    n1, nw1 = solve_challenge("ThIrTy MeTeRs AnD SeVeNtEeN MeTeRs iN sUmMeR, aLl Of ThEm")
+    n2, nw2 = solve_challenge("ThIrTy MeTeRs AnD SeVeNtEeN MeTeRs, ToTaLlY")
+    check("AM33i ...and only as whole words: 'sUmMeR', 'ToTaLlY' and an 'aLl' not after 'iN' abstain",
+          n1 is None and n2 is None, (n1, nw1, n2, nw2))
+    e1, ew1 = solve_challenge("fOuR cLaWs EaCh ExErT tWeLvE nEwToNs, ToTaL fOrCe?")
+    e2, ew2 = solve_challenge("tWeLvE nEwToNs FrOm EvErY cLaW, fOuR cLaWs, iN aLl?")
+    e3, ew3 = solve_challenge("EaCh LoBsTeR sWiMs At ThIrTy MeTeRs AnD sLoWs By FiVe")
+    check("AM33j a cue beside 'each' or 'every' abstains (four claws each exerting twelve newtons is 48; the cue "
+          "read 16.00), and 'each' leaves an operation word's reading alone", (e1, e2, e3) == (None, None, "25.00"),
+          (e1, ew1, e2, ew2, e3, ew3))
     v = _handle_verification({"post": {"verification": {
         "verification_code": "c1", "challenge_text": "totally unreadable",
         "expires_at": "soon"}}})

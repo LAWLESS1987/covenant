@@ -7645,6 +7645,48 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A333. [The challenge solver abstained on a challenge it should have read: the "+" was stripped before reading, and "together" was in no group. Symbols between the numbers and aggregation cues are read now; a word split by the obfuscation, or a cue beside "each"/"every", abstains] 2026-10-11. His words: "abstains on challenges it should read", and "A wrong answer costs the same as an expired one, so precision matters more than coverage". FIXED, driven both ways
+
+- **Measured.** Moltbook's challenge at 18:05 UTC: "A] lO^bSt-Er SwImS/ aT tHiRrTtY ] tWo MeTeRs + AnO-tHeR Lo.o bStEr SwImS^ SeVeNtEeN ] MeTeRs, uM, HoW/ mAnY MeTeRs ToGeThEr?" `solve_challenge` found 32 and 17 and returned "found 0 operation(s) none, need exactly 1 -- abstaining". `_deobfuscate` removed every character that is not a letter, digit or space, so the "+" was gone before anything read it, and "together" was in no `_OPS` group. 49.00 was submitted by hand and Moltbook answered "Verification successful! Your post is now published." (the 18:05:30Z row of `ops/ambassador_sends.jsonl`).
+- **Why it matters.** A324's rule: ten unsolved challenges in a row suspend the account, and an abstained challenge left to expire counts. `detect_moltbook_strikes`, read at commit against the live ledger: run 0 (the 18:05 solve ended it), longest run in 7 days 12, and solved 8, failed 5, abstained 30 in 7 days. free is isolated (`covenant_pause.py`) and will resume.
+- **Fix, in `covenant_ambassador.py`.**
+  - **Symbols.** `_tokens()` reads the raw text once. Its words are exactly what `_deobfuscate` always returned; `_deobfuscate` is now `_tokens(text)[0]`, and 200,000 random strings (Unicode whitespace included) gave no difference against the old function. It also records each whitespace-separated token that is exactly one of `+ - * / × ÷`. A symbol is read only when it stands after the first number's last word and before the second number's first word. A symbol glued to a word is never read, because the obfuscation scatters the same characters inside words. In the measured challenge "AnO-tHeR" carries a "-" between 32 and 17. Reading glued symbols also breaks AM19 and AM19b on Moltbook's own worked example.
+  - **Cues.** "together", "total", "combined" and "sum" join the "+" group. "in all" reads "+" when "all" follows "in". All are whole words after collapsing doubled letters. In the group, a cue beside a word of any other group makes two groups and an abstention. That is the stricter of the two readings of "only when no other operation family is present": the cue never outvotes "slows", and is never dropped in its favour. The reason is that "per", in the "/" group, is also a unit word ("meters per second"). A cue that yielded to it would divide where the problem adds.
+  - **Split words abstain (`_split_word`).** The obfuscation also splits words with a space ("Lo.o bStEr"). An agent on Moltbook quoted this challenge (`ops/moltbook_candidates.jsonl`): "fO RTy] NoOoToOnS/ WiTh~ OnEe ClAw, AnD OtHeR{ HaS- TwEnTy< FoUr>, ToTaL} FoRcE?", which is 40 + 24. "forty" is split and lost, "one claw" reads as a number, and with "total" read as "+" and no guard the solver answered 25.00. **The cue change alone would have turned an abstention into a wrong answer.** The solver now abstains when 2 or 3 adjacent words, joined, spell a number or operation word that none of them reads as alone. On ordinary text it fired in 10 of 116,145 sentences from the 25,342 distinct posts in that file, and 2 of the 10 were that same quoted challenge.
+  - **A cue beside "each" or "every" abstains.** "fOuR cLaWs EaCh ExErT tWeLvE nEwToNs, ToTaL fOrCe?" aggregates by multiplying: 48. The cue read it as 16.00. This path is predicted, not measured: no challenge on record has this shape. The hold applies only to readings that contain a cue, so "each" leaves a reading by an operation word alone.
+- **The five challenge texts on record, before -> after.** The measured one: abstain -> 49.00. Moltbook's worked example: 15.00 -> 15.00. "ThUnDeR ... ReDuCeS bY TwElVe" (quoted by an agent): 23.00 -> 23.00. "ThIrTy + tWeL.vE" (quoted): abstain -> 42.00. The "fO RTy" one: abstain -> abstain, now for the split.
+- **Guard.** AM33 to AM33j, ten checks. Ambassador 61/61 (51 before). Eleven mutations were each written as bytes and the file restored byte-identical (sha256):
+
+  | Mutation | Checks that went red |
+  |---|---|
+  | symbols not read | AM33b, AM33c, AM33d |
+  | single-word cues removed | AM33h, AM33d |
+  | symbols, cues and "in all" all removed (the reading before A333) | AM33, AM33b, AM33c, AM33d, AM33h |
+  | symbols read anywhere | AM33f |
+  | glued symbols read | AM33, AM33f, AM19, AM19b |
+  | split guard off | AM33g (25.00 and 35.00) |
+  | the first two of three numbers taken | AM33e |
+  | a "+" yields to the other group | AM33d (15.00) |
+  | cues matched as prefixes | AM33i |
+  | "all" read without "in" | AM33i |
+  | each/every hold off | AM33j (16.00 twice) |
+
+  Other suites at commit: R1 138/138, FW1 PASSED, H1 226/226, EB1 12/12, TA1 37/37.
+- **The first AM33c fixture was wrong, and the code was left alone.** It used "ThIrTy ÷ SiX" and failed. The tens-and-units merge (2026-09-09) joins "thirty" and "six" into 36 across the sign, finds one number and abstains. That outcome is safe. A "-" in the same place may be a spaced hyphen ("TwEnTy - FiVe" is 25), so the merge stays and the fixture is "SiXtY ÷ TwElVe". **Named limit, not guarded:** an operator symbol between a tens word and a units word is not read.
+- **What it cannot see.**
+  - **Coverage on the challenges actually met is UNDETERMINED.** The ledger keeps no challenge text: `covenant_free_will._ver` keeps required, solved and abstained, the answer, and Moltbook's reply. How many of the 30 abstentions this would have read, and whether it would have read any of them wrongly, cannot be replayed. Five texts are all there is.
+  - **Standalone noise symbols are UNDETERMINED.** Whether the obfuscation ever emits a standalone "-", "/" or "*" as noise cannot be told from five texts; the only standalone noise seen is "]". Such a symbol between the numbers, beside an operation word of another group, abstains. Beside no operation word it would be read. That is the one wrong-answer path this change adds that no guard covers.
+  - **Hazards seen and NOT changed.** Each can make a confident wrong answer with exactly two numbers:
+    - "per" is a unit word as well as a "/" word.
+    - "more" is in the "+" group, though "how many more" asks for a difference.
+    - "one" before a noun ("OnEe ClAw") is read as an operand.
+- **Tombstones searched first.**
+  - `docs/RETRACTED.json` (45 retractions): A283-STRIKES is about the strike count, not the solver, and no tombstone names the solver's reading.
+  - KNOWN_ISSUES: A283 and A324 are the strike count, and A331 is the hidden post.
+  - Not a recurrence. No claim is retracted: the solver said it answers only with two numbers and exactly one operation, and it still does.
+
+---
+
 ### A332. [Public CI was red for five pushes on 2026-10-11 and I did not read it: eval/, a new top-level folder, was in neither stage list] 2026-10-11.
 
 - **What failed.** A327 and A328 added `eval/`, a new tracked top-level folder holding the outside-label results and round 0 of the judge loop. It was put in neither `covenant_one.STAGE_DIRS` nor `NOT_STAGED`. On public CI, A298's guard failed with S1 "in neither list: ['eval']" (and S2 with it), on every push from 9238089 through 96ff3c0.
