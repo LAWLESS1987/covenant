@@ -1988,6 +1988,73 @@ def detect_tetsu_cannot_answer(health=None, ready=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
+PHONE_CHECKINS = os.path.join(HERE, "ops", "phone_checkins.jsonl")
+# The phone checks in every 600 s (median of the last 3,000 gaps; p99 656 s), and only two gaps in those
+# 3,000 ran past 3 h, both real outages. 3 h is my choice, 2026-10-11 (A329), and his to move.
+PHONE_SILENT_S = 3 * 3600
+
+
+def _last_phone_checkin(path=None):
+    """The newest check-in row, read from the end of the file, or None when there is none here."""
+    path = path or PHONE_CHECKINS
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - 65536))
+            tail = fh.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(tail):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and row.get("when"):
+            return row
+    return None
+
+
+def _tailscale_phone(run=None):
+    """Tailscale's own view of the android peer: {online, last_seen} -- the wire, beside the app's silence.
+    None when the CLI is absent or does not answer within 5 s."""
+    import subprocess
+    exe = r"C:\Program Files\Tailscale\tailscale.exe" if os.name == "nt" else "tailscale"
+    try:
+        out = (run or subprocess.run)([exe, "status", "--json"], capture_output=True, text=True, timeout=5).stdout
+        for peer in (json.loads(out).get("Peer") or {}).values():
+            if str(peer.get("OS", "")).lower() == "android":
+                # never the device name: it is his identifier (the opsec guard refused it, A329)
+                return {"online": bool(peer.get("Online")), "last_seen": peer.get("LastSeen")}
+    except Exception:                                                     # noqa: BLE001
+        return None
+    return None
+
+
+def detect_phone_silent(health=None, last=None, now=None, wire=None):
+    """The phone has stopped checking in.
+
+    A329 (2026-10-11, his words: "you're supposed to ensure Tetsu stays running and communicating with the phone
+    version but there's not been any communication in a long time ... neither's connecting. I'm super confused").
+    The phone's last check-in was 2026-10-08 23:16 (battery 94%) and Tailscale last saw it 23:25. For 53 hours
+    the road read every phone BUILD and never the phone itself, so nothing told him. This reads the newest
+    check-in and, beside it, Tailscale's view of the phone, so the reading says whether the wire or the app is
+    down. No remedy: the phone is his device, and nothing here can reach it while it is silent. Its warning
+    cannot reach him through the direct line either, since that line delivers through the phone; it shows on the
+    PC's road and orbs."""
+    now = time.time() if now is None else now
+    last = _last_phone_checkin() if last is None else last
+    if not last:
+        return {"state": UNKNOWN, "measured": {"why": "no phone check-in recorded here (a clone, CI, or a PC never paired)"}}
+    age = now - float(last.get("when"))
+    measured = {"last_checkin": last.get("t"), "age_h": round(age / 3600, 1), "silent_after_h": PHONE_SILENT_S / 3600,
+                "battery": last.get("battery")}
+    w = _tailscale_phone() if wire is None else wire
+    if w:
+        measured["tailscale"] = w
+    return {"state": PRESENT if age > PHONE_SILENT_S else ABSENT, "measured": measured}
+
+
 ASKS_WINDOW_S = 7200
 ASKS_MIN = 3
 
@@ -2068,6 +2135,7 @@ DETECTORS = {
     "judge_seat_missing": detect_judge_seat_missing,
     "build_stale_on_pc": detect_build_stale_on_pc,
     "phone_build_behind_core": detect_phone_build_behind_core,
+    "phone_silent": detect_phone_silent,
     "log_bloat": detect_log_bloat,
     "held_core_drift": detect_held_core_drift,
     "manifest_stale": detect_manifest_stale,

@@ -7645,6 +7645,20 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A329. [The phone went silent for 53 hours and nothing told him: the road read every phone BUILD, never the phone. Tetsu was down for lack of 0.06 GB] 2026-10-11. His words: "you're supposed to ensure Tetsu stays running and communicating with the phone version but there's not been any communication in a long time ... we made the highway to operate in place of Tailscale, but neither's connecting. I'm super confused". DETECTOR ADDED; the phone itself is his to reconnect
+
+- **Measured.**
+  - The phone's last check-in was 2026-10-08 23:16 (battery 94%). Tailscale last saw it at 23:25: the phone offline, its key valid to 2027-03, the PC side running.
+  - Normal check-ins come every 600 s (median, p99 656 s). The phone side dropped off the wire, and the app stopped with it.
+  - Tetsu's model server was down: readiness FAIL, 2.04 GB free against a 2.1 GB bar. Closing the three browser tabs Claude had open for the reviews freed 0.45 GB; readiness read PASS, and an ask through his door answered (200).
+- **Why it confused him.**
+  - The highway is the layer above the wire, not a replacement for Tailscale (`docs/HIGHWAY.md`), so when the phone leaves the tailnet both fall silent.
+  - The direct line delivers through the phone, so Tetsu's messages queued unread (`ops/contact_outbox.jsonl`).
+  - No detector read the phone's check-ins.
+- **Added.** `detect_phone_silent`: PRESENT when the newest check-in is more than 3 h old (my threshold, his to move), with Tailscale's view of the phone beside it so the reading says whether the wire or the app is down. No remedy: the phone is his device. H1ps drives it both ways; H1 226/226. Live it reads PRESENT, 53.7 h.
+
+---
+
 ### A328. [The judge does not judge (A327). A recursive loop to replace its reasoning, designed with three other models, pre-registered before any data: round 0 is a frozen meaning model in SHADOW, qualified against a bar that does not move] 2026-10-11. His words: "use the others and all of your discernment to solve or improve on this preferably solve we want recursive". PRE-REGISTERED, NOT RUN: the data waits on his yes
 
 - **The plan is `docs/JUDGE_LOOP.md`.** It was written from three independent reviews of one brief (the Claude on claude.ai, ChatGPT, Gemini). Tien's tab froze and Tetsu lacked the memory that hour.

@@ -1601,6 +1601,38 @@ def main():
         _CMk.ASKS = _real_asks
     check("H1ak no ledger here is UNKNOWN, never ABSENT", r_noledger == H.UNKNOWN, r_noledger)
 
+    # ---- H1ps: the phone gone silent (A329, 2026-10-11). Stand-in rows and wire, a fixed clock; nothing is run.
+    _tp = 1_900_000_000.0
+    _row = lambda ago: {"when": _tp - ago, "t": "stand-in", "battery": 94}                           # noqa: E731
+    _wire = {"online": False, "last_seen": "stand-in"}
+    ps = {
+        "silent": H.detect_phone_silent(last=_row(53 * 3600), now=_tp, wire=_wire),
+        "fresh": H.detect_phone_silent(last=_row(600), now=_tp, wire=_wire)["state"],
+        "edge": H.detect_phone_silent(last=_row(H.PHONE_SILENT_S - 1), now=_tp, wire=_wire)["state"],
+    }
+    check("H1ps phone_silent: 53 h without a check-in PRESENT with the wire's view beside it; 10 min ABSENT; "
+          "just under the threshold ABSENT",
+          ps["silent"]["state"] == H.PRESENT and ps["silent"]["measured"]["tailscale"]["online"] is False
+          and ps["silent"]["measured"]["age_h"] == 53.0 and ps["fresh"] == H.ABSENT and ps["edge"] == H.ABSENT, ps)
+    _real_pc = H.PHONE_CHECKINS
+    try:
+        H.PHONE_CHECKINS = os.path.join(tempfile.mkdtemp(prefix="h1ps_"), "absent.jsonl")
+        r_nophone = H.detect_phone_silent(now=_tp, wire={})["state"]
+    finally:
+        H.PHONE_CHECKINS = _real_pc
+    check("H1ps no check-in on record here is UNKNOWN, never ABSENT", r_nophone == H.UNKNOWN, r_nophone)
+    _d = tempfile.mkdtemp(prefix="h1ps_tail_")
+    _f = os.path.join(_d, "c.jsonl")
+    with open(_f, "w", encoding="utf-8") as _fh:
+        for _i in range(3000):
+            _fh.write(json.dumps({"when": 1000 + _i, "t": "r%d" % _i, "pad": "x" * 40}) + "\n")
+        _fh.write("not json\n")
+    check("H1ps the newest check-in is read from the end of the file, past a torn last line",
+          (H._last_phone_checkin(_f) or {}).get("t") == "r2999", H._last_phone_checkin(_f))
+    check("H1ps registered on the road, with no remedy (the phone is his device)",
+          H.DETECTORS.get("phone_silent") is H.detect_phone_silent
+          and not [n for n, r in H.REMEDIES.items() if "phone_silent" in (r.get("for") or [])])
+
     # ---- H1tf: the covenant witnesses threefold (A294, 2026-10-07). A stand-in reader; nothing is fetched.
     import hashlib as _hlt
     _G = "0" * 64
