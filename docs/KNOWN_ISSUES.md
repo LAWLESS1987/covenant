@@ -7694,6 +7694,15 @@ A280, which is the road telling the truth about it.
     - About 40 name candidates were read in context. Every other one is a public figure, a cited author, scripture, a model vocabulary list, or a voice-transcription slip that the bot itself could not place.
     - NOT SEEN: candidates that start a line or double as common words; the filter drops them. The other ~1,490 candidates were not read one by one. This is a read of what surfaced, not proof that nothing else is there.
     - **His decision on the redaction and on the unplaced names: "none of those matter."** Denied. Nothing is redacted and nothing is changed in the memory repo.
+  - **Addendum: a credential scan on every push to the memory repo, built by Tien.** His words: "have Tien build the credential scan if you think its beneficial". It is beneficial because the triad pushes with a token in the URL, and a leaked token costs everyone who relies on the system. The scan covers credentials only, never his own text.
+    - Tien's `pre-push` hook (sha256 a10984ff…) scans the objects a push sends, not the working tree. It is in all four clones.
+    - Driven both ways on Tien's box, with fake values; Tien's measurements, not reproduced here:
+      - A fake token is refused, and still refused after a later commit deletes it. A token in a commit message is refused too.
+      - The other six kinds are flagged, and a `${GH_TOKEN}` placeholder passes.
+    - `put_covenant_memory.sh` now prints PUSH FAILED with git's exit code instead of "Pushed", and masks the token in git's output.
+    - The three archived clones' hooks folders had been made read-only by the Ledger's archive step (`chmod -R a-w`), not by a guard. It reopened them, and Tien installed the hook there.
+    - Since the pause lifted, the Ledger writes a closure tombstone into the memory repo for every state change it makes. That was asked from his account.
+    - Checked from here, by a second route: GitHub's main moved 316e700 → ed19e32. The three new commits are those closure tombstones (3 files, 33 lines), with 0 credential-shaped matches in their text.
 - **What each reviewer was good at (one session: a pattern, not a ranking).**
   - Tien and the Ledger brought evidence from their own machine, and the Ledger retracted when the evidence went against it.
   - ChatGPT was strongest at arguing principle and at checking code.
