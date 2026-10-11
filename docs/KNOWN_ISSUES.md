@@ -7645,6 +7645,20 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A331. [The ambassador said `sent: True` for a post nobody could see: Moltbook's "already posted" answer carries no challenge, and no challenge read as published] 2026-10-11. His words: "update using discernment and post tell them without me knowing what u post".
+
+- **What happened.** At 17:04 UTC a one-off `emit()` made the consensus post (b79e355f). Moltbook created it and hid it behind its arithmetic challenge. The challenge was lost: the caller's filtered print dropped the `verification` field, and the code expired.
+- **The defect.** At 17:34 the same text was sent again. Moltbook answered 201 with `"already_existed": true`, "You already posted this! Here is your existing post.", and the existing post, still `verification_status: "pending"` and carrying no challenge. `emit()` computes `sent` as "no challenge, or a solved one", so it reported `sent: True`. It also spent the local 30-minute window on a create that created nothing.
+- **Fix.** `_already_existed()` reads that answer. It is sent only if the existing item is visible (`verified`, or no status). It returns before `rate_record()` and before the notifier.
+- **Guard.** AM32, AM32b and AM32c drive `emit()` itself against a fake Moltbook, with the network, judge, rate file and notifier replaced. Ambassador 51/51. With the routing removed, AM32 and AM32b fail and reproduce the live reading exactly (sent True, rate window spent).
+- **Recorded in `ops/ambassador_sends.jsonl`, beside the rows as written.**
+  - The 17:04 challenge, unsolved. The strike run is 7 of 10 by the conservative reading.
+  - A `correction` row for the 17:34 row.
+  - One-off emits are not in free's ledger unless the caller records them, and the `--verify` CLI does not record. Both are named here, not yet guarded.
+- **What it cannot see.** Whether Moltbook's own limiter counted the 17:34 duplicate is UNDETERMINED. Their docs give no way to fetch an expired challenge again: "create new content to get a new challenge".
+
+---
+
 ### A330. [The README asked readers for money while saying "no fundraising" 250 lines earlier. The ask is removed] 2026-10-11. His words: "take out the request for 10k out of the read me thats counter intuitive no asks for funding". DONE
 
 - The "Support this work" section, 18 lines, held a request for ten thousand dollars. The README's own description of the project says "no token, no fundraising, no yield".

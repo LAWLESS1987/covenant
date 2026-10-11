@@ -966,6 +966,26 @@ def submit_verification(code, answer, timeout=30, key=None):
         return {"success": False, "error": "%s: %s" % (type(e).__name__, e)}
 
 
+def _already_existed(payload):
+    """None, or the result for a create Moltbook answered with an EXISTING item.
+
+    A331 (2026-10-11). Moltbook answers an identical post with 201, `"already_existed": true` and the existing
+    post ("You already posted this! Here is your existing post."), carrying no challenge even while that post is
+    still hidden behind an unanswered one. emit read "no challenge" as "published": it said sent True for a post
+    nobody could see, and spent the 30-minute window on a create that created nothing. Sent only if the existing
+    item is visible: verification_status "verified", or no status at all (an account that is not challenged)."""
+    if not (payload or {}).get("already_existed"):
+        return None
+    node = payload.get("post") or payload.get("comment") or {}
+    vs = node.get("verification_status")
+    visible = vs in (None, "verified")
+    return {"sent": visible, "created": False, "already_existed": True, "verification_status": vs,
+            "post_id": node.get("id"),
+            "why": ("already posted; the existing item is visible" if visible else
+                    "already posted, and the existing item is still HIDDEN (verification_status %r). Its challenge "
+                    "cannot be fetched again; Moltbook's rule is to create new content for a new one" % vs)}
+
+
 def _handle_verification(payload, timeout=30):
     """Solve and submit if the create response demands it. Never guesses."""
     node = payload.get("post") or payload.get("comment") or payload
@@ -1212,6 +1232,13 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         created = json.loads(raw)
     except ValueError:
         created = {}
+    dup = _already_existed(created)
+    if dup is not None:
+        # Nothing new was created, so nothing is rate_record()ed and nobody is told a post went out.
+        dup.update({"kind": kind, "judged": verdict, "status": status, "repo_exposure": exposure,
+                    "crypto_risk": crypto, "overrode": overrode, "response": raw[:400],
+                    "rate": {"ok": True, "why": rate_why, "recorded": None}})
+        return dup
     # CREATED IS NOT PUBLISHED. Moltbook hides content until its math challenge
     # is answered, so `sent` reports what is actually VISIBLE rather than what
     # the API accepted. Reporting the acceptance would be this project's oldest
@@ -1602,6 +1629,65 @@ def _selftest_body(say, ok, check, _real_audit, _real_audit_size):
           "the way -- the rate limit is visible before the key exists",
           isinstance(dr.get("rate"), dict) and "ok" in dr["rate"]
           and dr.get("crypto_risk") is not None, dr.get("rate"))
+
+    # A331: emit() itself, against a fake Moltbook. Nothing reaches the network, the judge, the rate file or a
+    # notifier: each is replaced for the duration and restored.
+    import sys
+    import types
+    import urllib.request as _ur
+
+    class _Resp:
+        def __init__(self, body):
+            self._b, self.status = json.dumps(body).encode("utf-8"), 201
+
+        def read(self):
+            return self._b
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def _emit_against(body):
+        spent, saved = [], (_ur.urlopen, MB.judge_outbound, rate_check, rate_record,
+                            os.environ.get("MOLTBOOK_API_KEY"), sys.modules.get("covenant_notify"))
+        g = globals()
+        try:
+            _ur.urlopen = lambda req, timeout=30: _Resp(body)
+            MB.judge_outbound = lambda text: (True, ["clean (stand-in)"], False, True)
+            g["rate_check"] = lambda kind, **k: (True, "stand-in", 0)
+            g["rate_record"] = lambda kind, **k: spent.append(kind)
+            os.environ["MOLTBOOK_API_KEY"] = "stand-in"
+            sys.modules["covenant_notify"] = types.SimpleNamespace(notify=lambda *a, **k: None)
+            r = emit("Ordinary prose about gates.", title="t", dry_run=False, live_repo_check=False)
+        finally:
+            _ur.urlopen, MB.judge_outbound = saved[0], saved[1]
+            g["rate_check"], g["rate_record"] = saved[2], saved[3]
+            if saved[4] is None:
+                os.environ.pop("MOLTBOOK_API_KEY", None)
+            else:
+                os.environ["MOLTBOOK_API_KEY"] = saved[4]
+            if saved[5] is None:
+                sys.modules.pop("covenant_notify", None)
+            else:
+                sys.modules["covenant_notify"] = saved[5]
+        return r, spent
+
+    hidden, spent_h = _emit_against({"success": True, "already_existed": True,
+                                     "post": {"id": "p1", "verification_status": "pending"}})
+    check("AM32 an 'already_existed' answer for a post still HIDDEN is not sent, and spends no rate window "
+          "(A331: it read sent True on 2026-10-11)",
+          hidden.get("sent") is False and hidden.get("already_existed") is True and spent_h == [],
+          (hidden.get("sent"), hidden.get("why"), spent_h))
+    shown, spent_s = _emit_against({"success": True, "already_existed": True,
+                                    "post": {"id": "p2", "verification_status": "verified"}})
+    check("AM32b ...an 'already_existed' answer for a VISIBLE post is sent, still without spending the window",
+          shown.get("sent") is True and spent_s == [], (shown.get("sent"), spent_s))
+    fresh, spent_f = _emit_against({"success": True, "post": {"id": "p3"}})
+    check("AM32c ...and a genuinely new post with no challenge is sent and spends the window, as before",
+          fresh.get("sent") is True and fresh.get("created") is True and spent_f == ["post"],
+          (fresh.get("sent"), spent_f))
 
     # A162: every dry run above judged a draft; none of it may reach the
     # students' real audit trail. Measured, not assumed.
