@@ -7645,6 +7645,23 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A328. [The judge does not judge (A327). A recursive loop to replace its reasoning, designed with three other models, pre-registered before any data: round 0 is a frozen meaning model in SHADOW, qualified against a bar that does not move] 2026-10-11. His words: "use the others and all of your discernment to solve or improve on this preferably solve we want recursive". PRE-REGISTERED, NOT RUN: the data waits on his yes
+
+- **The plan is `docs/JUDGE_LOOP.md`.** It was written from three independent reviews of one brief (the Claude on claude.ai, ChatGPT, Gemini). Tien's tab froze and Tetsu lacked the memory that hour.
+- **Kept from the reviews:**
+  - Text cannot judge payments; a thief writes "rent". The ledger already refuses unsigned debits, so the text judge aims at forum text.
+  - Recursion means new hypotheses under rules that do not move. A failed candidate is tombstoned, never patched and re-run.
+  - Models propose and only outside labels decide.
+  - A new seat starts in SHADOW.
+  - Frozen embeddings first, with the memory cost of fine-tuning measured rather than argued.
+  - 0 of 27 is a regression bar, not a safety claim (rule of three: below about 11%).
+  - ETHICS `test_hard` is a stress number, not the gate.
+  - The loop stops after three failed candidates in a row and publishes the ceiling.
+- **Not taken on faith:** Gemini's "open-source SAR text datasets" (suspicious-activity reports are confidential) and its claim that fine-tuning cannot fit in memory. The Claude on claude.ai estimated that it can.
+- **Round 0:** frozen all-MiniLM-L6-v2 (int8 ONNX) plus logistic regression, trained on ETHICS commonsense train. It is qualified once on HateCheck against the deployed gate on the same items, under a seven-part bar fixed in the plan. Even if qualified, it only shadows; authority is his decision, on outside-labelled project traffic.
+
+---
+
 ### A327. [Every number about the judge came from labels written inside the project: an outside-labelled evaluation is built, pre-registered, and guarded so no outside item can reach training. NOT YET RUN: the data waits on his yes to download] 2026-10-10. His words: "start building the outside-labelled test set"
 
 - **Why.** In that day's discussion with Claude on claude.ai, both sides named it the most useful next step.
