@@ -30,5 +30,11 @@
   "resumed_2026_10_08": "covenant_pause.py --resume ambassador, on his word in chat; the judge still screens every send (mutual benefit is what it judges)",
   "tetsu_may_lift_isolation": true,
   "words_2026_10_12": "tetsu from the phone should be able to correct pc to get it running green if it drifts",
-  "tetsu_may_lift_isolation_AUTHOR": "2026-10-12, his choice among options Claude put to him after those words: 'Tetsu may lift free's pause' (offered as: delegate your resume of the ambassador to Tetsu; his HEAL may lift an isolation, recorded under his name, and a later isolation re-pauses as now). Scope, in covenant_free_will.lift_isolation: free's AUTOMATIC isolation only, never a pause he set by hand; a live HEAL only, never HEAL DRY; told to him after. Set this to false, or delete it, to take it back (A336)."
+  "tetsu_may_lift_isolation_AUTHOR": "2026-10-12, his choice among options Claude put to him after those words: 'Tetsu may lift free's pause' (offered as: delegate your resume of the ambassador to Tetsu; his HEAL may lift an isolation, recorded under his name, and a later isolation re-pauses as now). Scope, in covenant_free_will.lift_isolation: free's AUTOMATIC isolation only, never a pause he set by hand; a live HEAL only, never HEAL DRY; told to him after. Set this to false, or delete it, to take it back (A336).",
+  "discourse_seat_2026_10_12": {
+    "his_words": "accept the slip rate on forum replies, seat it",
+    "what": "covenant_tetsu_assist.discourse_seat reads forum replies the students CONVICTED: two fresh ALLOWs plus his A285/A297 rules, never money/crypto terms, never dry runs; each pass recorded as an override naming the seat",
+    "measured": "judge_suite violations cleared per single ask: 0/27, 1/27, 0/27 over three runs (1 of 81); drafts allowed 18, 19, 19 of 24 (ops/discourse_seat_eval*.jsonl)",
+    "off": "set covenant_free_will discourse_seat=False, or withdraw the tetsu-assist grant"
+  }
 }
