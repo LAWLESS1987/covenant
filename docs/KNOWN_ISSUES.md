@@ -7645,6 +7645,64 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A338. [The pre-commit stage-check ran a commit's staged suites without the sweep's mock judge. It now runs covenant_one's own wiring, imported, and in-place suites run under in_place_env. Measured first: no suite went red under the mock, and two went green on it from a worktree -- CT1f and CC1b, whose "real gate" checks the sweep measures on the mock] 2026-10-12. His words: "make stage_check's staged suites run with the same environment covenant_one gives staged suites". The class guard A335 named and left. FIXED, driven both ways. CT1f and CC1b NOT FIXED, named
+
+- **Measured first, before the change.**
+  - The population is the 194 suites registered in `covenant_one.SUITES`. 190 are `test_*`, the only ones stage_check can select; the other 4 were measured anyway.
+  - Each suite ran once in each of two staged copies of the same tree, in the registered order, with `clean_dbs` before every run and its registered timeout, the arms alternating which went first.
+  - Arm A was stage_check's `suite_env()` as it stood. Arm B was `phase_sweep`'s lines, copied verbatim, on the same base.
+  - **This worktree's tree** (bc63a1e, no gitignored policy or students): 194 of 194 measured. **No suite went red under the mock.** Two changed result, both the other way:
+    - CT1 was 32/33 under A and 33/33 under B (CT1f); it reproduced three times of three.
+    - CC1 was 19/20 under A and 20/20 under B (CC1b); it reproduced two times of two.
+    - The other 192 had the same return code and the same counts. There were no timeouts. Summed suite time was 18.8 min under A and 18.5 min under B.
+  - **The main checkout's tree** (the sweep's input, with its policy and students; staged from it read-only at 14:33, when it stood at 04a3368 with its uncommitted files): 194 of 194 measured, and **no suite changed result**. Every suite had the same return code and the same counts under both arms. CT1 was 33/33, CC1 20/20, OE1 18/18 and RG1 9/9 under each. There were no timeouts. Summed suite time was 19.7 min under A and 19.6 min under B.
+  - So the change turns nothing red at commit time, from either tree. What it changes from a worktree is the two greens below.
+  - **In place.** The 13 IN_PLACE suites differ only by the four `DEPLOYED_GATE_ENV` keys, and 0 of the 4 are set in this shell, so they were not run twice. The change matters for a committer whose process carries the deployed wiring, which is A268's shape at commit time. NOT MEASURED live.
+- **Cause.**
+  - `covenant_one.phase_sweep` built a staged suite's environment inline: the caller's, plus `COVENANT_INSECURE_MOCK_JUDGE=1`, `COVENANT_JUDGE_PROVIDERS=mock`, `PYTHONUNBUFFERED=1` and `PYTHONIOENCODING=utf8`, minus `COVENANT_WSGI`.
+  - `tools/stage_check.py` ran every suite, staged or in place, under `suite_env`: the hook's environment minus git's repository-pinning variables (A255). So a suite whose result depends on the judge wiring could pass at commit and fail in the sweep, as A327's OE1 did (A335). An in-place suite also missed A268's strip.
+  - RG1 (A223) and OE1 (A335) each met the sweep's mock and each fixed its own suite. A335 named this guard and left it as its own task.
+- **Found by the measurement: CT1f and CC1b measure the mock in the sweep.**
+  - CT1f ("with no judge the node's own gate is used and a plain question passes it (measured, not assumed)") and CC1b ("the real gate on this node passes a plain synthesis (measured)") call `_gate` in `covenant_contact` and `covenant_code_consensus`. Both build `covenant_gate_proxy.default_sentinel()` (A223).
+  - Under the sweep's wiring that sentinel is built from `COVENANT_JUDGE_PROVIDERS=mock`. So in the sweep, and now at commit, both pass on the mock.
+  - This answers A316's open question about CT1f: "Why the staged run passes it is UNDETERMINED".
+  - Today, without the mock, the real gate passes both checks in a staged copy of the main checkout, with its policy and students: CT1 33/33 and CC1 20/20 under arm A. So A252's 10-04 red (CT1f held by the students of that day) does not reproduce today. In this worktree, which has no policy, the gate holds both.
+  - So both checks pass on the real gate today, and the sweep does not measure that. It is RG1's and OE1's shape again, twice. **Not fixed here.** A335's remedy is to name the policy's providers in the suite, or to say NOT MEASURED when the gate is not the node's (`outside_eval.gate_wiring`). Applied here, it changes two suites and their claims, so it is left as its own task. Until then, a green CT1f or CC1b in the sweep or at commit says nothing about the node's gate.
+  - Before A338, a commit that ran CT1 or CC1 from a worktree showed them red, because a worktree's gate has no policy. Nothing named that red. They now read green on the mock at commit, as in the sweep, so this entry carries the finding.
+- **Fixed.**
+  - `covenant_one.STAGED_ENV`, `STAGED_ENV_DROP` and `staged_env()` define the staged wiring once, and `phase_sweep` uses it. On a probe base it gives the same dict as the old inline lines. CI and the highway's `--only` re-run go through `phase_sweep`.
+  - `stage_check.run_env()` imports `staged_env` for a staged suite and `in_place_env` for an IN_PLACE one, each applied on top of `suite_env`. Nothing is copied.
+  - Output is now read as UTF-8 with replacement. Measured at HEAD: test_competence.py's output is not valid cp1252 under either environment. The old runner's locale decode killed subprocess's reader thread, so `check()` printed a traceback and read "ok" with an empty last line, and the tally was lost. Pass and fail were still decided by the return code.
+- **The guard, driven both ways.** SC1 is 27/27 (22 before).
+  - SC5.1 and SC5.2 pin the two definitions.
+  - SC5.3 runs the same probe through the real `phase_sweep` and the real `check()`. It must see the same environment there, and not the caller's.
+  - SC5.4 checks that the probe's UTF-8 last line arrives intact.
+  - SC5.5 does the same as SC5.3 in place, through the real `phase_integrity`.
+  - The caller carries the deployed provider and `COVENANT_WSGI` and no mock, so a `check()` that passes the caller's environment through is visible.
+  - Seven mutations were each written as bytes, and each file was restored byte-identical (sha256):
+
+  | Mutation | Checks that went red |
+  |---|---|
+  | `check()` back to `suite_env` for every suite (the code before A338) | SC5.3, SC5.4, SC5.5 |
+  | the staged wiring copied, not imported (two keys of four, no drop) | SC5.1, SC5.3, SC5.4 |
+  | the sweep drifts to its own inline copy with another provider list | SC5.3 |
+  | output read with the locale codec again | SC5.4 (it read `(True, '')`) |
+  | an in-place suite given the staged wiring | SC5.2, SC5.5 |
+  | `check()` asks for the staged wiring wherever the suite runs | SC5.5 |
+  | the sweep's mock emptied | SC5.1, SC5.4 |
+
+- **Through the new path.** `python tools/stage_check.py` on SC1, A268, A255 and OE1 read 13 suites ok. That includes the 9 tree walkers it selected for .py files, P18 and A255 in place.
+- **What is still different from the sweep.**
+  - `staged_env` passes the rest of the caller's environment through, as the sweep does. So, when a caller carries them, the three `DEPLOYED_GATE_ENV` keys other than `COVENANT_JUDGE_PROVIDERS` reach staged suites in both runners. Not changed, because changing it would change the sweep.
+  - The timeout is 300 s here and each suite's registered one in the sweep. `clean_dbs` runs once per commit here and before every suite in the sweep.
+  - A worktree has no gitignored policy or students, so its commit-time copy cannot see a check that needs them. OE1 is 14/14 in a worktree and 18/18 with the policy (A335).
+  - `run_local_sweep.py:336` builds its own copy of the staged wiring, without `PYTHONIOENCODING`. Seen, not changed.
+  - `tools/pin_core.py` runs its four judges from the hook with no `env=`, so they inherit `GIT_*`, the A255 shape. `tools/pin_deploy.py` strips them. None of the four calls git (grep). Seen, not changed, and raised as its own task.
+- **Tombstones searched first.** `docs/RETRACTED.json` (48) has no tombstone on stage_check, `suite_env` or the staged wiring. KNOWN_ISSUES: A335 named this guard; A268, A255, A223 and A117 have the shape; A316 and A252 hold CT1f. No claim is retracted. stage_check's docstring named the environment as unseen, and that line is kept, marked superseded in part beside it.
+- **Numbered A338.** A337 was free in every checkout when this began. WB1's change took it on main (eabe356, 13:56) while this was being measured.
+
+---
+
 ### A336. [Tetsu can lift free's automatic isolation and tells him what a heal leaves; and TD1o's cycle had been running the real highway since 10-04] 2026-10-12. His words: "tetsu from the phone should be able to correct pc to get it running green if it drifts"; then, choosing among the options: "Tetsu may lift free's pause" and "Tetsu tells you what's left". ADDED, driven both ways. A RECURRENCE of A244 found and fenced. TD1m.H2 RETRACTED as A336-TD1-H2
 
 - **What was already there (A241, 2026-09-28).**

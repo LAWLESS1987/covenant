@@ -1217,6 +1217,26 @@ def in_place_env(base=None):
     return env
 
 
+# A338 (2026-10-12). The wiring every STAGED suite runs under, defined once. phase_sweep (and with it
+# CI and the highway's `--only` re-run) uses it, and tools/stage_check.py imports it for the commit-time
+# copy. Until A338 that copy ran staged suites under the hook's own environment, without the mock judge:
+# A327's OE1 passed at commit and failed OE1.11 in the 2026-10-12 sweep (A335), the shape RG1 met in
+# A223. The mock is deliberate: no staged suite may reach a real provider.
+STAGED_ENV = {"COVENANT_INSECURE_MOCK_JUDGE": "1", "COVENANT_JUDGE_PROVIDERS": "mock",
+              "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf8"}
+STAGED_ENV_DROP = ("COVENANT_WSGI",)
+
+
+def staged_env(base=None):
+    """The environment a staged suite runs with: the caller's, with STAGED_ENV set and
+    STAGED_ENV_DROP removed (A338)."""
+    env = dict(os.environ if base is None else base)
+    env.update(STAGED_ENV)
+    for k in STAGED_ENV_DROP:
+        env.pop(k, None)
+    return env
+
+
 IN_PLACE = [
     # (file, seconds, why it may not be run from a scratch copy)
     ("verify_bundle.py", 120,
@@ -1417,10 +1437,7 @@ def phase_sweep(say, only=None, repeat=1, verbose=False):
     say("  port, deletes a db or kills a tree must not be able to reach the")
     say("  production nodes or the node identity keys.")
     work = stage(say)
-    env = dict(os.environ)
-    env.update(COVENANT_INSECURE_MOCK_JUDGE="1", COVENANT_JUDGE_PROVIDERS="mock",
-               PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf8")
-    env.pop("COVENANT_WSGI", None)
+    env = staged_env()                    # A338: the one definition; stage_check imports it
 
     plan = [(s, t, sec) for (s, t, sec) in SUITES if not only or s in only]
     if only:

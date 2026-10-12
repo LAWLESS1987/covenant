@@ -14,6 +14,19 @@ WHAT IT DOES NOT SEE, said plainly: the runner's ENVIRONMENT (CI exports variabl
 machine does not), and a fresh clone's lack of hooks and local config. Those are still the full
 `python covenant_one.py --ci` on a fresh clone; this catches the .git-less directory, which is the
 case that recurred.
+[Superseded in part by A338, 2026-10-12: the wiring covenant_one itself gives a suite is now seen --
+see THE RUNNER'S WIRING below. CI's own exports and a fresh clone are still not.]
+
+THE RUNNER'S WIRING (A338, 2026-10-12). A suite ran here under the hook's environment, while
+covenant_one runs a staged suite under its mock judge (COVENANT_JUDGE_PROVIDERS=mock,
+COVENANT_INSECURE_MOCK_JUDGE=1). So A327's OE1 passed at commit and failed OE1.11 in the 2026-10-12
+sweep (A335), as RG1 had in A223. Now each suite runs under covenant_one's own definition, imported
+and never copied: a staged suite under staged_env, an IN_PLACE one under in_place_env (A268), each
+without GIT_* (suite_env, A255). Output is read as UTF-8, because staged_env sets PYTHONIOENCODING. What
+is still different from the sweep, said plainly: a variable the sweep's caller carries and the hook's
+caller does not (staged_env passes the rest of the caller's environment through, as the sweep does);
+the timeout (300 s here, each suite's registered one in the sweep); and clean_dbs, once per commit
+here, before every suite in the sweep.
 
 PUBLISHED MARKDOWN (A266, 2026-10-06). A commit can turn CI red without carrying a test file:
 2f6b184 changed only docs/SENTINEL_WITNESS.md (and a tool), no suite ran at commit time, and both
@@ -224,6 +237,14 @@ def suite_env(base=None):
         return {k: v for k, v in (os.environ if base is None else base).items() if not k.startswith("GIT_")}
 
 
+def run_env(in_place, base=None):
+    """The environment a suite runs with here (A338): covenant_one's own definition, imported, never
+    copied -- in_place_env for an IN_PLACE suite (the deployed gate's wiring removed, A268), staged_env
+    for a staged one (the sweep's mock judge) -- on top of suite_env (no GIT_*, A255)."""
+    import covenant_one as C1
+    return (C1.in_place_env if in_place else C1.staged_env)(suite_env(base))
+
+
 def in_place_names():
     """Suites covenant_one runs IN THE FOLDER (IN_PLACE), never in the staged copy."""
     try:
@@ -249,9 +270,10 @@ def check(tests, stage=None, clean=None, run=None, say=print, timeout=300):
             # runner runs it there; staging it produced a false "CI will be red".
             where = HERE if t in in_place else work
             try:
+                # A338: the runner's own wiring for where the suite runs, and its output read as UTF-8.
                 p = (run or (lambda t, w: subprocess.run([sys.executable, t], cwd=w, capture_output=True,
-                                                         text=True, timeout=timeout,
-                                                         env=suite_env())))(t, where)
+                                                         encoding="utf-8", errors="replace", timeout=timeout,
+                                                         env=run_env(w == HERE))))(t, where)
                 last = ((p.stdout or "").strip().splitlines() or [""])[-1][:160]
                 out[t] = (p.returncode == 0, last)
             except Exception as e:                               # noqa: BLE001
