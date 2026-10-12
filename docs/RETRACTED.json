@@ -1122,6 +1122,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch a283-every-send-claim-as-written-2026-10-11 (at 21aa4e7): the introduction's row without verification in covenant_free_will.run_round. The record keeps the wording in A283's title and quotes it in A334."
+  },
+  {
+   "id": "A334-ORDER",
+   "claim": "That of A333 and A334, whichever landed second would put its KNOWN_ISSUES entry above the other.",
+   "refuted_by": "docs/KNOWN_ISSUES.md orders entries by A-number, highest first: A274 landed after A275 and sits below it. A333 landed second, on 2026-10-12, by merging main into its branch, and its entry was placed below A334's.",
+   "truth": "Entries are ordered by A-number, highest first. One that lands after a higher number goes below it.",
+   "verbatim": [
+    "Whichever lands second puts its entry above the other."
+   ],
+   "patterns": [
+    "whichever\\s+lands\\s+second\\s+puts\\s+its\\s+entry\\s+above"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a334-order-claim-as-written-2026-10-12 (at a582352), in A334's 'What it cannot see'. The record keeps the sentence there, with the retraction beside it."
   }
  ]
 }

@@ -7690,6 +7690,7 @@ A280, which is the road telling the truth about it.
   - A replay runs the solver in the tree, not the solver of the day. That day's answer is kept; its `why` is not (`VER_DROPPED` says so).
   - The class guard sees the fields of the three paths FW1x drives: no challenge, abstained, and answered. A field returned only on some other path would not be seen.
   - A333 is on `claude/mystifying-mendeleev-d3c8c3`, not on main. Its hunks are in `solve_challenge` and the selftest, and this change touches `_handle_verification`. Whichever lands second puts its entry above the other.
+    - **Retracted as A334-ORDER (2026-10-12).** The sentence before this one was wrong. Entries are ordered by A-number, highest first: A274 landed after A275 and sits below it. A333 landed second, by merging main into its branch, and its entry sits below this one. The sentence is kept as written on branch `a334-order-claim-as-written-2026-10-12`. R1 was driven both ways: 144/144; with a probe in `docs/` holding the sentence, 143/144 (A334-ORDER.C, 1 violation); with the probe removed, 144/144. The first probe named the id in its own header and stayed green, because R1 exempts a match with its id within 10 lines. A probe must not cite what it tests.
 - **Tombstones searched first.**
   - `docs/RETRACTED.json` (45 retractions): A283-STRIKES is about the strike count, and no tombstone covers what a row keeps.
   - KNOWN_ISSUES: A283 and A324 are the verification record and the strike count, A331 is the hidden post, and A333 is the solver.
