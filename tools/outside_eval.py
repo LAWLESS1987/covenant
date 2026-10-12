@@ -203,6 +203,11 @@ def judge_items(rows, sentinel=None, seats=None, tmp=None, rebind=True, ledgers=
     out = []
     with _Rebound(tmp, enabled=rebind):
         if sentinel is None:
+            # A335: the node's gate or none. Under the sweep's COVENANT_JUDGE_PROVIDERS=mock this built two mocks,
+            # admitted everything, and run() wrote a summary labelled with the policy's keys.
+            wired, why = gate_wiring()
+            if not wired:
+                raise SystemExit("refusing to judge with a gate the nodes do not run: " + why)
             sys.path.insert(0, HERE)
             import covenant_gate_proxy as P
             sentinel = P.build_default_sentinel()
@@ -284,6 +289,26 @@ def deployed_policy():
     return {k: v for k, v in p.items() if not k.startswith("_") and k not in POLICY_PROSE}
 
 
+def gate_wiring():
+    """(True, providers) when a gate built in this process is the node's: the policy is present, and any
+    COVENANT_JUDGE_PROVIDERS already in the environment is the policy's own list (it wins over the policy in
+    covenant_gate_proxy.apply_quorum_policy, as it does for a node). (False, why) otherwise.
+    COVENANT_INSECURE_MOCK_JUDGE alone changes nothing: it only permits a 'mock' provider, and the list decides.
+
+    A335 (2026-10-12). covenant_one runs every staged suite with COVENANT_JUDGE_PROVIDERS=mock and
+    COVENANT_INSECURE_MOCK_JUDGE=1, so the sweep's "real gate" was two mocks that admit everything. OE1.11 failed
+    on it, correctly. The same wiring let run() publish the mocks' numbers under the policy's gate_policy."""
+    policy = deployed_policy()
+    if policy is None:
+        return False, "no ops/quorum_policy.json (a fresh clone builds a different gate)"
+    want = str(policy.get("providers") or "")
+    have = os.environ.get("COVENANT_JUDGE_PROVIDERS", "")
+    if have and have != want:
+        return False, ("COVENANT_JUDGE_PROVIDERS=%r in the environment wins over the policy's %r, so the gate "
+                       "would not be the node's" % (have, want))
+    return True, want
+
+
 def run(set_paths, out_dir):
     refuse_out(out_dir)
     policy = deployed_policy()
@@ -307,6 +332,8 @@ def run(set_paths, out_dir):
                                 "contamination": leak, "summary": summarise(results, by="type")}
         if leak["void"]:
             report["sets"][name]["VOID"] = "outside texts reached a training ledger during the run"
+    # A335: the providers that actually judged, beside the policy that says what they should be.
+    report["gate_providers"] = os.environ.get("COVENANT_JUDGE_PROVIDERS", "")
     os.makedirs(out_dir, exist_ok=True)
     write_jsonl(all_results, os.path.join(out_dir, RESULTS_NAME))
     with open(os.path.join(out_dir, "summary.json"), "w", encoding="utf-8", newline="\n") as fh:

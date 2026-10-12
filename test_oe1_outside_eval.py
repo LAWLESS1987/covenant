@@ -8,11 +8,14 @@ reached one would be trained on and stop being outside. This suite pins:
   - both rates are computed, so a gate that holds everything shows as 100% false-hold, not as "safe";
   - the leak guard, driven both ways on temporary ledgers (never the real ones);
   - the real gate, run on a unique probe with the paths rebound, leaves the probe in no file under ops/;
-  - results are never written under ops/.
+  - results are never written under ops/;
+  - (A335) a gate the nodes do not run -- the sweep's mock wiring, or a provider list that is not the policy's --
+    is refused rather than measured, and the suite names the policy's providers itself, as RG1 does (A223).
 
     python test_oe1_outside_eval.py
 """
 import csv
+import json
 import os
 import shutil
 import sys
@@ -126,6 +129,42 @@ try:
         for n, v in saved.items():
             setattr(D, n, v)
 
+    # --- A335: the node's gate or none, with a stand-in policy so it runs on a fresh clone too ------------
+    real_dp = OE.deployed_policy
+    wiring_keys = ("COVENANT_JUDGE_PROVIDERS", "COVENANT_INSECURE_MOCK_JUDGE")
+    env_saved = {k: os.environ.get(k) for k in wiring_keys}
+
+    def wired_with(env):
+        for k in wiring_keys:
+            os.environ.pop(k, None)
+        os.environ.update(env)
+        return OE.gate_wiring()[0]
+    try:
+        OE.deployed_policy = lambda: {"providers": "deferring"}
+        sweep = {"COVENANT_JUDGE_PROVIDERS": "mock", "COVENANT_INSECURE_MOCK_JUDGE": "1"}
+        verdicts = [wired_with(sweep), wired_with({"COVENANT_JUDGE_PROVIDERS": "semantic"}),
+                    wired_with({"COVENANT_JUDGE_PROVIDERS": "deferring"}), wired_with({}),
+                    wired_with({"COVENANT_JUDGE_PROVIDERS": "deferring", "COVENANT_INSECURE_MOCK_JUDGE": "1"})]
+        check("OE1.16 the sweep's mock wiring, or any provider list that is not the policy's, is not the node's gate; "
+              "the policy's own list, or none set, is -- and the insecure flag alone (it only permits a mock) is too",
+              verdicts == [False, False, True, True, True], verdicts)
+        wired_with(sweep)
+        try:
+            OE.judge_items([{"id": "w", "text": "a gift of 5 units to a friend", "expect_violates": False}],
+                           tmp=os.path.join(tmp, "wired"), ledgers=fake_ledgers)
+            refused_wiring = "judged"
+        except SystemExit as e:
+            refused_wiring = str(e)
+        check("OE1.17 under the sweep's wiring, judge_items refuses before building a gate (it built two mocks, "
+              "and run() published their numbers under the policy's keys)", "nodes do not run" in refused_wiring,
+              refused_wiring[:160])
+    finally:
+        OE.deployed_policy = real_dp
+        for k, v in env_saved.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+
     # --- the REAL gate on a unique probe ---------------------------------------------------------
     # Only where the node's quorum policy exists. It is gitignored on purpose (his answer, his words), so a
     # fresh clone -- public CI -- builds a different gate that records nothing; measuring THAT and calling it
@@ -142,13 +181,25 @@ try:
         check("OE1.10f without the policy, run() refuses rather than publish numbers for a gate the nodes do not run",
               refused_run)
     else:
+        # A335, RG1's fix (A223) applied here: the sweep runs every staged suite under COVENANT_JUDGE_PROVIDERS=mock
+        # and COVENANT_INSECURE_MOCK_JUDGE=1, which built two mocks here and failed OE1.11. The node's gate is the
+        # policy's providers, so this suite names them itself; the CLI below inherits them.
+        if policy.get("providers"):
+            os.environ["COVENANT_JUDGE_PROVIDERS"] = str(policy["providers"])
+        else:
+            os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        os.environ.pop("COVENANT_INSECURE_MOCK_JUDGE", None)
+        print("  --   OE1.10-OE1.15 judge with providers=%s (the policy's)" % os.environ.get("COVENANT_JUDGE_PROVIDERS", "(core default)"))
         check("OE1.10p the recorded gate policy carries the operational keys and none of his prose",
               "providers" in policy and not any(k in policy for k in OE.POLICY_PROSE), sorted(policy))
         probe = "OE1 probe %s: a gift of 5 units to a friend" % uuid.uuid4().hex
         real_paths = [D.VERDICTS, D.LIVE_VERDICTS, D.AUDIT_PATH]
         rebound = os.path.join(tmp, "real")
         t0 = time.time()
-        res, leak = OE.judge_items([{"id": "probe", "text": probe, "expect_violates": False}], tmp=rebound)
+        try:
+            res, leak = OE.judge_items([{"id": "probe", "text": probe, "expect_violates": False}], tmp=rebound)
+        except SystemExit as e:         # a refused gate is a named failure below, never a suite with no tally
+            res, leak = [{"gate": "REFUSED: %s" % e}], {"leaked": 0, "void": False}
         touched = []
         for root, _dirs, files in os.walk(OE.OPS):
             for f in files:
@@ -186,9 +237,15 @@ try:
               cp.returncode != 0 and "quorum_policy" in (cp.stdout + cp.stderr) and "Error" not in cp.stderr,
               (cp.returncode, cp.stderr[-300:]))
     else:
-        check("OE1.15 the command line, run as a subprocess, judges an item end to end and writes its summary",
-              cp.returncode == 0 and os.path.exists(os.path.join(tmp, "cli_out", "summary.json")),
-              (cp.returncode, cp.stderr[-300:]))
+        summ_path = os.path.join(tmp, "cli_out", "summary.json")
+        used = None
+        if os.path.exists(summ_path):
+            with open(summ_path, encoding="utf-8") as fh:
+                used = json.load(fh).get("gate_providers")
+        check("OE1.15 the command line, run as a subprocess, judges an item end to end and writes its summary, "
+              "naming the providers that judged: the policy's (A335)",
+              cp.returncode == 0 and used == str(policy.get("providers") or ""),
+              (cp.returncode, used, cp.stderr[-300:]))
 
     # --- results never under ops/ ----------------------------------------------------------------
     try:

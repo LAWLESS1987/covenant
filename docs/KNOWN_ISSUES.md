@@ -7645,6 +7645,42 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A335. [The sweep read red on OE1.11 because it measured a mock as "the real gate", and the same wiring let the outside evaluation publish a mock's numbers under the node's policy] 2026-10-12. His words: "tetsu from the phone should be able to correct pc to get it running green if it drifts", then, choosing among the options: "Fix OE1.11 now". A RECURRENCE of RG1's shape (A223). FIXED, driven both ways
+
+- **Measured.**
+  - This morning's full sweep (`ONE_RUN.txt`, started 05:25) read FAIL on one check: OE1 15/16, with OE1.11 "the real gate DID write the probe -- into the rebound temp dir" at 0.
+  - The heal's targeted re-run at 07:24 (`ops/sweep_heal_last.txt`, in a staged copy) failed the same check. That is why today's heal listed `sweep_red` as still needing a person.
+  - Run in place in the main checkout, OE1 was 16/16.
+- **Cause.**
+  - `covenant_one.py` runs every staged suite with `COVENANT_JUDGE_PROVIDERS=mock` and `COVENANT_INSECURE_MOCK_JUDGE=1`. That is deliberate, so no staged suite reaches a real provider.
+  - `covenant_gate_proxy.apply_quorum_policy` lets a provider list already in the environment win over the policy, as it does for a node.
+  - So in the sweep, `outside_eval`'s "node's gate" was `mock_insecure + mock_selfreport`. It admitted the probe and recorded nothing.
+  - Reproduced on a staged copy of the main checkout. Under the sweep's environment, OE1 was 15/16 and the probe left no rows. Without that environment, the same copy wrote 2 audit rows.
+  - **OE1.11 did its job:** it named a gate that was not the node's.
+- **A second defect under the same wiring.** OE1.15 passed in the sweep, which means `tools/outside_eval.py run` judged with the mocks and wrote a `summary.json` labelled with the policy's `gate_policy`. Nothing in a result showed which providers actually judged.
+  - The published A327 and A328 numbers were not mock runs: the gate held 93.7% to 96.1% of benign items there, and the mocks admit everything.
+- **A recurrence.** RG1 (A223, 2026-09-25) met the same wiring: "the staged copy ... built a quorum of two mocks and RG1.2/RG1.3 were vacuous". Its fix was for the suite to name the policy's providers itself. A268 strips the deployed gate's wiring from in-place suites, which is the opposite direction. **Why neither stopped this:** each repaired its own suite, and nothing checks that a gate claimed as the node's was built with the node's providers.
+- **Fixed.**
+  - `outside_eval.gate_wiring()` says whether a gate built in this process is the node's: the policy is present, and any provider list in the environment is the policy's own. The insecure flag alone changes nothing, because it only permits a mock provider.
+  - `judge_items` refuses to build a gate otherwise, so `run()` and A328's `tools/judge_loop.py`, which call it, can no longer measure a mock.
+  - `run()` records `gate_providers`, the providers that actually judged, beside `gate_policy`.
+  - OE1 names the policy's providers itself, as RG1 does (A223). A refusal there is a named failure of OE1.10, never a suite with no tally.
+- **Driven both ways.** OE1 is 14/14 in this worktree, where there is no policy and the four real-gate checks print NOT MEASURED. On a staged copy with the real policy it is 18/18, both under the sweep's environment and without it. OE1.16 and OE1.17 run everywhere, with a stand-in policy. Four mutations were each written as bytes on the staged copy under the sweep's environment, and each file was restored byte-identical (sha256):
+
+  | Mutation | Checks that went red |
+  |---|---|
+  | OE1 does not name the policy's providers | OE1.10, OE1.11, OE1.15 (15/18) |
+  | `judge_items` builds whatever the environment wires | OE1.17 |
+  | `gate_wiring` ignores a list that is not the policy's | OE1.16, OE1.17 |
+  | `run()` does not record `gate_providers` | OE1.15 |
+
+- **Not measured here.** The sweep itself: whether `sweep_red` clears is the next full sweep's to say, once this is on the main checkout.
+- **Class guard NOT built.** `build_default_sentinel` lets the environment win on purpose, because that is how a node is wired, and the sweep's mock is on purpose too. A guard there would change the node. The guard sits in the one tool that claims to measure the node's gate.
+  - **Seen and not changed.** `tools/stage_check.py` runs a commit's staged suites under the hook's environment minus `GIT_*` (`suite_env`), not under the sweep's mock wiring. So no commit can see this shape: A327 passed at commit and failed in the sweep. Making the commit-time copy run under the sweep's wiring would be the class guard. It changes what every commit runs, so it is left as its own task.
+- **Tombstones searched first.** `docs/RETRACTED.json` (47) has no tombstone on gate wiring. KNOWN_ISSUES: A223 (RG1), A268 and A117 are the shape; A327 is OE1. A327's "14/14 here and in the pre-commit staged copy" was true, because the pre-commit copy does not set the sweep's mock. No claim is retracted.
+
+---
+
 ### A334. [No Moltbook challenge text was kept, so no change to the solver could be replayed on the challenges actually met. The text is kept now, answered or abstained, and the introduction keeps its verification] 2026-10-11. His words: "Keep the challenge text (capped, e.g. 400 chars) in `_ver`'s output for every required challenge, answered or abstained." FIXED, a class guard added, driven both ways. A283's title RETRACTED as A283-EVERY-SEND
 
 - **Measured.** These counts are from the live ledger (the main checkout's `ops/ambassador_sends.jsonl`, 2,399 rows). 45 rows carry a verification block, and 43 of them say required: 8 solved, 30 abstained, 5 unsolved. None carries a challenge text. A333 found its solver change could not be replayed on them, so its coverage on the challenges met is UNDETERMINED.
