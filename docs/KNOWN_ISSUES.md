@@ -7645,6 +7645,43 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A337. [WB1.14 read a far host's 504 as our web door failing: a gateway or timeout answer from Gutenberg is NOT RUN now, after one retry, and NOT RUN is no longer counted as passed] 2026-10-12. His words: "make WB1.14 count a Gutenberg timeout as not run if the most logical". CHANGED, driven both ways
+
+- **Measured.** WB1.14 reads one real page, Gutenberg's Republic, and it has failed at least four times on Gutenberg's answer, never on this door:
+  - 504 on CI for `7c6e92c` (A284's note) and in the 10-06 sweep (A289);
+  - 504 and 503 on `a582352`'s two jobs (10-11);
+  - 504 on the `sentinel-witness` run of `bc63a1e` today, while the same commit passed on main.
+  - Each time, Gutenberg served the page here, and WB1 ran 30/30.
+- **Why it is the logical reading.** WB1.14 asks whether this door reads a real page. A 502, 503 or 504, or no answer in time, is the far host not serving, and says nothing either way. That is the same as the "no network" case the suite already marked NOT RUN.
+  - A284's note, "A check that FAILs when a far host times out is left as it is", was a decision, not a measurement. His word today changes it.
+- **And NOT RUN was counted as passed.** `not_run()` appended True to the tally, so an offline run read 30/30. The A129 and OE1 rule is that NOT RUN is never rounded up to a pass. Now a run with a NOT RUN prints "WB1: N passed, M failed, K NOT RUN (not counted as passed)", and the runner reads passed and failed from that line, so a failure is never hidden beside a NOT RUN.
+- **Changed, in `test_wb1_web.py` only.** `covenant_web` is untouched.
+  - `far_host_unavailable()` reads a 502, 503 or 504 status, or a timed-out reason, as the far host's.
+  - Everything else still FAILS, because it could be ours: a 4xx (429 included), a refusal by the door, TLS, DNS, or a page that is not the one asked for.
+  - `read_twice_if_far()` asks once more after 5 s, and a read that works the second time is a measurement. Only two far-host answers make WB1.14 NOT RUN, and both answers are named.
+- **Driven both ways.**
+  - WB1 33/33 here with the real read measured (30 before, plus WB1.15, WB1.16 and WB1.17).
+  - With Gutenberg's answer scripted, run whole and read the way `covenant_one` reads a tally:
+    - 504 twice: NOT RUN, exit 0, the runner reads ok with the NOT RUN on its line;
+    - 503 then the page: measured, 33/33;
+    - 404: not retried, FAIL, exit 1;
+    - a timeout twice: NOT RUN.
+  - Four mutations, each written as bytes and the file restored byte-identical (sha256):
+
+  | Mutation | Checks that went red |
+  |---|---|
+  | a 404 counted as the far host's | WB1.15, WB1.17 |
+  | a 504 not counted as the far host's | WB1.15, WB1.17 |
+  | NOT RUN counted as passed again | WB1.16 |
+  | no second ask | WB1.17 |
+
+- **What it cannot see.**
+  - If Gutenberg answers 5xx for good, for example to the GitHub runners, WB1.14 stays unmeasured there. That is said on every run and never counted.
+  - The tally line's format ("failed" beside "NOT RUN") is pinned by the scenario runs above, not by a check inside the suite.
+- **Tombstones searched first.** `docs/RETRACTED.json` (48) has nothing on WB1. KNOWN_ISSUES: A284 and A289 hold the earlier decision. A129, OE1 (A327) and A335 hold the rule that NOT RUN is not a pass. No claim is retracted.
+
+---
+
 ### A336. [Tetsu can lift free's automatic isolation and tells him what a heal leaves; and TD1o's cycle had been running the real highway since 10-04] 2026-10-12. His words: "tetsu from the phone should be able to correct pc to get it running green if it drifts"; then, choosing among the options: "Tetsu may lift free's pause" and "Tetsu tells you what's left". ADDED, driven both ways. A RECURRENCE of A244 found and fenced. TD1m.H2 RETRACTED as A336-TD1-H2
 
 - **What was already there (A241, 2026-09-28).**

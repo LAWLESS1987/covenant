@@ -8,15 +8,21 @@ local fixture (loopback is refused by the door, so the fixture is reached
 through an opener that the suite hands in, the way a mock network would be),
 and every read lands on the ledger. Real network: one public read at the end,
 NOT RUN when the network is away.
+A337 (2026-10-12, his words: "make WB1.14 count a Gutenberg timeout as not run if
+the most logical"): also NOT RUN when Gutenberg, asked twice, answers 502, 503 or
+504 or times out -- the far host not serving, which says nothing about this door.
+Anything else still FAILS. And a NOT RUN is never counted as passed.
 LICENCE: public domain.
 """
 import http.server
 import json
 import os
+import re
 import socket
 import sys
 import tempfile
 import threading
+import time
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
@@ -31,8 +37,27 @@ def check(name, cond, note=""):
     print("%s  %s%s" % ("ok  " if cond else "FAIL", name, ("  -- " + str(note)[:200]) if note and not cond else ""))
 
 
-def not_run(name, why):
-    ok.append(True); print("NOT RUN  %s -- %s" % (name, why))
+NOT_RUN = []
+
+
+def not_run(name, why, into=None):
+    """Said, and never counted as passed (A337). It appended True to `ok` before, so a run that measured nothing
+    here read 30/30. The A129 and OE1 rule: NOT RUN is never rounded up to a pass."""
+    (NOT_RUN if into is None else into).append(name)
+    print("NOT RUN  %s -- %s" % (name, why))
+
+
+# A337: what a far host answers when it is not serving -- a gateway or unavailable status, or no answer in time.
+# Never a 4xx (the request may be ours), a refusal by the door, a TLS error, or a page that is not the one asked for.
+FAR_HOST_STATUSES = (502, 503, 504)
+
+
+def far_host_unavailable(r):
+    if (r or {}).get("ok"):
+        return False
+    if (r or {}).get("status") in FAR_HOST_STATUSES:
+        return True
+    return bool(re.match(r"(TimeoutError|socket\.timeout|timeout|URLError)\b.*\btimed out\b", str((r or {}).get("reason", "")), re.I))
 
 
 tmp = tempfile.mkdtemp(prefix="wb1_")
@@ -201,14 +226,71 @@ check("WB1.13 the opener read() builds for itself carries _NoRedirect, so the de
 
 check("WB1.12 urls_in strips trailing punctuation", W.urls_in("see https://a.test/x, and https://b.test/y.") == ["https://a.test/x", "https://b.test/y"])
 
+# ---- A337: which answers are the far host's, and NOT RUN is not a pass -- both driven here, no network needed
+_cases = [({"ok": False, "status": 504, "reason": "HTTP 504"}, True), ({"ok": False, "status": 503, "reason": "HTTP 503"}, True),
+          ({"ok": False, "status": 502, "reason": "HTTP 502"}, True),
+          ({"ok": False, "reason": "TimeoutError: The read operation timed out"}, True),
+          ({"ok": False, "reason": "URLError: <urlopen error timed out>"}, True),
+          ({"ok": False, "status": 404, "reason": "HTTP 404"}, False), ({"ok": False, "status": 403, "reason": "HTTP 403"}, False),
+          ({"ok": False, "status": 429, "reason": "HTTP 429"}, False),
+          ({"ok": False, "reason": "redirect to a refused address (x): loopback"}, False),
+          ({"ok": False, "reason": "SSLError: certificate verify failed"}, False),
+          ({"ok": False, "reason": "URLError: <urlopen error [Errno 11001] getaddrinfo failed>"}, False),
+          ({"ok": True, "status": 504, "title": "x", "chars": 200}, False)]
+_wrong = [(c, want) for c, want in _cases if far_host_unavailable(c) != want]
+check("WB1.15 only a far host's 502/503/504 or a timeout is NOT RUN; a 4xx, a door refusal, TLS, DNS or a good read is not",
+      not _wrong, _wrong)
+_n_ok = len(ok)
+not_run("WB1.16's own probe of not_run (not a check, nothing skipped)", "counted below", into=[])
+check("WB1.16 a NOT RUN is never counted as passed: the tally did not move", len(ok) == _n_ok, (len(ok), _n_ok))
+
+
+def read_twice_if_far(read, pause=time.sleep):
+    """(r, first): one read, and once more after a pause when the first is the far host's (A337) -- a gateway
+    answer is usually brief, and a read that works the second time is a measurement."""
+    r = first = read()
+    if far_host_unavailable(r):
+        pause(5)
+        r = read()
+    return r, first
+
+
+def _scripted(*answers):
+    it, asked = iter(answers), []
+    return (lambda: asked.append(1) or next(it)), asked
+
+
+_good = {"ok": True, "status": 200, "title": "The Republic by Plato", "chars": 500}
+_far = {"ok": False, "status": 504, "reason": "HTTP 504"}
+_f1, _a1 = _scripted(_far, _good)
+_r1, _ = read_twice_if_far(_f1, pause=lambda s: None)
+_f2, _a2 = _scripted(_far, _far)
+_r2, _ = read_twice_if_far(_f2, pause=lambda s: None)
+_f3, _a3 = _scripted({"ok": False, "status": 404, "reason": "HTTP 404"}, _good)
+_r3, _ = read_twice_if_far(_f3, pause=lambda s: None)
+check("WB1.17 a far-host answer is asked once more: 504 then a page is MEASURED; 504 twice is the far host's; "
+      "a 404 is not retried and stays a failure",
+      _r1.get("ok") and len(_a1) == 2 and far_host_unavailable(_r2) and len(_a2) == 2
+      and _r3.get("status") == 404 and not far_host_unavailable(_r3) and len(_a3) == 1, (_r1, len(_a1), len(_a2), len(_a3)))
+
 # ---- one real public read
+GUTENBERG = "https://www.gutenberg.org/ebooks/1497"
 try:
     socket.create_connection(("www.gutenberg.org", 443), timeout=5).close()
-    r = W.read("https://www.gutenberg.org/ebooks/1497", grant_path=GRANT, ledger_path=LEDGER, max_chars=500)
-    check("WB1.14 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
+    r, first = read_twice_if_far(lambda: W.read(GUTENBERG, grant_path=GRANT, ledger_path=LEDGER, max_chars=500))
+    if far_host_unavailable(r):
+        not_run("WB1.14 a real public read", "Gutenberg did not serve the page, asked twice (%s, then %s): the far host, "
+                "not this door" % (first.get("reason"), r.get("reason")))
+    else:
+        check("WB1.14 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
 except OSError:
     not_run("WB1.14 a real public read", "no network")
 
 print("\nnot measured here: the door under his real grant file (ops/web_grant.json is read by the doors, this suite uses its own)")
-print("\nWB1: %d/%d passed" % (sum(ok), len(ok)))
+if NOT_RUN:
+    # the runner reads "N passed, M failed" from this line, so a failure is never hidden beside a NOT RUN
+    print("\nWB1: %d passed, %d failed, %d NOT RUN (not counted as passed): %s"
+          % (sum(ok), len(ok) - sum(ok), len(NOT_RUN), "; ".join(NOT_RUN)))
+else:
+    print("\nWB1: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)
