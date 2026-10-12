@@ -837,9 +837,11 @@ def _present(sense):
         return ["_unreadable: %s" % type(e).__name__]
 
 
-def check_adjust_loop(rounds=None, sense=None, heal=None, pref_path=None):
+def check_adjust_loop(rounds=None, sense=None, heal=None, pref_path=None, tell=None):
     """{"ran", "rounds": [{"round", "present_before", "fixed", "still_needs_a_person", "present_after"}],
-    "adjusted", "clean", "why"}. Never raises."""
+    "adjusted", "clean", "why"}. Never raises.
+    A336 (2026-10-12, his choice "Tetsu tells you what's left"): with `tell`, what the last pass left for him goes
+    on his line, once per change (covenant_heal.tell_left). Without it nothing is told: run_cycle passes his line."""
     pref = _read_json(pref_path or LOOP_PREF, {}) or {}
     if pref.get("declined"):
         return {"ran": False, "rounds": [], "adjusted": False, "clean": None,
@@ -873,6 +875,15 @@ def check_adjust_loop(rounds=None, sense=None, heal=None, pref_path=None):
             break
     else:
         out["why"] = "%d passes run; still present: %s" % (n, ", ".join(out["rounds"][-1]["present_after"]) if out["rounds"] else "?")
+    if tell is not None:
+        # The last pass's heal, or -- when nothing was present to heal -- a clean reading, so a set he was told about
+        # is said to have cleared. tell_left says nothing when the set is the one he already has.
+        last = h if out["rounds"] else ({"ok": True, "dry_run": False, "still_needs_a_person": []} if out["clean"] else None)
+        try:
+            import covenant_heal as _CH
+            out["told_left"] = bool(_CH.tell_left(last, tell, who="tetsu-daily-loop"))
+        except Exception:                                        # noqa: BLE001
+            out["told_left"] = False
     return out
 
 
@@ -899,7 +910,12 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
         tests_run.append("highway: %d detectors sensed" % len([k for k in hw if not k.startswith("_")]))
         # the check-adjust loop (his words 2026-10-03); if it changed anything, what is graded below is
         # the state AFTER it, read again -- and the record keeps every pass
-        loop = check_adjust_loop()
+        # A336: what the loop leaves goes on his line once per change -- the cycle's own teller, else the guarded line
+        if tell is None:
+            import covenant_tetsu_heal as _TH
+            loop = check_adjust_loop(tell=_TH._his_line)
+        else:
+            loop = check_adjust_loop(tell=tell)
         tests_run.append("check-adjust loop: %s" % (loop["why"] if not loop["ran"] else
                                                     "%d pass(es), %s" % (len(loop["rounds"]), loop["why"])))
         if loop.get("adjusted"):

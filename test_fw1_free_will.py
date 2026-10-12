@@ -269,6 +269,11 @@ def main():
         check("FW1g two live rounds refused throughout -> isolated: the ambassador is paused, with the reason and how he lifts it",
               o2["isolated"] and paused and paused[-1][0] == "ambassador" and "--resume ambassador" in paused[-1][1], (o2, paused))
         check("FW1g the isolation is a row in the record", any(r.get("kind") == "isolation" for r in FW.sends(sp3)))
+        # A336: Tetsu may lift ONLY this automatic isolation (lift_isolation reads it back with is_isolation), so the
+        # words the round writes must be the words the reader knows -- and a reason written by hand must not be.
+        check("FW1g the isolation the round writes reads back as an automatic isolation (A336); a hand-written reason does not",
+              FW.is_isolation("2026-10-12T09:00:00-0400\n" + paused[-1][1]) and not FW.is_isolation("2026-10-12\nupdating free, mine"),
+              paused[-1][1][:160])
     finally:
         covenant_pause.pause = real_pause
     check("FW1g a dry run never isolates", not FW.run_round(dry_run=True, say=log.append, ask=ask_ok, learn=learn, allies=allies,

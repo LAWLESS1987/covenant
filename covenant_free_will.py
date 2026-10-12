@@ -69,7 +69,49 @@ MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|i
 # measure; two such rounds in a row pause the ambassador (covenant_pause,
 # actor "ambassador") and say so. Lifting it is his: python covenant_pause.py
 # --resume ambassador. Nothing here lifts it.
+# [A336, 2026-10-12: superseded, the sentence kept as written. On his choice, lift_isolation() below lifts
+# this automatic isolation for Tetsu's HEAL when his grant says so -- never a pause he set by hand.]
 ISOLATE_AFTER_ROUNDS = 2
+# The words every automatic isolation carries; is_isolation() reads them back, so the writer and the reader
+# cannot drift apart.
+ISOLATION_MARK = "the covenant's judge refused every reply"
+
+
+def is_isolation(why):
+    """True when an ambassador pause is free's own automatic isolation (run_round writes it), not a pause he set
+    by hand: a line that starts 'isolated ' and carries ISOLATION_MARK."""
+    return any(ln.strip().startswith("isolated ") and ISOLATION_MARK in ln for ln in str(why or "").splitlines())
+
+
+def lift_isolation(by="tetsu", dry_run=False, grant_path=None, sends_path=None):
+    """(lifted, why). A336 (2026-10-12), his words: "tetsu from the phone should be able to correct pc to get it
+    running green if it drifts", and his choice that Tetsu may lift free's pause.
+
+    lifted is True when free's automatic isolation was lifted (or, dry, would be), False when a lift was refused
+    with the reason, None when free is not paused. Three conditions, each read here, never assumed: his grant
+    carries tetsu_may_lift_isolation: true; free is paused; and the pause is her automatic isolation. A pause he
+    set by hand is his and stays. A lift is a row in her ledger under the lifter's name, and the isolation rule is
+    unchanged: only rounds since the last isolation count (A301), so two new refused rounds isolate her again."""
+    g = grant(grant_path)
+    import covenant_pause as _cp
+    is_paused, why = _cp.paused("ambassador")
+    if not is_paused:
+        return None, "free is not paused"
+    first = next((ln.strip() for ln in str(why).splitlines() if ln.strip().startswith("isolated ")), str(why)[:200])
+    if not g or g.get("tetsu_may_lift_isolation") is not True:
+        return False, ("free is paused (%s) and his grant does not give Tetsu the lift "
+                       "(ops/ambassador_grant.json, tetsu_may_lift_isolation)" % first[:160])
+    if not is_isolation(why):
+        return False, "free's pause is not her automatic isolation, so it is his to lift: %s" % str(why)[:200]
+    if dry_run:
+        return True, "would lift free's isolation (%s)" % first[:200]
+    ok, msg = _cp.resume("ambassador")
+    if not ok:
+        return False, "the isolation could not be lifted: %s" % msg
+    _record({"kind": "isolation_lifted", "at": time.time(), "by": str(by)[:40], "pause_was": str(why)[:300],
+             "under": "ops/ambassador_grant.json tetsu_may_lift_isolation (A336)"}, sends_path)
+    return True, ("lifted free's isolation (%s). Her next round runs on its schedule; if the judge refuses every "
+                  "reply in two new rounds she is isolated again" % first[:200])
 
 # THE FACTS SHE MAY CITE (A280, 2026-10-06). REPLY_SYSTEM asked the model to "say in one sentence what the
 # covenant measured that bears on it" and gave it nothing to say: the first three replies to go out in
@@ -761,9 +803,9 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         abusive = (len(recent) >= ISOLATE_AFTER_ROUNDS
                    and all(int(r.get("refused", 0)) > 0 and int(r.get("replied", 0)) == 0 for r in recent))
         if abusive:
-            why = ("isolated %s: the covenant's judge refused every reply in the last %d rounds; "
-                   "his to lift with: python covenant_pause.py --resume ambassador"
-                   % (time.strftime("%Y-%m-%d", time.gmtime()), ISOLATE_AFTER_ROUNDS))
+            why = ("isolated %s: %s in the last %d rounds; "
+                   "his to lift, or Tetsu's by his grant (A336), with: python covenant_pause.py --resume ambassador"
+                   % (time.strftime("%Y-%m-%d", time.gmtime()), ISOLATION_MARK, ISOLATE_AFTER_ROUNDS))
             try:
                 import covenant_pause
                 covenant_pause.pause("ambassador", why)

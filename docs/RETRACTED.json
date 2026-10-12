@@ -1144,6 +1144,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch a334-order-claim-as-written-2026-10-12 (at a582352), in A334's 'What it cannot see'. The record keeps the sentence there, with the retraction beside it."
+  },
+  {
+   "id": "A336-TD1-H2",
+   "claim": "That test_td1_tetsu_daily.py measured that its daily cycles never enter the real covenant_highway.run_once (TD1m.H2, 2026-10-04, A244).",
+   "refuted_by": "Measured 2026-10-12 (A336) with a tripwire in place of the real run_once before TD1 captured it: TD1o's cycle, added the same day as the fence and run after the fence's finally had lifted it, entered the real run_once with dry_run=False on every run, and wrote the running tree's heal ledger. H2 read green because it was graded before TD1o's cycle. With the fence lifted early again as a mutation, H1 goes red under the corrected grading.",
+   "truth": "TD1's fence (the run_once spy, the save_last_sense tripwire, the temp heal ledger and the temp told-state) stays up through all three cycles and is lifted only in the suite's last finally; H1 and H2 are graded after TD1o over all three. With a tripwire in place of the real run_once: 0 entries. What the unfenced passes repaired from 2026-10-04 to 2026-10-12 is UNDETERMINED (in the sweep they ran in the staged copy, whose heal ledger is discarded).",
+   "verbatim": [
+    "TD1m.H2 ...and the REAL covenant_highway.run_once was never entered"
+   ],
+   "patterns": [
+    "TD1m\\.H2\\s+\\.\\.\\.and\\s+the\\s+REAL\\s+covenant_highway\\.run_once\\s+was\\s+never\\s+entered"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch td1-h2-check-as-written-2026-10-12 (at 95e35ec): TD1m.H2 graded before TD1o's cycle, with the fence lifted in row2's finally. The record quotes it in A336. The pattern names TD1m.H2: the same sentence is a true label in test_a115 (A115.H2), test_p20 and test_watchdog_outage (A244b), each about its own run."
   }
  ]
 }

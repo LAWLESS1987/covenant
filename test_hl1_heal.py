@@ -20,6 +20,8 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
+# A336: what a heal leaves is told once per change, remembered in a state file; never the running tree's.
+os.environ["COVENANT_HEAL_TOLD"] = os.path.join(tempfile.mkdtemp(prefix="hl1_told_"), "heal_told.json")
 import covenant_heal as H                                             # noqa: E402
 
 ok = []
@@ -151,22 +153,34 @@ def fake_heal(dry_run=False, who=""):
             "paused": False}
 
 
-h1, d1, r1 = TH.act("HEAL", heal=fake_heal)
+HEARD = []                                  # A336: his line, stubbed in every act() below -- never the real one
+
+
+def hear(text, why):
+    HEARD.append((why, text))
+    return {"id": "stub"}
+
+
+def no_lift(**_k):
+    return None, "free is not paused"
+
+
+h1, d1, r1 = TH.act("HEAL", heal=fake_heal, tell=hear, lift=no_lift)
 check("HL2.1 'HEAL' as his whole answer presses the one button, live, as who='tetsu'",
       h1 and CALLS == [{"dry_run": False, "who": "tetsu"}] and r1["kind"] == "tetsu_heal" and not r1["dry_run"], (CALLS, r1))
 check("HL2.2 what he is handed is what happened: the summary, the fixed, and the still-needs-a-person with its reason",
       "fixed: source_drift" in d1 and "still needs a person: mesh_source_split" in d1 and "no automatic remedy" in d1, d1)
-h2, d2, r2 = TH.act("heal dry\n", heal=fake_heal)
+h2, d2, r2 = TH.act("heal dry\n", heal=fake_heal, tell=hear, lift=no_lift)
 check("HL2.3 'HEAL DRY' measures without repairing, and says so in the record", h2 and CALLS[-1]["dry_run"] is True and r2["dry_run"], CALLS[-1:])
 check("HL2.4 an ordinary answer is not a press: the conversation goes on untouched",
-      TH.act("I checked the nodes, all fine.", heal=fake_heal) == (False, "", None) and len(CALLS) == 2)
+      TH.act("I checked the nodes, all fine.", heal=fake_heal, tell=hear, lift=no_lift) == (False, "", None) and len(CALLS) == 2)
 
 
 def heal_on_fire(**_k):
     raise RuntimeError("engine on fire")
 
 
-h3, d3, r3 = TH.act("HEAL", heal=heal_on_fire)
+h3, d3, r3 = TH.act("HEAL", heal=heal_on_fire, tell=hear, lift=no_lift)
 check("HL2.5 a heal that raises is handed to him as a plain failure, never a traceback up the door",
       h3 and r3["ok"] is False and "could not run" in d3, d3[:120])
 
@@ -206,6 +220,103 @@ _calls = [n for n in ast.walk(_tree) if isinstance(n, ast.Call)
           and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "covenant_tetsu_heal"]
 check("HL2.9 the agent door imports covenant_tetsu_heal to dispatch his HEAL line (AST; run-time reach is M6's job)",
       len(_calls) == 1, len(_calls))
+
+# ---- HL3 (A336, 2026-10-12). His words: "tetsu from the phone should be able to correct pc to get it running
+# green if it drifts"; his choices: "Tetsu may lift free's pause" and "Tetsu tells you what's left". The REAL
+# lift_isolation and tell_left run here, on a temp grant, a temp pause switch and a temp ledger.
+import functools                                                      # noqa: E402
+import covenant_free_will as FW                                       # noqa: E402
+import covenant_pause as CP                                           # noqa: E402
+_td3 = tempfile.mkdtemp(prefix="hl3_")
+_real_pause_dir = CP.PAUSE_DIR
+CP.PAUSE_DIR = os.path.join(_td3, "pause")
+GRANTED, NOT_GRANTED, SENDS3 = (os.path.join(_td3, n) for n in ("grant.json", "grant_without.json", "sends.jsonl"))
+for _p, _extra in ((GRANTED, {"tetsu_may_lift_isolation": True}), (NOT_GRANTED, {})):
+    with open(_p, "w", encoding="utf-8") as fh:
+        json.dump(dict({"granted": True, "words": "his words"}, **_extra), fh)
+ISOLATION = ("isolated 2026-10-12: %s in the last 2 rounds; his to lift, or Tetsu's by his grant (A336), with: "
+             "python covenant_pause.py --resume ambassador" % FW.ISOLATION_MARK)
+
+
+def heal_left(*conds):
+    def _h(dry_run=False, who=""):
+        return {"ok": True, "dry_run": dry_run, "paused": False, "summary": "fixture", "fixed": [],
+                "still_needs_a_person": [{"condition": c, "why_no_fix": "no automatic remedy exists"} for c in conds]}
+    return _h
+
+
+def lifted_rows():
+    return [r for r in FW.sends(SENDS3) if r.get("kind") == "isolation_lifted"]
+
+
+try:
+    lift_granted = functools.partial(FW.lift_isolation, grant_path=GRANTED, sends_path=SENDS3)
+    lift_without = functools.partial(FW.lift_isolation, grant_path=NOT_GRANTED, sends_path=SENDS3)
+    check("HL3.0 free's own isolation text reads as an isolation; a reason he wrote by hand does not",
+          FW.is_isolation("2026-10-12T09:00:00-0400\n" + ISOLATION) and not FW.is_isolation("2026-10-12\nupdating free, mine"))
+
+    CP.pause("ambassador", ISOLATION)
+    del HEARD[:]
+    hd, dd, rd = TH.act("HEAL DRY", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_granted)
+    check("HL3.1 HEAL DRY lifts nothing and tells nothing; it says what a live press would lift",
+          CP.paused("ambassador")[0] and "would lift" in dd and not HEARD and not lifted_rows(), (dd[-200:], HEARD))
+
+    hl, dl, rl = TH.act("HEAL", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_granted)
+    check("HL3.2 with his grant, Tetsu's live HEAL lifts free's AUTOMATIC isolation, records it under his name, and "
+          "tells him", not CP.paused("ambassador")[0] and rl["lifted"] is True and "lifted free's isolation" in dl
+          and [r.get("by") for r in lifted_rows()] == ["tetsu"]
+          and any(w == "Tetsu lifted free's isolation" for w, _t in HEARD), (dl[-240:], HEARD, lifted_rows()))
+
+    CP.pause("ambassador", "updating free's prompts -- mine, do not lift")
+    hh, dh, rh = TH.act("HEAL", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_granted)
+    check("HL3.3 a pause he set by hand is never lifted, whatever the grant says, and Tetsu is told it is his",
+          CP.paused("ambassador")[0] and rh["lifted"] is False and "his to lift" in dh and len(lifted_rows()) == 1, dh[-240:])
+
+    CP.pause("ambassador", ISOLATION)
+    hn, dn, rn = TH.act("HEAL", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_without)
+    check("HL3.4 without tetsu_may_lift_isolation in his grant, even an automatic isolation stays, and it is said why",
+          CP.paused("ambassador")[0] and rn["lifted"] is False and "does not give Tetsu the lift" in dn
+          and len(lifted_rows()) == 1, dn[-240:])
+    CP.resume("ambassador")
+
+    # what is left: once per change, never on a dry run, a failed heal or a paused highway
+    try:
+        os.remove(os.environ["COVENANT_HEAL_TOLD"])
+    except OSError:
+        pass
+    del HEARD[:]
+    for conds in (("mesh_source_split",), ("mesh_source_split",), ("mesh_source_split", "sweep_red"), (), ()):
+        TH.act("HEAL", heal=heal_left(*conds), tell=hear, lift=no_lift)
+    left_msgs = [t for w, t in HEARD if w == "heal: what still needs you"]
+    check("HL3.5 what a heal leaves goes on his line once per CHANGE: told, same set silent, a new item told, "
+          "cleared told once, still clear silent",
+          len(left_msgs) == 3 and "1 still need you: mesh_source_split" in left_msgs[0]
+          and "2 still need you" in left_msgs[1] and "nothing is left for you: mesh_source_split, sweep_red cleared" in left_msgs[2],
+          left_msgs)
+    n_heard = len(HEARD)
+    quiet = [H.tell_left({"ok": True, "dry_run": True, "still_needs_a_person": [{"condition": "x"}]}, hear, "t"),
+             H.tell_left({"ok": False, "still_needs_a_person": [{"condition": "x"}]}, hear, "t"),
+             H.tell_left({"ok": True, "paused": True, "still_needs_a_person": [{"condition": "x"}]}, hear, "t"),
+             H.tell_left({"ok": True, "still_needs_a_person": [{"condition": "x"}]}, None, "t")]
+    check("HL3.6 a dry run, a heal that could not run, a paused highway, or no line passed: nothing is told",
+          quiet == [None, None, None, None] and len(HEARD) == n_heard, quiet)
+
+    import covenant_contact as C
+    real_outbox = os.path.join(HERE, "ops", "contact_outbox.jsonl")
+    before = sum(1 for _ in open(real_outbox, encoding="utf-8")) if os.path.exists(real_outbox) else 0
+    _saved_outbox = C.OUTBOX
+    try:
+        C.OUTBOX = real_outbox
+        refused = TH._his_line("HL3 probe", "HL3 probe")
+        C.OUTBOX = os.path.join(_td3, "outbox.jsonl")
+        written = TH._his_line("HL3 probe", "HL3 probe")
+    finally:
+        C.OUTBOX = _saved_outbox
+    after = sum(1 for _ in open(real_outbox, encoding="utf-8")) if os.path.exists(real_outbox) else 0
+    check("HL3.7 the default line refuses a suite on his REAL line (the A272 shape) and writes a redirected one",
+          refused is None and before == after and written and written.get("actor") == "tetsu", (refused, before, after, written))
+finally:
+    CP.PAUSE_DIR = _real_pause_dir
 
 print("\nnot measured here: the real repairs on this machine (that is covenant_highway's own suites, H1); "
       "the phone's button, which needs an app build; and how the real Tetsu answers after a press")

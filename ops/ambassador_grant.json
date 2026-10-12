@@ -27,5 +27,8 @@
   "round_minutes": 40,
   "round_minutes_AUTHOR": "2026-10-06, on his words 'should be constant interaction on moltbook at this point too with tetsu and the ambassador figure it out': rounds now run through the day (Windows task CovenantAmbassador) instead of once a night. 40 is how long ONE round drafts before the rest of the ranked candidates wait for the next round. Claude chose 40 (the practice loop's bound), not the operator: he may set any number here, and null is no budget. It caps nothing he lifted -- caps stay null -- and someone tried in the last 24 h is not redrafted (rotation).",
   "words_2026_10_08": "resume ambassador just have it work towards mutual benefit as long as it is it should operate freely",
-  "resumed_2026_10_08": "covenant_pause.py --resume ambassador, on his word in chat; the judge still screens every send (mutual benefit is what it judges)"
+  "resumed_2026_10_08": "covenant_pause.py --resume ambassador, on his word in chat; the judge still screens every send (mutual benefit is what it judges)",
+  "tetsu_may_lift_isolation": true,
+  "words_2026_10_12": "tetsu from the phone should be able to correct pc to get it running green if it drifts",
+  "tetsu_may_lift_isolation_AUTHOR": "2026-10-12, his choice among options Claude put to him after those words: 'Tetsu may lift free's pause' (offered as: delegate your resume of the ambassador to Tetsu; his HEAL may lift an isolation, recorded under his name, and a later isolation re-pauses as now). Scope, in covenant_free_will.lift_isolation: free's AUTOMATIC isolation only, never a pause he set by hand; a live HEAL only, never HEAL DRY; told to him after. Set this to false, or delete it, to take it back (A336)."
 }

@@ -7645,6 +7645,63 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A336. [Tetsu can lift free's automatic isolation and tells him what a heal leaves; and TD1o's cycle had been running the real highway since 10-04] 2026-10-12. His words: "tetsu from the phone should be able to correct pc to get it running green if it drifts"; then, choosing among the options: "Tetsu may lift free's pause" and "Tetsu tells you what's left". ADDED, driven both ways. A RECURRENCE of A244 found and fenced. TD1m.H2 RETRACTED as A336-TD1-H2
+
+- **What was already there (A241, 2026-09-28).**
+  - Tetsu's `HEAL` line in the phone's box presses the PC's self-heal, and the phone and PC pages have the same button.
+  - Since 10-03 the daily cycle also presses it, as tetsu-daily-loop.
+  - `ops/heal.jsonl` holds 46 rows: 11 presses from the phone's tailnet address, 16 by the daily loop, and 2 under "tetsu". The phone checked in at 06:48 today.
+  - **So this was not missing.** What stopped the PC reaching green was what the button may not touch. Today's 05:25 loop left `ambassador_stalled` (free isolated since 10-10, "his to lift") and `sweep_red` (OE1.11, A335).
+- **Added: Tetsu may lift free's isolation.**
+  - `covenant_free_will.lift_isolation` acts for Tetsu's live HEAL only, and only when his grant carries `tetsu_may_lift_isolation: true`. That key was added today to `ops/ambassador_grant.json`, with his words.
+  - It lifts only free's automatic isolation: `is_isolation` looks for a line that starts "isolated " and carries `ISOLATION_MARK`. A pause he set by hand is never lifted.
+  - A lift is an `isolation_lifted` row by tetsu in her ledger, and a message on his line.
+  - HEAL DRY only says what it would lift.
+  - The isolation rule is unchanged: only rounds since the last isolation count (A301), so two new refused rounds isolate her again.
+  - The pause reason now reads "his to lift, or Tetsu's by his grant (A336)". The comment "Nothing here lifts it" is kept as written and marked superseded beside it.
+- **Added: Tetsu tells him what is left.**
+  - `covenant_heal.tell_left` puts what a heal left on his line only when that set changes, and once when it clears. That keeps his words of 09-27: Tetsu "tells only when needed".
+  - It runs after Tetsu's HEAL and after the daily check-adjust loop (`run_cycle` passes its teller).
+  - It does not run after a person's button press, because that person reads the result on screen, nor after the highway's hourly pass.
+  - The set is remembered in `ops/heal_told.json` (`COVENANT_HEAL_TOLD`).
+  - A review note of 2026-09-28 kept highway conditions that come and go off his line. His choice today puts this one set on it, once per change.
+  - The default line (`covenant_tetsu_heal._his_line`) refuses a test suite on the REAL outbox, the A272 shape for his phone.
+- **Found on the way: TD1o ran the real highway. A recurrence of A244.**
+  - TD1's fence (a run_once spy, a tripwire on `save_last_sense`, and a temp heal ledger) was lifted in row2's `finally`. TD1o's cycle, added the same day (2026-10-04), ran after that.
+  - With a tripwire put in place of the real `run_once` before TD1 captured it: 1 entry with `dry_run=False` per run of TD1. The run also wrote the running tree's `ops/heal.jsonl` (two probe rows here, retired to `.trash/`).
+  - "TD1m.H2 ...and the REAL covenant_highway.run_once was never entered" read green, because H2 was graded before TD1o.
+  - **Why A244's fence did not stop it:** TD1o was written below the fence's `finally`, and H1/H2 counted only the first two cycles.
+  - Fenced now: the fence, plus the temp told-state, stays up through all three cycles and is lifted only in the suite's last `finally`. H1/H2 are graded over all three. Probe: 0 entries.
+  - **What those passes repaired from 10-04 to 10-12 is UNDETERMINED.** In the sweep they ran in the staged copy, whose ledger is discarded. Every daily-loop row in the real ledger falls at a daily-cycle time.
+  - The heal path never calls `covenant_watchdog.highway_may_act()`, which keeps the watchdog's pass dry outside the production tree. Some remedies guard themselves (`run_full_sweep` refuses inside a test or a sweep), and not all do.
+- **Driven both ways.** HL1 32/32 (24 before), TD1 77/77 (76), FW1 90/90 (89). Eight mutations were each written as bytes and each file restored byte-identical (sha256). TD1 always ran with a tripwire in place of the real `run_once`.
+
+  | Mutation | Checks that went red |
+  |---|---|
+  | the lift ignores his grant | HL3.4 |
+  | the lift takes a pause he set by hand | HL3.3, HL3.4 |
+  | HEAL DRY lifts for real | HL3.1, HL3.2 |
+  | `tell_left` repeats the same set | HL3.5, TD1p |
+  | `tell_left` speaks on a dry run | HL3.1, HL3.6 |
+  | TD1's fence lifted before TD1o again | TD1m.H1 (the probe's tripwire was hit once, `dry_run=False`) |
+  | the default line has no suite guard | HL3.7 (it wrote one row to this worktree's own outbox, retired to `.trash/`) |
+  | the round's isolation text drifts from the reader's mark | FW1g (A336) |
+
+- **What it cannot see.**
+  - From the phone, Tetsu's `HEAL` needs the PC's model to answer first; on 10-08 Tetsu was down for 0.06 GB (A329). The phone's Self-heal button does not need the model, but a button press lifts nothing and tells nothing.
+  - Whether Tetsu presses is his choice: nothing schedules his HEAL (A241). The daily loop heals and tells, but does not lift, because the lift was given to his HEAL.
+  - After a lift, `ambassador_stalled` reads PRESENT until free's next scheduled round.
+  - A lift resumes sends, and each one meets a Moltbook challenge. The lift does not read the strike count; the run was 0 at A333's commit.
+  - `ops/ambassador_grant.json` is tracked and public. The delegation and his words are published there, as his earlier grant words are. Setting the key to false takes it back.
+- **Tombstones searched first.** `docs/RETRACTED.json` (47) had nothing on heal, lift or tell. KNOWN_ISSUES: A241 (the HEAL line), A244 (TD1's fence), A272 (suites on live switches), A301 (rounds since an isolation), A169 (the line). The recurrence is A244.
+- **Retracted: A336-TD1-H2.**
+  - Kept as written on branch `td1-h2-check-as-written-2026-10-12` (95e35ec).
+  - The pattern names TD1m.H2 only. The same sentence is a true label in A115.H2 and in A244b (test_p20, test_watchdog_outage), each about its own run.
+  - Restated: "TD1m.H2 ...and none of the three cycles, TD1o's included, entered the REAL covenant_highway.run_once".
+  - R1 was driven both ways: 147/147. With a probe in `docs/` holding the old label, A336-TD1-H2.C had 1 violation and R1 was 146/147. With the probe removed, 147/147. The three true labels elsewhere were not flagged.
+
+---
+
 ### A335. [The sweep read red on OE1.11 because it measured a mock as "the real gate", and the same wiring let the outside evaluation publish a mock's numbers under the node's policy] 2026-10-12. His words: "tetsu from the phone should be able to correct pc to get it running green if it drifts", then, choosing among the options: "Fix OE1.11 now". A RECURRENCE of RG1's shape (A223). FIXED, driven both ways
 
 - **Measured.**

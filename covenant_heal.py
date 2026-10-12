@@ -113,6 +113,56 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
     return out
 
 
+def _told_path(path=None):
+    return path or os.environ.get("COVENANT_HEAL_TOLD") or os.path.join(HERE, "ops", "heal_told.json")
+
+
+def tell_left(out, tell, who="", state_path=None):
+    """Put what a heal left for a person on his line, only when that set CHANGED. A336 (2026-10-12), his choice:
+    "Tetsu tells you what's left" -- after a heal that leaves red, what still needs him reaches his phone through
+    the direct line (A169), instead of waiting to be read. His standing words, 2026-09-27: Tetsu checks and tells
+    only when needed. So the same set twice is said once, and a set that clears is said once ("nothing left").
+
+    `tell(text, why)` is the line; there is no default here, so nothing reaches it unless a caller passes one.
+    Nothing is said for a dry run, a heal that could not run, or a paused highway (that pause is his). The set is
+    remembered only once the line took the message. Returns the row the line returned, or None."""
+    if not tell or not out or out.get("dry_run") or not out.get("ok") or out.get("paused"):
+        return None
+    left = [x for x in (out.get("still_needs_a_person") or []) if x.get("condition")]
+    now = sorted(x["condition"] for x in left)
+    path = _told_path(state_path)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            prev = json.load(fh).get("left") or []
+    except (OSError, ValueError, AttributeError):
+        prev = []
+    if now == prev:              # the same set again, or nothing left and nothing said before
+        return None
+    if now:
+        bits = []
+        for x in left[:6]:
+            m = x.get("measured") if isinstance(x.get("measured"), dict) else {}
+            reason = str(m.get("why") or x.get("why_no_fix") or "").replace("\n", " ")
+            bits.append("%s -- %s" % (x["condition"], reason[:140]))
+        text = "After the heal (%s), %d still need you: %s" % (who or "a press", len(now), "; ".join(bits))
+    else:
+        text = "After the heal (%s), nothing is left for you: %s cleared." % (who or "a press", ", ".join(prev))
+    try:
+        row = tell(text, "heal: what still needs you")
+    except Exception:                                             # noqa: BLE001 -- a message is never a reason to fail
+        row = None
+    if row:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"left": now, "who": str(who)[:40], "t": time.strftime("%Y-%m-%dT%H:%M:%S%z")}, fh)
+            os.replace(tmp, path)
+        except OSError:
+            pass
+    return row
+
+
 def remedies_for(HW, name):
     """The remedy names registered for a condition. HW.REMEDIES is keyed by
     remedy name, each entry carrying the conditions it is 'for'."""

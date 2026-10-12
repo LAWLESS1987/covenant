@@ -47,6 +47,8 @@ def node(nid, tip="aa" * 32, gen="00" * 32, src="e8a79ee502d8", deg=False, up=Tr
 
 def main():
     tmp = tempfile.mkdtemp(prefix="td1_")
+    realtold = os.environ.get("COVENANT_HEAL_TOLD")         # A336: restored in the last finally
+    fenced, realhw, realenv = False, None, None             # A336: the highway fence, lifted in the last finally
     real = {k: getattr(D, k) for k in ("HISTORY", "REPORT", "LATEST", "VERIFIED", "EXAMS", "SNAPS", "LOCK",
                                         "LAUNCH_STATE", "CHECKINS", "APP_LATEST", "NIGHTLY", "HERE", "OPS")}
     try:
@@ -367,12 +369,16 @@ def main():
         _HW.run_once, _HW.save_last_sense = _hw_run_once, _hw_tripwire
         _HW.sense = lambda *_a, **_k: {"td1_fixture": {"state": _HW.PRESENT, "measured": {"fixture": 1}}}
         os.environ["COVENANT_HEAL_LEDGER"] = os.path.join(tmp, "heal.jsonl")
+        fenced = True
+        # A336: the loop now tells him what it leaves, once per change, remembering the set in a state file --
+        # in tmp here, never the running tree's. Each message is kept with its reason, so the two kinds count apart.
+        os.environ["COVENANT_HEAL_TOLD"] = os.path.join(tmp, "heal_told.json")
         told = []
         try:
             if os.path.exists(D.HISTORY):
                 os.remove(D.HISTORY)
-            row, msg = D.run_cycle(tell=lambda t, w: told.append(t) or {"ok": 1})
-            again, msg2 = D.run_cycle(tell=lambda t, w: told.append(t))
+            row, msg = D.run_cycle(tell=lambda t, w: told.append((w, t)) or {"ok": 1})
+            again, msg2 = D.run_cycle(tell=lambda t, w: told.append((w, t)))
         finally:
             for k, f in realf.items():
                 setattr(D, k, f)
@@ -392,7 +398,8 @@ def main():
               and any("not applied" in r.get("why", "") for r in st["updates_rejected_or_rolled_back"]), st.get("updates_rejected_or_rolled_back"))
         check("TD1m the history is appended once, and a second run the same day refuses",
               again is None and "already ran today" in msg2 and len(D.history()) == 1, msg2)
-        check("TD1m the first record is told once on the direct line; the refused rerun says nothing", len(told) == 1, told)
+        check("TD1m the first record is told once on the direct line; the refused rerun says nothing",
+              len([t for w, t in told if w == "Tetsu's daily cycle"]) == 1, told)
         check("TD1m a verified day makes a rollback point and writes the last-verified state (the rollback reference)",
               rp == [1] and (D._read_json(D.VERIFIED, {}) or {}).get("students") == {"fallback_model.json": "9a2bbf97a69c"}, rp)
         # TD1n (review): a regressed day must not overwrite the last verified state
@@ -402,25 +409,13 @@ def main():
         for k, f in stubs2.items():
             setattr(D, k, f)
         try:
-            row2, _m2 = D.run_cycle(force=True, tell=lambda t, w: told.append(t))
+            row2, _m2 = D.run_cycle(force=True, tell=lambda t, w: told.append((w, t)))
         finally:
             for k, f in realf.items():
                 setattr(D, k, f)
-            _HW.run_once, _HW.sense, _HW.save_last_sense = realhw
-            if realenv is None:
-                os.environ.pop("COVENANT_HEAL_LEDGER", None)
-            else:
-                os.environ["COVENANT_HEAL_LEDGER"] = realenv
-        # two counts that can disagree: heal() presses the cycles' own records say the loop made, and
-        # run_once calls the spy received
-        _heals = sum(len((((r or {}).get("status") or {}).get("check_adjust_loop") or {}).get("rounds") or [])
-                     for r in (row, row2))
-        check("TD1m.H1 the loop reached heal() and every heal reached the highway through the spy (A244)",
-              _heals > 0 and len(_hw_spy) == _heals,
-              "%d heal passes recorded, %d spy calls, %d of them would have ACTED"
-              % (_heals, len(_hw_spy), sum(1 for d in _hw_spy if d is False)))
-        check("TD1m.H2 ...and the REAL covenant_highway.run_once was never entered", not _hw_real,
-              "tripwire: %d" % len(_hw_real))
+            # A336: the highway fence stays up through TD1o's cycle below; the last finally lifts it. It was
+            # lifted here, and TD1o's cycle then entered the REAL run_once with dry_run=False on every run of this
+            # suite since 2026-10-04 (measured 2026-10-12 with a tripwire in its place), while H2 read green.
         check("TD1n a day whose judge got worse reads regression FAIL and leaves the last verified state as it was (review)",
               row2 and row2["status"]["regression_tests"]["verdict"] == "FAIL"
               and D._read_json(D.VERIFIED, {}) == before and row2["state"]["verified"] is False,
@@ -433,7 +428,7 @@ def main():
         for k, f in stubs3.items():
             setattr(D, k, f)
         try:
-            row3, _m3 = D.run_cycle(force=True, tell=lambda t, w: told.append(t))
+            row3, _m3 = D.run_cycle(force=True, tell=lambda t, w: told.append((w, t)))
         finally:
             for k, f in realf.items():
                 setattr(D, k, f)
@@ -441,6 +436,22 @@ def main():
               bool(row3) and "cannot answer" in str((row3.get("failures") or {}).get("tetsu:cannot_answer"))
               and (row3["status"].get("tetsu") or {}).get("verdict") == "FAIL",
               ((row3 or {}).get("failures"), (row3 or {}).get("status", {}).get("tetsu")))
+        # two counts that can disagree: heal() presses the cycles' own records say the loop made, and
+        # run_once calls the spy received -- over ALL THREE cycles, TD1o's too (A336)
+        _heals = sum(len((((r or {}).get("status") or {}).get("check_adjust_loop") or {}).get("rounds") or [])
+                     for r in (row, row2, row3))
+        check("TD1m.H1 the loop reached heal() and every heal of the three cycles reached the highway through the spy (A244, A336)",
+              _heals > 0 and len(_hw_spy) == _heals,
+              "%d heal passes recorded, %d spy calls, %d of them would have ACTED"
+              % (_heals, len(_hw_spy), sum(1 for d in _hw_spy if d is False)))
+        check("TD1m.H2 ...and none of the three cycles, TD1o's included, entered the REAL covenant_highway.run_once (A336)", not _hw_real,
+              "tripwire: %d" % len(_hw_real))
+        # TD1p (A336, his choice "Tetsu tells you what's left"): the loop puts what it leaves on his line once per
+        # change. The fixture leaves the same condition every cycle, so three cycles say it once.
+        _left = [t for w, t in told if w == "heal: what still needs you"]
+        check("TD1p what the check-adjust loop leaves goes on his line once across three cycles, apart from the daily verdict, "
+              "and the set it remembers is in the suite's tmp", len(_left) == 1 and "td1_fixture" in _left[0]
+              and os.path.exists(os.path.join(tmp, "heal_told.json")), _left)
         check("TD1m the readable report has every field name", all(x in open(D.REPORT).read() for x in (
             "PC node:", "Phone node:", "Synchronization:", "Covenant tests:", "Regression tests:", "New failures:",
             "Updates considered:", "Updates applied:", "Updates rejected or rolled back:", "Unresolved issues:",
@@ -448,6 +459,18 @@ def main():
     finally:
         for k, v in real.items():
             setattr(D, k, v)
+        # A336: lifted only here, after TD1o's cycle too, so no cycle in this suite reaches the real highway, the
+        # real heal ledger or the real told-state file
+        if fenced:
+            _HW.run_once, _HW.sense, _HW.save_last_sense = realhw
+            if realenv is None:
+                os.environ.pop("COVENANT_HEAL_LEDGER", None)
+            else:
+                os.environ["COVENANT_HEAL_LEDGER"] = realenv
+        if realtold is None:
+            os.environ.pop("COVENANT_HEAL_TOLD", None)
+        else:
+            os.environ["COVENANT_HEAL_TOLD"] = realtold
         shutil.rmtree(tmp, ignore_errors=True)
 
     print()
