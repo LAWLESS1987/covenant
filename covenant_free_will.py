@@ -732,7 +732,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             # clean verdict sends. The introduction keeps the recorded override,
             # because it is the text the override was recorded for.
             res = emit(text, post_id=post_id, parent_id=comment_id, submolt=None, dry_run=dry_run, override_a67=False,
-                       discourse_seat=False)  # A322: measured and NOT seated -- Tetsu cleared a theft in run 2 (bar: 0); see KNOWN_ISSUES A322
+                       discourse_seat=True)   # A322: seated on his word 2026-10-12, accepting the measured slip rate (1 of 81 asks); KNOWN_ISSUES A322
         except Exception as e:                                    # noqa: BLE001
             res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
         sent = bool(res.get("sent"))
