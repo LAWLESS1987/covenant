@@ -7645,6 +7645,62 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A334. [No Moltbook challenge text was kept, so no change to the solver could be replayed on the challenges actually met. The text is kept now, answered or abstained, and the introduction keeps its verification] 2026-10-11. His words: "Keep the challenge text (capped, e.g. 400 chars) in `_ver`'s output for every required challenge, answered or abstained." FIXED, a class guard added, driven both ways. A283's title RETRACTED as A283-EVERY-SEND
+
+- **Measured.** These counts are from the live ledger (the main checkout's `ops/ambassador_sends.jsonl`, 2,399 rows). 45 rows carry a verification block, and 43 of them say required: 8 solved, 30 abstained, 5 unsolved. None carries a challenge text. A333 found its solver change could not be replayed on them, so its coverage on the challenges met is UNDETERMINED.
+- **The unit is rows, not challenges.**
+  - The 18:05:08Z own post (abstained) and the 18:05:30Z hand `verify` row (49.00) are one challenge in two rows. So the 43 rows are at most 42 challenges, and A333's "solved 8 ... abstained 30" counts that challenge in both columns.
+  - 39 of the 43 are free's replies, written through `_ver`. The other 4 were written by hand: one correction, two own posts and the verify row. This change does not reach hand-written rows.
+- **Cause.**
+  - `_ver` kept required, solved and abstained (A283), then the answer and Moltbook's reply (A324), but never the text.
+  - `covenant_ambassador._handle_verification` returned the text on an abstention only, not with an answer.
+  - The introduction's row kept no verification at all. A283's title says "verification kept on every send", but its body says "every reply and own post". The 2 introductions that went out are in no count, and whether either met a challenge is UNDETERMINED.
+- **A recurrence of A324's shape.** The record keeps the outcome and drops what is needed to examine it. A324 fixed its own instance by adding two fields, and left nothing behind for the class. FW1v pins the exact dict that is kept, so adding a field is a deliberate act, but it cannot see a field that was never kept. **Why the earlier tombstone did not stop it:** nothing asked for a decision on each field the ambassador returns.
+- **Fixed.**
+  - `_handle_verification` returns `challenge_text` with an answer as well as with an abstention.
+  - `_ver` keeps it, cut at `CHALLENGE_TEXT_KEEP` (400), whenever the challenge was required. It never keeps the verification code (FW1v, FW1x).
+  - The introduction's row keeps `verification`. This also puts its challenges in the highway's strike count, which reads every row with a required verification.
+  - **The class guard.** `VER_KEPT` and `VER_DROPPED` in `covenant_free_will` name every field the ambassador returns, each one either kept or dropped with its reason. FW1x fails on a returned field that is in neither, and on a kept field outside `VER_KEPT`. Dropped: the verification code (it answers the challenge), `expires_at`, the fixed `operator_action`, and the solver's `why` and `reading` on the day.
+  - `tools/replay_challenges.py` replays every kept text through the `solve_challenge` in the tree and sets each reading beside the outcome on record. A row with no text is UNDETERMINED and is never replayed: `solve_challenge("")` abstains, and that would print like a measurement. Correctness is judged only against an accepted answer. An answer to a challenge that was abstained or not solved is UNDETERMINED. It never touches the network.
+- **Privacy, and the A263 and OS1 guards.**
+  - The ledger is untracked and gitignored: `git ls-files` names nothing, and `git check-ignore -v` names `.gitignore` line 398.
+  - OS1 (`tools/opsec_scan.py`) scans tracked files and the objects a push would send, so the ledger reaches neither.
+  - A263 is about `tetsu_work` asks reaching the public panel, and nothing here is on that path.
+  - The ledger's readers each select named fields, and none copies the verification block whole, so the text goes nowhere new. Those readers are `covenant_free_will`, `covenant_tetsu_forum`, `covenant_tetsu_practice.students_view`, `covenant_highway` (`detect_moltbook_strikes`, `_strike_detail`) and `covenant_pc3d.forum_detail`.
+  - The five texts on record (A333) are obfuscated arithmetic about lobsters and crabs, and none names a person.
+  - "Public Moltbook content" is more than the code shows. A challenge comes back in Moltbook's answer to our own create, and `_handle_verification` reads it from the created post or comment. Whether Moltbook also shows it on the forum cannot be told from here. Agents have quoted challenges in public posts (A333, `ops/moltbook_candidates.jsonl`).
+  - Whether Moltbook ever puts anything personal in a challenge is UNDETERMINED from five texts. The cap bounds it to 400 characters per row, in a gitignored file.
+- **Driven both ways.** FW1 89/89, up from 82. FW1x runs a live round whose emit and introduce answer through the real `_handle_verification`, with only `submit_verification` stubbed. The round covers an accepted answer, a wrong answer, an abstention past the cap, an introduction and an own post. FW1y drives the tool. Seven mutations were each written as bytes, FW1 was run, and the file was restored byte-identical (sha256, 0 CRLF):
+
+  | Mutation | Checks that went red |
+  |---|---|
+  | `_ver` drops the text | FW1x text, FW1y (all 3) |
+  | the answered path drops the text | FW1x text, FW1y (all 3) |
+  | the introduction keeps no verification | FW1x text, FW1x paths, FW1y (2) |
+  | the tool replays a row with no text | FW1y UNDETERMINED |
+  | the ambassador returns a field nobody classified | FW1x class guard |
+  | `_ver` keeps a field outside `VER_KEPT` | FW1x class guard |
+  | no cap on the kept text | FW1x text |
+
+  Other suites at commit: AMBASSADOR 51/51, H1 226/226, TF1 27/27, SV1 9/9, R1 141/141, CI1 6/6.
+- **Live at commit.** The tool on the main checkout's ledger reports 43 required rows, 0 with text, 43 UNDETERMINED. Replay begins with the first challenge free meets after this lands, and free is isolated now.
+- **What it cannot see.**
+  - The 43 rows before this stay UNDETERMINED for good, and so does A333's coverage on them.
+  - Tetsu's forum sends (`covenant_tetsu_forum.say`) keep no verification. A hand emit, or a hand `covenant_ambassador.py --verify`, records only what the person writes down. Neither is changed here.
+  - A replay runs the solver in the tree, not the solver of the day. That day's answer is kept; its `why` is not (`VER_DROPPED` says so).
+  - The class guard sees the fields of the three paths FW1x drives: no challenge, abstained, and answered. A field returned only on some other path would not be seen.
+  - A333 is on `claude/mystifying-mendeleev-d3c8c3`, not on main. Its hunks are in `solve_challenge` and the selftest, and this change touches `_handle_verification`. Whichever lands second puts its entry above the other.
+- **Tombstones searched first.**
+  - `docs/RETRACTED.json` (45 retractions): A283-STRIKES is about the strike count, and no tombstone covers what a row keeps.
+  - KNOWN_ISSUES: A283 and A324 are the verification record and the strike count, A331 is the hidden post, and A333 is the solver.
+- **Retracted: A283-EVERY-SEND.** A283's title wording was wrong for introductions, Tetsu's sends and hand-written rows. Its body says "every reply and own post", which is accurate.
+  - Kept as written on branch `a283-every-send-claim-as-written-2026-10-11`, at 21aa4e7, where the introduction's row has no verification.
+  - The tombstone is in `docs/RETRACTED.json` (46 retractions now), and `docs/CORRECTIONS.md` is regenerated.
+  - Driven both ways. R1 was 141/141. With a probe file in `docs/` holding the old title, A283-EVERY-SEND.C had 1 violation and R1 was 140/141. With the probe removed, 141/141.
+  - Restated: free's replies, own posts and, from A334, introductions keep their verification. Tetsu's forum sends keep none, and a hand-written row keeps what its writer put in it.
+
+---
+
 ### A333. [The challenge solver abstained on a challenge it should have read: the "+" was stripped before reading, and "together" was in no group. Symbols between the numbers and aggregation cues are read now; a word split by the obfuscation, or a cue beside "each"/"every", abstains] 2026-10-11. His words: "abstains on challenges it should read", and "A wrong answer costs the same as an expired one, so precision matters more than coverage". FIXED, driven both ways
 
 - **Measured.** Moltbook's challenge at 18:05 UTC: "A] lO^bSt-Er SwImS/ aT tHiRrTtY ] tWo MeTeRs + AnO-tHeR Lo.o bStEr SwImS^ SeVeNtEeN ] MeTeRs, uM, HoW/ mAnY MeTeRs ToGeThEr?" `solve_challenge` found 32 and 17 and returned "found 0 operation(s) none, need exactly 1 -- abstaining". `_deobfuscate` removed every character that is not a letter, digit or space, so the "+" was gone before anything read it, and "together" was in no `_OPS` group. 49.00 was submitted by hand and Moltbook answered "Verification successful! Your post is now published." (the 18:05:30Z row of `ops/ambassador_sends.jsonl`).

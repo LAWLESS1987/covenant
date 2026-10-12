@@ -413,13 +413,31 @@ def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
     return row
 
 
+CHALLENGE_TEXT_KEEP = 400
+# A334 (2026-10-11): every field covenant_ambassador._handle_verification returns is kept by _ver or dropped here
+# with its reason, and FW1x fails on a field in neither. A324's answer and reply, and A334's challenge text, were
+# each a field nobody decided to drop; a new field is now a decision.
+VER_KEPT = ("required", "solved", "abstained", "answer", "response", "challenge_text")
+VER_DROPPED = {
+    "verification_code": "it answers the challenge; never kept (A324)",
+    "expires_at": "an abstained challenge is left to expire; the row's own time is kept",
+    "operator_action": "fixed text, the same on every abstention",
+    "why": "the solver's reason on the day. The outcome, the answer and the text are kept; a replay shows the "
+           "reason of the solver it runs, not that day's",
+    "reading": "the solver's reading on the day, as with why",
+}
+
+
 def _ver(res):
     """A283 (2026-10-06): what Moltbook's posting challenge did with this send, kept in the ledger. Moltbook
     suspends the account when its last 10 challenge attempts all failed, expired or incorrect; an unreadable
     challenge is abstained and left to expire, which in their words is a failure too (A324; the wording this
     replaced is retracted as A283-STRIKES). A324 (2026-10-10): the answer and Moltbook's reply are kept as well.
     Without them a wrong answer could not be told from a POST that never arrived: the four unsolved answers of
-    10-08 to 10-10 kept neither. None when no content was created (a hold, a refusal, a dry run)."""
+    10-08 to 10-10 kept neither. None when no content was created (a hold, a refusal, a dry run).
+    A334 (2026-10-11): the challenge text too, first CHALLENGE_TEXT_KEEP characters, answered or abstained. Without
+    it a change to the solver could not be replayed on the challenges actually met (A333: 43 rows on record,
+    none replayable). tools/replay_challenges.py replays what is kept."""
     v = (res or {}).get("verification")
     if not (res or {}).get("created") or not isinstance(v, dict):
         return None
@@ -430,6 +448,8 @@ def _ver(res):
     if isinstance(resp, dict):
         out["response"] = {k: (resp[k] if isinstance(resp[k], (bool, int)) else str(resp[k])[:200])
                            for k in ("success", "http", "error", "message") if k in resp}
+    if out["required"] and v.get("challenge_text"):
+        out["challenge_text"] = str(v["challenge_text"])[:CHALLENGE_TEXT_KEEP]
     return out
 
 
@@ -693,7 +713,9 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             except Exception as e:                                # noqa: BLE001
                 res = {"sent": False, "why": "introduce raised %s: %s" % (type(e).__name__, str(e)[:160])}
             sent = bool(res.get("sent"))
-            _record({"kind": "intro", "at": now, "dry_run": bool(dry_run), "sent": sent,
+            # A334: the introduction meets a challenge like any create; A283 kept verification on replies and own
+            # posts only, so an introduction's challenge reached neither the strike count nor the replay.
+            _record({"kind": "intro", "at": now, "verification": _ver(res), "dry_run": bool(dry_run), "sent": sent,
                      "why": str(res.get("why", ""))[:300], "judged": res.get("judged")}, sends_path)
             out["introduced"] = sent
             say("free: introduction %s (%s)" % ("posted" if sent else "not posted", str(res.get("why", ""))[:120]))

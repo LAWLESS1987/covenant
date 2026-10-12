@@ -1086,8 +1086,11 @@ def _handle_verification(payload, timeout=30):
                                    "expired answer spends one of ten before "
                                    "suspension, which is why nothing was sent)"}
     res = submit_verification(code, answer, timeout=timeout)
+    # A334: the text goes back with an answer too, not only with an abstention, so the ledger can keep it and a
+    # later solver can be replayed on what was actually met (covenant_free_will._ver, tools/replay_challenges.py).
     return {"required": True, "solved": bool(res.get("success")),
-            "answer": answer, "reading": why, "response": res}
+            "answer": answer, "reading": why, "response": res,
+            "challenge_text": v.get("challenge_text")}
 
 
 # THE MESSAGE THE AMBASSADOR EXISTS TO CARRY. His words for the purpose, 2026-09-09:

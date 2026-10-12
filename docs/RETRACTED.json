@@ -1100,6 +1100,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch a326-removal-scope-as-written-2026-10-10 (at 663b9cc). The record keeps the wording in A326, with the restatement beside it. The same count is in threefold PR #1 (acfee29) and the collective's refs/peer-review-2026-10-10.md, each corrected beside the original there."
+  },
+  {
+   "id": "A283-EVERY-SEND",
+   "claim": "That from A283 the verification of every send is kept in ops/ambassador_sends.jsonl.",
+   "refuted_by": "Read 2026-10-11 (A334). A283's own body says \"every reply and own post\", and covenant_free_will wrote the introduction's row with no verification field at all (line 696 at 21aa4e7). The 2 introductions that went out are in no challenge count. Tetsu's forum sends (covenant_tetsu_forum.say) keep none either, and hand emits and a hand `covenant_ambassador.py --verify` record only what the person writes.",
+   "truth": "covenant_free_will keeps a send's verification on free's replies and own posts (A283) and, from A334, on her introductions, with the challenge text cut at 400 characters. Tetsu's forum sends keep none. A hand-written row keeps what its writer put in it.",
+   "verbatim": [
+    "verification kept on every send"
+   ],
+   "patterns": [
+    "verification\\s+kept\\s+on\\s+every\\s+send"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a283-every-send-claim-as-written-2026-10-11 (at 21aa4e7): the introduction's row without verification in covenant_free_will.run_round. The record keeps the wording in A283's title and quotes it in A334."
   }
  ]
 }
