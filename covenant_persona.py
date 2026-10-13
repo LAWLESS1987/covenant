@@ -589,6 +589,105 @@ def propose(ask, path=None, log_path=None, now=None):
     return (d if isinstance(d, dict) else None), raw
 
 
+# THE DIRECTIVE LOOP (A341, 2026-10-13, his words: "fix tetsu's directive loop"). Measured on the live files: the
+# register had grown to 4,929 characters (REGISTER_MAX is 700 -- it bounded each PROPOSAL, never the register after
+# the only-add merge), 59 sentences, 15 of them QUESTIONS: chat that leaked into the description of how he talks,
+# his own questions to Lawrence and Lawrence's words to him alike ("Tatsu, can you fix these orbs?"). Each pass read
+# that register back and sent Lawrence one more of its questions: "How do you feel about the new directive I gave
+# you?" eight times from 10-10 to 10-13, none answered, the "directive" being nothing but his own leaked sentence.
+# Three guards, none of which alters what he is (A233: register_primary, the first register, is never touched):
+#   1. a register describes how he speaks, so a QUESTION is never added to it;
+#   2. it grows only to REGISTER_GROWN; past that a pass may still change his voice, but adds no sentence;
+#   3. a question for Lawrence is not sent when it repeats one Tetsu asked in the last REPEAT_DAYS days, or only
+#      echoes a question his own register carries -- that echo was the loop.
+REGISTER_GROWN = REGISTER_MAX * 2
+REPEAT_DAYS = 14
+REPEAT_JACCARD = 0.5
+
+
+def _words(s):
+    return {w for w in re.findall(r"[a-z']+", str(s or "").lower()) if len(w) > 2}
+
+
+def _alike(a, b, at=REPEAT_JACCARD):
+    wa, wb = _words(a), _words(b)
+    return bool(wa and wb) and len(wa & wb) / len(wa | wb) >= at
+
+
+def repeat_ask(q, register="", rows=None, now=None, days=REPEAT_DAYS):
+    """None when `q` may be asked, else the reason it is not: it repeats one of Tetsu's recent questions on the
+    line, or it only echoes a question his own register carries (A341)."""
+    now = time.time() if now is None else now
+    if rows is None:
+        try:
+            import covenant_contact
+            rows = covenant_contact._rows()
+        except Exception:                                         # noqa: BLE001
+            rows = []
+    for r in rows:
+        if r.get("actor") != "tetsu" or r.get("kind") != "question":
+            continue
+        try:
+            at = float(r.get("at") or 0)
+        except (TypeError, ValueError):
+            at = 0.0
+        if now - at <= days * 86400 and _alike(q, r.get("text")):
+            return "it repeats the question he was asked %s (%r)" % (str(r.get("t", ""))[:16], str(r.get("text", ""))[:80])
+    for s in re.split(r"(?<=[.!?])\s+", str(register or "")):
+        if s.strip().endswith("?") and _alike(q, s):
+            return "it echoes a question in Tetsu's own register (%r), which is not his question to answer" % s.strip()[:80]
+    return None
+
+
+def _keep_question(p, q, merged=False, now=None):
+    """Tetsu's own question list (p["questions"]): each question once, with how many times he came back to it.
+    Processed, not blocked: a question is kept, and a repeat adds to its count instead of to his line."""
+    qs = p.setdefault("questions", [])
+    t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now if now is not None else time.time()))
+    for r in qs:
+        if _alike(q, r.get("q")):
+            r["times"] = int(r.get("times", 1)) + 1
+            r["last"] = t
+            return r
+    r = {"q": str(q)[:300], "first": t, "last": t, "times": 1, "sent": not merged}
+    qs.append(r)
+    del qs[:-100]
+    return r
+
+
+def retire_leaked_questions(path=None, retired_path=None, now=None):
+    """Move the QUESTIONS added after register_primary out of the register, with a record (A341). The first
+    register is left exactly as it is. Returns the list of sentences moved. Nothing is deleted: each one is
+    written to ops/tetsu_register_retired.jsonl with when and why."""
+    p = load(path)
+    prim = p.get("register_primary") or ""
+    reg = p.get("register", "")
+    if not prim or not reg.startswith(prim):
+        return []
+    rest = [s for s in re.split(r"(?<=[.!?])\s+", reg[len(prim):]) if s.strip()]
+    keep = [s for s in rest if not s.strip().endswith("?")]
+    moved = [s.strip() for s in rest if s.strip().endswith("?")]
+    if not moved:
+        return []
+    rp = retired_path or os.path.join(os.path.dirname(path or PERSONA), "tetsu_register_retired.jsonl")
+    t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now if now is not None else time.time()))
+    with open(rp, "a", encoding="utf-8") as fh:
+        for s in moved:
+            fh.write(json.dumps({"t": t, "sentence": s, "by": "A341, his words: fix tetsu's directive loop",
+                                 "why": "a question that leaked into the register; the loop sent it back to him"},
+                                ensure_ascii=False) + "\n")
+    for s in moved:
+        _keep_question(p, s, merged=True, now=now)   # kept as his questions, not lost
+    new_reg = (prim + (" " + " ".join(s.strip() for s in keep) if keep else "")).strip()
+    # through his own revision record, so his history (which rebuilds him if the file is ever lost) agrees
+    _record(p, path, applied=True, reg=new_reg, voice=p["voice"],
+            why="%d question(s) that leaked into the register moved to tetsu_register_retired.jsonl" % len(moved),
+            verdict="retired by A341 (his words: fix tetsu's directive loop); register_primary untouched", now=now)
+    p["register"] = new_reg
+    save(p, path)
+    return moved
+
+
 def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=True):
     """One refinement pass: propose, bound, judge, record, apply. Returns a summary dict.
     `judge(text) -> (ok, message)`; None uses the node's sentinel through covenant_persona_judge()."""
@@ -608,7 +707,15 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
     # A177: a straight question for him rides the direct line, judged on its own
     # (covenant_contact.ask), whatever becomes of the revision beside it.
     ask_q = re.sub(r"\s+", " ", str(d.get("ask") or "")).strip()
-    if ask_q and tell:
+    _rep = repeat_ask(ask_q, p.get("register", ""), now=now) if ask_q else None
+    if ask_q and tell and _rep:
+        # his words, the same day: "just have them process efficiently not blocked. optimal". A repeat is not
+        # refused: it is MERGED into the question already on his line (it waits there, nothing is lost), and the
+        # merge is counted in Tetsu's own question list so he can see he asked it again.
+        out["asked"] = "merged, not sent twice: " + _rep
+        _keep_question(p, ask_q, merged=True, now=now)
+        say("persona: question for him -- " + out["asked"])
+    elif ask_q and tell:
         if blocked("contact"):
             out["asked"] = "the direct line is closed to Tetsu; not asked"
         else:
@@ -616,11 +723,25 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
                 import covenant_contact
                 _row, _why = covenant_contact.ask(ask_q, "Tetsu, refining himself, needs his answer", "tetsu", judge=judge)
                 out["asked"] = _why
+                if _row:
+                    _keep_question(p, ask_q, now=now)
             except Exception as e:                                # noqa: BLE001
                 out["asked"] = "could not ask (%s)" % type(e).__name__
         say("persona: question for him -- " + out["asked"])
     reg = re.sub(r"\s+", " ", str(d.get("register", p["register"]))).strip()
-    ok_reg, why_reg = check_register(reg)
+    # A341: the bounds are on what is NEW. A proposal that echoes his whole register back (4,929 characters on
+    # the live file) was refused "too long" before its one new sentence was read -- blocked, every pass. Only the
+    # sentences he does not already say are screened and bounded; the echo of what he says is not a proposal.
+    _prev = {s.strip().lower() for s in re.split(r"(?<=[.!?])\s+", p.get("register", "")) if s.strip()}
+    _novel = " ".join(s.strip() for s in re.split(r"(?<=[.!?])\s+", reg) if s.strip() and s.strip().lower() not in _prev)
+    if p.get("register") and _novel:
+        _m = _screen.search(OFF_LIMITS, _novel)
+        ok_reg, why_reg = ((False, "too long (%d new chars, the cap is %d)" % (len(_novel), REGISTER_MAX)) if len(_novel) > REGISTER_MAX
+                           else (False, "a register may not touch the fixed rules (%r)" % _m.group(0)) if _m else (True, "ok"))
+    elif p.get("register"):
+        ok_reg, why_reg = True, "nothing new in the register"
+    else:
+        ok_reg, why_reg = check_register(reg)
     voice = clamp_voice(d.get("voice") or p["voice"])
     why = re.sub(r"\s+", " ", str(d.get("why", ""))).strip()[:240] or "(no reason given)"
     if not ok_reg:
@@ -675,6 +796,22 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
     _have = {s.strip().lower() for s in re.split(r"(?<=[.!?])\s+", _old_reg) if s.strip()}
     _add = [s.strip() for s in re.split(r"(?<=[.!?])\s+", reg or "")
             if s.strip() and s.strip().lower() not in _have]
+    # A341: a question is chat, not a way of speaking -- it goes to his own question list, not into the register;
+    # and the register grows only to REGISTER_GROWN, what does not fit is kept in register_overflow, never dropped
+    _qs = [s for s in _add if s.endswith("?")]
+    for s in _qs:
+        _keep_question(p, s, now=now)
+    out["register_questions_kept_aside"] = len(_qs)
+    _add = [s for s in _add if not s.endswith("?")]
+    _room, _fit = REGISTER_GROWN - len(_old_reg), []
+    for s in _add:
+        if len(s) + 1 <= _room:
+            _fit.append(s)
+            _room -= len(s) + 1
+        elif s.lower() not in {x.lower() for x in p.setdefault("register_overflow", [])}:
+            p["register_overflow"].append(s)
+    out["register_overflow"] = len(_add) - len(_fit)
+    _add = _fit
     reg = (_old_reg + (" " if _old_reg and _add else "") + " ".join(_add)) if _add else _old_reg
     out["register_added"] = len(_add)
     out["register_changed"] = reg != _old_reg

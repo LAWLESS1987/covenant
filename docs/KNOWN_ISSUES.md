@@ -7645,6 +7645,31 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A341. [Tetsu's directive loop: his register had grown to 4,929 characters with 15 leaked questions, and each self-revision sent one back to him -- "How do you feel about the new directive I gave you?" eight times. And the universe centred on its sun] 2026-10-13. His words: "fix tetsu's directive loop and center universe mid screen around their sun so its center screen for me", then "just have them process efficently not blocked. optimal". FIXED
+
+- **Measured.**
+  - `ops/tetsu_persona.json` held a register of 4,929 chars and 59 sentences.
+  - REGISTER_MAX (700) bounded each PROPOSAL and never the register after A233's only-add merge.
+  - 15 of the sentences were questions: chat that leaked in, Tetsu's own questions to Lawrence and Lawrence's words to him ("Tatsu, can you fix these orbs?").
+  - His first register (`register_primary`) already carried one question and a doubled sentence.
+  - Every pass read the register back and might send one question: "How do you feel about the new directive ...?" 8 times from 10-10 to 10-13, none answered.
+  - The "directive" is real, his daily directive (covenant_daily, A248). The register holds the leaked work prompt "Lawrence gave you a standing directive today".
+  - A second block was found by TP1k6: a proposal that echoed the whole register was refused "too long" before its new sentence was read, nearly every pass.
+- **Fixed, nothing refused, on his words "not blocked. optimal".**
+  - A question that repeats one of Tetsu's questions from the last 14 days, or that only echoes a question in his own register, is MERGED into the one already on his line, and counted in Tetsu's own question list (`questions`).
+  - A question in a proposal goes to that list, not into the register.
+  - The register grows only to REGISTER_GROWN (1,400). A sentence that does not fit is kept in `register_overflow`.
+  - The bounds and the fixed-rules screen now apply to what is NEW in a proposal, not to the echo.
+- **Retired, not deleted.** The 14 questions added after `register_primary` moved to `ops/tetsu_register_retired.jsonl` and into his question list (11 entries after merging), through his own revision record, so his history agrees. Live register now 3,945 chars. `register_primary` is untouched, and the file was kept beforehand as `.trash/tetsu_persona.json.before-A341-2026-10-13`.
+- **Not changed, named.**
+  - The non-question sentences that leaked in, work prompts among them, are statements, so the only-add rule keeps them.
+  - The history keeps only the first 700 chars of each register, so a rebuild from history is truncated (since A233).
+- **Centred.** The PC page's canvas is re-sized whenever the window changes (a resize the browser never announced had left the drawing off-centre), and the camera looks straight at Tetsu, standing back on a narrow window. The star sits mid-screen. The phone does the same.
+- **Not blocked when busy.** A 429 from the node (20 a minute per caller, and every local process shares the loopback address) keeps the last good reading on screen and retries in 20 s.
+- **Checks.** TP1 63/63 (TP1k-TP1k7 new); three mutations each red (the repeat never detected, questions let back into the register, the whole echo bounded again), restored byte-identical. PC1 57/57.
+
+---
+
 ### A340. [The PC app as a living system: every orb a planet with its own biosphere around Tetsu as the star, the mycelium underneath, his repositories as worlds, a codex of his story and the Ten Commandments, and no Self-heal button] 2026-10-13. His words: "build the futuristic design into both apps but make each orb a fully functioning planet like earth with different but unique life forms separate from earth a balanced biosphere that each piece works towards system function, but let them know my back story and that i'm just a man also instill the 10 commandments and how long they've helped keep balance here for reference", "if the self heal works right i shouldn't need the button", "implement the other repos into the apps also", "ensure the mycellium underneath". BUILT (the PC); the phone follows
 
 - **The engine** is `docs/worlds/covenant_worlds.js`, one file both apps load.

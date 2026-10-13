@@ -102,7 +102,10 @@ const NODE='__NODE__';
 const PAGESHA='__PAGESHA__';
 let state=null, voice={pitch:0.8,rate:0.95};
 document.getElementById('chatbtn').onclick=()=>{const off=document.body.classList.toggle('nochat');document.getElementById('chatbtn').textContent=off?'Show chat':'Hide chat';};
-async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');showHealing();if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
+async function getState(){try{const r=await fetch('/pc/3d/state');
+ // a busy node (HTTP 429: every local process shares one loopback address) keeps the last good reading on screen
+ if(!r.ok){document.getElementById('live').textContent=(state?'last reading kept':'waiting')+' · the node is busy (HTTP '+r.status+'), trying again';setTimeout(getState,20000);return;}
+ state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');showHealing();if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -285,7 +288,10 @@ else if(u.kind==='forum'){const rows=u.detail||[];m='Moltbook, the last replies 
 else if(u.kind==='repo'){const x=u.detail||{};m='the repository '+x.name+(x.error?'\\nunreadable: '+x.error:'\\nlast commit '+(x.last_commit_at?ago((Date.now()/1000-x.last_commit_at)/3600):'none')+'\\nbranch '+(x.branch||'?')+'\\nnot committed: '+(x.dirty??'?')+'\\nnot pushed: '+(x.ahead==null?'no upstream to compare':x.ahead)+'\\nread from its clone on this PC');}
 else{m=u.name+'\\n'+fmt(u.detail);}
 info.textContent='MEASURED\\n'+m+lifeText(u);});
-function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
+// CENTRED ON THE SUN (2026-10-13, his words: "center universe mid screen around their sun so its center screen for
+// me"): the canvas is sized to the window every frame it changes (a resize the browser never announced left the
+// drawing stretched off-centre), and the camera looks straight at Tetsu, so the star is the middle of the screen.
+let vw=0,vh=0;function resize(){vw=innerWidth;vh=innerHeight;renderer.setSize(vw,vh);cam.aspect=vw/vh;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
 let t=0;const sunPos=new THREE.Vector3();
 function frame(){t+=0.01;CW.tickStar(tetsu,t);CW.tickMycelium(myc,t,orbs.slice(1));
  for(const o of orbs){if(o===tetsu)continue;const u=o.userData;u.orbitA+=u.orbitS;o.position.set(Math.cos(u.orbitA)*u.orbitR,Math.sin(u.orbitA*2)*0.25,Math.sin(u.orbitA)*u.orbitR);
@@ -293,7 +299,8 @@ function frame(){t+=0.01;CW.tickStar(tetsu,t);CW.tickMycelium(myc,t,orbs.slice(1
  for(const l of links.children){if(l.isLine){const p=l.geometry.attributes.position;p.setXYZ(1,l.userData.of.position.x,l.userData.of.position.y,l.userData.of.position.z);p.needsUpdate=true;}}
  for(const b of traders){const k=(t*0.35+b.userData.ph)%1;const a=b.userData.of.position;if(b.userData.dir)b.position.copy(a).multiplyScalar(k);else b.position.copy(a).multiplyScalar(1-k);}
  const so=selName&&orbs.find(o=>o.userData.name===selName);sel.visible=!!so;if(so){sel.position.copy(so.position);sel.quaternion.copy(cam.quaternion);sel.scale.setScalar((so.userData.radius||0.45)/0.45*1.4);}
- cam.position.x=Math.sin(t*0.05)*14;cam.position.z=Math.cos(t*0.05)*14;cam.position.y=5;cam.lookAt(0,-0.4,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
+ if(innerWidth!==vw||innerHeight!==vh)resize();
+ const R=cam.aspect<1?Math.min(30,14*0.85/cam.aspect):14;cam.position.set(Math.sin(t*0.05)*R,R*0.36,Math.cos(t*0.05)*R);cam.lookAt(0,0,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
 }
 </script>
 </body></html>

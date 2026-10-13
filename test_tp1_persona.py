@@ -399,6 +399,52 @@ def main():
           "edited version", after.get("register_primary") == base,
           after.get("register_primary"))
 
+    # TP1k: THE DIRECTIVE LOOP (A341, 2026-10-13, his words: "fix tetsu's directive loop", then "just have them
+    # process efficiently not blocked. optimal"). Questions leaked into the register and were sent back to him,
+    # "How do you feel about the new directive I gave you?" eight times. Nothing is refused: a repeat is MERGED
+    # into the question already on his line, a question in a proposal is kept in his own list instead of the
+    # register, and what will not fit the register is kept in its overflow.
+    now = 2_000_000_000.0
+    line = [{"actor": "tetsu", "kind": "question", "at": now - 3600, "t": "2033-05-18T02:33",
+             "text": "How do you feel about the new directive I gave you?"}]
+    check("TP1k a question he already asked in the last 14 days is recognised as a repeat (so it is merged)",
+          PZ.repeat_ask("How do you feel about the new directive you gave me?", "", rows=line, now=now) is not None)
+    check("TP1k2 ...a new question is not a repeat and goes to his line",
+          PZ.repeat_ask("Should free reply to MikeAdamSelene about revocable credentials?", "", rows=line, now=now) is None)
+    check("TP1k3 ...one that only echoes a question his own register carries is recognised (that echo was the loop)",
+          PZ.repeat_ask("What new insights have you gained today?", "Stay calm. What new insights have you gained today?",
+                        rows=[], now=now) is not None)
+    check("TP1k4 ...and an old one (15 days) is not held against a new ask",
+          PZ.repeat_ask("How do you feel about the new directive I gave you?", "",
+                        rows=[dict(line[0], at=now - 15 * 86400)], now=now) is None)
+    PZ.save({"register": base, "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pp)
+    PZ.refine(ask_with({"register": base + " Keep it warm. How does it feel to be part of this?",
+                        "voice": {"pitch": 1.0, "rate": 1.1}, "why": "test"}),
+              judge=lambda t: (True, "clean"), path=pp, log_path=log, say=lambda *a: None, tell=False)
+    k = PZ.load(pp)
+    check("TP1k5 a question in a proposal goes to his own question list, not into the register; the rest is added",
+          "Keep it warm." in k["register"] and "?" not in k["register"][len(base):]
+          and any("part of this" in q["q"] for q in k.get("questions", [])), (k["register"], k.get("questions")))
+    long_reg = base + " " + " ".join("Sentence number %d is here." % i for i in range(60))
+    PZ.save({"register": long_reg, "register_primary": base, "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pp)
+    PZ.refine(ask_with({"register": long_reg + " One more thing to add now.", "voice": {"pitch": 1.0, "rate": 1.1}, "why": "test"}),
+              judge=lambda t: (True, "clean"), path=pp, log_path=log, say=lambda *a: None, tell=False)
+    k = PZ.load(pp)
+    check("TP1k6 past REGISTER_GROWN nothing more is added to the register, and the sentence is KEPT in its overflow",
+          "One more thing to add now." not in k["register"] and "One more thing to add now." in k.get("register_overflow", []),
+          (len(k["register"]), k.get("register_overflow")))
+    rp = os.path.join(tempfile.mkdtemp(prefix="tp1k_"), "retired.jsonl")
+    PZ.save({"register": base + " Keep it warm. How do you feel about the new directive I gave you?",
+             "register_primary": base, "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pp)
+    moved = PZ.retire_leaked_questions(path=pp, retired_path=rp)
+    k = PZ.load(pp)
+    rec = [json.loads(x) for x in open(rp, encoding="utf-8")]
+    check("TP1k7 retiring moves only the questions added after his first register, keeps the rest, and loses nothing "
+          "(each goes to the record and to his own question list)",
+          moved == ["How do you feel about the new directive I gave you?"] and k["register"] == base + " Keep it warm."
+          and k["register_primary"] == base and len(rec) == 1 and any("directive" in q["q"] for q in k.get("questions", [])),
+          (moved, k["register"], rec))
+
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
         print("TP1 result: FAILED (%d)" % len(FAILURES))
