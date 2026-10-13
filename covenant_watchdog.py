@@ -2037,6 +2037,19 @@ def one_pass(strict=False):
         _dl = _daily_launch()
         if _dl:
             log("INFO", f"self-evaluation: {_dl}")
+    # THE DESK (A339, 2026-10-13, his words: "put it in a notepad and make that pop up"). When the phone has
+    # not collected a message for 30 min, covenant_desk opens it in Notepad on this screen, once per new
+    # message. The daemon only (persist): a suite that imports the watchdog never opens a window on his
+    # screen. A fault here is logged and never stops a round.
+    if _self_eval["persist"] and _self_eval["round"] % 10 == 0:
+        try:
+            import covenant_desk
+            _desk = covenant_desk.notice()
+            if _desk.get("opened"):
+                log("INFO", f"desk: the phone has not collected {_desk['stuck']} message(s); "
+                            f"opened {covenant_desk.DESK_FILE} in Notepad")
+        except Exception as e:  # noqa: BLE001
+            log("WARN", f"desk: {type(e).__name__}: {e}")
     return alerts
 
 

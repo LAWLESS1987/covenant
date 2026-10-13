@@ -154,6 +154,37 @@ if WIN:
     check("QW1.3 a patched child still returns its output", r.returncode == 0 and r.stdout.strip() == "7")
     Q.uninstall()
     check("QW1.4 uninstall() restores the original", subprocess.Popen.__init__ is before)
+
+    # A339 (2026-10-13): the entry points were all patched and windows still came, one every ~1.5 s -- a
+    # `git ls-files` per file from covenant_selfaudit, inside test_selfaudit.py, which the nightly started
+    # as a pythonw INTERPRETER. The patch is per process and pythonw has no console to pass down, so this
+    # population (entry points) could not see it. Measured here one level down, through the install() patch
+    # (covenant_quiet's own Q9 measures the run() path): a pythonw child of a patched process must HAVE a
+    # console -- hidden -- because whatever it starts inherits that console instead of getting a new one,
+    # and a new one is a window. Counted with GetConsoleProcessList (a hidden console has no window handle,
+    # so GetConsoleWindow reads 0 for it and for none). The first version measured the GRANDCHILD's count and
+    # could not tell an inherited console from a new one (2 either way) -- and its control opened a window.
+    # Neither check here starts a process that can open one.
+    _pw = next((os.path.join(os.path.dirname(sys.executable), n) for n in os.listdir(os.path.dirname(sys.executable))
+                if n.lower().startswith("pythonw") and n.lower().endswith(".exe")), None)
+    _count = "import ctypes; a = (ctypes.c_uint * 8)(); print(ctypes.windll.kernel32.GetConsoleProcessList(a, 8))"
+    if _pw:
+        Q.install()
+        try:
+            r = subprocess.run([_pw, "-c", _count], capture_output=True, text=True, timeout=120)
+        finally:
+            Q.uninstall()
+        got = (r.stdout or "").strip()
+        check("QW1.10 a pythonw child of a patched process has a hidden console to hand down "
+              "(attached %r; 0 means each console program it starts gets a new window)" % got,
+              got.isdigit() and int(got) > 0)
+        r = subprocess.run([_pw, "-c", _count], capture_output=True, text=True, timeout=120,
+                           creationflags=Q.NO_WINDOW)
+        got = (r.stdout or "").strip()
+        check("QW1.11 broken the other way: unpatched, with NO_WINDOW alone, the same child has none "
+              "(attached %r)" % got, got == "0")
+    else:
+        not_run("QW1.10 grandchild console through a pythonw child", "no pythonw beside %s" % sys.executable)
 else:
     before = subprocess.Popen.__init__
     Q.install(); Q.install()

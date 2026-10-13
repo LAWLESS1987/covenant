@@ -84,7 +84,7 @@ GREEN_SUITES = ["test_f1_fallback_silence.py", "test_f2_distill_loop.py",
                 "test_watchdog_outage.py", "test_sentinels.py",
                 "test_selfaudit.py", "test_teacher_panel.py", "test_sm1_sealed_mail.py", "test_ac1_ai_consult.py", "test_al1_actuator_learn.py",
                 "test_al2_actuator_brain.py",
-                "covenant_quiet.py"]
+                "covenant_quiet.py", "test_dk1_desk.py"]
 
 
 def tell_him_not_green(lines, say=print):

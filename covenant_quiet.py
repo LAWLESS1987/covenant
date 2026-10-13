@@ -56,14 +56,46 @@ def _flags(kw):
     return kw
 
 
+# A339 (2026-10-13, his words: "we're having the screens pop up again ... It just needs to not pop up and
+# interfere with what I'm doing"). Measured: a Terminal window every ~1.5 s, each a `git ls-files
+# --error-unmatch` run by covenant_selfaudit, inside test_selfaudit.py, which the nightly started as
+# `pythonw.exe test_selfaudit.py` with NO_WINDOW. The flag did nothing there: pythonw is a GUI-subsystem
+# binary, so it gets no console, hidden or not, and every console program IT starts gets a brand new one --
+# a window -- unless that child interpreter happens to call install() itself (test_selfaudit does not, and
+# QW1 checks only the entry points, never the interpreters they start). So a child that is a pythonw
+# interpreter is started as its console twin, python.exe beside it, under NO_WINDOW: a HIDDEN console, which
+# every descendant inherits, whatever it imports. Output is unchanged (pythonw had none to lose; a caller
+# that captures still captures). Only a list command whose program is pythonw*.exe with a python*.exe
+# sibling on disk is changed; anything else passes through untouched.
+def console_twin(cmd):
+    """cmd with a pythonw*.exe program replaced by the python*.exe beside it, when that file exists.
+    Anything else -- a string command, another program, no sibling -- comes back as it went in."""
+    if os.name != "nt" or not isinstance(cmd, (list, tuple)) or not cmd:
+        return cmd
+    prog = str(cmd[0])
+    d, base = os.path.split(prog)
+    low = base.lower()
+    if not (low.startswith("pythonw") and low.endswith(".exe")):
+        return cmd
+    twin = os.path.join(d, "python" + base[len("pythonw"):])
+    if not os.path.isfile(twin):
+        return cmd
+    return type(cmd)([twin] + list(cmd[1:])) if isinstance(cmd, list) else tuple([twin] + list(cmd[1:]))
+
+
+def _hideable(kw):
+    """True when this launch will carry NO_WINDOW (not detached, not a console asked for on purpose)."""
+    return os.name == "nt" and not int(kw.get("creationflags", 0) or 0) & (0x00000008 | 0x00000010)
+
+
 def run(cmd, **kw):
     """subprocess.run, with no console window on Windows."""
-    return subprocess.run(cmd, **_flags(kw))
+    return subprocess.run(console_twin(cmd) if _hideable(kw) else cmd, **_flags(kw))
 
 
 def popen(cmd, **kw):
     """subprocess.Popen, with no console window on Windows."""
-    return subprocess.Popen(cmd, **_flags(kw))
+    return subprocess.Popen(console_twin(cmd) if _hideable(kw) else cmd, **_flags(kw))
 
 
 # A204 (2026-09-21, his words: "still popping up"). The helper above only
@@ -88,6 +120,10 @@ def _quiet_init(self, *args, **kw):
         flags = int(kw.get("creationflags", 0) or 0)   # POSIX Popen refuses creationflags
         if not flags & (DETACHED_PROCESS | CREATE_NEW_CONSOLE):
             kw["creationflags"] = flags | NO_WINDOW
+            if args:                               # A339: a pythonw child gets a hidden console to hand down
+                args = (console_twin(args[0]),) + tuple(args[1:])
+            elif "args" in kw:
+                kw["args"] = console_twin(kw["args"])
     return _orig_init(self, *args, **kw)
 
 
@@ -212,6 +248,33 @@ def selftest():
         finally:
             uninstall()
             subprocess.Popen.__init__ = real_init
+    # A339: a pythonw child is started as its console twin, so it has a HIDDEN console to hand down.
+    if os.name == "nt":
+        import sys as _sys
+        d = os.path.dirname(_sys.executable)
+        pw = next((os.path.join(d, n) for n in os.listdir(d)
+                   if n.lower().startswith("pythonw") and n.lower().endswith(".exe")), None)
+        check("Q8 console_twin maps pythonw*.exe to the python*.exe beside it, and leaves others alone",
+              pw is not None and os.path.basename(console_twin([pw, "x"])[0]).lower().startswith("python")
+              and not os.path.basename(console_twin([pw, "x"])[0]).lower().startswith("pythonw")
+              and console_twin(["git", "status"]) == ["git", "status"] and console_twin("pythonw.exe x") == "pythonw.exe x")
+        # A hidden (CREATE_NO_WINDOW) console has no window handle, so GetConsoleWindow() reads 0 for it AND
+        # for no console at all -- the first version of this probe used it and read the fix as failing.
+        # GetConsoleProcessList counts the processes attached to the console: 0 means there is none to inherit.
+        probe_src = ("import ctypes; a = (ctypes.c_uint * 8)(); "
+                     "print(ctypes.windll.kernel32.GetConsoleProcessList(a, 8))")
+        if pw:
+            r = run([pw, "-c", probe_src], capture_output=True, text=True, timeout=60)
+            got = (r.stdout or "").strip()
+            check("Q9 a pythonw child started through run() has a console to hand down (attached %r)" % got,
+                  got.isdigit() and int(got) > 0)
+            r = subprocess.run([pw, "-c", probe_src], capture_output=True, text=True, timeout=60,
+                               creationflags=NO_WINDOW)
+            got = (r.stdout or "").strip()
+            check("Q10 broken the other way: the same child started plainly has NO console (attached %r)" % got,
+                  got == "0")
+        else:
+            check("Q9 a pythonw beside this interpreter to test with", False)
     # "N/N passed" is the shape run_all_tests.sh scrapes for. Anything else is
     # reported UNSCORED, which that runner is careful to say is not a pass.
     print("\nQUIET: %d/%d passed" % (sum(ok), len(ok)))

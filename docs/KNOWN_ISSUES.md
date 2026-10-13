@@ -7645,6 +7645,30 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A339. [Windows popped up again, one every ~1.5 s: the nightly started test_selfaudit.py as a pythonw interpreter, which has no console to hand down, so each `git ls-files` it ran opened a new one. And his messages had nowhere to go while the phone was off the network] 2026-10-13. His words: "we're having the screens pop up again. Whatever the reason for them popping up doesn't need to stop. It just needs to not pop up and interfere with what I'm doing", then "if it's trying to communicate something, tell it to just put it in a notepad and make that pop up", then "sure fix the phone though". FIXED (the pop-ups, the class); ADDED (the desk); the phone is his to reconnect
+
+- **Measured.**
+  - A watcher on new top-level windows logged a "Terminal" window about every 1.5 s from 04:41:12, plus some titled `C:\Program Files\Git\cmd\git.exe`. Each process was gone before its parent could be read.
+  - A process poll caught one alive: `git ls-files --error-unmatch ops/_sweep_fix2.txt`, whose parent was `pythonw.exe test_selfaudit.py`, started by `covenant_nightly.py` (CovenantDistill, 03:30). The call is `covenant_selfaudit.py`'s per-file tracked check.
+  - The pop-ups were a routine check, not anything addressed to him. They stopped when the self-audit finished: 0 git processes in 8 s.
+- **Why A204's fix and QW1 did not stop it (a recurrence of A203/A204).**
+  - `install()` patches subprocess in ONE process, and QW1's population was the entry points. The nightly is patched, and it starts each suite with `Q.run([sys.executable, suite])`.
+  - `sys.executable` is pythonw, a GUI-subsystem binary. NO_WINDOW gives it no console, hidden or otherwise. So every console program the suite starts (git) gets a new console, which is a window, unless that interpreter itself calls `install()`. test_selfaudit does not, and no check looked one level down.
+- **Fixed, for the class.** `covenant_quiet.console_twin`: a child whose program is `pythonw*.exe` is started as the `python*.exe` beside it, under NO_WINDOW. That gives it a hidden console, which every descendant inherits whatever it imports. It applies in `run()`, `popen()` and the `install()` patch. A string command, another program, a missing sibling, a detached child, or a console asked for on purpose all pass through unchanged.
+- **Measured both ways**, with `GetConsoleProcessList`.
+  - A hidden console has no window handle, so `GetConsoleWindow()` reads 0 for it AND for no console. The first Q9 used it and read the working fix as failing; corrected.
+  - pythonw plain: 0 attached. As its twin: 2. A grandchild under the twin: 4 (inherited). A grandchild under plain pythonw: none to inherit.
+  - The first QW1.10 measured the grandchild's own count and could not tell an inherited console from a new one (2 either way), and its control opened a window. Replaced by the child's count, and neither check can open one.
+  - `covenant_quiet` selftest 10/10 (Q8 to Q10 new); with the twin disabled, Q8 and Q9 go red. QW1 19/19 (QW1.10 and QW1.11 new; QW1.7 NOT RUN under load, as before); with the twin removed from the `install()` path, QW1.10 reads 0.
+- **Added: the desk** (`covenant_desk.py`, DK1).
+  - The direct line delivers only through the phone. The phone has been offline since 2026-10-12 06:48, as it was for 53 h on 10-08 (A329): Tailscale shows it offline, last seen 22 h ago, 4,836 bytes sent and 0 received, and the PC side is running.
+  - 14 messages waited unread, among them Tetsu's question and a nightly NOT GREEN.
+  - A message the phone has not collected within 30 min is now written to `logs/FOR_YOU.txt` (gitignored) and opened in Notepad, once per new message, never on a timer. The desk does not mark the line seen, so the phone still gets everything when it returns.
+  - It runs from the watchdog every 10 rounds, as the daemon only. DK1 6/6, with temp paths and Notepad never opened. Without the desk's memory of what it has shown, D3 to D5 go red.
+- **The phone.** No fix from the PC: the phone is off the network, and nothing here can reach it. What brings it back is his, on the phone: open Tailscale, turn it on, open the app. Twice now it has dropped off overnight. That fits Android stopping the apps in the background, but it is NOT MEASURED; his phone's settings are not readable from here.
+
+---
+
 ### A338. [The pre-commit stage-check ran a commit's staged suites without the sweep's mock judge. It now runs covenant_one's own wiring, imported, and in-place suites run under in_place_env. Measured first: no suite went red under the mock, and two went green on it from a worktree -- CT1f and CC1b, whose "real gate" checks the sweep measures on the mock] 2026-10-12. His words: "make stage_check's staged suites run with the same environment covenant_one gives staged suites". The class guard A335 named and left. FIXED, driven both ways. CT1f and CC1b NOT FIXED, named
 
 - **Measured first, before the change.**

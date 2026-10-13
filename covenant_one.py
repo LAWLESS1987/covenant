@@ -353,6 +353,7 @@ SUITES = [
     ("test_f2_distill_loop.py",           90,  "JUDGE"),
     ("test_f3_gate_end_to_end.py",       300,  "JUDGE"),
     ("covenant_quiet.py",                 30,  "JUDGE"),
+    ("test_dk1_desk.py",                  60,  "JUDGE"),
     ("test_f4_capability.py",            120,  "JUDGE"),
     ("test_f5_reserve.py",                90,  "JUDGE"),
     ("test_f6_stuffing.py",              120,  "JUDGE"),
