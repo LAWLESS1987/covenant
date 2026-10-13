@@ -152,6 +152,65 @@ def pick_model():
     return None
 
 
+def _listener_pid(port=None):
+    """The pid listening on the model port (Windows netstat), or None."""
+    port = port or PORT
+    try:
+        import covenant_quiet
+        r = covenant_quiet.run(["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=20)
+        for ln in (r.stdout or "").splitlines():
+            parts = ln.split()
+            if len(parts) >= 5 and parts[1].endswith(":%d" % port) and parts[3].upper() == "LISTENING":
+                return int(parts[4])
+    except Exception:                                             # noqa: BLE001
+        return None
+    return None
+
+
+def _process_cmdline(pid):
+    """(image path, command line) of `pid`, or (None, None)."""
+    try:
+        import covenant_quiet
+        r = covenant_quiet.run(["powershell", "-NoProfile", "-Command",
+                                "$p=Get-CimInstance Win32_Process -Filter \"ProcessId=%d\"; if($p){$p.ExecutablePath; $p.CommandLine}" % int(pid)],
+                               capture_output=True, text=True, timeout=30)
+        lines = [x for x in (r.stdout or "").splitlines() if x.strip()]
+        return (lines[0].strip(), lines[1].strip()) if len(lines) >= 2 else (None, None)
+    except Exception:                                             # noqa: BLE001
+        return None, None
+
+
+def adopt(listener=None, cmdline=None):
+    """A341b (2026-10-13, his words: "use your discernment and inference to get all nodes green"). Measured that
+    morning: llama-server pid 9220 (the 3B, started 06:15:41 by this keeper, under his own account) answered on
+    8081 with ops/model_server.json gone -- no stop line in the log explains it; several processes run idle
+    watchers, and which one dropped the record is UNDETERMINED. readiness() then read UNDETERMINED, and the road
+    read model_unmanaged PRESENT and tetsu_cannot_answer UNKNOWN for hours, though Tetsu answered.
+
+    When the server answers and no state is held, take it back -- ONLY if the process on the port is this
+    keeper's own binary (BIN) running one of CANDIDATES. It writes the state the keeper would have written; it
+    starts nothing and stops nothing. A server that is not ours (another binary, other weights) stays unmanaged:
+    A265's elevated orphan is not adopted, its kill is still his. Returns (adopted, why)."""
+    if _read_state().get("pid"):
+        return False, "already recorded"
+    if not alive():
+        return False, "nothing answers on the port"
+    pid = (listener or _listener_pid)()
+    if not pid:
+        return False, "no listener pid found for %s:%d" % (HOST, PORT)
+    exe, cmd = (cmdline or _process_cmdline)(pid)
+    if not exe or os.path.normcase(os.path.abspath(exe)) != os.path.normcase(os.path.abspath(BIN)):
+        return False, "pid %s on the port is not this keeper's runtime (%s)" % (pid, exe)
+    name = next((n for n, _need in CANDIDATES if n in (cmd or "")), None)
+    if not name:
+        return False, "pid %s runs weights this keeper does not know" % pid
+    need = next(need for n, need in CANDIDATES if n == name)
+    _write_state({"pid": pid, "model": name, "started": time.time(), "needs_gb": need, "adopted": True})
+    with open(LOG, "a", encoding="utf-8") as lf:
+        lf.write("%s adopt pid %s (%s): it answered with no state (A341b)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, name))
+    return True, "adopted pid %s (%s)" % (pid, name)
+
+
 def readiness():
     """Could Tetsu answer right now? A READ: it starts nothing and stops nothing.
 
@@ -166,6 +225,8 @@ def readiness():
     Returns {"verdict": PASS | FAIL | UNDETERMINED, "why": text, "free_gb": float|None, ...}."""
     if alive():
         st = _read_state()
+        # (A341b: adoption is NOT done here -- readiness stays a pure read, which suites call with stubs; the
+        # watchdog's daemon round calls adopt(), so no suite can write the live state file.)
         if not st.get("pid") and not st.get("model"):
             # A265: something answers on the port and this keeper recorded nothing. On 2026-10-05 that
             # was a server whose stop had failed: it answered /health and timed out every ask.

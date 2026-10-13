@@ -232,6 +232,29 @@ def main():
     finally:
         for k, v in real.items():
             setattr(M, k, v)
+
+    # MK1m (A341b, 2026-10-13): a server that answers with no state is ADOPTED only when it is provably this
+    # keeper's own -- its binary, one of its weights. Temp state and log; the port and the process are stand-ins.
+    keep = {k: getattr(M, k) for k in ("STATE", "LOG", "alive")}
+    tdm = tempfile.mkdtemp(prefix="mk1m_")
+    try:
+        M.STATE, M.LOG, M.alive = os.path.join(tdm, "state.json"), os.path.join(tdm, "log.txt"), (lambda: True)
+        ours = (lambda pid: (M.BIN, "%s -m x/%s --port 8081" % (M.BIN, M.CANDIDATES[-1][0])))
+        ok, why = M.adopt(listener=lambda: 9220, cmdline=ours)
+        st = json.load(open(M.STATE, encoding="utf-8")) if os.path.exists(M.STATE) else {}
+        check("MK1m a server on the port that is this keeper's binary and weights is adopted: the state is written back",
+              ok and st.get("pid") == 9220 and st.get("model") == M.CANDIDATES[-1][0] and st.get("adopted") is True, (ok, why, st))
+        os.remove(M.STATE)
+        ok, why = M.adopt(listener=lambda: 5524, cmdline=lambda pid: (r"C:\other\llama-server.exe", "x -m %s" % M.CANDIDATES[-1][0]))
+        check("MK1m2 ...another binary on the port is NOT adopted (A265's orphan stays his to end)",
+              not ok and not os.path.exists(M.STATE) and "not this keeper's runtime" in why, why)
+        ok, why = M.adopt(listener=lambda: 7, cmdline=lambda pid: (M.BIN, "%s -m unknown.gguf" % M.BIN))
+        check("MK1m3 ...nor our binary running weights the keeper does not know", not ok and not os.path.exists(M.STATE), why)
+        M.alive = lambda: False
+        check("MK1m4 ...and nothing is adopted when nothing answers", M.adopt(listener=lambda: 1, cmdline=ours)[0] is False)
+    finally:
+        for k, v in keep.items():
+            setattr(M, k, v)
     # The weights are not tracked (models/ is gitignored), so the runner's staged copy has none: the file
     # check is made only where the directory exists, and says so otherwise.
     have = os.path.isdir(M.MODELS) and any(os.path.isfile(os.path.join(M.MODELS, n)) for n, _ in M.CANDIDATES)

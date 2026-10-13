@@ -10088,6 +10088,8 @@ class CovenantAPI:
             insecure = "mock_insecure" in judge_id
             keyless = "quorum(" in judge_id and not insecure and not any(
                 os.environ.get(v) for v in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"))
+            # A343: keyless with a seated judge still judges; judgeless is keyless with none seated
+            judgeless = keyless and not ("local:" in judge_id or "semantic:" in judge_id)
             # A114 (2026-09-14). This alarm means "my genesis is not the one my
             # peers hold, so I can never converge with them". It used to ask a
             # DIFFERENT question -- "did my own key sign the genesis block?" --
@@ -10252,7 +10254,18 @@ class CovenantAPI:
                 "anomaly_kinds": sorted(mon.get("per_kind", {})),
                 "spike_detected": mon.get("spike_detected", False),
                 "warnings": warnings,
-                "degraded": bool(keyless or insecure or own_genesis or self.node.crisis_mode),
+                # A343 (2026-10-13, his words: "use your discernment and inference to get all nodes green").
+                # `degraded` is defined above as "running but cannot do its job". It was keyless, and keyless
+                # means no PROVIDER key -- while the warning above has said since 2026-09-06 that "keyless is
+                # not judgeless": with the students (local:) or the semantic judge seated, a hold fails closed
+                # and a clean verdict admits, and the mesh admitted blocks all day keyless (height 84 -> 85 on
+                # 10-13). So every node read degraded forever on the posture he chose (no provider key), and the
+                # flag stopped telling anyone anything. JUDGELESS is the case that cannot do its job: no key AND
+                # no seated judge, the branch above that rejects every transaction. `judge_keyless` is kept,
+                # unchanged, beside it -- the missing key is still said, it just no longer reads as a fault.
+                # The old checks are kept as written on branch degraded-keyless-checks-as-written-2026-10-13.
+                "judgeless": judgeless,
+                "degraded": bool(judgeless or insecure or own_genesis or self.node.crisis_mode),
             })
 
         @self.app.route("/mycelium", methods=["GET"])

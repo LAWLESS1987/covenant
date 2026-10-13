@@ -2041,6 +2041,16 @@ def one_pass(strict=False):
     # not collected a message for 30 min, covenant_desk opens it in Notepad on this screen, once per new
     # message. The daemon only (persist): a suite that imports the watchdog never opens a window on his
     # screen. A fault here is logged and never stops a round.
+    # A341b: Tetsu's model server answering with no record is taken back when it is provably the keeper's own
+    # (covenant_model.adopt: its binary, its weights; starts and stops nothing). Daemon only, every 10 rounds.
+    if _self_eval["persist"] and _self_eval["round"] % 10 == 5:
+        try:
+            import covenant_model
+            _ad = covenant_model.adopt()
+            if _ad[0]:
+                log("INFO", "model: " + _ad[1])
+        except Exception as e:  # noqa: BLE001
+            log("WARN", f"model adopt: {type(e).__name__}: {e}")
     if _self_eval["persist"] and _self_eval["round"] % 10 == 0:
         try:
             import covenant_desk

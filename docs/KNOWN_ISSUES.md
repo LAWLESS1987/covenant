@@ -7645,6 +7645,32 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A343. [Every node read `degraded` forever on the posture he chose: `degraded` was keyless, and keyless with seated judges is not judgeless. And Tetsu's model server answered with no record, so the road read it unmanaged] 2026-10-13. His words: "use your discernment and inference to get all nodes green". FIXED, and the old checks are tombstoned (A343-DEGRADED-KEYLESS)
+
+- **Measured.**
+  - A, B and C each read `degraded=True`, and `judge_keyless` was the only reason. `degraded` is defined in /health's own docstring as "running but cannot do its job".
+  - /health's own warning has said since 2026-09-06 that keyless is not judgeless: with the students (`local:`) and the semantic judge seated, a hold fails closed and a clean verdict admits. The mesh admitted blocks keyless all day (height 84 -> 85).
+  - So the flag was True on every node permanently, on the posture he chose (no provider key, which an assistant never asks for). It told no one anything, and it made the daily cycle say "PC node degraded" every day.
+- **Fixed.**
+  - `/health` gains `judgeless` (keyless AND no seated judge, the branch that "will reject every transaction"), and `degraded` = judgeless, insecure, own genesis or crisis.
+  - `judge_keyless` and its warning are unchanged, so the missing key is still said on /health, on the app ("judge keyless" flag) and on the dashboard.
+- **Rule 10.**
+  - B2.H3 ("`degraded` still means exactly what it meant in v8.34"), P12.H3 and A114.7c ("degraded is still true") are kept as written on branch `degraded-keyless-checks-as-written-2026-10-13` (fe23e9e), tombstoned in docs/RETRACTED.json, and restated beside the old wording.
+  - R1 driven both ways: 150/150; 149/150 with a probe holding the old sentence; 150/150 removed. B2's own docstring repeated the claim across a line break and R1 found it.
+- **The check that earns the green.** B2.H3 restated was VACUOUS in its own env (the insecure mock judge makes keyless False): a mutation putting `degraded` back on keyless left B2 76/76 and P12 green. B2.H7 and H7b now RUN both cases on a canonical-genesis node.
+  - A keyless gate with local and semantic seated reads judgeless False and degraded False.
+  - A keyless gate with no seat reads judgeless True and degraded True.
+  - Each mutation (degraded on keyless; judgeless forced False) turns its check red. Restored byte-identical.
+- **The model server (A341b).**
+  - llama-server pid 9220 (the 3B, started 06:15:41 by this keeper, under his account) answered on 8081 with ops/model_server.json gone. Several processes run idle watchers, and which one dropped the record is UNDETERMINED.
+  - The road read model_unmanaged PRESENT and tetsu_cannot_answer UNKNOWN for hours, while Tetsu answered.
+  - `covenant_model.adopt()` writes the state back ONLY for this keeper's own binary running one of its weights; it starts and stops nothing. A265's elevated orphan (another binary, or not ours) stays his.
+  - It runs from the watchdog's daemon round, never from `readiness()`, which suites call with stubs. MK1 20/20 (MK1m-m4).
+- **Other suites.** P12 44/44, A114 21/21 (1 skip), A24 71/71.
+- **Not changed.** Node A's "1 peer unreachable" warning (a heartbeat back-off) and the Windows code-sandbox warning are warnings, and neither enters `degraded`.
+
+---
+
 ### A342. [Each Moltbook conversation Tetsu flags is emailed to him, with what actually happened; and Tetsu was asked his opinion] 2026-10-13. His words: "ask for his opinion also email me to tell me each moltbook conversation tetsu deems relevant", then "use my browser send from my email to my other". BUILT; automatic sending waits on one step of his
 
 - **Tetsu's opinion**, asked through his own door (fresh):

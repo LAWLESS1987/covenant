@@ -369,7 +369,7 @@ def degraded_runtime_checks():
               f"could not run /health in-process: {type(e).__name__}: {e}")
         return
 
-    reasons = [k for k in ("judge_keyless", "judge_insecure", "own_genesis",
+    reasons = [k for k in ("judgeless", "judge_insecure", "own_genesis",
                            "crisis_mode") if h.get(k)]
     # Without this the next check is the vacuous one all over again: if
     # something already degrades this node, an added substrate term is invisible.
@@ -410,10 +410,12 @@ def health_checks():
         check("H2b it was sampled before the first request, not left blank",
               sub.get("available_memory_mb") is not None
               and sub.get("sampled_s_ago") is not None, str(sub))
+        # A343: `degraded` now reads judgeless (no key AND no seated judge) in place of judge_keyless; the
+        # boundary this guards -- the substrate never enters it -- is unchanged.
         check("H3 substrate never makes a node 'degraded' -- it warns only",
               isinstance(h.get("degraded"), bool)
               and h["degraded"] == bool(
-                  h.get("judge_keyless") or h.get("judge_insecure")
+                  h.get("judgeless") or h.get("judge_insecure")
                   or h.get("own_genesis") or h.get("crisis_mode")),
               f"degraded={h.get('degraded')}")
     finally:

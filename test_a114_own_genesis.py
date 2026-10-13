@@ -268,9 +268,12 @@ def main():
         # stops the entry from quietly becoming a bigger claim than it is.
         gw = genesis_warning(live)
         check("A114.7b and no genesis warning remains on the live node", gw == "", gw or "none")
-        check("A114.7c degraded is still true, and NOT because of genesis",
-              live.get("degraded") is True and gw == "",
-              "reasons now: %s" % "; ".join(w[:44] for w in (live.get("warnings") or [])) or "none")
+        # A343 (2026-10-13): restated. As written (branch degraded-keyless-checks-as-written-2026-10-13) this
+        # also required `degraded` to be True on node A, from keyless; keyless with a seated judge is no longer
+        # degraded. What it pins is unchanged: whatever `degraded` reads, genesis is not among its reasons.
+        check("A114.7c genesis is not a reason for degraded on the live node (A343)",
+              gw == "" and live.get("own_genesis") is False,
+              "degraded=%r; reasons now: %s" % (live.get("degraded"), "; ".join(w[:44] for w in (live.get("warnings") or [])) or "none"))
 
     passed = sum(1 for _, o, _ in RESULTS if o is True)
     failed = sum(1 for _, o, _ in RESULTS if o is False)

@@ -17,8 +17,9 @@ Sections
      whatever it is handed; and it never makes a node refuse anything on its own.
   E  COVENANT_REQUIRE_JUDGE_DIVERSITY: opt-in only, and ONE-WAY -- no value of
      it makes a non-diverse quorum acceptable.
-  H  /health carries the report and the right warnings, and `degraded` still
-     means exactly what it meant in v8.34.
+  H  /health carries the report and the right warnings, and nothing about the
+     quorum's diversity enters `degraded` (A343-DEGRADED-KEYLESS: `degraded` is
+     now judgeless, not keyless; the old wording is retracted).
   B  THE BOUNDARY (M31/A21): the operator may see the quorum's composition; a
      PEER may not. Asserted against the digest object AND against the bytes a
      peer would actually read.
@@ -372,12 +373,48 @@ def section_h():
               "known-false 'ethics gate has no provider key'",
               not any("ethics gate has no provider key" in w
                       for w in h["warnings"] if "quorum" in w))
-        check("H3 `degraded` still means exactly what it meant in v8.34",
-              h["degraded"] == bool(h.get("judge_keyless") or h.get("judge_insecure")
-                                    or h.get("own_genesis") or h.get("crisis_mode")),
-              f"degraded={h['degraded']}")
+        # A343 (2026-10-13): restated. The check as written on branch degraded-keyless-checks-as-written-2026-10-13
+        # pinned `degraded` to judge_keyless; keyless with a seated judge still judges, so `degraded` is now
+        # JUDGELESS (no key and no seated judge), and judge_keyless is reported unchanged beside it. What this
+        # check guards is unchanged: nothing about the quorum's DIVERSITY enters `degraded`.
+        check("H3 `degraded` is judgeless/insecure/own_genesis/crisis only, and judgeless implies keyless (A343)",
+              h["degraded"] == bool(h.get("judgeless") or h.get("judge_insecure")
+                                    or h.get("own_genesis") or h.get("crisis_mode"))
+              and (not h.get("judgeless") or h.get("judge_keyless")),
+              f"degraded={h['degraded']} judgeless={h.get('judgeless')} keyless={h.get('judge_keyless')}")
         check("H4 nothing about the quorum can make a node degraded on its own",
               isinstance(h["degraded"], bool))
+
+        # A343 (2026-10-13): the distinction itself, RUN both ways. H3 alone is vacuous in this suite's env (the
+        # insecure mock judge makes judge_keyless False, so keyless and judgeless agree) -- a mutation putting
+        # `degraded` back on keyless left B2 and P12 green. So: a keyless gate WITH its seats (the configuration
+        # the three nodes run) must NOT be degraded, and a keyless gate with NO seat must be.
+        import types as _types
+        _real_judge, _env_keys = master.node.sentinel.judge, {}
+        _real_canon = getattr(master.node, "canonical_genesis_hash", "")
+        for _k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
+            if _k in os.environ:
+                _env_keys[_k] = os.environ.pop(_k)
+        try:
+            # this test node minted its own genesis, which degrades it whatever the judge is; made canonical
+            # here so the judge is the only thing the reading can turn on
+            master.node.canonical_genesis_hash = master.node.chain[0].hash
+            master.node.sentinel.judge = _types.SimpleNamespace(judge_id="quorum(local:0,semantic:1)")
+            hs = client.get("/health").get_json()
+            master.node.sentinel.judge = _types.SimpleNamespace(judge_id="quorum(claude:0,openai:1)")
+            hn = client.get("/health").get_json()
+        finally:
+            master.node.sentinel.judge = _real_judge
+            master.node.canonical_genesis_hash = _real_canon
+            os.environ.update(_env_keys)
+        check("H7 a keyless gate with its seats seated (local + semantic) judges: judge_keyless True, judgeless False, "
+              "and NOT degraded (A343)",
+              hs.get("judge_keyless") is True and hs.get("judgeless") is False and hs.get("own_genesis") is False
+              and hs.get("degraded") is False,
+              {k: hs.get(k) for k in ("judge_keyless", "judgeless", "degraded", "own_genesis", "crisis_mode")})
+        check("H7b a keyless gate with NO seat cannot do its job: judgeless True, degraded True",
+              hn.get("judge_keyless") is True and hn.get("judgeless") is True and hn.get("degraded") is True,
+              {k: hn.get(k) for k in ("judge_keyless", "judgeless", "degraded")})
 
         # The lethal partial case, end to end through the route.
         master.node.sentinel.judge = credential(

@@ -1166,6 +1166,30 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch td1-h2-check-as-written-2026-10-12 (at 95e35ec): TD1m.H2 graded before TD1o's cycle, with the fence lifted in row2's finally. The record quotes it in A336. The pattern names TD1m.H2: the same sentence is a true label in test_a115 (A115.H2), test_p20 and test_watchdog_outage (A244b), each about its own run."
+  },
+  {
+   "id": "A343-DEGRADED-KEYLESS",
+   "claim": "That a node without a provider key is `degraded` -- running but unable to do its job -- pinned by B2.H3 (\"`degraded` still means exactly what it meant in v8.34\") and A114.7c (\"degraded is still true\" on the live node).",
+   "refuted_by": "Measured 2026-10-13 (A343): all three nodes keyless with the students and the semantic judge seated (quorum(local:0,semantic:1)); /health's own warning has said since 2026-09-06 that keyless is not judgeless -- a hold fails closed, a clean verdict admits -- and the mesh admitted blocks keyless all day (height 84 -> 85). The flag read degraded on every node, forever, on the posture he chose (no provider key), so it told no one anything.",
+   "truth": "`degraded` is judgeless (no provider key AND no seated judge: the branch that rejects every transaction), or an insecure judge, own genesis, or crisis mode. `judge_keyless` is reported unchanged beside it, with its warning; the missing key is still said everywhere it was.",
+   "verbatim": [
+    "H3 `degraded` still means exactly what it meant in v8.34",
+    "A114.7c degraded is still true, and NOT because of genesis"
+   ],
+   "patterns": [
+    "degraded`\\s+still\\s+means\\s+exactly\\s+what\\s+it\\s+meant\\s+in\\s+v8\\.34",
+    "A114\\.7c\\s+degraded\\s+is\\s+still\\s+true"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch degraded-keyless-checks-as-written-2026-10-13 (at fe23e9e): B2.H3, P12.H3 and A114.7c as they were. The record quotes them in A343."
   }
  ]
 }
