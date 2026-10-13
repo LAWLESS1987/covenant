@@ -347,6 +347,59 @@ def main():
     check("PC1z8 the conversation can be hidden to reach every orb, and nothing in it is dropped",
           'id="chatbtn"' in b and "body.nochat #answer{display:none" in b and "classList.toggle('nochat')" in b)
 
+    # ---- PC1z9 (A340, 2026-10-13, his words: "make each orb a fully functioning planet ...", "implement the other
+    # repos into the apps also", "if the self heal works right i shouldn't need the button"). The worlds engine is
+    # inlined and carries the codex; his repositories are found by discovery; the button is gone and the highway's
+    # own last repairs are read instead. A fake git (no real repository is read) and a temp ledger.
+    pz = get(client, "/pc/3d", "100.72.0.10").get_data(as_text=True)
+    check("PC1z9 the page carries the worlds engine and the codex, and no Self-heal button",
+          "window.CovenantWorlds" in pz and "__WORLDS_JS__" not in pz and "The Ten Commandments" in pz
+          and "He is just a man" in pz and 'id="heal"' not in pz and "showHealing()" in pz)
+    home = _tf.mkdtemp(prefix="pc1z9_")
+    try:
+        layout = {"mine": ("dir", "https://github.com/LAWLESS1987/mine.git", "100"),
+                  "mine-wt": ("file", "https://github.com/LAWLESS1987/mine.git", "999"),
+                  "theirs": ("dir", "https://github.com/someoneelse/theirs.git", "200"),
+                  "local-only": ("dir", "", "300"), "notarepo": (None, "", "")}
+        for d, (kind, _u, _c) in layout.items():
+            os.makedirs(os.path.join(home, d))
+            if kind == "dir":
+                os.makedirs(os.path.join(home, d, ".git"))
+            elif kind == "file":
+                open(os.path.join(home, d, ".git"), "w").close()
+        layout["local-only"] = ("dir", os.path.join(home, "mine"), "300")
+
+        class _R:
+            def __init__(self, out, rc=0): self.stdout, self.returncode = out, rc
+
+        def fake_run(cmd, **kw):
+            d = os.path.basename(cmd[2]); kind, url, ct = layout[d]; a = cmd[3:]
+            if a[:2] == ["remote", "get-url"]: return _R(url, 0 if url else 1)
+            if a[:1] == ["log"]: return _R(ct)
+            if a[:1] == ["rev-parse"]: return _R("main")
+            if a[:1] == ["status"]: return _R(" M a.txt\n?? b.txt" if d == "mine" else "")
+            if a[:1] == ["rev-list"]: return _R("2" if d == "mine" else "", 0 if d == "mine" else 128)
+            return _R("", 1)
+        rows = {r["name"]: r for r in P3z.repos_detail(home=home, now=0, run=fake_run)}
+        check("PC1z9 his repositories are found by discovery: someone else's code and a folder without git are left out",
+              set(rows) == {"mine", "local-only"}, sorted(rows))
+        check("PC1z9 a repository's own clone outranks a newer linked worktree of it, and is read as it is",
+              rows.get("mine", {}).get("last_commit_at") == 100 and rows["mine"].get("dirty") == 2 and rows["mine"].get("ahead") == 2,
+              rows.get("mine"))
+        check("PC1z9 no upstream to compare with reads as None (amber), never as 'in step'",
+              rows.get("local-only", {}).get("ahead") is None, rows.get("local-only"))
+        led = os.path.join(home, "highway.jsonl")
+        with open(led, "w", encoding="utf-8") as fh:
+            for r in ({"t": "2026-10-13T01:00:00", "remedy": "a", "detector": "x", "ran": True, "dry_run": True},
+                      {"t": "2026-10-13T02:00:00", "remedy": "b", "detector": "y", "ran": True, "dry_run": False, "fixed": False},
+                      {"t": "2026-10-13T03:00:00", "remedy": "c", "detector": "z", "ran": False}):
+                fh.write(json.dumps(r) + "\n")
+        hl = P3z.heal_detail(path=led)
+        check("PC1z9 self-heal reads only repairs that RAN for real, and says when one did not fix",
+              [h["remedy"] for h in hl] == ["b"] and hl[0]["ok"] is False, hl)
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
     print()
     n_ok = sum(1 for _, ok in results if ok)
     print("%d/%d passed" % (n_ok, len(results)))

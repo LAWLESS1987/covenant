@@ -41,50 +41,59 @@ def symbol_svg():
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8"><title>covenant · PC · __NODE__ · 3D</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-html,body{margin:0;height:100%;background:#0B1626;color:#E7F4EA;font:15px/1.4 system-ui,sans-serif;overflow:hidden}
+:root{--ink:#070B14;--deck:#0B1220;--line:rgba(92,225,230,.22);--cyan:#5CE1E6;--amber:#F2B84B;--red:#FF6B6B;--green:#46E3A0;--txt:#E6EEF8;--dim:#93A4BC;--sans:'Space Grotesk',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--txt);font:15px/1.45 var(--sans);overflow:hidden}
 #scene{position:fixed;inset:0}
-#hud{position:fixed;left:16px;top:16px;display:flex;gap:12px;align-items:center;pointer-events:none}
-#hud svg{width:56px;height:56px;border-radius:12px;box-shadow:0 0 24px #2E8B6E88}
-#hud .t{pointer-events:none}
-#hud .t b{display:block;font-size:17px}
-#hud .t small{color:#9fc7b0}
-#panel{position:fixed;right:16px;top:16px;width:min(340px,calc(100% - 32px));background:#10203390;backdrop-filter:blur(6px);border:1px solid #2E8B6E55;border-radius:14px;padding:12px 14px}
-#panel h3{margin:0 0 6px;font-size:14px;color:#9fc7b0;letter-spacing:.06em;text-transform:uppercase}
-#info{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;color:#cfe7d6;min-height:60px}
-#talk{position:fixed;left:16px;right:16px;bottom:16px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
-#talk textarea{flex:1;min-width:140px;min-height:44px;max-height:160px;resize:vertical;background:#0f1d2e;color:#E7F4EA;border:1px solid #2E8B6E66;border-radius:12px;padding:10px 12px;font:15px system-ui}
-#talk button{background:#2E8B6E;color:#fff;border:0;border-radius:12px;padding:12px 16px;font:600 15px system-ui;cursor:pointer}
+#hud{position:fixed;left:16px;top:16px;display:flex;gap:12px;align-items:center;padding:10px 16px 10px 10px;background:rgba(11,18,32,.72);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;z-index:3}
+#hud svg{width:48px;height:48px;border-radius:12px;box-shadow:0 0 22px rgba(92,225,230,.35)}
+#hud .t b{display:block;font-size:17px;letter-spacing:.08em}
+#hud .t small{display:block;color:var(--dim);font:12px var(--mono)}
+#healline{display:block;color:var(--green);font:12px var(--mono);max-width:46ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#codexbtn{margin-left:10px;background:transparent;color:var(--cyan);border:1px solid rgba(92,225,230,.45);border-radius:999px;padding:8px 14px;font:500 13px var(--sans);cursor:pointer;min-height:36px}
+#codexbtn:hover{background:rgba(92,225,230,.12)}
+#panel{position:fixed;right:16px;top:16px;width:min(380px,calc(100% - 32px));background:rgba(11,18,32,.78);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:16px;padding:12px 16px;z-index:3}
+#panel h3{margin:0 0 6px;font:500 13px var(--sans);color:var(--cyan);letter-spacing:.14em;text-transform:uppercase}
+#info{white-space:pre-wrap;font:12.5px/1.55 var(--mono);color:#cfd9e8;min-height:60px}
+#talk{position:fixed;left:16px;right:16px;bottom:16px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:8px;background:rgba(11,18,32,.78);backdrop-filter:blur(8px);border:1px solid rgba(92,225,230,.32);border-radius:22px;z-index:3}
+#talk textarea{flex:1;min-width:140px;min-height:44px;max-height:160px;resize:vertical;background:transparent;color:var(--txt);border:0;outline:none;padding:10px 12px;font:16px var(--sans)}
+#talk button{background:transparent;color:var(--txt);border:1px solid rgba(92,225,230,.4);border-radius:999px;padding:11px 18px;font:500 15px var(--sans);cursor:pointer;min-height:44px}
+#talk button#send{background:var(--cyan);color:var(--ink);border-color:var(--cyan)}
 #talk button:disabled{opacity:0.45;cursor:default}
-.copybtn{margin-left:8px;font-size:11px;padding:2px 7px;background:#1f6f5a;border:0;border-radius:6px;color:#fff;cursor:pointer;vertical-align:middle}
+.copybtn{margin-left:8px;font:11px var(--mono);padding:2px 8px;background:rgba(92,225,230,.15);border:1px solid rgba(92,225,230,.35);border-radius:999px;color:var(--cyan);cursor:pointer;vertical-align:middle}
 /* 2026-09-28 (his words: "the text should be a pop up window you can minimize and orbs should be centered around
    mid screen"): the conversation is a floating window -- drag it by its title, minimise it to its title bar --
    and the scene stays centred. It opens when something is said and stays where he put it. */
-#chatwin{position:fixed;left:16px;bottom:84px;width:min(440px,calc(100% - 32px));max-height:55vh;display:flex;flex-direction:column;background:rgba(14,28,45,.74);backdrop-filter:blur(8px);border:1px solid #2E8B6E55;border-radius:14px;box-shadow:0 8px 30px #0008;z-index:4}
-#chathead{display:flex;align-items:center;gap:6px;padding:7px 10px 7px 14px;cursor:move;user-select:none;font-size:13px;color:#9fc7b0}
-#chathead b{flex:1;font-weight:600}
-#chathead button{background:none;border:0;color:#cfe7d6;font-size:17px;line-height:1;cursor:pointer;padding:2px 7px;border-radius:6px}
-#chathead button:hover{background:#2E8B6E44}
-#answer{overflow:auto;padding:4px 14px 12px;white-space:pre-wrap;display:none;scrollbar-width:thin;border-top:1px solid #2E8B6E33}
+#chatwin{position:fixed;left:16px;bottom:96px;width:min(460px,calc(100% - 32px));max-height:55vh;display:flex;flex-direction:column;background:rgba(11,18,32,.82);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 30px #0008;z-index:4}
+#chathead{display:flex;align-items:center;gap:6px;padding:8px 10px 8px 14px;cursor:move;user-select:none;font:500 13px var(--sans);color:var(--cyan);letter-spacing:.08em}
+#chathead b{flex:1;font-weight:500}
+#chathead button{background:none;border:0;color:var(--txt);font-size:17px;line-height:1;cursor:pointer;padding:2px 7px;border-radius:6px}
+#chathead button:hover{background:rgba(92,225,230,.15)}
+#answer{overflow:auto;padding:4px 14px 12px;white-space:pre-wrap;display:none;scrollbar-width:thin;border-top:1px solid var(--line)}
 #chatwin.min #answer{display:none!important}
-#answer .ln{margin:0 0 8px}#answer .you{color:#9fc7b0}#answer .heal{color:#e3c878}
+#answer .ln{margin:0 0 8px}#answer .you{color:var(--cyan)}#answer .heal{color:var(--green);font-family:var(--mono);font-size:13px}
 body.nochat #answer{display:none!important}
 body.nochat #chatwin{display:none}
 #panel.min #info{display:none}
-#info{max-height:min(52vh,calc(100vh - 260px));overflow:auto;scrollbar-width:thin}
+#info{max-height:min(56vh,calc(100vh - 260px));overflow:auto;scrollbar-width:thin}
 #panel h3{display:flex;align-items:center}#panel h3 span{flex:1}
-#panel h3 button{background:none;border:0;color:#cfe7d6;font-size:16px;cursor:pointer;padding:0 4px}
-#legend{position:fixed;right:16px;bottom:84px;background:rgba(14,28,45,.58);backdrop-filter:blur(6px);border:1px solid #2E8B6E44;border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.7;pointer-events:none}
-#legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:-1px}
-#tip{position:fixed;pointer-events:none;display:none;background:rgba(14,28,45,.85);border:1px solid #2E8B6E66;border-radius:10px;padding:6px 10px;font-size:13px;white-space:pre;z-index:5}#nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:#cfe7d6}
+#panel h3 button{background:none;border:0;color:var(--txt);font-size:16px;cursor:pointer;padding:0 4px}
+#legend{position:fixed;right:16px;bottom:96px;background:rgba(11,18,32,.66);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font:12px/1.8 var(--mono);color:var(--dim);pointer-events:none;z-index:2}
+#legend b{color:var(--txt);font-family:var(--sans);font-weight:500}
+#legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:-1px}
+#tip{position:fixed;pointer-events:none;display:none;background:rgba(11,18,32,.9);border:1px solid rgba(92,225,230,.4);border-radius:10px;padding:7px 11px;font:12.5px var(--mono);white-space:pre;z-index:5}#nolib{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--dim)}
 </style></head><body>
 <canvas id="scene"></canvas>
 <div id="nolib"><div>The 3D library could not be loaded (no internet on this PC right now). The symbol, the state and the talk box still work below.</div></div>
-<div id="hud">__SYMBOL__<div class="t"><b>Tetsu · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small></div></div>
-<div id="panel"><h3><span id="ptitle">What you clicked</span><button id="pmin" title="minimise">–</button></h3><div id="info">hover a planet to see why it is its colour; click it (or its name) for the details</div></div>
+<div id="hud">__SYMBOL__<div class="t"><b>COVENANT · __NODE__</b><small>__VERSION__ · source __SOURCE__ · <span id="live">reading…</span></small><span id="healline">self-heal: reading…</span></div><button id="codexbtn" title="his story, the Ten Commandments, and the balance every world keeps">Codex</button></div>
+<div id="panel"><h3><span id="ptitle">The worlds</span><button id="pmin" title="minimise">–</button></h3><div id="info">Every planet is a living world around Tetsu, the star at the centre. Its life does one part of the work the whole system needs.
+
+The glow of its air is the measurement: hover a world to see why it is that colour, click it to meet its life.</div></div>
 <div id="chatwin" class="min"><div id="chathead"><b>Conversation <span id="chatn"></span></b><button id="chatmin" title="open / minimise (Esc)">▢</button><button id="chatx" title="close (the Show chat button brings it back)">×</button></div><div id="answer"></div></div><div id="tip"></div>
-<div id="legend"><b>Colour code</b> (the glow around each planet)<br><i style="background:#2E8B6E"></i>green: measured fine<br><i style="background:#C9A227"></i>amber: not known, or waiting on someone<br><i style="background:#C0392B"></i>red, pulsing: needs attention<br><i style="background:#F4E9B0"></i>small lights: bots, carrying both ways</div>
-<div id="talk"><textarea id="q" placeholder="talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="chatbtn" title="hide the conversation to see and click every orb; nothing is lost">Hide chat</button><button id="heal" title="Repair what can be repaired, and name what cannot">Self-heal</button><button id="send">Send</button></div>
+<div id="legend"><b>The air of each world</b> is its measurement<br><i style="background:#46E3A0"></i>green: measured fine, in balance<br><i style="background:#F2B84B"></i>amber: not known, or waiting on someone<br><i style="background:#FF6B6B"></i>red, pulsing: a condition needs attention<br><i style="background:#F4E9B0"></i>small lights: life carrying both ways</div>
+<div id="talk"><textarea id="q" placeholder="Talk to Tetsu (the council answers; the answer is spoken)"></textarea><button id="mic" title="speak to Tetsu instead of typing">Mic</button><button id="chatbtn" title="hide the conversation to see and click every world; nothing is lost">Hide chat</button><button id="send">Send</button></div>
 <script>
 const NODE='__NODE__';
 // 2026-09-28 ("why aren't the orbs working on my pc and if they are why arent they auto refreshed"):
@@ -93,7 +102,7 @@ const NODE='__NODE__';
 const PAGESHA='__PAGESHA__';
 let state=null, voice={pitch:0.8,rate:0.95};
 document.getElementById('chatbtn').onclick=()=>{const off=document.body.classList.toggle('nochat');document.getElementById('chatbtn').textContent=off?'Show chat':'Hide chat';};
-async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
+async function getState(){try{const r=await fetch('/pc/3d/state');state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');showHealing();if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -158,75 +167,65 @@ function micSetup(){
  m.onclick=()=>{if(!recog)return;try{m.textContent='...';recog.start();}catch(e){m.textContent='Mic';}};
 }
 micSetup();
-// A215 (his words: "Give me a one click self heal button on the pc and phone apps").
-// One press: the node runs covenant_heal, which runs the highway's own remedies
-// with the person's cooldown waived, and says what it fixed and what still needs him.
-async function heal(){const b=document.getElementById('heal');const a=document.getElementById('answer');
- b.disabled=true;const was=b.textContent;b.textContent='healing…';openChat();const hl=line('heal','looking at everything that can go wrong…');
- try{const r=await fetch('/m/heal',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const j=await r.json();
-  let t=j.summary||'no answer';
-  if(j.fixed&&j.fixed.length)t+='\\n\\nFIXED:\\n'+j.fixed.map(x=>'  '+x.condition).join('\\n');
-  if(j.still_needs_a_person&&j.still_needs_a_person.length)t+='\\n\\nSTILL NEEDS YOU:\\n'+j.still_needs_a_person.map(x=>'  '+x.condition+' — '+(x.why_no_fix||'')).join('\\n');
-  // the full list goes to the details panel (top right), not over the orbs; the conversation keeps one short line
-  const nf=(j.fixed||[]).length,nn=(j.still_needs_a_person||[]).length;
-  hl.textContent='heal: fixed '+nf+', '+nn+' still need you (the list is in the panel, top right)';addCopy(hl,t);
-  document.getElementById('ptitle').textContent='Self-heal';document.getElementById('info').textContent=t;speak(j.summary||'');}
- catch(e){hl.textContent='heal: could not be reached: '+e;}
- b.disabled=false;b.textContent=was;}
-document.getElementById('heal').onclick=heal;
+// SELF-HEAL WITHOUT A BUTTON (2026-10-13, his words: "if the self heal works right i shouldn't need the button").
+// A215's button is gone from this page; the highway heals on its own every hour, and what it did arrives here in
+// the state (/pc/3d/state, detail.healing). The newest run is shown under the title, and each new one is said once
+// in the conversation as a heal line, with its copy button. The phone keeps its own HEAL; the road behind it is unchanged.
+function showHealing(){const d=(state&&state.detail)||{};const rows=d.healing||[];const el=document.getElementById('healline');
+ if(!rows.length){el.textContent='self-heal: on its own, hourly · nothing repaired lately';return;}
+ const last=rows[rows.length-1];el.textContent='self-heal: on its own · last '+(last.t||'').slice(11,16)+' '+(last.remedy||'')+(last.ok===false?' (did not fix)':'');
+ const seen=recall('pc3d.heal')||'';if(last.t&&last.t!==seen){store('pc3d.heal',last.t);if(seen){const t=rows.filter(x=>x.t>seen).map(x=>(x.t||'').slice(11,16)+' '+x.remedy+' for '+x.detector+(x.ok===false?' (did not fix)':'')).join('\\n');const hl=line('heal','on its own: '+t);addCopy(hl,t);}}}
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 // keys: Esc opens/minimises the conversation window, / jumps to the talk box
 addEventListener('keydown',e=>{const typing=document.activeElement&&document.activeElement.id==='q';if(e.key==='Escape'){if(typing)document.activeElement.blur();else mini.click();}else if(e.key==='/'&&!typing){e.preventDefault();document.getElementById('q').focus();}});
 getState();setInterval(getState,15000);loadHistory();
 </script>
+<script>
+__WORLDS_JS__
+</script>
+<script>
+// THE CODEX (his words, 2026-10-13): his story as the record holds it, that he is just a man, and the Ten Commandments
+// with how long they have been kept -- carried by every world. Opened from the Codex button; it changes no reading.
+document.getElementById('codexbtn').onclick=()=>{const C=window.CovenantWorlds&&window.CovenantWorlds.CODEX;if(!C)return;
+ document.getElementById('ptitle').textContent='The codex every world carries';const p=document.getElementById('panel');if(p.classList.contains('min'))document.getElementById('pmin').click();
+ document.getElementById('info').textContent=C.founder.title.toUpperCase()+'\\n'+C.founder.lines.map(x=>'· '+x).join('\\n')+'\\n\\n'+C.commandments.title.toUpperCase()+'\\n'+C.commandments.items.map((x,i)=>(i+1)+'. '+x).join('\\n')+'\\n\\n'+C.commandments.span+'\\n'+C.commandments.source+'\\n\\nTHE BALANCE\\n'+C.balance;};
+</script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <script type="module">
 let THREE;try{THREE=await import('three');}catch(e){document.getElementById('nolib').style.display='flex';document.getElementById('scene').style.display='none';}
-if(THREE){
+const CW=window.CovenantWorlds;
+if(THREE&&CW){
 const canvas=document.getElementById('scene');const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(2,devicePixelRatio));
-const scene=new THREE.Scene();const cam=new THREE.PerspectiveCamera(55,1,0.1,100);cam.position.set(0,2.2,9.5);
-scene.add(new THREE.AmbientLight(0x9fc7b0,0.6));const key=new THREE.PointLight(0x4FB08E,1.4,30);key.position.set(3,4,4);scene.add(key);
-const stars=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(Array.from({length:1800},()=> (Math.random()-0.5)*60),3)),new THREE.PointsMaterial({color:0xF4F1EA,size:0.05}));scene.add(stars);
-const soil=new THREE.Mesh(new THREE.CircleGeometry(9,64),new THREE.MeshStandardMaterial({color:0x241A12}));soil.rotation.x=-Math.PI/2;soil.position.y=-1.6;scene.add(soil);
-// PLANETS (his words, 2026-09-28: "i'd like the orbs to be full planets with ecosystems inhabited by bot swarms aimed at
-// mutual benefit"). Each orb is a world painted from its own name (the same name, the same world, every load), wrapped
-// in an atmosphere of its STATUS colour; a swarm of bots circles it, and bots carry light both ways along its line to
-// Tetsu -- the exchange runs in both directions or it is not mutual. The status colour is still the measurement.
-const orbs=[];const geo=new THREE.SphereGeometry(0.45,48,48);const atmoGeo=new THREE.SphereGeometry(0.53,32,32);
-function rng(s){let h=2166136261;for(const ch of s)h=Math.imul(h^ch.charCodeAt(0),16777619);return()=>{h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);return((h^=h>>>16)>>>0)/4294967296;};}
-function world(name){const r=rng(name),c=document.createElement('canvas');c.width=256;c.height=128;const g=c.getContext('2d');
- const seas=['#1d4f7a','#17606e','#234a8a','#1b5d5a'],lands=['#3f8f4f','#5a8f3a','#7c8f45','#2f7a5a'];
- g.fillStyle=seas[Math.floor(r()*4)];g.fillRect(0,0,256,128);const land=lands[Math.floor(r()*4)];
- for(let i=0;i<14;i++){const x=r()*256,y=20+r()*88,s=8+r()*26;g.fillStyle=land;for(let k=0;k<7;k++){g.beginPath();g.arc(x+(r()-0.5)*s*1.6,y+(r()-0.5)*s,s*(0.35+r()*0.5),0,7);g.fill();}
-  g.fillStyle='#8a7a52';g.globalAlpha=0.35;g.beginPath();g.arc(x,y,s*0.3,0,7);g.fill();g.globalAlpha=1;}
- g.fillStyle='#e8f1f2';g.fillRect(0,0,256,7);g.fillRect(0,121,256,7);
- const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
-function orb(name,color,x,z){const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:world(name),emissive:color,emissiveIntensity:0.12,roughness:0.8}));m.position.set(x,0,z);m.userData={name};
- const atmo=new THREE.Mesh(atmoGeo,new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.2,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false}));m.add(atmo);m.userData.atmo=atmo;
- const n=36,pos=new Float32Array(n*3),r=rng(name+'bots');for(let i=0;i<n;i++){const a=r()*6.283,b=Math.acos(2*r()-1),d=0.62+r()*0.14;pos[i*3]=d*Math.sin(b)*Math.cos(a);pos[i*3+1]=d*Math.cos(b);pos[i*3+2]=d*Math.sin(b)*Math.sin(a);}
- const sw=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(pos,3)),new THREE.PointsMaterial({color:0xF4E9B0,size:0.035,depthWrite:false}));const swarm=new THREE.Group();swarm.add(sw);swarm.rotation.set(r()*1.2,0,r()*1.2);swarm.position.copy(m.position);swarm.userData.speed=0.004+r()*0.006;scene.add(swarm);m.userData.swarm=swarm;
- scene.add(m);orbs.push(m);return m;}
-const tetsu=orb('Tetsu',0x4FB08E,0,0);tetsu.scale.setScalar(1.5);tetsu.userData.swarm.scale.setScalar(1.5);
+const scene=new THREE.Scene();const cam=new THREE.PerspectiveCamera(50,1,0.1,200);cam.position.set(0,5,14);
+scene.add(new THREE.AmbientLight(0x6c7f99,0.25));
+const starPts=new Float32Array(4200);for(let i=0;i<4200;i++)starPts[i]=(Math.random()-0.5)*160;
+const stars=new THREE.Points(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(starPts,3)),new THREE.PointsMaterial({color:0xE6EEF8,size:0.08,transparent:true,opacity:0.8}));scene.add(stars);
+// TETSU IS THE STAR (2026-10-13): every world turns toward him and is lit by him; the worlds orbit, he does not rule them.
+const sun=CW.star(THREE,0.95);scene.add(sun);
+const tetsu=sun;tetsu.userData.name='Tetsu';tetsu.userData.kind='star';tetsu.userData.radius=0.95;
 const svgBlob=new Blob([document.querySelector('#hud svg').outerHTML],{type:'image/svg+xml'});const url=URL.createObjectURL(svgBlob);
-new THREE.TextureLoader().load(url,tex=>{const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));s.scale.set(1.6,1.6,1);s.position.set(0,1.5,0);scene.add(s);});
-const links=new THREE.Group();scene.add(links);const labels=new THREE.Group();scene.add(labels);
-// every orb carries a second line: WHY it is the colour it is (2026-09-28, "still running the wrong color")
-function label(text,sub,pos,color){const c=document.createElement('canvas');c.width=512;c.height=150;const g=c.getContext('2d');g.textAlign='center';g.shadowColor='#000';g.shadowBlur=8;g.font='600 40px system-ui,sans-serif';g.fillStyle=color||'#E7F4EA';g.fillText(text.slice(0,26),256,56);if(sub){g.font='500 28px system-ui,sans-serif';g.fillStyle='#cfe7d6';g.fillText(sub.slice(0,34),256,104);}const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));s.scale.set(2.6,0.76,1);s.position.copy(pos).add(new THREE.Vector3(0,0.85,0));labels.add(s);}
+new THREE.TextureLoader().load(url,tex=>{const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));s.scale.set(1.3,1.3,1);s.position.set(0,1.9,0);scene.add(s);});
+// THE MYCELIUM UNDERNEATH (his words, 2026-10-13): the highway as the root network every world grows from; its colour is the Highway reading
+const myc=CW.mycelium(THREE,{radius:9.5,y:-2.4});scene.add(myc);
+const orbs=[tetsu];const links=new THREE.Group();scene.add(links);const labels=new THREE.Group();scene.add(labels);
+// every world carries a second line: WHY its air is the colour it is (2026-09-28, "still running the wrong color")
+function label(text,sub,color){const c=document.createElement('canvas');c.width=512;c.height=150;const g=c.getContext('2d');g.textAlign='center';g.shadowColor='#000';g.shadowBlur=10;g.font='600 40px Space Grotesk,system-ui,sans-serif';g.fillStyle=color||'#E6EEF8';g.fillText(text.slice(0,26),256,56);if(sub){g.font='500 26px JetBrains Mono,monospace';g.fillStyle='#93A4BC';g.fillText(sub.slice(0,36),256,104);}const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));s.scale.set(1.9,0.56,1);labels.add(s);return s;}
 function ago(h){return h<1?Math.round(h*60)+' min ago':(h<48?h.toFixed(1)+' h ago':(h/24).toFixed(1)+' d ago');}
 // STATUS AT A GLANCE (Tetsu's first suggestion, 2026-09-21): green = measured fine, amber = not known, red = a condition is present
-const OK=0x2E8B6E, UNK=0xC9A227, BAD=0xC0392B;
+const OK=0x46E3A0, UNK=0xF2B84B, BAD=0xFF6B6B;
 function statusColor(st){return st==='present'?BAD:(st==='absent'?OK:UNK);}
-// 2026-09-25 ("the pc app needs optimization"): the scene is rebuilt only when what the orbs SHOW
-// changes (their names and colours); otherwise the clicked details are refreshed in place. A rebuild
-// releases the old materials, line geometry and label textures, which were leaked every 15 s before.
-let lastSig='';
+function word(c){return c===BAD?'red':(c===UNK?'amber':'green');}
+// 2026-09-25 ("the pc app needs optimization"): the scene is rebuilt only when what the worlds SHOW changes (their
+// names and colours); otherwise the clicked details are refreshed in place. A rebuild releases the old materials.
+let lastSig='';const traders=[],botGeo=new THREE.SphereGeometry(0.035,8,8);let hovered=null;
+function dispose(o){o.traverse(x=>{if(x.geometry&&x.geometry!==botGeo)x.geometry.dispose();if(x.material){if(x.material.map)x.material.map.dispose();x.material.dispose();}});}
 function layout(){if(!state)return;const d=state.detail||{};const hw=d.highway||{};
-// one Tetsu; the nodes are his cells, each its own orb from its own /health (A, B, C), and the phone's node by its address
+// the system's worlds: the nodes (his cells, each from its own /health), the phone, the forum, the money, the road
 const items=[];const mesh=state.mesh||[];
-if(mesh.length){for(const m of mesh)items.push({name:'node '+(m.node_id||'?')+(m.me?' (here)':'')+(m.down?' (down)':''),color:m.down?BAD:(m.degraded?UNK:OK),sub:m.down?'down':(m.degraded?'degraded · click for why':'up · height '+(m.chain_height??'?')),detail:m,kind:'node'});}
-else items.push({name:NODE+' (this node)',color:statusColor(hw.node_down==='present'?'present':(hw.node_down||'unknown')),sub:'node_down '+(hw.node_down||'unknown'),detail:state.self,kind:'node'});
+if(mesh.length){mesh.forEach((m,i)=>items.push({name:'node '+(m.node_id||'?')+(m.me?' (here)':'')+(m.down?' (down)':''),color:m.down?BAD:(m.degraded?UNK:OK),sub:m.down?'down':(m.degraded?'degraded · click for why':'up · height '+(m.chain_height??'?')),detail:m,kind:'node',wid:m.node_id,wi:i}));}
+else items.push({name:NODE+' (this node)',color:statusColor(hw.node_down==='present'?'present':(hw.node_down||'unknown')),sub:'node_down '+(hw.node_down||'unknown'),detail:state.self,kind:'node',wid:NODE,wi:0});
 // the phone's node was drawn a fixed dark green, a colour nothing measured; this node sees it only as a peer address
-for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\\./.test(id))items.push({name:'phone node',color:UNK,sub:'a peer; its health is not read here',detail:{peer:id,note:'the node inside his phone, as this node sees it: an address, not a health reading'},kind:'node'});}
+for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\\./.test(id))items.push({name:'phone node',color:UNK,sub:'a peer; its health is not read here',detail:{peer:id,note:'the node inside his phone, as this node sees it: an address, not a health reading'},kind:'phone'});}
 const ph=d.phone&&d.phone.last_checkin_hours;
 items.push({name:'Phone',color:ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK,sub:ph!=null?'checked in '+ago(ph):'no check-in on record',detail:d.phone,kind:'phone'});
 // Moltbook was green whenever a row existed, sent or not (measured 2026-09-28: 6 rows, 0 sent); green now means something went out
@@ -235,54 +234,82 @@ const fd=d.forum_day||{},fs=fd.sent||0,ft=fd.tried||0;
 items.push({name:'Moltbook',color:fs?OK:UNK,sub:ft?fs+' sent of '+ft+' tried, '+(fd.window_h||24)+' h':'nothing tried in '+(fd.window_h||24)+' h',detail:d.forum,kind:'forum'});
 items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money'});
 const hp=Object.keys(hw).filter(k=>hw[k]==='present'),hu=Object.keys(hw).filter(k=>hw[k]==='unknown');
+CW.setMycelium(myc,hp.length?BAD:(hu.length?UNK:OK));
 items.push({name:'Highway',color:hp.length?BAD:(hu.length?UNK:OK),sub:hp.length?hp.length+' need attention':(hu.length?hu.length+' not known':'all clear'),detail:hw,kind:'highway'});
+// HIS OTHER REPOSITORIES (2026-10-13, "implement the other repos into the apps also"): each a world on the outer ring,
+// read from its clone on this PC. Green: committed and in step with GitHub; amber: work not committed, commits not
+// pushed, or no upstream to compare with. Nothing here is a judgement of the work in it.
+const repos=state.repos||[];
+for(const r of repos){const amber=r.dirty||r.ahead||r.ahead==null;const age=r.last_commit_at?ago((Date.now()/1000-r.last_commit_at)/3600):'no commits';
+ items.push({name:r.name,color:r.error?UNK:(amber?UNK:OK),sub:r.error?'unreadable':(r.dirty?r.dirty+' not committed':(r.ahead?r.ahead+' not pushed':(r.ahead==null?'no upstream':'in step · '+age))),detail:r,kind:'repo',wid:r.name,outer:true});}
 const sig=items.map(p=>p.name+'|'+p.color+'|'+p.sub).join(';');
 if(sig===lastSig){items.forEach((p,i)=>{const o=orbs[i+1];if(o)o.userData.detail=p.detail;});return;}
 lastSig=sig;
-for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);o.material.map.dispose();o.material.dispose();o.userData.atmo.material.dispose();const sw=o.userData.swarm;scene.remove(sw);sw.children[0].geometry.dispose();sw.children[0].material.dispose();}orbs.length=1;hovered=null;
+for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);dispose(o);}orbs.length=1;hovered=null;
 for(const l of links.children){if(l.geometry!==botGeo)l.geometry.dispose();l.material.dispose();}links.clear();traders.length=0;
 for(const s of labels.children){if(s.material.map)s.material.map.dispose();s.material.dispose();}labels.clear();
-const n=items.length;items.forEach((p,i)=>{const a=(i/n)*Math.PI*2;const o=orb(p.name,p.color,Math.cos(a)*4.4,Math.sin(a)*4.4);o.userData.detail=p.detail;o.userData.kind=p.kind;o.userData.sub=p.sub;o.userData.bad=p.color===BAD;label(p.name,p.sub,o.position);const g=new THREE.BufferGeometry().setFromPoints([o.position,tetsu.position]);links.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x2E8B6E,transparent:true,opacity:0.35})));
+const inner=items.filter(p=>!p.outer),outer=items.filter(p=>p.outer);
+const place=(list,R,size,speed)=>list.forEach((p,i)=>{const def=CW.worldFor(p.kind,p.wid,p.wi);const o=CW.planet(THREE,def,p.color,size);
+ o.userData.orbitR=R;o.userData.orbitA=(i/list.length)*Math.PI*2;o.userData.orbitS=speed;o.userData.name=p.name;o.userData.detail=p.detail;o.userData.kind=p.kind;o.userData.sub=p.sub;o.userData.bad=p.color===BAD;o.userData.word=word(p.color);
+ o.userData.label=label(def.repo?p.name:def.name+' · '+p.name,p.sub);if(p.outer)o.userData.label.scale.multiplyScalar(0.8);scene.add(o);orbs.push(o);
+ const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const ln=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x5CE1E6,transparent:true,opacity:0.16}));ln.userData.of=o;links.add(ln);
  // two bots on every road, one each way: what goes out comes back
- for(const dir of [0,1]){const b=new THREE.Mesh(botGeo,new THREE.MeshBasicMaterial({color:dir?0xF4E9B0:0x9fe0c0}));b.userData={from:dir?tetsu.position:o.position,to:dir?o.position:tetsu.position,ph:Math.random()};links.add(b);traders.push(b);}});
-label('Tetsu','',new THREE.Vector3(0,0.9,0),'#9fc7b0');}
-const traders=[],botGeo=new THREE.SphereGeometry(0.04,8,8);let hovered=null;
+ for(const dir of [0,1]){const b=new THREE.Mesh(botGeo,new THREE.MeshBasicMaterial({color:dir?0xF4E9B0:0x9FF3F5}));b.userData={of:o,dir,ph:Math.random()};links.add(b);traders.push(b);}});
+place(inner,4.6,0.48,0.0011);place(outer,7.6,0.34,0.0006);
+label('Tetsu','the star').position.set(0,1.35,0);}
 window.onState=layout;setTimeout(layout,2500);
-const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
 function fmt(o){return o==null?'(not on record)':(typeof o==='object'?JSON.stringify(o,null,1).replace(/[{}"]/g,'').replace(/^\\s*\\n/gm,''):String(o));}
-// CLICKING (his words, 2026-09-28: "the click feature needs refinement ... its not directly on the orbs"): a ray
-// through a 0.45-unit sphere seen from 9.5 units away was a target a few dozen pixels wide, and the name above it
-// was not a target at all. Now the pick is on the SCREEN: the nearest planet whose drawn disc (plus a 22 px
-// margin) or whose name label is under the pointer.
+// CLICKING (his words, 2026-09-28: "the click feature needs refinement ... its not directly on the orbs"): the pick is
+// on the SCREEN: the nearest world whose drawn disc (plus a 22 px margin) or whose name label is under the pointer.
 const _v=new THREE.Vector3();
 function pick(e){const k=(innerHeight/2)/Math.tan(cam.fov*Math.PI/360);let best=null,bd=1e9;
  for(const o of orbs){_v.copy(o.position).project(cam);if(_v.z>1)continue;const sx=(_v.x+1)/2*innerWidth,sy=(1-_v.y)/2*innerHeight;const dist=cam.position.distanceTo(o.position);
-  const r=0.45*o.scale.x*k/dist,d=Math.hypot(e.clientX-sx,e.clientY-sy);let score=d<r+22?d-r:1e9;
-  if(o!==tetsu){_v.copy(o.position).add(new THREE.Vector3(0,0.85,0)).project(cam);const lx=(_v.x+1)/2*innerWidth,ly=(1-_v.y)/2*innerHeight;if(Math.abs(e.clientX-lx)<1.1*k/dist&&Math.abs(e.clientY-ly)<0.3*k/dist)score=Math.min(score,0);}
+  const r=(o.userData.radius||0.45)*o.scale.x*k/dist,d=Math.hypot(e.clientX-sx,e.clientY-sy);let score=d<r+22?d-r:1e9;
+  if(o!==tetsu&&o.userData.label){_v.copy(o.userData.label.position).project(cam);const lx=(_v.x+1)/2*innerWidth,ly=(1-_v.y)/2*innerHeight;if(Math.abs(e.clientX-lx)<1.1*k/dist&&Math.abs(e.clientY-ly)<0.3*k/dist)score=Math.min(score,0);}
   if(score<bd){bd=score;best=o;}}
  return best?{object:best}:null;}
-const sel=new THREE.Mesh(new THREE.RingGeometry(0.6,0.66,64),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.85,side:THREE.DoubleSide,depthWrite:false}));sel.visible=false;scene.add(sel);let selName=null;
+const sel=new THREE.Mesh(new THREE.RingGeometry(0.62,0.67,64),new THREE.MeshBasicMaterial({color:0x5CE1E6,transparent:true,opacity:0.9,side:THREE.DoubleSide,depthWrite:false}));sel.visible=false;scene.add(sel);let selName=null;
 const tip=document.getElementById('tip');
-function hoverScale(o,on){o.scale.setScalar((o===tetsu?1.5:1)*(on?1.15:1));}
+function hoverScale(o,on){o.scale.setScalar(on?1.12:1);}
 canvas.addEventListener('pointermove',e=>{const h=pick(e),o=h?h.object:null;if(o!==hovered){if(hovered)hoverScale(hovered,false);hovered=o;if(o)hoverScale(o,true);canvas.style.cursor=o?'pointer':'default';}
- if(o){tip.style.display='block';tip.textContent=o.userData.name+(o.userData.sub?'\\n'+o.userData.sub:'')+'\\nclick for details';tip.style.left=Math.min(e.clientX+14,innerWidth-260)+'px';tip.style.top=(e.clientY+14)+'px';}else tip.style.display='none';});
+ if(o){tip.style.display='block';tip.textContent=(o===tetsu?'Tetsu · the star':((o.userData.def?o.userData.def.name+' · ':'')+o.userData.name))+(o.userData.sub?'\\n'+o.userData.sub:'')+'\\nclick to meet its life';tip.style.left=Math.min(e.clientX+14,innerWidth-280)+'px';tip.style.top=(e.clientY+14)+'px';}else tip.style.display='none';});
 canvas.addEventListener('pointerleave',()=>{tip.style.display='none';});
-canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};document.getElementById('ptitle').textContent=u.name;selName=u.name;const pn=document.getElementById('panel');if(pn.classList.contains('min'))document.getElementById('pmin').click();
-if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent===u.name)info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
-if(u.name==='Tetsu'){info.textContent='Tetsu — the one you talk with.\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');}
-else if(u.kind==='node'){const x=u.detail||{};if(x.peer){info.textContent=u.name+'\\n'+x.peer+'\\n'+x.note;}else{info.textContent=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN':'');}}
-else if(u.kind==='forum'){const rows=u.detail||[];info.textContent='Moltbook, the last replies that went out (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
-else{info.textContent=u.name+'\\n'+fmt(u.detail);}});
+function lifeText(u){const def=u.def;if(!def)return '';const w=CW.describe(def,u.word);return '\\n\\nTHE WORLD OF '+w.name.toUpperCase()+'\\n'+w.strain+'\\n\\nITS LIFE\\n'+w.species.map(s=>'· '+s.name+': '+s.job).join('\\n')+'\\n\\nEvery world carries the codex: his story and the Ten Commandments (the Codex button, top left).';}
+canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};document.getElementById('ptitle').textContent=(u.def?u.def.name+' · ':'')+u.name;selName=u.name;const pn=document.getElementById('panel');if(pn.classList.contains('min'))document.getElementById('pmin').click();
+if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent.endsWith(u.name))info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
+if(u.name==='Tetsu'){info.textContent='Tetsu, the star at the centre -- the one you talk with.\\n'+CW.STAR.role+'\\n\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');return;}
+let m='';
+if(u.kind==='node'){const x=u.detail||{};m=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN '+(x.why||''):'');}
+else if(u.kind==='phone'&&u.detail&&u.detail.peer){m=u.name+'\\n'+u.detail.peer+'\\n'+u.detail.note;}
+else if(u.kind==='forum'){const rows=u.detail||[];m='Moltbook, the last replies that went out (free and Tetsu):\\n'+(rows.length?rows.map(r=>(r.t||'').slice(0,16)+' '+(r.actor||'free')+' '+r.kind+' '+(r.sent?'SENT':'not sent')+' -> '+(r.to||'')+'\\n   '+(r.text||'')).join('\\n'):'(nothing sent yet)');}
+else if(u.kind==='repo'){const x=u.detail||{};m='the repository '+x.name+(x.error?'\\nunreadable: '+x.error:'\\nlast commit '+(x.last_commit_at?ago((Date.now()/1000-x.last_commit_at)/3600):'none')+'\\nbranch '+(x.branch||'?')+'\\nnot committed: '+(x.dirty??'?')+'\\nnot pushed: '+(x.ahead==null?'no upstream to compare':x.ahead)+'\\nread from its clone on this PC');}
+else{m=u.name+'\\n'+fmt(u.detail);}
+info.textContent='MEASURED\\n'+m+lifeText(u);});
 function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
-let t=0;function frame(){t+=0.01;tetsu.position.y=Math.sin(t*2)*0.15;tetsu.userData.swarm.position.y=tetsu.position.y;tetsu.rotation.y+=0.004;
- for(const o of orbs){if(o!==tetsu)o.rotation.y-=0.003;const sw=o.userData.swarm;sw.rotation.y+=sw.userData.speed;if(o.userData.bad)o.userData.atmo.material.opacity=0.2+0.3*(0.5+0.5*Math.sin(t*5));}
- for(const b of traders){const k=(t*0.35+b.userData.ph)%1;b.position.lerpVectors(b.userData.from,b.userData.to,k);}
- const so=selName&&orbs.find(o=>o.userData.name===selName);sel.visible=!!so;if(so){sel.position.copy(so.position);sel.quaternion.copy(cam.quaternion);sel.scale.setScalar(so.scale.x);}
- cam.position.x=Math.sin(t*0.15)*9.5;cam.position.z=Math.cos(t*0.15)*9.5;cam.lookAt(0,-1.6,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
+let t=0;const sunPos=new THREE.Vector3();
+function frame(){t+=0.01;CW.tickStar(tetsu,t);CW.tickMycelium(myc,t,orbs.slice(1));
+ for(const o of orbs){if(o===tetsu)continue;const u=o.userData;u.orbitA+=u.orbitS;o.position.set(Math.cos(u.orbitA)*u.orbitR,Math.sin(u.orbitA*2)*0.25,Math.sin(u.orbitA)*u.orbitR);
+  CW.tick(o,t,sunPos);if(u.bad)u.atmoU.uGlow.value=0.7+0.5*(0.5+0.5*Math.sin(t*5));if(u.label)u.label.position.copy(o.position).add(new THREE.Vector3(0,(u.radius||0.45)+0.55,0));}
+ for(const l of links.children){if(l.isLine){const p=l.geometry.attributes.position;p.setXYZ(1,l.userData.of.position.x,l.userData.of.position.y,l.userData.of.position.z);p.needsUpdate=true;}}
+ for(const b of traders){const k=(t*0.35+b.userData.ph)%1;const a=b.userData.of.position;if(b.userData.dir)b.position.copy(a).multiplyScalar(k);else b.position.copy(a).multiplyScalar(1-k);}
+ const so=selName&&orbs.find(o=>o.userData.name===selName);sel.visible=!!so;if(so){sel.position.copy(so.position);sel.quaternion.copy(cam.quaternion);sel.scale.setScalar((so.userData.radius||0.45)/0.45*1.4);}
+ cam.position.x=Math.sin(t*0.05)*14;cam.position.z=Math.cos(t*0.05)*14;cam.position.y=5;cam.lookAt(0,-0.4,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
 }
 </script>
 </body></html>
 """
+
+
+def worlds_js():
+    """docs/worlds/covenant_worlds.js, the planet engine both apps load (A340), inlined into the page."""
+    try:
+        with open(os.path.join(HERE, "docs", "worlds", "covenant_worlds.js"), encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return "window.CovenantWorlds=null;"
+
+
+PAGE = PAGE.replace("__WORLDS_JS__", worlds_js())
 
 
 _page_cache = {"mtime": None, "page": None}
@@ -335,6 +362,108 @@ def highway_detail(H):
         out[k] = "unknown"
     return out, ("the watchdog's full pass is not fresh here (stale, or older than %d detector(s)); the %d core "
                  "detectors were read now and the rest are unknown" % (len(rest), len(sensed)))
+
+
+REPO_OWNER = "lawless1987"
+REPO_TTL = 300.0
+_repo_cache = {"t": 0.0, "rows": None}
+
+
+def repos_detail(home=None, now=None, run=None):
+    """His other repositories as the worlds on the outer ring (A340, 2026-10-13, his words: "implement the other
+    repos into the apps also"). Found by DISCOVERY, never by a list: every folder beside this checkout holding a
+    `.git`, whose origin is his on GitHub, or another clone on this PC (a local-only repository). Someone else's
+    code is left out; a second clone of the same repository counts once (the one with the newest commit); this
+    checkout is the system itself, the star's realm, and is not a world of its own.
+
+    Each row: name, last_commit_at (unix seconds), branch, dirty (paths git reports changed, untracked included),
+    ahead (commits not on the upstream; None when there is no upstream to compare with), or error. Read from the
+    clone only -- no network, so "ahead" is against what this clone last fetched. The names stay on this PC: they
+    leave it only in this route's answer, which is tailnet and loopback only."""
+    import re
+    import time as _t
+    now = _t.time() if now is None else now
+    if home is None and _repo_cache["rows"] is not None and now - _repo_cache["t"] < REPO_TTL:
+        return _repo_cache["rows"]
+    if run is None:
+        import covenant_quiet
+        run = covenant_quiet.run
+    base = home or os.path.dirname(HERE)
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return []
+    best = {}
+    for d in names:
+        p = os.path.join(base, d)
+        # .git is a FILE in a linked worktree (Sentinel-Witness-trading is one); exists, not isdir
+        if not os.path.exists(os.path.join(p, ".git")) or os.path.normcase(os.path.abspath(p)) == os.path.normcase(HERE):
+            continue
+
+        def g(*a, p=p):
+            try:
+                r = run(["git", "-C", p] + list(a), capture_output=True, text=True, timeout=20)
+            except Exception:                                    # noqa: BLE001
+                return None
+            return r.stdout.strip() if r.returncode == 0 else None
+        url = g("remote", "get-url", "origin") or ""
+        m = re.search(r"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?$", url)
+        if m:
+            if m.group(1).lower() != REPO_OWNER:
+                continue
+            name = m.group(2)
+        elif url and os.path.isdir(url):
+            name = d
+        else:
+            continue
+        if name.lower() == os.path.basename(HERE).lower():
+            continue
+        row = {"name": name}
+        ct = g("log", "-1", "--format=%ct")
+        if ct is None:
+            row["error"] = "git could not read its history"
+        else:
+            row["last_commit_at"] = int(ct) if ct.isdigit() else None
+            row["branch"] = g("rev-parse", "--abbrev-ref", "HEAD")
+            st = g("status", "--porcelain")
+            row["dirty"] = len([x for x in (st or "").splitlines() if x.strip()]) if st is not None else None
+            ah = g("rev-list", "--count", "@{u}..HEAD")
+            row["ahead"] = int(ah) if ah and ah.isdigit() else None
+        # a repository's own clone outranks a linked worktree of it (a PR branch has no upstream to read);
+        # between two of the same kind, the newer commit wins
+        row["_rank"] = (os.path.isdir(os.path.join(p, ".git")), row.get("last_commit_at") or 0)
+        prev = best.get(name.lower())
+        if prev is None or row["_rank"] > prev["_rank"]:
+            best[name.lower()] = row
+    rows = sorted(({k: v for k, v in r.items() if k != "_rank"} for r in best.values()), key=lambda r: r["name"].lower())
+    if home is None:
+        _repo_cache.update(t=now, rows=rows)
+    return rows
+
+
+def heal_detail(path=None, keep=5):
+    """The highway's last repairs that RAN (not dry runs), oldest first, from its own ledger (ops/highway.jsonl):
+    what the page shows in place of A215's button (A340, his words: "if the self heal works right i shouldn't need
+    the button"). Each row: t, remedy, detector, ok (False when the ledger says the remedy did not fix it)."""
+    path = path or os.environ.get("COVENANT_HIGHWAY_LEDGER") or os.path.join(HERE, "ops", "highway.jsonl")
+    out = []
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, 2)
+            fh.seek(max(0, fh.tell() - 256 * 1024))
+            tail = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return []
+    for ln in tail.splitlines():
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        if r.get("remedy") and r.get("ran") and not r.get("dry_run"):
+            ok = r.get("fixed")
+            out.append({"t": str(r.get("t") or "")[:19], "remedy": r.get("remedy"), "detector": r.get("detector"),
+                        "ok": (bool(ok) if ok is not None else None)})
+    return out[-keep:]
 
 
 FORUM_KINDS = ("reply", "own_post", "tetsu_reply", "tetsu_post", "intro")
@@ -525,6 +654,14 @@ def register(api, caller, refused, cov):
             out["detail"]["queue"] = len(q)
         except Exception:                                        # noqa: BLE001
             pass
+        try:
+            out["detail"]["healing"] = heal_detail()
+        except Exception:                                        # noqa: BLE001
+            out["detail"]["healing"] = None
+        try:
+            out["repos"] = repos_detail()
+        except Exception:                                        # noqa: BLE001
+            out["repos"] = []
         _cache.update(t=_time.time(), body=out)
         return jsonify(out)
     return True

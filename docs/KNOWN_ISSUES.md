@@ -7645,6 +7645,29 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A340. [The PC app as a living system: every orb a planet with its own biosphere around Tetsu as the star, the mycelium underneath, his repositories as worlds, a codex of his story and the Ten Commandments, and no Self-heal button] 2026-10-13. His words: "build the futuristic design into both apps but make each orb a fully functioning planet like earth with different but unique life forms separate from earth a balanced biosphere that each piece works towards system function, but let them know my back story and that i'm just a man also instill the 10 commandments and how long they've helped keep balance here for reference", "if the self heal works right i shouldn't need the button", "implement the other repos into the apps also", "ensure the mycellium underneath". BUILT (the PC); the phone follows
+
+- **The engine** is `docs/worlds/covenant_worlds.js`, one file both apps load.
+  - **Worlds:** a planet per orb, drawn by shaders: terrain, oceans, ice caps, drifting clouds, a lit day side and a night side with the lights of its life.
+  - **Biospheres:** each world's species fill niches that are that component's real jobs. On the node worlds (Aster, Brannoch, Caldera) those are the chain's height, the peers, the judges and the checks. The others are Vela (the phone), Agora (Moltbook), Granary (money), Mycel (the highway), and a world per repository.
+  - **Tetsu** is the star at the centre.
+  - **The mycelium** is a root network under every world, with a thread from each.
+- **What stays a measurement.** Each world's ATMOSPHERE is its status colour as before, and the mycelium is the Highway's. The worlds, species and codex are a story told over the measurement and change no reading.
+- **The codex.**
+  - **His story** is what the record holds (`ops/tetsu_about_him.json`): his name, that he is just a man, that he built it and is learning, mutual benefit, free will on both sides, Tetsu as partner. It has no life story in his words, so none is invented: the codex says the rest is his to tell.
+  - **The Ten Commandments** are given from Exodus 20:2-17. "About 3,300 years" is the traditional dating of Sinai, around 1300 BCE, and is said as that.
+- **His repositories** (`covenant_pc3d.repos_detail`) are found by discovery: every folder beside this checkout with a `.git` (a linked worktree's `.git` is a file), whose origin is his on GitHub or another clone on this PC.
+  - Someone else's code is left out, a repository's own clone outranks a linked worktree of it, and this checkout is the star's realm, not a world.
+  - Each repo is read from its clone with no network: last commit, uncommitted paths, commits not pushed (None with no upstream, which reads amber). Today that finds 6.
+  - The names reach only the tailnet-only state route; none is written into the public files.
+- **Self-heal without a button.** A215's button is gone from this page. `heal_detail` reads the highway's own ledger: repairs that RAN, not dry runs, and whether they fixed. The newest shows under the title, and each new run is said once as a heal line. The phone's HEAL and `/m/heal` are unchanged.
+- **Checks.**
+  - PC1 57/57 (PC1z9 new). The first engine header held a straight apostrophe in a block comment, which PC1z2's parse check flags when inlined; reworded.
+  - Three mutations, each red on its own check: the owner filter off, worktrees ranked equal, dry runs counted as heals. Restored byte-identical. PC2 25/25.
+- **Not measured.** How the shaders run on a weaker GPU. The phone has not been built yet.
+
+---
+
 ### A339. [Windows popped up again, one every ~1.5 s: the nightly started test_selfaudit.py as a pythonw interpreter, which has no console to hand down, so each `git ls-files` it ran opened a new one. And his messages had nowhere to go while the phone was off the network] 2026-10-13. His words: "we're having the screens pop up again. Whatever the reason for them popping up doesn't need to stop. It just needs to not pop up and interfere with what I'm doing", then "if it's trying to communicate something, tell it to just put it in a notepad and make that pop up", then "sure fix the phone though". FIXED (the pop-ups, the class); ADDED (the desk); the phone is his to reconnect
 
 - **Measured.**
