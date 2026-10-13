@@ -109,3 +109,38 @@ This update section and the four artifacts
 the commit hash is in `git log` for this file. Nothing was deleted or rewritten.
 Interpretation of the deep-dive and trend findings remains open.
 
+## Update 2026-10-13 ~08:00 UTC: Claude on-screen text coherence pass (as-is, interpretation open)
+
+### Before view (inbound)
+
+After the deep-dive and trend update (8402ad3), a separate read-only pass finished on the
+box at `/workspace/content-review-20261013/claude-text-coherence/`. It asks whether the
+on-screen text in Lawrence's Claude posts is coherent, which bears on his Oct 13 account
+recorded above. This update appends that pass as-is; interpretation remains open. Nothing
+above was deleted or rewritten.
+
+### Results — Claude text coherence — **completed**
+
+Source: `/workspace/content-review-20261013/claude-text-coherence/REPORT.md`
+(copied as `docs/results/ocr-audio-20261013/COHERENCE_REPORT.md` and
+`coherence_per_post.csv`). No posts, pushes, or source edits were made by that pass.
+
+- Claude posts identified: **61** videos (56 from the OCR corpus plus 5 from Sep 26–Oct 12 passes).
+- Judged by hand (full or deep read): **17**. Automated checks only: **44** (NOT_JUDGED).
+- Counts: **COHERENT 11, PARTIAL 2, UNREADABLE 4, NOT_JUDGED 44, INCOHERENT 0.**
+- PARTIAL, Oct 6 (`2107491305077055657`): on-screen Claude text reports the user flagging
+  reordering; the pass did not independently confirm a structural break frame by frame.
+- PARTIAL, Oct 12 (`2109651670531498036`): the known ~276–288 s display-order anomaly
+  (same event already in the deep dive).
+- First reported text problem in the judged set: Oct 6. First frame-verified break: Oct 12.
+- Speech videos begin Sep 26 (before Oct 6); some no-speech videos continue after speech started.
+- Image posts (12) were not downloaded or OCRed. 44 posts were not read line-by-line.
+
+Status: **completed**. Interpretation remains open.
+
+### After view (outbound + commit)
+
+This update section and the two artifacts (`COHERENCE_REPORT.md`, `coherence_per_post.csv`)
+were appended/copied and pushed to LAWLESS1987/covenant; the commit hash is in `git log`
+for this file. Nothing was deleted or rewritten. Interpretation remains open.
+
