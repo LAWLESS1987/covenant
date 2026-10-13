@@ -1,8 +1,8 @@
-# J-Space cross-referenced against covenant — and against the pre-reveal record
+# L-Space cross-referenced against covenant — and against the pre-reveal record
 
 Written 2026-09-17, on the operator's instruction, after reading Anthropic's
 ["A Global Workspace in Language Models"](https://www.anthropic.com/research/global-workspace)
-(the "J-space" / Jacobian-lens result, announced **6 July 2026**).
+(Anthropic's "J-space" / Jacobian-lens result, announced **6 July 2026**; Lawrence naming for this build: **LSpace** / L-space).
 
 This document does three things and keeps them separate on purpose: it maps the
 finding against what covenant was already built to do; it records, again, that
@@ -18,7 +18,7 @@ question and whose verdict this file does not reopen.
 
 ---
 
-## What J-space is (from the source, so the mapping is honest)
+## What L-space is (from the source; Anthropic published the finding as J-space)
 
 A small, emergent set of internal neural patterns — "a few dozen concepts at a
 time", under a tenth of Claude's internal activity — that behaves like a shared
@@ -32,11 +32,11 @@ unclear whether any scientific experiment could" settle the latter.
 
 ---
 
-## Part 1 — J-space against covenant's mechanisms
+## Part 1 — L-space against covenant's mechanisms
 
 The shared spine: **a system's output is not its whole computation, so you must
 instrument the layer beneath the report.** Covenant asserts this as governance;
-J-space demonstrates it as mechanism.
+L-space demonstrates it as mechanism.
 
 | J-space (measured) | Covenant (built) |
 |---|---|
