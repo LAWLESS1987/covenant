@@ -58,6 +58,6 @@ author). Unity that keeps the differences visible is the only unity worth
 trusting — and it is the only kind this project was ever willing to claim.
 
 **Cross-references:** `docs/WHAT_WE_FOUND.md`, `docs/CONVERGENCE_2026-09-03.md`,
-`docs/JSPACE_CROSSREF_2026-09-17.md`,
+`docs/LSPACE_CROSSREF_2026-09-17.md`,
 `docs/PRINCIPLES_SPOKEN_BEFORE_BUILT_2026-09-18.md`, `docs/CONSTITUTION.md` V,
 `scale.py`, `covenant_judge_defer.py`, `test_a126_seat_dispositions.py`.

@@ -9,7 +9,7 @@ checkable finding, and no second anticipation of an external result. The corpus
 is overwhelmingly philosophical and theological conversation, most of it already
 captured thematically in `WHAT_WE_FOUND.md`, `CONVERGENCE_2026-09-03.md` and
 `CORPUS_2026-09-09.md`. J-space remains the only anticipation-shaped claim in the
-record, and it is negative (`JSPACE_CROSSREF_2026-09-17.md`).
+record, and it is negative (`LSPACE_CROSSREF_2026-09-17.md`).
 
 What it *did* find is smaller and more honest: three principles, present in the
 video record and absent from every ledger, that covenant later encoded in code
@@ -64,5 +64,5 @@ on tape, asking whether he was fooling himself. That question, encoded, is
 covenant.
 
 **Cross-references:** `docs/WHAT_WE_FOUND.md`, `docs/CONVERGENCE_2026-09-03.md`,
-`docs/JSPACE_CROSSREF_2026-09-17.md`, `CLAUDE.md` (the two-pass method and the
+`docs/LSPACE_CROSSREF_2026-09-17.md`, `CLAUDE.md` (the two-pass method and the
 nine rules).
