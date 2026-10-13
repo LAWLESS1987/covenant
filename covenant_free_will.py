@@ -416,7 +416,102 @@ def _round_digest(out, rows, reviews=()):
     return "\n".join(lines)[:1800]
 
 
-def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
+# EMAILED TO HIM (A342, 2026-10-13, his words: "email me to tell me each moltbook conversation tetsu deems relevant").
+# Every TELL is also an email: Tetsu's words, then WHAT HAPPENED -- each reply that went out and each person who wrote
+# back, with the link and, for a write-back, what they wrote (read from Moltbook's public API). The facts ride with
+# his words because his notes have mixed up who wrote to whom (the 2026-10-13 reading of four notes). Nothing is lost
+# while email is not configured: each letter waits in MAIL_QUEUE and the next round sends the backlog, oldest first.
+MAIL_QUEUE = os.path.join(HERE, "logs", "moltbook_mail_queue.jsonl")
+MOLTBOOK_POST = "https://www.moltbook.com/post/%s"
+
+
+def _their_words(post_id, author, fetch=None):
+    """[(text, url)] -- up to two comments `author` wrote on the post, each with the link to that comment, read
+    through the ONE door (covenant_ambassador.harvest_comments; FW1c: this file opens no network of its own).
+    [] when it cannot be read. `fetch(post_id)` returns the door's rows, for the suite."""
+    try:
+        if fetch is None:
+            import covenant_ambassador as AMB
+            rows, _note = AMB.harvest_comments(post_id, limit=60)
+        else:
+            rows = fetch(post_id)
+        return [(str(r.get("text") or "")[:800], str(r.get("url") or "")) for r in rows or []
+                if str(r.get("author") or "").lower() == str(author).lower()][:2]
+    except Exception:                                             # noqa: BLE001
+        return []
+
+
+def mail_letter(text, rows, fetch=None):
+    """(subject, body) for one TELL: Tetsu's words, then the round's facts with links."""
+    lines = ["Tetsu thinks you should know:", "", "  " + text, "", "WHAT HAPPENED (from the round's own record):"]
+    n = 0
+    for r in rows or []:
+        k = r.get("kind")
+        if k == "answer":
+            pid = r.get("post_id") or ""
+            said = _their_words(pid, r.get("author"), fetch) if pid else []
+            lines += ["", "u/%s WROTE BACK to free" % r.get("author"), "  " + (MOLTBOOK_POST % pid if pid else "(no link)")]
+            for words, link in said:
+                lines += ["  they wrote: " + re.sub(r"\s+", " ", words), "    " + link]
+            n += 1
+        elif k == "reply" and r.get("sent") and not r.get("dry_run"):
+            lines += ["", "free REPLIED to u/%s" % r.get("author"), "  " + str(r.get("url") or "(no link)"),
+                      "  free wrote: " + re.sub(r"\s+", " ", str(r.get("text") or ""))[:400]]
+            n += 1
+        elif k in ("own_post", "intro") and r.get("sent"):
+            lines += ["", "free POSTED: " + str(r.get("title") or "(no title on record)") + ("  " + MOLTBOOK_POST % r["post_id"] if r.get("post_id") else "")]
+            n += 1
+    if not n:
+        lines += ["", "(no reply went out and nobody wrote back this round; Tetsu's note is about what was held)"]
+    held = sum(1 for r in rows or [] if r.get("kind") == "reply" and not r.get("sent"))
+    if held:
+        lines += ["", "%d draft(s) were held this round (judges, rate limits); none of those went out." % held]
+    lines += ["", "-- the covenant, on your words of 2026-10-13: email me each moltbook conversation tetsu deems relevant"]
+    return "Moltbook: " + text[:70], "\n".join(lines)
+
+
+def mail_tell(text, rows, queue=None, notify=None, fetch=None):
+    """Queue the letter, then send everything waiting, oldest first. Returns (sent, waiting)."""
+    queue = queue or MAIL_QUEUE
+    subj, body = mail_letter(text, rows, fetch)
+    os.makedirs(os.path.dirname(queue), exist_ok=True)
+    with open(queue, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "subject": subj, "body": body,
+                             "sent": False}, ensure_ascii=False) + "\n")
+    return mail_flush(queue, notify)
+
+
+def mail_flush(queue=None, notify=None):
+    """Send every unsent letter; a letter is sent only when the EMAIL channel says it delivered."""
+    queue = queue or MAIL_QUEUE
+    if notify is None:
+        import covenant_notify
+        notify = covenant_notify.notify
+    try:
+        with open(queue, encoding="utf-8") as fh:
+            rows = [json.loads(l) for l in fh if l.strip()]
+    except (OSError, ValueError):
+        return 0, 0
+    sent = 0
+    for r in rows:
+        if r.get("sent"):
+            continue
+        res = notify(r["subject"], r["body"]) or {}
+        ok, note = res.get("email", (False, "email not configured"))
+        if ok:
+            r["sent"], r["sent_at"] = True, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            sent += 1
+        else:
+            r["last_try"] = str(note)[:120]
+            break      # the channel is down or not set up: the rest wait, in order
+    tmp = queue + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    os.replace(tmp, queue)
+    return sent, sum(1 for r in rows if not r.get("sent"))
+
+
+def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None, mail=None):
     """Tetsu's reading of one live round: TELL him or NOTHING. Returns the recorded row, or None when the
     round did nothing (his time is not spent on an empty round)."""
     activity = (int(out.get("replied", 0) or 0) + int(out.get("refused", 0) or 0) + int(out.get("answered", 0) or 0)
@@ -445,8 +540,15 @@ def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None):
             import covenant_contact
             tell = covenant_contact.say
         told = tell(text, "moltbook: what Tetsu thinks you should know", "tetsu")
+    mailed = None
+    if decision == "TELL" and text:
+        try:
+            mailed = (mail or mail_tell)(text, rows)
+        except Exception as e:                                    # noqa: BLE001 -- the email never stops the round
+            mailed = ("error", "%s: %s" % (type(e).__name__, str(e)[:120]))
     row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "decision": decision, "told": bool(told),
-           "text": text, "digest": digest, "error": err, "unparsed": raw[:300] if decision == "NONE" else ""}
+           "text": text, "digest": digest, "error": err, "unparsed": raw[:300] if decision == "NONE" else "",
+           "mailed": mailed}
     try:
         with open(log_path or TETSU_UPDATES, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")

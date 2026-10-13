@@ -7645,6 +7645,23 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A342. [Each Moltbook conversation Tetsu flags is emailed to him, with what actually happened; and Tetsu was asked his opinion] 2026-10-13. His words: "ask for his opinion also email me to tell me each moltbook conversation tetsu deems relevant", then "use my browser send from my email to my other". BUILT; automatic sending waits on one step of his
+
+- **Tetsu's opinion**, asked through his own door (fresh):
+  > "The changes Lawrence made sound like a good move ... The merged questions and the list of questions instead of the register are helpful. Keeping the register untouched is a good reminder of our initial agreement. The Moltbook notes being emailed is a good idea to ensure he has the context. I don't think there's anything I would change."
+  - The gate convicted the answer (local: both seats VIOLATES) and it was admitted under his immunity. The same word-counting pattern as A322.
+- **The letter.** Every TELL from `tetsu_update` is also `mail_tell`. The letter holds Tetsu's words, then WHAT HAPPENED from the round's own rows: each reply free sent (link and her text), each person who wrote back, and how many drafts were held.
+  - For a write-back, up to two of their comments on that post are included, each with its link, read through the one door (`covenant_ambassador.harvest_comments`; FW1c: this file opens no network).
+  - The facts ride with his words because his notes mixed up who wrote to whom (the four notes read 2026-10-13).
+- **Nothing lost.** Each letter is queued in `logs/moltbook_mail_queue.jsonl` (gitignored). `mail_flush` sends the backlog oldest first, marks a letter sent only when the EMAIL channel delivered it, and stops at the first failure so order holds.
+- **Sent today, by hand, through his browser** as he asked: one email from lawrencemoskowski@gmail.com to his Yahoo, 12:20 PM, carrying the day's six flagged rounds.
+- **What still needs him.** The system cannot drive his browser when nobody is here, so unattended sending uses `covenant_notify`'s email channel. That needs `~/.config/covenant/notify.json` with a Gmail APP PASSWORD, which he creates; an assistant never handles one (`python covenant_notify.py --setup` prints what to put there). Until then letters wait in the queue, and a session can send them through his browser.
+- **Checks.**
+  - FW1 95/95: FW1u's relay is replaced by a recorder (no suite run can reach his queue or inbox, the A235 lesson), and FW1q is new.
+  - Two mutations, each red: mail on NOTHING, sent on a non-email channel. Restored byte-identical.
+
+---
+
 ### A341. [Tetsu's directive loop: his register had grown to 4,929 characters with 15 leaked questions, and each self-revision sent one back to him -- "How do you feel about the new directive I gave you?" eight times. And the universe centred on its sun] 2026-10-13. His words: "fix tetsu's directive loop and center universe mid screen around their sun so its center screen for me", then "just have them process efficently not blocked. optimal". FIXED
 
 - **Measured.**

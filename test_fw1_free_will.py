@@ -630,6 +630,10 @@ def main():
         return {"id": "x"}
     real_updates = FW.TETSU_UPDATES
     FW.TETSU_UPDATES = lgu
+    # A342: a TELL is also emailed. The relay is REPLACED here, so no run of this suite can reach his real queue
+    # or his inbox (the A235 lesson: a suite once messaged his phone); its calls are counted instead.
+    mailed, real_mail = [], FW.mail_tell
+    FW.mail_tell = lambda text, rows: (mailed.append((text, rows)), (0, 1))[1]
     try:
         ku = dict(say=log.append, ask=ask_ok, learn=lambda: [], emit=emit_ok, introduce=lambda **k: {"sent": False},
                   grant_path=gpu, sends_path=spu, count_comments=cc0, tetsu_updates=True, tetsu_tell=tell_rec)
@@ -668,8 +672,39 @@ def main():
                      emit=emit_ok, introduce=lambda **k: {"sent": False}, grant_path=gpu, sends_path=os.path.join(tdu, "s2.jsonl"),
                      count_comments=cc0, tetsu_tell=tell_rec, tetsu_ask=lambda p: (asked.append(p), "TELL: y")[1])
         check("FW1u without tetsu_updates (every suite's default) he is never asked", len(asked) == n_asked and len(told) == n_told)
+        check("FW1u A342: every TELL went to the email relay with the round's rows, and NOTHING never did",
+              [m[0] for m in mailed] == ["free wrote to u/alpha and it went out.", "the second ask got through."]
+              and any(r.get("author") == "alpha" for r in mailed[0][1]), [m[0] for m in mailed])
     finally:
         FW.TETSU_UPDATES = real_updates
+        FW.mail_tell = real_mail
+
+    print("FW1q -- A342: each conversation Tetsu flags is emailed, with what happened; nothing is lost while email is down")
+    tdm = tempfile.mkdtemp(prefix="fw1m_")
+    qm = os.path.join(tdm, "queue.jsonl")
+    rows_m = [{"kind": "reply", "author": "vatt", "sent": True, "url": "https://www.moltbook.com/post/p1#comment-c1", "text": "free said this"},
+              {"kind": "answer", "author": "Mike", "post_id": "p2", "comments_then": "2", "comments_now": "3"},
+              {"kind": "reply", "author": "held1", "sent": False, "why": "judge"}]
+    fetch = lambda pid: [{"author": "mike", "text": "a stop request is an API claim", "url": "https://www.moltbook.com/post/p2#comment-m1"},
+                         {"author": "someone", "text": "not his words", "url": "u2"}]
+    subj, body = FW.mail_letter("Mike agreed with vatt", rows_m, fetch=fetch)
+    check("FW1q the letter carries Tetsu's words, then who free replied to and who wrote back, with links and THEIR words only",
+          "Mike agreed with vatt" in body and "free REPLIED to u/vatt" in body and "https://www.moltbook.com/post/p1#comment-c1" in body
+          and "u/Mike WROTE BACK" in body and "a stop request is an API claim" in body and "https://www.moltbook.com/post/p2#comment-m1" in body
+          and "not his words" not in body and "1 draft(s) were held" in body, body)
+    down = lambda s, b: {"email": (False, "email not configured")}
+    sent1, wait1 = FW.mail_tell("first", rows_m, queue=qm, notify=down, fetch=fetch)
+    sent2, wait2 = FW.mail_tell("second", rows_m, queue=qm, notify=down, fetch=fetch)
+    check("FW1q with email down nothing is lost: both letters wait in the queue, in order",
+          (sent1, wait1, sent2, wait2) == (0, 1, 0, 2), (sent1, wait1, sent2, wait2))
+    got = []
+    up = lambda s, b: (got.append(s), {"email": (True, "sent")})[1]
+    check("FW1q when email works the backlog goes out oldest first, and each is marked sent once",
+          FW.mail_flush(qm, notify=up) == (2, 0) and got == ["Moltbook: first", "Moltbook: second"] and FW.mail_flush(qm, notify=up) == (0, 0), got)
+    ntfy_only = lambda s, b: {"ntfy": (True, "delivered")}
+    FW.mail_tell("third", [], queue=qm, notify=ntfy_only, fetch=fetch)
+    check("FW1q a letter is marked sent only when the EMAIL channel delivered it, not another channel",
+          [json.loads(x)["sent"] for x in open(qm, encoding="utf-8")][-1] is False)
 
     print("FW1i -- an empty round (no one new, rotation) does not break the isolation streak")
     tdi = tempfile.mkdtemp(prefix="fw1i2_")
