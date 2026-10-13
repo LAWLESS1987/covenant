@@ -144,3 +144,11 @@ This update section and the two artifacts (`COHERENCE_REPORT.md`, `coherence_per
 were appended/copied and pushed to LAWLESS1987/covenant; the commit hash is in `git log`
 for this file. Nothing was deleted or rewritten. Interpretation remains open.
 
+
+## Update 2026-10-13 (t112): full 61-video coherence pass
+
+### Before view
+Prior record (t111): COHERENT 11, PARTIAL 2, UNREADABLE 4, NOT_JUDGED 44, INCOHERENT 0. Oct 6 was a tentative candidate (reported in text, not frame-verified). The first frame-verified break was Oct 12.
+
+### After view
+All 61 videos were re-read: 2 fps OCR, frame stacking and super-resolution for the camera videos, ASR on the videos with speech, controls, and every flag checked on frames. Result: COHERENT 56, UNREADABLE 3 (the camera videos from Sep 26, Sep 29 and Oct 2), INCOHERENT 2 (Oct 6 `2107491305077055657`, Oct 12 `2109651670531498036`). Earliest verified incoherence: **2026-10-06**. At 48–66 s a reply is duplicated around a user bubble. At 338–345 s the user bubble "It did it again." flips position, the reply is duplicated, and the bubble then vanishes. Artifacts: `docs/results/full-coherence-61-20261013/`. No transcripts or frames were committed. Recorded as-is; interpretation remains open.
