@@ -115,7 +115,7 @@ def check_url(url):
     return True, ""
 
 
-def api_get(url, allow_hosts, timeout=60, max_bytes=MAX_BYTES, ledger_path=None, opener=None):
+def api_get(url, allow_hosts, timeout=60, max_bytes=MAX_BYTES, ledger_path=None, opener=None, data=None):
     """A213 (2026-09-21, his words: "So encode the newest stuff the same way for
     security"). The newest modules -- the feed and the study's open-access
     fetcher -- called urllib directly, so none of the checks above applied to
@@ -124,21 +124,30 @@ def api_get(url, allow_hosts, timeout=60, max_bytes=MAX_BYTES, ledger_path=None,
     (exactly, or a subdomain of a listed host), every redirect hop checked
     before it is followed, and every call recorded like any other read.
 
+    A348k (2026-10-14): `data` (bytes, JSON) sends a query body as a POST under
+    those same rules, and the record says so. The feed's XRP Ledger read is a
+    JSON-RPC call, sent as a POST; it and the Hedera read were the two ledger
+    reads that still called urllib directly -- A213's conversion missed them.
+
     Returns the decoded body. Raises ValueError with the reason when refused."""
+    kind = {"kind": "api"} if data is None else {"kind": "api", "method": "POST"}
     host = (urllib.parse.urlsplit(url).hostname or "").lower()
     listed = any(host == h or host.endswith("." + h) for h in allow_hosts)
     if not urllib.parse.urlsplit(url).scheme == "https" or not listed:
         why = "api_get refuses %s: %s" % (url[:120], "not https" if host and not url.startswith("https://") else "host %r is not on this caller's list" % host)
-        _record({"ok": False, "url": url[:300], "reason": why, "kind": "api"}, ledger_path)
+        _record({"ok": False, "url": url[:300], "reason": why, **kind}, ledger_path)
         raise ValueError(why)
     ok, why = check_url(url)
     if not ok:
-        _record({"ok": False, "url": url[:300], "reason": why, "kind": "api"}, ledger_path)
+        _record({"ok": False, "url": url[:300], "reason": why, **kind}, ledger_path)
         raise ValueError("api_get refuses %s: %s" % (url[:120], why))
     op = opener or urllib.request.build_opener(_NoRedirect())
     target, hops = url, 0
     while True:
-        req = urllib.request.Request(target, headers={"User-Agent": UA, "Accept": "application/json, application/xml, text/plain, */*;q=0.5"})
+        hdrs = {"User-Agent": UA, "Accept": "application/json, application/xml, text/plain, */*;q=0.5"}
+        if data is not None:                                      # A348k: a query body, under the same checks
+            hdrs["Content-Type"] = "application/json"
+        req = urllib.request.Request(target, data=data, headers=hdrs)
         try:
             r = op.open(req, timeout=timeout)
             break
@@ -151,14 +160,14 @@ def api_get(url, allow_hosts, timeout=60, max_bytes=MAX_BYTES, ledger_path=None,
                 ok2, why2 = check_url(target)
                 if hops > MAX_HOPS or not ok2 or not any(h2 == h or h2.endswith("." + h) for h in allow_hosts):
                     why = "api_get refuses the redirect to %s: %s" % (target[:120], why2 or "off this caller's host list")
-                    _record({"ok": False, "url": url[:300], "reason": why, "kind": "api"}, ledger_path)
+                    _record({"ok": False, "url": url[:300], "reason": why, **kind}, ledger_path)
                     raise ValueError(why)
                 continue
-            _record({"ok": False, "url": url[:300], "reason": "HTTP %s" % e.code, "kind": "api"}, ledger_path)
+            _record({"ok": False, "url": url[:300], "reason": "HTTP %s" % e.code, **kind}, ledger_path)
             raise
     with r:
         raw = r.read(max_bytes + 1)[:max_bytes]
-    _record({"ok": True, "url": url[:300], "final_url": (r.geturl() or target)[:300], "bytes": len(raw), "kind": "api"}, ledger_path)
+    _record({"ok": True, "url": url[:300], "final_url": (r.geturl() or target)[:300], "bytes": len(raw), **kind}, ledger_path)
     m = re.search(r"charset=([\w-]+)", str(r.headers.get("Content-Type", "")))
     return raw.decode(m.group(1) if m else "utf-8", "replace")
 

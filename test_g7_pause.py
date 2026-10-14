@@ -25,12 +25,19 @@ THE CONTRACT, and every line of it is driven both ways here:
         TRADER_HALT, and this module refuses to arm or disarm the trader.
   G7.9  a pause is reported on every round, with its age, so a system left
         half-off for a week says so.
+  G7.11 (A348j) "earn" and "tetsu", read by name since A222 and A175, are said
+        in the report and in --list while they stand.
+  G7.12 (A348j) every actor name a module passes to covenant_pause's paused()
+        or pause(), found by walking the tree, is listed in ACTORS.
 
     python test_g7_pause.py
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import os
+import re
 import sys
 import tempfile
 
@@ -224,15 +231,32 @@ def main():
 
         # ---- G7.9: a pause is visible on every round, with its age
         _a, infos = P.report()
-        check("G7.9 a standing pause is reported, with what it stops",
-              any("nightly" in i and "hours" not in i.split("--")[0] for i in infos)
-              and any("nightly" in i for i in infos), str(infos)[:110])
+        # A348j: this asserted "hours" NOT in the line, and report() writes " for N.N h", so the age
+        # promised above was never checked. It is now, with what the pause stops.
+        check("G7.9 a standing pause is reported, with its age and what it stops",
+              any(re.match(r"paused: nightly for \d+\.\d h -- ", i) and P.ACTORS["nightly"] in i for i in infos),
+              str(infos)[:110])
         check("G7.9b ...and the report raises no alert -- a pause is a decision, not a fault",
               not _a, str(_a)[:60])
         P.resume("nightly")
         _a2, infos2 = P.report()
         check("G7.9c ...and it stops being reported once resumed",
               not any("nightly" in i for i in infos2), str(infos2)[:80])
+
+        # ---- G7.11 (A348j): earn and tetsu were paused by name and never listed
+        P.pause("earn", "G7 earn")
+        P.pause("tetsu", "G7 tetsu")
+        _a3, infos3 = P.report()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            P.main(["--list"])
+        listed = {ln.split()[0]: ln.split()[1] for ln in buf.getvalue().splitlines() if ln.strip()}
+        P.resume("earn")
+        P.resume("tetsu")
+        check("G7.11 a standing earn or tetsu pause is said in the watchdog's report and in --list",
+              any(i.startswith("paused: earn for ") for i in infos3) and any(i.startswith("paused: tetsu for ") for i in infos3)
+              and listed.get("earn") == "PAUSED" and listed.get("tetsu") == "PAUSED",
+              "report %s; list earn=%s tetsu=%s" % ([i[:24] for i in infos3], listed.get("earn"), listed.get("tetsu")))
     finally:
         P.PAUSE_DIR, P.TRADER_HALT = real_dir, real_halt
 
@@ -240,11 +264,74 @@ def main():
           P.PAUSE_DIR == real_dir and P.TRADER_HALT == real_halt
           and not os.path.exists(real_halt), "halt exists: %s" % os.path.exists(real_halt))
 
-    failed = [n for n, ok in results if not ok]
+    # ---- G7.12 (A348j): the class -- an actor read by name and missing from ACTORS
+    root = os.path.dirname(os.path.abspath(P.__file__))
+    consumed, files = _pause_names_consumed(root)
+    unlisted = sorted(n for n in consumed if n not in P.ACTORS)
+    print("  G7.12 read %d module(s) that name covenant_pause; actor names they pass: %s"
+          % (len(files), ", ".join("%s (%s)" % (n, ", ".join(sorted(consumed[n]))) for n in sorted(consumed))))
+    check("G7.12 the walk sees all three shapes: a literal (earn), a constant (tetsu-immunity), a loop (tetsu)",
+          {"earn", "tetsu-immunity", "tetsu"} <= set(consumed), sorted(consumed))
+    check("G7.12b every actor name a module pauses or reads is listed in ACTORS, so --list shows it",
+          not unlisted, "unlisted: %s" % ["%s in %s" % (n, sorted(consumed[n])) for n in unlisted])
+
+    failed =[n for n, ok in results if not ok]
     print(f"\nG7: {len(results) - len(failed)}/{len(results)} passed")
     if failed:
         print("FAILED: " + "; ".join(failed))
     return 1 if failed else 0
+
+
+def _pause_names_consumed(root):
+    """({actor name: {files}}, [files read]): every name a module passes to covenant_pause's paused() or pause(),
+    by DISCOVERY (A348j; rule 2): walk the tree, prune .git, .claude (worktrees, A267), .trash and virtualenvs by
+    path, keep the .py files whose text names covenant_pause, skip test_*.py and covenant_pause.py itself, and
+    read each call's first argument as a string literal, a module-level string constant, or the target of a for
+    over a literal tuple or list. What it cannot see: a name computed at run time or passed through any other
+    variable, and a call made through an alias not named paused or pause."""
+    import ast
+    prune = {".git", ".claude", ".trash", ".venv", "venv", "node_modules", "__pycache__"}
+    names, files = {}, []
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if d not in prune]
+        for fn in fns:
+            if not fn.endswith(".py") or fn.startswith("test_") or fn == "covenant_pause.py":
+                continue
+            fp = os.path.join(dp, fn)
+            try:
+                with open(fp, encoding="utf-8", errors="replace") as fh:
+                    src = fh.read()
+                tree = ast.parse(src) if "covenant_pause" in src else None
+            except (OSError, SyntaxError, ValueError):
+                continue
+            if tree is None:
+                continue
+            files.append(fp)
+            consts = {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign)
+                      and isinstance(n.value, ast.Constant) and isinstance(n.value.value, str)
+                      for t in n.targets if isinstance(t, ast.Name)}
+            loops = {}
+            for n in ast.walk(tree):
+                if isinstance(n, ast.For) and isinstance(n.target, ast.Name) and isinstance(n.iter, (ast.Tuple, ast.List)):
+                    loops.setdefault(n.target.id, []).extend(
+                        e.value for e in n.iter.elts if isinstance(e, ast.Constant) and isinstance(e.value, str))
+            for n in ast.walk(tree):
+                if not isinstance(n, ast.Call) or not n.args:
+                    continue
+                f = n.func
+                callee = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else ""
+                if callee not in ("paused", "pause"):
+                    continue
+                a = n.args[0]
+                if isinstance(a, ast.Constant) and isinstance(a.value, str):
+                    found = [a.value]
+                elif isinstance(a, ast.Name):
+                    found = [consts[a.id]] if a.id in consts else loops.get(a.id, [])
+                else:
+                    found = []
+                for v in found:
+                    names.setdefault(v, set()).add(os.path.relpath(fp, root).replace(os.sep, "/"))
+    return names, files
 
 
 class _FakeProc:

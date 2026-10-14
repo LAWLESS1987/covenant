@@ -12,6 +12,8 @@ A337 (2026-10-12, his words: "make WB1.14 count a Gutenberg timeout as not run i
 the most logical"): also NOT RUN when Gutenberg, asked twice, answers 502, 503 or
 504 or times out -- the far host not serving, which says nothing about this door.
 Anything else still FAILS. And a NOT RUN is never counted as passed.
+A348k (2026-10-14): api_get carries a query body (POST) under the same rules, and
+covenant_feed.ledger_facts reaches the network only through it -- no network used.
 LICENCE: public domain.
 """
 import http.server
@@ -272,6 +274,79 @@ check("WB1.17 a far-host answer is asked once more: 504 then a page is MEASURED;
       "a 404 is not retried and stays a failure",
       _r1.get("ok") and len(_a1) == 2 and far_host_unavailable(_r2) and len(_a2) == 2
       and _r3.get("status") == 404 and not far_host_unavailable(_r3) and len(_a3) == 1, (_r1, len(_a1), len(_a2), len(_a3)))
+
+# ---- A348k: api_get carries a query body under the same rules, and the feed's two ledger reads go only through it.
+# covenant_feed.ledger_facts called urllib directly for both (A213's conversion never reached it), so its requests
+# followed redirects unchecked and were never recorded. No network: a handler answers, and the feed is run with
+# api_get recorded and urllib's urlopen refusing.
+class _Post(urllib.request.HTTPSHandler):
+    seen = []
+
+    def https_open(self, req):
+        _Post.seen.append((req.get_method(), req.full_url, req.data, req.get_header("Content-type")))
+        import email, io
+        class R(io.BytesIO):
+            def __init__(s):
+                io.BytesIO.__init__(s, b'{"ok": 1}')
+                s.status, s.code, s.msg = 200, 200, "OK"
+                s.headers = email.message_from_string("Content-Type: application/json\n")
+            def geturl(s):
+                return req.full_url
+            def info(s):
+                return s.headers
+        return R()
+
+
+_Post.seen = []
+_pop = urllib.request.build_opener(_Post())
+_real3 = W.check_url
+W.check_url = lambda u: (True, "")              # the address gate is WB1.3's; this measures the verb and the record
+try:
+    W.api_get("https://s1.ripple.com:51234/", ("ripple.com",), ledger_path=LEDGER, opener=_pop, data=b'{"method": "ledger"}')
+    _rec_post = rows()[-1]
+    W.api_get("https://api.test.example/x", ("test.example",), ledger_path=LEDGER, opener=_pop)
+    _rec_get = rows()[-1]
+    try:
+        W.api_get("https://elsewhere.example/", ("ripple.com",), ledger_path=LEDGER, opener=_pop, data=b"{}")
+        _refused = False
+    except ValueError:
+        _refused = True
+finally:
+    W.check_url = _real3
+check("WB1.18 (A348k) api_get with data= sends that body as a JSON POST, recorded with method POST; without it, a GET "
+      "recorded as before; a body for a host off the list is refused before any request is made",
+      len(_Post.seen) == 2 and _Post.seen[0] == ("POST", "https://s1.ripple.com:51234/", b'{"method": "ledger"}', "application/json")
+      and _rec_post.get("method") == "POST" and _rec_post.get("ok") is True and _Post.seen[1][0] == "GET"
+      and _Post.seen[1][2] is None and "method" not in _rec_get and _refused, (_Post.seen, _rec_post, _rec_get))
+
+import covenant_feed as F                                              # noqa: E402
+_calls, _direct = [], []
+
+
+def _api_rec(url, allow_hosts, timeout=60, data=None, **_k):
+    _calls.append((url, data, tuple(allow_hosts)))
+    if "ripple" in url:
+        return json.dumps({"result": {"ledger": {"ledger_index": "100", "total_coins": "99985000000000000"}}})
+    return json.dumps({"released_supply": "4000000000000000000", "total_supply": "5000000000000000000", "timestamp": "1760000000.0"})
+
+
+def _no_urlopen(*a, **_k):
+    _direct.append(a[:1])
+    raise AssertionError("urlopen called directly")
+
+
+_real_api, _real_uo = W.api_get, urllib.request.urlopen
+W.api_get, urllib.request.urlopen = _api_rec, _no_urlopen
+try:
+    _facts = F.ledger_facts()
+finally:
+    W.api_get, urllib.request.urlopen = _real_api, _real_uo
+check("WB1.19 (A348k) covenant_feed.ledger_facts reaches both ledgers only through api_get, with the feed's host list (the "
+      "XRP Ledger's JSON-RPC as the body), never urllib directly; both facts parse",
+      [c[0] for c in _calls] == ["https://s1.ripple.com:51234/", "https://mainnet-public.mirrornode.hedera.com/api/v1/network/supply"]
+      and b'"ledger"' in (_calls[0][1] or b"") and _calls[1][1] is None and all(c[2] == tuple(F.API_HOSTS) for c in _calls)
+      and not _direct and [f["id"].split("-")[0] for f in _facts] == ["xrpl", "hedera"] and not any(f.get("error") for f in _facts),
+      (_calls, _direct, _facts))
 
 # ---- one real public read
 GUTENBERG = "https://www.gutenberg.org/ebooks/1497"

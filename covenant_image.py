@@ -33,12 +33,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BIN = os.path.join(HERE, "tools", "sd", "sd-cli.exe")   # the release ships sd-cli.exe and sd-server.exe
 WEIGHTS = os.path.join(HERE, "models", "sd_turbo.safetensors")
 OUT_DIR = os.path.join(HERE, "ops", "images")                    # gitignored
-LOG = os.path.join(HERE, "logs", "image.log")
+# A348l (2026-10-14): a test program never writes the live log (A272's lesson, as covenant_model._note_ask).
+# IG1, run in place by the nightly, wrote its fake frames here: one run put 5 rows in this checkout's
+# logs/image.log, 3 of them with no "test" mark, and the 10-14 review counted 151 of the live log's 161 rows as IG1's.
+_REAL_LOG = os.path.join(HERE, "logs", "image.log")
+LOG = _REAL_LOG
 NEED_GB = 2.5
 STEPS, SIZE, CFG = 4, 512, 1.0                                    # sd-turbo: few steps, guidance 1
 
 
 def _log(line):
+    prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+    if os.path.abspath(LOG) == os.path.abspath(_REAL_LOG) and prog.startswith("test_"):
+        return                                                    # A348l: a test_*.py writes only a log it pointed elsewhere
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     with open(LOG, "a", encoding="utf-8") as fh:
         fh.write("%s %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), line))
@@ -61,8 +68,13 @@ def _make_room():
         import covenant_model as M
         free = M.free_gb()
         if free is not None and free < NEED_GB and M.alive():
-            M.stop(say=lambda *_a: None)
+            # A348l (2026-10-14): stop() answers (ok, why) since A265, and a refused or foreign server is not stopped.
+            # Its answer was dropped, so all three of its answers, driven, read "stopped the language model".
+            res = M.stop(say=lambda *_a: None)
+            ok, why = (res[0], res[1]) if isinstance(res, tuple) and len(res) == 2 else (bool(res), repr(res))
             time.sleep(2)
+            if not ok:
+                return "could NOT stop the language model (free %.2f GB): %s" % (free, why)
             return "stopped the language model (free was %.2f GB)" % free
         return "free %s GB" % free
     except Exception as e:                                        # noqa: BLE001
@@ -110,7 +122,15 @@ def generate(prompt, out=None, seed=-1, timeout=600):
         args[args.index("-s") + 1] = str(seed2)
         r = subprocess.run(args, capture_output=True, text=True, timeout=timeout, creationflags=creation, cwd=os.path.dirname(BIN))
         ms = int((time.time() - t0) * 1000)
-        if r.returncode != 0 or not os.path.isfile(p) or is_black(p):
+        # A348l (2026-10-14): a crash on the second seed is a crash, with its exit code and its words. It was
+        # folded into "black frame twice ... try other words" (driven: exit 3 "read tensor data failed" read so,
+        # and the log kept no rc) -- the wrong reason and the wrong remedy.
+        if r.returncode != 0 or not os.path.isfile(p):
+            tail = ((r.stdout or "")[-600:] + (r.stderr or "")[-600:]).replace("\n", " | ")[-300:]
+            _log("FAIL rc=%s on the second seed after a black frame %d ms seed=%s prompt=%r %s" % (r.returncode, ms, seed2, prompt[:80], tail))
+            raise RuntimeError("sd exited %s on the second seed (%s, after a black frame on seed %s) after %d ms: %s"
+                               % (r.returncode, seed2, seed, ms, tail))
+        if is_black(p):
             _log("BLACK FRAME twice %d ms prompt=%r" % (ms, prompt[:80]))
             raise RuntimeError("the model drew a black frame twice (seeds %s and %s) after %d ms; try other words" % (seed, seed2, ms))
         room = room + "; second seed after a black frame"

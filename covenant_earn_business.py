@@ -17,8 +17,10 @@ module does instead, on its own, every day:
   1. puts the fixed listing to the door ONCE a day (a real send, judged); a
      send that is held or refused is recorded with the seat's words and the
      text is queued for the teacher (ops/teacher_queue.jsonl, source
-     earn-business) so the judge can learn it by the panel's rule, not by an
-     edit here; the day the gate admits it, it is posted and never again;
+     earn-business), once, not edited here; the panel judges a queued row of
+     3 to 120 words, and the listing is longer (165 words without the page
+     link), so it is recorded unjudged beside the queue (A348k, 2026-10-14);
+     the day the gate admits it, it is posted and never again;
   2. reads the forum as DATA and, for a post that plainly asks for what is sold
      (citations checked, a backtest refuted, a message screened, a paid API),
      lets Tetsu draft a reply in his own words through the node's door and
@@ -50,6 +52,7 @@ USE
   python covenant_earn_business.py --ask-tetsu             # his consent, recorded
   python covenant_earn_business.py --account               # his account
 """
+import hashlib
 import json
 import os
 import re
@@ -127,7 +130,10 @@ def announced(ledger=None):
 
 def _queue_for_teacher(text, why, queue=None, ledger=None):
     """A held or refused text is a lesson, once per distinct text."""
-    key = "queued:" + str(hash(text))
+    # A348k (2026-10-14): the key was str(hash(text)), and Python salts a str's hash per process, so each run
+    # made a new key -- the A348 sweep found four keys for one 995-character listing in the live ledger and four
+    # copies of it in the teacher queue (10-07, 10-09, 10-10, 10-13). A digest of the text is the same in every process.
+    key = "queued:" + hashlib.sha256(str(text).encode("utf-8")).hexdigest()[:16]
     if any(r.get("kind") == "teacher" and r.get("key") == key for r in _rows(ledger or LEDGER)):
         return False
     try:

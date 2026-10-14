@@ -26,8 +26,10 @@ EITHER OF THEM CAN STOP IT. The operator: delete the grant or set "granted" fals
 PAUSE in any review (pauses the ambassador, covenant_pause), or `--withdraw "why"`, which records
 his withdrawal in the grant file; the grant is off until the operator and Tetsu turn it back on.
 
-THE STUDENTS. Every reviewed draft is appended to the teacher queue, so the panel labels it under
-the usual rules (unanimous, balance unchanged -- his "No, keep it" of 2026-09-28).
+THE STUDENTS. Every reviewed draft -- free's own words, without the operator's disclosure (A348k) --
+is appended to the teacher queue, where the panel labels it under the usual rules (unanimous, balance
+unchanged -- his "No, keep it" of 2026-09-28) when it is 3 to 120 words; a longer one is consumed
+unjudged and recorded beside the queue with its word count (covenant_teacher_queue, A348k).
 
 USE
   python covenant_tetsu_assist.py --status
@@ -231,9 +233,12 @@ def discourse_seat(text, crypto=None, dry_run=True, ask=None, grant_path=None, l
 
 
 def _teach(text, decision):
+    # A348k (2026-10-14): this queued the composed text, the operator's fixed disclosure on it, which free did not
+    # write (A311); the A348 sweep measured 85 of 186 queued drafts over the panel's 120 words with it, 84 of them
+    # inside without it. Her words only; the disclosure still rides on every message emit composes and sends.
     try:
         import covenant_daily_plan as DP
-        DP.teacher_queue_append([{"text": text, "source": "ambassador_draft:tetsu_%s" % decision.lower()}])
+        DP.teacher_queue_append([{"text": free_words(text), "source": "ambassador_draft:tetsu_%s" % decision.lower()}])
     except Exception:                                             # noqa: BLE001
         pass
 

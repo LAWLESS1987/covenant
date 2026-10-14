@@ -153,6 +153,36 @@ def get(url):
         return e.code, json.loads(e.read().decode() or "{}"), dict(e.headers)
 
 
+def raw_post(port, path, length, data):
+    """A348i: a POST written by hand, so its Content-Length can be one urllib would never send. The
+    write side is closed after the body, so a handler that reads to EOF returns instead of hanging."""
+    import socket
+    s = socket.create_connection(("127.0.0.1", port), timeout=10)
+    resp = b""
+    try:
+        try:
+            s.sendall(("POST %s HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n"
+                       "Content-Length: %s\r\nConnection: close\r\n\r\n" % (path, length)).encode() + data)
+            s.shutdown(socket.SHUT_WR)
+        except OSError:                 # a refusal that leaves the body unread may close on us mid-send
+            pass
+        try:
+            while True:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                resp += chunk
+        except OSError:                 # ... or reset the connection after its answer
+            pass
+    finally:
+        s.close()
+    payload = resp.partition(b"\r\n\r\n")[2]
+    try:
+        return json.loads(payload.decode("utf-8") or "{}")
+    except ValueError:
+        return {"unparsed": payload[:100]}
+
+
 def main():
     print("gate proxy -- fail closed, forward only what the gate clears")
     up_port, px_port = free_port(), free_port()
@@ -209,6 +239,12 @@ def main():
     big = json.dumps({"text": "x" * (GP.MAX_BODY + 10)}).encode()
     code, body, _ = post(base + "/intent", None, raw=big)
     ok("G14", "an oversized body is refused", body.get("kind") == "error" and "cap" in body.get("message", ""))
+    # A348i: G14 sends an honest length. The same body sent as Content-Length -1 passed the cap and was
+    # read to EOF and forwarded (measured 2026-10-14: the upstream received all 65558 bytes).
+    n_before = len(Upstream.seen)
+    body = raw_post(px_port, "/intent", "-1", big)
+    ok("G14b", "a negative Content-Length is refused, never read to the end and forwarded past the cap",
+       body.get("kind") == "error" and "Content-Length" in body.get("message", "") and len(Upstream.seen) == n_before, body)
 
     code, body, hdr = get(base + "/health")
     ok("G15", "GET /health passes through", code == 200 and body.get("route") == "/health" and hdr.get("X-Covenant-Gate") == "pass")
@@ -294,6 +330,36 @@ def main():
     ok("G22b", "and it really takes those imports at run time, all three, before the quorum",
        not err and at >= 0 and len(companions) == 3 and all(log.index(c) < at for c in companions)
        and isinstance(built, tuple) and built[0] == "sentinel", err or log)
+
+    # A348i: G10's judge never answers. This one answers just after the deadline, while the refusal is
+    # being audited -- and decide read its "clean" back out of the shared box and returned it, so the
+    # proxy forwarded what the docstring calls a refusal (measured 2026-10-14: (True, 'clean (late)')).
+    go, late_written = threading.Event(), threading.Event()
+
+    class LateResult:
+        @property
+        def judge_id(self):            # read by the judge's thread right after it writes ok and msg
+            late_written.set()
+            return "late"
+
+    class LateSentinel:
+        def evaluate_transaction(self, tx):
+            go.wait(5)
+            return (True, "clean (late)", None, LateResult())
+
+    class SlowAuditGate(GP.Gate):
+        def audit(self, path, text, verdict):
+            go.set()                   # the judge answers now, past the deadline
+            late_written.wait(5)       # and its answer is in the box before this row is written
+            GP.Gate.audit(self, path, text, verdict)
+
+    late_audit = os.path.join(tempfile.mkdtemp(), "late.jsonl")
+    allowed, why = SlowAuditGate(LateSentinel(), timeout_s=0.1, audit_path=late_audit).decide("/intent", "anything")
+    ok("G23", "a judge that answers after the deadline is still a refusal: its late 'clean' is never returned",
+       allowed is False and "did not answer" in why and late_written.is_set(), (allowed, why))
+    late_rows = [json.loads(l) for l in io.open(late_audit, encoding="utf-8") if l.strip()]
+    ok("G23b", "and the audit row says what was returned: held, not allowed",
+       len(late_rows) == 1 and late_rows[0]["allowed"] is False and late_rows[0]["why"] == why, late_rows)
 
     print("GATE-PROXY: %d/%d passed" % (N - len(FAILS), N))
     return 1 if FAILS else 0

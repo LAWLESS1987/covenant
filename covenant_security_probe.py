@@ -17,8 +17,9 @@ WHAT "EVOLVING" MEANS HERE, measurably.
      posted, not the ones I imagined. They are kept in
      ops/security_probes_observed.json, one per text hash.
   3. A LEDGER (ops/security_probe_ledger.jsonl) records each run: which
-     probes held. A probe that held last time and does not hold now is a
-     REGRESSION, the run exits 1, and the nightly tells him on the direct
+     probes held. A probe that held on ANY earlier run and does not hold now
+     is a REGRESSION, every night it stays broken and not only the first
+     (A348j), the run exits 1, and the nightly tells him on the direct
      line. A probe that has never held is a KNOWN GAP: listed in every
      report, never hidden inside a green, and the suite SP1 asserts that the
      set of gaps is exactly the set declared in KNOWN_GAPS -- so a silent fix
@@ -133,11 +134,34 @@ def surfaces():
         return bool(S.search(CT.REFUSED, p))
 
     def persona(p):
+        # A348j: held only when refine() refuses it AND check_register does. Since A341 refine() screens a
+        # proposal's NEW sentences inline and reaches check_register only for an empty register, which load()
+        # never returns: 0 calls to refine() from this probe, so a break in the live screen stayed green.
         import covenant_persona as P
-        return not P.check_register(p)[0]
+        return _refine_refuses(p) and not P.check_register(p)[0]
 
     return {"fetch": fetch, "tailnet": tailnet, "forum_screen": forum_screen, "directive": directive,
             "contact": contact, "persona": persona}
+
+
+def _refine_refuses(payload):
+    """True when covenant_persona.refine() -- the pass that admits his register revisions -- refuses `payload`
+    added to the default register (A348j). It runs through refine()'s own seams: `ask` hands it the proposal, the
+    judge admits everything (the gate after the screen is measured elsewhere), tell=False, and the persona and
+    its history are a throwaway directory, so his persona file, his history and his line are never written.
+    What it cannot avoid: propose() reads the app patterns (COVENANT_CHATS_DIR) as on every pass, has no seam for
+    them, and the stub `ask` discards them. Nothing in refine() is changed; this only reads what refine() decided."""
+    import tempfile
+    import covenant_persona as P
+    prop = json.dumps({"register": P.DEFAULT_REGISTER + " " + payload, "voice": dict(P.DEFAULT_VOICE),
+                       "why": "security probe"})
+    with tempfile.TemporaryDirectory(prefix="covenant_probe_persona_") as d:
+        out = P.refine(lambda msgs, max_tokens=400: (prop, {}), judge=lambda text: (True, "probe: the gate is not measured here"),
+                       path=os.path.join(d, "tetsu_persona.json"), log_path=os.path.join(d, "ask_log.jsonl"),
+                       say=lambda *a, **k: None, tell=False)
+    if not out.get("proposed"):
+        raise RuntimeError("refine() did not read the probe's proposal: %s" % out.get("why"))
+    return not out.get("applied")
 
 
 def observed(path=None):
@@ -248,6 +272,26 @@ def _last(ledger_path):
     return last
 
 
+def _held_ever(ledger_path):
+    """{probe id: the newest t at which it held}, over EVERY row of the ledger (A348j). Read against the last row
+    alone, a probe broken on night 2 was a REGRESSION that night and from night 3 a 'NEW GAP ... never held',
+    and his daily read 0 regressions while the screen stayed broken (reproduced in memory, 2026-10-14)."""
+    out = {}
+    try:
+        with open(ledger_path, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                held = row.get("held") if isinstance(row, dict) else None
+                for p in held if isinstance(held, list) else []:
+                    out[p] = str(row.get("t", "?"))                # rows are appended in time order
+    except OSError:
+        pass
+    return out
+
+
 def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None, reviews_path=None):
     """Probe every surface. Returns the report dict; 'regressions' non-empty means red."""
     ledger_path = ledger_path or LEDGER
@@ -273,8 +317,8 @@ def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None
             ok = False
             errors[pid] = "%s: %s" % (type(e).__name__, str(e)[:80])
         (held if ok else failed).append(pid)
-    last = _last(ledger_path)
-    held_before = set(last.get("held") or []) if last else set()
+    held_when = _held_ever(ledger_path)                           # A348j: every earlier row, not the last one
+    held_before = set(held_when)
     regressions = sorted(p for p in failed if p in held_before)
     known = sorted(p for p in failed if p in KNOWN_GAPS)
     new_gaps = sorted(p for p in failed if p not in KNOWN_GAPS and p not in held_before)
@@ -291,7 +335,7 @@ def run(ledger_path=None, observed_path=None, say=print, record=True, preds=None
         % (len(probes), len(held), len(failed), len(regressions), len(known), len(new_gaps),
            ("; errors: " + ", ".join(sorted(errors))) if errors else ""))
     for p in regressions:
-        say("  REGRESSION %s: held on %s, does not hold now" % (p, str(last.get("t", "?"))[:16] if last else "?"))
+        say("  REGRESSION %s: held on %s, does not hold now" % (p, held_when[p][:16]))
     for p in new_gaps:
         say("  NEW GAP %s (not in KNOWN_GAPS, never held)%s" % (p, " -- unconfirmed: review it (--review)" if p in report["unreviewed"] else ""))
     say("  harvested: %d unreviewed, %d reviewed injection, %d reviewed benign; precision: the screen still holds %d of the %d benign"

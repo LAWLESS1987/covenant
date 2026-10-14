@@ -115,6 +115,14 @@ check("TA1w ...a STOP-FREE line of its own pauses; one on a numbered line does n
       and TA.read_answer("1. OK\n2. OK\n3. STOP-FREE", _s)[0] == "NONE")
 q = open(os.environ["COVENANT_TEACHER_QUEUE"], encoding="utf-8").read()
 check("TA1d the reviewed draft goes to the students' teacher queue", DRAFT in q and "tetsu_send" in q, q[:200])
+# A348k: the queued row is free's own words. It carried the composed text, the operator's disclosure on it
+# (85 of 186 queued drafts over the panel's 120 words); TA1d's substring test could not see that.
+_qrows = [json.loads(x) for x in q.splitlines() if x.strip()]
+_alog = [json.loads(x) for x in open(os.environ["COVENANT_TETSU_ASSIST_LOG"], encoding="utf-8") if x.strip()]
+check("TA1z (A348k) the queued row is exactly free's draft, without the operator's disclosure; the review's own record "
+      "still holds the composed text, disclosure and all",
+      [r["text"] for r in _qrows if r.get("source") == "ambassador_draft:tetsu_send"] == [DRAFT]
+      and AMB._DISCLOSURE_MARK in _alog[-1].get("text", ""), (_qrows, _alog[-1:]))
 
 n = len(asked)
 r = emit_with(HOLD, "REFUSE it overstates what we did")

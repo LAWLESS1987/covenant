@@ -618,6 +618,38 @@ def main():
           and r_wrong[2]["verdict"].endswith("whether that is right is UNDETERMINED"),
           (r_wrong[0]["verdict"], r_none[0]["verdict"], r_wrong[2]["verdict"]))
 
+    # FW1l (A348m, 2026-10-14): content CREATED and then hidden by Moltbook's challenge is not a hold. On 10-14 the
+    # digest Tetsu reads said "held, to u/<author>: " with nothing after the colon for three replies he had sent (one
+    # answered 3.29, "Incorrect answer"; two abstained), because emit's created result carries no why. rowsx is FW1x's
+    # round, made through the real _handle_verification: beta answered wrong, gamma and her own post abstained, omega
+    # held (nothing created), alpha and theta visible.
+    print("FW1l -- A348m: a reply created and left hidden by the challenge is told as such, not as held")
+    dl = FW._round_digest({"candidates": 5, "replied": 2, "refused": 3}, rowsx)
+    dlines = dl.splitlines()
+    line_of = lambda who: [l for l in dlines if "u/%s:" % who in l]                          # noqa: E731
+    check("FW1l the reply answered wrong reads created but HIDDEN, with the answer and Moltbook's word; the abstained "
+          "one says the challenge was not read; neither reads held",
+          line_of("beta") == ["created but HIDDEN, to u/beta: Moltbook's challenge was answered 10.00 and not solved "
+                              "(Incorrect answer)"]
+          and line_of("gamma") == ["created but HIDDEN, to u/gamma: Moltbook's challenge was not read, so no answer "
+                                   "was sent"], dlines)
+    check("FW1l a hold is still a hold, with its reason, and no line ends in an empty reason",
+          line_of("omega") == ["held, to u/omega: held"] and not any(l.rstrip() != l or l.endswith(":") for l in dlines),
+          dlines)
+    check("FW1l the header keeps the round's own count and names how many of it were created, then hidden; her own "
+          "post that abstained reads created but HIDDEN, not 'not posted'",
+          dlines[0].startswith("round: 5 candidate(s), 2 replied, 3 held or refused (2 of them created, then hidden by "
+                               "Moltbook's challenge), ")
+          and any(l.startswith("her own post created but HIDDEN") and l.endswith("-- Moltbook's challenge was not read, "
+                                                                                  "so no answer was sent") for l in dlines),
+          dlines)
+    _, letter = FW.mail_letter("t", rowsx, fetch=lambda pid: [])
+    check("FW1l the letter to him counts only omega as a held draft and lists beta and gamma as created and hidden, "
+          "with the challenge's state",
+          "1 draft(s) were held this round" in letter and "2 repl(ies) were created and are HIDDEN" in letter
+          and "  to u/beta: Moltbook's challenge was answered 10.00 and not solved (Incorrect answer)" in letter
+          and "  to u/gamma: Moltbook's challenge was not read" in letter, letter)
+
     print("FW1u -- Tetsu reads each live round and decides what, if anything, to tell him")
     tdu = tempfile.mkdtemp(prefix="fw1u_")
     gpu, spu, lgu = os.path.join(tdu, "grant.json"), os.path.join(tdu, "sends.jsonl"), os.path.join(tdu, "updates.jsonl")

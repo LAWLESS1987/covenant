@@ -9,7 +9,8 @@ ways: no grant -> nothing; the listing held by the door -> recorded and queued f
 admitted -> posted once, never again; a reply only to a post that asks, only when Tetsu writes one, only
 through the door; his consent recorded either way; his account: not doubled -> every 402 names the operator,
 doubled and owed -> his wallet, paid to him -> owed falls, a cost after doubling -> his share falls; a grant
-carrying a key-shaped field refused whole; his share lowered after consent named in status.
+carrying a key-shaped field refused whole; his share lowered after consent named in status. A348k: a text is
+queued for the teacher once across processes too (two interpreters, two hash seeds, one queued copy).
 
 Run: python test_eb1_earn_business.py        -> "EB1: n/n passed"
 """
@@ -195,6 +196,24 @@ def main():
               "covenant_tetsu_forum's money screen on its own (his newer words are the grant)",
               src.count("override_a67=False") >= 2 and "covenant_ambassador" in src and "MONEY" not in src.replace("money", "")
               and not any(w in src for w in ("covenant_trader", "coinbase_balance", "private_key", "PRIVATE KEY")), "")
+        # 13. A348k: "once per distinct text" across PROCESSES. Each nightly round is a new interpreter, and the key was
+        # str(hash(text)), salted per process: the live ledger held four keys for one listing. EB1.3 runs in one
+        # process, so it could not see it. Two interpreters with different hash seeds queue the same text here.
+        import subprocess
+        ql, qf = os.path.join(td, "xproc.jsonl"), os.path.join(td, "xproc_queue.jsonl")
+        prog = ("import json, sys; sys.path.insert(0, sys.argv[1]); import covenant_earn_business as B; "
+                "q = lambda rows: open(sys.argv[3], 'a', encoding='utf-8').write(json.dumps(rows) + '\\n'); "
+                "print(B._queue_for_teacher(sys.argv[4], 'held in a test', q, sys.argv[2]))")
+        outs13 = []
+        for seed in ("1", "2"):
+            p = subprocess.run([sys.executable, "-c", prog, HERE, ql, qf, text], cwd=HERE, capture_output=True, text=True,
+                               env=dict(os.environ, PYTHONHASHSEED=seed), timeout=120)
+            outs13.append((p.returncode, p.stdout.strip(), p.stderr.strip()[-200:]))
+        tq = [r for r in B._rows(ql) if r.get("kind") == "teacher"]
+        nq = len(open(qf, encoding="utf-8").read().splitlines()) if os.path.exists(qf) else 0
+        check("EB1.13 (A348k) the same held text, queued from two processes with different hash seeds, reaches the teacher once: "
+              "one teacher row, one queued copy, the second process answers 'already queued'",
+              [o[:2] for o in outs13] == [(0, "True"), (0, "False")] and len(tq) == 1 and nq == 1, (outs13, [r.get("key") for r in tq], nq))
 
     n_ok, n = sum(results), len(results)
     print("EB1: %d/%d passed" % (n_ok, n))

@@ -1388,6 +1388,56 @@
    ],
    "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
+  },
+  {
+   "id": "A348j-PROBE-LAST-RUN-AND-UNFAILABLE",
+   "claim": "That the security probe's REGRESSION is \"A probe that held last time and does not hold now\", and that SP1d checked an unreadable quarantine -- a check written `... in (0,) or True)`, which cannot fail.",
+   "refuted_by": "Measured 2026-10-14 (A348j): read against the last run alone, a probe broken on night 2 was a REGRESSION that night and from night 3 a 'NEW GAP ... never held', so Tetsu's daily read 0 regressions while the screen stayed broken (reproduced in memory). SP1d's `or True` made it pass whatever evolve() returned, and SP1c named the CLI's exit 1 but drove only the exit 0.",
+   "truth": "A probe that held on ANY earlier run and does not hold now is a REGRESSION every night it stays broken. SP1d, SP1c and G7.9 now fail when what they name is false, driven both ways. The persona probes are held only when refine() itself refuses them. Pinned by SP1 and G7's new checks.",
+   "verbatim": [
+    "A probe that held last time and does not hold now is a REGRESSION, the run exits 1, and the nightly tells him on the direct line.",
+    "check(\"SP1d an unreadable quarantine adds nothing and does not raise\", SP.evolve(quarantine_rows=None, path=os.path.join(TMP, \"x.json\"), say=quiet) in (0,) or True)"
+   ],
+   "patterns": [
+    "A probe that held last time and does not hold now",
+    "quiet\\) in \\(0,\\) or True\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348k-TEACHER-QUEUE-PROMISES",
+   "claim": "That the rows the teacher-queue writers append are labelled by the panel: earn-business's listing \"so the judge can learn it by the panel's rule\", each reviewed draft \"so the panel labels it under the usual rules\", own-work's entries \"cut to the queue's size\"; and that earn-business queues a listing once, keyed by \"queued:\" + str(hash(text)).",
+   "refuted_by": "Measured 2026-10-14 (A348k): the panel judges rows of 3 to 120 words and consumes a longer one unjudged, only counted; 332 of 344 own-work rows, 85 of 186 reviewed drafts (the operator's disclosure attached) and 4 of 4 earn-business listings were longer. str(hash()) is salted per process, so the one listing was queued four times under four keys.",
+   "truth": "A row outside the panel's size is recorded in the queue's withheld twin with its word count and the reason, and counted as out_of_size. Reviewed drafts are queued as free's words without the disclosure (still on every message sent). The listing key is a sha256 of its text. Own-work keys a reused A-number by its header too. Pinned by TQ1, TA1, EB1 and OW1's new checks.",
+   "verbatim": [
+    "earn-business) so the judge can learn it by the panel's rule, not by an edit here; the day the gate admits it, it is posted and never again;",
+    "THE STUDENTS. Every reviewed draft is appended to the teacher queue, so the panel labels it under the usual rules (unanimous, balance unchanged -- his \"No, keep it\" of 2026-09-28).",
+    "header, then the entry's first paragraphs, cut to the queue's size;",
+    "key = \"queued:\" + str(hash(text))"
+   ],
+   "patterns": [
+    "so the judge can learn it by the panel's rule",
+    "so the panel labels it under",
+    "first paragraphs, cut to the queue's size",
+    "\"queued:\" \\+ str\\(hash\\(text\\)\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all four in A348."
+  },
+  {
+   "id": "A348m-A333-ONE-WRONG-PATH",
+   "claim": "A333: standalone noise symbols read beside no operation word -- \"That is the one wrong-answer path this change adds that no guard covers.\"",
+   "refuted_by": "Measured 2026-10-14 (A348m): A333's aggregation cue added a second: an operation word no group reads was skipped and the cue alone made the reading. Answers 17.00 (10-13 10:12Z) and 37.00 (10-14 01:10Z) were submitted that way and came back \"Incorrect answer\", each hiding a reply Tetsu had cleared; 3.29 (10-14 07:02Z) predates A333.",
+   "truth": "An operation word the solver does not read makes it abstain (A333's own rule: precision over coverage). Replayed on the 58 challenge texts on record: 55 read the same, the 3 wrong answers now abstain, and no accepted answer is lost. Pinned by AM33k and AM33l.",
+   "verbatim": [
+    "That is the one wrong-answer path this change adds that no guard covers."
+   ],
+   "patterns": [
+    "the one wrong-answer path this change adds"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written in A333 (docs/KNOWN_ISSUES.md) and on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2)."
   }
  ]
 }

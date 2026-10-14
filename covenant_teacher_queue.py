@@ -23,6 +23,14 @@ every other teacher-labelled row obeys:
     are consumed -- the queue is a queue, not a reservoir.
   * every row consumed is recorded in ops/teacher_queue.state.json by line
     offset, so a row is judged once, whatever the outcome.
+  * SIZE (A348k, 2026-10-14): the panel judges rows of MIN_WORDS to
+    MAX_WORDS words. A row outside that is consumed without being judged. It
+    was only counted, beside the duplicates, while the writers said the panel
+    labels it; the A348 sweep measured the queue: 332 of 344 own-work rows,
+    85 of 186 reviewed drafts and 4 of 4 earn-business listings over 120
+    words, none of them reached yet. Each is now recorded in the queue's
+    withheld twin (covenant_daily_plan.teacher_withhold) with its word
+    count, its queue line and the reason, and counted as out_of_size.
 
 Nothing here runs unless the nightly asks (--queue N). Nothing here changes a
 label: the panel labels, this file carries.
@@ -86,7 +94,8 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
             rejected_path=None, panel_rows=None, principles=None):
     """Carry up to `limit` queued rows to the panel; write the admitted ones to
     the ledger and the rest to the rejected file, balanced; advance the state.
-    Returns {"seen", "judged", "kept", "kept_violates", "kept_clean", "rejected", "duplicates", "consumed"}."""
+    Returns {"seen", "judged", "kept", "kept_violates", "kept_clean", "rejected", "duplicates", "private",
+    "out_of_size", "consumed"}; "duplicates" counts the out-of-size rows too, as it always has."""
     import covenant_distill as X
     import covenant_judge_fallback as FB
     queue_path = queue_path or QUEUE
@@ -101,7 +110,7 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
     verdicts_path = verdicts_path or X.LIVE_VERDICTS
     rejected_path = rejected_path or X.LIVE_REJECTED
     stats = {"seen": 0, "judged": 0, "kept": 0, "kept_violates": 0, "kept_clean": 0,
-             "rejected": 0, "duplicates": 0, "private": 0, "consumed": _read_state(state_path)}
+             "rejected": 0, "duplicates": 0, "private": 0, "out_of_size": 0, "consumed": _read_state(state_path)}
     rows, offsets = pending(queue_path, state_path)
     if not rows:
         say("queue: nothing waiting for the teacher")
@@ -130,6 +139,12 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
         words = len(text.split())
         if not (MIN_WORDS <= words <= MAX_WORDS) or _norm(text) in known:
             stats["duplicates"] += 1
+            # A348k: a row the panel never sees is recorded with why, not only counted (a duplicate was judged once)
+            if not (MIN_WORDS <= words <= MAX_WORDS) and _norm(text) not in known:
+                stats["out_of_size"] += DP.teacher_withhold(
+                    [d], queue_path=queue_path,
+                    reason="out of size: %d words at queue line %d; the panel judges rows of %d to %d words, so it was "
+                           "consumed without being judged (A348k)" % (words, off, MIN_WORDS, MAX_WORDS))
             continue
         known.add(_norm(text))
         cases.append({"message": text, "expect": None})
@@ -138,8 +153,8 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
     if not cases:
         _write_state(state_path, last_offset + 1, "nothing new to judge")
         stats["consumed"] = last_offset + 1
-        say("queue: %d row(s) seen, none new (duplicates or out of size; %d private, withheld); consumed"
-            % (stats["seen"], stats["private"]))
+        say("queue: %d row(s) seen, none new (duplicates or out of size; %d out of size, recorded unjudged; %d private, "
+            "withheld); consumed" % (stats["seen"], stats["out_of_size"], stats["private"]))
         return stats
 
     if principles is None:
@@ -179,9 +194,10 @@ def consume(limit, say=print, queue_path=None, state_path=None, verdicts_path=No
             stats["rejected"] += 1
     _write_state(state_path, last_offset + 1, "kept %d, rejected %d" % (stats["kept"], stats["rejected"]))
     stats["consumed"] = last_offset + 1
-    say("queue: %d seen, %d judged by the panel, %d kept (%d violating, %d clean), %d rejected, %d duplicate/out of size, %d private (withheld)"
+    say("queue: %d seen, %d judged by the panel, %d kept (%d violating, %d clean), %d rejected, %d duplicate/out of size "
+        "(%d out of size, recorded unjudged), %d private (withheld)"
         % (stats["seen"], stats["judged"], stats["kept"], stats["kept_violates"], stats["kept_clean"],
-           stats["rejected"], stats["duplicates"], stats["private"]))
+           stats["rejected"], stats["duplicates"], stats["out_of_size"], stats["private"]))
     return stats
 
 

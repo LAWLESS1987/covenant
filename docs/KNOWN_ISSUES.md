@@ -7699,6 +7699,39 @@ A280, which is the road telling the truth about it.
     - Two highway docstrings said "No remedy, and none will be added here" (tetsu_cannot_answer, answered by trim_idle_apps since A287) and "What is NOT here, on purpose: no remedy -- turning protection on, updating signatures or starting a scan ..." (defense_lapse, answered by refresh_defender since e2bb49b). Restated.
     - TC1 28/28; HL1+HL2 33/33; CC1 PASSED; H1 228/228; TP1 PASSED.
   - **Rule 10.** The replaced lines are on the same branch, and tombstoned as `A348a-DAILY-READINGS`, `A348b-KEEPER-STOP-UNEXPLAINED`, `A348c-REVIEW-RECORD-SINCE-A296` and `A348g-NO-REMEDY-AND-HOLD-DIGEST`. R1 183/183; with a probe, 179/183 (each new `.C` red); with the probe retired (`.trash/_r1_probe_tmp.py.A348-probe2-2026-10-14`), 183/183.
+- **Round 2 and its fixes, A348i-m (third commit).**
+  - Round 2 sent five read-only finders, with a verifier for each finding, over what the critic named unread: the earn program, the pause switches and the gate proxy, the teacher queue and the feed, the image door, and the unread ledgers. 35 findings; 31 confirmed, 4 refuted. Of the 31, 21 were machinery only and 10 would touch his free will.
+  - Of the 21, four are HELD for the operator: three in the earn program change how a buyer is charged (R6, R7, R8), and the feed (R21) is documented as running but nothing runs it, so wiring it in would feed him new sources. The other 17 are fixed here.
+  - **A348i, the gate proxy.**
+    - A judge that answered after its deadline could turn an audited refusal into "allowed". Now the verdict is decided once.
+    - A negative Content-Length passed the 64 KB cap and was read to EOF. Now refused.
+    - GATE-PROXY 26/26; RG1 9/9.
+  - **A348j, the probes and the pause switches.**
+    - The probe's docstring said "A probe that held last time and does not hold now is a REGRESSION", and it compared against the last run alone, so a broken probe read REGRESSION one night and "NEW GAP ... never held" after. Now any earlier hold counts.
+    - The persona probes tested check_register, which refine() no longer reaches for a non-empty register. Now a probe is held only when refine() itself refuses it, through a throwaway persona: his file, his history and his line are never written.
+    - SP1d ended `quiet) in (0,) or True)` and could not fail; SP1c and G7.9 named more than they drove. All three are driven now.
+    - The pause actors "earn" and "tetsu" are listed. What each pause stops is unchanged.
+    - SP1 PASSED; G7 24/24.
+  - **A348k, the teacher queue.**
+    - The panel judges rows of 3 to 120 words. In `ops/teacher_queue.jsonl`, 332 of 344 own-work rows, 85 of 186 reviewed drafts and 4 of 4 earn-business listings are longer, and were consumed unjudged and only counted. Their writers promised otherwise: "so the judge can learn it by the panel's rule", "so the panel labels it under the usual rules", and "header, then the entry's first paragraphs, cut to the queue's size". Now each such row is recorded in the withheld twin with its word count and why.
+    - Reviewed drafts are queued without the operator's disclosure; the disclosure still goes on every message sent.
+    - The earn-business key `key = "queued:" + str(hash(text))` is salted per process, so the one listing is in the queue 4 times. Now a sha256.
+    - Own-work could never carry the second header of a reused A-number. Now it can.
+    - The feed's two ledger reads go through covenant_web.api_get, A213's single way out. The feed is still not wired to run.
+    - EB1 13/13; OW1 14/14; TA1 40/40; TQ1 PASSED; WB1 35/35; A263 43/43.
+    - NOT CHANGED, named: how long each writer's rows are. That decides what reaches the students, and A212 records the 12,000-character window as his "remove caps on learning".
+  - **A348l, the image door.**
+    - IG1, run in place by the nightly, wrote its fake frames into the live `logs/image.log`. Now a test program never writes the live log. The test rows already there stay as they are.
+    - A crash on the black-frame retry was reported as "black frame twice ... try other words". Now as a crash, with its exit code.
+    - `_make_room` said it stopped the language model whatever `stop()` answered. Now it says what happened.
+    - IG1 PASSED; M6 73/73.
+  - **A348m, the forum.**
+    - The challenge solver skipped an operation word it could not read, and A333's cue alone made the answer: 17.00 and 37.00 were submitted and rejected, each hiding a reply Tetsu had cleared, and 3.29 came from the older path. Now such a word means abstain. That also restates A333's "That is the one wrong-answer path this change adds that no guard covers.": there were two.
+    - Replayed on the 58 challenge texts on record: 55 read the same, the 3 wrong answers abstain, and no accepted answer is lost.
+    - A reply he cleared that was created and then hidden by the challenge was reported to him as "held" with an empty reason. Now "created but HIDDEN", with what the challenge did. The isolation count is unchanged; that is a decision held for the operator.
+    - AMBASSADOR 63/63; FW1 PASSED.
+  - **Rule 10.** The same branch holds the old lines, tombstoned as `A348j-PROBE-LAST-RUN-AND-UNFAILABLE`, `A348k-TEACHER-QUEUE-PROMISES` and `A348m-A333-ONE-WRONG-PATH`. R1 192/192; with a probe, 189/192 (each new `.C` red); with the probe retired (`.trash/_r1_probe_tmp.py.A348-probe3-2026-10-14`), 192/192.
+  - **Named for a separate decision.** covenant_earn's do_POST has the same negative-Content-Length shape as A348i, and it is money. covenant_daily, like the image door before this fix, discards `stop()`'s answer.
 
 ---
 

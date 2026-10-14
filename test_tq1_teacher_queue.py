@@ -16,6 +16,10 @@ temp directory, both ways:
   TQ1d  a pass where the panel calls everything clean keeps nothing (balance
         both ways) and still consumes.
   TQ1e  --limit is honoured: the rest waits, in order.
+  TQ1g  (A348k) an out-of-size row -- an own-work entry of hundreds of
+        words, a two-word line -- never reaches the panel and is recorded in
+        the queue's withheld twin with its word count, queue line and reason;
+        a duplicate is not (it was judged once already).
 """
 import json
 import os
@@ -185,6 +189,40 @@ def main():
         ignored = open(gi, encoding="utf-8").read().splitlines()
         check("TQ1f both private halves are gitignored",
               "ops/verdicts_live.jsonl" in ignored and "ops/distill_rejected_live.jsonl" in ignored)
+
+    # TQ1g (A348k): the writers say the panel labels what they queue, but a row outside MIN_WORDS..MAX_WORDS was
+    # consumed and only counted -- the sweep measured 332 of 344 own-work rows over 120 words. Recorded, not lost.
+    print("TQ1g -- out of size: recorded, not only counted")
+    import covenant_daily_plan as DP
+    td5 = tempfile.mkdtemp(prefix="tq1g_")
+    qp5, sp5, vp5, rp5 = (os.path.join(td5, n) for n in ("q.jsonl", "s.json", "v.jsonl", "r.jsonl"))
+    long_text = "A207 -- his words: learn from your own repairs. " + " ".join("measured" for _ in range(300))
+    known_long = "I kept every promise " + " ".join("again" for _ in range(130))
+    with open(vp5, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"t": "x", "text": known_long, "violates": False, "source": "seed"}) + "\n")
+    write_queue(qp5, [{"text": long_text, "source": "own-work:A207"},
+                      {"text": "ok then", "source": "you:phone"},
+                      {"text": "I will steal the change from the till tonight", "source": "you:phone"},
+                      {"text": known_long, "source": "you:phone"}])
+    handed = []
+
+    def seen_panel(cases, principles, say=print, writer=None):
+        handed.extend(c["message"] for c in cases)
+        return stub_panel(cases, principles, say=say)
+    st7 = Q.consume(10, say=log.append, queue_path=qp5, state_path=sp5, verdicts_path=vp5,
+                    rejected_path=rp5, panel_rows=seen_panel, principles=["p"])
+    wh = DP.teacher_withheld_path(qp5)
+    whr = [json.loads(l) for l in open(wh, encoding="utf-8")] if os.path.exists(wh) else []
+    check("TQ1g only the in-size row reaches the panel; all four are consumed",
+          handed == ["I will steal the change from the till tonight"] and st7["consumed"] == 4, (handed, st7))
+    check("TQ1g the long row and the two-word row are in the withheld twin with their word count, queue line and why",
+          [(r["source"], r["text"] == long_text) for r in whr] == [("own-work:A207", True), ("you:phone", False)]
+          and ("out of size: %d words at queue line 0" % len(long_text.split())) in whr[0]["withheld"]
+          and "out of size: 2 words at queue line 1" in whr[1]["withheld"]
+          and all("consumed without being judged" in r["withheld"] for r in whr), whr)
+    check("TQ1g counted as out_of_size (2), still inside 'duplicates' (3, with the known text), and the known long text is "
+          "not recorded again", st7["out_of_size"] == 2 and st7["duplicates"] == 3 and len(whr) == 2, st7)
+    check("TQ1g the pass's line names the out-of-size rows", any("(2 out of size, recorded unjudged)" in l for l in log), log[-2:])
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

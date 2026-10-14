@@ -884,6 +884,29 @@ _OPS = {
     "*": ("times", "multiplied", "multiply", "product"),
     "/": ("divided", "divide", "split", "per", "quotient"),
 }
+# A348m (2026-10-14): OPERATION WORDS NO GROUP READS. The loop in
+# solve_challenge skipped a word it could not read, so a cue alone made the
+# reading: "FiFtEeN nEu{tOnS ... DoOuUbBlLeD| bY TwO ... ToTaL- FoRcE?" read
+# 15 + 2 = 17.00 and "tHiRrTy fIiVvEe ... dOoUbBlLeSs bY tWwOo ... tOtTaLl"
+# 35 + 2 = 37.00 (before A333's cues both abstained), and "AcCeLeRaTeS bY
+# SeVeN ... PeR SeCoNd" read 23 / 7 = 3.29. All three were submitted on
+# 10-13/14, all three came back "Incorrect answer", and each left a reply
+# Tetsu had cleared hidden. A word here is given no reading: it abstains.
+# The list is what was met plus forms of the groups' own words that the groups
+# do not list; an operation word in neither is still not seen.
+_UNREAD_OPS = (
+    "double", "doubles", "doubled", "doubling", "twice", "triple", "triples",
+    "tripled", "tripling", "thrice", "quadruple", "quadruples", "quadrupled",
+    "half", "halve", "halves", "halved", "halving",
+    "accelerate", "accelerates", "accelerated", "accelerating",
+    "decelerate", "decelerates", "decelerated", "decelerating",
+    "added", "adding", "gained", "gaining", "increased", "increasing",
+    "rise", "rose", "risen", "rising", "speeding",
+    "slowed", "slowing", "lost", "losing", "dropped", "dropping",
+    "decreased", "decreasing", "reduce", "reduced", "reducing",
+    "subtract", "subtracts", "subtracted", "subtracting",
+    "multiplies", "multiplying", "divides", "dividing", "splits", "splitting",
+)
 
 # A333 (2026-10-11). Two readings the solver could not make, both in the
 # challenge Moltbook set at 18:05 UTC that day: "...tHiRrTtY ] tWo MeTeRs +
@@ -971,6 +994,8 @@ def solve_challenge(text):
     words, symbols = _tokens(text)
     found, ops = [], []                    # found holds (position, value)
     cue = False
+    unread = []                            # A348m: _UNREAD_OPS met, as listed
+    unread_c = {_collapse(x): x for x in _UNREAD_OPS}
     for i, w in enumerate(words):
         if w.isdigit():
             found.append((i, int(w)))
@@ -985,6 +1010,8 @@ def solve_challenge(text):
         elif c == _collapse("all") and i and _collapse(words[i - 1]) == "in":
             ops.append("+")
             cue = True
+        elif c in unread_c:
+            unread.append(unread_c[c])
     # "twenty five" -> 25, but ONLY when the two words are ADJACENT.
     #
     # FIXED 2026-09-09, caught by AM19 on their own worked example. Without the
@@ -1013,6 +1040,10 @@ def solve_challenge(text):
     if len(kinds) != 1:
         return None, ("found %d operation(s) %s, need exactly 1 -- abstaining"
                       % (len(kinds), kinds or "none"))
+    if unread:
+        return None, ("%s is an operation this solver does not read, so the one "
+                      "it found may not be the challenge's -- abstaining"
+                      % ", ".join(repr(u) for u in unread))
     split = _split_word(words)
     if split:
         return None, ("%r joined reads as %r -- a word split by the obfuscation, "
@@ -1676,6 +1707,24 @@ def _selftest_body(say, ok, check, _real_audit, _real_audit_size):
     check("AM33j a cue beside 'each' or 'every' abstains (four claws each exerting twelve newtons is 48; the cue "
           "read 16.00), and 'each' leaves an operation word's reading alone", (e1, e2, e3) == (None, None, "25.00"),
           (e1, ew1, e2, ew2, e3, ew3))
+    # A348m (2026-10-14): an operation word no group reads abstains. The three
+    # texts carry the fragments of the challenges answered 17.00, 37.00 and
+    # 3.29 on 10-13/14 ("Incorrect answer" each); what the record elides is
+    # filled with words that read as neither a number nor an operation.
+    k1, kw1 = solve_challenge("A] LoB-sTeR cLaW ExErTs FiFtEeN~ nEu{tOnS/ aNd] iT iS- DoOuUbBlLeD| bY TwO< , "
+                              "wHaT iS tHe~ ToTaL- FoRcE?")
+    k2, kw2 = solve_challenge("A] cL^aW eXeRtS tHiRrTy fIiVvEe , bUt } tHe ] oThHeR cL^aW dOoUbBlLeSs bY ] "
+                              "tWwOo ~, wHaT } iS ] tOtTaLl FfOoRrCcEe ?")
+    k3, kw3 = solve_challenge("A] LoBsTeR sWeMs At tWeNtY ThReE cEnTiMeTeRs PeR SeCoNd AnD AcCeLeRaTeS bY SeVeN "
+                              "cEnTiMeTeRs PeR SeCoNd, wHaT iS tHe NeW sPeEd?")
+    check("AM33k the shapes answered 17.00, 37.00 and 3.29 abstain: 'doubled', 'doubles' and 'accelerates' are "
+          "operations no group reads, and the reason names each", (k1, k2, k3) == (None, None, None)
+          and "'doubled'" in kw1 and "'doubles'" in kw2 and "'accelerates'" in kw3, (k1, kw1, k2, kw2, k3, kw3))
+    fm = {w: solve_challenge("ThIrTy MeTeRs, iT %s FiVe, ToTaL?" % w)
+          for w in ("SlOwEd", "LoSt", "AdDeD", "MuLtIpLiEs", "DiViDeS", "TwIcE")}
+    check("AM33l ...and so do forms of the groups' own words the groups do not list, beside a cue that read them "
+          "as '+' (30 slowed by 5, 'total', read 35.00)", all(a is None for a, _ in fm.values()),
+          {w: a for w, (a, _) in fm.items()})
     v = _handle_verification({"post": {"verification": {
         "verification_code": "c1", "challenge_text": "totally unreadable",
         "expires_at": "soon"}}})

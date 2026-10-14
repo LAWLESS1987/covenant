@@ -66,9 +66,13 @@ API_HOSTS = ("api.openalex.org", "export.arxiv.org", "ebi.ac.uk",
              "ripple.com", "mirrornode.hedera.com")
 
 
-def _api(url, timeout=60):
+# A348k (2026-10-14): "Every fetch" above was not so for ledger_facts: both of its reads called urllib directly
+# (redirects followed unchecked, no host list, no record) until this date; A213's diff never touched it. They go
+# through _api now, the XRP Ledger's JSON-RPC as a POST body (covenant_web.api_get's data=). The "pages" kind
+# reads through covenant_web.read, the web door, under its grant -- not api_get, and not unchecked.
+def _api(url, timeout=60, data=None):
     import covenant_web
-    return covenant_web.api_get(url, API_HOSTS, timeout=timeout)
+    return covenant_web.api_get(url, API_HOSTS, timeout=timeout, data=data)
 # A211: these were 6 and 3000, the assistant's numbers. Raised, and overridable.
 # What remains is only what keeps a nightly pass finishing and polite to the open
 # services it reads (OpenAlex, Europe PMC and arXiv are free and shared).
@@ -185,7 +189,7 @@ def ledger_facts():
     facts = []
     try:
         body = json.dumps({"method": "ledger", "params": [{"ledger_index": "validated", "transactions": False, "expand": False}]}).encode()
-        r = json.load(urllib.request.urlopen(urllib.request.Request("https://s1.ripple.com:51234/", data=body, headers=dict(UA, **{"Content-Type": "application/json"})), timeout=30))
+        r = json.loads(_api("https://s1.ripple.com:51234/", timeout=30, data=body))           # A348k: through api_get
         L = r["result"]["ledger"]
         total = int(L["total_coins"]) / 1e6
         facts.append({"id": "xrpl-%s" % L["ledger_index"], "title": "XRP Ledger #%s: %.6f XRP remain of 100,000,000,000; %.6f XRP destroyed as fees to date"
@@ -193,7 +197,7 @@ def ledger_facts():
     except Exception as e:                                        # noqa: BLE001
         facts.append({"id": "xrpl-error-%s" % time.strftime("%Y%m%d"), "title": "XRP Ledger: not read (%s: %s)" % (type(e).__name__, str(e)[:80]), "source": "s1.ripple.com", "error": True})
     try:
-        r = json.load(urllib.request.urlopen(urllib.request.Request("https://mainnet-public.mirrornode.hedera.com/api/v1/network/supply", headers=UA), timeout=30))
+        r = json.loads(_api("https://mainnet-public.mirrornode.hedera.com/api/v1/network/supply", timeout=30))   # A348k
         rel, tot = int(r["released_supply"]) / 1e8, int(r["total_supply"]) / 1e8
         facts.append({"id": "hedera-%s" % str(r.get("timestamp", ""))[:10], "title": "Hedera: %.0f HBAR released of %.0f total (%.1f%%)" % (rel, tot, 100 * rel / tot if tot else 0),
                       "source": "https://mainnet-public.mirrornode.hedera.com/api/v1/network/supply", "n": {"released": rel, "total": tot}})

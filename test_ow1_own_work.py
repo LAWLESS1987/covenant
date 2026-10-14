@@ -5,7 +5,8 @@ its settled code answers, bounded, once each, through the teacher queue.
 Everything here runs on fixtures in a temp dir: a small ledger in the real
 ledger's shape, a consensus file with one settled and one undetermined
 record, the teacher queue redirected by path. The real ledger is read once,
-read-only, to prove the parser finds its entries.
+read-only, to prove the parser finds its entries. A348k: an entry that reuses
+an A-number is carried once of its own, and "waiting" counts what is not carried.
 LICENCE: public domain.
 """
 import json
@@ -96,6 +97,27 @@ st3 = os.path.join(tmp, "state3.json")
 res5 = OW.run(ledger=led, consensus=con, state_path=st3, queue_path=q2, say=said.append, append=lambda rows, path=None: 1)
 check("OW1.10 only what the queue took is marked carried (append took 1 of 4)",
       res5["queued"] == 1 and len(OW.load_state(st3)["ledger"]) == 1 and not OW.load_state(st3)["consensus"])
+
+# A348k: a number used twice. The real ledger has two headers each for A222, A223 and A224; keyed by the number
+# alone, the later entry was never carried and every night reported entries minus numbers as waiting.
+led2 = os.path.join(tmp, "dup.md"); st4 = os.path.join(tmp, "state4.json"); q4 = os.path.join(tmp, "queue4.jsonl")
+open(led2, "w", encoding="utf-8").write(LEDGER + '\n### A900. [a later entry, the same number] "other words" BUILT\n\n**Built.** Later.\n\n---\n')
+res6 = OW.run(ledger=led2, consensus=os.path.join(tmp, "none.jsonl"), state_path=st4, queue_path=q4, say=said.append)
+res7 = OW.run(ledger=led2, consensus=os.path.join(tmp, "none.jsonl"), state_path=st4, queue_path=q4, say=said.append)
+st5 = os.path.join(tmp, "state5.json"); q5 = os.path.join(tmp, "queue5.jsonl")
+json.dump({"ledger": ["A900", "A901"], "consensus": []}, open(st5, "w", encoding="utf-8"))   # as the bare-number state left it
+res8 = OW.run(ledger=led2, consensus=os.path.join(tmp, "none.jsonl"), state_path=st5, queue_path=q5, say=said.append)
+check("OW1.13 (A348k) a later entry reusing a number is carried once of its own (waiting 0, nothing twice), and a state "
+      "of bare numbers carries only that later entry, its earlier namesake counted as carried",
+      res6["queued"] == 3 and [r["source"] for r in rows_in(q4)] == ["own-work:A900", "own-work:A901", "own-work:A900"]
+      and "other words" in rows_in(q4)[-1]["text"] and res6["waiting"] == 0 and res7["queued"] == 0 and res7["waiting"] == 0
+      and res8["queued"] == 1 and "other words" in rows_in(q5)[0]["text"] and res8["waiting"] == 0, (res6, res7, res8))
+st6 = os.path.join(tmp, "state6.json")
+json.dump({"ledger": ["A899"], "consensus": []}, open(st6, "w", encoding="utf-8"))           # an entry no longer in the ledger
+res9 = OW.run(ledger=led2, consensus=os.path.join(tmp, "none.jsonl"), state_path=st6, queue_path=os.path.join(tmp, "q6.jsonl"),
+              limit=2, say=said.append)
+check("OW1.14 (A348k) 'waiting' counts the entries not carried: a carried key whose entry left the ledger hides none of them",
+      res9["queued"] == 2 and res9["waiting"] == 1, res9)
 
 # the real ledger, read-only
 try:

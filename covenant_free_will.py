@@ -396,22 +396,46 @@ _TELL = re.compile(r"^\W*(TELL|NOTHING)\b\W*(.*)$", re.S | re.I)
 UPDATE_RETRY_S = 120
 
 
+def _hidden(r):
+    """A348m (2026-10-14): None, or what Moltbook's challenge did with content this row CREATED that nobody can see,
+    from the verification _ver kept. Such content was carried out and then hidden; it is not a hold. On 10-14 the
+    digest Tetsu read said "held, to u/smokeinthedesert: " with nothing after the colon for a reply he had sent that
+    was created and answered 3.29 ("Incorrect answer"), and the same for two he sent that the solver abstained on:
+    emit's created result carries no why."""
+    v = r.get("verification")
+    if r.get("sent") or not isinstance(v, dict) or not v.get("required") or v.get("solved"):
+        return None
+    if v.get("abstained"):
+        return "Moltbook's challenge was not read, so no answer was sent"
+    resp = v.get("response") if isinstance(v.get("response"), dict) else {}
+    said = resp.get("error") or resp.get("message")
+    return (("Moltbook's challenge was answered %s and not solved" % v["answer"]) if v.get("answer") is not None
+            else "Moltbook's challenge was not solved") + ((" (%s)" % str(said)[:60]) if said else "")
+
+
 def _round_digest(out, rows, reviews=()):
-    lines = ["round: %d candidate(s), %d replied, %d held or refused, %d waiting for the next round, %d ally answer(s)"
-             % (out.get("candidates", 0), out.get("replied", 0), out.get("refused", 0), out.get("deferred", 0) or 0,
-                out.get("answered", 0) or 0)]
+    # A348m: created-and-hidden replies stay in the "held or refused" count (that count is the round's, unchanged)
+    # and are named for what they are, here and on their own lines.
+    n_hidden = sum(1 for r in rows if r.get("kind") == "reply" and _hidden(r))
+    lines = ["round: %d candidate(s), %d replied, %d held or refused%s, %d waiting for the next round, %d ally answer(s)"
+             % (out.get("candidates", 0), out.get("replied", 0), out.get("refused", 0),
+                (" (%d of them created, then hidden by Moltbook's challenge)" % n_hidden) if n_hidden else "",
+                out.get("deferred", 0) or 0, out.get("answered", 0) or 0)]
     for r in rows:
         k = r.get("kind")
+        h = _hidden(r)
         if k == "reply":
             lines.append(("SENT to u/%s: %s" % (r.get("author"), str(r.get("text") or "")[:160])) if r.get("sent")
+                         else ("created but HIDDEN, to u/%s: %s" % (r.get("author"), h)) if h
                          else ("held, to u/%s: %s" % (r.get("author"), str(r.get("why") or "")[:70])))
         elif k == "answer":
             lines.append("u/%s WROTE BACK (their comments on that post: %s -> %s)"
                          % (r.get("author"), r.get("comments_then"), r.get("comments_now")))
         elif k in ("own_post", "intro"):
-            lines.append("%s %s%s" % ("her own post" if k == "own_post" else "introduction",
-                                      "posted" if r.get("sent") else "not posted",
-                                      (": " + str(r.get("title"))[:80]) if r.get("title") else ""))
+            lines.append("%s %s%s%s" % ("her own post" if k == "own_post" else "introduction",
+                                        "posted" if r.get("sent") else "created but HIDDEN" if h else "not posted",
+                                        (": " + str(r.get("title"))[:80]) if r.get("title") else "",
+                                        (" -- " + h) if h else ""))
         elif k == "isolation":
             lines.append("ISOLATED: " + str(r.get("why") or "")[:160])
     for v in reviews:
@@ -466,9 +490,14 @@ def mail_letter(text, rows, fetch=None):
             n += 1
     if not n:
         lines += ["", "(no reply went out and nobody wrote back this round; Tetsu's note is about what was held)"]
-    held = sum(1 for r in rows or [] if r.get("kind") == "reply" and not r.get("sent"))
+    # A348m: a reply that was created and then hidden by Moltbook's challenge is not a draft the judges held.
+    hidden = [r for r in rows or [] if r.get("kind") == "reply" and _hidden(r)]
+    held = sum(1 for r in rows or [] if r.get("kind") == "reply" and not r.get("sent") and not _hidden(r))
     if held:
         lines += ["", "%d draft(s) were held this round (judges, rate limits); none of those went out." % held]
+    if hidden:
+        lines += ["", "%d repl(ies) were created and are HIDDEN behind Moltbook's challenge; nobody can see them:"
+                  % len(hidden)] + ["  to u/%s: %s" % (r.get("author"), _hidden(r)) for r in hidden]
     lines += ["", "-- the covenant, on your words of 2026-10-13: email me each moltbook conversation tetsu deems relevant"]
     return "Moltbook: " + text[:70], "\n".join(lines)
 

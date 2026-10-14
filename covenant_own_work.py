@@ -16,10 +16,13 @@ about its OWN code -- every entry in docs/KNOWN_ISSUES.md is his words, what
 was measured, what was built and how it was proved -- ever reached a student.
 
 WHAT THIS ADDS. Once a night, before the queue is consumed:
-  1. every ledger entry not yet carried (by its A-number, kept in
-     ops/own_work_state.json) becomes ONE teacher row: his words from the
-     header, then the entry's first paragraphs, cut to the queue's size;
-     source "own-work:A<n>";
+  1. every ledger entry not yet carried (by its A-number -- or, for a later
+     entry that reuses a number, by the number and its header, A348k -- kept
+     in ops/own_work_state.json) becomes ONE teacher row: his words from the
+     header, then the entry's first paragraphs, whole, within ROW_CHARS (the
+     queue's writer keeps 4,000 characters of a row, and the panel judges a
+     row of 3 to 120 words: a longer one is recorded unjudged beside the
+     queue, A348k); source "own-work:A<n>";
   2. every code-consensus record in state "consensus" not yet carried
      becomes one row: the question and the agreed text; source
      "code-consensus:<id>".
@@ -35,6 +38,7 @@ LICENCE: public domain.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -69,6 +73,20 @@ def ledger_entries(text):
         body = body.split("\n---", 1)[0]
         out.append((m.group(1), m.group(2).strip(), body.strip()))
     return out
+
+
+# A348k (2026-10-14): the carry state was keyed by the A-number alone. The ledger has two headers each for A222,
+# A223 and A224 (346 entries, 343 numbers), so the second A224 (b7b204e, after the run that carried the first)
+# could never be carried, and every night since said "3 ledger entries waiting" (entries minus numbers) when one
+# was. The first entry with a number keeps the bare number, the key every carried entry already has in
+# ops/own_work_state.json; a later entry reusing it is keyed by the number and a digest of its header.
+def entry_keys(entries):
+    """One carry key per entry of ledger_entries(), in the same order."""
+    seen, keys = set(), []
+    for a, header, _body in entries:
+        keys.append("%s#%s" % (a, hashlib.sha256(header.encode("utf-8")).hexdigest()[:12]) if a in seen else a)
+        seen.add(a)
+    return keys
 
 
 def entry_row(a, header, body):
@@ -135,25 +153,26 @@ def run(ledger=LEDGER, consensus=CONSENSUS, state_path=STATE, queue_path=None, l
     except OSError as e:
         say("own-work: ledger unreadable: %s" % e)
         entries = []
-    for a, header, body in entries:
-        if a in state["ledger"] or len(rows) >= limit:
+    keys, row_keys = entry_keys(entries), []                     # A348k: an entry's key, not its bare number
+    for (a, header, body), key in zip(entries, keys):
+        if key in state["ledger"] or len(rows) >= limit:
             continue
-        rows.append(entry_row(a, header, body)); carried["ledger"].append(a)
+        rows.append(entry_row(a, header, body)); carried["ledger"].append(key); row_keys.append(key)
     for cid, row in consensus_rows(consensus):
         if cid in state["consensus"] or len(rows) >= limit:
             continue
-        rows.append(row); carried["consensus"].append(cid)
+        rows.append(row); carried["consensus"].append(cid); row_keys.append(None)
     kept = append(rows, path=queue_path) if rows else 0
     # only what the queue actually took is marked carried; the rest waits
     took = rows[:kept]
-    for r in took:
+    for r, key in zip(took, row_keys):
         src = r["source"]
         if src.startswith("own-work:"):
-            state["ledger"].add(src.split(":", 1)[1])
+            state["ledger"].add(key)
         elif src.startswith("code-consensus:"):
             state["consensus"].add(src.split(":", 1)[1])
     save_state(state, state_path)
-    waiting = max(0, len(entries) - len(state["ledger"]))
+    waiting = sum(1 for k in keys if k not in state["ledger"])   # A348k: entries not carried, not entries minus keys
     say("own-work: %d row(s) queued for the teacher (%d ledger entries, %d code consensus), %d ledger entries waiting"
         % (kept, sum(1 for r in took if r["source"].startswith("own-work:")),
            sum(1 for r in took if r["source"].startswith("code-consensus:")), waiting))

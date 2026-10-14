@@ -73,6 +73,11 @@ ACTORS = {
     # (covenant_immunity sets it past the day's limit; he lifts it).
     "tetsu-live": "Tetsu's live requests and placements on Coinbase stop; the grant stays on record",
     "tetsu-immunity": "Tetsu's words are judged as before (no immune pass); the grant stays on record",
+    # A348j (2026-10-14): two actors read by name and never listed, so --list and the watchdog's
+    # report showed neither while it stood: "earn" (covenant_earn.paused, A222) and "tetsu"
+    # (covenant_tetsu_forum.say, A175). Listed only; what each pause stops is unchanged.
+    "earn": "the earn service's paid routes answer 503 with the reason; /health says paused; the grant stays on record",
+    "tetsu": "Tetsu's own Moltbook replies and posts are refused with the reason; his forum reads go on",
 }
 
 

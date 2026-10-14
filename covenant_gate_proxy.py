@@ -168,10 +168,16 @@ class Gate:
         t = threading.Thread(target=run, daemon=True)
         t.start()
         t.join(self.timeout_s)
+        # A348i: the verdict is decided once, here, and never read back from the box the judge's thread
+        # still writes to -- a late "clean" landed between the refusal and the return, and decide
+        # returned (True, 'clean (late)') past a 0.1 s deadline (measured 2026-10-14). A refusal stands.
         if t.is_alive() or "ok" not in box:
-            box["ok"], box["msg"] = False, "Held: the gate did not answer within %.0f s" % self.timeout_s
-        self.audit(path, text, box)
-        return box["ok"], box["msg"]
+            verdict = {"ok": False, "msg": "Held: the gate did not answer within %.0f s" % self.timeout_s,
+                       "judge": box.get("judge", "?")}
+        else:
+            verdict = dict(box)
+        self.audit(path, text, verdict)
+        return verdict["ok"], verdict["msg"]
 
     def audit(self, path, text, box):
         if not self.audit_path:
@@ -255,6 +261,10 @@ def make_handler(gate, upstream):
                 n = int(self.headers.get("Content-Length", "0"))
             except ValueError:
                 return self._refuse("bad Content-Length")
+            # A348i: a negative length passed the cap below and read(-1) read to EOF -- a 65558-byte
+            # body sent as Content-Length -1 was forwarded (measured 2026-10-14). Refused like any bad length.
+            if n < 0:
+                return self._refuse("bad Content-Length: %d is negative" % n)
             if n > MAX_BODY:
                 return self._refuse("body of %d bytes exceeds the %d byte cap" % (n, MAX_BODY))
             raw = self.rfile.read(n) if n else b""
