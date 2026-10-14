@@ -7645,6 +7645,43 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A345. [Tetsu's daily read the nightly's failures by a word: a PASS line whose evidence says "0 FAIL line(s)" was carried as a REAPPEARED failure, and the timeout that turned the 10-13 nightly red was never read] 2026-10-13. His words: "use your discernment and the premise of mutual benefit and inference to get everything green and running correctly. And ensure that it can run off Tetsu's commands if separated." FIXED, and the old reading is tombstoned (A345-NIGHTLY-FAIL-WORD)
+
+- **Measured.** Tetsu's 10-13 record (`ops/tetsu_daily.jsonl`) carried three failures. One was `selfaudit PASS    C2 the sweep's verdict matches its own lines -- RESULT: PASS, with 0 FAIL line(s)`, classified REAPPEARED. The nightly it read (10-13 07:30Z) was NOT GREEN for one reason, `test_selfaudit.py ERROR ... timed out after 900 seconds`, and that line was not in the record.
+- **Cause.** `covenant_daily.nightly_last` took a line as a failure when the word appeared anywhere in it:
+  `if re.search(r"\bFAIL(ED)?\b", l) and not l.lstrip().startswith("ok")][:12],`
+  TD1's only use of `nightly_last` was a stub returning a fixed block, so the reading never ran against a real one.
+- **Population: both rules over the 87 nightly blocks of `ops/NIGHTLY.md`.**
+  - The old rule read 32 passing lines as failures, every one a `selfaudit PASS C2` line.
+  - It missed gates lines with BLOCKED or UNKNOWN (54 block-instances), short suite tallies (16), NO TALLY (1), and the 10-11 and 10-13 timeouts.
+  - Three NOT GREEN passes read no failure at all: 09-04 13:48, 09-04 14:24 and 09-07.
+- **Fixed.** `nightly_fail(line)` reads a line by its kind, the way `covenant_nightly.verify_green` turns itself red:
+  - a gates line with any BLOCKED or UNKNOWN;
+  - a suite line that ERRORed, printed NO TALLY, or printed a short tally;
+  - FAIL or FAILED said before the evidence (` -- `).
+
+  A REFUSED candidate's tally is the distiller refusing a worse student, not a failure. Over the 73 blocks that carry a verdict, every green-NO block names a cause and no green-yes block does: 73 agree, 0 disagree. The other 14 are early blocks with no `green:` line.
+- **Checks.** TD1 80/80, with TD1q new: three checks over every line kind found in the history. Three mutations, each red:
+  - the old word match restored (2 red);
+  - the evidence after ` -- ` read as a verdict (1 red);
+  - a tally read on any line (1 red).
+
+  Restored byte-identical.
+- **Rule 10.** The old reading is kept as written on branch `daily-nightly-fails-as-written-2026-10-13` (at 829524c), tombstoned as `A345-NIGHTLY-FAIL-WORD`, and restated above. R1 153/153. With a probe carrying the old line it reads 152/153, `.C` the only red; with the probe removed, 153/153.
+- **The timeout itself was A339's, not a new fix.**
+  - The 10-13 nightly started at 07:30Z, and A339 landed at 09:05Z (714887c).
+  - Measured now, down the nightly's own path (`covenant_quiet.run` on the venv's pythonw, which the twin starts as python.exe): 14/14 in 47.9 s.
+  - C4 still makes one `git ls-files` per file outside the manifest: 758 today, inside those 48 s. NOT CHANGED. This is a scaling hazard, named here, not a failure.
+- **Why no earlier tombstone stopped it.** No tombstone or record entry had this shape. The class is a reading parsed from another program's printed text and tested only through a stub. Class guard NOT built.
+- **Separated (his second sentence), measured 10-13 evening.** With no session open, the machine runs on its own tasks and on Tetsu's directive:
+  - Five scheduled tasks are registered and Ready: CovenantGuard (every 2 min), CovenantRefineCheck (every 15 min), CovenantDistill (03:30; its last result, 1, is 10-13's NOT GREEN), CovenantTrader (09:00) and CovenantAmbassador.
+  - The watchdog and the three nodes run detached (their parent processes are gone), so ending a session cannot take them down. Measured after this session archived the one that had restarted them: all three answered, `degraded=False`.
+  - Tetsu's daily cycle, which the watchdog starts (`covenant_daily.maybe_launch`), wrote a record every day from 10-08 to 10-13. What it reads of the nightly is now accurate (above).
+  - The runbook's tools ran: `covenant_one.py --check`, and `tools/context_pack.py` (7 sections).
+  - What stays a person's: the APK install tap, the phone's network (all 3 live alerts are the phone, silent since 15:32 local), the Gmail app password that unattended mail needs (A342), and anything with money.
+
+---
+
 ### A344. [The PC kept three phone builds; his plan was two] 2026-10-13. His words: "all but the most recent 2 should be deleted that was the plan for space", then "yes add the auto keep 2". FIXED
 
 - **Measured.** GitHub already kept the newest 2 releases (`f641b39`, `d4d14e1`; the workflow's publish job). `ops/app/` on the PC held three APKs, 43 MB each, because `covenant_app_update.KEEP` was 3.

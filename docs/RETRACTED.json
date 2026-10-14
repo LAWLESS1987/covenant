@@ -1190,6 +1190,28 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch degraded-keyless-checks-as-written-2026-10-13 (at fe23e9e): B2.H3, P12.H3 and A114.7c as they were. The record quotes them in A343."
+  },
+  {
+   "id": "A345-NIGHTLY-FAIL-WORD",
+   "claim": "That a line of the nightly's block is a failure when the word FAIL or FAILED appears anywhere in it (and it does not start with `ok`) -- covenant_daily.nightly_last's reading, which is what Tetsu's daily record carries as the nightly's failures.",
+   "refuted_by": "Measured 2026-10-13 (A345) over the 87 nightly blocks of ops/NIGHTLY.md. It read 32 passing lines as failures, every one `selfaudit PASS C2 ... -- RESULT: ..., with N FAIL line(s)`, and missed what turned the nightly red: gates lines with BLOCKED or UNKNOWN (54 block-instances), short suite tallies (16, e.g. F3: 7/8 passed), NO TALLY (1), and the 2026-10-11 and 2026-10-13 test_selfaudit.py timeouts (ERROR). Three passes were NOT GREEN with no failure read at all (09-04 13:48, 09-04 14:24, 09-07). Tetsu's 10-13 record listed the C2 PASS as a REAPPEARED failure and never named the timeout.",
+   "truth": "A nightly line is a failure by its kind, the way covenant_nightly.verify_green turns itself red: a gates line with any BLOCKED or UNKNOWN; a suite line that ERRORed, printed NO TALLY or a short tally; FAIL / FAILED said before the evidence (' -- '). Over the 73 blocks that carry a verdict, every green-NO block names a cause this way and no green-yes block does. Pinned by TD1q.",
+   "verbatim": [
+    "if re.search(r\"\\bFAIL(ED)?\\b\", l) and not l.lstrip().startswith(\"ok\")][:12],"
+   ],
+   "patterns": [
+    "re\\.search\\(r\"\\\\bFAIL\\(ED\\)\\?\\\\b\", l\\) and not l\\.lstrip\\(\\)\\.startswith\\(\"ok\"\\)"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch daily-nightly-fails-as-written-2026-10-13 (at 829524c): covenant_daily.nightly_last's word match as it was. The record quotes it in A345."
   }
  ]
 }

@@ -15,6 +15,7 @@ anything else; and Tetsu's system message carries the directive, read at call ti
   TD1g  the judge rollback        TD1h  the watchdog's daily row  TD1i  the check-in's tip/genesis
   TD1j  the directive reaches Tetsu                               TD1k  the understanding rubric
   TD1l  only the daemon launches  TD1m  a whole cycle, end to end, stubbed
+  TD1q  the nightly's failures, read by the kind of line (A345)
 LICENCE: Apache-2.0.
 """
 import json
@@ -472,6 +473,49 @@ def main():
         else:
             os.environ["COVENANT_HEAL_TOLD"] = realtold
         shutil.rmtree(tmp, ignore_errors=True)
+
+    # TD1q (A345): the nightly's failures are read by the KIND of line, as the nightly reads itself. Every
+    # line below is a kind found in ops/NIGHTLY.md's history; the two first are the 2026-10-13 errors (a
+    # PASS read as a failure, the timeout that turned the pass red not read at all).
+    tq = tempfile.mkdtemp(prefix="td1q_")
+    try:
+        fail_lines = [
+            "  test_selfaudit.py                ERROR Command '['pythonw.exe', 'test_selfaudit.py']' timed out after 900 seconds",
+            "gates: 11 PASS   1 BLOCKED   0 UNKNOWN",
+            "gates: 12 PASS   0 BLOCKED   1 UNKNOWN",
+            "  test_f3_gate_end_to_end.py       F3: 7/8 passed",
+            "  test_gate_proxy.py               NO TALLY (rc=1)",
+            "selfaudit FAIL    C4 the manifest covers what git tracks -- 3 changed or missing",
+            "study FAILED: AttributeError: module 'covenant_study' has no attribute 'generate'",
+            "  PMC6959478 fetch FAILED HTTPError",
+        ]
+        pass_lines = [
+            "selfaudit PASS    C2 the sweep's verdict matches its own lines -- RESULT: PASS, with 0 FAIL line(s)",
+            "selfaudit PASS    C2 the sweep's verdict matches its own lines -- RESULT: FAIL, with 2 FAIL line(s)",
+            "gates: 12 PASS   0 BLOCKED   0 UNKNOWN",
+            "  test_f1_fallback_silence.py      F1: 28/28 passed",
+            "  test_selfaudit.py                SELF-AUDIT SELFTEST: 14/14 checks passed",
+            "REFUSED: regresses the pinned disposition claims (test_a126 A126: 12/13 passed on the candidate; "
+            "the model in use keeps them) -- A163 twice was enough",
+            "   ok    E2 G1 cannot be BLOCKED by a ledger write: no CHANGED/MISSING line names a .jsonl",
+        ]
+        nf = os.path.join(tq, "NIGHTLY.md")
+        with open(nf, "w", encoding="utf-8") as fh:
+            fh.write("## 2026-10-12T07:30:19Z  nightly pass\n  test_f3_gate_end_to_end.py       F3: 6/8 passed\n"
+                     "green: NO\n\n## 2026-10-13T07:30:14Z  nightly pass\n**NOT GREEN after this pass**\n"
+                     + "\n".join(pass_lines + fail_lines) + "\ngreen: NO\ntook 76 minutes\n")
+        got = D.nightly_last(nf)
+        f = got.get("fails") or []
+        check("TD1q every failing kind of nightly line is read as a failure (ERROR, NO TALLY, a short tally, "
+              "gates with BLOCKED or UNKNOWN, FAIL / FAILED before the evidence)",
+              all(any(x.strip()[:60] in y for y in f) for x in fail_lines), f)
+        check("TD1q a passing line is never a failure: FAIL after ' -- ' is evidence, a REFUSED candidate's tally "
+              "is the distiller working, a full tally and clean gates pass",
+              not any(any(x.strip()[:60] in y for y in f) for x in pass_lines), f)
+        check("TD1q only the latest pass is read: the earlier block's 6/8 is not carried",
+              got.get("started") == "2026-10-13T07:30:14Z" and not any("6/8" in y for y in f), got)
+    finally:
+        shutil.rmtree(tq, ignore_errors=True)
 
     print()
     n_ok = sum(1 for _, ok in results if ok)

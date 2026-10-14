@@ -445,6 +445,31 @@ def highway_now():
         return {"_error": "%s: %s" % (type(e).__name__, str(e)[:160])}
 
 
+# A345: what turned the nightly red is read by the KIND of line, the way covenant_nightly.verify_green
+# turns itself red: a gates line with any BLOCKED or UNKNOWN, a suite that raised (ERROR), printed no
+# tally (NO TALLY) or a short one (7/8 passed), and any FAIL / FAILED said before the evidence. The word
+# FAIL after " -- " is evidence, not a verdict ("selfaudit PASS C2 ... RESULT: PASS, with 0 FAIL
+# line(s)" passed). Measured over the 87 nightly blocks of ops/NIGHTLY.md: every green-NO block names at
+# least one cause this way, and no green-yes block names one.
+_NIGHTLY_GATES = re.compile(r"^gates:\s*\d+ PASS\s+(\d+) BLOCKED\s+(\d+) UNKNOWN")
+_NIGHTLY_TALLY = re.compile(r"\b(\d+)/(\d+) (?:checks )?passed\b")
+
+
+def nightly_fail(line):
+    """True when one line of a nightly block reports a failure."""
+    s = str(line).strip()
+    if not s or s.startswith("ok"):
+        return False
+    g = _NIGHTLY_GATES.match(s)
+    if g:
+        return g.group(1) != "0" or g.group(2) != "0"
+    head = s.split(" -- ", 1)[0]
+    if re.search(r"\bFAIL(ED)?\b|\bERROR\b|\bNO TALLY\b", head):
+        return True
+    m = _NIGHTLY_TALLY.search(head)                      # a suite line only: a REFUSED candidate's tally is
+    return bool(m and re.match(r"\S+\.py\s", s) and m.group(1) != m.group(2))   # the distiller working
+
+
 def nightly_last(path=None):
     """The latest nightly pass, from its own block: green or not, what failed, what the
     distiller promoted or refused, the security probe's regression count."""
@@ -462,8 +487,7 @@ def nightly_last(path=None):
     g = re.search(r"^green:\s*(\S+)", block, re.M)
     probe = re.search(r"(\d+) regression\(s\)", block)
     return {"started": head[3:23], "green": g.group(1) if g else UNDET,
-            "fails": [_mask(l.strip())[:160] for l in block.splitlines()
-                      if re.search(r"\bFAIL(ED)?\b", l) and not l.lstrip().startswith("ok")][:12],
+            "fails": [_mask(l.strip())[:160] for l in block.splitlines() if nightly_fail(l)][:12],
             "promoted": [l.strip()[:160] for l in block.splitlines() if l.strip().startswith("PROMOTED")][:4],
             "refused": [l.strip()[:160] for l in block.splitlines() if l.strip().startswith("REFUSED")][:4],
             "probe_regressions": int(probe.group(1)) if probe else None}
