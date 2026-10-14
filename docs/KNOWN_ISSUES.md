@@ -7645,6 +7645,27 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A347. [A345 and A346 each committed retractions without regenerating the correction index, and both were pushed: the sweep read CI1 2/6. A recurrence of A326's shape, the forgotten "touch the index too", by me] 2026-10-13. Under his words of the same evening: "everything always uses the tombstone system" (10-03) and "Do not delete anything. Only improve." FIXED, with a guard at the place the step is forgotten
+
+- **Measured.** The sweep of 82d1044 (195 suites) read `test_ci1_corrections_index.py` 2/6, its only unclean suite. CI1.1 named `A345-NIGHTLY-FAIL-WORD`, `A346-PRUNE-DELETES` and `A345-DRAFT-COUNT` as in the ledger and missing from `docs/CORRECTIONS.md`. Both commits went to public main red on CI1.
+- **Why A326's guard did not stop it.**
+  - CI1 runs in the sweep, after the push.
+  - The commit's stage-check selects suites that name a staged file only when the file is published Markdown. For a staged `.json` it selects only the tree walkers.
+  - Measured over the 259 tracked non-`.py`/`.md` files: even a names rule for every file would select only R1 for `docs/RETRACTED.json`, because CI1 reads the ledger through `tools/corrections_index`'s constants.
+  - And the stage-check never blocks a commit.
+- **Fixed, the instance.** `python tools/corrections_index.py --write`: three rows added; the generated heading count went from 49 to 52.
+- **Fixed, the class.** The pre-commit hook's new step 2e, in `ops/pre-commit.synchold`, installed byte-identical:
+  - when a commit stages `docs/RETRACTED.json`, it regenerates the index and stages `docs/CORRECTIONS.md`;
+  - it does this only when the ledger and the index on disk are exactly what the index holds (A255). Otherwise it says NOT regenerated and leaves both;
+  - it never blocks the commit.
+- **Checks.** CI1 10/10, with CI1.7-CI1.10 new: the real hook in a throwaway repository under `verify_bundle.repo_env()`.
+  - Covered: a ledger-only commit carries the new id; an index with unstaged changes is left alone and the hand note survives; unstaged ledger entries never reach the index.
+  - Three mutations, each red: the step never fires (CI1.8-10); the unstaged guard removed (CI1.9-10); regenerated but never staged (CI1.8). Restored byte-identical.
+- **Kept.** The hook as installed before is in `.trash/pre-commit.before-A347-2026-10-13`, byte-identical to HEAD's tracked copy. The index as it was is in git at 82d1044.
+- **NOT FIXED, named.** The stage-check does not select a suite that reads a staged file through an imported module's constant. CI1 is now covered by the hook step; the class is not.
+
+---
+
 ### A346. [Nothing deleted, everything tombstoned: what this session removed, overwrote or had set to delete, each kept aside or turned into a retirement] 2026-10-13. His words: "Do not delete anything. Only improve. And everything should be tombstone that you've done and are doing in case it needs to be altered. Which you should already know. And if you're not doing it that way, it's deceit." FIXED where it can be; one loss NOT RECOVERABLE, named
 
 - **Measured: what this session, and the one it continued, removed, overwrote or had set to delete.**

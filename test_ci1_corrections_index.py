@@ -50,5 +50,82 @@ check("CI1.5 mutation: deleting the last retraction's row (%s) reads as missing 
 check("CI1.6 a claim with a pipe or a long sentence still renders as one table cell",
       CI.first_sentence("a | b " + "x" * 300).count("\\|") == 1 and len(CI.first_sentence("y" * 400)) <= CI.MAX_CHARS)
 
+
+# CI1.7-CI1.10 (A347): the real pre-commit hook regenerates the index when a commit stages the ledger. A345 and
+# A346 each committed retractions without it and CI1 read 2/6 in the sweep after both were pushed. Driven in a
+# throwaway repository with the hook installed; git runs under verify_bundle.repo_env(), so a hook's GIT_DIR
+# can never reach the real repository (A255).
+def hook_checks():
+    import shutil
+    import subprocess
+    import tempfile
+    sys.path.insert(0, HERE)
+    import verify_bundle as VB
+    root = tempfile.mkdtemp(prefix="ci1_hook_")
+    env = dict(VB.repo_env())
+    env["PATH"] = os.path.dirname(sys.executable) + os.pathsep + env.get("PATH", "")
+
+    def git(*a):
+        return subprocess.run(["git", "-c", "user.name=ci1", "-c", "user.email=ci1@invalid", "-c", "core.autocrlf=false"]
+                              + list(a), cwd=root, capture_output=True, text=True, timeout=300, env=env)
+
+    def entry(i):
+        return {"id": "CI1-HOOK-%d" % i, "claim": "Hook probe claim %d." % i}
+
+    def write_ledger(n):
+        with open(os.path.join(root, "docs", "RETRACTED.json"), "w", encoding="utf-8", newline="\n") as fh:
+            json.dump({"retractions": [entry(i) for i in range(1, n + 1)]}, fh, indent=1)
+
+    def head_index():
+        return git("show", "HEAD:docs/CORRECTIONS.md").stdout
+
+    try:
+        os.makedirs(os.path.join(root, "docs"))
+        os.makedirs(os.path.join(root, "tools"))
+        shutil.copy2(os.path.join(HERE, "tools", "corrections_index.py"), os.path.join(root, "tools"))
+        git("init", "-q")
+        write_ledger(1)
+        with open(os.path.join(root, "docs", "CORRECTIONS.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("# Corrections\n\n" + CI.section({"retractions": [entry(1)]}) + "\n")
+        git("add", "-A")
+        if git("commit", "-qm", "base").returncode != 0:
+            print("  not measured: the scratch base commit failed -- CI1.7-CI1.10 did not run")
+            return
+        hook = os.path.join(root, ".git", "hooks", "pre-commit")
+        shutil.copy2(os.path.join(HERE, "ops", "pre-commit.synchold"), hook)
+        os.chmod(hook, 0o755)
+
+        write_ledger(2)                                     # a retraction staged alone, the A345 commit
+        git("add", "docs/RETRACTED.json")
+        c = git("commit", "-m", "ledger only")
+        said = (c.stdout or "") + (c.stderr or "")
+        check("CI1.7 the installed hook ran (its 'pre-commit:' lines are in the commit's output)",
+              c.returncode == 0 and "pre-commit:" in said, said[-240:])
+        check("CI1.8 a commit that stages only the ledger carries the regenerated index with the new id",
+              "`CI1-HOOK-2`" in head_index() and "staged docs/CORRECTIONS.md" in said, said[-240:])
+
+        with open(os.path.join(root, "docs", "CORRECTIONS.md"), "a", encoding="utf-8", newline="\n") as fh:
+            fh.write("\nA hand note not meant for this commit.\n")
+        write_ledger(3)
+        git("add", "docs/RETRACTED.json")
+        c = git("commit", "-m", "ledger over an unstaged index edit")
+        said = (c.stdout or "") + (c.stderr or "")
+        check("CI1.9 an index with unstaged changes is NOT regenerated or staged, the hook says so, and the hand "
+              "note is still on disk", "`CI1-HOOK-3`" not in head_index() and "hand note" not in head_index()
+              and "NOT regenerated" in said and "hand note" in open(os.path.join(root, "docs", "CORRECTIONS.md"),
+                                                                      encoding="utf-8").read(), said[-240:])
+        git("checkout", "--", "docs/CORRECTIONS.md")
+        write_ledger(4)
+        git("add", "docs/RETRACTED.json")
+        write_ledger(5)                                     # a fifth retraction on disk, NOT staged
+        c = git("commit", "-m", "ledger with an unstaged fifth")
+        said = (c.stdout or "") + (c.stderr or "")
+        check("CI1.10 a ledger with unstaged entries is not read into the index (A255): no unstaged id is committed",
+              "`CI1-HOOK-5`" not in head_index() and "NOT regenerated" in said, said[-240:])
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+hook_checks()
 print("\nCI1: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)
