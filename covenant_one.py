@@ -770,8 +770,48 @@ BUDGET_TOTAL_S = int(os.environ.get("COVENANT_ONE_BUDGET_S", 75 * 60))
 # --------------------------------------------------------------------------
 # output: everything to the screen AND to one transcript, always both
 # --------------------------------------------------------------------------
+# A346 (his words, 2026-10-13: "Do not delete anything. Only improve."): open(path, "w") emptied the
+# previous transcript at the start of every run, and it is gitignored, so it was gone -- the 10-10
+# ONE_SWEEP.txt was lost that way the same evening. The previous transcript is now copied to
+# logs/transcripts/<name>.<its mtime><ext> first. If it cannot be kept, the run refuses to write over it.
+KEPT_TRANSCRIPTS = os.path.join("logs", "transcripts")
+
+
+def keep_previous(path, kept_dir=None):
+    """Copy an existing, non-empty transcript aside before it is overwritten. Returns the kept copy's
+    path, or None when there was nothing to keep. Raises SystemExit when it cannot be kept."""
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) == 0:
+            return None
+        mt = os.path.getmtime(path)
+    except OSError:
+        return None
+    d = kept_dir or os.path.join(os.path.dirname(os.path.abspath(path)), KEPT_TRANSCRIPTS)
+    stem, ext = os.path.splitext(os.path.basename(path))
+    ts = time.strftime("%Y-%m-%dT%H%M%S", time.localtime(mt))
+    try:
+        os.makedirs(d, exist_ok=True)
+        with open(path, "rb") as fh:
+            data = fh.read()
+        n = 1
+        while True:
+            dest = os.path.join(d, "%s.%s%s%s" % (stem, ts, "" if n == 1 else ".%d" % n, ext))
+            if not os.path.exists(dest):
+                break
+            with open(dest, "rb") as fh:
+                if fh.read() == data:
+                    return dest                      # already kept, byte for byte
+            n += 1
+        shutil.copy2(path, dest)
+    except OSError as e:
+        raise SystemExit("covenant_one: could not keep the previous transcript %s (%s: %s); refusing to "
+                         "write over it" % (path, type(e).__name__, e))
+    return dest
+
+
 class Tee:
     def __init__(self, path):
+        self.kept = keep_previous(path)
         self.fh = open(path, "w", encoding="utf8", errors="replace")
         self.path = path
 
@@ -1664,6 +1704,8 @@ def main():
     say("#" * 74)
     say("#  COVENANT -- ONE COMMAND.  Nothing hidden, nothing silent.")
     say("#  transcript: %s" % say.path)
+    if getattr(say, "kept", None):
+        say("#  the previous one is kept, not overwritten: %s" % say.kept)
     if args.only:
         say("#  scope: PARTIAL -- --only %d suite(s); not the sweep, and its verdict speaks for them alone"
             % len(args.only))

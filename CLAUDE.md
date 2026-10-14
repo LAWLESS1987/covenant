@@ -160,6 +160,13 @@ judge's behaviour for the third time, both after earlier fixes of the same
 shape -- because those fixes repaired the instance and left nothing behind to
 stop the next one.
 
+*2026-10-13:* his words, *"Do not delete anything. Only improve. And everything
+should be tombstone that you've done and are doing in case it needs to be
+altered."* This covers your own scratch too. A probe that has turned R1 red is
+retired to `.trash/`, not `rm`ed. A transcript or a build is kept aside before
+it is replaced. A draft you correct before committing is still a claim you made,
+so it gets a tombstone. Three of those happened silently on 2026-10-13 (A346).
+
 ---
 
 **Re-runnable, not remembered:** `python tools/corpus_reconcile.py`,

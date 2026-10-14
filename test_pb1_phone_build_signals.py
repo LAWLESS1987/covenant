@@ -19,6 +19,7 @@ Nothing here touches the network, the real ops/app record or the real highway le
 
     python test_pb1_phone_build_signals.py
 """
+import hashlib
 import json
 import os
 import shutil
@@ -184,6 +185,25 @@ def main():
         check("PB1k3 ...and with latest naming the newest, exactly two APKs remain",
               AU.prune(dir_=pd, keep=2) == [names[0]] and len([f for f in os.listdir(pd) if f.endswith(".apk")]) == 2)
         check("PB1k4 the PC's keep is 2, his plan, the same as the GitHub releases", AU.KEEP == 2, AU.KEEP)
+        # PB1k5-k7 (A346, his words "Do not delete anything. Only improve."): what keep-2 moves out is RETIRED.
+        rd = os.path.join(pd, "retired")
+        gone = [n for n in names if not os.path.exists(os.path.join(pd, n))]
+        check("PB1k5 nothing is deleted: every APK prune moved out is in retired/, byte for byte",
+              gone == names[:2] and all(os.path.exists(os.path.join(rd, n))
+                                        and open(os.path.join(rd, n), "rb").read() == b"x" for n in gone),
+              (gone, sorted(os.listdir(rd)) if os.path.isdir(rd) else None))
+        rows = [json.loads(l) for l in open(os.path.join(rd, "RETIRED.jsonl"), encoding="utf-8")] \
+            if os.path.exists(os.path.join(rd, "RETIRED.jsonl")) else []
+        check("PB1k6 each retirement is one record row: the file, where it went, its sha256, by whom and why",
+              [r.get("file") for r in rows] == [names[1], names[0]]
+              and all(r.get("sha256") == hashlib.sha256(b"x").hexdigest() and r.get("by") and r.get("why")
+                      and os.path.exists(os.path.join(pd, r.get("to") or "-")) for r in rows), rows)
+        open(os.path.join(pd, names[1]), "wb").write(b"y")              # the same name arrives and is retired again
+        os.utime(os.path.join(pd, names[1]), (999, 999))
+        AU.prune(dir_=pd, keep=2)
+        check("PB1k7 a name retired twice keeps both copies", sorted(
+            open(os.path.join(rd, f), "rb").read() for f in os.listdir(rd) if f.startswith(names[1][:-4]))
+            == [b"x", b"y"], sorted(os.listdir(rd)))
     finally:
         shutil.rmtree(pd, ignore_errors=True)
     for n in NOT_RUN:

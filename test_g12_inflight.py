@@ -280,6 +280,43 @@ def main():
         ok("I7d", "measured: a sweep that never ran (--quick) proves nothing, so no second ask",
            len(asks) == 1, repr(asks))
 
+    # K1-K5 (A346, his words "Do not delete anything"): the transcript a run writes over is kept first.
+    import covenant_one as ONE
+    with tempfile.TemporaryDirectory() as tmp:
+        t = os.path.join(tmp, "ONE_SWEEP.txt")
+        with open(t, "w", encoding="utf-8") as fh:
+            fh.write("the 10-10 sweep\n  RESULT: PASS\n")
+        old = os.path.getmtime(t)
+        say = ONE.Tee(t)
+        say("a new run")
+        say.close()
+        kept = say.kept or ""
+        ok("K1", "the transcript a run writes over is copied to logs/transcripts first, byte for byte",
+           os.path.dirname(kept) == os.path.join(tmp, "logs", "transcripts")
+           and open(kept, encoding="utf-8").read() == "the 10-10 sweep\n  RESULT: PASS\n", kept)
+        ok("K2", "the kept copy carries its own time, in its name and its mtime",
+           time.strftime("%Y-%m-%dT%H%M%S", time.localtime(old)) in os.path.basename(kept)
+           and abs(os.path.getmtime(kept) - old) < 2, kept)
+        ok("K3", "and the new run still writes the named transcript",
+           open(t, encoding="utf-8").read() == "a new run\n")
+        k_a = ONE.keep_previous(t)                           # the new run's transcript, kept
+        k_b = ONE.keep_previous(t)                           # the same bytes again: no second copy
+        n_kept = len(os.listdir(os.path.join(tmp, "logs", "transcripts")))
+        ok("K4", "a missing transcript keeps nothing; two runs kept in one second do not collide; "
+           "a second keep of the same bytes adds no copy",
+           ONE.keep_previous(os.path.join(tmp, "nope.txt")) is None and k_a and k_a == k_b
+           and k_a != kept and n_kept == 2, (kept, k_a, k_b, n_kept))
+        blocked = os.path.join(tmp, "blocked")
+        with open(blocked, "w") as fh:                       # a FILE where the kept folder must go
+            fh.write("x")
+        try:
+            ONE.keep_previous(t, kept_dir=os.path.join(blocked, "sub"))
+            refused = False
+        except SystemExit:
+            refused = True
+        ok("K5", "when the previous transcript cannot be kept, the run refuses to write over it",
+           refused and open(t, encoding="utf-8").read() == "a new run\n")
+
     print("G12-inflight: %d/%d passed" % (N - len(FAILS), N))
     return 1 if FAILS else 0
 

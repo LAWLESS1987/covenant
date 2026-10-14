@@ -1212,6 +1212,54 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "Kept as written on branch daily-nightly-fails-as-written-2026-10-13 (at 829524c): covenant_daily.nightly_last's word match as it was. The record quotes it in A345."
+  },
+  {
+   "id": "A346-PRUNE-DELETES",
+   "claim": "That the PC deletes an APK older than the two newest after each new fetch (covenant_app_update.prune, `os.remove`), recorded in A344 as his space plan and an exception to rule 10's \"retire, never delete\".",
+   "refuted_by": "His words, 2026-10-13, the same evening: \"Do not delete anything. Only improve. And everything should be tombstone that you've done and are doing in case it needs to be altered.\" The exception was inferred from his keep-2 plan; his rule says nothing is deleted. Nothing had been deleted under it: the third copy was waiting for the next fetch.",
+   "truth": "An older APK is retired to ops/app/retired/, one row each in its RETIRED.jsonl (when, the file, where it went, its sha256, by whom, why). ops/app/ keeps the two newest; the space comes back only when he empties retired/. Pinned by PB1k5-k7.",
+   "verbatim": [
+    "os.remove(os.path.join(dir_, old))",
+    "That is his space plan, an exception he chose to rule 10's \"retire, never delete\" for rebuildable build artifacts."
+   ],
+   "patterns": [
+    "os\\.remove\\(os\\.path\\.join\\(dir_, old\\)\\)",
+    "an exception he chose to rule 10's \"retire, never delete\""
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a344-prune-deletes-as-written-2026-10-13 (at 829524c): prune() as A344 landed it. The record quotes it in A344 (unedited) and A346."
+  },
+  {
+   "id": "A345-DRAFT-COUNT",
+   "claim": "My first draft of the A345-NIGHTLY-FAIL-WORD tombstone: gates lines with BLOCKED or UNKNOWN in 59 block-instances, and two red passes with no failure read.",
+   "refuted_by": "The measurement it summarised printed 37 + 8 + 4 + 3 + 2 = 54 gates block-instances, and three NOT GREEN passes with nothing read (09-04 13:48, 09-04 14:24, 09-07). 59 was typed, not printed. I corrected the draft before the commit (5f4a967) and left no record of it, which his words of the same evening say is not enough: everything I do is tombstoned.",
+   "truth": "54 block-instances and three passes, as committed in 5f4a967. The draft never existed as a commit, so there is no branch; its wording is kept verbatim here and in A346.",
+   "verbatim": [
+    "gates lines with BLOCKED or UNKNOWN (59 block-instances)",
+    "On 09-04 13:48 and 09-07 the nightly was NOT GREEN and it read no failure at all."
+   ],
+   "patterns": [
+    "BLOCKED or UNKNOWN \\(59 block-instances\\)",
+    "On 09-04 13:48 and 09-07 the nightly was NOT GREEN"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "No branch: the wrong wording was a draft in my working copy, corrected before any commit. The record quotes it in A346."
   }
  ]
 }

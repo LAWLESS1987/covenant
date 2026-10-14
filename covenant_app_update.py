@@ -41,6 +41,9 @@ LATEST = os.path.join(DIR, "latest.json")
 # A344 (2026-10-13, his words: "all but the most recent 2 should be deleted that was the plan for space", then
 # "yes add the auto keep 2"). The GitHub side already keeps the newest 2 releases (the workflow's publish job);
 # this kept 3 on the PC, 43 MB each. The newest two are kept; older APKs go after each new fetch, by prune().
+# A346 (the same evening, his words: "Do not delete anything. Only improve."): "go" is now RETIRED, not deleted --
+# moved to ops/app/retired/ with one row in its RETIRED.jsonl. The space comes back only when he empties it.
+# A344's prune deleted them; kept as written on branch a344-prune-deletes-as-written-2026-10-13.
 KEEP = 2
 
 
@@ -585,9 +588,11 @@ def release_asset(run, tok):
 
 
 def prune(dir_=None, keep=None, keep_file=None):
-    """Remove all but the `keep` newest APKs (by mtime) in ops/app/; returns the names removed. The file
-    latest.json names, and `keep_file`, are never removed whatever their age. Only covenant-node-*.apk files
-    are touched -- latest.json, requests.jsonl and anything else in the folder are not."""
+    """Retire all but the `keep` newest APKs (by mtime) in ops/app/ to ops/app/retired/, one row each in
+    retired/RETIRED.jsonl (when, the file, where it went, its sha256, by whom, why); returns the names
+    retired. Nothing is deleted (A346). The file latest.json names, and `keep_file`, are never retired
+    whatever their age. Only covenant-node-*.apk files are touched -- latest.json, requests.jsonl and
+    anything else in the folder are not."""
     dir_ = dir_ or DIR
     keep = KEEP if keep is None else keep
     try:
@@ -599,13 +604,26 @@ def prune(dir_=None, keep=None, keep_file=None):
         pinned.add(keep_file)
     apks = sorted((f for f in os.listdir(dir_) if f.startswith("covenant-node-") and f.endswith(".apk")),
                   key=lambda f: os.path.getmtime(os.path.join(dir_, f)))
-    removed = []
+    retired_dir = os.path.join(dir_, "retired")
+    retired = []
     for old in apks[:-keep] if keep > 0 else apks:
         if old in pinned:
             continue
-        os.remove(os.path.join(dir_, old))
-        removed.append(old)
-    return removed
+        src = os.path.join(dir_, old)
+        os.makedirs(retired_dir, exist_ok=True)
+        dest = os.path.join(retired_dir, old)
+        if os.path.exists(dest):                          # the same name retired before: both are kept
+            dest = os.path.join(retired_dir, "%s.%d.apk" % (old[:-4], int(time.time())))
+        with open(src, "rb") as fh:
+            sha = hashlib.sha256(fh.read()).hexdigest()
+        os.replace(src, dest)
+        with open(os.path.join(retired_dir, "RETIRED.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "file": old,
+                                 "to": os.path.relpath(dest, dir_).replace(os.sep, "/"), "sha256": sha,
+                                 "by": "covenant_app_update.prune (A344 keep %d; A346 retire, never delete)" % keep,
+                                 "why": "older than the %d newest builds" % keep}) + "\n")
+        retired.append(old)
+    return retired
 
 
 def fetch(say=print):
@@ -669,9 +687,9 @@ def fetch(say=print):
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(d, fh, indent=1)
         os.replace(tmp, LATEST)
-        removed = prune(keep_file=fname)
+        retired = prune(keep_file=fname)
         say("app update: fetched build %s (%d bytes, sha256 %s)%s" % (sha7, len(apk), d["sha256"][:12],
-            ("; removed older build(s): " + ", ".join(removed)) if removed else ""))
+            ("; retired older build(s) to ops/app/retired/: " + ", ".join(retired)) if retired else ""))
         return d
     say("app update: no green build with an artifact or a release in the last five runs"); return None
 
