@@ -38,7 +38,10 @@ REPO = os.environ.get("COVENANT_PHONE_REPO", "LAWLESS1987/covenant-phone")
 ARTIFACT = "covenant-node-apk"
 DIR = os.path.join(HERE, "ops", "app")
 LATEST = os.path.join(DIR, "latest.json")
-KEEP = 3
+# A344 (2026-10-13, his words: "all but the most recent 2 should be deleted that was the plan for space", then
+# "yes add the auto keep 2"). The GitHub side already keeps the newest 2 releases (the workflow's publish job);
+# this kept 3 on the PC, 43 MB each. The newest two are kept; older APKs go after each new fetch, by prune().
+KEEP = 2
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -581,6 +584,30 @@ def release_asset(run, tok):
     return next((a for a in rel.get("assets", []) if a.get("name") == RELEASE_ASSET), None)
 
 
+def prune(dir_=None, keep=None, keep_file=None):
+    """Remove all but the `keep` newest APKs (by mtime) in ops/app/; returns the names removed. The file
+    latest.json names, and `keep_file`, are never removed whatever their age. Only covenant-node-*.apk files
+    are touched -- latest.json, requests.jsonl and anything else in the folder are not."""
+    dir_ = dir_ or DIR
+    keep = KEEP if keep is None else keep
+    try:
+        with open(os.path.join(dir_, "latest.json"), encoding="utf-8") as fh:
+            pinned = {str(json.load(fh).get("file") or "")}
+    except (OSError, ValueError):
+        pinned = set()
+    if keep_file:
+        pinned.add(keep_file)
+    apks = sorted((f for f in os.listdir(dir_) if f.startswith("covenant-node-") and f.endswith(".apk")),
+                  key=lambda f: os.path.getmtime(os.path.join(dir_, f)))
+    removed = []
+    for old in apks[:-keep] if keep > 0 else apks:
+        if old in pinned:
+            continue
+        os.remove(os.path.join(dir_, old))
+        removed.append(old)
+    return removed
+
+
 def fetch(say=print):
     """The newest green build's APK from the private repository, kept under ops/app/.
     Returns the latest.json dict, or None with the reason said."""
@@ -642,9 +669,9 @@ def fetch(say=print):
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(d, fh, indent=1)
         os.replace(tmp, LATEST)
-        for old in sorted((f for f in os.listdir(DIR) if f.startswith("covenant-node-") and f.endswith(".apk")), key=lambda f: os.path.getmtime(os.path.join(DIR, f)))[:-KEEP]:
-            os.remove(os.path.join(DIR, old))
-        say("app update: fetched build %s (%d bytes, sha256 %s)" % (sha7, len(apk), d["sha256"][:12]))
+        removed = prune(keep_file=fname)
+        say("app update: fetched build %s (%d bytes, sha256 %s)%s" % (sha7, len(apk), d["sha256"][:12],
+            ("; removed older build(s): " + ", ".join(removed)) if removed else ""))
         return d
     say("app update: no green build with an artifact or a release in the last five runs"); return None
 

@@ -161,6 +161,31 @@ def main():
                 os.environ.pop("COVENANT_PHONE_REPO", None)
     finally:
         AU.LATEST, AU.DIR, AU.latest, AU._get_json, AU.is_new_build = real
+
+    # PB1k (A344, 2026-10-13, his words: "all but the most recent 2 should be deleted that was the plan for space",
+    # "yes add the auto keep 2"): the PC keeps the two newest APKs; the one latest.json names is never removed.
+    # A temp folder only -- the real ops/app is never touched here.
+    pd = tempfile.mkdtemp(prefix="pb1e_")
+    try:
+        names = ["covenant-node-a%d-r%d.apk" % (i, i) for i in range(4)]
+        for i, n in enumerate(names):
+            open(os.path.join(pd, n), "wb").write(b"x")
+            os.utime(os.path.join(pd, n), (1000 + i, 1000 + i))
+        for other in ("requests.jsonl", "notes.txt"):
+            open(os.path.join(pd, other), "w").write("keep me")
+        json.dump({"file": names[0]}, open(os.path.join(pd, "latest.json"), "w"))   # latest names the OLDEST
+        removed = AU.prune(dir_=pd, keep=2)
+        left = sorted(os.listdir(pd))
+        check("PB1k keep 2: the two newest APKs stay, older ones go, and the file latest.json names stays whatever its age",
+              sorted(removed) == [names[1]] and names[0] in left and names[2] in left and names[3] in left, (removed, left))
+        check("PB1k2 ...nothing but covenant-node-*.apk is touched (latest.json, requests.jsonl, other files stay)",
+              all(f in left for f in ("latest.json", "requests.jsonl", "notes.txt")), left)
+        json.dump({"file": names[3]}, open(os.path.join(pd, "latest.json"), "w"))
+        check("PB1k3 ...and with latest naming the newest, exactly two APKs remain",
+              AU.prune(dir_=pd, keep=2) == [names[0]] and len([f for f in os.listdir(pd) if f.endswith(".apk")]) == 2)
+        check("PB1k4 the PC's keep is 2, his plan, the same as the GitHub releases", AU.KEEP == 2, AU.KEEP)
+    finally:
+        shutil.rmtree(pd, ignore_errors=True)
     for n in NOT_RUN:
         print("  NOT RUN  %s" % n)
     print("PB1: %d/%d passed%s" % (PASSED[0], PASSED[0] + len(FAILED),

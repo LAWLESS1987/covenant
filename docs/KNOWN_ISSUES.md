@@ -7645,6 +7645,15 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A344. [The PC kept three phone builds; his plan was two] 2026-10-13. His words: "all but the most recent 2 should be deleted that was the plan for space", then "yes add the auto keep 2". FIXED
+
+- **Measured.** GitHub already kept the newest 2 releases (`f641b39`, `d4d14e1`; the workflow's publish job). `ops/app/` on the PC held three APKs, 43 MB each, because `covenant_app_update.KEEP` was 3.
+- **Fixed.** KEEP = 2. The clean-up is now `prune()`, run after each NEW fetch: the two newest APKs stay, the file `latest.json` names is never removed whatever its age, and nothing but `covenant-node-*.apk` is touched.
+- **Not deleted now.** The third copy (`252d3e1`, the last copy anywhere since GitHub pruned it) goes at the next fetch of a new build, by his rule. That is his space plan, an exception he chose to rule 10's "retire, never delete" for rebuildable build artifacts.
+- **Checks.** PB1 10/10 (PB1k-k4 new, a temp folder only). Two mutations, each red: the latest.json pin ignored, keep 3. Restored byte-identical. H2 44/44, M6 73/73, DU1 11/11.
+
+---
+
 ### A343. [Every node read `degraded` forever on the posture he chose: `degraded` was keyless, and keyless with seated judges is not judgeless. And Tetsu's model server answered with no record, so the road read it unmanaged] 2026-10-13. His words: "use your discernment and inference to get all nodes green". FIXED, and the old checks are tombstoned (A343-DEGRADED-KEYLESS)
 
 - **Measured.**
