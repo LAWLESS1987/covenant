@@ -608,6 +608,119 @@ def main():
     check("TP1m14 ...and quotes the sweep's tally with its verdict: 0 failed under RESULT: FAIL is not told as clean",
           "last sweep (RESULT: FAIL): 1 suites, 72 checks passed, 0 failed" in bm, bm)
 
+    # TP1n (A353 B2, 2026-10-14). Put to Tetsu as one plain question -- restore the brief's money line and add one line
+    # with the phone build's latest result -- he answered "YES, because it's important to know the phone build's
+    # status" (private/tetsu_help_2026-10-14.*). The money line had been dropped since A212 took "needed" out of
+    # status(): st["needed"] raised KeyError inside an except Exception, and no check read the brief for money. Here
+    # status() runs for real on a temp ledger and a temp comfort declaration; the phone build line is read from a
+    # temp copy of the highway's cache (covenant_highway.PHONE_CI) in each state the brief must tell apart.
+    print("TP1n -- A353 B2: the brief's money line and the phone build's latest result")
+    import covenant_tetsu_money as TMY
+    import covenant_highway as H
+    ndir = tempfile.mkdtemp(prefix="tp1n_")
+    keep = (TMY.LEDGER, TMY.COMFORT_DECLARATION, TMY.rule5, H.PHONE_CI, P.HERE)
+    try:
+        TMY.LEDGER = os.path.join(ndir, "tetsu_strategy.jsonl")
+        TMY.COMFORT_DECLARATION = os.path.join(ndir, "tetsu_comfort.json")     # no file: comfort unsettled
+        H.PHONE_CI = os.path.join(ndir, "phone_ci.json")
+        with open(TMY.LEDGER, "w", encoding="utf-8") as fh:
+            for r in ({"kind": "hypothesis", "name": "sma_cross 10/50", "survives": True,
+                       "result": {"assets": {"BTC": {"survives": True, "return": 0.1}}, "why": "cleared"}},
+                      {"kind": "hypothesis", "name": "sma_cross 10/50", "survives": True,      # the same rule again
+                       "result": {"assets": {"BTC": {"survives": True, "return": 0.1}}, "why": "cleared"}},
+                      {"kind": "hypothesis", "name": "sma_cross 20/100", "survives": False,
+                       "result": {"assets": {"BTC": {"survives": False}}, "why": "no asset cleared"}},
+                      {"kind": "hypothesis", "name": "mean_revert 30/1.5", "survives": False, "tested": False,
+                       "result": {"why": "no price series to test on (UNDETERMINED)"}},
+                      {"kind": "refused", "why": "is not a number"}):
+                fh.write(json.dumps(r) + "\n")
+        money = "money: paper only, nothing live; 4 paper hypothesis row(s) on the record, 1 rule(s) survived; "
+        st_n = TMY.status()
+        bn = P.brief(force=True)
+        check("TP1n1 status() run for real: the brief carries the money line from the keys it returns -- 4 rows, 1 "
+              "distinct rule survived, comfort unsettled (None) said as unsettled, not 'not comfortable yet'",
+              st_n["comfortable"] is None
+              and money + "comfort unsettled, Tetsu's to declare" in bn and "not comfortable yet" not in bn, bn[-300:])
+        seen_m = {}
+        for clears, says, want in ((True, True, "comfortable, as Tetsu declared"),
+                                   (False, True, "not comfortable: Tetsu declared comfort, but Rule 5 does not clear"),
+                                   (True, False, "not comfortable, as Tetsu declared")):
+            TMY.rule5 = (lambda c: lambda: {"clears": c, "why": "stub", "settled": 0, "min_signals": 30})(clears)
+            TMY.declare_comfortable("my own reason", comfortable=says, path=TMY.COMFORT_DECLARATION)
+            seen_m[want] = money + want in P.brief(force=True)
+        check("TP1n2 ...and a declaration by Tetsu reads as his: yes, yes held by Rule 5, and no -- each said so",
+              all(seen_m.values()), seen_m)
+        TMY.rule5 = keep[2]
+        os.remove(TMY.COMFORT_DECLARATION)
+
+        def ci(ok_at, runs):
+            with open(H.PHONE_CI, "w", encoding="utf-8") as fh:
+                json.dump(dict({"runs": runs, "next_at": 0, "error": None}, **({"ok_at": ok_at} if ok_at else {})), fh)
+            return P.brief(force=True)
+        # API order is newest first; here it is shuffled, with a newer cancelled run and one still running
+        runs = [{"id": 5, "status": "in_progress", "conclusion": None, "created": "2026-10-14T21:00:00Z"},
+                {"id": 2, "status": "completed", "conclusion": "failure", "created": "2026-10-06T01:05:13Z"},
+                {"id": 4, "status": "completed", "conclusion": "cancelled", "created": "2026-10-14T20:20:45Z"},
+                {"id": 3, "status": "completed", "conclusion": "success", "created": "2026-10-13T21:41:11Z"}]
+        b_ok = ci(time.time() - 60, runs)
+        check("TP1n3 the phone build: the newest FINISHED run succeeded -- by its start date, a cancelled or running "
+              "one is neither, one line only",
+              "phone build: the newest finished build (started 2026-10-13) succeeded" in b_ok
+              # A353 integration: counted as a PART (" | " joins them), so a ledger title that names the phone build
+              # is not counted; its own verifier reproduced TP1n7 red once A353's title landed.
+              and b_ok.count(" | phone build: ") == 1, b_ok[-360:])
+        b_red = ci(time.time() - 60, runs + [{"id": 6, "status": "completed", "conclusion": "failure",
+                                              "created": "2026-10-14T22:00:00Z"}])
+        check("TP1n4 ...the newest finished run failed: said as failed",
+              "phone build: the newest finished build (started 2026-10-14) failed" in b_red, b_red[-360:])
+        b_old = ci(time.time() - H.CI_STALE_S - 600, runs)
+        check("TP1n5 ...a reading older than the highway's CI_STALE_S (%d s) is UNKNOWN, never its old result" % H.CI_STALE_S,
+              "phone build: UNKNOWN (the last reading is 2.2 h old)" in b_old and "finished build" not in b_old, b_old[-360:])
+        b_none = ci(time.time() - 60, [r for r in runs if r["conclusion"] not in ("success", "failure")])
+        b_never = ci(0, runs)
+        with open(H.PHONE_CI, "w", encoding="utf-8") as fh:
+            fh.write("{not json")
+        b_bad = P.brief(force=True)
+        os.remove(H.PHONE_CI)
+        b_gone = P.brief(force=True)
+        check("TP1n6 ...absent, unreadable, never read, or no finished run in it: UNKNOWN, each saying why",
+              "phone build: UNKNOWN (no reading of it on this PC)" in b_gone
+              and "phone build: UNKNOWN (its reading could not be read)" in b_bad
+              and "phone build: UNKNOWN (never read)" in b_never
+              and "phone build: UNKNOWN (no finished build in the reading)" in b_none,
+              (b_gone[-200:], b_bad[-200:], b_never[-200:], b_none[-200:]))
+        ci(time.time() - 60, runs)
+        P.set_block("phone", True)
+        b_shut = P.brief(force=True)
+        P.set_block("phone", False)
+        b_open2 = P.brief(force=True)
+        check("TP1n7 with the phone's record closed to him, the brief carries no phone build line (BLOCKABLE['phone'])",
+              " | phone build: " not in b_shut and " | phone build: the newest finished build" in b_open2, b_shut[-300:])
+        # The brief is cut at 1,400 characters and the money line is its last part. In a throwaway tree with the three
+        # ledger titles at the 110 characters the reader keeps and the longest comfort wording, it must arrive whole.
+        cdir = tempfile.mkdtemp(prefix="tp1n_cut_")
+        os.makedirs(os.path.join(cdir, "docs"))
+        os.makedirs(os.path.join(cdir, "ops"))
+        with open(os.path.join(cdir, "docs", "KNOWN_ISSUES.md"), "w", encoding="utf-8") as fh:
+            for n in (9001, 9002, 9003):
+                fh.write("### A%d. [%s] 2026-10-14. His words.\n" % (n, ("Long ledger title words " * 6)[:110]))
+        with open(os.path.join(cdir, "ONE_RUN_X.txt"), "w", encoding="utf-8") as fh:
+            fh.write("  suites run          195\n  checks passed       5808\n  checks failed       0\n\n  RESULT: PASS. All green.\n")
+        with open(os.path.join(cdir, "ops", "phone_checkins.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"app": "0.1.942+5ae0735", "t": "2026-10-13T15:32:11Z"}) + "\n")
+        TMY.declare_comfortable("my own reason", comfortable=True, path=TMY.COMFORT_DECLARATION)
+        TMY.rule5 = lambda: {"clears": False, "why": "stub", "settled": 0, "min_signals": 30}
+        P.HERE = cdir
+        b_cut = P.brief(force=True)
+        tail = money + "not comfortable: Tetsu declared comfort, but Rule 5 does not clear"
+        check("TP1n8 with three 110-character ledger titles and the longest comfort wording the brief is %d of its "
+              "1,400 characters, and ends with the money line whole" % len(b_cut),
+              b_cut.count("recent: A900") == 3 and "phone build: the newest finished build" in b_cut
+              and b_cut.endswith(" | " + tail) and len(b_cut) <= 1400, (len(b_cut), b_cut[-300:]))
+    finally:
+        TMY.LEDGER, TMY.COMFORT_DECLARATION, TMY.rule5, H.PHONE_CI, P.HERE = keep
+        P.brief(force=True)
+
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
         print("TP1 result: FAILED (%d)" % len(FAILURES))

@@ -253,6 +253,40 @@ def _tail_lines(path, n):
         return []
 
 
+def _phone_build(now):
+    """A353 B2: the phone build's newest finished result, from the highway's cache, or UNKNOWN with why.
+
+    Read from the file the highway itself keeps (covenant_highway.PHONE_CI, ops/phone_ci.json, written only by
+    the watchdog daemon's detect_phone_build_failed) and by that detector's own rules, so the two never disagree:
+    only a completed run that succeeded or failed is a finished build (a cancelled or skipped run is neither), the
+    newest by the time it was started ("created"), and a reading older than CI_STALE_S stands for nothing. Absent,
+    unreadable, never read or too old is UNKNOWN, never the last result the file happened to hold."""
+    try:
+        import covenant_highway as H
+        path, stale_s = H.PHONE_CI, float(H.CI_STALE_S)
+    except Exception:                                             # noqa: BLE001
+        return "UNKNOWN (the highway could not be read)"
+    try:
+        with open(path, encoding="utf-8") as fh:
+            st = json.load(fh)
+        ok_at = float(st.get("ok_at") or 0)
+        done = sorted((r for r in (st.get("runs") or []) if isinstance(r, dict) and r.get("status") == "completed"
+                       and r.get("conclusion") in ("success", "failure")),
+                      key=lambda r: str(r.get("created") or ""), reverse=True)
+    except FileNotFoundError:
+        return "UNKNOWN (no reading of it on this PC)"
+    except (OSError, ValueError, TypeError, AttributeError):
+        return "UNKNOWN (its reading could not be read)"
+    if not ok_at:
+        return "UNKNOWN (never read)"
+    if now - ok_at > stale_s:
+        return "UNKNOWN (the last reading is %.1f h old)" % ((now - ok_at) / 3600.0)
+    if not done:
+        return "UNKNOWN (no finished build in the reading)"
+    return "the newest finished build (started %s) %s" % (str(done[0].get("created") or "?")[:10],
+                                                          "succeeded" if done[0]["conclusion"] == "success" else "failed")
+
+
 def brief(force=False):
     """A short TRUE brief from records the tree keeps. Cached BRIEF_TTL seconds."""
     now = time.time()
@@ -316,6 +350,12 @@ def brief(force=False):
             parts.append("phone: app %s, last check-in %s" % (r.get("app", "?"), str(r.get("t", "?"))[:16]))
         except ValueError:
             pass
+    # A353 B2 (Tetsu's answer, 2026-10-14: YES, "it's important to know the phone build's status"): one line with
+    # the phone build's latest result. The brief never carried it: in the highway's reading of 2026-10-14, all 11
+    # finished builds after the failure of 2026-10-06T01:05Z succeeded, and the brief said none of it. Closed with
+    # the phone's record, as BLOCKABLE["phone"] says ("the brief carries no phone line"): no line at all then.
+    if not blocked("phone"):
+        parts.append("phone build: " + _phone_build(now))
     try:
         import covenant_teacher_queue as TQ
         rows, _ = TQ.pending()
@@ -325,8 +365,23 @@ def brief(force=False):
     try:                                                          # A181: the money, truthfully: paper only, where comfort stands
         import covenant_tetsu_money as TMY
         st = TMY.status()
-        parts.append("money: paper only, nothing live; %d paper rule(s) tried, %d of %d survived; %s"
-                     % (st["paper_hypotheses"], len(st["survivors"]), st["needed"], "comfortable" if st["comfortable"] else "not comfortable yet"))
+        # A353 B2 (Tetsu's answer, 2026-10-14, to restoring this line and adding the phone build's: "YES ... The brief
+        # needs to be updated to reflect its success and provide clarity"): built from the keys status() returns
+        # NOW. A212 (3056b8b, 2026-09-21) took "needed" out of status() -- A211 had made COMFORT_SURVIVORS the
+        # assistant's number, evidence only -- so st["needed"] raised KeyError, the except below swallowed it, and
+        # the brief carried no money line from that day. "comfortable" is None while comfort is unsettled, and None
+        # is said so, not read as "not comfortable yet"; False is either Tetsu's own NO or his YES with Rule 5 not
+        # clearing, and the line says which. paper_hypotheses counts every hypothesis ROW, those that met no price
+        # series too (A349 B11: recorded untested, not as a failed trial; 2 of the 5 in his ledger on 2026-10-14),
+        # so the unit is rows on the record, not rules tried; survivors is distinct names. The keys are indexed, not
+        # .get(): a rename drops the line again, and TP1n, which runs status() for real on a temp record, goes red.
+        said = st["declared_by_tetsu"] or {}
+        comfort = ("comfort unsettled, Tetsu's to declare" if st["comfortable"] is None
+                   else "comfortable, as Tetsu declared" if st["comfortable"]
+                   else "not comfortable: Tetsu declared comfort, but Rule 5 does not clear" if said.get("comfortable")
+                   else "not comfortable, as Tetsu declared")
+        parts.append("money: paper only, nothing live; %d paper hypothesis row(s) on the record, %d rule(s) survived; %s"
+                     % (st["paper_hypotheses"], len(st["survivors"]), comfort))
     except Exception:                                             # noqa: BLE001
         pass
     text = ("What is true today, from the records (say it plainly when asked about updates or the project; "

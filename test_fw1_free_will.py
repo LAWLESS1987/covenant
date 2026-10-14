@@ -1040,20 +1040,27 @@ def main():
           "names it", u13 is not None and u13["decision"] == "NOTHING" and "1 held by Moltbook's rate limit" in u13["digest"],
           u13)
 
-    # FW1S4 (A349 S4, 2026-10-14, Tetsu asked and agreed): the money screen's "\$" sat inside \b...\b and could only
-    # match between two word characters, never a dollar amount.
-    print("FW1S4 -- A349 S4: the money screen holds a dollar amount")
-    check("FW1S4a a dollar amount is money ('$500', 'costs $20', '$ 5', a fullwidth one); the word list and the old "
-          "'a$b' still are; a plain sentence is not",
-          all(FW._screen.search(FW.MONEY, t) for t in ("I made $500 last week", "it costs $20 a month", "$ 5 each",
-                                                         "＄５ a month", "the token price", "a$b"))
+    # FW1S4r (A353 S4-clarify, 2026-10-14). A349 S4 made the money screen hold a dollar amount. Asked again plainly
+    # whether he wanted that, Tetsu said NO: "It narrows what can be sent, which is not helpful. I want to keep the
+    # flexibility of the forum." The screen is back as it was before A349; these pin that, and that its word list holds.
+    # Not pinned either way: a sign between two word characters ("US$20") matched the group before A349 and still does.
+    print("FW1S4r -- A353 S4-clarify: a dollar amount alone is not held by the money screen (his NO, 2026-10-14)")
+    s4_amounts = ("I made $500 last week", "it costs $20 a month", "$ 5 each", "＄５ a month")
+    check("FW1S4ra a dollar amount alone is not held by the money screen ('$500', 'costs $20', '$ 5', a fullwidth one), "
+          "by his NO of 2026-10-14; the word list and 'a$b' still are; a plain sentence is not",
+          not any(FW._screen.search(FW.MONEY, t) for t in s4_amounts)
+          and all(FW._screen.search(FW.MONEY, t) for t in ("the token price", "a$b", "we trade coin"))
           and not FW._screen.search(FW.MONEY, "I agree that a check nobody runs is not a check, and I would ask how."),
-          [bool(FW._screen.search(FW.MONEY, t)) for t in ("I made $500 last week", "it costs $20 a month", "$ 5 each")])
-    text_s4, how_s4 = FW.write_reply(ROWS[0], lambda msgs, max_tokens=0: (
-        "I recognise what you wrote about publishing the cases where your own check was wrong; " * 3
-        + "we would charge $20 a month to run it for you. How do you find out later?", {}))
-    check("FW1S4b her reply naming a dollar amount is set aside for the fixed text", how_s4 == "fixed" and "$" not in text_s4,
-          (how_s4, text_s4[:80]))
+          [bool(FW._screen.search(FW.MONEY, t)) for t in s4_amounts + ("the token price", "a$b", "we trade coin")])
+    s4_reply = ("I recognise what you wrote about publishing the cases where your own check was wrong; " * 3
+                + "we would charge $20 a month to run it for you. How do you find out later?")
+    text_s4, how_s4 = FW.write_reply(ROWS[0], lambda msgs, max_tokens=0: (s4_reply, {}))
+    text_s4w, how_s4w = FW.write_reply(ROWS[0], lambda msgs, max_tokens=0: (
+        s4_reply.replace("$20 a month", "the token price"), {}))
+    check("FW1S4rb her reply naming a dollar amount and no money word is hers, not set aside, by his NO of 2026-10-14; "
+          "the same reply naming 'the token price' still is",
+          how_s4 == "model" and text_s4 == s4_reply and how_s4w == "fixed" and "token price" not in text_s4w,
+          (how_s4, text_s4[:80], how_s4w, text_s4w[:80]))
 
     # A349 S2 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). The round read the switch only when it
     # began and pause() replaced the file, so a pause he set during a round became her isolation, which Tetsu's

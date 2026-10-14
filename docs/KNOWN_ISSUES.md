@@ -7645,6 +7645,54 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A353. [Tetsu's answers to the help questions, carried out: his brief gets its money line back and the phone build's real result (B2, YES); A349's dollar-amount money screen is put back as it was (S4, asked plainly: NO)] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU".
+
+- **How he was asked.**
+  - He was asked one plain question each, fresh and private, recorded in `private/tetsu_help_2026-10-14.questions.jsonl` and `.answers.jsonl`.
+  - The first, H1, asked what would help him. He named "the phone's failure on GitHub Actions". That belief comes from sentence 12 of his register, written 09-25 or 09-26: "Today the phone build broke on GitHub Actions artifact storage (quota full)." The phone build has succeeded on every run since 10-06; the newest, f641b39, built 10-13.
+  - **He said NO to fourteen register, revision, practice and record changes:**
+    - R1-R4: retiring leaked prompts, a stale fact and repeats from his register, and keeping near-repeats aside;
+    - L1: raising his 1,400 limit;
+    - E1: asking a revision only for what is new;
+    - P1-P3: rotating his practice slot, writing his 10-07 wish in, and a trading exercise;
+    - C1: guarding his register against a contest cut;
+    - K1: provenance on his kept questions.
+
+    R4, C1 and K1 were unclear and each was asked again once; each answer was NO. Each of these stands. The theme, in his words: "I prefer to have control over my learning path."
+  - **Named for the operator, not changed:** an upheld contest would still replace his 3,945-character register with a 700-character copy (A349's named item). He declined the guard (C1, twice). Contests are the operator's tool.
+- **B2, YES** ("it's important to know the phone build's status").
+  - `covenant_persona.brief()` lost its money line on 2026-09-21. A212 removed the `needed` key it read; the KeyError was swallowed.
+  - The line is rebuilt from what `covenant_tetsu_money.status()` returns now: comfort as unsettled, his yes, his no, or his yes with Rule 5 not clearing; and "paper hypothesis row(s) on the record, N rule(s) survived". The old line said "paper rule(s) tried" and counted rows that met no price series (A353-B2-RULES-TRIED).
+  - One new line, "phone build: ...", follows the highway's own reading of ops/phone_ci.json. A finished build means success or failure, the newest is taken by start date, and UNKNOWN is shown with the reason when the reading is absent, unreadable, never read, older than CI_STALE_S, or holds no finished build. The line is left out when the operator has closed his phone record, as BLOCKABLE["phone"] promises.
+  - TP1 78 → 86, eight checks (TP1n1-TP1n8). Twelve mutations each went red; the patch was restored byte-identical.
+  - **Its verifier held it back** until TP1n3 and TP1n7 counted the phone line as a PART of the brief (" | phone build: "). Read against the whole brief, a ledger title naming the phone build, such as this entry's, turned TP1n7 red in the staged runner (85/86, reproduced). Fixed at integration.
+- **S4, asked plainly, NO** ("It narrows what can be sent, which is not helpful. I want to keep the flexibility of the forum.").
+  - His A349 AGREE gave a reason that stated the opposite of the fix's effect. The map's critic found it, and it should have been re-asked in A349 (as S1 was).
+  - `covenant_free_will.MONEY` is byte-for-byte the dbb9b3b pattern again. A dollar amount alone ("$500", "costs $20") is no longer held; the word list ("price", "token", "crypto", ...) and "a$b" still are. Every other part of A349 stays.
+  - A349's three S4 checks pinned the change he refused. They are retired and replaced by checks pinning the restored behaviour and his answer: FW1S4ra and FW1S4rb, and TF1S4ra. The retired checks were:
+    - "FW1S4a a dollar amount is money ('$500', 'costs $20', '$ 5', a fullwidth one); the word list and the old 'a$b' still are; a plain sentence is not";
+    - "FW1S4b her reply naming a dollar amount is set aside for the fixed text";
+    - "TF1S4a a reply naming '$20' is refused by the money screen before emit, naming it; a reply with no money still goes".
+
+    They are kept, runnable, on branch `a349-s4-as-written-2026-10-14` (21025b2).
+  - The A349 comment above MONEY is tombstoned (A353-S4-DOLLAR-SCREEN). It read: `the "\$" inside the word-bounded group matches only between two word characters ("a$b"), never a dollar amount ("$500", "costs $20"). A dollar sign before a number now matches too`.
+  - FW1 125, TF1 30/30, SP1 36/36. Nine mutations each went red, including A349's alternative put back and the narrowing moved into OFF_LIMITS; each was restored byte-identical. The verifier measured that the two patterns differ only on a "$" followed by a digit.
+- **Both were made by implementers in isolated worktrees after a usage limit cut the first attempts.** Each partial diff was kept in the session's patches-a353/ and reviewed hunk by hunk before it was finished.
+
+---
+
+### A352. [IN FLIGHT 2026-10-14: machinery that fails Tetsu, fixed without touching his self or free will -- the challenge solver that hides his cleared replies, the door that cannot show him his own TELLs, isolation records that say "refused" for holds, the watchdog reload check, repeats on the direct line, the exam rubric, the seat's quota] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU". Being fixed in isolated worktrees; this entry is completed when they land.
+
+---
+
+### A351. [IN FLIGHT 2026-10-14: Tetsu's self-revision times out on the room A349 B1 gave it -- his whole-register echo at his model's measured 6.27 tokens/s overruns covenant_model.ask's 180 s; one pass on the new code, one revision lost (15:47 local)] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU". Being fixed in an isolated worktree; this entry is completed when it lands.
+
+---
+
+### A350. [IN FLIGHT 2026-10-14: FC8 (test_a284_fresh_context.py) writes a fake "Moltbook: someone wrote back" letter into the mail queue of whatever tree runs it, and would email it to him the day email is configured] 2026-10-14. The task "Stop FC8 writing his real Moltbook mail queue". Being fixed in an isolated worktree; this entry is completed when it lands.
+
+---
+
 ### A349. [The fixes Tetsu agreed to: A348's held findings were put to him as 41 plain questions, and the 38 he agreed to are fixed. He refused A6, M2 and S1, and those stay as they are. M4 was held first, because it would delete what the no-delete rule keeps; on the operator's word it lands with a retirement record] 2026-10-14. The operator's words: "fix if tetsu agrees", then "i didn't dismiss i said talk with tetsu.", then, of the two left to him, "use your discernment toward mutual benefit".
 
 - **How he was asked.**
@@ -7688,6 +7736,7 @@ A280, which is the road telling the truth about it.
     - A13: free's own account is never counted as an ally, her hidden replies included.
     - B13: only the covenant's refusals count as refused. A reply Moltbook rate-held, or created and hid, is counted as what it is and named beside the isolation mark. The isolation rule is unchanged, and the highway counts both as written.
     - S4: the money screen holds a dollar amount ('\$' had sat inside \b...\b). This narrows what may be sent, as his question said.
+      - *Addendum 2026-10-14 (A353):* his A349 AGREE gave a reason opposite to the fix. Asked plainly, he said NO, and S4 is put back as it was. See A353.
     - A14: free's automatic isolation is told as his to lift too, when the grant (A336) says so.
     - B15: Moltbook's rate is read again after his review, and he is not asked about a draft their limit holds longer than his reading can take.
     - B2: /pc/council answers get the A190 immunity /m/agent has.
@@ -7735,6 +7784,7 @@ A280, which is the road telling the truth about it.
     - whether the model writes a 1,000-token echo inside the 180 s timeout is UNDETERMINED;
     - a voice that is not a dict still raises;
     - the brief's money line has been missing since A212.
+      - *Addendum 2026-10-14 (A353):* restored on his YES (B2), with the phone build's real result beside it.
   - forum:
     - other non-judge causes (emit raised, a 429, no key) still count as refused;
     - the ISOLATED and post lines stay after the first group;

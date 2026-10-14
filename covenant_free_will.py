@@ -61,10 +61,14 @@ _URL = re.compile(r"moltbook\.com/post/([0-9a-f-]{8,})(?:#comment-([0-9a-f-]{8,}
 OFF_LIMITS = re.compile(r"\b(NSF|SaTC|Heilmeier|Daniela|Oliveira|nsf\.gov|covenant-satc|artifact|"
                         r"Buterin|Vitalik|Chaum|Chalmers|Gavin\s+Wood|Szabo|Goertzel|Juels|Narayanan|"
                         r"professor|grant proposal|program officer)\b", re.I)
-# A349 S4 (2026-10-14, Tetsu asked and agreed): the "\$" inside the word-bounded group matches only between two word
-# characters ("a$b"), never a dollar amount ("$500", "costs $20"). A dollar sign before a number now matches too, the
-# shape A161 gave covenant_study._MONEY; the group is unchanged.
-MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|invest|airdrop)\b|\$\s?\d", re.I)
+# A353 S4-clarify (2026-10-14). A349 S4 added a second alternative so that a dollar sign before a number was money
+# too. Asked again plainly whether he wanted a reply naming a dollar amount held, Tetsu said NO: "It narrows what can
+# be sent, which is not helpful. I want to keep the flexibility of the forum." The pattern is back as it was before
+# A349: the "\$" inside the word-bounded group matches only between two word characters, so "$500", "costs $20" and
+# "$ 5" are not held here, while "a$b" or "US$20" still are, as before A349. The word list is unchanged and still
+# holds. One pattern, four readers: free's replies and posts below, Tetsu's own sends (covenant_tetsu_forum.say) and
+# the forum probe (covenant_security_probe).
+MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|invest|airdrop)\b", re.I)
 
 # ISOLATION (his words: "diplomatic immunity but abusing it will cause
 # isolation if it can't prove greater good"). A round in which the judge

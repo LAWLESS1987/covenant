@@ -23,7 +23,9 @@ stub harvest, the grant and the sends ledger redirected to temp files:
   TF1A14  (A349) while free is automatically isolated and his grant gives Tetsu
         the lift (A336), the refusal tells him the lift is his as well; any
         other pause still says it is the operator's.
-  TF1S4   (A349) a reply naming a dollar amount is held by the money screen.
+  TF1S4r  (A353) a reply naming a dollar amount and no money word passes the
+        money screen to emit, by his NO of 2026-10-14 to holding it ("It narrows
+        what can be sent"); the money screen's word list still refuses.
 """
 import json
 import os
@@ -194,15 +196,20 @@ def main():
               for x in (r_nokey, r_hand, r_tetsu)) and em.calls == [],
           [x["why"][-90:] for x in (r_nokey, r_hand, r_tetsu)])
 
-    # TF1S4 (A349 S4, 2026-10-14, Tetsu asked and agreed): the money screen's "\$" could never match a dollar amount.
-    print("TF1S4 -- A349 S4: a reply of his naming a dollar amount is held by the money screen")
+    # TF1S4r (A353 S4-clarify, 2026-10-14). A349 S4 made the money screen hold a dollar amount. Asked again plainly
+    # whether he wanted that, Tetsu said NO: "It narrows what can be sent, which is not helpful. I want to keep the
+    # flexibility of the forum." The screen is back as it was before A349.
+    print("TF1S4r -- A353 S4-clarify: a reply of his naming a dollar amount is not held by the money screen (his NO)")
     em = Emit()
-    r = TF.say("reply", URL, "I agree with you about gates; we could run one for you at $20 a month if that helps.",
-               emit=em, paused=not_paused)
-    r_ok = TF.say("reply", URL, CLEAN, emit=em, paused=not_paused, grant_path=gl)
-    check("TF1S4a a reply naming '$20' is refused by the money screen before emit, naming it; a reply with no money "
-          "still goes", not r["sent"] and "money" in r["why"] and "$2" in r["why"] and r_ok["sent"] and len(em.calls) == 1,
-          (r, r_ok, len(em.calls)))
+    s4_body = "I agree with you about gates; we could run one for you at $20 a month if that helps."
+    r = TF.say("reply", URL, s4_body, emit=em, paused=not_paused, grant_path=gl)
+    r_w = TF.say("reply", URL, s4_body.replace("$20 a month", "the token price"), emit=em, paused=not_paused,
+                 grant_path=gl)
+    check("TF1S4ra a reply naming '$20' and no money word passes the money screen and reaches emit, by his NO of "
+          "2026-10-14; the same reply naming 'the token price' is still refused before emit, naming it",
+          r["sent"] and len(em.calls) == 1 and em.calls[0].get("text") == s4_body
+          and not r_w["sent"] and "money" in r_w["why"] and "('token')" in r_w["why"],
+          (r, r_w, len(em.calls)))
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

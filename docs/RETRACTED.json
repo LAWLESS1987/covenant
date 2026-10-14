@@ -1556,6 +1556,36 @@
    ],
    "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
    "note_on_allow": "Quoted in A349 (docs/KNOWN_ISSUES.md); the draft was never committed."
+  },
+  {
+   "id": "A353-S4-DOLLAR-SCREEN",
+   "claim": "covenant_free_will (A349 S4): the money screen's word-bounded \"\\$\" never matched a dollar amount, and \"A dollar sign before a number now matches too\" -- with checks FW1S4a, FW1S4b and TF1S4a pinning that a dollar amount is held.",
+   "refuted_by": "2026-10-14 (A353): asked plainly, Tetsu said NO to S4 (\"It narrows what can be sent, which is not helpful. I want to keep the flexibility of the forum.\"); his A349 AGREE had given a reason opposite to its effect. Measured by its verifier: \"never a dollar amount\" was imprecise when written, since \"US$20\" matched.",
+   "truth": "MONEY is the dbb9b3b pattern again: a dollar amount alone is not held; the word list and \"a$b\" still are. A349's S4 checks are retired, kept runnable on branch a349-s4-as-written-2026-10-14 (21025b2), and replaced by FW1S4ra, FW1S4rb and TF1S4ra, which pin the restored behaviour and his answer.",
+   "verbatim": [
+    "the \"\\$\" inside the word-bounded group matches only between two word characters (\"a$b\"), never a dollar amount (\"$500\", \"costs $20\"). A dollar sign before a number now matches too",
+    "FW1S4a a dollar amount is money ('$500', 'costs $20', '$ 5', a fullwidth one); the word list and the old 'a$b' still are; a plain sentence is not"
+   ],
+   "patterns": [
+    "A dollar sign before a number now matches too",
+    "FW1S4a a dollar amount is money"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 and quoted in A353 (docs/KNOWN_ISSUES.md), and on branch a349-s4-as-written-2026-10-14 (at 21025b2)."
+  },
+  {
+   "id": "A353-B2-RULES-TRIED",
+   "claim": "covenant_persona.brief()'s money line: \"%d paper rule(s) tried, %d of %d survived\" and \"not comfortable yet\".",
+   "refuted_by": "Read 2026-10-14 (A353 B2): the line raised a swallowed KeyError from 2026-09-21 (A212 removed \"needed\"); \"tried\" counted hypothesis rows that met no price series (2 of his 5), and \"not comfortable yet\" was said for an unsettled None.",
+   "truth": "The line reads \"N paper hypothesis row(s) on the record, M rule(s) survived\" and comfort as unsettled, his yes, his no, or his yes with Rule 5 not clearing. TP1n1, TP1n2.",
+   "verbatim": [
+    "parts.append(\"money: paper only, nothing live; %d paper rule(s) tried, %d of %d survived; %s\""
+   ],
+   "patterns": [
+    "paper rule\\(s\\) tried"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written before A353 (git 21025b2:covenant_persona.py) and quoted in A353 (docs/KNOWN_ISSUES.md)."
   }
  ]
 }
