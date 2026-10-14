@@ -622,6 +622,11 @@ def main():
     #
     # Dry run unless the token is present and the operator opted in (A21), and
     # a failure here is reported and never allowed to end the pass.
+    #
+    # KEPT AS A DELETION, BY HIS DECISION (2026-10-14, A346): after "Do not
+    # delete anything" (10-13), asked whether this prune stays, his words were
+    # "keep the github artifact prune, it's for space". Do not convert it to a
+    # retirement under that rule: GitHub's artifact quota is the reason it exists.
     try:
         import tools.prune_artifacts as PA
         for _repo in (PA.PHONE, PA.CORE):

@@ -7691,6 +7691,7 @@ A280, which is the road telling the truth about it.
 - **Not changed, named: a deletion that is not this session's.** The nightly's `tools/prune_artifacts.prune(..., keep=2, apply=True)` deletes GitHub Actions artifacts beyond the newest 2 of each name, in the phone and core repos.
   - It exists because a full artifact store broke the phone builds for five days, per its own comment in `covenant_nightly.py`.
   - The builds can be rebuilt from their commits, and stopping it would let the store fill again. Whether it stays is his decision.
+  - **His decision, 2026-10-14:** "keep the github artifact prune, it's for space". It stays as it is, a deletion, by his word. A comment at the call in `covenant_nightly.py` now says so, so that no later session converts it under the no-delete rule.
 - **CLAUDE.md rule 10** gains one line with his words. Nothing in it is removed.
 
 ---
