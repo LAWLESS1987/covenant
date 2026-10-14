@@ -391,12 +391,75 @@ def main():
         led = os.path.join(home, "highway.jsonl")
         with open(led, "w", encoding="utf-8") as fh:
             for r in ({"t": "2026-10-13T01:00:00", "remedy": "a", "detector": "x", "ran": True, "dry_run": True},
-                      {"t": "2026-10-13T02:00:00", "remedy": "b", "detector": "y", "ran": True, "dry_run": False, "fixed": False},
+                      {"t": "2026-10-13T02:00:00", "remedy": "b", "detector": "y", "ran": True, "dry_run": False, "outcome": "did not fix"},
                       {"t": "2026-10-13T03:00:00", "remedy": "c", "detector": "z", "ran": False}):
                 fh.write(json.dumps(r) + "\n")
         hl = P3z.heal_detail(path=led)
         check("PC1z9 self-heal reads only repairs that RAN for real, and says when one did not fix",
               [h["remedy"] for h in hl] == ["b"] and hl[0]["ok"] is False, hl)
+
+        # ---- PC1z10 (A348d, 2026-10-14). PC1z9's row above carried a "fixed" key until today, and the highway never
+        # writes one: it grades in "outcome" (covenant_highway.apply_remedy and grade_started). On the real ledger ok
+        # was None for every row, so a repair that did not fix read as a plain one (the 10-14 audit of ops/highway.jsonl:
+        # 0 of 2376 rows carry "fixed"; 18 synchronous and 40 late grades say "did not fix"). PC1z6's shape again: a fixture the writer
+        # does not write. These rows are shaped as the highway writes them, a late grade with no "ran" among them.
+        led2 = os.path.join(home, "highway_written.jsonl")
+        with open(led2, "w", encoding="utf-8") as fh:
+            for r in ({"t": "2026-10-13T10:00:00-0400", "remedy": "a", "detector": "x", "dry_run": False, "ran": True,
+                       "before": "PRESENT", "after": "ABSENT", "outcome": "fixed"},
+                      {"t": "2026-10-13T11:00:00-0400", "remedy": "b", "detector": "y", "dry_run": False, "ran": True,
+                       "before": "PRESENT", "after": "PRESENT", "outcome": "did not fix"},
+                      {"t": "2026-10-13T12:00:00-0400", "remedy": "c", "detector": "z", "dry_run": False, "ran": True,
+                       "before": "PRESENT", "after": "PRESENT", "outcome": "started"},
+                      {"t": "2026-10-13T13:00:00-0400", "remedy": "d", "detector": "w", "dry_run": False, "ran": False,
+                       "before": "PRESENT", "after": "PRESENT", "outcome": "held"},
+                      {"t": "2026-10-13T14:00:00-0400", "remedy": "e", "detector": "v", "dry_run": True, "ran": True,
+                       "before": "PRESENT", "after": "PRESENT", "outcome": "dry run"},
+                      {"t": "2026-10-13T15:00:00-0400", "remedy": "c", "detector": "z", "dry_run": False, "before": "PRESENT",
+                       "after": "PRESENT", "outcome": "did not fix", "graded_late": True, "started_t": "2026-10-13T12:00:00-0400"}):
+                fh.write(json.dumps(r) + "\n")
+        hl2 = P3z.heal_detail(path=led2)
+        check("PC1z10 self-heal reads the grade the highway writes: fixed is ok, did not fix is not, a start is not graded yet",
+              [(h["remedy"], h["ok"]) for h in hl2][:3] == [("a", True), ("b", False), ("c", None)], hl2)
+        check("PC1z10 a late grade (no ran key: it answers a start) is read, so a start that later failed shows failed; held and dry runs stay out",
+              [(h["remedy"], h["ok"]) for h in hl2] == [("a", True), ("b", False), ("c", None), ("c", False)], hl2)
+
+        # The immunity count on Tetsu's panel (A348d): the state carries the words covenant_immunity.count_text gives
+        # and the page shows them as is. Joined on the page it read "on, 27 of 0 today" under his no-ceiling grant.
+        # A temp grant and ledger, a stub pause and line, no node read and no sensing: nothing live is touched.
+        import covenant_immunity as IMz
+        import urllib.request as _urz
+        real_imz = (IMz.GRANT, IMz.LEDGER, IMz.paused)
+        real_z = (_urz.urlopen, HW.sense, P3z.STATE_TTL)
+        imm0, imm5 = {}, {}
+        try:
+            IMz.GRANT, IMz.LEDGER = os.path.join(home, "immunity.json"), os.path.join(home, "immunity.jsonl")
+            IMz.paused = lambda: (False, "")
+            P3z.STATE_TTL = -1
+
+            def _no_node(url, timeout=None):
+                raise ConnectionRefusedError("no node in this check")
+            _urz.urlopen = _no_node
+            HW.sense = lambda only=None, **kw: {k: {"state": HW.ABSENT} for k in (only or want)}
+            with open(IMz.GRANT, "w", encoding="utf-8") as fh:
+                json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 0}}, fh)
+            for i in range(2):
+                IMz.immune("answer", verdict="HOLD", text="z%d" % i, say=lambda *a: None, tell=False,
+                           pause_fn=lambda *a: None, contact=lambda *a: None)
+            imm0 = (get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("immunity") or {}
+            with open(IMz.GRANT, "w", encoding="utf-8") as fh:
+                json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 5}}, fh)
+            imm5 = (get(client, "/pc/3d/state", "100.72.0.10").get_json() or {}).get("immunity") or {}
+        finally:
+            IMz.GRANT, IMz.LEDGER, IMz.paused = real_imz
+            _urz.urlopen, HW.sense, P3z.STATE_TTL = real_z
+        check("PC1z10 the state carries the day's immunity count in words: no ceiling reads 'no ceiling', never 'of 0'",
+              imm0.get("count") == "2 today, no ceiling" and imm0.get("per_day") == 0 and imm0.get("passes_today") == 2, imm0)
+        check("PC1z10 a ceiling he writes reads 'N of M today' from the same rule",
+              imm5.get("count") == "2 of 5 today" and imm5.get("per_day") == 5, imm5)
+        check("PC1z10 Tetsu's panel shows the state's count as is and no longer joins the passes to per_day itself",
+              "'on, '+(state.immunity.count||" in pz and re.search(r"of '\+state\.immunity\.per_day", pz) is None,
+              re.findall(r"immunity: .{0,160}", pz)[:1])
     finally:
         shutil.rmtree(home, ignore_errors=True)
 

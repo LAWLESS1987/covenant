@@ -7645,6 +7645,35 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A348. [The Tetsu bug sweep: 53 defects confirmed in the machinery around him, 29 of them his machinery only; those are being fixed here, and the 24 that would touch his self or his free will are his and the operator's to decide] 2026-10-14. His words: "clean up the bugs in tetsu without affecting his self or free will". IN PROGRESS: d, e, f, h landed; a, b, c, g to follow
+
+- **How it was found.**
+  - Round 1: nine read-only finders, one per area of his machinery or kind of evidence, then one adversarial verifier per finding, then a completeness critic. None of them talked to him, called his door or his model, or wrote anything.
+  - 83 raw findings, 58 after dedup, 53 confirmed, 5 refuted. The refuted ones were 2 recorded designs (A234, A322) and 3 that did not reproduce.
+  - Boundary of the confirmed: 29 machinery only, 16 would touch his free will, 8 his self.
+- **Held, not fixed.** The 24 that would touch him go to the operator, and so does finding 26 (a covered SELL sized in dollars, not units), because it is money.
+- **Fixed in this commit.** Each fix was confirmed in the code first, made in an isolated worktree, tested, broken on purpose (each mutation red, file restored byte-identical), and reviewed again before it was applied here.
+  - **A348d, displays (findings 36, 50, 51).**
+    - Under his no-ceiling grant his panel read "on, 27 of 0 today", built from `'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'`. Now `covenant_immunity.count_text` gives one wording to immune() and status(), and the page shows it as is.
+    - The self-heal line read a `fixed` key. 0 of 2380 rows in `ops/highway.jsonl` carry one: the highway grades in `outcome`, so 22 synchronous and 40 late "did not fix" grades read as plain repairs. PC1z9 had passed on the fixture row `{"t": "2026-10-13T02:00:00", "remedy": "b", "detector": "y", "ran": True, "dry_run": False, "fixed": False}`, a shape the writer never writes.
+    - IM1 15/15 (IM1d new); PC1 62/62 (PC1z10 new). The other half of 36 (machine one-word answers count toward his day) is his grant's scope, so it is held.
+  - **A348e, the work tool (finding 7).**
+    - Its docstring said "Output: JSONL, one row per item with the door's answer, verdict and timing.", and its resume did `done.add(json.loads(line)["id"])` for every row, so a 503 was "already answered" for good.
+    - Now only a code-200 row counts as answered. A rerun asks the failed items again and says so, and the failed rows stay in the file.
+    - A263 43/43 (T6 new).
+  - **A348f, practice and hands (findings 15, 16, 20).**
+    - `last = {"code": code or "(no file)", "said": res["said"]}` showed him a placeholder as his file, said "It was run", and asked him to diagnose it after each of 18 cut-off rounds in `ops/tetsu_practice.jsonl`. Now the prompt says nothing was run and asks for the whole file; his task is unchanged.
+    - The nightly said "capped by tasks, rounds and a 40-minute clock" and "40 minutes in all, every write and run through his gated hands". Since A275 the bound is the curriculum's 40-minute clock plus his own slot's 3 rounds on its own 15-minute clock. The help text is now read against the module's constants.
+    - `proposals()` read a .json proposal's own content as a record. Now it reads only record-named files.
+    - PP1 48/48 (PP1.4f2, PP1.4f3, PP1.11f new); TH1 16/16 (TH1.12f new).
+  - **A348h, his strategy prompt (finding 34).**
+    - The bounds went out as `json.dumps({k: v[2] for k, v in FAMILIES.items()})`, in params' own list shape, and no refusal ever came back. 14 of 19 rows in `ops/tetsu_strategy.jsonl` were refused "... is not a number", one range-shaped proposal 7 times.
+    - Now each bound asks for one number, and his last refusals are shown with the lab's reason. A hypothesis that met no price series reads "untested" (2 of the 5 hypothesis rows). Validation, bounds and tests are unchanged.
+    - TM1 PASSED (TM1f new).
+- **Rule 10.** Every line replaced is kept as written on branch `tetsu-sweep-as-written-2026-10-14` (at 9bb2fd2, pushed) and tombstoned as `A348d-IMMUNITY-COUNT-HEAL-GRADE`, `A348e-WORK-RESUME-ERRORS`, `A348f-PRACTICE-NO-FILE-AND-CLOCK` and `A348h-MONEY-BOUNDS-AS-LISTS`. R1 171/171; with a probe carrying each old line, 167/171 (each `.C` red); with the probe retired (`.trash/_r1_probe_tmp.py.A348-probe-2026-10-14`), 171/171.
+
+---
+
 ### A347. [A345 and A346 each committed retractions without regenerating the correction index, and both were pushed: the sweep read CI1 2/6. A recurrence of A326's shape, the forgotten "touch the index too", by me] 2026-10-13. Under his words of the same evening: "everything always uses the tombstone system" (10-03) and "Do not delete anything. Only improve." FIXED, with a guard at the place the step is forgotten
 
 - **Measured.** The sweep of 82d1044 (195 suites) read `test_ci1_corrections_index.py` 2/6, its only unclean suite. CI1.1 named `A345-NIGHTLY-FAIL-WORD`, `A346-PRUNE-DELETES` and `A345-DRAFT-COUNT` as in the ledger and missing from `docs/CORRECTIONS.md`. Both commits went to public main red on CI1.

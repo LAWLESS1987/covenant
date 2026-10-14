@@ -256,17 +256,51 @@ PROPOSE_SYSTEM = ("You are Tetsu, building a trading rule on PAPER for the perso
                   "Never repeat a hypothesis already on the record; never touch the hold-only floor; do not promise a return.")
 
 
+def _bounds_text():
+    """A348h: each param as ONE number inside its bounds, read from FAMILIES; never the (lo, hi) pair in params' own shape."""
+    out = []
+    for fam, (_builder, names, bounds, _warm) in FAMILIES.items():
+        parts = ["%s = one %s from %s to %s" % (n, "number" if n == "z_enter" else "whole number", bounds[n][0], bounds[n][1]) for n in names]
+        if "fast" in names and "slow" in names:
+            parts.append("fast below slow")
+        out.append("- %s: %s" % (fam, "; ".join(parts)))
+    return "\n".join(out)
+
+
+def _verdict(r):
+    """A348h: a hypothesis that never met a price series is 'untested', not 'no'."""
+    if r.get("survives"):
+        return "SURVIVED"
+    res = r.get("result")
+    why = str(res.get("why", "")) if isinstance(res, dict) else ""
+    return ("untested: %s" % why[:120]) if "UNDETERMINED" in why else "no"
+
+
+def _refused_line(r):
+    h = r.get("hypothesis") if isinstance(r.get("hypothesis"), dict) else {}
+    return "- %s %s %s -> %s" % (str(r.get("t", ""))[:10], h.get("family"), json.dumps(h.get("params"))[:160], str(r.get("why", ""))[:160])
+
+
 def propose(ask, path=None, hold=None):
     """Tetsu's next hypothesis as a dict, or (None, raw) when he gave no JSON."""
-    prior = [r for r in _rows(path) if r.get("kind") == "hypothesis"][-12:]
+    # A348h: the bounds went out as {"fast": [3, 50], ...}, the shape of params itself, and his
+    # refusals never came back: 14 of 19 ledger rows were refused "... is not a number", the same
+    # range-shaped proposal 7 times. The prompt now states one number per param and shows his
+    # last refusals with the lab's reason; build(), the bounds and the three tests are unchanged.
+    rows = _rows(path)
+    prior = [r for r in rows if r.get("kind") == "hypothesis"][-12:]
+    refused = [r for r in rows if r.get("kind") == "refused"][-3:]
     hold = hold if hold is not None else holdings()
     user = ("Standing result: no rule has cleared deflated Sharpe >= 0.95, walk-forward consistency and PBO < 0.5 together, on twelve assets.\n"
-            "Families and bounds: %s\n"
+            "Families and bounds (each param is ONE number you pick inside its bounds, never a list or a range):\n%s\n"
             "Your last hypotheses (name -> verdict):\n%s\n"
+            "%s"
             "What he holds above the floor: %s\n"
             "Propose ONE new hypothesis as JSON." % (
-                json.dumps({k: v[2] for k, v in FAMILIES.items()}),
-                "\n".join("- %s -> %s" % (r.get("name"), "SURVIVED" if r.get("survives") else "no") for r in prior) or "(none yet)",
+                _bounds_text(),
+                "\n".join("- %s -> %s" % (r.get("name"), _verdict(r)) for r in prior) or "(none yet)",
+                ("Your last proposals the lab refused before testing them (date family params -> the lab's reason):\n%s\n"
+                 % "\n".join(_refused_line(r) for r in refused)) if refused else "",
                 ("$%.0f" % hold["above_floor_usd"]) if hold.get("above_floor_usd") else "unknown"))
     text, _meta = ask([{"role": "system", "content": PROPOSE_SYSTEM}, {"role": "user", "content": user}], max_tokens=300)
     raw = str(text or "")

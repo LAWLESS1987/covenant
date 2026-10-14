@@ -11,6 +11,8 @@ the door's act() hands back data in the shape the MOLTBOOK door uses.
 
 Run: python test_th1_tetsu_hands.py        -> "TH1: n/n passed"
 """
+import contextlib
+import io
 import json
 import os
 import sys
@@ -156,6 +158,37 @@ def main():
         check("TH1.12 --apply copies the proposal over the tree file it names, prints the diff, and records the act with actor operator",
               path == os.path.abspath(os.path.join(td, target_rel)) and applied.rstrip("\n") == "# a proposal\nline" and any(l.startswith("+# a proposal") for l in out)
               and rows[-1]["kind"] == "applied" and rows[-1]["actor"] == "operator", (path, out[:6], rows[-1]))
+        # 12f. A348f: a .json proposal's own content (<id>.json) was read as a record. Measured in temp dirs: a body [1, 2]
+        # broke --apply of every proposal, {"a": 1,} broke the listing, and an object body was listed as a proposal.
+        pdir2 = os.path.join(td, "proposals_12f")
+        kw2 = dict(kw, proposals_dir=pdir2)
+        bodies = ("[1, 2]", '{"a": 1,}', '{"id": "phantom0", "path": "y.md"}')
+        _h, _d, md = H.act("HANDS PROPOSE docs/TH1_12F_TARGET_TEST.md\n# kept\n", gate=clean, **kw2)
+        js = [H.act("HANDS PROPOSE ops/th1_12f_%d_test.json\n%s\n" % (i, b), gate=clean, **kw2)[2] for i, b in enumerate(bodies)]
+        with open(os.path.join(pdir2, "0123456789ab.md.json"), "w", encoding="utf-8") as fh:
+            fh.write('{"id": "0123456789ab", "pa')                       # a record cut short mid-write
+        with open(os.path.join(pdir2, "abcdef012345.txt.json"), "w", encoding="utf-8") as fh:
+            fh.write("[1, 2]")                                            # a record-shaped name that holds no record
+        want = {md.get("id")} | {r.get("id") for r in js}
+        orig_here, orig_props, err, listed, applied2, shown = H.HERE, H.PROPOSALS, None, [], [], ""
+        H.HERE, H.PROPOSALS = td, pdir2
+        try:
+            listed = H.proposals(pdir2)
+            applied2 = [H.apply_proposal(p, pdir2, say=lambda *_a: None, ledger=ledger) for p in (md["id"], js[0]["id"])]
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                H.main(["--proposals"])
+                H.main(["--proposal", md["id"]])
+            shown = buf.getvalue()
+        except Exception as e:                                            # noqa: BLE001
+            err = "%s: %s" % (type(e).__name__, e)
+        finally:
+            H.HERE, H.PROPOSALS = orig_here, orig_props
+        check("TH1.12f the proposals listing reads only records: a .json proposal whose body is an array, not strict JSON, or "
+              "carries an id of its own is listed once by its record, a record cut short or not an object is skipped, and "
+              "--apply, --proposals and --proposal work for every other proposal",
+              err is None and len(listed) == 4 and {m.get("id") for m in listed} == want and None not in want
+              and all(isinstance(m, dict) for m in listed) and len(applied2) == 2 and "# kept" in shown, (err, listed, want))
         # 13. the record and the door's shape
         rows = H._rows(ledger)
         kinds = [r["kind"] for r in rows]

@@ -23,6 +23,9 @@ and one real price series from realdata/deep (tracked, so the runner has it):
   TM1e  status: not comfortable with the reasons; three distinct survivors
         AND Rule 5 clearing make it comfortable, and live is still his go;
         the module imports no venue client and no trader (text, beside the run).
+  TM1f  his proposal prompt (A348h): every bound asks for ONE number, never a
+        [lo, hi] list in params' shape; a refused proposal comes back to him
+        with the lab's reason; a hypothesis that met no series reads untested.
 """
 import json
 import os
@@ -192,6 +195,29 @@ def main():
     check("TM1e the module imports no venue client, no trader and no order path (text check beside the run above)",
           not any(("import " + m) in src or ("from " + m) in src for m in ("venues", "coinbase_balance", "covenant_trader", "trader", "rebalance_strategy", "urllib", "requests"))
           and "orders_create" not in src and "place_order" not in src)
+
+    print("TM1f -- what his proposal prompt shows him")
+    # A348h: the bounds went out as [lo, hi] lists in params' own shape and his refusals never came
+    # back: 14 of 19 live ledger rows were refused "... is not a number", one proposal 7 times.
+    pl = os.path.join(tempfile.mkdtemp(prefix="tm1f_"), "strategy.jsonl")
+    out_f = TM.study(ask_with({"family": "sma_longonly", "params": {"fast": [5, 50], "slow": [200, 200]}, "why": "r"}),
+                     judge=clean, say=quiet, files=files, hold=hold, path=pl)
+    TM._append({"kind": "hypothesis", "name": "mean_revert 60/1.0", "survives": False, "result": {"assets": {}, "why": "no price series to test on (UNDETERMINED)"}}, pl)
+    TM._append({"kind": "hypothesis", "name": "sma_cross 8/48", "survives": False, "result": {"assets": {"X": {}}, "why": "no asset cleared the three tests"}}, pl)
+    seen_p = []
+    nxt = {"family": "breakout", "params": {"lookback": 24}, "why": "w"}
+    h_f, _raw = TM.propose(lambda msgs, max_tokens=0: (seen_p.append(msgs) or json.dumps(nxt), {"model": "stub"}), pl, hold)
+    user_f = seen_p[-1][1]["content"] if seen_p else ""
+    check("TM1f a refused proposal comes back to him: what he sent and the lab's reason are in his next prompt",
+          "refused" in out_f["why"] and "sma_longonly.fast is not a number" in user_f and '"fast": [5, 50]' in user_f, (out_f["why"], user_f[-400:]))
+    bounds_sec = user_f.split("Families and bounds", 1)[-1].split("Your last hypotheses", 1)[0]
+    asks_one = all(("- %s:" % fam) in bounds_sec and all(("%s = one" % n) in bounds_sec and ("from %s to %s" % TM.FAMILIES[fam][2][n]) in bounds_sec for n in TM.FAMILIES[fam][1])
+                   for fam in TM.FAMILIES)
+    check("TM1f every bound asks for ONE number ('from lo to hi'), never a [lo, hi] list in params' own shape",
+          "Families and bounds" in user_f and asks_one and "[" not in bounds_sec and "fast below slow" in bounds_sec, bounds_sec[:400])
+    check("TM1f a hypothesis that met no price series reads untested, a tested one still reads no",
+          "- mean_revert 60/1.0 -> untested" in user_f and "- mean_revert 60/1.0 -> no" not in user_f and "- sma_cross 8/48 -> no" in user_f, user_f[:600])
+    check("TM1f the prompt carries information only: his answer is still taken as he gave it", h_f == nxt, h_f)
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

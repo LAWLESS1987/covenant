@@ -439,6 +439,21 @@ PR.practise(PR.BY_ID["flatten"], scripted(["```python\ndef flatten(x):\n    out 
 check("PP1.4f an answer cut off at the length limit is told so, not 'no file' (measured: the 3B's first n_queens hit the cap)",
       len(seen9) > 1 and "reached the length limit" in seen9[1][-1]["content"],
       seen9[1][-1]["content"][-200:] if len(seen9) > 1 else "no second round was asked")
+# A348f: after a round with no file the harness's statement of fact must be true -- nothing was run, there is no file to
+# show or diagnose -- and it must not ask for an explanation in the prompt that asks for none (18 such prompts by 10-14).
+_p9 = seen9[1][-1]["content"] if len(seen9) > 1 else ""
+check("PP1.4f2 ...and the next prompt says nothing was run: no placeholder shown as his file, no 'It was run', no request to "
+      "say what in that file caused it",
+      "nothing was run" in _p9 and "reached the length limit" in _p9 and "It was run" not in _p9
+      and "say what in that file" not in _p9 and "(no file)" not in _p9 and "Your last attempt" not in _p9, _p9[-300:])
+w10, l10 = fresh()
+seen10 = []
+PR.practise(PR.BY_ID["flatten"], scripted(["I would recurse into each list.", good], seen10), gate=gate_clean, workshop=w10,
+            ledger=l10, hands_ledger=HLED, say=lambda *_a: None)
+_p10 = seen10[1][-1]["content"] if len(seen10) > 1 else ""
+check("PP1.4f3 an answer with no Python file in it (not cut off) is told so the same way: nothing was run, nothing to diagnose",
+      "no Python file could be read" in _p10 and "nothing was run" in _p10 and "It was run" not in _p10
+      and "say what in that file" not in _p10 and "(no file)" not in _p10, _p10[-300:])
 check("PP1.5 broken the other way: never right -> unsolved after %d rounds, no solved file, no lesson" % PR.ROUNDS,
       r["solved_round"] is None and r["rounds"] == PR.ROUNDS and not os.path.exists(os.path.join(w2, "practice", "solved", "flatten.py"))
       and not PR.lessons(w2), r)
@@ -523,6 +538,17 @@ hp = subprocess.run([sys.executable, os.path.join(HERE, "covenant_nightly.py"), 
 check("PP1.11 the nightly offers --practice (running its --help, which parses and exits before any step)",
       hp.returncode == 0 and "--practice" in hp.stdout, (hp.returncode, hp.stdout[-200:], hp.stderr[-200:]))
 import covenant_nightly as NIGHT                                      # noqa: E402
+# A348f: the help and the step's docstring said one 40-minute total after A275 gave his own slot its own clock. Both are
+# read against the practice module's constants, so a change to a clock or a round count turns this red until they agree.
+_hp = " ".join(hp.stdout.rsplit("--practice PRACTICE", 1)[-1].split("--model-step-up", 1)[0].split())   # its option text
+_doc = " ".join((NIGHT.practice_step.__doc__ or "").split())
+check("PP1.11f the nightly's --practice help and practice_step's docstring state the bound night() keeps: %d rounds each, no "
+      "round after %d minutes, then his own slot's %d rounds on its own %d-minute clock"
+      % (PR.ROUNDS, PR.BUDGET_S // 60, PR.CHOICE_ROUNDS, PR.CHOICE_BUDGET_S // 60),
+      "%d rounds each" % PR.ROUNDS in _hp and "no round started after %d minutes" % (PR.BUDGET_S // 60) in _hp
+      and "%d rounds, on its own clock of %d minutes" % (PR.CHOICE_ROUNDS, PR.CHOICE_BUDGET_S // 60) in _hp
+      and "minutes in all" not in _hp and "%d-minute clock" % (PR.BUDGET_S // 60) in _doc
+      and "own %d-minute clock" % (PR.CHOICE_BUDGET_S // 60) in _doc, (_hp[:400], _doc[:400]))
 calls, said = [], []
 fake = types.SimpleNamespace(night=lambda **kw: calls.append(kw) or {"tried": 0})
 _ask = lambda *a, **k: ("", {})                                       # noqa: E731

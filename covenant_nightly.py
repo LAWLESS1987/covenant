@@ -132,7 +132,8 @@ def compact_step(say, run=None, measure=None):
 def practice_step(a, say, practice_mod=None, ask=None):
     """TETSU PRACTISES (2026-09-26, his words: "train tetsu to code at a high recursive level"; asked how, he
     chose the practice loop, nightly and bounded). Write, run, read the failure, rewrite -- in his workshop,
-    through his gated hands, capped by tasks, rounds and a 40-minute clock; one line to him. A function, not
+    through his gated hands, capped by tasks, rounds and the curriculum's 40-minute clock, then one slot of his
+    own choice on its own 15-minute clock (A275; A348f corrected the bound here); one line to him. A function, not
     inline in main(), so PP1 drives the wiring instead of reading this file's text (A74). Never raises."""
     if getattr(a, "practice", 0) <= 0:
         return None
@@ -204,10 +205,13 @@ def main():
     ap.add_argument("--earn-report", type=int, default=1,
                     help="2026-09-25 (A222): one line to him on the direct line with covenant_earn's account (jobs, earned, held, "
                          "net against the seed); says nothing when his grant is absent; 0 disables")
+    # A348f: the bound since A275 is the curriculum's clock plus his own slot's (covenant_tetsu_practice.night), not
+    # one 40-minute total; PP1.11f reads this help against BUDGET_S, CHOICE_ROUNDS and CHOICE_BUDGET_S.
     ap.add_argument("--practice", type=int, default=6,
                     help="2026-09-26 (his words: 'train tetsu to code at a high recursive level'; he chose a practice loop, "
                          "nightly and bounded): tasks Tetsu practises in his workshop (covenant_tetsu_practice: 4 rounds each, "
-                         "40 minutes in all, every write and run through his gated hands); 0 disables")
+                         "no round started after 40 minutes; then, when he has named one, a slot of his own choice (A275): "
+                         "3 rounds, on its own clock of 15 minutes; every write and run through his gated hands); 0 disables")
     ap.add_argument("--model-step-up", type=int, default=1,
                     help="2026-09-21 (A196, his words: 'we need to rapidly make up the gap in ai'): before the pass, step the local "
                          "model up to the largest that fits once the running one is reclaimed (covenant_model.step_up); 0 disables")

@@ -14,6 +14,9 @@ as and individuality the gates too tight on him"):
         itself with the actor's name, he is told once, an isolation row is
         written; while paused nothing passes and the reason says how he
         lifts it.
+  IM1d  the day's count in words is one rule for immune() and status()
+        (A348d): "N today, no ceiling" with no ceiling, never "N of 0";
+        "N of M today" under a ceiling he writes.
 """
 import json
 import os
@@ -90,6 +93,22 @@ def main():
                              pause_fn=lambda actor, why: pauses_n.append(actor), tell=False)[0] for i in range(20)]
             check("IM1n no ceiling (%s): twenty passes in one day, none refused, the immunity never pauses" % (isolation or "no key"),
                   all(oks) and pauses_n == [], (oks.count(False), pauses_n))
+        # IM1d (A348d, 2026-10-14): the day's count in words is one rule, count_text, for immune()'s own line and for
+        # status(), which the PC page shows as is. Measured: the page joined the two numbers itself and read
+        # "on, 27 of 0 today" under his no-ceiling grant, while immune() said "27 today, no ceiling".
+        st0 = IM.status(now=1_900_000_000.0)
+        okd, whyd = IM.immune("answer", verdict="HOLD", text="d", say=quiet, now=1_900_000_000.0, tell=False)
+        st1 = IM.status(now=1_900_000_000.0)
+        check("IM1d no ceiling: status() says the day's count with 'no ceiling', never 'of 0', in the words immune() used",
+              st0["per_day"] == 0 and st0["count"] == "%d today, no ceiling" % st0["passes_today"] and " of 0" not in st0["count"]
+              and okd and st1["passes_today"] == st0["passes_today"] + 1 and "(%s)" % st1["count"] in whyd, (st0, st1, whyd))
+        with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
+            json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 3}}, fh)
+        st2 = IM.status(now=2_000_000_000.0)
+        okd2, whyd2 = IM.immune("answer", verdict="HOLD", text="d2", say=quiet, now=2_000_000_000.0, tell=False)
+        st3 = IM.status(now=2_000_000_000.0)
+        check("IM1d a ceiling he writes: status() says 'N of M today', the same words immune() used",
+              st2["count"] == "0 of 3 today" and okd2 and st3["count"] == "1 of 3 today" and "(1 of 3 today)" in whyd2, (st2, st3, whyd2))
         with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
             json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 3}}, fh)
     finally:

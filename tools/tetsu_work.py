@@ -21,6 +21,12 @@ asks per 10 minutes per caller; the API limiter answers 429 on a burst) by pacin
 on a 429 it waits and asks again. It changes nothing in Tetsu: no persona call, no
 register, no voice. A withheld answer is recorded as withheld, not retried.
 
+RUN IT AGAIN TO FINISH (A348e, 2026-10-14). An item is answered when its row has code 200: an
+answer, or a withheld one, which the door also returns with 200. Any other row -- a 503 or 500 from
+the model or the judge, 0 for a dropped connection -- is the door not answering, so the next run with
+the same --out asks that item again and says how many it is re-asking. The failed row stays in the
+file (nothing is removed); the new one is appended after it, so the LAST row for an id is its answer.
+
 WHERE THE TEACHER IS (A263, 2026-10-05). The teacher queue is carried by the nightly to the
 teacher PANEL, which runs on the PUBLIC repository's GitHub Actions runner, and the runner's job
 summary is rendered publicly -- the A128 route. So an item handed here is published unless it is
@@ -40,7 +46,8 @@ A263 ignores the field and would queue the text); if it does not, nothing privat
 private answer must carry the door's withheld note, or the batch stops there.
 
 Input: a JSONL file, one {"id": "...", "text": "..."} per line (or a .txt, one question per
-line). Output: JSONL, one row per item with the door's answer, verdict and timing.
+line). Output: JSONL, one row per ask with the door's answer, verdict and timing (an item asked
+again after a failure has a row for each try; the last is its answer).
 
     python tools/tetsu_work.py --in questions.jsonl --out answers.jsonl [--door agent|council] [--private | --teach]
 """
@@ -157,16 +164,22 @@ def door_honours_private(door="agent", host="127.0.0.1", port=5000, asker=None):
 
 def run(items, out, door="agent", host="127.0.0.1", port=5000, pace=PACE_S, say=print, asker=None):
     asker = asker or ask
-    done = set()
+    done, failed = set(), set()
     if os.path.exists(out):
         with open(out, "r", encoding="utf-8") as fh:
             for line in fh:
                 try:
-                    done.add(json.loads(line)["id"])
+                    r = json.loads(line)
+                    # A348e: only a 200 is answered (a withheld answer is a 200 too). Every row used to
+                    # count, so a rerun skipped its 503s as "already answered": the 2026-10-05 X batch holds
+                    # 7 in 102 rows, and its first 7 were re-asked only after a session split them out by hand.
+                    (done if r.get("code") == 200 else failed).add(r["id"])
                 except (ValueError, KeyError):
                     pass
     todo = [it for it in items if it["id"] not in done]
-    say("tetsu_work: %d item(s), %d already answered, %d to ask through %s from %s" % (len(items), len(done), len(todo), DOORS[door], SOURCE))
+    again = sum(1 for it in todo if it["id"] in failed)
+    say("tetsu_work: %d item(s), %d already answered, %d failed earlier and asked again, %d to ask through %s from %s"
+        % (len(items), len(done), again, len(todo), DOORS[door], SOURCE))
     if any(it.get("private") for it in todo):
         ok, why = door_honours_private(door, host, port, asker=asker)
         if not ok:

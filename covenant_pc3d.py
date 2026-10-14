@@ -280,7 +280,9 @@ canvas.addEventListener('pointerleave',()=>{tip.style.display='none';});
 function lifeText(u){const def=u.def;if(!def)return '';const w=CW.describe(def,u.word);return '\\n\\nTHE WORLD OF '+w.name.toUpperCase()+'\\n'+w.strain+'\\n\\nITS LIFE\\n'+w.species.map(s=>'· '+s.name+': '+s.job).join('\\n')+'\\n\\nEvery world carries the codex: his story and the Ten Commandments (the Codex button, top left).';}
 canvas.addEventListener('pointerdown',e=>{const hit=pick(e);const info=document.getElementById('info');if(!hit){return;}const u=hit.object.userData;const d=(state&&state.detail)||{};document.getElementById('ptitle').textContent=(u.def?u.def.name+' · ':'')+u.name;selName=u.name;const pn=document.getElementById('panel');if(pn.classList.contains('min'))document.getElementById('pmin').click();
 if(u.kind==='node'&&u.detail&&u.detail.me&&u.detail.degraded){fetch('/health').then(r=>r.json()).then(h=>{if(document.getElementById('ptitle').textContent.endsWith(u.name))info.textContent+='\\n\\nwhy, in its own words (/health):\\n- '+(h.warnings||[]).join('\\n- ');}).catch(()=>{});}
-if(u.name==='Tetsu'){info.textContent='Tetsu, the star at the centre -- the one you talk with.\\n'+CW.STAR.role+'\\n\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');return;}
+// A348d (2026-10-14): the immunity count is the words covenant_immunity.count_text gives (state.immunity.count); joined here
+// it read "on, 27 of 0 today" under his no-ceiling grant. A node not yet restarted sends no count: the bare day count shows.
+if(u.name==='Tetsu'){info.textContent='Tetsu, the star at the centre -- the one you talk with.\\n'+CW.STAR.role+'\\n\\nvoice pitch '+voice.pitch+' rate '+voice.rate+(state&&state.immunity?'\\nimmunity: '+(state.immunity.granted?(state.immunity.paused?'paused':'on, '+(state.immunity.count||(state.immunity.passes_today+' today'))):'none'):'')+(d.queue!=null?'\\nteacher\\'s queue: '+d.queue+' row(s)':'')+(state&&state.register?'\\n\\nhow he talks: '+state.register:'')+(d.brief?'\\n\\n'+d.brief:'');return;}
 let m='';
 if(u.kind==='node'){const x=u.detail||{};m=u.name+(x.port?' · port '+x.port:'')+'\\nversion '+(x.version||'?')+'\\nheight '+(x.chain_height??'?')+'\\npeers '+(Array.isArray(x.peers)?x.peers.length:(x.peers??'?'))+'\\nsource '+(x.source||(x.source_sha256?x.source_sha256.slice(0,12):'?'))+(x.degraded?'\\ndegraded: yes':'')+(x.down?'\\nDOWN '+(x.why||''):'');}
 else if(u.kind==='phone'&&u.detail&&u.detail.peer){m=u.name+'\\n'+u.detail.peer+'\\n'+u.detail.note;}
@@ -466,10 +468,12 @@ def heal_detail(path=None, keep=5):
             r = json.loads(ln)
         except ValueError:
             continue
-        if r.get("remedy") and r.get("ran") and not r.get("dry_run"):
-            ok = r.get("fixed")
+        # A348d (2026-10-14): the highway grades a repair in "outcome" (covenant_highway.apply_remedy, grade_started);
+        # no row carries a "fixed" key (0 of 2376, the 10-14 audit), so ok was None for every row and a repair that did not fix
+        # read as a plain one. A late grade has no "ran" (it answers a start that ran), so it is read too, at its own time.
+        if r.get("remedy") and not r.get("dry_run") and (r.get("ran") or r.get("graded_late")):
             out.append({"t": str(r.get("t") or "")[:19], "remedy": r.get("remedy"), "detector": r.get("detector"),
-                        "ok": (bool(ok) if ok is not None else None)})
+                        "ok": {"fixed": True, "did not fix": False}.get(r.get("outcome"))})
     return out[-keep:]
 
 
@@ -614,7 +618,8 @@ def register(api, caller, refused, cov):
         try:
             import covenant_immunity
             st = covenant_immunity.status()
-            out["immunity"] = {k: st.get(k) for k in ("granted", "paused", "passes_today", "per_day")}
+            # A348d: "count" is the day's count in words (covenant_immunity.count_text), which the page shows as is.
+            out["immunity"] = {k: st.get(k) for k in ("granted", "paused", "passes_today", "per_day", "count")}
         except Exception:                                        # noqa: BLE001
             pass
         # MORE DETAIL (his words the same hour: "more detail in the app") and Tetsu's own

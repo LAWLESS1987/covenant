@@ -21,6 +21,8 @@ WHAT IT PINS (every check runs the code; none greps it).
   T1-T5  tools/tetsu_work.py: what is private (flag, line, private/ path by default, --teach,
          COVENANT_HOLD_PRIVATE), the preflight refuses an older core with nothing sent, a reply
          without the withheld note stops the batch, and the tool end to end through the real door
+  T6     (A348e) a rerun on the same --out asks again what the door did not answer (503, code 0) and
+         nothing it did (an answer or a withheld one), and keeps the failed rows in the file
   M1-M5  mutations: each guard switched off in turn, and the check it backs goes red
   G1     git ignores the withheld twin -- SKIP, counted apart, where it cannot be asked (staged copy)
 
@@ -284,6 +286,45 @@ def main():
         rc = TW.run([{"id": "o1", "text": "an ordinary batch item"}], out, door="council", pace=0, say=quiet, asker=via_door)
         check("T5 an ordinary batch through the real /pc/council is queued as before, and the row says so",
               rc == 0 and has(q, "an ordinary batch item") and "not marked private" in str(rows_of(out)[0].get("teacher")), rows_of(out))
+
+        # T6 (A348e): a rerun on the same --out asks again what the door did not answer. Every row used to
+        # count as answered, so a 503 or a dropped connection was skipped for good and called "already answered".
+        sent.clear()
+
+        def flaky(text, door, host, port, timeout=600, private=False):
+            sent.append(text)
+            if text == "one":
+                return 503, {"status": "error", "message": "the model did not answer: TimeoutError: timed out"}
+            if text == "three":
+                raise ConnectionResetError("stub: the node restarted")
+            if text == "four":
+                return 200, {"status": "success", "answer": "", "withheld": True}
+            return 200, {"status": "success", "answer": "x"}
+
+        def steady(text, door, host, port, timeout=600, private=False):
+            sent.append(text)
+            return 200, {"status": "success", "answer": "x"}
+        batch = [{"id": "a", "text": "one"}, {"id": "b", "text": "two"}, {"id": "c", "text": "three"}, {"id": "d", "text": "four"}]
+        out = tempfile.mktemp(suffix="_a263_out4.jsonl")
+        said = []
+        rc1 = TW.run(batch, out, pace=0, say=said.append, asker=flaky)
+        first = [(x["id"], x["code"]) for x in rows_of(out)]
+        sent.clear(); said.clear()
+        rc2 = TW.run(batch, out, pace=0, say=said.append, asker=steady)
+        check("T6 a rerun asks again the item the door answered 503 and the one whose connection dropped (code 0), and only those",
+              rc1 == 0 and first == [("a", 503), ("b", 200), ("c", 0), ("d", 200)] and rc2 == 0 and sent == ["one", "three"],
+              (rc1, first, rc2, sent))
+        check("T6 ...a withheld answer (200) is not asked again, as the docstring says",
+              "four" not in sent, sent)
+        check("T6 ...the rerun does not call the failed items answered, and says it is asking them again",
+              bool(said) and "4 item(s), 2 already answered, 2 failed earlier and asked again, 2 to ask" in said[0], said[:1])
+        orows = [(x["id"], x["code"]) for x in rows_of(out)]
+        check("T6 ...the failed rows stay in the file and each new answer follows them, so the last row per id is 200",
+              orows == first + [("a", 200), ("c", 200)] and {i: c for i, c in orows} == {"a": 200, "b": 200, "c": 200, "d": 200}, orows)
+        sent.clear(); said.clear()
+        rc3 = TW.run(batch, out, pace=0, say=said.append, asker=steady)
+        check("T6 ...a third run has nothing to ask", rc3 == 0 and sent == []
+              and "4 item(s), 4 already answered, 0 failed earlier and asked again, 0 to ask" in (said or [""])[0], (rc3, sent, said[:1]))
 
         # ---- M: each guard off, and its check goes red ----------------------------------------
         real_is_private, real_private_ask, real_history = DP.is_private, cov.private_ask, cov.agent_history

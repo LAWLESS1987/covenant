@@ -508,7 +508,14 @@ def prompt(task, workshop=None, last=None, retention=False):
     ls = [l for l in lessons(workshop) if l.get("task") != task["id"]][-LESSONS_SHOWN:]
     if ls:
         parts.append("What you learned fixing earlier tasks:\n" + "\n".join("- %s: %s" % (l["task"], l["lesson"]) for l in ls))
-    if last:
+    if last and last.get("code") is None:
+        # A348f: no file came back (cut off at the cap, or none could be read), so nothing was written or run and there
+        # is no file to diagnose. Until now he was shown a placeholder as his file, told it had been run, and asked to
+        # explain it in the prompt that asked for no explanation (18 cut-off rounds on record by 2026-10-14, each followed
+        # by one).
+        parts.append("Your last answer held no complete Python file, so nothing was run -- %s.\n"
+                     "Give the whole file in one ```python block." % last["said"])
+    elif last:
         # Diagnose, then rewrite: told only to rewrite, the 3B handed back the same wrong file (measured 2026-09-26).
         parts.append("Your last attempt:\n```python\n%s```\nIt was run: %s\nFirst, in at most three lines, say what in "
                      "that file causes this result. Then give the whole corrected file in one ```python block."
@@ -616,7 +623,7 @@ def practise(task, ask, gate=None, workshop=None, ledger=None, hands_ledger=None
                 _save_lesson({"task": task["id"], "rounds": rnd, "lesson": lesson}, workshop)
                 _append({"kind": "lesson", "task": task["id"], "lesson": lesson}, ledger)
             break
-        last = {"code": code or "(no file)", "said": res["said"]}
+        last = {"code": code, "said": res["said"]}         # A348f: None when no file came back; prompt() says so
     out["first"] = first_said
     return out
 

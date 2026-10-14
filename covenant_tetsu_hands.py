@@ -342,14 +342,24 @@ def propose(path, body, proposals=None, say=None):
     return rec
 
 
+# A348f: a proposal's record is <id><ext>.json and its content <id><ext>, so a .json proposal's content (<id>.json) also
+# ends in .json and was read as a record: in temp dirs a body [1, 2] broke --apply of every proposal, {"a": 1,} the listing.
+_RECORD_NAME = re.compile(r"^[0-9a-f]{12}(?:%s)\.json$" % "|".join(re.escape(e) for e in PROPOSABLE_EXT))
+
+
 def proposals(pdir=None):
     pdir = pdir or PROPOSALS
     out = []
     try:
         for f in sorted(os.listdir(pdir)):
-            if f.endswith(".json"):
-                with open(os.path.join(pdir, f), encoding="utf-8") as fh:
-                    out.append(json.load(fh))
+            if _RECORD_NAME.match(f):
+                try:
+                    with open(os.path.join(pdir, f), encoding="utf-8") as fh:
+                        m = json.load(fh)
+                except ValueError:                                # a record cut short is skipped, not fatal to the rest
+                    continue
+                if isinstance(m, dict) and m.get("id"):
+                    out.append(m)
     except OSError:
         pass
     return out

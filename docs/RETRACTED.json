@@ -1260,6 +1260,70 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "No branch: the wrong wording was a draft in my working copy, corrected before any commit. The record quotes it in A346."
+  },
+  {
+   "id": "A348d-IMMUNITY-COUNT-HEAL-GRADE",
+   "claim": "That Tetsu's panel on the PC can show the day's immunity count by joining passes_today and per_day (\"N of M today\"), and that a highway repair's grade is in a `fixed` key -- covenant_pc3d's page and heal_detail, and PC1z9's fixture row that carried \"fixed\": False.",
+   "refuted_by": "Measured 2026-10-14 (A348d): under his no-ceiling grant (per_day 0) the page read \"on, 27 of 0 today\" while covenant_immunity.immune() said \"27 today, no ceiling\". ops/highway.jsonl: 0 of 2380 rows carry a `fixed` key -- the highway grades in `outcome` -- so every repair's ok was None, and 22 synchronous and 40 late \"did not fix\" grades read as plain repairs. PC1z9 passed on a fixture shape the writer never writes.",
+   "truth": "covenant_immunity.count_text is the one rule for the count in words (\"N today, no ceiling\" or \"N of M today\"); status() carries it and the page shows it as is. heal_detail reads `outcome` (fixed / did not fix) and late grades. Pinned by IM1d and PC1z10.",
+   "verbatim": [
+    "'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'",
+    "{\"t\": \"2026-10-13T02:00:00\", \"remedy\": \"b\", \"detector\": \"y\", \"ran\": True, \"dry_run\": False, \"fixed\": False}"
+   ],
+   "patterns": [
+    "state\\.immunity\\.passes_today\\+' of '\\+state\\.immunity\\.per_day",
+    "\"dry_run\": False, \"fixed\": False"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348e-WORK-RESUME-ERRORS",
+   "claim": "That tools/tetsu_work.py's output is one row per item and that a rerun on the same --out skips only what was answered -- its resume counted every recorded row as answered, errors included.",
+   "refuted_by": "Measured 2026-10-14 (A348e, the Tetsu bug sweep): a 503 or a dropped connection was recorded as a row, so the next run counted it \"already answered\" and never asked it again; the 2026-10-05 X batch held 7 such rows that a session had to split out by hand.",
+   "truth": "An item is answered when its row has code 200 (an answer, or a withheld one). A rerun asks again what the door did not answer and says how many; the failed rows stay in the file and the last row per id is its answer. Pinned by T6 in test_a263_private_teacher.py.",
+   "verbatim": [
+    "Output: JSONL, one row per item with the door's answer, verdict and timing.",
+    "done.add(json.loads(line)[\"id\"])"
+   ],
+   "patterns": [
+    "one row per item with the door's answer",
+    "done\\.add\\(json\\.loads\\(line\\)\\[\"id\"\\]\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348f-PRACTICE-NO-FILE-AND-CLOCK",
+   "claim": "That after a practice round with no file Tetsu's last attempt was \"(no file)\" and \"It was run\", to be diagnosed; and that the nightly's practice is \"40 minutes in all\", \"capped by tasks, rounds and a 40-minute clock\".",
+   "refuted_by": "Measured 2026-10-14 (A348f): ops/tetsu_practice.jsonl holds 18 rounds cut off at the length limit, each followed by a prompt that showed him a placeholder as his file, said it had been run, and asked him to explain it. Since A275 the practice bound is the curriculum's 40-minute clock plus his own slot's 3 rounds on its own 15-minute clock, not one 40-minute total.",
+   "truth": "After a round with no complete file the prompt says nothing was run and asks for the whole file; his task is unchanged. The nightly's help and practice_step's docstring state the bound night() keeps, read against BUDGET_S, CHOICE_ROUNDS and CHOICE_BUDGET_S by PP1.11f. Pinned by PP1.4f2, PP1.4f3, PP1.11f.",
+   "verbatim": [
+    "last = {\"code\": code or \"(no file)\", \"said\": res[\"said\"]}",
+    "capped by tasks, rounds and a 40-minute clock",
+    "40 minutes in all, every write and run through his gated hands"
+   ],
+   "patterns": [
+    "\"code\": code or \"\\(no file\\)\"",
+    "capped by tasks, rounds and a 40-minute clock",
+    "40 minutes in all"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
+  },
+  {
+   "id": "A348h-MONEY-BOUNDS-AS-LISTS",
+   "claim": "That Tetsu's strategy-proposal prompt told him the bounds he must propose within -- it sent them as {\"fast\": [3, 50], ...}, the shape of params itself, and never showed him a refusal.",
+   "refuted_by": "Measured 2026-10-14 (A348h): ops/tetsu_strategy.jsonl holds 19 rows, 14 of them refused \"... is not a number\", the same range-shaped proposal ({\"fast\": [5, 50], \"slow\": [200, 200]}) 7 times; nothing he was shown said why.",
+   "truth": "Each bound is stated as ONE number from lo to hi, his last refused proposals come back with the lab's reason, and a hypothesis that met no price series reads \"untested\". build(), the bounds, the three tests and what counts as a pass are unchanged. Pinned by TM1f.",
+   "verbatim": [
+    "json.dumps({k: v[2] for k, v in FAMILIES.items()})"
+   ],
+   "patterns": [
+    "json\\.dumps\\(\\{k: v\\[2\\] for k, v in FAMILIES\\.items\\(\\)\\}\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
   }
  ]
 }

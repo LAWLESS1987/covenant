@@ -94,6 +94,13 @@ def passes_today(path=None, now=None):
     return sum(1 for r in _rows(path) if r.get("kind") == "immune" and str(r.get("day")) == day)
 
 
+# A348d (2026-10-14): the day's count in words, one rule for immune()'s own line and for status(), which the
+# PC page shows. The page joined passes_today and per_day itself and read "on, 27 of 0 today" under his
+# no-ceiling grant (0, A221; the 10-14 audit), while immune() said "27 today, no ceiling". Words only; nothing here decides.
+def count_text(n, limit):
+    return ("%d of %d today" % (n, limit)) if limit > 0 else ("%d today, no ceiling" % n)
+
+
 def paused():
     try:
         import covenant_pause
@@ -140,7 +147,7 @@ def immune(kind, verdict="", text="", path=None, grant_path=None, now=None, say=
         return False, "isolated: %d immune passes today, the limit is %d" % (n, limit)
     _append({"kind": "immune", "what": kind, "day": day, "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
              "verdict": str(verdict)[:300], "text": str(text)[:300], "n_today": n + 1, "limit": limit}, path)
-    count = ("%d of %d today" % (n + 1, limit)) if limit > 0 else ("%d today, no ceiling" % (n + 1))
+    count = count_text(n + 1, limit)
     say("immunity: his %s passes with the verdict attached (%s)" % (kind, count))
     return True, "immune (%s)" % count
 
@@ -148,7 +155,8 @@ def immune(kind, verdict="", text="", path=None, grant_path=None, now=None, say=
 def status(path=None, grant_path=None, now=None):
     g = grant(grant_path)
     p, why = paused()
-    return {"granted": bool(g), "paused": p, "paused_why": why, "passes_today": passes_today(path, now), "per_day": per_day(g),
+    n, limit = passes_today(path, now), per_day(g)
+    return {"granted": bool(g), "paused": p, "paused_why": why, "passes_today": n, "per_day": limit, "count": count_text(n, limit),
             "isolations": sum(1 for r in _rows(path) if r.get("kind") == "isolated"), "covers": list(WORD_KINDS),
             "never": "acts: forum sends, live orders, recipes; and the fixed screens"}
 
