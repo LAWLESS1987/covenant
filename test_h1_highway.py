@@ -40,6 +40,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -1547,6 +1548,17 @@ def main():
           len(_lr) == 2 and _lr[0]["sent"] == 1 and _lr[1] == {"t": "r2", "tried": 5, "sent": 1, "held_no_view": 2, "convicted": 1,
                                                                 "rate_limited": 1, "other": 0, "tetsu_reviewed": 2, "tetsu_refused": 1},
           _lr)
+    # A348c (2026-10-14): any word counted as a review, so SKIP -- returned before he is asked (reviews_per_run spent, no
+    # grant, a dry run, money) -- read as one: 48 "reviewed" for the 04:13Z round of 10-14, when he read 6.
+    _hold = "held by covenant's judge (no view -- not an objection)"
+    _rws3 = [{"kind": "round", "t": "r0"}, {"kind": "reply", "sent": True, "tetsu": "SEND"},
+             {"kind": "reply", "why": "HELD by Moltbook's own rate limit -- 1 comment per 20s", "tetsu": "SEND"},
+             {"kind": "reply", "why": _hold, "tetsu": "REFUSE"}, {"kind": "reply", "why": _hold, "tetsu": "PAUSE"},
+             {"kind": "reply", "why": _hold, "tetsu": "NONE"}, {"kind": "reply", "why": _hold, "tetsu": None}] \
+        + [{"kind": "reply", "why": _hold, "tetsu": "SKIP"}] * 4 + [{"kind": "round", "t": "r1"}]
+    _lr3 = H._round_breakdown(_rws3)[-1]
+    check("H1am3 a SKIP (never asked) is not a review; SEND, REFUSE, PAUSE and NONE (each an ask) are (A348c)",
+          (_lr3["tried"], _lr3["held_no_view"], _lr3["tetsu_reviewed"], _lr3["tetsu_refused"]) == (10, 8, 5, 1), _lr3)
     # A300 (2026-10-07): a starved round (the model could not write) ran but did not speak.
     _sv = lambda h, w="RuntimeError: no weights fit: free 1.6 GB": {"at": _n - h * 3600, "starved": w}  # noqa: E731
     am_s = {
@@ -1897,6 +1909,17 @@ def main():
     check("H1tt both are registered, so sense() runs them every pass",
           H.DETECTORS.get("tetsu_cannot_answer") is H.detect_tetsu_cannot_answer
           and H.DETECTORS.get("model_unmanaged") is H.detect_model_unmanaged)
+    # A348g: a detector's own docstring and the registry must agree on whether it has a remedy. Two said it had
+    # none while one was registered for it: tetsu_cannot_answer's after A287 paired the trim with it, and
+    # defense_lapse's beside refresh_defender from the commit that wrote both (e2bb49b).
+    # A sentence speaks for this detector unless it names another detect_* (source_drift's points at mesh_source_split's).
+    _paired = {f for r in H.REMEDIES.values() for f in list(r.get("for") or []) + list(r.get("async_for") or [])}
+    _says_none = sorted(k for k, fn in H.DETECTORS.items()
+                        if any("no remedy" in s.lower() and not [d for d in re.findall(r"detect_\w+", s) if d != fn.__name__]
+                               for s in re.split(r"(?<=[.!?])\s+", " ".join((fn.__doc__ or "").split()))))
+    _contradicted = [k for k in _says_none if k in _paired]
+    check("H1nr a detector whose docstring says it has no remedy has none registered (A348g)",
+          _says_none and not _contradicted, (_contradicted, _says_none))
 
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]

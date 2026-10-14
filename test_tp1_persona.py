@@ -445,6 +445,39 @@ def main():
           and k["register_primary"] == base and len(rec) == 1 and any("directive" in q["q"] for q in k.get("questions", [])),
           (moved, k["register"], rec))
 
+    # A348g: every file the retirement writes BY DEFAULT is one git ignores. The paths are not typed here: the real
+    # retire runs on a temp tree shaped like this one (<root>/ops/tetsu_persona.json, no retired_path), and each file
+    # it leaves is asked of git as <root>-relative. Measured before: ops/tetsu_register_retired.jsonl was neither
+    # tracked nor ignored, one `git add -A` from the public repository. Three answers (A263 G1): no git and no
+    # .gitignore here (the staged copy) is said as a skip, never a pass.
+    import subprocess
+    root = tempfile.mkdtemp(prefix="tp1k8_")
+    os.makedirs(os.path.join(root, "ops"))
+    pk = os.path.join(root, "ops", "tetsu_persona.json")
+    PZ.save({"register": base + " Is this a question?", "register_primary": base,
+             "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pk)
+    PZ.retire_leaked_questions(path=pk)
+    wrote = sorted(os.path.relpath(os.path.join(d, f), root).replace(os.sep, "/")
+                   for d, _s, fs in os.walk(root) for f in fs)
+    answers, how = {}, ""
+    for rel in wrote:
+        try:
+            g = subprocess.run(["git", "check-ignore", "-q", rel], cwd=HERE, capture_output=True, timeout=30)
+            if g.returncode in (0, 1):
+                answers[rel], how = g.returncode == 0, "git check-ignore"
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if len(answers) < len(wrote) and os.path.isfile(os.path.join(HERE, ".gitignore")):
+        with open(os.path.join(HERE, ".gitignore"), encoding="utf-8") as fh:
+            lines = [l.strip() for l in fh]
+        answers, how = {rel: rel in lines for rel in wrote}, "the exact line in .gitignore"
+    if len(answers) < len(wrote):
+        print("  [SKIP] TP1k8 cannot tell here: no git repository and no .gitignore beside this file (the staged copy)")
+    else:
+        check("TP1k8 every file the register retirement writes by default is ignored by git (asked of %s)" % how,
+              "ops/tetsu_register_retired.jsonl" in wrote and all(answers.values()),
+              (how, sorted(r for r, ig in answers.items() if not ig), wrote))
+
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
         print("TP1 result: FAILED (%d)" % len(FAILURES))

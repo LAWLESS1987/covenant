@@ -232,6 +232,11 @@ def crawl(start, pages=DEFAULT_PAGES, read=None):
         final = r.get("final_url") or u
         if host is None:
             host = (urllib.parse.urlsplit(final).hostname or "").lower()
+        elif (urllib.parse.urlsplit(final).hostname or "").lower() != host:
+            # A348g: a same-host link the door followed to ANOTHER host is refused, not read: measured, a.test/go
+            # redirecting to other.test/landing was handed over (and its links followed) inside a.test's crawl.
+            refused.append({"url": u[:300], "reason": ("redirected off host to %s" % final)[:200]})
+            continue
         seen.add(urllib.parse.urldefrag(final)[0])
         text = r.get("text", "")
         out.append({"url": final[:300], "title": r.get("title", ""), "text": text[:PAGE_CHARS],

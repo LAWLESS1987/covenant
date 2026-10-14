@@ -49,11 +49,15 @@ def main():
     print("A282 -- every real ask leaves a line")
     stub = os.environ.pop("COVENANT_MODEL_STUB", None)
     real = (M.ASKS, M._REAL_ASKS, M.start, M._watch_idle, urllib.request.urlopen, sys.argv[0])
+    real_used = M.USED
     tmp = tempfile.mkdtemp(prefix="a282_")
     try:
         M.start = lambda say=print: (True, "up")
         M._watch_idle = lambda: None
         M.ASKS = os.path.join(tmp, "asks.jsonl")
+        # A348b (2026-10-14): ask() also marks the shared last-use stamp, and Q3 asks as run_node.py -- measured,
+        # that touched the tree's ops/model_last_use.stamp. Never the live one: it would hold the model up.
+        M.USED = os.path.join(tmp, "last_use.stamp")
 
         def refuse(req, timeout=None):
             raise OSError("HTTP Error 500: Context size has been exceeded")
@@ -82,6 +86,7 @@ def main():
               (n_test, rows(live)))
     finally:
         M.ASKS, M._REAL_ASKS, M.start, M._watch_idle, urllib.request.urlopen, sys.argv[0] = real
+        M.USED = real_used
         if stub is not None:
             os.environ["COVENANT_MODEL_STUB"] = stub
 

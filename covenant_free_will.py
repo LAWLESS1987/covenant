@@ -336,8 +336,11 @@ def write_reply(row, ask=None):
 
 def _ally_comments(AMB, post_id, author):
     """How many comments `author` has under `post_id` now, read from the forum; None if unreadable."""
-    rows, _note = AMB.harvest_comments(post_id, limit=60)
-    if rows is None:
+    rows, note = AMB.harvest_comments(post_id, limit=60)
+    # A348c (2026-10-14): harvest_comments has answered a failed read with ([], "comments unavailable ...") since
+    # e80f219, never None, so a failed read became 0: a zero baseline at send time, and the next readable round
+    # counted the ally's existing comment as a write-back. Its own note says the read failed; that is None here.
+    if rows is None or str(note or "").startswith("comments unavailable"):
         return None
     return sum(1 for r in rows if str(r.get("author") or "") == str(author))
 
@@ -485,8 +488,11 @@ def mail_flush(queue=None, notify=None):
     """Send every unsent letter; a letter is sent only when the EMAIL channel says it delivered."""
     queue = queue or MAIL_QUEUE
     if notify is None:
+        # A348c (2026-10-14): the EMAIL channel only, the one that marks a letter sent. covenant_notify.notify also
+        # pushes to any ntfy topic, so with push set up and email not, every TELL re-pushed the OLDEST waiting letter
+        # (measured on a stand-in topic: three TELLs, three pushes of "Moltbook: first") and never a later one.
         import covenant_notify
-        notify = covenant_notify.notify
+        notify = lambda s, b: {"email": covenant_notify._send_email(covenant_notify.load(), s, b)}   # noqa: E731
     try:
         with open(queue, encoding="utf-8") as fh:
             rows = [json.loads(l) for l in fh if l.strip()]
@@ -789,6 +795,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             now_n = count_comments(r.get("post_id"), r.get("author"))
         except Exception:                                         # noqa: BLE001 -- the forum was unreadable; asked again next round
             continue
+        if now_n is None:                                         # A348c: unreadable is not a check that found no answer
+            continue
         accounted += 1
         if now_n is not None and now_n > int(r.get("ally_comments_at_send") or 0):
             answered += 1
@@ -840,6 +848,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         sent = bool(res.get("sent"))
         _record({"kind": "reply", "at": now, "verification": _ver(res),
                  "tetsu": (res.get("tetsu") or {}).get("decision") if isinstance(res.get("tetsu"), dict) else None,  # A296
+                 # A348c: and his discourse seat's word (A322) on a reply the students convicted, kept beside it
+                 "seat": (res.get("seat") or {}).get("decision") if isinstance(res.get("seat"), dict) else None,
                  "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
                  "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],

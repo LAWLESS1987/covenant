@@ -43,6 +43,7 @@ HOST, PORT = "127.0.0.1", int(os.environ.get("COVENANT_MODEL_PORT", "8081"))
 IDLE_S = int(os.environ.get("COVENANT_MODEL_IDLE_S", "600"))
 STATE = os.path.join(HERE, "ops", "model_server.json")        # pid, model, started -- gitignored ops/ state
 LOG = os.path.join(HERE, "logs", "model_server.log")
+RUNTIME_LOG = os.path.join(HERE, "logs", "model_server.runtime.log")   # llama-server's own output (A348b, start())
 
 # (file name, resident memory it needs, in GB) -- the first that fits the memory
 # free at start is the one loaded. Split GGUFs are named by their first part.
@@ -118,6 +119,41 @@ def _bar(name, need):
 _lock = threading.Lock()
 _last_used = [0.0]
 
+# LAST USE, SHARED (A348b, 2026-10-14). _last_used is this process's clock, but the server is one for every
+# process that asks: a node's or the watchdog's idle watcher read only its own clock and stopped the server
+# under another process's ask. The 2026-10-14 review read that in the ledgers: 16 of the 17 ConnectionResetErrors
+# in ops/model_asks.jsonl fell within 2 s of an idle stop by another process (the 17th beside a stop line whose
+# head was overwritten, see start()), 11 free rounds and 2 practice nights cut short. Every use now also touches this stamp (its mtime is the last use by ANY process), and the idle and
+# pressure checks read the later of the two clocks. His rule is unchanged: put away IDLE_S after the last ask.
+# Gitignored ops/ state; a test program never touches the live one (A272's lesson, as _note_ask).
+_REAL_USED = os.path.join(HERE, "ops", "model_last_use.stamp")
+USED = _REAL_USED
+
+
+def _mark_used(t=None):
+    """This process used the server now: its own clock, and the shared stamp. Never raises."""
+    t = time.time() if t is None else t
+    _last_used[0] = t
+    try:
+        prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+        if os.path.abspath(USED) == os.path.abspath(_REAL_USED) and prog.startswith("test_"):
+            return
+        if not os.path.exists(USED):
+            os.makedirs(os.path.dirname(USED), exist_ok=True)
+            open(USED, "a").close()
+        os.utime(USED, (t, t))
+    except Exception:                                             # noqa: BLE001 -- then this process's clock alone, as before
+        pass
+
+
+def _last_use():
+    """The last use of the server by ANY process: the later of this process's clock and the shared stamp."""
+    try:
+        shared = os.path.getmtime(USED)
+    except OSError:
+        shared = 0.0
+    return max(_last_used[0], shared)
+
 
 def free_gb():
     """Physical memory free right now, GB; None where it cannot be read."""
@@ -183,8 +219,10 @@ def _process_cmdline(pid):
 def adopt(listener=None, cmdline=None):
     """A341b (2026-10-13, his words: "use your discernment and inference to get all nodes green"). Measured that
     morning: llama-server pid 9220 (the 3B, started 06:15:41 by this keeper, under his own account) answered on
-    8081 with ops/model_server.json gone -- no stop line in the log explains it; several processes run idle
-    watchers, and which one dropped the record is UNDETERMINED. readiness() then read UNDETERMINED, and the road
+    8081 with ops/model_server.json gone. (Restated by A348b, 2026-10-14: the review read the stop line that
+    explains it, its head overwritten by the 3B's first output -- an idle stop by the watchdog, whose stop()
+    removed the state the 3B's start() had just written. Both causes are fixed in start() and stop() below.)
+    readiness() then read UNDETERMINED, and the road
     read model_unmanaged PRESENT and tetsu_cannot_answer UNKNOWN for hours, though Tetsu answered.
 
     When the server answers and no state is held, take it back -- ONLY if the process on the port is this
@@ -339,18 +377,25 @@ def start(say=print):
     creation = 0x08000000 if os.name == "nt" else 0               # CREATE_NO_WINDOW
     with open(LOG, "a", encoding="utf-8") as lf:
         lf.write("%s start %s (free %s GB, needs %s GB, %d threads)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), name, free_gb(), need, threads))
-        p = subprocess.Popen(args, stdout=lf, stderr=subprocess.STDOUT, creationflags=creation, cwd=os.path.dirname(BIN))
+    # ITS OWN FILE FOR THE RUNTIME (A348b, 2026-10-14). Handed this log's handle, llama-server wrote where start()
+    # left off (an inherited handle has no append on Windows), over lines other processes appended after the start
+    # line: reproduced in a scratch run, and the review found both stop lines of A276's and A341b's unmanaged
+    # servers headless that way. The keeper's log now has no handle that outlives one write.
+    with open(RUNTIME_LOG, "a", encoding="utf-8") as rf:
+        rf.write("%s start %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), name))
+        rf.flush()
+        p = subprocess.Popen(args, stdout=rf, stderr=subprocess.STDOUT, creationflags=creation, cwd=os.path.dirname(BIN))
     _write_state({"pid": p.pid, "model": name, "started": time.time(), "needs_gb": need, "threads": threads})
     for _ in range(120):                                          # a 4 GB file from a cold disk can take a minute
         if alive():
-            _last_used[0] = time.time()
+            _mark_used()
             _watch_idle()
             say("model server: up, %s, pid %d" % (name, p.pid))
             return True, "up: %s" % name
         if p.poll() is not None:
-            return False, "llama-server exited %s -- see %s" % (p.returncode, LOG)
+            return False, "llama-server exited %s -- see %s" % (p.returncode, RUNTIME_LOG)
         time.sleep(1)
-    return False, "llama-server did not answer within 120 s -- see %s" % LOG
+    return False, "llama-server did not answer within 120 s -- see %s" % RUNTIME_LOG
 
 
 def _stop_origin():
@@ -372,7 +417,7 @@ def _stop_origin():
         where = " <- ".join(chain) or "?"
         if "_pressure_check" in where:
             reason = "pressure"
-        elif "_watch_idle" in where:
+        elif "_watch_idle" in where or "_idle_tick" in where:          # A348b: the watcher's round is _idle_tick
             reason = "idle"
         elif "covenant_model.step_up" in where:
             reason = "step_up"
@@ -430,13 +475,20 @@ def stop(say=print):
                         detail, _stop_origin()))
         say("model server: could NOT stop pid %s -- it still answers (%s)" % (pid, detail or "no detail"))
         return False, "could not stop pid %s: it still answers (%s)" % (pid, detail or "no detail")
-    try:
-        os.remove(STATE)
-    except OSError:
-        pass
+    # THE RECORD GOES ONLY WITH ITS OWN SERVER (A348b, 2026-10-14). Between the read above and here, another
+    # process's start() can bring a new server up and write its state; removing that record left the new server
+    # unmanaged (A276 on 10-06, A341b on 10-13, 10 h) and every ask meanwhile named its model "?".
+    now_st, left = _read_state(), ""
+    if str(now_st.get("pid")) == str(pid):
+        try:
+            os.remove(STATE)
+        except OSError:
+            pass
+    elif now_st.get("pid"):
+        left = "; state left: it names pid %s, a newer server (A348b)" % now_st.get("pid")
     with open(LOG, "a", encoding="utf-8") as lf:
         # The first part is unchanged (same words, same order); who stopped it follows " -- ".
-        lf.write("%s stop pid %s (%s)%s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model"), _stop_origin()))
+        lf.write("%s stop pid %s (%s)%s%s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model"), _stop_origin(), left))
     say("model server: stopped pid %s" % pid)
     return True, "stopped"
 
@@ -451,7 +503,7 @@ def _pressure_check(now=None):
     if not alive():
         return False
     cur = str(_read_state().get("model") or "")
-    if not cur or cur in ALWAYS_ANSWER or now - _last_used[0] < PRESSURE_IDLE_S:
+    if not cur or cur in ALWAYS_ANSWER or now - _last_use() < PRESSURE_IDLE_S:      # A348b: any process's use
         return False
     free = free_gb()
     if free is None or free >= FLOOR_GB:
@@ -474,16 +526,27 @@ def _watch_idle():
     def run():
         while True:
             time.sleep(30)
-            if not alive():
-                return
-            if _pressure_check():
-                return
-            if time.time() - _last_used[0] > IDLE_S:
-                stop(say=lambda *_a: None)
+            if _idle_tick():
                 return
     t = threading.Thread(target=run, name="covenant-model-idle", daemon=True)
     t.start()
     _idle_thread[0] = t
+
+
+def _idle_tick(now=None):
+    """One round of the idle watcher; True when its work is done (nothing answers, put away, or stopped).
+    A348b (2026-10-14): idle is counted from the last use by ANY process (_last_use), not this one's alone,
+    so one process's watcher no longer stops the shared server mid-answer of another. A function of its own
+    so a suite drives the real round: the suites that reach the keeper stub _watch_idle, so none had run it."""
+    now = time.time() if now is None else now
+    if not alive():
+        return True
+    if _pressure_check(now=now):
+        return True
+    if now - _last_use() > IDLE_S:
+        stop(say=lambda *_a: None)
+        return True
+    return False
 
 
 _REAL_ASKS = os.path.join(HERE, "ops", "model_asks.jsonl")
@@ -529,7 +592,8 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
         # that asks -- the CLI's watcher died with the CLI and left the server
         # up, measured at 22:52. So every asker arms the watcher, and the
         # long-lived node process is the one that will put the model away.
-        _last_used[0] = time.time()
+        # (A348b: and every process's watcher counts this ask -- the shared stamp, _mark_used.)
+        _mark_used()
         _watch_idle()
     # enable_thinking off (2026-10-04): the Qwen3.5 fallback, asked without it, spent all 160 tokens
     # reasoning and returned an empty answer (finish=length); with it, it answered in 2.8 s. The 3B
@@ -547,7 +611,7 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
         _note_ask(False, (time.time() - t0) * 1000, "%s: %s" % (type(e).__name__, str(e)[:120]))
         raise
     _note_ask(True, (time.time() - t0) * 1000)
-    _last_used[0] = time.time()
+    _mark_used()
     text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
     usage = d.get("usage", {}) or {}
     return text, {"model": _read_state().get("model", "?"), "tokens": int(usage.get("completion_tokens", 0) or 0),

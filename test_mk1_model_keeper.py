@@ -35,10 +35,12 @@ def main():
     big, small = M.CANDIDATES[0][0], M.CANDIDATES[-1][0]
     for name in (big, small):
         open(os.path.join(tmp, name), "wb").write(b"x")
-    real = {k: getattr(M, k) for k in ("MODELS", "free_gb", "alive", "stop", "start", "_read_state", "LOG")}
+    real = {k: getattr(M, k) for k in ("MODELS", "free_gb", "alive", "stop", "start", "_read_state", "LOG",
+                                       "USED", "_REAL_USED")}
     calls = []
     try:
         M.MODELS = tmp
+        M.USED = os.path.join(tmp, "last_use.stamp")     # A348b: never the live shared stamp (its time would move MK1i)
         M.stop = lambda say=print: calls.append("stop")
         M.start = lambda say=print: (calls.append("start") or (True, "up"))
         quiet = lambda *a, **k: None      # noqa: E731
@@ -229,6 +231,107 @@ def main():
         check("MK1l ask() sends chat_template_kwargs enable_thinking=false (the fallback answers nothing without it)",
               text == "ok" and len(sent) == 1
               and (sent[0].get("chat_template_kwargs") or {}).get("enable_thinking") is False, sent)
+
+        # (n) A348b (2026-10-14): the server is ONE for every process, so its idle clock is too. A node's or the
+        # watchdog's watcher read only its own clock and stopped the server under another process's ask: the
+        # review matched all 17 ConnectionResetErrors on record to such a stop. The REAL watcher round
+        # (_idle_tick) runs here, with stop() a recorder; "another process" is the shared stamp, written as its
+        # _mark_used writes it.
+        import time as _t
+        stops.clear()
+        origins = []
+
+        def rec_stop(say=print):
+            stops.append("stop")
+            origins.append(M._stop_origin())
+
+        def stamp(path, t):
+            open(path, "a").close()
+            os.utime(path, (t, t))
+        M.stop = rec_stop
+        M.alive = lambda: True
+        M._read_state = lambda: {"model": small}         # a rung in ALWAYS_ANSWER: never put away for pressure
+        M.free_gb = lambda: 0.5
+        M.USED = os.path.join(tmp, "n.stamp")
+        real_last2 = M._last_used[0]
+        now = _t.time()
+        old = now - (M.IDLE_S + 100)
+        try:
+            M._last_used[0] = old
+            stamp(M.USED, now - 10)
+            n1 = M._idle_tick(now=now)
+            check("MK1n1 this process idle %ds, another asked 10 s ago: the watcher round does NOT stop the server"
+                  % (M.IDLE_S + 100), n1 is False and stops == [], (n1, stops))
+            stops.clear()
+            origins.clear()
+            stamp(M.USED, old)
+            n2 = M._idle_tick(now=now)
+            check("MK1n2 ...every process idle past IDLE_S: it stops it, logged as an idle stop (his rule, unchanged)",
+                  n2 is True and stops == ["stop"] and "reason=idle" in (origins[0] if origins else ""), (n2, stops, origins))
+            stops.clear()
+            M._last_used[0] = now - 10
+            n3 = M._idle_tick(now=now)
+            check("MK1n3 ...this process asked 10 s ago and the stamp is old: not stopped, as before", n3 is False and stops == [],
+                  (n3, stops))
+            M.USED = os.path.join(tmp, "absent.stamp")
+            M._last_used[0] = old
+            n4 = M._idle_tick(now=now)
+            check("MK1n4 ...no stamp at all (a fresh clone): this process's own clock decides, as before",
+                  n4 is True and stops == ["stop"], (n4, stops))
+            stops.clear()
+            M.USED = os.path.join(tmp, "n.stamp")
+            stamp(M.USED, now - 10)
+            M._read_state = lambda: {"model": big}
+            M.free_gb = lambda: 0.8
+            M._last_used[0] = now - 120
+            n5 = M._pressure_check(now=now)
+            check("MK1n5 under memory pressure a big model another process asked 10 s ago is NOT put away (never mid-answer)",
+                  n5 is False and stops == [], (n5, stops))
+            M.USED = os.path.join(tmp, "mark.stamp")
+            M._mark_used(now - 5)
+            check("MK1n6 _mark_used sets this process's clock and the shared stamp",
+                  M._last_used[0] == now - 5 and os.path.exists(M.USED) and abs(os.path.getmtime(M.USED) - (now - 5)) < 1,
+                  (M._last_used[0], os.path.exists(M.USED)))
+            live = os.path.join(tmp, "live.stamp")
+            M.USED = M._REAL_USED = live
+            real_argv0 = sys.argv[0]
+            try:
+                sys.argv[0] = "test_something.py"
+                M._mark_used()
+                by_test = os.path.exists(live)
+                sys.argv[0] = "run_node.py"
+                M._mark_used()
+            finally:
+                sys.argv[0] = real_argv0
+            check("MK1n6b a test program never touches the LIVE stamp; a node does (A272's lesson)",
+                  by_test is False and os.path.exists(live), (by_test, os.path.exists(live)))
+            M._REAL_USED = real["_REAL_USED"]
+            # the ask itself: the stamp must be fresh when the request is SENT (that is what keeps an answer in
+            # flight from being cut), and again when it comes back
+            M.USED = os.path.join(tmp, "ask.stamp")
+            at_send = []
+            stub_env3 = os.environ.pop("COVENANT_MODEL_STUB", None)
+            real_urlopen3, real_watch3 = _ur.urlopen, M._watch_idle
+            t0 = _t.time()
+            try:
+                M.start = lambda say=print: (True, "up")
+                M._watch_idle = lambda: None
+                def answer(req, timeout=None):
+                    at_send.append(os.path.exists(M.USED) and os.path.getmtime(M.USED) >= t0 - 1)
+                    if os.path.exists(M.USED):
+                        os.utime(M.USED, (old, old))      # as if the answer took past IDLE_S: only a mark after it is fresh
+                    return _Resp(b'{"choices":[{"message":{"content":"ok"}}],"usage":{}}')
+                _ur.urlopen = answer
+                M.ask([{"role": "user", "content": "hello"}], max_tokens=16)
+            finally:
+                _ur.urlopen, M._watch_idle = real_urlopen3, real_watch3
+                if stub_env3 is not None:
+                    os.environ["COVENANT_MODEL_STUB"] = stub_env3
+            after = os.path.getmtime(M.USED) if os.path.exists(M.USED) else 0.0
+            check("MK1n7 an ask marks the shared stamp before its request is sent, and again after the answer",
+                  at_send == [True] and after >= t0 - 1, (at_send, after, t0))
+        finally:
+            M._last_used[0] = real_last2
     finally:
         for k, v in real.items():
             setattr(M, k, v)

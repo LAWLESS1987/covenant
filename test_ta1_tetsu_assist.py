@@ -4,7 +4,9 @@
 His words, 2026-09-28: "have tetsu assist the ambassador and students and lift i approve unless myself
 or tetsu decides against it later", then "Yes, connect it". These checks run emit() itself with the
 judge stubbed to a HOLD and no key in the environment, so a draft that clears the gate stops at "no
-MOLTBOOK_API_KEY" -- nothing can reach the network from here.
+MOLTBOOK_API_KEY" -- nothing can reach the network from here. TA1y (A348c) is the one exception to "no key": it
+sets a stand-in key for its own calls, with urllib's urlopen, the rate window and the notifier replaced for them,
+and puts all four back, so nothing reaches the network there either.
 """
 import json
 import os
@@ -240,6 +242,81 @@ check("TA1x a dry run never spends the seat", (r.get("seat") or {}).get("decisio
 r = seat_emit(CONVICT, ["ALLOW", "ALLOW"], text="Thanks for the thread. We measured 98% accuracy on our gate.")
 check("TA1x his own rules (facts A285 / no measurements A297) still block a measurement claim, whatever he answers",
       r.get("sent") is False and "his rule of 2026-10-0" in str((r.get("seat") or {}).get("why", "")), r)
+
+# A348c (2026-10-14): only the refusal's return carried his reading, so free's ledger (A296) recorded every draft he
+# passed as tetsu=None -- 0 reply rows with SEND against 114 SEND readings in ops/tetsu_assist.jsonl since 10-07.
+# Each later return is driven here: no key, Moltbook's rate limit, a create, an "already posted". The key, the rate
+# window, Moltbook's answer and the notifier are stand-ins for the call and restored, so nothing leaves this process.
+print("TA1y -- A348c: his reading, and his seat's, ride on every return after it")
+import types as _types                                              # noqa: E402
+import urllib.request as _ur                                        # noqa: E402
+
+
+class _Resp:
+    def __init__(self, body):
+        self._b, self.status = json.dumps(body).encode("utf-8"), 201
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def keyed_emit(judge, ask, rate_ok=True, body=None, discourse_seat=False):
+    posted = []
+    saved = (_ur.urlopen, AMB.rate_check, AMB.rate_record, os.environ.get("MOLTBOOK_API_KEY"),
+             sys.modules.get("covenant_notify"), TA._default_ask)
+    try:
+        _ur.urlopen = lambda req, timeout=30: (posted.append(req.full_url),
+                                               _Resp(body or {"success": True, "comment": {"id": "c1"}}))[1]
+        AMB.rate_check = lambda kind, **k: (rate_ok, "stand-in window", 0 if rate_ok else 30)
+        AMB.rate_record = lambda kind, **k: None
+        os.environ["MOLTBOOK_API_KEY"] = "stand-in"
+        sys.modules["covenant_notify"] = _types.SimpleNamespace(notify=lambda *a, **k: None)
+        AMB.MB.judge_outbound = lambda t: judge
+        TA._default_ask = ask
+        r = AMB.emit(DRAFT, post_id="p1", submolt=None, dry_run=False, override_a67=False, live_repo_check=False,
+                     discourse_seat=discourse_seat)
+    finally:
+        _ur.urlopen, AMB.rate_check, AMB.rate_record = saved[0], saved[1], saved[2]
+        if saved[3] is None:
+            os.environ.pop("MOLTBOOK_API_KEY", None)
+        else:
+            os.environ["MOLTBOOK_API_KEY"] = saved[3]
+        if saved[4] is None:
+            sys.modules.pop("covenant_notify", None)
+        else:
+            sys.modules["covenant_notify"] = saved[4]
+        TA._default_ask = saved[5]
+    return r, posted
+
+
+_dec = lambda r, k="tetsu": (r.get(k) or {}).get("decision")       # noqa: E731
+grant()
+r_nokey = emit_with(HOLD, "SEND")
+r_rate, p_rate = keyed_emit(HOLD, say("SEND"), rate_ok=False)
+grant()
+r_made, p_made = keyed_emit(HOLD, say("SEND"))
+grant()
+r_dup, p_dup = keyed_emit(HOLD, say("SEND"), body={"success": True, "already_existed": True,
+                                                   "comment": {"id": "c1", "verification_status": "verified"}})
+check("TA1y a HOLD he passed with SEND carries his SEND on every way the send ends: no key, held by Moltbook's rate "
+      "limit (nothing posted), created and sent, already posted",
+      "no MOLTBOOK_API_KEY" in r_nokey.get("why", "") and _dec(r_nokey) == "SEND"
+      and "rate limit" in r_rate.get("why", "") and not p_rate and _dec(r_rate) == "SEND"
+      and r_made.get("created") is True and r_made.get("sent") is True and len(p_made) == 1 and _dec(r_made) == "SEND"
+      and r_dup.get("already_existed") is True and len(p_dup) == 1 and _dec(r_dup) == "SEND",
+      [(x.get("why", "")[:40], x.get("tetsu")) for x in (r_nokey, r_rate, r_made, r_dup)])
+it_seat = iter(["ALLOW", "ALLOW"])
+r_seat, p_seat = keyed_emit(CONVICT, lambda prompt: next(it_seat), discourse_seat=True)
+check("TA1y a reply the students convicted and his seat allowed carries the seat's ALLOW on the created return (and no "
+      "review of his, which reads holds only)",
+      r_seat.get("created") is True and len(p_seat) == 1 and _dec(r_seat, "seat") == "ALLOW" and r_seat.get("tetsu") is None,
+      (r_seat.get("why", "")[:60], r_seat.get("seat"), r_seat.get("tetsu")))
 
 print("\nnot measured here: how Tetsu actually judges real drafts. ops/tetsu_assist.jsonl records every reading.")
 print("\nTA1: %d/%d passed" % (sum(ok), len(ok)))

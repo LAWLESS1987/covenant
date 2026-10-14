@@ -1198,6 +1198,12 @@ def detect_moltbook_strikes(health=None, rows=None, now=None):
 
 
 AMBASSADOR_STALL_H = 8.0     # rounds run every 3 h (CovenantAmbassador) plus the nightly's; 8 h is two missed
+# A348c (2026-10-14): the decisions that mean he was ASKED -- each spent one of reviews_per_run and is a row in
+# ops/tetsu_assist.jsonl. NONE is one (the ask failed, or his answer left a sentence without a word; the reply row
+# does not say which). SKIP is not: covenant_tetsu_assist.review returns it before asking (no grant, a dry run,
+# money, or reviews_per_run spent). Counting any word as a review read 48 for the 04:13Z round of 10-14, when he
+# read 6 (47 of the 48 were SKIP).
+TETSU_ASKED = ("SEND", "REFUSE", "PAUSE", "NONE")
 
 
 def _round_breakdown(rows, n=2):
@@ -1214,7 +1220,7 @@ def _round_breakdown(rows, n=2):
              "rate_limited": 0, "other": 0, "tetsu_reviewed": 0, "tetsu_refused": 0}
         for r in reps:
             w = str(r.get("why") or "")
-            if r.get("tetsu"):                       # kept on each reply since A296; rows before it carry none
+            if r.get("tetsu") in TETSU_ASKED:        # kept on each reply since A296, his SEND since A348c; older rows carry none
                 b["tetsu_reviewed"] += 1
                 b["tetsu_refused"] += int(r.get("tetsu") == "REFUSE")
             if r.get("sent"):
@@ -1905,9 +1911,11 @@ def detect_defense_lapse(health=None):
     will ever exist ensure it constantly adapts to protect the mycelal network". What adapts
     here is measurement: the probe set grows from what the forum sends (A176), the antivirus'
     findings reach the record (A201), the wire admits by single-use signature (A200) and its
-    refusals are counted here by address. What is NOT here, on purpose: no remedy -- turning
-    protection on, updating signatures or starting a scan are the operator's own system
-    settings, and this file names the lapse rather than reaching into them.
+    refusals are counted here by address. What is NOT here, on purpose: turning protection on
+    is the operator's own system setting, and this file names that lapse rather than reaching
+    into it. A348g: the other two lapses have had a remedy since this detector was written
+    (e2bb49b, "with a bounded auto-fix"): refresh_defender updates the signatures through
+    covenant_immune.update()'s judged update and scans our own tree, never Defender's settings.
     """
     st = _defender_status()
     refusals = {}
@@ -1969,8 +1977,10 @@ def detect_tetsu_cannot_answer(health=None, ready=None):
     A276 (2026-10-06, his words: "get the road green and start expanding the highway"). The keeper's own
     readiness() has said this since A252 (10-04), but only the daily cycle read it, once a day, as
     "tetsu:cannot_answer"; the hourly road never did. It is a READ of covenant_model.readiness(): it starts,
-    stops and frees nothing. No remedy, and none will be added here: what to close to free memory is his
-    (A252), and anything touching the model is NEVER_AUTOMATIC."""
+    stops and frees nothing. A348g: since A287 (2026-10-06) one remedy answers it, trim_idle_apps
+    (AUTO_REVERSIBLE, at most hourly; H1tt pins the pairing): it trims idle background apps' working sets,
+    never the app in front of him, never Python or the model server, and closes nothing.
+    What to CLOSE to free memory stays his (A252), and anything touching the model is NEVER_AUTOMATIC."""
     r, err = _tetsu_readiness(ready)
     if r is None:
         return {"state": UNKNOWN, "measured": {"error": err}}
@@ -2094,8 +2104,10 @@ def detect_model_unmanaged(health=None, ready=None):
     """A model server answers on Tetsu's port that the keeper has no record of starting.
 
     A276 (2026-10-06). Twice in two days: A265 (10-05, a server whose stop was refused, answering /health
-    and timing out every ask) and 10-06 07:54, when a 3B came up after the one-slot server vanished with no
-    stop line, and ops/model_server.json was gone. Unmanaged, nothing puts it away when idle, readiness()
+    and timing out every ask) and 10-06 07:54, when a 3B came up during an idle stop of the one-slot server,
+    and ops/model_server.json was gone. (Restated by A348b, 2026-10-14: the review read that stop line in the
+    log with its head overwritten by the 3B's first output, and the stop had removed the 3B's fresh state;
+    both are fixed in covenant_model.) Unmanaged, nothing puts it away when idle, readiness()
     cannot say PASS, and a restart of the keeper's code never reaches it. A READ of readiness()'s `managed`;
     no remedy -- stopping a model is NEVER_AUTOMATIC; adopting or ending it is a person's call."""
     r, err = _tetsu_readiness(ready)

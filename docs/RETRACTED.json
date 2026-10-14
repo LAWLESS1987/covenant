@@ -1324,6 +1324,70 @@
    ],
    "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
+  },
+  {
+   "id": "A348a-DAILY-READINGS",
+   "claim": "That Tetsu's daily record named his model with pick_model() (\"Tetsu's model: <file> or not found\"), and that its `daily` row FAILs when the newest record is \"more than 26 h old\".",
+   "refuted_by": "Measured 2026-10-14 (A348a): pick_model() names the weights that would fit the memory free NOW, and a loaded model uses that memory -- 10-13 recorded none while the 2B answered, 10-08 named the 3B while the 2B served. The threshold in the code is STALE_H = 30 h (588b208, 2026-09-28); the words in covenant_daily's and covenant_watchdog's docstrings still said 26 h.",
+   "truth": "The model line names the weights the keeper's server RUNS while it answers, and only otherwise what would load, said as that. The row FAILs past STALE_H (30 h). Pinned by TD1t and the docstrings now name STALE_H.",
+   "verbatim": [
+    "considered.append({\"what\": \"Tetsu's model: %s\" % (model.get(\"file\") or \"not found\")})",
+    "The next self-evaluations carry a `daily` row that reads FAIL when the newest record is more than 26 h old, so a cycle that stops happening is itself reported."
+   ],
+   "patterns": [
+    "\"Tetsu's model: %s\" % \\(model\\.get\\(\"file\"\\) or \"not found\"\\)",
+    "more than 26 h old"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348b-KEEPER-STOP-UNEXPLAINED",
+   "claim": "That the model server's lost record had no stop line to explain it -- A341b: \"no stop line in the log explains it; several processes run idle watchers, and which one dropped the record is UNDETERMINED\"; A276: a 3B came up \"after the one-slot server vanished with no stop line\".",
+   "refuted_by": "Measured 2026-10-14 (A348b): both stop lines exist, their heads overwritten by the new server's first output -- llama-server was handed the keeper log's handle and wrote at a stale offset (reproduced in a scratch run). Each was an idle stop by another process whose stop() removed the state the new server's start() had just written. The idle watchers also read only their own process's clock, so one process stopped the shared server mid-answer of another.",
+   "truth": "Idle is counted from the last use by ANY process (ops/model_last_use.stamp); stop() removes the state only while it still names the pid it stopped; llama-server writes to its own logs/model_server.runtime.log. Pinned by MK1, A265 and A269's new checks.",
+   "verbatim": [
+    "8081 with ops/model_server.json gone -- no stop line in the log explains it; several processes run idle watchers, and which one dropped the record is UNDETERMINED.",
+    "when a 3B came up after the one-slot server vanished with no stop line, and ops/model_server.json was gone."
+   ],
+   "patterns": [
+    "which one dropped the record is UNDETERMINED",
+    "after the one-slot server vanished with no"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348c-REVIEW-RECORD-SINCE-A296",
+   "claim": "That Tetsu's review word has been \"kept on each reply since A296; rows before it carry none\", so the road's breakdown counting any word was a count of his reviews.",
+   "refuted_by": "Measured 2026-10-14 (A348c): emit() returned his reading only on the refusal path, so ops/ambassador_sends.jsonl held 0 reply rows with tetsu SEND against 114 SEND readings in ops/tetsu_assist.jsonl since 10-07 (its 1628 rows since then: 917 SKIP, 669 none, 36 REFUSE, 6 NONE); and SKIP, returned before he is asked, was counted by the road as a review.",
+   "truth": "His reading and his discourse seat's ride on every return from emit(); the road counts as reviewed only SEND, REFUSE, PAUSE and NONE (TETSU_ASKED). Pinned by FW1, TA1 and H1's new checks.",
+   "verbatim": [
+    "if r.get(\"tetsu\"):                       # kept on each reply since A296; rows before it carry none"
+   ],
+   "patterns": [
+    "kept on each reply since A296; rows before it carry none"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
+  },
+  {
+   "id": "A348g-NO-REMEDY-AND-HOLD-DIGEST",
+   "claim": "That detect_tetsu_cannot_answer has \"No remedy, and none will be added here\"; that detect_defense_lapse has \"no remedy -- turning protection on, updating signatures or starting a scan are the operator's own system settings\"; and that in code consensus \"the gate judges that synthesis, and a hold returns the digest instead\".",
+   "refuted_by": "Read 2026-10-14 (A348g): trim_idle_apps has answered tetsu_cannot_answer since A287 (2026-10-06) and refresh_defender has answered defense_lapse since e2bb49b, both registered AUTO_REVERSIBLE in REMEDIES; and a hold passes in code consensus (A223), where it was labelled \"synthesis judged clean\" though nothing judged it.",
+   "truth": "Both docstrings name the remedy that answers them and keep what stays the operator's (closing apps, turning protection on). A held synthesis passes and is labelled \"passed unjudged\". Pinned by H1 and CC1's new checks.",
+   "verbatim": [
+    "No remedy, and none will be added here: what to close to free memory is his (A252), and anything touching the model is NEVER_AUTOMATIC.",
+    "What is NOT here, on purpose: no remedy -- turning protection on, updating signatures or starting a scan are the operator's own system settings, and this file names the lapse rather than reaching into them.",
+    "the gate judges that synthesis, and a hold returns the digest instead."
+   ],
+   "patterns": [
+    "No remedy, and none will be added here",
+    "What is NOT here, on purpose: no remedy -- turning",
+    "the gate judges that synthesis, and"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
   }
  ]
 }

@@ -70,11 +70,15 @@ def act(answer, heal=None, tell=None, lift=None):
             tell("Tetsu %s, on your grant (A336)." % lift_why, "Tetsu lifted free's isolation")
         except Exception:                                         # noqa: BLE001
             pass
+    ran = True
     try:
         import covenant_heal as CH
         out = (heal or CH.heal)(dry_run=dry, who="tetsu")
     except Exception as e:                                        # noqa: BLE001
-        out = {"ok": False, "summary": "the heal could not run: %s: %s" % (type(e).__name__, str(e)[:160])}
+        # A348g: heal() writes his row only when it returns, so here nothing is on record; measured, this path
+        # handed him a blank "error:" line and "(Recorded under your name ...)" with no ledger row written.
+        ran, err = False, "%s: %s" % (type(e).__name__, str(e)[:160])
+        out = {"ok": False, "summary": "the heal could not run: %s" % err, "error": err}
     told = None
     try:
         import covenant_heal as CH
@@ -98,7 +102,8 @@ def act(answer, heal=None, tell=None, lift=None):
         lines.append("error: " + str(out.get("error", ""))[:200])
     if told:
         lines.append("what is still left was put on his line (it had changed since the last time he was told).")
-    return True, "\n".join(lines) + "\n\n(Recorded under your name in ops/heal.jsonl.)", rec
+    return True, "\n".join(lines) + ("\n\n(Recorded under your name in ops/heal.jsonl.)" if ran
+                                     else "\n\n(Nothing was recorded in ops/heal.jsonl: the heal did not run.)"), rec
 
 
 if __name__ == "__main__":

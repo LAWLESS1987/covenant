@@ -13,6 +13,8 @@ WHAT IT PINS.
   S2  a kill that works: True, state removed, the log says "stop pid" as before
   S3  a server already gone: True, state removed (nothing to wait for)
   S4  no state: "not started by this keeper", and no kill is attempted
+  S5  (A348b) another process's start() records a NEW server while the old one is being stopped: the stop
+      returns True and leaves the new state (removing it left the 10-06 and 10-13 servers unmanaged)
   R1  readiness(): a server answers and the keeper recorded nothing -> UNDETERMINED, managed False
   R2  readiness(): a server answers and the keeper started it -> PASS, as before
 
@@ -106,6 +108,32 @@ def main():
         ok, why = M.stop(say=lambda *_a: None)
         check("S4 no state: 'not started by this keeper' and no kill attempted",
               ok is False and why == "not started by this keeper" and kills == [], (ok, why, kills))
+
+        # S5 (A348b, 2026-10-14): the old server still answers its first /health after the kill, and in that
+        # moment another process's start() brings a new one up and writes ITS state -- the race the review
+        # reproduced. The stop must remove only a record that still names the pid it killed.
+        kills.clear()
+        open(M.LOG, "w").close()
+        write_state(state)
+        new_pid = FAKE_PID - 1
+        seen = [0]
+
+        def old_then_new():
+            seen[0] += 1
+            if seen[0] == 1:
+                write_state({"pid": new_pid, "model": "Qwen3.5-2B-Q4_K_M.gguf", "started": 1})
+                return True
+            return False
+        M.subprocess.run = lambda args, **k: (kills.append(tuple(args)) or _Run(0, ""))
+        os.kill = lambda pid, sig: kills.append(("kill", pid))
+        M.alive = old_then_new
+        ok, why = M.stop(say=lambda *_a: None)
+        log = log_text()
+        left = json.load(open(M.STATE, encoding="utf-8")) if os.path.isfile(M.STATE) else {}
+        check("S5 a new server recorded during the stop: True, and its state is LEFT (it still names pid %d)" % new_pid,
+              ok is True and why == "stopped" and left.get("pid") == new_pid, (ok, why, left))
+        check("S5 ...the log says 'stop pid' for the old one and names the state it left",
+              " stop pid %d " % FAKE_PID in log and "state left: it names pid %d" % new_pid in log, log)
 
         # R1/R2: readiness
         M.alive = lambda: True

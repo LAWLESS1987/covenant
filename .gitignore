@@ -361,6 +361,8 @@ models/
 *.gguf
 ops/model_server.json
 logs/model_server.log
+# A348b (2026-10-14): the last use of the model by any process (its mtime), read by every idle watcher
+ops/model_last_use.stamp
 tools/sd/
 *.safetensors
 ops/images/
@@ -378,6 +380,8 @@ ops/tetsu_persona.json
 # his whole revision history, append-only, and any persona file set aside unreadable (A233, 2026-09-26)
 ops/tetsu_persona_history.jsonl
 ops/tetsu_persona.json.unreadable-*
+# A348g: the questions A341 moved out of his register, written beside it -- his words and the operator's; was neither tracked nor ignored
+ops/tetsu_register_retired.jsonl
 ops/tetsu_blocks.json
 ops/security_probe_ledger.jsonl
 ops/security_probes_observed.json

@@ -706,6 +706,110 @@ def main():
     check("FW1q a letter is marked sent only when the EMAIL channel delivered it, not another channel",
           [json.loads(x)["sent"] for x in open(qm, encoding="utf-8")][-1] is False)
 
+    # FW1o (A348c, 2026-10-14): mail_flush called covenant_notify.notify, which also pushes to any ntfy topic. With push
+    # set up and email not, three TELLs pushed "Moltbook: first" three times and never a later letter. The REAL notify
+    # module runs here with its config, its push and its SMTP send replaced by stand-ins, so nothing leaves this PC.
+    print("FW1o -- A348c: a letter goes to the email channel only; push set up alone re-sends nothing")
+    import covenant_notify as _N
+    _real_n = (_N.load, _N._send_ntfy, _N._send_email)
+    pushed_o, mailed_o = [], []
+    qo = os.path.join(tdm, "queue_o.jsonl")
+    try:
+        _N.load = lambda path=None: {"ntfy_topic": "fw1o-stand-in"}
+        _N._send_ntfy = lambda topic, title, body, priority="default": (pushed_o.append(title), True)[1]
+        wait_o = [FW.mail_tell(w, [], queue=qo, fetch=fetch) for w in ("first", "second", "third")]
+        check("FW1o push set up alone: no letter is pushed (the oldest is not re-sent each TELL), all three wait in order",
+              not pushed_o and wait_o == [(0, 1), (0, 2), (0, 3)]
+              and [json.loads(x).get("last_try") for x in open(qo, encoding="utf-8")] == ["email not configured", None, None],
+              (pushed_o, wait_o))
+        _N.load = lambda path=None: {"ntfy_topic": "fw1o-stand-in", "smtp_host": "h", "smtp_user": "u", "smtp_password": "p"}
+        _N._send_email = lambda cfg, title, body: (mailed_o.append(title), (True, "sent (stand-in)"))[1]
+        check("FW1o with email set up as well, the backlog is emailed oldest first and pushed nowhere",
+              FW.mail_flush(qo) == (3, 0) and mailed_o == ["Moltbook: first", "Moltbook: second", "Moltbook: third"]
+              and not pushed_o, (mailed_o, pushed_o))
+    finally:
+        _N.load, _N._send_ntfy, _N._send_email = _real_n
+
+    # FW1j (A348c, 2026-10-14): harvest_comments answers a failed read with ([], "comments unavailable ..."), never None,
+    # and _ally_comments counted that as 0 comments: a zero baseline when she replied, then the ally's existing comment
+    # read as a write-back. Driven through the round's OWN counter (count_comments not passed), the door a stand-in.
+    print("FW1j -- A348c: a forum that cannot be read is unknown, never zero")
+    import covenant_ambassador as _AMBj
+    _real_harvest, door = _AMBj.harvest_comments, {"rows": None}
+
+    def harvest_j(post_id, limit=35, **k):
+        if door["rows"] is None:
+            return [], "comments unavailable (TimeoutError: stand-in)"
+        return list(door["rows"]), "read %d comment(s), %d long enough to keep" % (len(door["rows"]), len(door["rows"]))
+    tdj = tempfile.mkdtemp(prefix="fw1j_")
+    gpj = os.path.join(tdj, "grant.json")
+    with open(gpj, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "test", "caps": {"comments": 1, "posts": 0}, "round_minutes": None}, fh)
+    kj = dict(say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: [ROWS[0]], emit=emit, introduce=introduce,
+              grant_path=gpj)
+    _real_api = _AMBj._api
+
+    def api_down(*a, **k):
+        raise TimeoutError("stand-in: the forum did not answer")
+    try:
+        # The REAL door first, only its one network call replaced by a failure: the note _ally_comments reads is the
+        # door's own, so a reworded note cannot turn a failed read back into 0 without this going red.
+        _AMBj._api = api_down
+        real_door = (FW._ally_comments(_AMBj, "p", "alpha"), _AMBj.harvest_comments("p", limit=60))
+        _AMBj._api = _real_api
+        check("FW1j the real harvest_comments, its forum unreachable, reads as None (unknown), not 0",
+              real_door[0] is None and real_door[1][0] == [], real_door)
+        _AMBj.harvest_comments = harvest_j
+        unread = FW._ally_comments(_AMBj, "p", "alpha")
+        door["rows"] = [{"author": "alpha"}, {"author": "beta"}]
+        read_two = FW._ally_comments(_AMBj, "p", "alpha")
+        door["rows"] = []
+        read_none = FW._ally_comments(_AMBj, "p", "alpha")
+        check("FW1j an unreadable forum is None (as the docstring says); a read with her comment is 1; an empty read is 0",
+              unread is None and read_two == 1 and read_none == 0, (unread, read_two, read_none))
+        spj = os.path.join(tdj, "sends.jsonl")
+        door["rows"] = None
+        FW.run_round(dry_run=False, sends_path=spj, now=6000.0, **kj)
+        door["rows"] = [{"author": "alpha"}]
+        oj = FW.run_round(dry_run=False, sends_path=spj, now=6100.0, **kj)
+        rowj = [r for r in FW.sends(spj) if r.get("kind") == "reply"]
+        check("FW1j a read that failed when she replied is no baseline (None), so the ally's existing comment, read next "
+              "round, is no write-back",
+              len(rowj) == 1 and rowj[0].get("sent") and rowj[0].get("ally_comments_at_send") is None and oj["answered"] == 0
+              and not [r for r in FW.sends(spj) if r.get("kind") == "answer"], (rowj, oj))
+        spj2 = os.path.join(tdj, "sends2.jsonl")
+        FW.run_round(dry_run=False, sends_path=spj2, now=7000.0, **kj)
+        door["rows"] = None
+        oc = FW.run_round(dry_run=False, sends_path=spj2, now=7100.0, **kj)
+        door["rows"] = [{"author": "alpha"}, {"author": "alpha"}]
+        od = FW.run_round(dry_run=False, sends_path=spj2, now=7200.0, **kj)
+        check("FW1j a read that failed while accounting is not counted as a check that found no answer; the next round "
+              "reads the post again and records the answer",
+              [r.get("ally_comments_at_send") for r in FW.sends(spj2) if r.get("kind") == "reply"] == [1]
+              and (oc["accounted"], oc["answered"]) == (0, 0) and (od["accounted"], od["answered"]) == (1, 1), (oc, od))
+    finally:
+        _AMBj.harvest_comments, _AMBj._api = _real_harvest, _real_api
+
+    # FW1p (A348c, 2026-10-14): his reading rides on emit's every return now (TA1y), and free keeps it on the reply row
+    # with his discourse seat's word beside it (A322), whichever way the send ended.
+    print("FW1p -- A348c: free keeps Tetsu's word and his seat's on each reply")
+    tdp = tempfile.mkdtemp(prefix="fw1p_")
+    gpp, spp = os.path.join(tdp, "grant.json"), os.path.join(tdp, "sends.jsonl")
+    with open(gpp, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    ends = iter([{"sent": True, "created": True, "judged": "HELD", "why": "", "verification": {"required": False},
+                  "tetsu": {"decision": "SEND", "why": "every sentence read OK"}, "seat": None},
+                 {"sent": False, "created": False, "judged": "HELD", "why": "HELD by Moltbook's own rate limit -- stand-in",
+                  "tetsu": {"decision": "SEND", "why": "every sentence read OK"}, "seat": None},
+                 {"sent": True, "created": True, "judged": "VIOLATES", "why": "", "verification": {"required": False},
+                  "tetsu": None, "seat": {"decision": "ALLOW", "why": "discourse seat (A322): ALLOW, ALLOW"}}])
+    FW.run_round(dry_run=False, say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three),
+                 emit=lambda text, **k: next(ends), introduce=lambda **k: {"sent": False}, grant_path=gpp, sends_path=spp,
+                 now=710000.0, count_comments=cc0)
+    got_p = [(r.get("tetsu"), r.get("seat")) for r in FW.sends(spp) if r.get("kind") == "reply"]
+    check("FW1p sent, rate-held and seat-allowed replies keep SEND, SEND and the seat's ALLOW",
+          got_p == [("SEND", None), ("SEND", None), (None, "ALLOW")], got_p)
+
     print("FW1i -- an empty round (no one new, rotation) does not break the isolation streak")
     tdi = tempfile.mkdtemp(prefix="fw1i2_")
     gpi, spi = os.path.join(tdi, "grant.json"), os.path.join(tdi, "sends.jsonl")

@@ -33,8 +33,10 @@ that is measured or declared UNDETERMINED:
       Two or more: the local model is asked, under a fixed brief, to write
       AGREED (points at least two systems make), DISPUTED (where they differ
       and each side's reason) and UNJUDGED (what none supports with a
-      reason), adding nothing of its own; the gate judges that synthesis, and
-      a hold returns the digest instead. The state is recorded either way.
+      reason), adding nothing of its own; the gate reads that synthesis: a
+      finding, or a gate that cannot be reached, returns the digest instead;
+      a hold passes (A223) and is labelled "passed unjudged", never "judged
+      clean" (A348g). The state is recorded either way.
 
 "Synced with the pc": the phone's Code screen sends the question to the PC's
 /m/code door (registered beside the council's routes, tailnet only) and
@@ -151,6 +153,10 @@ def digest(row, consult_path=None):
     return "\n".join(lines)
 
 
+# The sentinel's own words for a hold (covenant_unified_v8 evaluate_transaction): no finding was made either way.
+_HOLDS = ("Held, not judged", "Blocked, not proven")
+
+
 def _gate(text):
     """A223 (2026-09-25): the node's real quorum (covenant_gate_proxy.default_sentinel), where the core's
     MockJudge stood; semantics unchanged (a hold passes as 'not judged', a finding refuses, unreachable refuses)."""
@@ -193,6 +199,12 @@ def consensus(qid, ask=None, judge=None, path=None, consult_path=None, now=None)
         ok, msg = (judge or _gate)(text)
         if not ok:
             out["state"], out["why"], out["text"] = "digest", "the synthesis was held by the gate: %s" % str(msg)[:160], digest(row, consult_path)
+        elif str(msg).startswith(_HOLDS):
+            # A348g: a hold passes (A223), but nothing judged it; measured, a held synthesis was labelled
+            # "judged clean" here, and that label is what covenant_own_work teaches as "AGREED BY ...".
+            out["state"], out["text"] = "consensus", text[:4000]
+            out["why"] = "%d systems, synthesis passed unjudged (the gate held it; a hold passes, A223): %s" % (
+                len(answered), str(msg)[:120])
         else:
             out["state"], out["text"], out["why"] = "consensus", text[:4000], "%d systems, synthesis judged clean" % len(answered)
     except Exception as e:                                        # noqa: BLE001

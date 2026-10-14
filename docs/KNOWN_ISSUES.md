@@ -7671,6 +7671,34 @@ A280, which is the road telling the truth about it.
     - Now each bound asks for one number, and his last refusals are shown with the lab's reason. A hypothesis that met no price series reads "untested" (2 of the 5 hypothesis rows). Validation, bounds and tests are unchanged.
     - TM1 PASSED (TM1f new).
 - **Rule 10.** Every line replaced is kept as written on branch `tetsu-sweep-as-written-2026-10-14` (at 9bb2fd2, pushed) and tombstoned as `A348d-IMMUNITY-COUNT-HEAL-GRADE`, `A348e-WORK-RESUME-ERRORS`, `A348f-PRACTICE-NO-FILE-AND-CLOCK` and `A348h-MONEY-BOUNDS-AS-LISTS`. R1 171/171; with a probe carrying each old line, 167/171 (each `.C` red); with the probe retired (`.trash/_r1_probe_tmp.py.A348-probe-2026-10-14`), 171/171.
+- **Landed in the second commit, the same way: A348a, b, c, g.** The four agents that hit the usage limit were rerun from the same prompts. Their partial worktrees (`.claude/worktrees/wf_9550101c-173-*`) are left as they were, unused.
+  - **A348a, Tetsu's daily record (findings 40-46).**
+    - Standing degraded reasons were keyed as failures only on failed days, so they read new, cleared or reappeared from day to day; a highway condition was keyed twice. Now only failing reasons are keys.
+    - The phone was compared by commit alone, and one commit is rebuilt against each newer core. Now the versionName too, and a phone newer than the PC's build is said to be ahead.
+    - His model line was `considered.append({"what": "Tetsu's model: %s" % (model.get("file") or "not found")})`, which is pick_model's would-fit, not what runs. Now it names what runs.
+    - The commit count was cut at 20 before counting; the false-hold denominator was all 53 exam cases, of which 26 are clean-labelled; a nodes interpreter whose packages were not read now says why.
+    - Two docstrings said the row FAILs when the newest record is "more than 26 h old" (the code uses STALE_H, 30 h); restated.
+    - TD1 PASSED (TD1r-TD1x new).
+  - **A348b, the model keeper (findings 37-39).**
+    - Each process's idle watcher read only its own clock and stopped the shared server under another process's ask. 17 asks in `ops/model_asks.jsonl` since 10-06 ended in ConnectionResetError; the sweep's verifier joined 16 of them to an idle stop by another process within 2 s. Idle now counts from the last use by any process (`ops/model_last_use.stamp`, gitignored); his rule is unchanged: put away 600 s after the last ask.
+    - stop() removed the state record even after another process's start() had written a new one. Now only while it names the pid stopped.
+    - llama-server was handed the keeper log's handle and overwrote lines at a stale offset. It now writes `logs/model_server.runtime.log`.
+    - That is why A341b's docstring said "no stop line in the log explains it; several processes run idle watchers, and which one dropped the record is UNDETERMINED", and A276's said "after the one-slot server vanished with no stop line". Both stop lines existed, headless. Restated.
+    - MK1 PASSED; A265 11/11; A269 4/4; A282 3/3.
+  - **A348c, the records of his forum decisions (findings 27, 30, 32, 47, 49).**
+    - emit() returned his reading only on the refusal path. Since 10-07, `ops/ambassador_sends.jsonl` holds 0 reply rows with tetsu SEND against 114 SEND readings in `ops/tetsu_assist.jsonl`; its 1628 rows since then carry 917 SKIP, 669 none, 36 REFUSE and 6 NONE. Now every return carries his word and his seat's.
+    - The road counted SKIP, which is returned before he is asked, as a review: `if r.get("tetsu"):                       # kept on each reply since A296; rows before it carry none`. Now only SEND, REFUSE, PAUSE and NONE count.
+    - An unreadable comment count became a zero baseline. Now it is None, and the round skips it.
+    - mail_flush now sends by EMAIL only, the channel A342 decided marks a letter sent. With push set up and email not, it had re-pushed the oldest letter on every TELL. Letters no longer also go to the push topic.
+    - What he decides, and what is sent, is unchanged. FW1 PASSED; TA1 39/39; H1 228/228.
+  - **A348g, small items (findings 8, 21, 22, 52, 53).**
+    - `ops/tetsu_register_retired.jsonl` (his and the operator's words) was neither tracked nor ignored; now ignored like its siblings.
+    - A same-host crawl followed a redirect to another host. Now refused and named.
+    - A heal that could not run said "(Recorded under your name ...)" with nothing recorded. Now it says nothing was recorded, and why.
+    - Code consensus labelled a held synthesis "judged clean". Its docstring said "the gate judges that synthesis, and a hold returns the digest instead", but a hold passes (A223). Now labelled "passed unjudged".
+    - Two highway docstrings said "No remedy, and none will be added here" (tetsu_cannot_answer, answered by trim_idle_apps since A287) and "What is NOT here, on purpose: no remedy -- turning protection on, updating signatures or starting a scan ..." (defense_lapse, answered by refresh_defender since e2bb49b). Restated.
+    - TC1 28/28; HL1+HL2 33/33; CC1 PASSED; H1 228/228; TP1 PASSED.
+  - **Rule 10.** The replaced lines are on the same branch, and tombstoned as `A348a-DAILY-READINGS`, `A348b-KEEPER-STOP-UNEXPLAINED`, `A348c-REVIEW-RECORD-SINCE-A296` and `A348g-NO-REMEDY-AND-HOLD-DIGEST`. R1 183/183; with a probe, 179/183 (each new `.C` red); with the probe retired (`.trash/_r1_probe_tmp.py.A348-probe2-2026-10-14`), 183/183.
 
 ---
 

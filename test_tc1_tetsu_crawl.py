@@ -137,6 +137,16 @@ def main():
         out, _r = C.crawl("https://alias.test/", 3, read=mkread(site3, log))
         check("TC1.15 after a redirect the crawl stays on the FINAL host and resolves links against it",
               log == ["https://alias.test/", "https://real.test/n1"] and out[0]["url"] == "https://real.test/", log)
+        # A348g: a redirect MID-crawl to another host is refused, not read, and its links are not followed
+        site4 = {"https://a.test/": (page(["/go", "/b"], "root"), None),
+                 "https://a.test/go": (page(["https://a.test/c"], "OFF HOST TEXT"), "https://other.test/landing"),
+                 "https://a.test/b": (page([], "page b"), None), "https://a.test/c": (page([], "page c"), None)}
+        log = []
+        out, refused = C.crawl("https://a.test/", 5, read=mkread(site4, log))
+        check("TC1.15b a same-host link that redirects to another host is named refused (off host), never read or followed",
+              [o["url"] for o in out] == ["https://a.test/", "https://a.test/b"] and not any("OFF HOST" in o["text"] for o in out)
+              and len(refused) == 1 and refused[0]["url"] == "https://a.test/go" and "off host" in refused[0]["reason"]
+              and "https://a.test/c" not in log, (out, refused, log))
 
         # --- bounds
         big = {"https://big.test/": (page(["/%d" % i for i in range(1, 12)], "x" * 9000), None)}

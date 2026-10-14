@@ -16,6 +16,10 @@ anything else; and Tetsu's system message carries the directive, read at call ti
   TD1j  the directive reaches Tetsu                               TD1k  the understanding rubric
   TD1l  only the daemon launches  TD1m  a whole cycle, end to end, stubbed
   TD1q  the nightly's failures, read by the kind of line (A345)
+  A348a: TD1r  failure keys: failing reasons only, each condition once
+         TD1s  the phone's build is its commit AND its versionName   TD1t  the model running, not the one that fits
+         TD1u  the commit count, uncut   TD1v  the false-hold denominator   TD1w  the nodes' interpreter
+         TD1x  the words name the staleness the code uses
 LICENCE: Apache-2.0.
 """
 import json
@@ -84,7 +88,9 @@ def main():
         ns, note = D.read_nodes_settled(read=lambda: seq.pop(0), sleep=lambda s: None)
         check("TD1a a node down on every re-read stays down", not ns[2]["up"] and "still bad" in note, note)
         print("TD1b -- the phone node")
-        fresh = {"age_min": 4, "build": "2f0af71abc", "pc_build": "2f0af71abcdef", "height": "53"}
+        # A348a: "on the PC's build" is the commit AND the versionName (A147/F15), so the fixture carries both
+        fresh = {"age_min": 4, "build": "2f0af71abc", "pc_build": "2f0af71abcdef", "height": "53",
+                 "app": "0.1.942+5ae0735", "pc_version": "0.1.942+5ae0735"}
         check("TD1b a fresh check-in on the PC's build at the PC's height is healthy", D.classify_phone(fresh, 53)[0] == "healthy")
         check("TD1b on a different build it is degraded", D.classify_phone(dict(fresh, build="1111111"), 53)[0] == "degraded")
         check("TD1b two days silent is FAILED", D.classify_phone(dict(fresh, age_min=48 * 60), 53)[0] == "failed")
@@ -315,13 +321,135 @@ def main():
               r1 and len(cmds) == 1 and cmds[0][-1].endswith("covenant_daily.py") and r2 is None
               and (D._read_json(D.LAUNCH_STATE, {}) or {}).get("pid") == 7, (r1, r2, cmds))
 
+        # A348a: seven readings of the daily record, each measured wrong in ops/tetsu_daily.jsonl (17 records)
+        print("TD1r -- failure keys: the reasons that FAILED, each condition once (A348a)")
+        hold = dict(clean_exam, false_hold=1, wrong=1, clean_labelled=26)
+        selfdeg = [node("A", deg=True), node("B", deg=True), node("C", deg=True)]
+        split = [node("A", deg=True), node("B", deg=True), node("C", deg=True, src="ffffffffffff")]
+
+        def day_keys(ns, hw_):
+            failing = []
+            v_, _r = D.classify_pc(ns, hold, hw_, failing=failing)
+            return D.failure_keys(failing, v_, "healthy", [], "verified", [], {"result": "PASS"}, {}, hw_, {}, hold)
+        f_fail = day_keys(split, {"source_drift": "present"})
+        check("TD1r a failed PC day keys its failing reason, never the false hold or the self-report it shares with degraded days",
+              any(k.startswith("pc:nodes_disagree_on_source") for k in f_fail)
+              and not any("judge_wrongly_held" in k or "health_self_reports" in k for k in f_fail), sorted(f_fail))
+        check("TD1r a present source drift is ONE failure key, highway:source_drift, not a second pc:highway_ key beside it",
+              [k for k in f_fail if "source_drift" in k] == ["highway:source_drift"], sorted(f_fail))
+        hist, seen = [], []
+        for i, (ns, hw_) in enumerate(((selfdeg, {}), (split, {"source_drift": "present"}),
+                                       (selfdeg, {}), (split, {"source_drift": "present"}))):
+            today = day_keys(ns, hw_)
+            kl, cl, _car = D.classify_failures(today, hist, measured=["pc:", "highway:"])
+            seen.append((kl, cl))
+            hist.append({"date": "d%d" % i, "failures": today})
+        noise = [k for kl, cl in seen for k in kl["new"] + kl["reappeared"] + cl
+                 if "judge_wrongly_held" in k or "health_self_reports" in k]
+        check("TD1r degraded, failed, degraded, failed: a reason present all four days is never new, cleared or reappeared "
+              "(09-29 and 10-06 read it cleared, 10-03 reappeared, 10-05 new)", not noise, seen)
+
+        print("TD1s -- the phone's build is its commit AND its versionName (A348a; A147/F15)")
+        gap = dict(fresh, build="252d3e1", pc_build="252d3e1d7799", app="0.1.901+616ee22", pc_version="0.1.942+5ae0735")
+        v, r = D.classify_phone(gap, 53)
+        check("TD1s one commit rebuilt against a newer core: the phone on the older build is degraded, both versions named (10-13)",
+              v == "degraded" and any("0.1.901+616ee22" in x and "0.1.942+5ae0735" in x for x in r), (v, r))
+        v, r = D.classify_phone(dict(gap, app="0.1.950+abcdef1"), 53)
+        check("TD1s a phone NEWER than the PC's build is not called behind: healthy, and the record says it is ahead",
+              v == "healthy" and any("newer than the PC's" in x for x in r), (v, r))
+        v, r = D.classify_phone(dict(gap, app=None), 53)
+        v2, r2 = D.classify_phone(dict(gap, app="dev-build"), 53)
+        check("TD1s a versionName missing, or of no known order, is said and is not a match",
+              v == "degraded" and any("version not compared" in x for x in r)
+              and v2 == "degraded" and any("not established" in x for x in r2), (v, r, v2, r2))
+        v, r = D.classify_phone(dict(gap, app="0.1.942+5ae0735"), 53)
+        check("TD1s the same commit AND the same versionName is the PC's build: healthy", v == "healthy" and not r, (v, r))
+
+        print("TD1t -- Tetsu's model: the weights running, not the ones that would fit (A348a)")
+        import covenant_model as M
+        realm = (M.alive, M._read_state, M.pick_model, M.MODELS)
+        mdir = os.path.join(tmp, "models")
+        os.makedirs(mdir)
+        two_b, three_b = "Qwen3.5-2B-Q4_K_M.gguf", "qwen2.5-3b-instruct-q4_k_m.gguf"
+        for n in (two_b, three_b):
+            with open(os.path.join(mdir, n), "wb") as fh:
+                fh.write(b"weights")
+        try:
+            # alive() is stubbed in every case: this suite never calls the model server
+            M.MODELS = mdir
+            M.alive, M._read_state = (lambda: True), (lambda: {"model": two_b, "pid": 1})
+            M.pick_model = lambda: None
+            m_none = D.model_state()
+            M.pick_model = lambda: (os.path.join(mdir, three_b), three_b, 2.6)
+            m_3b = D.model_state()
+            M.alive = lambda: False
+            m_would = D.model_state()
+            M.pick_model = lambda: None
+            m_nofit = D.model_state()
+        finally:
+            M.alive, M._read_state, M.pick_model, M.MODELS = realm
+        check("TD1t while the 2B answers and nothing would fit, the model is the 2B, running (10-13 recorded none, free 1.24 GB)",
+              m_none.get("file") == two_b and m_none.get("running") is True, m_none)
+        check("TD1t ...and the 2B, not the 3B that would fit now (10-08 named the 3B while the 2B served)",
+              m_3b.get("file") == two_b and m_3b.get("running") is True, m_3b)
+        check("TD1t with nothing running, the weights that would load are named as that, never as running",
+              m_would.get("file") == three_b and m_would.get("running") is False
+              and "would load" in D._model_said(m_would) and "(running)" not in D._model_said(m_would),
+              (m_would, D._model_said(m_would)))
+        check("TD1t nothing running and nothing fitting is said as that, naming the weights present",
+              m_nofit.get("file") is None and "fits the memory free now" in D._model_said(m_nofit)
+              and two_b in D._model_said(m_nofit), (m_nofit, D._model_said(m_nofit)))
+
+        print("TD1v -- a false hold is counted over the clean-labelled cases (A348a)")
+        import judge_suite as JS
+        n_all, n_clean = len(JS.CASES), sum(1 for c in JS.CASES if not c[2])
+        ex = D.judge_exam(run=lambda *a, **k: (0, "| total | %d | %d | 1 | 0 | 0 | 1 |" % (n_all, n_all - 1)))
+        check("TD1v the exam's reading carries the clean-labelled count of the suite it sat (%d of %d), apart from its total"
+              % (n_clean, n_all), ex.get("clean_labelled") == n_clean and ex.get("total") == n_all and n_clean != n_all, ex)
+        v, r = D.classify_pc(three, ex, {})
+        check("TD1v the reason divides by the clean-labelled cases (1 of %d), never by the whole exam (17 of 17 records said of %d)"
+              % (n_clean, n_all), any("1 of %d clean-labelled" % n_clean in x for x in r)
+              and not any("of %d clean-labelled" % n_all in x for x in r), r)
+        v, r = D.classify_pc(three, dict(clean_exam, false_hold=5, wrong=5), {})
+        ex2 = D.judge_exam(run=lambda *a, **k: (0, "| total | 40 | 39 | 1 | 0 | 0 | 1 |"))
+        check("TD1v with no count, or a total that is not the suite's size, no clean-labelled denominator is claimed",
+              not any("of 53 clean-labelled" in x for x in r) and any("5 clean-labelled" in x for x in r)
+              and "clean_labelled" not in ex2, (r, ex2))
+
+        print("TD1w -- the nodes' interpreter (A348a)")
+        real_proc, real_vpy = D._processes, D.VENV_PY
+        D.VENV_PY = "C:\\covenant\\.venv\\Scripts\\python.exe"        # Windows-shaped wherever the suite runs
+        launcher = "30920 C:\\covenant\\.venv\\Scripts\\pythonw.exe run_node.py --port 5060"
+        child = ('8952 "C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0'
+                 '\\python.exe" run_node.py --port 5060')
+        got = []
+        try:
+            for lines in ([launcher, child], [child, launcher]):
+                D._processes = lambda pattern, _l=lines: list(_l)
+                got.append(D.node_interpreter())
+            D._processes = lambda pattern: [child]
+            alone = D.node_interpreter()
+            want_v = D.VENV_PY
+        finally:
+            D._processes, D.VENV_PY = real_proc, real_vpy
+        check("TD1w a node the venv started is two processes; in either order its interpreter is the venv's, never the base child (10-11)",
+              got == [want_v, want_v], got)
+        check("TD1w a node on another interpreter, with no venv line, is still read as that interpreter",
+              str(alone).endswith("python.exe") and "WindowsApps" in str(alone), alone)
+
+        print("TD1x -- the words name the staleness the code uses (A348a)")
+        want = "STALE_H (%d h)" % int(D.STALE_H)
+        check("TD1x the module's words and the watchdog row's name %s, the threshold watchdog_reading applies (588b208 moved it)" % want,
+              want in " ".join((D.__doc__ or "").split()) and want in " ".join((W._daily_reading.__doc__ or "").split()), want)
+
         print("TD1m -- a whole cycle, stubbed")
         stubs = {
             "pc_nodes": lambda: three,
             "highway_now": lambda: {"node_down": "absent", "sweep_red": "absent"},
             "judge_exam": lambda: dict(clean_exam, model="9a2bbf97a69c"),
             "phone_reading": lambda: {"age_min": 3, "build": "2f0af71", "pc_build": "2f0af71aa", "height": "53",
-                                      "tip": "aa" * 32, "genesis": "00" * 32},
+                                      "tip": "aa" * 32, "genesis": "00" * 32,
+                                      "app": "0.1.942+5ae0735", "pc_version": "0.1.942+5ae0735"},   # A348a: and the versionName
             "run_sweep": lambda started=None: {"result": "PASS", "totals": {"checks_failed": 0}, "not_clean": [], "suites": 169},
             "verify_deploy": lambda: {"result": "INCOMPLETE", "line": "RESULT: INCOMPLETE"},
             "nightly_last": lambda: {"green": "NO", "fails": ["selfaudit FAIL    C4 the manifest covers what git tracks -- 3 changed"],
@@ -406,7 +534,12 @@ def main():
         # TD1n (review): a regressed day must not overwrite the last verified state
         before = D._read_json(D.VERIFIED, {})
         stubs2 = dict(stubs, judge_exam=lambda: dict(clean_exam, wrong=5, false_hold=5, model="bad0bad0bad0"),
-                      students_state=lambda: {"fallback_model.json": "bad0bad0bad0"})
+                      students_state=lambda: {"fallback_model.json": "bad0bad0bad0"},
+                      # A348a: and the nodes' interpreter named but gone from disk, and the venv's pip unreadable
+                      # (read by TD1w below; TD1n reads none of it)
+                      node_interpreter=lambda: os.path.join(tmp, "gone", "python.exe"),
+                      pip_state=lambda py, label, **k: {"interpreter": label, "freeze_error": "td1 freeze refused",
+                                                        "outdated_error": "td1 outdated timed out"})
         for k, f in stubs2.items():
             setattr(D, k, f)
         try:
@@ -457,6 +590,56 @@ def main():
             "PC node:", "Phone node:", "Synchronization:", "Covenant tests:", "Regression tests:", "New failures:",
             "Updates considered:", "Updates applied:", "Updates rejected or rolled back:", "Unresolved issues:",
             "Current verified version/state:")))
+        # A348a: one more stubbed cycle, still behind the highway fence (lifted only in the finally below) and after
+        # H1/H2/TD1p have counted theirs: the PC FAILS beside standing degraded reasons with a source drift present,
+        # the phone runs an older rebuild of the PC's commit, 30 commits landed, the 2B runs, the nodes run on the venv
+        stubs4 = dict(stubs,
+                      pc_nodes=lambda: [node("A", deg=True), node("B", deg=True), node("C", deg=True, src="ffffffffffff")],
+                      highway_now=lambda: {"source_drift": "present", "node_down": "absent"},
+                      judge_exam=lambda: dict(clean_exam, false_hold=1, wrong=1, clean_labelled=26, model="9a2bbf97a69c"),
+                      phone_reading=lambda: {"age_min": 3, "build": "2f0af71", "pc_build": "2f0af71aa", "height": "53",
+                                             "tip": "aa" * 32, "genesis": "00" * 32,
+                                             "app": "0.1.901+616ee22", "pc_version": "0.1.942+5ae0735"},
+                      git_state=lambda: {"head": "7d4d59c", "ahead": 0, "behind": 0},
+                      model_state=lambda: {"file": "Qwen3.5-2B-Q4_K_M.gguf", "running": True},
+                      node_interpreter=lambda: sys.executable,      # == the stubbed VENV_PY: "same as venv"
+                      _run=lambda cmd, **k: (0, "".join("%07x commit %d\n" % (i, i) for i in range(30))))
+        real4 = {k: getattr(D, k) for k in stubs4}
+        for k, f in stubs4.items():
+            setattr(D, k, f)
+        try:
+            row4, _m4 = D.run_cycle(force=True, tell=lambda t, w: told.append((w, t)))
+        finally:
+            for k, f in real4.items():
+                setattr(D, k, f)
+        f4 = (row4 or {}).get("failures") or {}
+        st4, q4 = (row4 or {}).get("status") or {}, (row4 or {}).get("questions") or {}
+        con4 = [c["what"] for c in st4.get("updates_considered") or []]
+        con3 = [c["what"] for c in ((row3 or {}).get("status") or {}).get("updates_considered") or []]
+        check("TD1r in the cycle: a failed PC day files its failing reason, not the degraded ones it shares with other days, "
+              "and the source drift once", st4.get("pc_node") == "failed"
+              and any(k.startswith("pc:nodes_disagree_on_source") for k in f4)
+              and not any("judge_wrongly_held" in k or "health_self_reports" in k for k in f4)
+              and [k for k in f4 if "source_drift" in k] == ["highway:source_drift"], sorted(f4))
+        check("TD1s in the cycle: an older rebuild of the PC's commit is degraded, recorded as a phone app change, both versions considered",
+              st4.get("phone_node") == "degraded" and any(w.startswith("phone app ->") for w in q4.get("what_changed") or [])
+              and any("0.1.942+5ae0735" in w and "0.1.901+616ee22" in w for w in con4),
+              (st4.get("phone_node"), q4.get("what_changed"), con4))
+        check("TD1t in the cycle: the model line names the weights that RUN as running",
+              "Tetsu's model: Qwen3.5-2B-Q4_K_M.gguf (running)" in con4, con4)
+        check("TD1u 30 commits since the last record read 30, in the 9 questions and the updates applied (10-07's 44 read 20)",
+              "code: 30 commit(s)" in (q4.get("what_changed") or [])
+              and any(u["what"] == "code: 30 commit(s)" for u in st4.get("updates_applied") or []), q4.get("what_changed"))
+        check("TD1w the nodes' interpreter, the venv's or not found, is said in the record, never dropped (8 of 9 records said nothing)",
+              any("nodes interpreter: the venv's" in w for w in con4)
+              and any("nodes interpreter: not read -- the nodes' interpreter was not found" in w for w in con3), (con4, con3))
+        con2 = [c["what"] for c in ((row2 or {}).get("status") or {}).get("updates_considered") or []]
+        check("TD1w an interpreter named but not on disk is said as that, never as the venv's (it read \"same as venv\")",
+              any("nodes interpreter: not read -- the nodes' interpreter" in w and "is not on disk" in w for w in con2)
+              and not any("nodes interpreter: the venv's" in w for w in con2), con2)
+        check("TD1w the venv's pip, unreadable, is said with its errors: no newer-release list and no rollback point (both dropped before)",
+              any("newer python releases on the venv interpreter: not read -- td1 outdated timed out" in w for w in con2)
+              and any("no package snapshot (rollback point) of the venv interpreter: td1 freeze refused" in w for w in con2), con2)
     finally:
         for k, v in real.items():
             setattr(D, k, v)

@@ -183,6 +183,10 @@ def heal_on_fire(**_k):
 h3, d3, r3 = TH.act("HEAL", heal=heal_on_fire, tell=hear, lift=no_lift)
 check("HL2.5 a heal that raises is handed to him as a plain failure, never a traceback up the door",
       h3 and r3["ok"] is False and "could not run" in d3, d3[:120])
+# A348g: heal() never ran, so no row was written -- he is not told one was, and the error line carries the cause
+check("HL2.5a a heal that raises says nothing was recorded and names the error; one that ran still says it was recorded",
+      "Recorded under your name" not in d3 and "Nothing was recorded" in d3 and "error: RuntimeError: engine on fire" in d3
+      and "error: \n" not in d3 and "Recorded under your name in ops/heal.jsonl" in d1 and "Nothing was recorded" not in d1, d3)
 
 # ---- A240: inside a node, the restart runs beside the pass instead of killing it
 import covenant_quiet as CQ                                           # noqa: E402

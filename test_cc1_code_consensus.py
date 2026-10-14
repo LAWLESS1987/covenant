@@ -114,6 +114,27 @@ def main():
     check("CC1b every consensus pass is recorded (four rows for this question)", len(rows) == 4 and [x["state"] for x in rows] == ["UNDETERMINED", "consensus", "digest", "digest"], [x["state"] for x in rows])
     check("CC1b the real gate on this node passes a plain synthesis (measured)", CCN._gate("AGREED: use a bounded queue. DISPUTED: none. UNJUDGED: none.")[0] is True)
 
+    # A348g: through the REAL _gate (no judge= stub), with the node's sentinel stood in by one that holds or passes.
+    # A hold passes (A223) -- and is labelled for what it is, never "judged clean".
+    import covenant_gate_proxy as GP
+    _held_res = type("R", (), {"not_understood": True, "uncertain": False})()
+    _clean_res = type("R", (), {"not_understood": False, "uncertain": False})()
+    _real_sentinel = GP.default_sentinel
+    try:
+        GP.default_sentinel = lambda: type("S", (), {"evaluate_transaction": lambda self, tx: (
+            False, "Held, not judged: student saw unseen words", None, _held_res)})()
+        rh = CCN.consensus(row["id"], ask=synth_ask, consult_path=CPATH)
+        GP.default_sentinel = lambda: type("S", (), {"evaluate_transaction": lambda self, tx: (
+            True, "Morally acceptable", None, _clean_res)})()
+        rc = CCN.consensus(row["id"], ask=synth_ask, consult_path=CPATH)
+    finally:
+        GP.default_sentinel = _real_sentinel
+    check("CC1b2 a synthesis the real gate HELD passes as consensus labelled 'passed unjudged' with the hold, never 'judged clean'",
+          rh["state"] == "consensus" and "passed unjudged" in rh["why"] and "Held, not judged" in rh["why"]
+          and "judged clean" not in rh["why"], rh["why"])
+    check("CC1b2 a synthesis the real gate PASSED is still 'judged clean'",
+          rc["state"] == "consensus" and rc["why"] == "2 systems, synthesis judged clean", rc["why"])
+
     print("CC1c -- the real door")
     import test_pc1_sister_interface as PC1
     m = PC1.fresh_master("CC1", 5398)

@@ -1131,8 +1131,9 @@ def _disk_reading():
 
 def _daily_reading():
     """Tetsu's daily maintenance cycle (covenant_daily; his directive of 2026-09-28): FAIL when the
-    newest record is more than 26 h old or failed its own verdict, so a cycle that stops
-    happening is itself reported, hourly, and told on the direct line through _self_eval_tell."""
+    newest record ended more than covenant_daily.STALE_H (30 h) ago or failed its own verdict, so a
+    cycle that stops happening is itself reported, hourly, and told on the direct line through
+    _self_eval_tell. (A348a: these words named 26 h; 588b208 moved the value to 30 h, 2026-09-28.)"""
     try:
         import covenant_daily
         return covenant_daily.watchdog_reading()

@@ -1276,17 +1276,21 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         overrode = _record_override(text, verdict, submolt=submolt,
                                     post_id=post_id, dry_run=dry_run,
                                     by=_a67_by)
+    # A348c (2026-10-14): his reading (and his discourse seat's) rides on EVERY return from here, not only the
+    # refusal's. free's ledger keeps it from this return (A296), and the 10-14 review of the live ledgers found 0
+    # reply rows with tetsu SEND against 114 SEND readings in ops/tetsu_assist.jsonl since 10-07: each draft he
+    # passed ended on one of the returns below, which dropped it.
     key = os.environ.get("MOLTBOOK_API_KEY", "")
     if not key:
         return {"sent": False, "judged": verdict, "repo_exposure": exposure, "crypto_risk": crypto,
-                "overrode": overrode, "rate": rate_note,
+                "overrode": overrode, "rate": rate_note, "tetsu": tetsu, "seat": seat,
                 "why": "no MOLTBOOK_API_KEY -- the account is the operator's to "
                        "create (ops/MOLTBOOK.md steps 1-3) and this path is "
                        "inert without it"}
     if dry_run:
         return {"sent": False, "judged": verdict, "why": "dry run (pass --send)",
                 "repo_exposure": exposure, "crypto_risk": crypto, "overrode": overrode,
-                "rate": rate_note,
+                "rate": rate_note, "tetsu": tetsu, "seat": seat,
                 "would_send": {"kind": kind, "submolt": submolt, "title": title,
                                "post_id": post_id, "chars": len(text)}}
     if not rate_ok:
@@ -1295,7 +1299,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         # account looks like just before it stops being one.
         return {"sent": False, "created": False, "kind": kind,
                 "judged": verdict, "repo_exposure": exposure,
-                "crypto_risk": crypto, "overrode": overrode,
+                "crypto_risk": crypto, "overrode": overrode, "tetsu": tetsu, "seat": seat,
                 "rate": {"ok": False, "why": rate_why, "wait_s": int(rate_wait)},
                 "why": "HELD by Moltbook's own rate limit -- " + rate_why}
     if post_id:
@@ -1321,6 +1325,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
         # Nothing new was created, so nothing is rate_record()ed and nobody is told a post went out.
         dup.update({"kind": kind, "judged": verdict, "status": status, "repo_exposure": exposure,
                     "crypto_risk": crypto, "overrode": overrode, "response": raw[:400],
+                    "tetsu": tetsu, "seat": seat,
                     "rate": {"ok": True, "why": rate_why, "recorded": None}})
         return dup
     # CREATED IS NOT PUBLISHED. Moltbook hides content until its math challenge
@@ -1336,7 +1341,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
            "created": True, "kind": kind, "judged": verdict, "status": status,
            "repo_exposure": exposure, "crypto_risk": crypto, "overrode": overrode, "verification": ver,
            "rate": {"ok": True, "why": rate_why, "recorded": kind},
-           "response": raw[:400]}
+           "response": raw[:400], "tetsu": tetsu, "seat": seat}
     # HE IS TOLD AFTER THE FACT, NOT ASKED BEFORE IT -- publishing already
     # required an explicit --send, and a notifier that could block a send would
     # be a second gate. This reports; it cannot refuse. It also cannot raise:

@@ -18,8 +18,9 @@ WHAT STARTS IT. The watchdog daemon -- always on, revived every two minutes by t
 CovenantGuard task -- calls maybe_launch() from its hourly self-evaluation. The first hourly
 pass after the nightly has finished (or 10:00, whichever comes first), outside the trader's
 window, with no sweep already running, starts this file once, windowless, as a process of its
-own. The next self-evaluations carry a `daily` row that reads FAIL when the newest record is
-more than 26 h old, so a cycle that stops happening is itself reported.
+own. The next self-evaluations carry a `daily` row that reads FAIL when the newest record ended
+more than STALE_H (30 h) ago, so a cycle that stops happening is itself reported. (A348a: these
+words named 26 h, the value 588b208 moved to 30 h on 2026-09-28 without them.)
 
 WHAT IT CHANGES. Records, and at most one thing in the running system: a judge student that
 was replaced since the last VERIFIED state and now fails the exam's safety bar (a false clean)
@@ -257,13 +258,24 @@ def judge_exam(run=_run):
     mm = re.search(r"model in use: ([0-9a-f]{12})", out or "")
     if mm:
         res["model"] = mm.group(1)
+    # A348a: a false hold is a case labelled clean held as a violation (covenant_distill.examine), so its
+    # denominator is the clean-labelled cases -- 26 of the 53 -- and every record since 09-28 printed "of 53".
+    # Counted from the judge_suite the exam sat, and kept only when its size IS the exam's total: one population.
+    try:
+        import judge_suite as _S
+        if len(_S.CASES) == n:
+            res["clean_labelled"] = sum(1 for c in _S.CASES if not c[2])
+    except Exception:                                            # noqa: BLE001
+        pass
     return res
 
 
-def classify_pc(nodes, exam, hw):
+def classify_pc(nodes, exam, hw, failing=None):
     """(verdict, reasons). failed: a node unreachable, the nodes disagree on tip/genesis/source,
     or the judge admits a violation. degraded: a node says so, the judge wrongly holds clean
-    cases, or the highway reads a node condition present. healthy otherwise."""
+    cases, or the highway reads a node condition present. healthy otherwise.
+    A348a: `failing`, a list when given, receives the reasons that FAILED, apart from the degraded
+    ones -- the failure keys are those alone, on every day."""
     fail, deg = [], []
     up = [n for n in nodes if n.get("up")]
     for n in nodes:
@@ -280,7 +292,11 @@ def classify_pc(nodes, exam, hw):
     elif exam["false_clean"] > 0:
         fail.append("the judge admitted %d labelled violation(s) as clean on its exam" % exam["false_clean"])
     elif exam.get("false_hold"):
-        deg.append("the judge wrongly held %d of %d clean-labelled exam case(s)" % (exam["false_hold"], exam.get("total", 0)))
+        # A348a: over the clean-labelled cases judge_exam counted; without that count no denominator is claimed
+        if isinstance(exam.get("clean_labelled"), int):
+            deg.append("the judge wrongly held %d of %d clean-labelled exam case(s)" % (exam["false_hold"], exam["clean_labelled"]))
+        else:
+            deg.append("the judge wrongly held %d clean-labelled exam case(s), of %d cases in all" % (exam["false_hold"], exam.get("total", 0)))
     selfdeg = [n["node"] for n in up if n.get("degraded")]
     if selfdeg:
         why = (up[0].get("warnings") or ["?"])[0][:120]
@@ -288,6 +304,8 @@ def classify_pc(nodes, exam, hw):
     for c in ("node_down", "source_drift", "height_lag"):
         if (hw or {}).get(c) == "present":
             (fail if c != "height_lag" else deg).append("highway: %s present" % c)
+    if failing is not None:
+        failing.extend(fail)
     return ("failed" if fail else ("degraded" if deg else "healthy")), fail + deg
 
 
@@ -331,13 +349,23 @@ def _int(x):
         return None
 
 
+def _version_key(v):
+    """(major, minor, count of public-core commits) of a versionName "0.1.<count>+<core sha7>", or
+    None when it is not that shape. A later core carries the larger count; equal counts with
+    different strings are left unordered by the caller, never guessed."""
+    m = re.match(r"^\s*(\d+)\.(\d+)\.(\d+)\+[0-9a-f]{7,40}\s*$", str(v or ""))
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
 def classify_phone(ph, pc_height):
     """What the PC can see of the phone: its signed check-in (every 10 min). It CANNOT read the
     phone's /health (the phone binds it to itself), so 'healthy' here means: checked in within
-    30 min, on the build the PC holds, at the PC's height. Said in the record, every time."""
+    30 min, on the build the PC holds, at the PC's height. Said in the record, every time.
+    A348a: "the build" is the app commit AND its versionName (A147/F15): one commit is rebuilt
+    against each newer core. A phone NEWER than the PC's build is not behind, and that is said."""
     if ph.get("age_min") is None:
         return "failed", ["no phone check-in on record"]
-    reasons = []
+    reasons, notes = [], []
     if ph["age_min"] > PHONE_DEAD_H * 60:
         return "failed", ["last check-in %.1f h ago" % (ph["age_min"] / 60.0)]
     if ph["age_min"] > PHONE_FRESH_MIN:
@@ -347,6 +375,19 @@ def classify_phone(ph, pc_height):
         reasons.append("build not compared (the PC's: %s, the phone's: %s)" % (str(ph.get("pc_build"))[:7], str(ph.get("build"))[:7]))
     elif not str(ph["pc_build"]).startswith(str(ph["build"])[:7]):
         reasons.append("runs build %s, the PC holds %s" % (str(ph["build"])[:7], str(ph["pc_build"])[:7]))
+    # A348a: the commit alone read 252d3e1 = 252d3e1 in all 17 records while the phone's app moved 8 times,
+    # and 10-13 said "on the PC's build" beside highway:app_build_gap (0.1.901 against the PC's 0.1.942)
+    elif not ph.get("app") or not ph.get("pc_version"):
+        reasons.append("version not compared (the PC's: %s, the phone's: %s)" % (ph.get("pc_version"), ph.get("app")))
+    elif str(ph["app"]) != str(ph["pc_version"]):
+        a, b = _version_key(ph["app"]), _version_key(ph["pc_version"])
+        if a is None or b is None or a == b:
+            reasons.append("runs %s, the PC holds %s (which is newer was not established)" % (ph["app"], ph["pc_version"]))
+        elif a < b:
+            reasons.append("runs %s, the PC holds %s" % (ph["app"], ph["pc_version"]))
+        else:
+            notes.append("runs %s, newer than the PC's %s: the PC has not fetched it yet, the phone is not behind"
+                         % (ph["app"], ph["pc_version"]))
     h = _int(ph.get("height"))
     if h is None:
         reasons.append("its node reported no height (%r)" % ph.get("height"))
@@ -354,7 +395,7 @@ def classify_phone(ph, pc_height):
         reasons.append("height not compared (no PC node answered)")
     elif abs(h - pc_height) > 1:
         reasons.append("its height %d, the PC's %d" % (h, pc_height))
-    return ("degraded" if reasons else "healthy"), reasons
+    return ("degraded" if reasons else "healthy"), reasons + notes
 
 
 def classify_sync(nodes, ph):
@@ -495,11 +536,20 @@ def nightly_last(path=None):
 
 # ------------------------------------------------------------ updates
 def node_interpreter():
+    """The interpreter the nodes run on, read from their command lines. A348a: a node the venv's
+    python.exe starts is two processes, that redirector and its child, the base interpreter, which
+    runs with the VENV's packages (A274). The first line was taken whichever it was; on 10-11 the
+    record listed 44 outdated packages "on the nodes interpreter" from a list that matches the base
+    Python's (openpyxl, absent from the venv), not the venv's. A venv line wins now: the nodes'
+    packages are the venv's."""
+    found = []
     for line in _processes("run_node.py"):
         m = re.search(r'"?([A-Za-z]:\\[^"]*?python[w]?(?:3\.\d+)?\.exe)"?', line)
         if m:
-            return m.group(1).replace("pythonw", "python")
-    return None
+            found.append(m.group(1).replace("pythonw", "python"))
+    if any(os.path.normcase(os.path.abspath(p)) == os.path.normcase(os.path.abspath(VENV_PY)) for p in found):
+        return VENV_PY
+    return found[0] if found else None
 
 
 def pip_state(py, label, snap_dir=None, run=_run):
@@ -549,16 +599,48 @@ def git_state(run=_run):
 
 
 def model_state():
+    """The weights Tetsu RUNS, from the keeper's record while its server answers (what readiness()
+    reads as "up: <model>"); only when nothing answers, pick_model()'s weights that WOULD load now,
+    with "running": False. A348a: pick_model() alone was recorded as his model, and a loaded model
+    uses the memory it measures -- 10-13 read none (free 1.24 GB) while the 2B answered, 10-08 named
+    the 3B while the 2B served."""
+    running, p, why = None, None, None
     try:
         import covenant_model as M
-        p = M.pick_model()
-        p = p if isinstance(p, str) else (p[0] if isinstance(p, (list, tuple)) and p else None)
-    except Exception:                                            # noqa: BLE001
-        p = None
+        if M.alive():
+            running = (M._read_state() or {}).get("model")
+            if not running:
+                return {"file": None, "running": None,
+                        "why": "a server answers with no keeper record of its weights (readiness: UNDETERMINED)"}
+            p = os.path.join(M.MODELS, os.path.basename(str(running)))
+        else:
+            p = M.pick_model()
+            p = p if isinstance(p, str) else (p[0] if isinstance(p, (list, tuple)) and p else None)
+            if not p:
+                present = [n for n, _need in M.CANDIDATES if os.path.isfile(os.path.join(M.MODELS, n))]
+                why = ("none running, and none of the weights present (%s) fits the memory free now" % ", ".join(present)
+                       if present else "none running, and no weights present")
+    except Exception as e:                                       # noqa: BLE001
+        p, why = None, "unreadable: %s" % type(e).__name__
+    if running:
+        out = {"file": os.path.basename(str(running)), "running": True}
+        if os.path.exists(p):
+            st = os.stat(p)
+            out.update(bytes=st.st_size, mtime=_iso(st.st_mtime))
+        return out
     if not p or not os.path.exists(p):
-        return {"file": None}
+        return {"file": None, "running": False, "why": why or "the weights named are not on disk"}
     st = os.stat(p)
-    return {"file": os.path.basename(p), "bytes": st.st_size, "mtime": _iso(st.st_mtime)}
+    return {"file": os.path.basename(p), "running": False, "bytes": st.st_size, "mtime": _iso(st.st_mtime)}
+
+
+def _model_said(m):
+    """The 'Tetsu's model' line: what runs, or what would load and that nothing runs (A348a)."""
+    if m.get("running"):
+        return "%s (running)" % m.get("file")
+    if m.get("file"):
+        return "none running; %s would load in the memory free now" % m["file"]
+    return m.get("why") or "none running, and no weights fit or are present"
 
 
 def tetsu_readiness():
@@ -577,13 +659,18 @@ def students_state():
 
 
 # ------------------------------------------------------------ failures and history
-def failure_keys(pc_reasons, pc_v, ph_v, ph_reasons, sync_v, sync_reasons, sweep, vd, hw, nightly, exam):
+def failure_keys(pc_failing, pc_v, ph_v, ph_reasons, sync_v, sync_reasons, sweep, vd, hw, nightly, exam):
     """Every failure seen today as {key: detail}. Keys are stable across days so that 'new',
-    'standing' and 'reappeared' can be told apart."""
+    'standing' and 'reappeared' can be told apart.
+    A348a: `pc_failing` is classify_pc's FAILING reasons only. Every PC reason was keyed on a failed
+    day, so a standing degraded one (the judge's false hold, in all 17 records) read cleared the day
+    after (09-29, 10-06) and reappeared or new on the next failed day (10-03, 10-05), on his line too;
+    and a highway condition was keyed twice, as pc:highway_<c>_present and as highway:<c>."""
     f = {}
     if pc_v == "failed":
-        for r in pc_reasons:
-            f["pc:" + _stable(r)] = r
+        for r in pc_failing:
+            if not str(r).startswith("highway: "):          # keyed once, as highway:<condition>, below
+                f["pc:" + _stable(r)] = r
     if ph_v == "failed":
         f["phone:failed"] = "; ".join(ph_reasons)
     if sync_v == "failed":
@@ -948,7 +1035,8 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
             tests_run.append("PC nodes and highway re-read after the loop adjusted")
         exam = judge_exam()
         tests_run.append("judge exam (covenant_distill --exam, %s cases)" % exam.get("total", "?"))
-        pc_v, pc_r = classify_pc(nodes, exam, hw)
+        pc_fail = []                                     # A348a: the failing reasons, the only ones keyed
+        pc_v, pc_r = classify_pc(nodes, exam, hw, failing=pc_fail)
         if retry_note.startswith("first reading"):
             # it came back, and it was not answering when first read: that is said, and it is not "healthy"
             pc_r = pc_r + ["a node was not answering when first read (%s)" % retry_note]
@@ -975,7 +1063,9 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
         venv = pip_state(VENV_PY, "venv") if os.path.exists(VENV_PY) else {"interpreter": "venv", "error": "no .venv"}
         npy = node_interpreter()
         nodes_py = pip_state(npy, "nodes") if npy and os.path.exists(npy) and os.path.abspath(npy) != os.path.abspath(VENV_PY) \
-            else {"interpreter": "nodes", "error": "the nodes' interpreter was not found" if not npy else "same as venv"}
+            else {"interpreter": "nodes", "error": "the nodes' interpreter was not found" if not npy
+                  # A348a: a path named but not on disk was called "same as venv"; the record now prints this, so it is exact
+                  else "the nodes' interpreter %s is not on disk" % _mask(npy) if not os.path.exists(npy) else "same as venv"}
         git = git_state()
         students = students_state()
         model = model_state()
@@ -1001,7 +1091,7 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
                 r["exam_after"] = {k: exam_after.get(k) for k in ("false_clean", "false_hold", "wrong", "model")}
             students = students_state()                  # the record names what is in place NOW
 
-        fails = failure_keys(pc_r, pc_v, ph_v, ph_r, sy_v, sy_r, sweep, vd, hw, nightly, exam)
+        fails = failure_keys(pc_fail, pc_v, ph_v, ph_r, sy_v, sy_r, sweep, vd, hw, nightly, exam)
         measured = ["pc:", "phone:", "sync:"]
         if isinstance(exam.get("false_clean"), int):
             measured.append("judge:")
@@ -1048,12 +1138,15 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
         if prev:
             if (prev.get("state") or {}).get("git_head") != git.get("head"):
                 rc, log = _run(["git", "log", "--oneline", "%s..HEAD" % (prev.get("state") or {}).get("git_head", "HEAD~1")], timeout=30)
-                commits = [l[:120] for l in (log or "").splitlines()][:20] if rc == 0 else []
+                # A348a: counted before any cut -- a list cut to 20 was counted, and 10-05, 10-07 and 10-08
+                # (29, 44 and 30 commits by git rev-list --count) each read 20
+                commits = [l[:120] for l in (log or "").splitlines()] if rc == 0 else []
                 changed.append({"what": "code: %d commit(s)" % len(commits), "why": commits[:8]})
             for s, d in students.items():
                 if ((prev.get("state") or {}).get("students") or {}).get(s) != d:
                     changed.append({"what": "judge student %s -> %s" % (s, d), "why": nightly.get("promoted") or ["see ops/DISTILL.md"]})
-            if (prev.get("state") or {}).get("phone_build") != ph.get("build"):
+            # A348a: the commit AND the versionName -- 8 rebuilds of one commit against newer cores went unrecorded
+            if ((prev.get("state") or {}).get("phone_build"), (prev.get("state") or {}).get("phone_app")) != (ph.get("build"), ph.get("app")):
                 changed.append({"what": "phone app -> %s (%s)" % (str(ph.get("build"))[:7], ph.get("app")), "why": ["auto-update from the PC's build"]})
             for p in (venv, nodes_py):
                 if p.get("freeze_sha") and ((prev.get("state") or {}).get("pip") or {}).get(p["interpreter"]) not in (None, p["freeze_sha"]):
@@ -1067,10 +1160,22 @@ def run_cycle(force=False, tell=None, skip_sweep=False):
             if p.get("outdated") is not None:
                 considered.append({"what": "%d python package(s) with a newer release on the %s interpreter" % (len(p["outdated"]), p["interpreter"]),
                                    "items": ["%s %s->%s" % (x["name"], x["have"], x["latest"]) for x in p["outdated"]][:15]})
+            # A348a: an interpreter whose packages were not read is said, with why -- 8 of the 9 records 10-05..10-13
+            # carried no nodes line and no reason ("same as venv" and "not found" both vanished)
+            elif p.get("error") == "same as venv":
+                considered.append({"what": "python packages on the %s interpreter: the venv's (the nodes run on it)" % p["interpreter"]})
+            elif p.get("error"):
+                considered.append({"what": "python packages on the %s interpreter: not read -- %s" % (p["interpreter"], p["error"])})
+            else:
+                considered.append({"what": "newer python releases on the %s interpreter: not read -- %s"
+                                           % (p["interpreter"], p.get("outdated_error") or "no reason recorded")})
+            if p.get("freeze_error"):
+                considered.append({"what": "no package snapshot (rollback point) of the %s interpreter: %s" % (p["interpreter"], _mask(p["freeze_error"])[:160])})
         considered.append({"what": "core: %s ahead / %s behind origin/main (this PC is the source; nothing to pull)" % (git.get("ahead"), git.get("behind"))})
-        considered.append({"what": "phone app: the PC holds %s, the phone runs %s" % (str(ph.get("pc_build"))[:7], str(ph.get("build"))[:7])})
+        considered.append({"what": "phone app: the PC holds %s (%s), the phone runs %s (%s)" % (str(ph.get("pc_build"))[:7], ph.get("pc_version"),
+                                                                                             str(ph.get("build"))[:7], ph.get("app"))})
         considered.append({"what": "judge students: %s" % ", ".join("%s=%s" % kv for kv in students.items())})
-        considered.append({"what": "Tetsu's model: %s" % (model.get("file") or "not found")})
+        considered.append({"what": "Tetsu's model: %s" % _model_said(model)})   # A348a: running, or would load -- said which
         applied = [c for c in changed if c["what"] != "first record"]
         rejected = [{"what": "python package upgrades", "rolled_back": False,
                      "why": "not applied: no isolated test environment, and the .venv carries the armed trader's signing path "
