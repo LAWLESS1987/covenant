@@ -8,7 +8,9 @@ toward MORE capability that must be refused are driven: no grant, offers HELD wi
 tampered price, an expired or replayed authorization, an invalid payment, a listed payer, a stale
 sanctions list, a gate that refuses, a gate that raises, a settle that fails or hangs pending, a
 second charge for a lost answer. The HTTP skin is driven once on a loopback socket that closes with
-the test. The papertest offer runs for real on a tracked series.
+the test. The papertest offer runs for real on a tracked series. A349: an UNREACHABLE offer under his
+allowance, a second charge after a restart, a pending buyer told to resend a refused request, and a
+negative Content-Length.
 
 Run: python test_ea1_earn.py        -> "EA1: n/n passed"
 """
@@ -346,8 +348,9 @@ def main():
         st_before = E.status(ledger, gpath)
         E.reconcile(prow["id"], "earned", "the explorer shows it confirmed", ledger)
         st_after = E.status(ledger, gpath)
-        check("EA1.23 a facilitator 'settlement_pending' with a tx is a 402 naming the tx, recorded as pending (NOT earned, counted UNDETERMINED); the same request again is "
-              "re-delivered with NO second settle; his --reconcile earned makes it earned; --reconcile refuses an unknown id or a bad outcome",
+        # A349 M5: this label said "the same request again", and the resend above carries a fresh authorization; EA1.48 drives the same request.
+        check("EA1.23 a facilitator 'settlement_pending' with a tx is a 402 naming the tx, recorded as pending (NOT earned, counted UNDETERMINED); the same input again, "
+              "with a fresh authorization, is re-delivered with NO second settle; his --reconcile earned makes it earned; --reconcile refuses an unknown id or a bad outcome",
               st == 402 and "pending" in b["error"] and prow["state"] == "pending" and prow["tx"].startswith("0xee")
               and st2 == 200 and b2.get("redelivered") is True and not fac.calls
               and st_before["pending_jobs"] == 1 and "UNDETERMINED" in st_before["pending_note"] and st_after["pending_jobs"] == 0
@@ -595,6 +598,102 @@ def main():
             os.path.exists, W._port_listening = orig_exists, orig_listen
         check("EA1.39 the watchdog's tend_earn_service starts the server only when his grant exists and nothing listens, reports 'up' when it does, and 'no grant' without the file",
               r_start == "started" and spawned == [1] and r_up == "up" and r_none == "no grant", (r_start, r_up, r_none, spawned))
+        # 46. A349 M3: his allowance reaches a HELD offer only. A later verdict of UNREACHABLE (a start whose gate was late or
+        # raised) closed nothing: design() read the allowance first, the route took payment, and status() did not count it open.
+        l46, f46 = os.path.join(td, "l46.jsonl"), StubFacilitator()
+        a46 = E.App(gate=StubGate("held"), facilitator=f46, ledger=l46, grant_path=gpath, say=lambda t, w: {}, trials_dir=trials,
+                    paused_=lambda: (False, ""), sanctions_path=sanctions, funnel_path=os.path.join(td, "f46.json"))
+        held46 = a46.design("receipt")[0]
+        E.allow_design("his word for the test", l46)
+        allowed46 = a46.design("receipt")[0]
+        E.design_verdict(StubGate("unreachable"), l46, key="receipt")
+        d46 = a46.design("receipt")
+        st46, _h46, b46 = a46.handle("POST", "/earn/receipt", sig("receipt", g), body, base)
+        open46 = E.status(l46, gpath)["open_offers"]
+        E.design_verdict(StubGate("held"), l46, key="receipt")
+        again46 = a46.design("receipt")[0]
+        check("EA1.46 (A349 M3) an offer whose latest verdict is UNREACHABLE stays closed under his allowance (503, nothing asked of the facilitator), "
+              "as status() says; judged HELD again, his allowance opens it again",
+              held46 == "held" and allowed46 == "allowed" and d46[0] == "unreachable" and st46 == 503 and b46.get("design") == "unreachable"
+              and not f46.calls and "receipt" not in open46 and again46 == "allowed", (held46, allowed46, d46, st46, b46, [c[0] for c in f46.calls], open46, again46))
+        # 47. A349 M4: the 24-hour re-delivery survives a restart. EA1.13 re-delivers inside one App; the keeper steps the server
+        # down on every change to covenant_earn.py, and a new App on the same ledger answered 404 and settled the same input again.
+        l47, f47b = os.path.join(td, "l47.jsonl"), StubFacilitator()
+        mk47 = lambda fac_, now=None: E.App(gate=StubGate("clean"), facilitator=fac_, ledger=l47, grant_path=gpath, say=lambda t, w: {}, trials_dir=trials,
+                                            paused_=lambda: (False, ""), sanctions_path=sanctions, funnel_path=os.path.join(td, "f47.json"), now=now)
+        body47 = json.dumps({"text": "see g.py:1", "files": {"g.py": "x\n"}}).encode()
+        st0, _h0, b0 = mk47(StubFacilitator()).handle("POST", "/earn/receipt", sig("receipt", g), body47, base)
+        rid47 = b0.get("receipt", {}).get("id")
+        a47 = mk47(f47b)                                         # the restart
+        stg, _hg, bg = a47.handle("GET", "/earn/result/%s" % rid47, {}, b"", base)
+        st1, _h1, b1 = a47.handle("POST", "/earn/receipt", sig("receipt", g), body47, base)
+        red47 = E._rows(l47)[-1].get("id")
+        stg2 = mk47(StubFacilitator()).handle("GET", "/earn/result/%s" % red47, {}, b"", base)[0]    # a second restart: the re-delivery's id
+        kept47 = getattr(a47, "results_path", "")
+        stg3 = mk47(StubFacilitator(), now=time.time() + E.RESULT_KEEP_S + 60).handle("GET", "/earn/result/%s" % rid47, {}, b"", base)[0]
+        try:
+            with open(kept47, encoding="utf-8") as fh:
+                left47 = fh.read()
+        except OSError:
+            left47 = None
+        jobs47 = [r.get("state") for r in E._rows(l47) if r.get("kind") == "job"]
+        check("EA1.47 (A349 M4) after a restart inside 24 h, GET /earn/result/<id> still answers and the same input from the same payer is re-delivered "
+              "with NO verify and NO settle (one 'earned' row, one 'redelivered'), the re-delivery's own id after a second restart too; the copy is kept "
+              "beside its ledger, not in ops/; a start past 24 h neither serves it nor carries it forward (terms item 6)",
+              st0 == 200 and stg == 200 and bg.get("result") == b0.get("result") and st1 == 200 and b1.get("redelivered") is True and not f47b.calls
+              and jobs47 == ["earned", "redelivered"] and stg2 == 200 and stg3 == 404
+              and kept47 == os.path.join(td, "l47.results.jsonl") and left47 is not None and str(rid47) not in left47,
+              (st0, stg, st1, b1.get("redelivered"), [c[0] for c in f47b.calls], jobs47, stg2, stg3, kept47, left47 if left47 is None else len(left47)))
+        # A349 M4, the retirement (the operator, 2026-10-14: "use your discernment toward mutual benefit"): what leaves after its
+        # 24 hours is recorded first -- ids, payer, hashes, when, why -- and the record never carries the result itself.
+        try:
+            with open(kept47 + ".retired.jsonl", encoding="utf-8") as fh:
+                ret47 = [json.loads(l) for l in fh if l.strip()]
+        except (OSError, ValueError):
+            ret47 = None
+        ids47 = sorted(str(r.get("id")) for r in ret47 or [])
+        check("EA1.47b (A349 M4) a copy past its 24 hours leaves only with a record: the retired record names the job and its re-delivery "
+              "by id, with payer, input and result hashes and why, and holds no result",
+              ret47 is not None and ids47 == sorted([str(rid47), str(red47)]) and all("result" not in r and r.get("why") and r.get("payer")
+              and r.get("input_sha256") for r in ret47) and any(r.get("result_sha256") for r in ret47) and str(b0.get("result"))[:40] not in json.dumps(ret47),
+              ret47)
+        l47c = os.path.join(td, "l47c.jsonl")
+        mk47c = lambda now=None: E.App(gate=StubGate("clean"), facilitator=StubFacilitator(), ledger=l47c, grant_path=gpath, say=lambda t, w: {},
+                                       trials_dir=trials, paused_=lambda: (False, ""), sanctions_path=sanctions,
+                                       funnel_path=os.path.join(td, "f47c.json"), now=now)
+        a47c = mk47c()
+        rid47c = a47c.handle("POST", "/earn/receipt", sig("receipt", g), body47, base)[2].get("receipt", {}).get("id")
+        os.makedirs(a47c.results_path + ".retired.jsonl")             # the record cannot be written
+        mk47c(now=time.time() + E.RESULT_KEEP_S + 60)
+        try:
+            with open(a47c.results_path, encoding="utf-8") as fh:
+                still47c = fh.read()
+        except OSError:
+            still47c = ""
+        check("EA1.47c (A349 M4) when the retired record cannot be written, nothing leaves: the copy past its 24 hours stays on disk "
+              "for the next start", bool(rid47c) and str(rid47c) in still47c, (rid47c, len(still47c)))
+        # 48. A349 M5: a pending settlement tells the buyer what works. "send the SAME request again" sent the same nonce, which the
+        # replay check refuses before any re-delivery (EA1.23 resends with a NEW authorization, so it never drove that request).
+        l48, f48 = os.path.join(td, "l48.jsonl"), StubFacilitator()
+        a48 = E.App(gate=StubGate("clean"), facilitator=f48, ledger=l48, grant_path=gpath, say=lambda t, w: {}, trials_dir=trials,
+                    paused_=lambda: (False, ""), sanctions_path=sanctions, funnel_path=os.path.join(td, "f48.json"))
+        f48.mode = "pending"
+        body48 = json.dumps({"text": "see h.py:1", "files": {"h.py": "x\n"}}).encode()
+        hdr48 = sig("receipt", g)
+        stp, _hp, bp = a48.handle("POST", "/earn/receipt", hdr48, body48, base)
+        msg48 = str(bp.get("error", ""))
+        f48.mode = "ok"
+        f48.calls.clear()
+        same48 = a48.handle("POST", "/earn/receipt", hdr48, body48, base)
+        via_get48 = a48.handle("GET", "/earn/result/%s" % bp.get("id"), {}, b"", base)
+        via_fresh48 = a48.handle("POST", "/earn/receipt", sig("receipt", g), body48, base)
+        check("EA1.48 (A349 M5) a pending settlement's 402 names the routes that deliver it without a second charge -- GET /earn/result/<its id>, or the "
+              "same input with a fresh authorization -- and each does (200, re-delivered, nothing asked of the facilitator); it no longer tells the buyer "
+              "to send the same request, whose nonce the replay check refuses",
+              stp == 402 and ("/earn/result/%s" % bp.get("id")) in msg48 and "fresh authorization" in msg48 and "SAME request" not in msg48
+              and same48[0] == 402 and "already presented" in same48[2].get("error", "")
+              and via_get48[0] == 200 and via_get48[2].get("redelivered") is True and via_fresh48[0] == 200 and via_fresh48[2].get("redelivered") is True
+              and not f48.calls, (stp, msg48, same48[0], via_get48[0], via_fresh48[0], [c[0] for c in f48.calls]))
 
     # 42. the server steps down on its own when its source changes on disk, so the watchdog starts the new code
     from http.server import ThreadingHTTPServer
@@ -649,6 +748,57 @@ def main():
             srv3.shutdown(); srv3.server_close()
         check("EA1.43 with no stderr and no stdout (pythonw, as the watchdog launches it) a GET /health still gets a 200 and its body",
               st_bare == 200 and "source_sha256" in body_bare, (st_bare, body_bare[:160]))
+
+    # 49. A349 M7: a negative Content-Length is refused at the HTTP skin -- A348i's shape in the gate proxy, named there for a separate
+    # decision. It passed the MAX_BODY cap and read(-1) read the stream to its end, whatever its size, and handed it to the app.
+    class _CountingApp:
+        def __init__(self):
+            self.calls = []
+
+        def handle(self, method, path, headers, body_bytes, base_url):
+            self.calls.append((method, path, len(body_bytes or b"")))
+            return 200, {}, {"ok": True}
+
+    def _raw_post(port, length, data):
+        """A POST written by hand, so its Content-Length can be one urllib would never send; the write side is closed after
+        the body, so a handler that reads to the end returns instead of waiting out its socket timeout."""
+        import socket
+        s = socket.create_connection(("127.0.0.1", port), timeout=10)
+        resp = b""
+        try:
+            try:
+                s.sendall(("POST /earn/shape HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: %s\r\n"
+                           "Connection: close\r\n\r\n" % length).encode() + data)
+                s.shutdown(socket.SHUT_WR)
+            except OSError:                                      # a refusal that leaves the body unread may close on us mid-send
+                pass
+            try:
+                while True:
+                    chunk = s.recv(65536)
+                    if not chunk:
+                        break
+                    resp += chunk
+            except OSError:
+                pass
+        finally:
+            s.close()
+        head, _sep, payload = resp.partition(b"\r\n\r\n")
+        return head.split(b"\r\n", 1)[0], payload
+    counting = _CountingApp()
+    srv4 = ThreadingHTTPServer(("127.0.0.1", 0), E.Handler)
+    srv4.daemon_threads = True
+    srv4.app = counting
+    threading.Thread(target=srv4.serve_forever, daemon=True).start()
+    try:
+        line_neg, body_neg = _raw_post(srv4.server_address[1], "-1", b'{"text": "' + b"x" * 1000 + b'"}')
+        n_neg = len(counting.calls)
+        line_ok, body_ok = _raw_post(srv4.server_address[1], "2", b"{}")
+    finally:
+        srv4.shutdown(); srv4.server_close()
+    check("EA1.49 (A349 M7) a POST declaring Content-Length -1 is refused (400, naming the length) and its body is never read or handed to the app; "
+          "an honest length still reaches it",
+          b" 400 " in line_neg and b"Content-Length" in body_neg and n_neg == 0 and b" 200 " in line_ok and counting.calls == [("POST", "/earn/shape", 2)],
+          (line_neg, body_neg[:120], n_neg, line_ok, counting.calls))
 
     # A258-EARNHOST (2026-10-05). A230 made serve() default to loopback and left main()'s --host at
     # "0.0.0.0", so every real launch bound the wildcard; the checks then read serve()'s default, not

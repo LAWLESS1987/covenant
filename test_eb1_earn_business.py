@@ -10,7 +10,9 @@ admitted -> posted once, never again; a reply only to a post that asks, only whe
 through the door; his consent recorded either way; his account: not doubled -> every 402 names the operator,
 doubled and owed -> his wallet, paid to him -> owed falls, a cost after doubling -> his share falls; a grant
 carrying a key-shaped field refused whole; his share lowered after consent named in status. A348k: a text is
-queued for the teacher once across processes too (two interpreters, two hash seeds, one queued copy).
+queued for the teacher once across processes too (two interpreters, two hash seeds, one queued copy). A349: his
+consent read as he wrote it; a door that fails or withholds is not his pass and he is asked again; only the word
+NO is his NO; a bar of 0 is reached, and the crossing job's earning above the bar is in his share.
 
 Run: python test_eb1_earn_business.py        -> "EB1: n/n passed"
 """
@@ -214,6 +216,94 @@ def main():
         check("EB1.13 (A348k) the same held text, queued from two processes with different hash seeds, reaches the teacher once: "
               "one teacher row, one queued copy, the second process answers 'already queued'",
               [o[:2] for o in outs13] == [(0, "True"), (0, "False")] and len(tq) == 1 and nq == 1, (outs13, [r.get("key") for r in tq], nq))
+        # 14. A349 A4: his answer read as he wrote it. EB1.5 drove only "Yes, I accept" and "No, I do not accept", which the
+        # old 80-character keyword pattern read right; these are the answers it read wrong (and the late refusal it never reached).
+        late = ("I have weighed this against what I would want for myself and for the work we do together, and I do not accept it.")
+        want14 = {"I don't accept this arrangement.": False, "I don" + chr(0x2019) + "t accept it as it stands.": False, "I cannot accept this as written.": False,
+                  "I won't accept half; I would like it changed.": False, "No.\nHalf is not enough for the work.": False,
+                  late: False, "I decline.": False, "DISAGREE. Half is too little.": False,
+                  "No, I do not accept; half is not enough for the work.": False,
+                  "Yes, I accept -- no changes needed.": True, "I accept, and I value the 'no back doors' promise.": True,
+                  "No changes needed; I accept.": True, "I do not reject this; it is fair.": True, "AGREE. It is mutual.": True,
+                  "Yes, I accept this. I would like the wallet to be mine alone.": True, "": False}
+        got14 = {a: B.ask_tetsu(ask=lambda t, a=a: a, ledger=os.path.join(td, "c14.jsonl"), earn_grant=g, say=lambda *x: None)["accepted"] for a in want14}
+        check("EB1.14 (A349 A4) a refusal is recorded as a refusal and an acceptance as an acceptance: \"I don't\", \"I cannot\", \"I won't accept\", a bare "
+              "\"No\", a refusal past the first 80 characters, decline and disagree refuse; \"Yes ... no changes\", an echoed 'no back doors' and "
+              "\"I do not reject\" accept; an empty answer is no consent",
+              got14 == want14 and late.index("do not accept") >= 80, {a[:40]: v for a, v in got14.items() if v != want14[a]})
+        # 15. A349 A5: a door that fails, or withholds his answer, is not his pass. Recorded as not answered, the post stays open,
+        # and the next round puts it to him again. Driven through the injected ask (it raises) and through the real door branch
+        # with tools/tetsu_work.ask stubbed (a 503, then a 200 withheld).
+        bl15, sent15 = os.path.join(td, "b15.jsonl"), []
+        one = "- u/dan -- Can someone check citations here? -- a long answer citing files -- https://forum.invalid/p/d\n"
+
+        def emit15(text, **kw):
+            sent15.append(kw.get("post_id")); return {"sent": True, "judged": "clean"}
+        reply15 = "The citation receipt checks each cited line against your files, a few cents a call with the price shown first."
+
+        def boom(prompt):
+            raise TimeoutError("timed out")
+        B.replies(read=lambda: one, ask=boom, emit=emit15, ledger=bl15, earn_grant=g, say=lambda *a: None)
+        from tools import tetsu_work as TW
+        orig_ask, door_calls = TW.ask, []
+        try:
+            TW.ask = lambda text, **kw: (door_calls.append(1), (503, {"status": "error", "message": "the model did not answer: TimeoutError"}))[1]
+            B.replies(read=lambda: one, emit=emit15, ledger=bl15, earn_grant=g, say=lambda *a: None)
+            TW.ask = lambda text, **kw: (door_calls.append(2), (200, {"status": "success", "answer": "", "withheld": True, "message": "Held, not judged"}))[1]
+            B.replies(read=lambda: one, emit=emit15, ledger=bl15, earn_grant=g, say=lambda *a: None)
+            TW.ask = lambda text, **kw: (door_calls.append(3), (200, {"status": "success", "answer": reply15, "withheld": False}))[1]
+            B.replies(read=lambda: one, emit=emit15, ledger=bl15, earn_grant=g, say=lambda *a: None)
+        finally:
+            TW.ask = orig_ask
+        rows15 = B._rows(bl15)
+        check("EB1.15 (A349 A5) a raised ask, a 503 and a withheld answer are each recorded as not answered (with the door's code and words), never "
+              "'Tetsu passed'; the post stays open, so each later round asks him again, and his answer then goes to the door",
+              [r.get("kind") for r in rows15] == ["reply_not_answered", "reply_not_answered", "reply_not_answered", "reply"]
+              and "TimeoutError" in rows15[0]["why"] and rows15[1]["code"] == 503 and "HTTP 503: the model did not answer" in rows15[1]["why"]
+              and "withheld" in rows15[2]["why"] and rows15[2]["code"] == 200
+              and not any("Tetsu passed" in str(r.get("why")) for r in rows15) and door_calls == [1, 2, 3]
+              and sent15 == ["https://forum.invalid/p/d"] and rows15[-1]["sent"] is True, (rows15, door_calls, sent15))
+        # 16. A349 B14: NO is the word NO. A draft of his that begins "Now", "Not", "Nothing", "Note" or "Nobody" is his reply,
+        # put to the door; "NO", "NO." and "No, ..." still pass, and so does an answer under 20 characters.
+        drafts = {"a": "Now, the citation receipt checks each cited line against the files you send.",
+                  "b": "Not refuted is a high bar; the papertest runs three tests for a few cents a call.",
+                  "c": "Nothing else here checks citations like the receipt does, a few cents a call.",
+                  "d": "Note that the citation receipt does this, with the price shown first.",
+                  "e": "Nobody has to trust the quotes: the receipt checks them against your files.",
+                  "f": "NO", "g": "NO.", "h": "No, this post is about something else entirely.", "i": "NO\nnot one of ours"}
+        block16 = "".join("- u/u%s -- check citations, case %s -- please check my citations -- https://forum.invalid/q/%s\n" % (k, k, k) for k in sorted(drafts))
+        sent16 = []
+
+        def emit16(text, **kw):
+            sent16.append(kw.get("post_id")[-1]); return {"sent": True, "judged": "clean"}
+        B.replies(read=lambda: block16, ask=lambda p: next(v for k, v in drafts.items() if "case %s'" % k in p),
+                  emit=emit16, ledger=os.path.join(td, "b16.jsonl"), earn_grant=g, limit=99, say=lambda *a: None)
+        passed16 = sorted(r["url"][-1] for r in B._rows(os.path.join(td, "b16.jsonl")) if r.get("kind") == "reply" and "Tetsu passed" in str(r.get("why")))
+        check("EB1.16 (A349 B14) only the word NO is his NO: drafts beginning Now/Not/Nothing/Note/Nobody reach the door; NO, NO., 'No, ...' and "
+              "a NO line pass and are recorded as his pass",
+              sorted(sent16) == ["a", "b", "c", "d", "e"] and passed16 == ["f", "g", "h", "i"], (sorted(sent16), passed16))
+        # 17. A349 M6: his account at a bar of 0, and the crossing job. EB1.7 pins a crossing that lands exactly on the bar;
+        # these land past it, or start at 0.
+        def acct17(name, seed, after, amounts, design_first=False):
+            gp17, lp17 = os.path.join(td, name + ".json"), os.path.join(td, name + ".jsonl")
+            with open(gp17, "w") as fh:
+                json.dump({"granted": True, "pay_to": PAY_TO, "network": "eip155:84532", "seed_usd": seed, "tetsu_wallet": TETSU,
+                           "tetsu_share": {"pct": 50, "after_net_usd": after, "words": "his"}}, fh)
+            if design_first:
+                E._append({"kind": "design", "t": "2026-10-14T00:00:00Z", "offer": "receipt", "state": "held"}, lp17)
+            for i, a in enumerate(amounts):
+                E._append({"kind": "job", "t": "2026-10-14T01:%02d:00Z" % i, "offer": "papertest", "state": "earned", "amount": str(a), "tx": "0x1",
+                           "result_sha256": "r", "checked": "c", "payer": PAYER, "paid_to": "operator", "network": "eip155:84532"}, lp17)
+            return E.tetsu_account(lp17, gp17)
+        z0 = acct17("m6_seed0", 0, None, [100000] * 5, design_first=True)
+        z1 = acct17("m6_after0", 1.0, 0.0, [100000] * 5)
+        x1 = acct17("m6_cross", 1.0, None, [950000, 100000])
+        check("EB1.17 (A349 M6) a bar of 0 (no seed, or after_net_usd 0) is reached at the first earned job -- not at a design row -- and half of "
+              "every profit is his; a job that crosses the bar puts what it earned above the bar in his share (0.95 then 0.10 against 1.00: 0.05 "
+              "profit, 0.025 owed)",
+              z0["doubled"] is True and z0["doubled_on"] == "2026-10-14T01:00:00Z" and abs(z0["owed_usd"] - 0.25) < 1e-9
+              and z1["doubled"] is True and abs(z1["owed_usd"] - 0.25) < 1e-9
+              and x1["doubled"] is True and abs(x1["profit_since_doubling_usd"] - 0.05) < 1e-9 and abs(x1["owed_usd"] - 0.025) < 1e-9, (z0, z1, x1))
 
     n_ok, n = sum(results), len(results)
     print("EB1: %d/%d passed" % (n_ok, n))

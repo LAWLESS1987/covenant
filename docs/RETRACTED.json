@@ -1438,6 +1438,124 @@
    ],
    "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
    "note_on_allow": "Kept as written in A333 (docs/KNOWN_ISSUES.md) and on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2)."
+  },
+  {
+   "id": "A349-S3-AS-THE-NODE",
+   "claim": "covenant_gate_proxy: apply_quorum_policy's environment rule is the node's (\"as it does for the node\"), and default_sentinel is \"the same quorum the node and this proxy use\".",
+   "refuted_by": "Read 2026-10-14 (A349 S3): run_node.py applies ops/quorum_policy.json OVER the environment (only COVENANT_JUDGE_PROVIDERS_OVERRIDE beats it), and with no policy and nothing exported it seats deferring,semantic (A93, the operator's 2026-09-12 decision); default_sentinel built the core's keyless 'claude', which refuses everything.",
+   "truth": "With no policy and nothing exported, default_sentinel now seats NODE_NO_POLICY_PROVIDERS (deferring,semantic), as the node does; an environment list still wins here, on purpose (A335: the sweep's mock; G21). Both sentences are kept in place, restated beside them. RG1.7 runs run_node and compares.",
+   "verbatim": [
+    "COVENANT_JUDGE_PROVIDERS already in the environment wins, as it does for the node.",
+    "So: the same quorum the node and this proxy use, cached;"
+   ],
+   "patterns": [
+    "already in the environment wins, as it does for the node",
+    "the same quorum the node and this proxy use"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept in place in covenant_gate_proxy.py with the restatement citing A349-S3-AS-THE-NODE beside each; as written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-B3-NEW-CONVERSATION",
+   "claim": "covenant_refine_loop: a pass waits for \"at least one NEW conversation row (kind agent or council) in the ask log since the last pass\", so it never revises from the same evidence twice; a pass reports \"refined on N new row(s)\".",
+   "refuted_by": "Measured 2026-10-14 (A349 B3): 210 of the 1,759 agent/council rows were his words, the rest work-tool rows a pass is never shown; 50 of 62 passes after A314 ran with no new word of his.",
+   "truth": "Only rows covenant_persona.is_his_word holds (the rows a pass is shown) count as new, under their own name last_his_rows; a pass says \"refined on N new row(s) of his words\". RL1's new checks.",
+   "verbatim": [
+    "2. at least one NEW conversation row (kind agent or council) in the ask log since the last pass -- a refinement with nothing new to read would revise from the same evidence twice;",
+    "out.update(ran=True, why=\"refined on %d new row(s)\" % out[\"new_rows\"], ...)"
+   ],
+   "patterns": [
+    "NEW conversation row \\(kind agent or council\\)",
+    "refined on %d new row\\(s\\)\""
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-A3-NOTHING-CHANGED",
+   "claim": "covenant_persona.refine recorded a pass whose new sentence was set aside in register_overflow as verdict \"nothing changed\".",
+   "refuted_by": "Read 2026-10-14 (A349 A3): the sentence was kept in register_overflow, and his history never held it.",
+   "truth": "The row says how many sentences were kept in register_overflow and holds them (\"overflow\"); REGISTER_GROWN (1,400) is unchanged. TP1's new checks.",
+   "verbatim": [
+    "_record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=\"nothing changed\", now=now)"
+   ],
+   "patterns": [
+    "verdict=\"nothing changed\", now=now"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-B11-UNTESTED-SAID-NO",
+   "claim": "covenant_tetsu_money.study told him \"no\" for every hypothesis that did not survive, including one that met no price series.",
+   "refuted_by": "Read 2026-10-14 (A349 B11): such a hypothesis was never tested; it was also counted as a trial and its name blocked for good.",
+   "truth": "It is said untested (or undetermined, A349 B12), is not counted as a trial and does not block its name; the three tests are unchanged. TM1's new checks.",
+   "verbatim": [
+    "say(\"money: %s -- %s -- %s\" % (name, \"SURVIVED\" if row[\"survives\"] else \"no\", out[\"why\"]))"
+   ],
+   "patterns": [
+    "\"SURVIVED\" if row\\[\"survives\"\\] else \"no\""
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-M5-SAME-REQUEST",
+   "claim": "covenant_earn's pending-settlement 402 told a buyer to \"send the SAME request again in 30 s\" for delivery without a second charge; EA1.23's label said the same request again is re-delivered.",
+   "refuted_by": "Measured 2026-10-14 (A349 M5): the same request carries the same nonce, which the replay check in _paid refuses before any re-delivery; EA1.23 resent with a fresh authorization, so it never drove the request the buyer was told to send.",
+   "truth": "The 402 names the two routes that deliver without a second charge: GET /earn/result/<id>, or the same input from the same paying address with a fresh authorization. EA1.48 drives all three.",
+   "verbatim": [
+    "\"settlement pending on the chain (tx %s); the result is held for you -- send the SAME request again in 30 s and it is \" \"delivered without a second charge\"",
+    "EA1.23 ... the same request again is \" \"re-delivered with NO second settle"
+   ],
+   "patterns": [
+    "send the SAME request again in 30 s",
+    "the same request again is"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-M6-EVERY-FURTHER-PROFIT",
+   "claim": "covenant_earn.tetsu_account: after doubling, \"pct% of every further profit\" is Tetsu's.",
+   "refuted_by": "Read 2026-10-14 (A349 M6): a bar of 0 was never reached (bar_u > 0), and what the crossing job earned above the bar was in no one's share, since only rows after it counted.",
+   "truth": "A bar of 0 is reached at the first earned job; any other bar exactly as before; the crossing job's earning above the bar is profit past it. EB1.17.",
+   "verbatim": [
+    "After it, pct% of every further profit (earned minus costs, whoever was paid) is his;"
+   ],
+   "patterns": [
+    "After it, pct% of every further profit"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-B5-NOTHING-COULD-ANSWER",
+   "claim": "covenant_tetsu_practice.night: his own-choice slot is skipped only after a stop by the gate or when \"the model (nothing could answer)\".",
+   "refuted_by": "Read 2026-10-14 (A349 B5): any exception from one ask stopped the night and skipped the slot, a passing OSError included (on 10-09 and 10-10 the model was put away mid-answer after 14 and 16 answered rounds).",
+   "truth": "A passing error (OSError) is asked again at most ASK_RETRIES (1) times within the clock and, still failing, is marked passing and does not cost the slot; a model that cannot start stops as before. PP1/PP2's new checks.",
+   "verbatim": [
+    "Not after a stop by the gate (fail closed) or the model (nothing could answer)."
+   ],
+   "patterns": [
+    "or the model \\(nothing could answer\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-DRAFT-UNIT",
+   "claim": "My draft of A349's header (2026-10-14, uncommitted): \"39 of the 41 held findings were put to him one plain question each and he answered AGREE\".",
+   "refuted_by": "Counted 2026-10-14: 41 is the number of QUESTIONS (private/tetsu_consent_2026-10-14.questions.jsonl rows), not of findings; a units error (CLAUDE.md rule 4), corrected before commit.",
+   "truth": "The held findings were put to him as 41 questions; he answered AGREE to 39 at first; A6, M2 and S1, asked again, are NO; 38 are fixed (M4 held first, then landed with a retirement record on the operator's word).",
+   "verbatim": [
+    "39 of the 41 held findings were put to him one plain question each and he answered AGREE"
+   ],
+   "patterns": [
+    "39 of the 41 held findings"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Quoted in A349 (docs/KNOWN_ISSUES.md); the draft was never committed."
   }
  ]
 }

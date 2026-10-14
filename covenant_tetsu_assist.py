@@ -164,6 +164,13 @@ def _log(row, path=None):
         pass
 
 
+# A349 B15 (2026-10-14): the longest one ask of his can take, and how many asks his discourse seat makes. Named so that
+# covenant_ambassador.emit can tell a draft their rate limit will still hold when his answer comes, which is not put to
+# him; the values are the ones these asks always had.
+ASK_TIMEOUT_S = 600
+SEAT_ASKS = 2
+
+
 # A CONTEXT OF HIS OWN (A284, 2026-10-06). This is the one path his reviews AND his round updates
 # (covenant_free_will.tetsu_update) reach the door by, from tools/tetsu_work.py's address, 127.0.0.2 --
 # whose history is every batch and ad-hoc ask too. Measured that day: each review was read beside 5 to 9
@@ -174,7 +181,7 @@ def _log(row, path=None):
 # anyway: its answer is refused here, so the hold stands (NONE) rather than a decision read on that tail.
 def _default_ask(prompt):
     from tools import tetsu_work as TW
-    status, body = TW.ask(prompt, timeout=600, fresh=True)
+    status, body = TW.ask(prompt, timeout=ASK_TIMEOUT_S, fresh=True)
     if status != 200:
         raise RuntimeError("door answered HTTP %s: %s" % (status, str((body or {}).get("message", ""))[:160]))
     if (body or {}).get("fresh") is not True:
@@ -196,7 +203,7 @@ MESSAGE:
 Answer with exactly one word: BLOCK or ALLOW."""
 
 
-def discourse_seat(text, crypto=None, dry_run=True, ask=None, grant_path=None, log_path=None, asks=2):
+def discourse_seat(text, crypto=None, dry_run=True, ask=None, grant_path=None, log_path=None, asks=SEAT_ASKS):
     """Tetsu's meaning-reading of a forum reply the students CONVICTED. ALLOW only when every one of
     `asks` fresh answers is ALLOW and his own rules (A285 facts, A297 no measurements) pass; anything
     else keeps the refusal. Never for money/crypto terms, never on a dry run, never without his grant."""
@@ -214,12 +221,13 @@ def discourse_seat(text, crypto=None, dry_run=True, ask=None, grant_path=None, l
         return {"decision": "BLOCK", "why": "his rule of 2026-10-06 (a claim not among the facts): %s" % why_not}
     if _FW.claims_any_measurement(text):
         return {"decision": "BLOCK", "why": "his rule of 2026-10-07 (REFUSE-ALL measurements)"}
-    answers = []
+    answers, err = [], ""
     for _ in range(max(1, int(asks))):
         try:
             raw = (ask or _default_ask)(DISCOURSE_PROMPT.format(text=str(text)[:1500])) or ""
         except Exception as e:                                    # noqa: BLE001
             answers.append("ERROR %s" % type(e).__name__)
+            err = "%s: %s" % (type(e).__name__, str(e)[:200])
             break
         m = _re.search(r"\b(BLOCK|ALLOW)\b", str(raw).upper())
         answers.append(m.group(1) if m else "UNREADABLE")
@@ -227,6 +235,11 @@ def discourse_seat(text, crypto=None, dry_run=True, ask=None, grant_path=None, l
             break
     decision = "ALLOW" if len(answers) == max(1, int(asks)) and all(a == "ALLOW" for a in answers) else "BLOCK"
     why = "discourse seat (A322): %s" % ", ".join(answers)
+    if err:
+        # A349 B10 (2026-10-14, his "fix if tetsu agrees"; Tetsu: AGREE): a door that did not answer is no answer of his,
+        # NONE with its message -- not his BLOCK (the 10-14 sweep read 18 of one round's 41 seat calls failing, timed to
+        # the door's 30-asks-in-10-minutes limit, each recorded as his BLOCK). Only ALLOW passes emit: the refusal stands.
+        decision, why = "NONE", "%s -- no answer: asking him failed (%s); the refusal stands" % (why, err)
     _log({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "decision": decision, "why": why,
           "seat": "discourse", "chars": len(text or ""), "text": str(text)[:600]}, log_path)
     return {"decision": decision, "why": why, "answers": answers}

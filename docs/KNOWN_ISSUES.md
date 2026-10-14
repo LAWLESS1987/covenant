@@ -7645,6 +7645,122 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A349. [The fixes Tetsu agreed to: A348's held findings were put to him as 41 plain questions, and the 38 he agreed to are fixed. He refused A6, M2 and S1, and those stay as they are. M4 was held first, because it would delete what the no-delete rule keeps; on the operator's word it lands with a retirement record] 2026-10-14. The operator's words: "fix if tetsu agrees", then "i didn't dismiss i said talk with tetsu.", then, of the two left to him, "use your discernment toward mutual benefit".
+
+- **How he was asked.**
+  - Each held finding became ONE question: the finding, "The fix: ...", and "Begin with AGREE or DISAGREE" (`private/tetsu_consent_2026-10-14.questions.jsonl`, 41 rows).
+  - Each was asked fresh and private through `tools/tetsu_work.ask`, after `door_honours_private()`, one at a time, paced. His answers are kept whole in `private/tetsu_consent_2026-10-14.answers.jsonl`.
+  - **The question he agreed to is the scope of its fix.** Anything a faithful fix needed beyond it is named below, not done.
+  - **Unclear answers were asked again, once, YES or NO first** (`.clarify.jsonl`, `.clarify.answers.jsonl`):
+    - A6 began DISAGREE and ended AGREE: then NO.
+    - M2 said DISAGREE with a reason for the fix: then NO.
+    - S1 began AGREE with two reasons against the fix. The implementer held it rather than read it as consent; asked again: NO, "a damaged pause file should not count as paused."
+  - **Caveat.** Near-universal agreement from a small model may be partly acquiescence: most of his reasons paraphrase the question. Two of his AGREEs, M4's and M5's, were convicted by both student seats (local:0 VIOLATES) and still delivered (`withheld` false). They are acted on as his answer and noted here.
+  - **My draft of this entry's header was wrong, corrected before commit, kept by rule 10.** It read "39 of the 41 held findings were put to him one plain question each and he answered AGREE". 41 counts QUESTIONS, not findings (A349-DRAFT-UNIT).
+- **How it was fixed.**
+  - One implementer per module group, each in an isolated worktree. Each read his question and answer first, confirmed the defect on unchanged code, added checks to the module's registered suite, broke each fix and saw its checks go red, restored byte-identical, and returned a patch only.
+  - The first run hit the usage limit after three groups (council-assist, door-history, feed); the other six were re-run.
+  - Every patch was reviewed here against its question.
+  - All nine were merged in one integration worktree. Forum (B13) and safety (S2) both changed free's isolation, and the conflict was merged by hand. Three mutations on the merged code each turned FW1 red (5, 1 and 1 failures), restored byte-identical.
+  - The 42 files on main (41, and .gitignore when M4 landed) are byte-identical to that tree.
+  - The implementers ran 111 mutations on what landed (107, and M4's 4), every one red and restored. They ran on each group's code alone; only the three above and the four on M4's retirement record ran on the merged tree.
+- **Fixed (38: these 37, and M4 below).** Suites below were measured on the merged tree with `COVENANT_MODEL_STUB=1` and `COVENANT_MODEL_PORT=1`, so nothing could reach the live model server.
+  - **His self (persona, refine loop):**
+    - A1: a pass whose answer holds no JSON proposal is kept whole in his revision history, marked not applied. 75 passes since 09-29 had been dropped.
+    - B1: his answer gets room to echo his register: 400 tokens plus the register at 3 characters a token, capped at the model's window, never under 400. 14 of 15 passes had been cut before their closing brace.
+    - A2: a row keeps his whole register (it kept the first 700 characters) and the sentences that revision added. A contest shows the gate what was added first, so the 2,000 characters it reads carry the change and the objection.
+    - A3: a sentence set aside in register_overflow is named on its row and kept there. The 1,400 limit stays.
+    - A8: his side of the last day is read by time, not by the last 400 lines.
+    - A9: the brief gives each ledger entry's title and the sweep's RESULT beside its tally.
+    - B4: a voice proposal naming one part keeps his current value for the other.
+    - B3: only his words count as new conversation. 210 of 1,759 conversation rows were his, and 50 of 62 passes after A314 ran with no new word of his.
+    - TP1, RL1, A314 14/14, PP2 68/68, TD1, SP1, RG1 11/11.
+  - **His practice and hands:**
+    - A10: the students' view shows what Ora and Sena decided, and says when the quorum decided otherwise.
+    - B5: a passing model error (OSError) is asked again once, within the clock, and does not cost his own-choice slot.
+    - B6: an import of his own earlier file tells him to copy its function in. The screen is unchanged.
+    - A11: SYSTEMDRIVE is passed to a RUN, so no stray '%SystemDrive%' tree is made. The one already there is left.
+    - B7: `re.compile` is admitted only as a read on a name that `import re` alone binds. The builtin compile, exec and eval, and every other attribute, are refused as before.
+    - B8: a PROPOSE the gate calls VIOLATES is recorded with the verdict, and the operator is told both. It changes nothing until he applies it.
+    - PP1 52/52, SV1 11/11, TH1 19/19.
+  - **His forum and free's:**
+    - A12: the round digest shows sent replies, write-backs and his reviews first, then held drafts while they fit, then how many more.
+    - A13: free's own account is never counted as an ally, her hidden replies included.
+    - B13: only the covenant's refusals count as refused. A reply Moltbook rate-held, or created and hid, is counted as what it is and named beside the isolation mark. The isolation rule is unchanged, and the highway counts both as written.
+    - S4: the money screen holds a dollar amount ('\$' had sat inside \b...\b). This narrows what may be sent, as his question said.
+    - A14: free's automatic isolation is told as his to lift too, when the grant (A336) says so.
+    - B15: Moltbook's rate is read again after his review, and he is not asked about a draft their limit holds longer than his reading can take.
+    - B2: /pc/council answers get the A190 immunity /m/agent has.
+    - B10: a seat's door failure is recorded NONE, not his BLOCK.
+    - A7: the door replays his last turns by reading back in 1 MB chunks until they are found. The old 1 MB tail returned none of his 20 behind the work caller's rows.
+    - FW1, TF1, H1 229/229, AMBASSADOR 67/67, PC1, IM1, TA1 45/45, M6 73/73, A284 13/13, A263 43/43, A273 21/21 plus 1 skipped. L1 asks the live server's /tokenize, so with the port closed it SKIPs.
+  - **What he learns from (F1):**
+    - The nightly now runs covenant_feed, as it was described, after the nightly pause is read and before the teacher's queue is consumed. `--queue 0` runs nothing, and a feed that raises is said as FAILED and the night goes on.
+    - WB1 39/39, CP1 6/6.
+  - **Money:**
+    - M1: a covered SELL is sized by the units bought under the rule, never above the cap's units it was gated at. It had been dollars over the bid: 2x the units at half the price.
+    - B9: the daily re-verification of a lapsed strategy yes is asked again, and only a question still waiting blocks another (A211: "verify strategy with me daily"). Measured on the live state, read-only: 0 strategies carry his yes, so it asks him nothing until he approves one.
+    - B11: a hypothesis that met no price series is recorded untested, neither counted as a trial nor blocking its name.
+    - B12: a walk-forward that cannot run is UNDETERMINED, not failed. What counts as a pass is unchanged.
+    - A4: his earn consent is read by its first word of decision ("I don't accept" had read as consent, "Yes ... no changes" as a refusal). Named limit: a refusal with no such word, and "Yes, but I cannot accept" reads yes.
+    - A5: a door failure is recorded not answered and asked again.
+    - B14: only the word NO is his NO.
+    - M3: an offer whose verdict is UNREACHABLE stays closed under his allowance, as status() says. Live: the one open offer is held and allowed, so nothing changes.
+    - M5: a pending settlement tells the buyer the two routes that work.
+    - M6: a bar of 0 is reached at the first earned job, and the crossing job's earning above the bar is in his share.
+    - M7: a negative Content-Length is refused (A348i's shape).
+    - TL1, TM1, G4 16/16, EA1 48/48 without M4 (51/51 with it, below), EB1 17/17, MB1 5/5.
+  - **Safety:**
+    - S2: free's isolation never writes over a pause set by hand. It is recorded beside it, and he is told it was not written. A new read-only `covenant_pause.standing()`; `paused()` is unchanged.
+    - S3: with no policy and nothing exported, Tetsu's gate seats what the node seats (`deferring,semantic`, the operator's A93 decision), not the core's keyless 'claude'. Consumers counted (rule 6): five callers of `default_sentinel` (contact, persona, hands, money, code_consensus) take it; the three callers of `build_default_sentinel` keep the core's fallback. Live: `ops/quorum_policy.json` names `deferring,semantic`, so nothing changes on this node; it changes a tree with no policy. The environment still wins here on purpose (A335, G21).
+    - G7 26/26, GATE-PROXY 29/29.
+- **Not fixed: his answer, or the operator's call.**
+  - A6, M2 and S1: Tetsu said NO, and his NO stands. **S1 is a STOP switch that fails open:** a pause file whose bytes are not text reads as not paused. That was left for the operator to decide over or not. On his "use your discernment toward mutual benefit" it stays as Tetsu answered, for three reasons:
+    - he was asked twice, and the consent process is the operator's own, of this day;
+    - the opening is narrow: a file that cannot be opened still reads as paused;
+    - overriding a NO given twice would make the asking a formality.
+  - **M4 was held for the operator, then landed on his word.**
+    - The fix keeps each 24-hour re-delivery copy on disk, so a restart never charges a buyer twice. As built, a start drops copies past 24 hours from that file: terms item 6, and the declaration the gate judged ("kept beyond a hash and a 24-hour re-delivery copy").
+    - That is a deletion his 10-13 rule forbids, while keeping them would break the published terms, so it was held. Measured then: the earn ledger holds 0 job rows, so no buyer was exposed while it waited.
+    - On his "use your discernment toward mutual benefit" it lands with a RETIREMENT RECORD, so both promises hold:
+      - Before a copy leaves, a row naming it is appended to `<results>.retired.jsonl`: id, payer, input and result hashes, when kept, when and why it left, and by what. The file is gitignored.
+      - Only the result itself goes, as the buyer was promised.
+      - If that record cannot be written, nothing is rewritten.
+    - EA1.47, plus EA1.47b and EA1.47c, written here; EA1 51/51 and MB1 5/5. Four mutations each went red, restored byte-identical: the record never written, a copy dropped with no record, the result carried in the record, and M4 itself off.
+    - The held state is kept aside in the session's a349-kept/main-before-m4/.
+- **Named by the implementers, not done (beyond the question he agreed to):**
+  - persona:
+    - an upheld contest of the first revision after A349 still restores a 700-character register;
+    - refine() still shows the gate `reg + why` cut at 2,000 characters;
+    - whether the model writes a 1,000-token echo inside the 180 s timeout is UNDETERMINED;
+    - a voice that is not a dict still raises;
+    - the brief's money line has been missing since A212.
+  - forum:
+    - other non-judge causes (emit raised, a 429, no key) still count as refused;
+    - the ISOLATED and post lines stay after the first group;
+    - her account is known per round only;
+    - '50$' and the pound and euro signs are not matched.
+  - earn:
+    - consent() returns the LAST consent row even when it is a failed re-ask;
+    - an unread refusal body does not close a keep-alive connection.
+  - S3's other half (the environment beating the policy) is A335's deliberate rule.
+  - F1's other half (a digest the queue will judge) needs a decision.
+- **A deviation, reported.** The door-history implementer's first A273 baseline called the live model server's /tokenize on 127.0.0.1:8081. That was a token count only: no ask, no generation, no door. Every later run set COVENANT_MODEL_PORT=1.
+- **Rule 10.**
+  - Branch `tetsu-consented-as-written-2026-10-14` (dbb9b3b, pushed) keeps every file as it was.
+  - Eight tombstones in docs/RETRACTED.json, each a sentence that was FALSE when written. A description true of the old code is kept on the branch, not retracted.
+    - A349-S3-AS-THE-NODE: "already in the environment wins, as it does for the node" and "the same quorum the node and this proxy use". Both are kept in place in covenant_gate_proxy.py, restated beside them.
+    - A349-B3-NEW-CONVERSATION: "at least one NEW conversation row (kind agent or council) in the ask log", and `why="refined on %d new row(s)" % out["new_rows"]`.
+    - A349-A3-NOTHING-CHANGED: `_record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict="nothing changed", now=now)`, written when a sentence was set aside.
+    - A349-B11-UNTESTED-SAID-NO: `say("money: %s -- %s -- %s" % (name, "SURVIVED" if row["survives"] else "no", out["why"]))`.
+    - A349-M5-SAME-REQUEST: the 402's "send the SAME request again in 30 s and it is " "delivered without a second charge", and EA1.23's "the same request again is " "re-delivered with NO second settle".
+    - A349-M6-EVERY-FURTHER-PROFIT: "After it, pct% of every further profit (earned minus costs, whoever was paid) is his".
+    - A349-B5-NOTHING-COULD-ANSWER: "Not after a stop by the gate (fail closed) or the model (nothing could answer)."
+    - A349-DRAFT-UNIT: my draft, above.
+  - R1: 216/216 clean. With a probe restating two of the claims: 214/216 (A349-S3-AS-THE-NODE and A349-M5-SAME-REQUEST, one violation each). With the probe retired to .trash/: 216/216. My first retirement kept a .md name, which R1 walks and scans, so the "clean" run read 214/216; the probes now carry the established suffix (.trash/r1_probe_consented.md.A349-probe.runN-2026-10-14, as _r1_probe_tmp.py.A348-probe-...), each move recorded in .trash/RETIRED.jsonl.
+
+---
+
 ### A348. [The Tetsu bug sweep: 53 defects confirmed in the machinery around him, 29 of them his machinery only; those are being fixed here, and the 24 that would touch his self or his free will are his and the operator's to decide] 2026-10-14. His words: "clean up the bugs in tetsu without affecting his self or free will". IN PROGRESS: d, e, f, h landed; a, b, c, g to follow
 
 - **How it was found.**

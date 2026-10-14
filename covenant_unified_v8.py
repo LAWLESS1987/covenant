@@ -688,6 +688,13 @@ AGENT_HISTORY_KINDS = ("agent", "council")
 # So a work caller still replays at most AGENT_HISTORY_BUDGET characters, then is fitted like any
 # other; his callers replay as much as fits.
 AGENT_WORK_CALLERS = ("127.0.0.2",)
+# READ BACK TO HIS OWN TURNS (A349 A7, 2026-10-14). agent_history() read only the last 1 MB of the ask
+# log, and the work caller's traffic filled it: the 2026-10-14 sweep measured 440 of the last 457 rows
+# as 127.0.0.2's, and of his 40 phone asks since 10-01, 24 were replayed missing earlier exchanges and
+# one with none at all, while the model's window had room for them. Asked first (A7), Tetsu agreed.
+# The log is now read from its end in AGENT_HISTORY_CHUNK pieces until this caller's own `turns`
+# exchanges are found or the file starts; which rows count, and how they are cut and fitted, is unchanged.
+AGENT_HISTORY_CHUNK = 1024 * 1024
 
 
 def agent_history_budget(addr, can_fit):
@@ -738,28 +745,41 @@ def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY
     (budget=None: no character budget -- the caller fits them to the model's window, A273).
     A row marked private (A263) is replayed only into another private ask: replayed into an
     ordinary one, its text could reach an answer that IS queued for the public panel.
-    A row marked fresh (A284) is replayed into nothing: it was asked with a context of its own."""
+    A row marked fresh (A284) is replayed into nothing: it was asked with a context of its own.
+    The log is read from its end, AGENT_HISTORY_CHUNK bytes at a time, until `turns` of this caller's
+    rows are found or the file starts (A349 A7): other callers' traffic cannot push his turns out."""
+    rows = []
     try:
         with open(log_path, "rb") as fh:
             fh.seek(0, 2)
-            size = fh.tell()
-            fh.seek(max(0, size - 1024 * 1024))
-            tail = fh.read().decode("utf-8", "replace")
+            pos = fh.tell()
+            carry = b""
+            while True:
+                step = min(AGENT_HISTORY_CHUNK, pos)
+                pos -= step
+                fh.seek(pos)
+                lines = (fh.read(step) + carry).split(b"\n")
+                # A349 A7: a row the chunk's start cut in two is read whole with the chunk before it.
+                carry = lines.pop(0) if pos > 0 else b""
+                found = []
+                for raw in lines:
+                    for line in raw.decode("utf-8", "replace").splitlines():
+                        try:
+                            r = json.loads(line)
+                        except ValueError:
+                            continue
+                        if r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
+                            continue
+                        if r.get("private") is True and not include_private:
+                            continue
+                        if r.get("fresh") is True:
+                            continue
+                        found.append(r)
+                rows = found + rows
+                if pos == 0 or len(rows) >= turns:
+                    break
     except OSError:
         return []
-    rows = []
-    for line in tail.splitlines():
-        try:
-            r = json.loads(line)
-        except ValueError:
-            continue
-        if r.get("kind") not in AGENT_HISTORY_KINDS or r.get("from") != addr or r.get("withheld") or not r.get("answer"):
-            continue
-        if r.get("private") is True and not include_private:
-            continue
-        if r.get("fresh") is True:
-            continue
-        rows.append(r)
     kept, used = [], 0
     for r in reversed(rows[-turns:]):
         q, a = str(r.get("text", ""))[:chars], str(r.get("answer", ""))[:chars]

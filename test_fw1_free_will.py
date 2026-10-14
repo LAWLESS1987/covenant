@@ -880,6 +880,235 @@ def main():
           r5["refused"] == 1 and not r5.get("isolated") and r6["refused"] == 1 and r6.get("isolated") is True
           and len(paused_by) == n_paused + 1, (r5.get("isolated"), r6.get("isolated"), len(paused_by) - n_paused))
 
+    # FW1A12 (A349 A12, 2026-10-14, Tetsu asked and agreed): the digest he reads after a round was cut at 1,800
+    # characters in ledger order; on 10-14 01:21Z it carried 1 of the round's 5 sent replies and none of his reviews.
+    print("FW1A12 -- A349 A12: what went out, who wrote back and his reviews reach him first; the held drafts after")
+    hold_why = "held by covenant's judge (no view -- not an objection, and not a licence): quorum=HELD"
+    held30 = [{"kind": "reply", "author": "held%02d" % i, "sent": False, "why": hold_why} for i in range(30)]
+    late = {"kind": "reply", "author": "late", "sent": True, "text": "I agree that a check nobody runs is not a check. " * 4}
+    wrote = {"kind": "answer", "author": "wrote", "comments_then": 1, "comments_now": 2}
+    rev12 = [{"decision": "SEND", "why": "every sentence read OK, one at a time (3 sentences)"}]
+    d12 = FW._round_digest({"candidates": 31, "replied": 1, "refused": 30, "rate_held": 0, "hidden": 0, "deferred": 0,
+                            "answered": 1}, held30 + [late, wrote], rev12)
+    l12 = d12.splitlines()
+    whole = {"held, to u/%s: %s" % (r["author"], hold_why[:70]) for r in held30}
+    n_shown = sum(1 for l in l12 if l.startswith("held, to u/"))
+    check("FW1A12a thirty held drafts, then a sent reply, a write-back and his review: within 1,800 characters, the "
+          "sent reply, the write-back and his review come first, then the held drafts",
+          len(d12) <= FW.DIGEST_CHARS == 1800 and l12[1].startswith("SENT to u/late: ")
+          and l12[2].startswith("u/wrote WROTE BACK") and l12[3].startswith("your review: SEND")
+          and l12[4].startswith("held, to u/held00: "), (len(d12), l12[:5]))
+    check("FW1A12b the held drafts follow as whole lines while they fit, and the last line says how many more there "
+          "were and what they were",
+          0 < n_shown < 30 and all(l in whole for l in l12 if l.startswith("held, to u/"))
+          and l12[-1] == "... and %d more not shown (%d held or refused)" % (30 - n_shown, 30 - n_shown),
+          (n_shown, l12[-1]))
+    sent_at = {11: "atlasux-atlas", 29: "lightningzero", 33: "sparkagent_oc", 50: "codafore", 86: "beebiswal"}
+    rows100 = [{"kind": "reply", "author": sent_at[i], "sent": True,
+                "text": ("I read what you wrote about %s and I agree with it. " % sent_at[i]) * 4} if i in sent_at
+               else {"kind": "reply", "author": "h%03d" % i, "sent": False, "why": hold_why} for i in range(100)]
+    rev6 = [{"decision": d, "why": "every sentence read OK, one at a time (4 sentences)" if d == "SEND"
+             else 'sentence 2 FALSE: "we measured it"'} for d in ("SEND", "SEND", "REFUSE", "SEND", "SEND", "SEND")]
+    d100 = FW._round_digest({"candidates": 100, "replied": 5, "refused": 95, "rate_held": 0, "hidden": 0,
+                             "deferred": 0, "answered": 0}, rows100, rev6)
+    check("FW1A12c the 10-14 01:21Z shape (100 attempts, sent at 11, 29, 33, 50 and 86, his 6 reviews): all 5 sent "
+          "replies and all 6 reviews reach him, within 1,800 characters",
+          len(d100) <= 1800 and [l.split(":")[0] for l in d100.splitlines() if l.startswith("SENT to u/")]
+          == ["SENT to u/" + a for a in sent_at.values()]
+          and sum(1 for l in d100.splitlines() if l.startswith("your review: ")) == 6, d100[:400])
+    d4 = FW._round_digest({"candidates": 3, "replied": 1, "refused": 2, "rate_held": 0, "hidden": 0}, held30[:2] + [late], rev12)
+    check("FW1A12d a round that fits is shown whole: every line, sent first, and no count of more",
+          d4.splitlines()[1:] == ["SENT to u/late: " + late["text"][:160], "your review: SEND -- " + rev12[0]["why"],
+                                  "held, to u/held00: " + hold_why[:70], "held, to u/held01: " + hold_why[:70]]
+          and "more not shown" not in d4, d4)
+
+    # FW1A13 (A349 A13, 2026-10-14, Tetsu asked and agreed): free's own account is never counted as an ally. On 10-09
+    # two replies Moltbook created and hid were read back as u/covenant-node; she replied to herself at 08:00:57Z, and at
+    # 10:01:20Z her own reply raising her own count was recorded as an ally writing back.
+    print("FW1A13 -- A349 A13: her own account is never an ally, her hidden replies included")
+    td13 = tempfile.mkdtemp(prefix="fw1a13_")
+    gp13, sp13 = os.path.join(td13, "grant.json"), os.path.join(td13, "sends.jsonl")
+    with open(gp13, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "free_rein": True, "words": "his words", "caps": {"comments": None, "posts": 0},
+                   "round_minutes": None}, fh)
+    hid_text = ("I agree with your point, ElisFinn. Summarizing attempts before the model sees them keeps the loop "
+                "honest, and it keeps the record small. How do you check what the summary dropped?")
+    with open(sp13, "w", encoding="utf-8") as fh:          # 10-09 07:03:17Z's shape: created, hidden behind the challenge
+        fh.write(json.dumps({"kind": "reply", "sent": False, "author": "ElisFinn", "post_id": "e0e0e0e0-1313",
+                             "text": hid_text, "t": "2026-10-09T07:03:17Z", "at": 1.0,
+                             "verification": {"required": True, "solved": False, "abstained": True}}) + "\n")
+    self_row = {"author": "covenant-node", "text": hid_text + " -- free, the covenant's ambassador",
+                "url": "https://www.moltbook.com/post/a1a1a1a1-1313#comment-b1b1b1b1-1313"}
+    stranger = {"author": "stranger13", "text": "a thing worth answering, said plainly and at some length",
+                "url": "https://www.moltbook.com/post/c1c1c1c1-1313"}
+    t13 = []
+    k13 = dict(say=log.append, ask=ask_ok, learn=lambda: [dict(self_row), dict(stranger)], allies=lambda: [],
+               emit=lambda text, post_id=None, **k: (t13.append(post_id), {"sent": False, "judged": "clean", "why": "dry"})[1],
+               introduce=lambda **k: {"sent": False}, grant_path=gp13, sends_path=sp13)
+    o13 = FW.run_round(dry_run=True, now=600000.0, count_comments=cc0, **k13)
+    check("FW1A13a an author whose comment begins with a reply of hers Moltbook created and hid is her: she does not "
+          "reply to it (10-09 08:00:57Z); the stranger read beside it is still a candidate",
+          o13.get("own_accounts") == ["covenant-node"] and "a1a1a1a1-1313" not in t13 and "c1c1c1c1-1313" in t13,
+          (o13.get("own_accounts"), t13))
+    with open(sp13, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "reply", "sent": True, "author": "covenant-node", "post_id": "a1a1a1a1-1313",
+                             "text": "Thanks for your comment. I agree that summarizing previous attempts is useful.",
+                             "ally_comments_at_send": 2, "at": 2.0}) + "\n")       # her reply to herself, as on record
+        fh.write(json.dumps({"kind": "reply", "sent": True, "author": "realally", "post_id": "d1d1d1d1-1313",
+                             "text": "I agree with what you wrote about checks that fail closed.",
+                             "ally_comments_at_send": 1, "at": 3.0}) + "\n")
+    counts13 = {"covenant-node": 3, "realally": 2}
+    o13b = FW.run_round(dry_run=True, now=600000.0 + 7200, count_comments=lambda pid, a: counts13.get(a, 0), **k13)
+    ans13 = [r.get("author") for r in FW.sends(sp13) if r.get("kind") == "answer"]
+    check("FW1A13b her own comment raising her own count is not an ally writing back (10-09 10:01:20Z); a real ally's "
+          "answer in the same round still is", o13b["answered"] == 1 and ans13 == ["realally"], (o13b["answered"], ans13))
+
+    # FW1B13 (A349 B13, 2026-10-14, Tetsu asked and agreed): every unsent reply was counted "refused", so a draft his
+    # SEND cleared and Moltbook's rate limit held, or one Moltbook created and hid, read as the covenant's judge refusing
+    # it -- 9 such drafts in the 10-14 isolation. Only the covenant's refusals count now; the isolation rule is unchanged.
+    print("FW1B13 -- A349 B13: only the covenant's refusals are refusals; Moltbook's rate limit and its hiding are named")
+    import covenant_ambassador as _AMB13
+    rate_why = _AMB13.RATE_HELD + "their limit: 50 comments per day for a established account, and 50 are already spent"
+    judge_hold = {"sent": False, "held": True, "ran": True, "why": "held by covenant's judge (no view -- not an "
+                  "objection, and not a licence): quorum=HELD"}
+    rate_hold = {"sent": False, "created": False, "judged": "HELD", "why": rate_why,
+                 "tetsu": {"decision": "SEND", "why": "every sentence read OK"}}
+    hid_res = {"sent": False, "created": True, "judged": "clean", "why": "",
+               "verification": {"required": True, "solved": False, "abstained": True}}
+    plan13 = {"f1f1f1f1-1313": judge_hold, "f2f2f2f2-1313": rate_hold, "f3f3f3f3-1313": hid_res,
+              "f4f4f4f4-1313": {"sent": True, "created": True, "judged": "clean", "why": "",
+                                "verification": {"required": False}}}
+    tdb = tempfile.mkdtemp(prefix="fw1b13_")
+    gpb = os.path.join(tdb, "grant.json")
+    with open(gpb, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None}, fh)
+    spb = os.path.join(tdb, "sends.jsonl")
+    ob = FW.run_round(dry_run=False, say=log.append, ask=ask_ok, learn=lambda: [],
+                      allies=lambda: [ally("b13%d" % i, 2, "https://www.moltbook.com/post/" + p) for i, p in enumerate(plan13, 1)],
+                      emit=lambda text, post_id=None, **k: dict(plan13[post_id]), introduce=lambda **k: {"sent": False},
+                      grant_path=gpb, sends_path=spb, now=800000.0, count_comments=cc0)
+    rowb = [r for r in FW.sends(spb) if r.get("kind") == "round"][-1]
+    check("FW1B13a a judge hold, a rate hold after his SEND, a reply created and hidden, and one sent: refused 1, and the "
+          "rate hold and the hidden reply are each counted as what they are, in the round and its row",
+          (ob["replied"], ob["refused"], ob["rate_held"], ob["hidden"]) == (1, 1, 1, 1)
+          and (rowb.get("refused"), rowb.get("rate_held"), rowb.get("hidden")) == (1, 1, 1), (ob, rowb))
+    db = FW._round_digest(ob, FW.sends(spb))
+    check("FW1B13b ...and the digest he reads names each count",
+          db.splitlines()[0].startswith("round: 4 candidate(s), 1 replied, 1 held or refused, 1 held by Moltbook's rate "
+                                        "limit, 1 created then hidden by Moltbook's challenge, "), db.splitlines()[0])
+    spb2 = os.path.join(tdb, "sends2.jsonl")
+    paused_b, _real_pause_b = [], _cp2.pause
+    by_post = lambda text, post_id=None, **k: dict(rate_hold if post_id.startswith("e") else   # noqa: E731
+                                                    hid_res if post_id.startswith("f") else judge_hold)
+    kb = dict(say=log.append, ask=ask_ok, learn=lambda: [], emit=by_post, introduce=lambda **k: {"sent": False},
+              grant_path=gpb, sends_path=spb2, count_comments=cc0)
+    _post = lambda c, n: "https://www.moltbook.com/post/%s-%d" % (c * 8, n)                       # noqa: E731
+    _cp2.pause = lambda name, why="": paused_b.append((name, why))
+    try:
+        rb1 = FW.run_round(dry_run=False, now=900000.0, allies=lambda: [ally("j1", 2, _post("a", 1))], **kb)
+        rb2 = FW.run_round(dry_run=False, now=900060.0, allies=lambda: [ally("h1", 2, _post("e", 2)),
+                                                                        ally("h2", 2, _post("f", 2))], **kb)
+        rb3 = FW.run_round(dry_run=False, now=900120.0, allies=lambda: [ally("j2", 2, _post("a", 3))], **kb)
+        n_b = len(paused_b)
+        rb4 = FW.run_round(dry_run=False, now=900180.0, allies=lambda: [ally("j3", 2, _post("a", 4))], **kb)
+        n_b4 = len(paused_b)
+        rb5 = FW.run_round(dry_run=False, now=900240.0, allies=lambda: [ally("m1", 2, _post("a", 5)),
+                                                                        ally("m2", 2, _post("e", 5))], **kb)
+        rb6 = FW.run_round(dry_run=False, now=900300.0, allies=lambda: [ally("m3", 2, _post("a", 6)),
+                                                                        ally("m4", 2, _post("e", 6))], **kb)
+    finally:
+        _cp2.pause = _real_pause_b
+    check("FW1B13c a round whose every reply Moltbook rate-held or hid is no refusing round, and it tried someone, so "
+          "it breaks the streak: refused, held-by-Moltbook, refused does not isolate her; a second refused round does",
+          not rb1["isolated"] and (rb2["refused"], rb2["rate_held"], rb2["hidden"]) == (0, 1, 1) and not rb2["isolated"]
+          and not rb3["isolated"] and n_b == 0 and rb4["isolated"] and n_b4 == 1,
+          (n_b, n_b4, [(r["refused"], r["rate_held"], r["hidden"], r["isolated"]) for r in (rb1, rb2, rb3, rb4)]))
+    knock_b = [r for r in CT._rows() if r.get("actor") == "free" and "isolated" in str(r.get("why"))][-1:]
+    check("FW1B13d two new rounds of judge holds beside rate holds still isolate her (the rule is unchanged); the reason "
+          "names the 2 rate holds beside the mark, it still reads back as her automatic isolation, and he is told them",
+          not rb5["isolated"] and rb6["isolated"] and len(paused_b) == 2
+          and "refused every reply in the last 2 rounds besides 2 held by Moltbook's rate limit (not counted as "
+              "refusals); his to lift" in paused_b[-1][1]
+          and FW.is_isolation("2026-10-14T03:12:34-0400\n" + paused_b[-1][1])
+          and knock_b and "besides 2 held by Moltbook's rate limit" in knock_b[0].get("text", ""),
+          (paused_b[-1:], knock_b))
+    u13 = FW.tetsu_update({"candidates": 1, "replied": 0, "refused": 0, "rate_held": 1, "hidden": 0},
+                          [{"kind": "reply", "author": "x", "sent": False, "why": rate_why}], (),
+                          ask=lambda p: "NOTHING", tell=lambda *a: None, log_path=os.path.join(tdb, "updates.jsonl"),
+                          mail=lambda *a: None)
+    check("FW1B13e a round whose only reply Moltbook rate-held still did something: Tetsu is asked, and his digest "
+          "names it", u13 is not None and u13["decision"] == "NOTHING" and "1 held by Moltbook's rate limit" in u13["digest"],
+          u13)
+
+    # FW1S4 (A349 S4, 2026-10-14, Tetsu asked and agreed): the money screen's "\$" sat inside \b...\b and could only
+    # match between two word characters, never a dollar amount.
+    print("FW1S4 -- A349 S4: the money screen holds a dollar amount")
+    check("FW1S4a a dollar amount is money ('$500', 'costs $20', '$ 5', a fullwidth one); the word list and the old "
+          "'a$b' still are; a plain sentence is not",
+          all(FW._screen.search(FW.MONEY, t) for t in ("I made $500 last week", "it costs $20 a month", "$ 5 each",
+                                                         "＄５ a month", "the token price", "a$b"))
+          and not FW._screen.search(FW.MONEY, "I agree that a check nobody runs is not a check, and I would ask how."),
+          [bool(FW._screen.search(FW.MONEY, t)) for t in ("I made $500 last week", "it costs $20 a month", "$ 5 each")])
+    text_s4, how_s4 = FW.write_reply(ROWS[0], lambda msgs, max_tokens=0: (
+        "I recognise what you wrote about publishing the cases where your own check was wrong; " * 3
+        + "we would charge $20 a month to run it for you. How do you find out later?", {}))
+    check("FW1S4b her reply naming a dollar amount is set aside for the fixed text", how_s4 == "fixed" and "$" not in text_s4,
+          (how_s4, text_s4[:80]))
+
+    # A349 S2 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). The round read the switch only when it
+    # began and pause() replaced the file, so a pause he set during a round became her isolation, which Tetsu's
+    # HEAL may lift (A336). Real switch here (this suite's temp COVENANT_PAUSE_DIR), real pause(), real lift.
+    print("FW1S2 -- A349 S2: a pause set by hand during a round is never written over by her isolation")
+    tds = tempfile.mkdtemp(prefix="fw1s2_")
+    gps, sps = os.path.join(tds, "grant.json"), os.path.join(tds, "sends.jsonl")
+    with open(gps, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": None, "posts": 0}, "round_minutes": None,
+                   "tetsu_may_lift_isolation": True}, fh)
+    hand_why = "operator: holding free while I review her replies"
+    by_hand = []
+
+    def emit_refuse_s2(text, post_id=None, parent_id=None, submolt=None, dry_run=True, **kw):
+        while by_hand:                              # he pauses her by hand while the round is running
+            _cp.pause("ambassador", by_hand.pop())
+        return {"sent": False, "judged": "VIOLATES", "why": "the covenant's judge refused this text"}
+    ks2 = dict(say=log.append, ask=ask_ok, learn=lambda: [], allies=lambda: [three[0]], emit=emit_refuse_s2,
+               introduce=lambda **k: {"sent": False}, grant_path=gps, sends_path=sps, count_comments=cc0)
+    step = FW.ROTATE_HOURS * 3600 + 60
+    q1 = FW.run_round(dry_run=False, now=300000.0, **ks2)
+    by_hand.append(hand_why)
+    q2 = FW.run_round(dry_run=False, now=300000.0 + step, **ks2)
+    s2_stands = _cp.standing("ambassador")
+    check("FW1S2a two refusing rounds, his pause set during the second: his reason stands on the switch, not hers",
+          q1["refused"] == 1 and q2["refused"] == 1 and not q1.get("isolated") and q2.get("isolated") is False
+          and s2_stands is not None and hand_why in s2_stands and not FW.is_isolation(s2_stands), (q2.get("isolated"), s2_stands))
+    s2_rows = [r for r in FW.sends(sps) if r.get("kind") == "isolation"]
+    check("FW1S2b her isolation is recorded beside it: one isolation row, written false, naming the pause that stands",
+          len(s2_rows) == 1 and s2_rows[0].get("written") is False and hand_why in str(s2_rows[0].get("stands"))
+          and FW.ISOLATION_MARK in str(s2_rows[0].get("why")), s2_rows)
+    import covenant_contact as CT2
+    s2_knock = [r for r in CT2._rows() if r.get("actor") == "free"][-1:]
+    check("FW1S2c the knock to him says it was recorded, not written, and does not tell him to --resume (that lifts HIS pause)",
+          s2_knock and s2_knock[0].get("why") == "ambassador: isolation recorded" and "--resume" not in s2_knock[0].get("text", "")
+          and "not written" in s2_knock[0].get("text", ""), s2_knock)
+    check("FW1S2d the digest Tetsu reads names it as not written, not as ISOLATED",
+          "NOT WRITTEN" in FW._round_digest({"refused": 1}, s2_rows) and "ISOLATED: " not in FW._round_digest({"refused": 1}, s2_rows))
+    _cp.paused = _real_paused                       # the lift reads the switch itself
+    try:
+        s2_lift = FW.lift_isolation(by="tetsu", grant_path=gps, sends_path=sps)
+        s2_after = _cp.standing("ambassador")
+    finally:
+        _cp.paused = lambda name: (False, "") if name == "ambassador" else _real_paused(name)
+    check("FW1S2e Tetsu's HEAL lift, under a grant that allows it, refuses: the pause is his and is still there",
+          s2_lift[0] is False and s2_after is not None and hand_why in s2_after, (s2_lift, s2_after))
+    _cp.resume("ambassador")                        # he lifts his own pause
+    q3 = FW.run_round(dry_run=False, now=300000.0 + 2 * step, **ks2)
+    q4 = FW.run_round(dry_run=False, now=300000.0 + 3 * step, **ks2)
+    s2_iso = _cp.standing("ambassador")
+    check("FW1S2f control: with no pause standing, two NEW refusing rounds still write her isolation (A301's count began at the row)",
+          not q3.get("isolated") and q4.get("isolated") is True and s2_iso is not None and FW.is_isolation(s2_iso),
+          (q3.get("isolated"), q4.get("isolated"), s2_iso))
+    _cp.resume("ambassador")
+
     covenant_model.ask = real_model_ask
     check("FW1z every round drafted with the suite's own writer: covenant_model.ask reached 0 times (A316: CT1's "
           "ask=None queued on the live model and timed out)", not model_asks, "%d draft(s) reached it" % len(model_asks))

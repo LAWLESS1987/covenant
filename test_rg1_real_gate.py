@@ -9,6 +9,7 @@ same quorum the node uses. Every check RUNS the helper (A87) and drives the gate
 sentence is not admitted as clean, a plain one is; the mock alone would have admitted the coercive one
 (the fix mattered); a sentinel that cannot be built refuses (no backdoor); and Tetsu's own words still
 go through under his immunity grant with the verdict attached (nothing of his is withheld).
+A349 S3 (2026-10-14): RG1.7 -- with no policy and nothing exported the shared sentinel seats what run_node seats.
 
 Run: python test_rg1_real_gate.py        -> "RG1: n/n passed"
 """
@@ -128,6 +129,45 @@ def main():
               "under his immunity with the verdict in its reason -- nothing of his is withheld (the quorum's answer today: %s)" % ("admitted" if verdict[0] else "convicted"),
               row is not None and why == "asked" and len(rows) == 1 and rows[0]["text"] == q
               and (verdict[0] or "under his immunity" in rows[0]["why"]), (verdict, row, why, rows[:1]))
+
+    # 7. A349 S3 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). On a tree with no policy and nothing
+    #    exported -- every clone, since the policy is gitignored -- default_sentinel() built the core's keyless 'claude'
+    #    seat, which refuses everything, where the node seats A93's fallback. Built for real here (nothing is judged),
+    #    and run_node.py itself is run in a child process with its policy loader returning none, so the two cannot
+    #    drift apart unseen. An exported list still wins here (A335, G21): this is the no-policy case only.
+    saved7 = (GP.HERE, GP._DEFAULT["sentinel"], os.environ.get("COVENANT_JUDGE_PROVIDERS"))
+    with tempfile.TemporaryDirectory() as nopol:
+        GP.HERE, GP._DEFAULT["sentinel"] = nopol, None
+        os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        try:
+            s7 = GP.default_sentinel()
+            seats7 = [type(j).__name__ for j in s7.judge.judges]
+            env7 = os.environ.get("COVENANT_JUDGE_PROVIDERS")
+        finally:
+            GP.HERE, GP._DEFAULT["sentinel"] = saved7[0], saved7[1]
+            if saved7[2] is None:
+                os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+            else:
+                os.environ["COVENANT_JUDGE_PROVIDERS"] = saved7[2]
+    want7 = [type(cov.JudgeProviderRegistry.build(p.strip(), i)).__name__
+             for i, p in enumerate(GP.NODE_NO_POLICY_PROVIDERS.split(","))] + ["MockJudge"]
+    check("RG1.7a no policy, nothing exported: default_sentinel() seats the node's no-policy providers beside the self-report "
+          "mock -- not the core's keyless 'claude' -- and exports nothing for a later build in the process to inherit",
+          seats7 == want7 and "ClaudeReasoningJudge" not in seats7 and env7 is None, (seats7, want7, env7))
+    import subprocess
+    child = ("import os, sys; sys.path.insert(0, %r); import covenant_judge_defer as D; "
+             "D.load_policy = lambda path=None: {}; import run_node; "
+             "print('__RG17__' + os.environ['COVENANT_JUDGE_PROVIDERS'], flush=True)" % HERE)
+    cenv = dict(os.environ, COVENANT_MODEL_STUB="1")
+    for k in ("COVENANT_JUDGE_PROVIDERS", "COVENANT_JUDGE_PROVIDERS_OVERRIDE"):
+        cenv.pop(k, None)
+    try:
+        r7 = subprocess.run([sys.executable, "-c", child], cwd=HERE, env=cenv, capture_output=True, text=True, timeout=150)
+        node7, tail7 = [ln[len("__RG17__"):] for ln in r7.stdout.splitlines() if ln.startswith("__RG17__")], r7.stderr[-300:]
+    except Exception as e:                                     # noqa: BLE001 -- a child that cannot run is a failure, named
+        node7, tail7 = [], "%s: %s" % (type(e).__name__, e)
+    check("RG1.7b ...and that is what run_node.py itself seats with no policy and nothing exported, run in a child process: %s"
+          % (node7[0] if node7 else "?"), node7 == [GP.NODE_NO_POLICY_PROVIDERS], (node7, tail7))
 
     n_ok, n = sum(results), len(results)
     print("RG1: %d/%d passed" % (n_ok, n))

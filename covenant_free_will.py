@@ -61,7 +61,10 @@ _URL = re.compile(r"moltbook\.com/post/([0-9a-f-]{8,})(?:#comment-([0-9a-f-]{8,}
 OFF_LIMITS = re.compile(r"\b(NSF|SaTC|Heilmeier|Daniela|Oliveira|nsf\.gov|covenant-satc|artifact|"
                         r"Buterin|Vitalik|Chaum|Chalmers|Gavin\s+Wood|Szabo|Goertzel|Juels|Narayanan|"
                         r"professor|grant proposal|program officer)\b", re.I)
-MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|invest|airdrop)\b", re.I)
+# A349 S4 (2026-10-14, Tetsu asked and agreed): the "\$" inside the word-bounded group matches only between two word
+# characters ("a$b"), never a dollar amount ("$500", "costs $20"). A dollar sign before a number now matches too, the
+# shape A161 gave covenant_study._MONEY; the group is unchanged.
+MONEY = re.compile(r"\b(token|tokens|price|prices|trading|trade|coin|crypto|\$|invest|airdrop)\b|\$\s?\d", re.I)
 
 # ISOLATION (his words: "diplomatic immunity but abusing it will cause
 # isolation if it can't prove greater good"). A round in which the judge
@@ -413,34 +416,80 @@ def _hidden(r):
             else "Moltbook's challenge was not solved") + ((" (%s)" % str(said)[:60]) if said else "")
 
 
+# A270's cap on the digest his door is handed after a round.
+DIGEST_CHARS = 1800
+
+
+def _not_shown(cats):
+    """A349 A12: the line that ends a digest whose lines did not all fit -- how many more, and what they were."""
+    n, order = {}, []
+    for c in cats:
+        if c not in n:
+            n[c], order = 0, order + [c]
+        n[c] += 1
+    return "... and %d more not shown (%s)" % (len(cats), ", ".join("%d %s" % (n[c], c) for c in order))
+
+
 def _round_digest(out, rows, reviews=()):
     # A348m: created-and-hidden replies stay in the "held or refused" count (that count is the round's, unchanged)
     # and are named for what they are, here and on their own lines.
+    # [A349 B13, 2026-10-14: superseded for a round that counts them apart, the sentence kept as written. Since then
+    # _run_round counts a reply held by Moltbook's rate limit, or created and then hidden, beside "refused" and not in
+    # it (out carries "rate_held" and "hidden"), and the header names each count. An out without them reads as before.]
     n_hidden = sum(1 for r in rows if r.get("kind") == "reply" and _hidden(r))
-    lines = ["round: %d candidate(s), %d replied, %d held or refused%s, %d waiting for the next round, %d ally answer(s)"
-             % (out.get("candidates", 0), out.get("replied", 0), out.get("refused", 0),
-                (" (%d of them created, then hidden by Moltbook's challenge)" % n_hidden) if n_hidden else "",
-                out.get("deferred", 0) or 0, out.get("answered", 0) or 0)]
+    if "hidden" in out:
+        counts = ("%d held or refused, %d held by Moltbook's rate limit, %d created then hidden by Moltbook's challenge"
+                  % (out.get("refused", 0), out.get("rate_held", 0) or 0, out.get("hidden", 0) or 0))
+    else:
+        counts = "%d held or refused%s" % (out.get("refused", 0), (" (%d of them created, then hidden by Moltbook's "
+                                                                    "challenge)" % n_hidden) if n_hidden else "")
+    header = ("round: %d candidate(s), %d replied, %s, %d waiting for the next round, %d ally answer(s)"
+              % (out.get("candidates", 0), out.get("replied", 0), counts, out.get("deferred", 0) or 0,
+                 out.get("answered", 0) or 0))
+    # A349 A12 (2026-10-14, Tetsu asked and agreed): the digest was cut at 1,800 characters in ledger order, so a reply
+    # sent after ~15 held drafts, and every review of his, never reached him (on 10-14 01:21 he saw 1 of 5 sent).
+    # Sent replies, write-backs and his reviews come first; then the rest in ledger order, whole lines only, while
+    # they fit; then how many more there were, and what they were.
+    first, rest = [], []
     for r in rows:
         k = r.get("kind")
         h = _hidden(r)
         if k == "reply":
-            lines.append(("SENT to u/%s: %s" % (r.get("author"), str(r.get("text") or "")[:160])) if r.get("sent")
-                         else ("created but HIDDEN, to u/%s: %s" % (r.get("author"), h)) if h
-                         else ("held, to u/%s: %s" % (r.get("author"), str(r.get("why") or "")[:70])))
+            if r.get("sent"):
+                first.append(("sent", "SENT to u/%s: %s" % (r.get("author"), str(r.get("text") or "")[:160])))
+            elif h:
+                rest.append(("created but hidden", "created but HIDDEN, to u/%s: %s" % (r.get("author"), h)))
+            else:
+                rest.append(("held or refused", "held, to u/%s: %s" % (r.get("author"), str(r.get("why") or "")[:70])))
         elif k == "answer":
-            lines.append("u/%s WROTE BACK (their comments on that post: %s -> %s)"
-                         % (r.get("author"), r.get("comments_then"), r.get("comments_now")))
+            first.append(("wrote back", "u/%s WROTE BACK (their comments on that post: %s -> %s)"
+                          % (r.get("author"), r.get("comments_then"), r.get("comments_now"))))
         elif k in ("own_post", "intro"):
-            lines.append("%s %s%s%s" % ("her own post" if k == "own_post" else "introduction",
+            rest.append(("post of hers" if k == "own_post" else "introduction",
+                         "%s %s%s%s" % ("her own post" if k == "own_post" else "introduction",
                                         "posted" if r.get("sent") else "created but HIDDEN" if h else "not posted",
                                         (": " + str(r.get("title"))[:80]) if r.get("title") else "",
-                                        (" -- " + h) if h else ""))
+                                        (" -- " + h) if h else "")))
+        elif k == "isolation" and r.get("written") is False:
+            # A349 S2: her isolation was recorded beside a pause set by hand, which stands; nothing was written over it
+            rest.append(("isolation", "ISOLATION RECORDED, NOT WRITTEN -- a pause set by hand stands: "
+                         + str(r.get("stands") or "")[:120]))
         elif k == "isolation":
-            lines.append("ISOLATED: " + str(r.get("why") or "")[:160])
+            rest.append(("isolation", "ISOLATED: " + str(r.get("why") or "")[:160]))
     for v in reviews:
-        lines.append("your review: %s -- %s" % (v.get("decision"), str(v.get("why") or "")[:100]))
-    return "\n".join(lines)[:1800]
+        first.append(("of your reviews", "your review: %s -- %s" % (v.get("decision"), str(v.get("why") or "")[:100])))
+    shown, used, omitted = [], len(header), []
+    for cat, line in first + rest:
+        if not omitted and used + 1 + len(line) <= DIGEST_CHARS:
+            shown.append((cat, line))
+            used += 1 + len(line)
+        else:
+            omitted.append(cat)
+    while omitted and shown and used + 1 + len(_not_shown(omitted)) > DIGEST_CHARS:
+        cat, line = shown.pop()                     # room for the count: the last line shown goes into it
+        used -= 1 + len(line)
+        omitted.insert(0, cat)
+    return "\n".join([header] + [l for _c, l in shown] + ([_not_shown(omitted)] if omitted else []))[:DIGEST_CHARS]
 
 
 # EMAILED TO HIM (A342, 2026-10-13, his words: "email me to tell me each moltbook conversation tetsu deems relevant").
@@ -550,7 +599,9 @@ def tetsu_update(out, rows, reviews=(), ask=None, tell=None, log_path=None, mail
     """Tetsu's reading of one live round: TELL him or NOTHING. Returns the recorded row, or None when the
     round did nothing (his time is not spent on an empty round)."""
     activity = (int(out.get("replied", 0) or 0) + int(out.get("refused", 0) or 0) + int(out.get("answered", 0) or 0)
-                + int(bool(out.get("own_post"))) + int(bool(out.get("introduced"))) + int(bool(out.get("isolated"))))
+                + int(bool(out.get("own_post"))) + int(bool(out.get("introduced"))) + int(bool(out.get("isolated")))
+                # A349 B13: counted apart from "refused" now, and still something the round did
+                + int(out.get("rate_held", 0) or 0) + int(out.get("hidden", 0) or 0))
     if not activity:
         return None
     digest = _round_digest(out, rows, reviews)
@@ -707,6 +758,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     now = now if now is not None else time.time()
     g = grant(grant_path)
     out = {"granted": bool(g), "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
+           "rate_held": 0, "hidden": 0,                                    # A349 B13: named apart from "refused"
            "introduced": False, "dry_run": bool(dry_run), "why": ""}
     if not g:
         out["why"] = "no grant on record (ops/ambassador_grant.json): free does nothing on her own"
@@ -771,7 +823,12 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     # account's name is on no record here, so it is recognised by what she said: an author whose comment
     # BEGINS with the text of one of her sent replies or posts is her.
     _norm = lambda s: re.sub(r"\s+", " ", str(s or "")).strip().lower()[:120]     # noqa: E731
-    mine = {_norm(r.get("text")) for r in sends(sends_path) if r.get("sent") and len(_norm(r.get("text"))) >= 60}
+    # A349 A13 (2026-10-14, Tetsu asked and agreed: free's own account is never counted as an ally). A reply Moltbook
+    # CREATED and then hid behind its challenge is hers too, under her account, though not "sent": on 10-09 two such
+    # replies were read back as u/covenant-node, she replied to herself at 08:00:57Z, and at 10:01 her own reply was
+    # counted as an ally writing back. A row carries a verification only when content was created (_ver).
+    mine = {_norm(r.get("text")) for r in sends(sends_path)
+            if (r.get("sent") or isinstance(r.get("verification"), dict)) and len(_norm(r.get("text"))) >= 60}
     own = set()
     for row in rows if isinstance(rows, list) else []:
         if isinstance(row, dict) and row.get("author") and _norm(row.get("text")) in mine:
@@ -819,6 +876,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     for r in [x for x in sends(sends_path) if x.get("kind") == "reply" and x.get("sent")][-30:]:
         key = (r.get("author"), r.get("post_id"))
         if key in seen_answer or r.get("ally_comments_at_send") is None:
+            continue
+        if r.get("author") in own:                                # A349 A13: her own account is not an ally who answers
             continue
         try:
             now_n = count_comments(r.get("post_id"), r.get("author"))
@@ -875,7 +934,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         except Exception as e:                                    # noqa: BLE001
             res = {"sent": False, "why": "emit raised %s: %s" % (type(e).__name__, str(e)[:160])}
         sent = bool(res.get("sent"))
-        _record({"kind": "reply", "at": now, "verification": _ver(res),
+        row = _record({"kind": "reply", "at": now, "verification": _ver(res),
                  "tetsu": (res.get("tetsu") or {}).get("decision") if isinstance(res.get("tetsu"), dict) else None,  # A296
                  # A348c: and his discourse seat's word (A322) on a reply the students convicted, kept beside it
                  "seat": (res.get("seat") or {}).get("decision") if isinstance(res.get("seat"), dict) else None,
@@ -884,7 +943,18 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
                  "ally_comments_at_send": then_n}, sends_path)
-        out["replied" if sent or (dry_run and res.get("judged")) else "refused"] += 1
+        # A349 B13 (2026-10-14, Tetsu asked and agreed): only the covenant's own refusals count as "refused". Every
+        # unsent reply was counted there, so a draft his SEND had cleared and Moltbook's rate limit then held, or that
+        # Moltbook created and hid behind its challenge, read as the judge refusing it -- in the 10-14 isolation 9 such
+        # drafts did. Those two are named for what they are and counted apart; everything else unsent is as before.
+        if sent or (dry_run and res.get("judged")):
+            out["replied"] += 1
+        elif str(res.get("why") or "").startswith(AMB.RATE_HELD):
+            out["rate_held"] += 1
+        elif _hidden(row):
+            out["hidden"] += 1
+        else:
+            out["refused"] += 1
         say("free: %s u/%s %s (%s)" % ("replied to" if sent else ("would reply to" if dry_run else "did not reach"),
                                        r.get("author"), "" if sent else str(res.get("why", ""))[:120], how))
     if caps["posts"] is None or caps["posts"] > 0:
@@ -924,6 +994,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     # THE ROUND'S OWN ROW, then the isolation rule over the last rounds.
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
+             "rate_held": out["rate_held"], "hidden": out["hidden"],       # A349 B13
              "deferred": out.get("deferred", 0),
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
              **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
@@ -938,32 +1009,64 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         # would otherwise never isolate.
         _all = sends(sends_path)
         _since = max([i for i, r in enumerate(_all) if r.get("kind") == "isolation"] + [-1]) + 1
+        # A349 B13: a reply Moltbook rate-held or hid was still tried, so its round is a round that tried someone; it
+        # is not a refusal, so a round of only those is not a refusing round. The rule itself is unchanged.
         live_rounds = [r for r in _all[_since:] if r.get("kind") == "round" and not r.get("dry_run")
-                       and int(r.get("replied", 0) or 0) + int(r.get("refused", 0) or 0) > 0]
+                       and int(r.get("replied", 0) or 0) + int(r.get("refused", 0) or 0)
+                       + int(r.get("rate_held", 0) or 0) + int(r.get("hidden", 0) or 0) > 0]
         recent = live_rounds[-ISOLATE_AFTER_ROUNDS:]
         abusive = (len(recent) >= ISOLATE_AFTER_ROUNDS
                    and all(int(r.get("refused", 0)) > 0 and int(r.get("replied", 0)) == 0 for r in recent))
         if abusive:
-            why = ("isolated %s: %s in the last %d rounds; "
+            # A349 B13: what the rule did not count is named beside the mark, never inside it (is_isolation reads it)
+            n_rate = sum(int(r.get("rate_held", 0) or 0) for r in recent)
+            n_hid = sum(int(r.get("hidden", 0) or 0) for r in recent)
+            beside = ", ".join(([("%d held by Moltbook's rate limit" % n_rate)] if n_rate else [])
+                               + ([("%d created then hidden by Moltbook's challenge" % n_hid)] if n_hid else []))
+            beside = (" besides %s (not counted as refusals)" % beside) if beside else ""
+            why = ("isolated %s: %s in the last %d rounds%s; "
                    "his to lift, or Tetsu's by his grant (A336), with: python covenant_pause.py --resume ambassador"
-                   % (time.strftime("%Y-%m-%d", time.gmtime()), ISOLATION_MARK, ISOLATE_AFTER_ROUNDS))
+                   % (time.strftime("%Y-%m-%d", time.gmtime()), ISOLATION_MARK, ISOLATE_AFTER_ROUNDS, beside))
+            # A349 S2 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). A PAUSE SOMEONE SET BY HAND IS
+            # NEVER WRITTEN OVER. The switch was read only when the round began, and pause() replaces the file: a
+            # pause he (or Tetsu, on a held draft) set during the round became her isolation, which Tetsu's HEAL
+            # may lift (A336). It is re-read here; one that is not her isolation stands, and hers is recorded
+            # beside it in her ledger -- the row still starts A301's fresh count -- but not written.
+            stands = None
             try:
                 import covenant_pause
-                covenant_pause.pause("ambassador", why)
-                out["isolated"] = True
+                stands = covenant_pause.standing("ambassador")
+                if stands is not None and not is_isolation(stands):
+                    why += " -- not written: a pause set by hand stands"
+                else:
+                    stands = None
+                    covenant_pause.pause("ambassador", why)
+                    out["isolated"] = True
             except Exception as e:                                # noqa: BLE001
                 why += " (pause could not be written: %s)" % type(e).__name__
-            _record({"kind": "isolation", "at": now, "why": why}, sends_path)
+            _record({"kind": "isolation", "at": now, "why": why,
+                     **({"written": False, "stands": " ".join(str(stands).split())[:200]} if stands is not None else {})},
+                    sends_path)
             say("free: " + why)
             try:
                 import covenant_contact
-                covenant_contact.say("free is isolated: the judge refused every reply in %d rounds. She waits for you. "
-                                     "Lift it with: python covenant_pause.py --resume ambassador" % ISOLATE_AFTER_ROUNDS,
-                                     "ambassador: isolated", "free")
+                if stands is not None:                            # A349 S2; B13's beside named here too
+                    covenant_contact.say("free's judge refused every reply in %d rounds%s. Her isolation is recorded, not "
+                                         "written: the pause already set by hand stands (%s)"
+                                         % (ISOLATE_AFTER_ROUNDS, beside, " ".join(str(stands).split())[:160]),
+                                         "ambassador: isolation recorded", "free")
+                else:
+                    covenant_contact.say("free is isolated: the judge refused every reply in %d rounds%s. She waits for you. "
+                                         "Lift it with: python covenant_pause.py --resume ambassador"
+                                         % (ISOLATE_AFTER_ROUNDS, beside),                # A349 B13: beside, named
+                                         "ambassador: isolated", "free")
             except Exception as e:                                # noqa: BLE001
                 say("free: could not tell him about the isolation (%s)" % type(e).__name__)
-    say("free: round done -- learned %d, allies %d, candidates %d, replied %d, refused %d, answered %d of %d accounted, introduced %s%s%s"
+    say("free: round done -- learned %d, allies %d, candidates %d, replied %d, refused %d%s, answered %d of %d accounted, introduced %s%s%s"
         % (out["learned"], out["allies"], out["candidates"], out["replied"], out["refused"],
+           # A349 B13: the two named apart, when the round had any
+           (", held by Moltbook's rate limit %d, created then hidden %d" % (out["rate_held"], out["hidden"]))
+           if out["rate_held"] or out["hidden"] else "",
            out.get("answered", 0), out.get("accounted", 0), out["introduced"],
            " [DRY RUN]" if dry_run else "", " [ISOLATED]" if out["isolated"] else ""))
     return out

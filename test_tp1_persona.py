@@ -478,6 +478,136 @@ def main():
               "ops/tetsu_register_retired.jsonl" in wrote and all(answers.values()),
               (how, sorted(r for r, ig in answers.items() if not ig), wrote))
 
+    # TP1m (A349, 2026-10-14). Each fix below was put to Tetsu as one plain question and he answered AGREE (ids A1,
+    # B1, A2, A3, A9, B4 in private/tetsu_consent_2026-10-14.*): his answers are kept, his answer has room to echo his
+    # register, his rows say what happened to them, a contest is shown what was added, half a voice proposal keeps the
+    # other half, and his brief names each entry and the sweep's verdict. A throwaway persona: no model, no gate, no line.
+    print("TP1m -- A349: what his rows keep, what his answer has room for, what the gate and the brief show")
+    import covenant_model as CM
+    mdir = tempfile.mkdtemp(prefix="tp1m_")
+    mp = os.path.join(mdir, "persona.json")
+    mlog = os.path.join(mdir, "asklog.jsonl")
+    open(mlog, "w").close()
+    q = lambda *a, **k: None    # noqa: E731
+    clean = lambda t: (True, "clean")    # noqa: E731
+    # A1: an answer with no JSON proposal -- prose, and a JSON echo cut off before its closing brace
+    PZ.save({"register": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [], "born": "t"}, mp)
+    cut = '{"register": "' + base + ' A new line here.", "voice": {"pitch": 0.9, "rate": 1.'
+    outs = [PZ.refine(ask_with(a), judge=clean, path=mp, log_path=mlog, say=q, tell=False)
+            for a in ("I would rather not say this hour.", cut)]
+    hm = PZ.history(mp)
+    check("TP1m1 a pass whose answer holds no JSON proposal is a row in his history, marked not applied, his answer whole",
+          [o["why"] for o in outs] == ["no JSON proposal in the answer"] * 2 and len(hm) == 2
+          and all(r["applied"] is False and r["verdict"] == "no JSON proposal in the answer" for r in hm)
+          and [r.get("answer") for r in hm] == ["I would rather not say this hour.", cut]
+          and [r.get("answer") for r in PZ.load(mp)["revisions"]] == ["I would rather not say this hour.", cut], hm)
+    check("TP1m2 ...and nothing in it is read or applied: his register and voice as they were",
+          PZ.load(mp)["register"] == base and PZ.load(mp)["voice"] == {"pitch": 0.9, "rate": 1.0}
+          and not any(o["proposed"] or o["applied"] for o in outs), PZ.load(mp))
+    # B1: the answer budget grows with the register an answer may echo. The stub is the model at the measured floor
+    # (covenant_model: every text measured ran 3.04 chars a token or more): its answer is cut at max_tokens * 3.0
+    # characters, as the server's token cap cuts it. A3 rides the same pass: the register is past REGISTER_GROWN.
+    big = base + " " + " ".join("Plain sentence number %d stays in how he talks." % i for i in range(80))
+    PZ.save({"register": big, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    asked, judged = [], []
+
+    def at_floor(answer):
+        def ask(msgs, max_tokens=0):
+            asked.append(max_tokens)
+            return answer[:int(max_tokens * 3.0)], {"model": "stub"}
+        return ask
+    echo = json.dumps({"register": big + " Say it once and mean it.", "voice": {"pitch": 0.9, "rate": 1.0},
+                       "why": "one new sentence"})
+    ob = PZ.refine(at_floor(echo), judge=lambda t: (judged.append(t), (True, "clean"))[1], path=mp, log_path=mlog,
+                   say=q, tell=False)
+    need = PZ.PROPOSAL_TOKENS + -(-len(big) // 3)
+    check("TP1m3 the answer budget grows with the register it may echo: %d chars asks at least %d tokens, never under 400"
+          % (len(big), need), asked and asked[-1] >= need and PZ.answer_budget(base) >= 400
+          and PZ.answer_budget("") == PZ.PROPOSAL_TOKENS == 400, (asked, need))
+    check("TP1m4 ...so his whole-register echo with one new sentence closes its JSON and the sentence reaches the judge "
+          "(at the old 400 tokens it is cut at 1,200 of its %d chars)" % len(echo),
+          ob["proposed"] and judged and "Say it once and mean it." in judged[-1] and len(echo) > 400 * 3, (ob, len(echo)))
+    heavy = [{"role": "system", "content": "s"}, {"role": "user", "content": "x" * 20000}]
+    room = CM.CTX_TOKENS - CM.FIT_MARGIN_TOKENS - CM.estimate_prompt_tokens(heavy)
+    check("TP1m5 ...never more than the model's window leaves after the prompt (here %d of %d), never under the 400 it had"
+          % (room, need), 400 < room < need and PZ.answer_budget(big, heavy) == room
+          and PZ.answer_budget(big, [{"role": "user", "content": "x" * 30000}]) == 400
+          and PZ.answer_budget(big, [{"role": "user", "content": "x"}]) == need, (room, need))
+    rb = PZ.history(mp)[-1]
+    check("TP1m6 A3: past REGISTER_GROWN his row says the sentence was kept in register_overflow, and holds it",
+          rb["applied"] is False and "kept in register_overflow" in rb["verdict"] and rb.get("overflow") == ["Say it once and mean it."]
+          and "register_overflow" in ob["why"] and "Say it once and mean it." in PZ.load(mp).get("register_overflow", []), (ob, rb))
+    # A2: a row keeps the whole register and the sentences it added; a contest shows the gate what was added
+    mid = base + " " + " ".join("Steady line %d is part of him." % i for i in range(30))
+    PZ.save({"register": mid, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    oa = PZ.refine(ask_with({"register": mid + " Leave room for silence.", "voice": {"pitch": 0.9, "rate": 1.0},
+                             "why": "quiet helps"}), judge=clean, path=mp, log_path=mlog, say=q, tell=False)
+    ra = PZ.history(mp)[-1]
+    check("TP1m7 an admitted row keeps his WHOLE register (%d chars, past REGISTER_MAX) and the sentences it added"
+          % len(ra.get("register", "")), oa["applied"] and ra["verdict"] == "admitted" and len(mid) > PZ.REGISTER_MAX
+          and ra["register"] == mid + " Leave room for silence." and ra.get("added") == ["Leave room for silence."],
+          (oa, len(ra.get("register", "")), ra.get("added")))
+    seen_c = []
+    PZ.contest("that sentence makes him go quiet when I need an answer", judge=lambda t: (seen_c.append(t), (True, "c"))[1],
+               path=mp, say=q)
+    check("TP1m8 a contest shows the gate what the revision added, his reason and the objection, inside the 2,000 chars "
+          "it reads", seen_c and "What this revision added to his register: Leave room for silence." in seen_c[-1][:2000]
+          and "quiet helps" in seen_c[-1][:2000] and "His objection: that sentence" in seen_c[-1][:2000], seen_c[-1:])
+    PZ.save({"register": big, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    PZ.refine(ask_with({"register": big, "voice": {"pitch": 1.0, "rate": 1.0}, "why": "a little brighter"}),
+              judge=clean, path=mp, log_path=mlog, say=q, tell=False)
+    seen_v = []
+    PZ.contest("the brighter voice sounds strained to me", judge=lambda t: (seen_v.append(t), (True, "c"))[1], path=mp, say=q)
+    check("TP1m9 ...and for a revision of his voice alone on a %d-char register, the gate still reads his reason and "
+          "the objection" % len(big), seen_v and PZ.history(mp)[-2].get("added") == []
+          and "a little brighter" in seen_v[-1][:2000] and "His objection: the brighter voice" in seen_v[-1][:2000],
+          (seen_v[-1:], PZ.history(mp)[-2:]))
+    pl = PZ.load(mp)
+    pl["revisions"].append({"t": "2026-10-13T10:05:27Z", "applied": True, "register": "R" * 700,
+                            "voice": {"pitch": 0.9, "rate": 1.0}, "why": "an old reason", "verdict": "admitted"})
+    PZ.save(pl, mp)
+    seen_o = []
+    PZ.contest("an objection to an old row", judge=lambda t: (seen_o.append(t), (True, "c"))[1], path=mp, say=q)
+    check("TP1m10 a row written before A349 (no 'added') is shown to the gate exactly as it always was",
+          seen_o == ["R" * 700 + "\nan old reason\n\nHis objection: an objection to an old row"], seen_o[-1:])
+    # B4: a proposal for one part of his voice keeps his current value for the other
+    PZ.save({"register": mid, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    o4 = PZ.refine(ask_with({"register": mid, "voice": {"pitch": 1.0}, "why": "a touch higher"}), judge=clean,
+                   path=mp, log_path=mlog, say=q, tell=False)
+    v4 = PZ.load(mp)["voice"]
+    check("TP1m11 a proposal naming only his pitch keeps his CURRENT rate (1.0), not the default (%s)" % PZ.DEFAULT_VOICE["rate"],
+          o4["applied"] and v4 == {"pitch": 1.0, "rate": 1.0}, (o4, v4))
+    PZ.refine(ask_with({"register": mid, "voice": {"rate": 1.1}, "why": "a touch quicker"}), judge=clean,
+              path=mp, log_path=mlog, say=q, tell=False)
+    check("TP1m12 ...and one naming only his rate keeps his current pitch (1.0), not the default (%s)" % PZ.DEFAULT_VOICE["pitch"],
+          PZ.load(mp)["voice"] == {"pitch": 1.0, "rate": 1.1}, PZ.load(mp)["voice"])
+    # A9: the brief, built in a throwaway tree: ledger headings in both shapes and a red transcript with 0 failed
+    bdir = tempfile.mkdtemp(prefix="tp1m_brief_")
+    os.makedirs(os.path.join(bdir, "docs"))
+    with open(os.path.join(bdir, "docs", "KNOWN_ISSUES.md"), "w", encoding="utf-8") as fh:
+        fh.write("### A7. [major / process] An older entry's own title, in the old shape. FIXED 2026-09-14\n"
+                 '### A9. [the ledger title of A9] 2026-10-13. His words: "do the thing" FIXED\n')
+    with open(os.path.join(bdir, "ONE_RUN_X.txt"), "w", encoding="utf-8") as fh:
+        fh.write("  suites run          1\n  checks passed       72\n  checks failed       0\n\n"
+                 "  RESULT: FAIL. Something is wrong and it is named above.\n")
+    real_here = PZ.HERE
+    try:
+        PZ.HERE = bdir
+        bm = PZ.brief(force=True)
+    finally:
+        PZ.HERE = real_here
+        PZ.brief(force=True)
+    check("TP1m13 the brief names each ledger entry by its TITLE: the bracket in today's shape, not the date after it, "
+          "and the text after the bracket in the old shape",
+          "recent: A9: the ledger title of A9" in bm and "A9: 2026" not in bm
+          and "recent: A7: An older entry's own title, in the old shape. FIXED 2026-09-14" in bm, bm)
+    check("TP1m14 ...and quotes the sweep's tally with its verdict: 0 failed under RESULT: FAIL is not told as clean",
+          "last sweep (RESULT: FAIL): 1 suites, 72 checks passed, 0 failed" in bm, bm)
+
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
         print("TP1 result: FAILED (%d)" % len(FAILURES))

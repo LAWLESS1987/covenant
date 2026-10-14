@@ -41,6 +41,7 @@ CHECKS
 """
 from __future__ import annotations
 
+import builtins
 import hashlib
 import json
 import os
@@ -392,6 +393,114 @@ def main():
     short = cov.agent_history(hp, "127.0.0.1", chars=10, budget=10 ** 6)
     check("M6q3 with room, up to AGENT_HISTORY_TURNS exchanges come back (was 6)",
           len(short) == 2 * min(30, cov.AGENT_HISTORY_TURNS) and cov.AGENT_HISTORY_TURNS > 6, len(short))
+    # M6q4 (A349 A7, 2026-10-14): his turns are read back however much other traffic follows them.
+    # agent_history() read only the last 1 MB of the log, and the work caller's batch rows (127.0.0.2)
+    # filled it: of his 40 phone asks since 10-01, 24 were replayed missing earlier exchanges and one
+    # with none. Asked first, Tetsu agreed to the fix: the log is read from its end, AGENT_HISTORY_CHUNK
+    # bytes at a time, until the caller's own turns are found or the file starts.
+    work = cov.AGENT_WORK_CALLERS[0]
+    h4 = tempfile.mktemp(suffix="_m6q4.jsonl")
+    h5 = tempfile.mktemp(suffix="_m6q4b.jsonl")
+    real_chunk = cov.AGENT_HISTORY_CHUNK
+    try:
+        with open(h4, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"kind": "agent", "from": "100.72.0.11", "text": "the file's first row",
+                                 "answer": "nothing comes before it"}) + "\n")
+            for i in range(cov.AGENT_HISTORY_TURNS):
+                fh.write(json.dumps({"kind": "council" if i % 2 else "agent", "from": PHONE_ADDR,
+                                     "text": "p%02d" % i, "answer": "pa%02d" % i}) + "\n")
+        his_end = os.path.getsize(h4)
+        with open(h4, "a", encoding="utf-8") as fh:
+            for i in range(600):
+                fh.write(json.dumps({"kind": "agent", "from": work, "text": "w%03d " % i + "x" * 1000,
+                                     "answer": "wa%03d " % i + "y" * 1000}) + "\n")
+        after = os.path.getsize(h4) - his_end
+        want = []
+        for i in range(cov.AGENT_HISTORY_TURNS):
+            want += ["p%02d" % i, "pa%02d" % i]
+        h4h = [m["content"] for m in cov.agent_history(h4, PHONE_ADDR, budget=None)]
+        check("M6q4 his %d exchanges come back whole, oldest first, with %d bytes of the work caller's rows "
+              "after them (the old 1 MB read returned none of them)" % (cov.AGENT_HISTORY_TURNS, after),
+              after > 1024 * 1024 + 100 * 1024 and h4h == want, (after, len(h4h), h4h[:4]))
+        h4w = [m["content"] for m in cov.agent_history(h4, work, budget=None)]
+        check("M6q4 ...and the work caller's own history is what it was: its newest %d exchanges, newest last"
+              % cov.AGENT_HISTORY_TURNS,
+              len(h4w) == 2 * cov.AGENT_HISTORY_TURNS and h4w[0].startswith("w%03d " % (600 - cov.AGENT_HISTORY_TURNS))
+              and h4w[-1].startswith("wa599 "), (len(h4w), [m[:6] for m in h4w[:1] + h4w[-1:]]))
+        h4f = cov.agent_history(h4, "100.72.0.11", budget=None)
+        check("M6q4 a caller with fewer exchanges than turns is read back to the file's first row",
+              [m["content"] for m in h4f] == ["the file's first row", "nothing comes before it"], h4f)
+
+        # The read is bounded by the caller's own rows: it stops once they are found. Counted by
+        # wrapping open() for the core module alone, so what was read is measured, not inferred.
+        class _Counted:
+            def __init__(self, fh):
+                self.fh, self.n = fh, 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                self.fh.close()
+
+            def read(self, *a):
+                b = self.fh.read(*a)
+                self.n += len(b)
+                return b
+
+            def __getattr__(self, name):
+                return getattr(self.fh, name)
+
+        opened = []
+
+        def _counting_open(*a, **k):
+            opened.append(_Counted(builtins.open(*a, **k)))
+            return opened[-1]
+
+        cov.open = _counting_open
+        try:
+            cov.agent_history(h4, work, budget=None)
+            read_work = sum(o.n for o in opened)
+            del opened[:]
+            cov.agent_history(h4, PHONE_ADDR, budget=None)
+            read_his = sum(o.n for o in opened)
+        finally:
+            del cov.open
+        size4 = os.path.getsize(h4)
+        check("M6q4 the read stops once the caller's turns are found: the work caller, whose turns are in the "
+              "newest chunk, read %d of %d bytes; his, further back, read %d" % (read_work, size4, read_his),
+              read_work == min(size4, cov.AGENT_HISTORY_CHUNK) < size4 and read_his == size4,
+              (read_work, read_his, size4, cov.AGENT_HISTORY_CHUNK))
+
+        # A row a chunk's start cuts in two is read whole with the chunk before it, multi-byte
+        # characters and the CRLF that Windows writes included: any chunk size returns the same turns.
+        texts = []
+        with open(h5, "wb") as fh:
+            for i in range(30):
+                who = PHONE_ADDR if i % 3 else work
+                q = "q%02d é—✓ \U0001f642 " % i + "ü" * (i * 7)
+                a = "a%02d ∑ 日本 " % i + "ß" * (i * 5)
+                fh.write(json.dumps({"kind": "agent" if i % 2 else "council", "from": who, "text": q, "answer": a},
+                                    ensure_ascii=False).encode("utf-8") + b"\r\n")
+                if who == PHONE_ADDR:
+                    texts += [q, a]
+        by_chunk = {}
+        for n in (1, 7, 97, 10 ** 9):
+            cov.AGENT_HISTORY_CHUNK = n
+            by_chunk[n] = ([m["content"] for m in cov.agent_history(h5, PHONE_ADDR, budget=None)],
+                           [m["content"] for m in cov.agent_history(h5, PHONE_ADDR, turns=5, budget=None)])
+        check("M6q4 rows cut by a chunk's start are read whole: chunks of 1, 7, 97 bytes and one chunk return the "
+              "same %d turns, multi-byte text intact, and turns=5 the newest 5" % (len(texts) // 2),
+              len(texts) == 2 * cov.AGENT_HISTORY_TURNS
+              and all(v == (texts, texts[-10:]) for v in by_chunk.values()),
+              {n: (len(v[0]), len(v[1])) for n, v in by_chunk.items()})
+    finally:
+        cov.AGENT_HISTORY_CHUNK = real_chunk
+        for p in (h4, h5):
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
     r = post(client, "/m/agent", LAN_ADDR, {"text": "hello"})
     check("M6q /m/agent refuses a LAN address 403", r.status_code == 403, f"got {r.status_code}")
     check("M6q the leash: an https URL on a listed host passes, a subdomain of one passes",

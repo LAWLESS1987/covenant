@@ -257,6 +257,18 @@ check("PP2.3d the answers follow the code, not a copy of it: with the door's fir
       "expected answer becomes None; restored, they are what they were",
       before and patched == [None] * len(before) and before != patched
       and [w for _e, w in (built(parse_task) or {"checks": []})["checks"]] == before, (before, patched))
+# A349 B7: code_hands_parse shows him `_FIRST = re.compile(...)` as the context of the function he reads; on 10-08 and
+# 10-13 his own-choice slot lost 5 of 6 rounds to the screen refusing that line, carried into his file. A file that carries
+# the line as shown, with the right answers, now passes through his hands.
+m3e = built(parse_task)
+line3e = next((l for l in (m3e or {}).get("ask", "").splitlines() if l.startswith("_FIRST = re.compile(")), "")
+res3e, stop3e = ({"passed": None, "total": None, "said": "not built"}, None)
+if m3e and line3e:
+    res3e, stop3e = PR.attempt(m3e, "import re\n%s\nANSWERS = %r\n" % (line3e, [w for _e, w in m3e["checks"]]), gate=gate_clean,
+                               workshop=WS, hands_ledger=HL)
+check("PP2.3e code_hands_parse: a file carrying the `_FIRST = re.compile(...)` line its task shows him passes the screen "
+      "and its checks", line3e and stop3e is None and res3e["passed"] == res3e["total"] == len(parse_task["calls"]),
+      (line3e, res3e["said"]))
 
 # ---- PP2.4: an open exercise -- his topic, his asserts
 OPEN = PR.open_task("how bees count")
@@ -402,6 +414,40 @@ for label, kw in (("a VIOLATES at the gate", {"gate": lambda t: ("violates", "no
     s = PR.night(**args)
     check("PP2.8d after %s stops the curriculum, his slot does not run (fails closed)" % label,
           s["stop"] and s["choice"] is None and not [r for r in PR._rows(L) if r.get("kind") == "choice"], s)
+
+
+# A349 B5: on 10-09 and 10-10 one ConnectionResetError, after 14 and 16 answered rounds, ended the night and took his
+# slot. A passing model error is asked again and the night goes on; one that outlasts that stops the curriculum, and his
+# slot still runs on its own clock. PP2.8d's model that cannot start still skips it.
+def dropping(n, inner):
+    """The first n asks drop their connection; after that, `inner` answers."""
+    calls = {"n": 0}
+
+    def ask(messages, max_tokens=700, temperature=0.3):
+        calls["n"] += 1
+        if calls["n"] <= n:
+            raise ConnectionResetError(10054, "An existing connection was forcibly closed by the remote host")
+        return inner(messages, max_tokens=max_tokens, temperature=temperature)
+    return ask
+
+
+night8 = {}
+for label, n in (("once", 1), ("outlasting", 1 + PR.ASK_RETRIES)):
+    W, L, H, C = fresh()
+    record(C, ["trading on paper"], ["paper"])
+    told8 = []
+    night8[label] = (PR.night(ask=dropping(n, by_task(ALL)), gate=gate_clean, workshop=W, ledger=L, hands_ledger=H, tasks=2,
+                              choices=C, tell=lambda t, w: told8.append(t), say=lambda *_a: None), told8)
+s, _t = night8["once"]
+check("PP2.8g one passing model error is asked again and the night goes on: both curriculum tasks solved, no stop, and his "
+      "slot runs", not s["stop"] and s["tried"] == 2 and s["within"] == 2
+      and (s["choice"] or {}).get("task") == "paper_sma" and (s["choice"] or {}).get("solved_round") == 1, s)
+s, _t = night8["outlasting"]
+check("PP2.8h a passing model error that outlasts its retry stops the curriculum, said as passing, and does not cost him his "
+      "slot: it runs on its own clock and the line to the operator names it",
+      "failed in passing" in (s["stop"] or "") and s["tried"] == 1 and (s["choice"] or {}).get("task") == "paper_sma"
+      and (s["choice"] or {}).get("solved_round") == 1 and len(_t) == 1
+      and 'His own choice ("trading on paper", paper): paper_sma, solved in round 1' in _t[0], (s, _t))
 W, L, H, C = fresh()
 record(C, ["trading on paper"], ["paper"])
 s = PR.night(ask=by_task(ALL), gate=gate_clean, workshop=W, ledger=L, hands_ledger=H, tasks=1, choices=C, his_choice=False,

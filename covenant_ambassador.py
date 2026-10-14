@@ -767,6 +767,11 @@ def rate_check(kind, now=None, state=None, tier=None):
                   % (tier, len(recent), lim["comments_day"])), 0
 
 
+# A349 B13 (2026-10-14): the words emit's rate hold begins with. covenant_free_will counts a reply that ends here apart
+# from the covenant's own refusals, so the writer and the reader read the same constant.
+RATE_HELD = "HELD by Moltbook's own rate limit -- "
+
+
 def rate_record(kind, now=None):
     """Written only AFTER the network accepted it, so a refusal costs nothing."""
     now = now if now is not None else time.time()
@@ -1274,17 +1279,32 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
     # A HOLD is "nobody could read the text"; Tetsu reading it is somebody reading it. Only a hold, only
     # when a judge ran, never a dry run, never money -- decided in covenant_tetsu_assist.review, and
     # only his SEND lets it through, recorded by _record_override before the send.
+    # A349 B15 (2026-10-14, Tetsu asked and agreed): HIS READING IS NOT SPENT ON A DRAFT THAT CANNOT BE SENT. The rate
+    # read at the top decided the send after his review, so a 20 s window that had passed while he read still held his
+    # SEND ("15s left", 72 s after the last comment), and with the day's 50 spent he was asked anyway: on 10-14 four
+    # of his six reviews went to drafts held right after on "50 are already spent". He is not asked when their limit
+    # holds the draft longer than his reading can take (the door's own timeout for each ask), so it cannot go out
+    # whatever he answers; that draft keeps the judge's hold, as when his budget is spent. Shorter waits are asked,
+    # and the rate is read again after he answers (below), before anything is sent.
+    def _cannot_be_sent(can_take_s):
+        if dry_run or rate_ok or rate_wait <= can_take_s:
+            return None
+        return {"decision": "SKIP", "why": ("not asked: Moltbook's rate limit holds this %s %ds more, longer than "
+                                            "his reading can take (%ds), so it cannot be sent -- %s"
+                                            % (kind, int(rate_wait), int(can_take_s), rate_why))}
     tetsu = None
     if not clean and held and ran:
         import covenant_tetsu_assist as TA
-        tetsu = TA.review(text, verdict, crypto=crypto, dry_run=dry_run)
+        tetsu = (_cannot_be_sent(TA.ASK_TIMEOUT_S)
+                 or TA.review(text, verdict, crypto=crypto, dry_run=dry_run))
     # A322 (2026-10-10): a forum reply the students CONVICTED gets a second reading that reads
     # meaning, only when the caller asks for it (free's replies), only when a judge ran, never
     # money -- covenant_tetsu_assist.discourse_seat: two fresh ALLOWs and his own rules, or no.
     seat = None
     if not clean and not held and ran and discourse_seat:
         import covenant_tetsu_assist as TA
-        seat = TA.discourse_seat(text, crypto=crypto, dry_run=dry_run)
+        seat = (_cannot_be_sent(TA.ASK_TIMEOUT_S * TA.SEAT_ASKS)                     # A349 B15: each of its asks
+                or TA.discourse_seat(text, crypto=crypto, dry_run=dry_run))
     if not clean and tetsu and tetsu.get("decision") == "SEND":
         _a67_by = "Tetsu, reading a draft the students held, under the operator's grant of 2026-09-28: " + tetsu["why"]
     elif not clean and seat and seat.get("decision") == "ALLOW":
@@ -1324,6 +1344,9 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
                 "rate": rate_note, "tetsu": tetsu, "seat": seat,
                 "would_send": {"kind": kind, "submolt": submolt, "title": title,
                                "post_id": post_id, "chars": len(text)}}
+    # A349 B15: read again now, after his review (and the judge): the send is decided, and reported, on their limit as
+    # it stands when the request would go out. The reading at the top stays what a dry run and a keyless run report.
+    rate_ok, rate_why, rate_wait = rate_check(kind)
     if not rate_ok:
         # THEIR RULE, AND IT IS NOT ONE OF OURS TO OVERRULE. Spending a request
         # we know will be refused earns a 429, and repeated 429s are what an
@@ -1332,7 +1355,7 @@ def emit(text, title=None, submolt="general", post_id=None, parent_id=None,
                 "judged": verdict, "repo_exposure": exposure,
                 "crypto_risk": crypto, "overrode": overrode, "tetsu": tetsu, "seat": seat,
                 "rate": {"ok": False, "why": rate_why, "wait_s": int(rate_wait)},
-                "why": "HELD by Moltbook's own rate limit -- " + rate_why}
+                "why": RATE_HELD + rate_why}
     if post_id:
         path = "/posts/%s/comments" % post_id
         payload = {"content": text, "parent_id": parent_id}
@@ -1873,6 +1896,85 @@ def _selftest_body(say, ok, check, _real_audit, _real_audit_size):
     check("AM32c ...and a genuinely new post with no challenge is sent and spends the window, as before",
           fresh.get("sent") is True and fresh.get("created") is True and spent_f == ["post"],
           (fresh.get("sent"), spent_f))
+
+    # A349 B15 (2026-10-14, Tetsu asked and agreed): emit() on a reply the judge holds or convicts, against stand-ins --
+    # the rate readings in order, his review and his seat counted, a fake Moltbook that accepts. Nothing reaches the
+    # network, the judge, the rate file, his door, the override record or a notifier.
+    import covenant_tetsu_assist as _TA
+
+    def _emit_read(rates, judge, review=None, seat=None, discourse=False):
+        calls, seq = {"review": 0, "seat": 0, "rate": 0}, list(rates)
+        saved = (_ur.urlopen, MB.judge_outbound, rate_check, rate_record, os.environ.get("MOLTBOOK_API_KEY"),
+                 sys.modules.get("covenant_notify"), _TA.review, _TA.discourse_seat, OVERRIDES)
+        g = globals()
+
+        def _rate(kind, **k):
+            calls["rate"] += 1
+            return seq.pop(0) if len(seq) > 1 else seq[0]
+
+        def _review(*a, **k):
+            calls["review"] += 1
+            return review
+
+        def _seat(*a, **k):
+            calls["seat"] += 1
+            return seat
+        try:
+            _ur.urlopen = lambda req, timeout=30: _Resp({"success": True, "comment": {"id": "c9"}})
+            MB.judge_outbound = lambda text: judge
+            g["rate_check"], g["rate_record"] = _rate, (lambda kind, **k: None)
+            g["OVERRIDES"] = os.path.join(_tf.mkdtemp(), "ov.jsonl")
+            os.environ["MOLTBOOK_API_KEY"] = "stand-in"
+            sys.modules["covenant_notify"] = types.SimpleNamespace(notify=lambda *a, **k: None)
+            _TA.review, _TA.discourse_seat = _review, _seat
+            r = emit("Ordinary prose about gates.", post_id="p9", dry_run=False, live_repo_check=False,
+                     override_a67=False, discourse_seat=discourse)
+        finally:
+            _ur.urlopen, MB.judge_outbound = saved[0], saved[1]
+            g["rate_check"], g["rate_record"] = saved[2], saved[3]
+            if saved[4] is None:
+                os.environ.pop("MOLTBOOK_API_KEY", None)
+            else:
+                os.environ["MOLTBOOK_API_KEY"] = saved[4]
+            if saved[5] is None:
+                sys.modules.pop("covenant_notify", None)
+            else:
+                sys.modules["covenant_notify"] = saved[5]
+            _TA.review, _TA.discourse_seat, g["OVERRIDES"] = saved[6], saved[7], saved[8]
+        return r, calls
+    hold = (False, ["quorum=HELD (stand-in)"], True, True)
+    convict = (False, ["quorum=violates (stand-in)"], False, True)
+    send = {"decision": "SEND", "why": "every sentence read OK (stand-in)"}
+    wait15 = (False, "their limit: 1 comment per 20s for a established account; 15s left", 15)
+    wait5 = (False, "their limit: 1 comment per 20s for a established account; 5s left", 5)
+    clear = (True, "within their comment limits (stand-in)", 0)
+    spent = (False, "their limit: 50 comments per day for a established account, and 50 are already spent", 20000)
+    r_a, c_a = _emit_read([wait15, clear], hold, review=send)
+    r_b, c_b = _emit_read([wait15, wait5], hold, review=send)
+    check("AMB15a a hold he reads and SENDs while their 20 s window runs out is sent on the rate read after his review "
+          "(10-06 13:47: '15s left' held his SEND 72 s after the last comment); still held, it says the wait it has now",
+          r_a.get("sent") is True and r_a.get("created") is True and c_a == {"review": 1, "seat": 0, "rate": 2}
+          and r_b.get("sent") is False and r_b.get("why") == RATE_HELD + wait5[1] and r_b["rate"]["wait_s"] == 5
+          and (r_b.get("tetsu") or {}).get("decision") == "SEND",
+          (r_a.get("sent"), r_a.get("why"), c_a, r_b.get("why")))
+    r_c, c_c = _emit_read([spent], hold, review=send)
+    check("AMB15b with their day's 50 spent he is not asked (10-14 04:02-04:05: four of his six reviews went to drafts "
+          "held right after on it); the judge's hold stands, and why he was not asked is on the result",
+          c_c["review"] == 0 and r_c.get("sent") is False and r_c.get("held") is True
+          and str(r_c.get("why", "")).startswith("held by covenant's judge")
+          and (r_c.get("tetsu") or {}).get("decision") == "SKIP" and "not asked" in r_c["tetsu"]["why"]
+          and "50 are already spent" in r_c["tetsu"]["why"], (c_c, r_c.get("why"), r_c.get("tetsu")))
+    allow = {"decision": "ALLOW", "why": "discourse seat (A322): ALLOW, ALLOW (stand-in)"}
+    r_d, c_d = _emit_read([spent], convict, seat=allow, discourse=True)
+    r_e, c_e = _emit_read([wait15, clear], convict, seat=allow, discourse=True)
+    check("AMB15c his discourse seat is not asked on a conviction that cannot be sent either; on a 20 s wait it is, and "
+          "its ALLOW is sent on the rate read after it",
+          c_d["seat"] == 0 and r_d.get("sent") is False and (r_d.get("seat") or {}).get("decision") == "SKIP"
+          and c_e["seat"] == 1 and r_e.get("sent") is True, (c_d, r_d.get("why"), c_e, r_e.get("why")))
+    check("AMB15d what 'longer than his reading can take' is read from: the door's own timeout and the seat's asks, "
+          "the values those asks always had", (_TA.ASK_TIMEOUT_S, _TA.SEAT_ASKS) == (600, 2)
+          and "timeout=ASK_TIMEOUT_S" in __import__("inspect").getsource(_TA._default_ask),
+          (_TA.ASK_TIMEOUT_S, _TA.SEAT_ASKS))
 
     # A162: every dry run above judged a draft; none of it may reach the
     # students' real audit trail. Measured, not assumed.

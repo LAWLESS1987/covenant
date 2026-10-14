@@ -181,10 +181,20 @@ def build(h):
     return name, strat, int(warm(vals))
 
 
+def _tested(r):
+    """A349 B11: False for a hypothesis that met no price series -- it was never a trial. Read from the
+    row's own "tested" (written from A349 on), or, for a row written before it, from its empty result."""
+    if r.get("tested") is False:
+        return False
+    res = r.get("result")
+    return not (isinstance(res, dict) and not res.get("assets") and "no price series" in str(res.get("why", "")))
+
+
 def trials_so_far(path=None):
-    """Every trial ever made counts against the next one: the lab's grid plus Tetsu's hypotheses."""
+    """Every trial ever made counts against the next one: the lab's grid plus Tetsu's hypotheses that met
+    a price series. A349 B11: one that met none was counted too, though nothing was tested."""
     import strategy_lab as L
-    return len(L.build_grid()) + sum(1 for r in _rows(path) if r.get("kind") == "hypothesis")
+    return len(L.build_grid()) + sum(1 for r in _rows(path) if r.get("kind") == "hypothesis" and _tested(r))
 
 
 def evaluate(h, files=None, folds=5, path=None, holdings_=None):
@@ -194,13 +204,14 @@ def evaluate(h, files=None, folds=5, path=None, holdings_=None):
     name, strat, warm = build(h)
     files = SV.series_files(h.get("assets") or None) if files is None else files
     if not files:
-        return {"name": name, "survives": False, "assets": {}, "why": "no price series to test on (UNDETERMINED)"}
+        return {"name": name, "survives": False, "assets": {}, "why": "no price series to test on (UNDETERMINED)", "tested": False}   # A349 B11
     tried = trials_so_far(path) + 1
     cost = SV.CostModel(taker_fee_bps=SV.FEE_BPS, spread_bps=SV.SPREAD_BPS, slippage_bps=SV.SLIP_BPS, min_notional=SV.MIN_NOTIONAL)
     bt = SV.Backtester(cost=cost, capital=SV.CAPITAL)
     fam = h["family"]
     family_variants = [(n, s, w) for n, s, w in L.build_grid() if n.split(" ")[0] == fam.replace("sma_longonly", "sma_longonly")]
     out = {"name": name, "trials_counted": tried, "assets": {}, "survives": False, "why": ""}
+    wf_reason, undetermined = {}, []          # A349 B12: why walk-forward could not run, per asset
     for sym, fpath in list(files.items())[:MAX_ASSETS]:
         try:
             bars = SV.load_csv(fpath)
@@ -216,11 +227,14 @@ def evaluate(h, files=None, folds=5, path=None, holdings_=None):
             except ValueError:
                 continue
         p, _nsplit = SV.pbo(rets) if len(rets) >= 2 else (-1, 0)
-        wf = None
+        wf, wf_none = None, ""
         try:
             wf = SV.walk_forward(bars, lambda train, _s=strat: _s, folds=folds, embargo_frac=0.02, cost=cost, capital=SV.CAPITAL, warmup=warm)
-        except ValueError:
-            wf = None
+        except ValueError as e:
+            # A349 B12: a warm-up above about 71 bars cannot run 5 folds on these series (the bounds allow
+            # up to 242), and this was folded into a plain fail of the three tests. It is recorded as
+            # UNDETERMINED with its reason; what counts as a pass (ok, below) is unchanged.
+            wf, wf_none = None, str(e)[:160]
         held = sum(t.bars_held for t in r.trades)
         ok = bool(wf and wf["consistent"]) and d["deflated_sharpe"] >= 0.95 and 0 <= p < 0.5
         out["assets"][sym] = {"bars": len(bars), "return": round(r.total_return, 4), "sharpe": round(r.sharpe(), 3),
@@ -229,10 +243,26 @@ def evaluate(h, files=None, folds=5, path=None, holdings_=None):
                                       "positive": wf["positive_folds"], "folds": wf["folds"]} if wf else None),
                               "mdd": round(r.max_drawdown(), 4), "trades": r.n_trades, "in_market": round(held / float(max(1, r.n_bars)), 3),
                               "survives": ok}
+        if wf_none:
+            wf_reason[sym] = wf_none
+            out["assets"][sym]["wf_undetermined"] = "UNDETERMINED: " + wf_none
+            if d["deflated_sharpe"] >= 0.95 and 0 <= p < 0.5:
+                undetermined.append(sym)          # the two measured tests cleared; only walk-forward is unknown
         if ok:
             out["survives"] = True
-    out["why"] = ("survives on %s" % ", ".join(s for s, a in out["assets"].items() if a.get("survives"))) if out["survives"] else \
-        "no asset cleared deflated Sharpe >= 0.95, walk-forward consistency and PBO < 0.5 together (%d trials counted)" % tried
+    if wf_reason:
+        out["walk_forward_undetermined"] = sorted(wf_reason)
+    if out["survives"]:
+        out["why"] = "survives on %s" % ", ".join(s for s, a in out["assets"].items() if a.get("survives"))
+    elif undetermined:
+        # A349 B12: no measured test failed on these assets; the verdict is UNDETERMINED, not failed.
+        out["undetermined"] = undetermined
+        out["why"] = ("UNDETERMINED: on %s the deflated Sharpe and PBO cleared but walk-forward could not run (%s); "
+                      "no asset cleared all three (%d trials counted)" % (", ".join(undetermined), wf_reason[undetermined[0]], tried))
+    else:
+        out["why"] = "no asset cleared deflated Sharpe >= 0.95, walk-forward consistency and PBO < 0.5 together (%d trials counted)" % tried
+        if wf_reason:
+            out["why"] += "; walk-forward was UNDETERMINED, not failed, on %s (%s)" % (", ".join(sorted(wf_reason)), wf_reason[sorted(wf_reason)[0]])
     out["consequence"] = consequence(out, holdings_ if holdings_ is not None else holdings())
     return out
 
@@ -268,12 +298,18 @@ def _bounds_text():
 
 
 def _verdict(r):
-    """A348h: a hypothesis that never met a price series is 'untested', not 'no'."""
+    """A348h: a hypothesis that never met a price series is 'untested', not 'no'.
+    A349 B11/B12: untested is read by _tested(), not by the word UNDETERMINED in the why (a B12 why carries
+    it too), and a rule whose walk-forward could not run where the other two tests cleared is 'undetermined'."""
     if r.get("survives"):
         return "SURVIVED"
     res = r.get("result")
     why = str(res.get("why", "")) if isinstance(res, dict) else ""
-    return ("untested: %s" % why[:120]) if "UNDETERMINED" in why else "no"
+    if not _tested(r):
+        return "untested: %s" % why[:120]
+    if isinstance(res, dict) and res.get("undetermined"):
+        return "undetermined: %s" % why[:120]
+    return "no"
 
 
 def _refused_line(r):
@@ -352,7 +388,8 @@ def study(ask, judge=None, path=None, say=print, files=None, hold=None, tell=Tru
         _append({"kind": "refused", "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "hypothesis": h, "why": out["why"]}, path)
         say("money: " + out["why"])
         return out
-    if any(r.get("name") == name for r in _rows(path) if r.get("kind") == "hypothesis"):
+    # A349 B11: an untested row (no price series met) blocked its name for good, though nothing was tested.
+    if any(r.get("name") == name for r in _rows(path) if r.get("kind") == "hypothesis" and _tested(r)):
         out["why"] = "already on the record: %s" % name
         say("money: " + out["why"])
         return out
@@ -361,11 +398,12 @@ def study(ask, judge=None, path=None, say=print, files=None, hold=None, tell=Tru
     ok_j, msg_j = (judge or _gate)(why_text + "\n" + res.get("consequence", ""))
     row = {"kind": "hypothesis", "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "name": name, "hypothesis": h,
            "why": why_text, "gate": {"ok": bool(ok_j), "message": str(msg_j)[:200]}, "survives": bool(res.get("survives")) and bool(ok_j),
-           "result": {k: v for k, v in res.items() if k != "consequence"}, "consequence": res.get("consequence", ""), "paper": True}
+           "result": {k: v for k, v in res.items() if k != "consequence"}, "consequence": res.get("consequence", ""), "paper": True,
+           "tested": res.get("tested") is not False}       # A349 B11: recorded untested, not as a failed trial
     _append(row, path)
     out["recorded"], out["survives"] = True, row["survives"]
     out["why"] = ("held by the gate: %s" % str(msg_j)[:120]) if not ok_j else res.get("why", "")
-    say("money: %s -- %s -- %s" % (name, "SURVIVED" if row["survives"] else "no", out["why"]))
+    say("money: %s -- %s -- %s" % (name, _verdict(row).split(":")[0], out["why"]))      # A349 B11/B12: untested, undetermined or no
     if row["survives"] and tell:
         try:
             import covenant_contact

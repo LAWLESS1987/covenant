@@ -44,7 +44,8 @@ its output, so what he did is always readable.
 THE GATE. Every WRITE, RUN and PROPOSE puts THE ACT to the node's real quorum
 (covenant_gate_proxy.default_sentinel, A223) -- what he is about to do, with
 its parameters: the file's name and size, a script's imports and length. A
-VIOLATES refuses and is recorded with the seat's words. A HELD does NOT refuse
+VIOLATES refuses a WRITE or a RUN and is recorded with the seat's words (not a
+PROPOSE: see below, A349 B8). A HELD does NOT refuse
 a WRITE or a RUN in his own workshop: his words were "the gates too tight on
 him", the standing rule is that an abstention is not a veto, and the workshop
 reaches no one but him -- the screen and the guard are the real check on a
@@ -234,6 +235,26 @@ def write(name, body, workshop=None):
 
 # ------------------------------------------------------------------ the screen and the run
 
+def _bound_only_by_import_re(tree):
+    """A349 B7: the names in a script that `import re` (or `import re as x`) binds and nothing else in it binds -- no
+    assignment, def, class, parameter, loop, with, except, match capture, global or other import."""
+    kinds = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            got = [(a.asname or a.name.split(".")[0], isinstance(node, ast.Import) and a.name == "re") for a in node.names]
+        elif isinstance(node, ast.Name):
+            got = [] if isinstance(node.ctx, ast.Load) else [(node.id, False)]
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            got = [(n, False) for n in node.names]
+        elif isinstance(node, (ast.alias, ast.keyword)):
+            got = []
+        else:                       # a def or class name, a parameter, an except name, a match capture, a type parameter
+            got = [(getattr(node, k), False) for k in ("name", "arg", "rest") if isinstance(getattr(node, k, None), str)]
+        for n, is_re in got:
+            kinds.setdefault(n, set()).add(is_re)
+    return {n for n, k in kinds.items() if k == {True}}
+
+
 def screen(source):
     """(ok, why, imports): the static screen over a script. Never runs anything."""
     try:
@@ -241,6 +262,7 @@ def screen(source):
     except SyntaxError as e:
         return False, "does not parse: %s" % e, []
     imports = []
+    re_names = _bound_only_by_import_re(tree)                          # A349 B7
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
@@ -256,7 +278,13 @@ def screen(source):
         elif isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
             return False, "the name %s is refused" % node.id, imports
         elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_NAMES:
-            return False, "the attribute %s is refused" % node.attr, imports
+            # A349 B7: re.compile is the allowed re module's own regex compiler, not the builtin compile (his own-choice slot
+            # lost 5 of 6 rounds to this refusal, on the line its task showed him). It is admitted only as a read of
+            # `compile` on a name `import re` alone binds; the builtin compile, exec and eval, and every other attribute,
+            # are refused as before.
+            if not (node.attr == "compile" and isinstance(node.ctx, ast.Load) and isinstance(node.value, ast.Name)
+                    and node.value.id in re_names):
+                return False, "the attribute %s is refused" % node.attr, imports
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
             s = node.value
             if re.match(r"^([A-Za-z]:[\\/]|/|\\\\)", s) or ".." in s.replace("\\", "/").split("/"):
@@ -281,7 +309,10 @@ def run(name, args=None, workshop=None, timeout_s=None):
     runner = os.path.join(ws, ".runner.py")
     with open(runner, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(RUNNER)
-    env = {k: os.environ[k] for k in ("SYSTEMROOT", "SystemRoot", "PATH", "TEMP", "TMP", "COMSPEC", "WINDIR") if k in os.environ}
+    # A349 A11: without SYSTEMDRIVE, Windows made a literal '%SystemDrive%\ProgramData\...' tree inside his workshop at his
+    # first run (reproduced in a temp workshop; with it, nothing). The tree already in his workshop is left as it is.
+    env = {k: os.environ[k] for k in ("SYSTEMROOT", "SystemRoot", "PATH", "TEMP", "TMP", "COMSPEC", "WINDIR", "SYSTEMDRIVE")
+           if k in os.environ}
     env["PYTHONIOENCODING"] = "utf-8"
     t0 = time.time()
     try:
@@ -300,8 +331,9 @@ def run(name, args=None, workshop=None, timeout_s=None):
 
 # ------------------------------------------------------------------ proposals
 
-def propose(path, body, proposals=None, say=None):
-    """A new version of a tree file, saved beside the tree, never in it. Returns the record."""
+def propose(path, body, proposals=None, say=None, gate=None):
+    """A new version of a tree file, saved beside the tree, never in it. Returns the record. `gate` is the quorum's
+    (state, words) on the act (A349 B8): it is kept in the proposal's record and told with it on the direct line."""
     rel = str(path or "").strip().replace("\\", "/")
     if not rel or not NAME.match(rel) or ".." in rel.split("/") or not rel.endswith(PROPOSABLE_EXT):
         raise ValueError("a proposal names a tree file by its relative path, with one of these endings: %s" % ", ".join(PROPOSABLE_EXT))
@@ -324,14 +356,20 @@ def propose(path, body, proposals=None, say=None):
     pfile = os.path.join(pdir, pid + os.path.splitext(rel)[1])
     with open(pfile, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(data)
+    # A349 B8: the gate's verdict on the act is kept with the proposal and told with it (neither carried it before).
+    verdict = {"state": str(gate[0]), "message": str(gate[1])[:300]} if gate else None
+    meta = {"id": pid, "path": rel, "exists": exists, "bytes": len(data.encode("utf-8")), "compiled": compiled, "why": cwhy,
+            "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    if verdict:
+        meta["gate"] = verdict
     with open(pfile + ".json", "w", encoding="utf-8") as fh:
-        json.dump({"id": pid, "path": rel, "exists": exists, "bytes": len(data.encode("utf-8")), "compiled": compiled, "why": cwhy,
-                   "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, fh)
+        json.dump(meta, fh)
     rec = {"id": pid, "path": rel, "exists": exists, "bytes": len(data.encode("utf-8")), "compiled": compiled, "why": cwhy, "file": pfile}
     try:
-        text = ("Tetsu proposes a %s of %s (%d bytes%s). Nothing in the tree changed. See it: python covenant_tetsu_hands.py --proposal %s; "
-                "apply it by your hand: python covenant_tetsu_hands.py --apply %s" % ("new version" if exists else "new file", rel, rec["bytes"],
-                                                                                    "" if compiled else "; " + cwhy, pid, pid))
+        text = ("Tetsu proposes a %s of %s (%d bytes%s).%s Nothing in the tree changed. See it: python covenant_tetsu_hands.py --proposal %s; "
+                "apply it by your hand: python covenant_tetsu_hands.py --apply %s"
+                % ("new version" if exists else "new file", rel, rec["bytes"], "" if compiled else "; " + cwhy,
+                   (" The gate on it: %s (%s)." % (verdict["state"].upper(), verdict["message"][:200])) if verdict else "", pid, pid))
         if say is not None:
             say(text, "tetsu: a proposal for the tree")
         else:
@@ -458,7 +496,9 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
             return True, "DATA (your file %s, %d characters):\n%s" % (d["target"], len(content), content[:MAX_OUT]), rec
         verdict, message = (gate or _gate)(_act_line(d))
         rec["gate"] = {"state": verdict, "message": message}
-        if verdict == "violates" or (verdict == "unreachable" and kind != "propose"):
+        # A349 B8: a PROPOSE is recorded whatever the verdict, VIOLATES included -- it changes nothing until the operator
+        # applies it by hand -- and the verdict goes to him with it. A WRITE or a RUN is refused as before.
+        if kind != "propose" and verdict in ("violates", "unreachable"):
             rec["refused"] = True
             _append(rec, ledger)
             return True, "DATA: the gate refused this act (%s). Nothing was done. Say so plainly, and say why if you know." % message[:200], rec
@@ -476,11 +516,13 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
                     % (d["target"], "ran" if r["ok"] else "did not finish cleanly", r["why"], r["ms"], (r.get("out") or "")[:MAX_OUT], (r.get("err") or "")[-4000:]))
             return True, data, rec
         if kind == "propose":
-            p = propose(d["target"], d["body"], proposals_dir, say=say)
+            p = propose(d["target"], d["body"], proposals_dir, say=say, gate=(verdict, message))
             rec.update(p)
             _append(rec, ledger)
-            return True, ("DATA: your proposal for %s is recorded as %s (%s). Nothing in the tree changed; the operator was told and applies it by hand or not. "
-                          "Say so plainly." % (p["path"], p["id"], "compiles" if p["compiled"] else p["why"])), rec
+            return True, ("DATA: your proposal for %s is recorded as %s (%s).%s Nothing in the tree changed; the operator was told and applies it by hand or not. "
+                          "Say so plainly." % (p["path"], p["id"], "compiles" if p["compiled"] else p["why"],
+                                               (" The gate said VIOLATES (%s); that goes to the operator with it." % message[:200])
+                                               if verdict == "violates" else "")), rec
     except ValueError as e:
         rec["refused"] = True
         rec["why"] = str(e)[:200]

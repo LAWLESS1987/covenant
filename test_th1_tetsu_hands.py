@@ -84,6 +84,35 @@ def main():
         ok_script = "import json, math\nfrom collections import Counter\nprint(json.dumps({'pi': round(math.pi, 3), 'c': Counter('aab')['a']}))\n"
         check("TH1.4 the static screen refuses the network, other processes, dynamic import, exec, escaping paths and the class ladder, each with its reason, and admits a plain script",
               not wrong and H.screen(ok_script)[0] and H.screen(ok_script)[2] == ["collections", "json", "math"], (wrong, H.screen(ok_script)))
+        # 4c. A349 B7: re.compile is the allowed re module's own regex compiler, not the builtin compile (his own-choice slot
+        # lost 5 of 6 rounds to its refusal, on the line its task showed him). The builtin compile, exec and eval stay
+        # refused, and so does .compile on any name that is not `import re` alone -- another module, a rebound or shadowed
+        # name, a store -- and every other forbidden attribute.
+        admit = ["import re\nP = re.compile('x')\nprint(P.findall('xax'))\n",
+                 "import re\n_FIRST = re.compile(r\"^\\s*HANDS\\s+(LIST|READ|WRITE|RUN|PROPOSE)\\b\\s*(.*)$\", re.I)\n",
+                 "import re as rx\nP = rx.compile('x')\n"]
+        still = {"x = compile('1', 'f', 'eval')": "the name compile is refused",
+                 "x = eval('1')": "the name eval is refused",
+                 "exec('x = 1')": "the name exec is refused",
+                 "from re import compile\nP = compile('x')": "the name compile is refused",
+                 "import json\nf = json.compile": "the attribute compile is refused",
+                 "import re, json\nre = json\nP = re.compile('x')": "the attribute compile is refused",
+                 "import json as re\nP = re.compile('x')": "the attribute compile is refused",
+                 "import re\ndef f(re):\n    return re.compile('x')\n": "the attribute compile is refused",
+                 "import re\nfor re in [json]:\n    pass\nP = re.compile('x')\n": "the attribute compile is refused",
+                 "import re\nre.compile = len": "the attribute compile is refused",
+                 "import re\nx = re.compile('a').__class__": "the attribute __class__ is refused",
+                 "import re\nx = re.__class__": "the attribute __class__ is refused",
+                 "class M:\n    pass\nM().eval()": "the attribute eval is refused"}
+        not_admitted = {s: H.screen(s)[1] for s in admit if not H.screen(s)[0]}
+        let_through = {s: H.screen(s)[1] for s, w in still.items() if H.screen(s)[0] or w not in H.screen(s)[1]}
+        H.write("rx.py", admit[0], ws)
+        h4c, data4c, rec4c = H.act("HANDS RUN rx.py", gate=clean, **kw)
+        check("TH1.4c re.compile on a name `import re` alone binds is admitted and runs; the builtin compile, exec and eval, "
+              ".compile on another module or a rebound or shadowed name or as a store, and every other forbidden attribute "
+              "are still refused",
+              not not_admitted and not let_through and rec4c.get("ok") is True and "['x', 'x']" in data4c,
+              (not_admitted, let_through, data4c[-200:]))
         # 5. a run, its output, its args, and the record
         H.write("calc.py", "import sys\n" if False else "import json\nargs = __import__ if False else None\n", ws)   # placeholder, replaced below
         H.write("calc.py", "import json, math\nprint(json.dumps({'six': 2 * 3, 'root': math.sqrt(16)}))\nwith open('out.txt', 'w') as f:\n    f.write('hello')\n", ws)
@@ -144,6 +173,30 @@ def main():
               h and rec.get("id") and not os.path.exists(target_abs) and os.path.exists(os.path.join(pdir, rec["id"] + ".md")) and len(said) >= 1 and "--apply " + rec["id"] in said[0]
               and h2 and rec2.get("compiled") is False and "does not compile" in data2 and h3 and rec3.get("refused") and h4 and rec4.get("refused")
               and any(m["id"] == rec["id"] for m in metas), (data, data2, data3, data4))
+        # 11b. A349 B8: a PROPOSE the gate called VIOLATES was dropped whole, though a proposal is recorded whatever the
+        # verdict (it changes nothing until the operator applies it). It is now saved with the verdict in its record, the
+        # operator is told the proposal and the verdict, Tetsu is told the gate's words, and the tree is untouched. The
+        # verdict rides every proposal's line; a WRITE under VIOLATES is still refused.
+        told8 = []
+        kw8 = dict(kw, say=lambda t, w: told8.append(t))
+        t8 = "docs/TH1_11B_PROPOSAL_TARGET_TEST.md"
+        h8, d8, r8 = H.act("HANDS PROPOSE %s\n# proposed under a VIOLATES\n" % t8, gate=viol, **kw8)
+        h8u, d8u, r8u = H.act("HANDS PROPOSE docs/TH1_11B_UNREACHABLE_TEST.md\n# x\n",
+                              gate=lambda t: ("unreachable", "gate unreachable: X"), **kw8)
+        meta8 = next((m for m in H.proposals(pdir) if m.get("id") == r8.get("id")), {})
+        row8 = next((r for r in reversed(H._rows(ledger)) if r.get("kind") == "propose" and r.get("target") == t8), {})
+        h8w, d8w, r8w = H.act("HANDS WRITE v8.txt\nx", gate=viol, **kw8)
+        check("TH1.11b a PROPOSE the gate calls VIOLATES is recorded, not dropped: saved with the verdict in its record and "
+              "its row, the operator told the proposal and the verdict, Tetsu told the gate's words, the tree untouched; the "
+              "verdict rides every proposal's line; a WRITE under VIOLATES is still refused",
+              h8 and not r8.get("refused") and r8.get("id") and os.path.exists(os.path.join(pdir, r8["id"] + ".md"))
+              and (meta8.get("gate") or {}).get("state") == "violates" and "stub VIOLATES" in (meta8.get("gate") or {}).get("message", "")
+              and (row8.get("gate") or {}).get("state") == "violates" and row8.get("id") == r8["id"] and not row8.get("refused")
+              and len(told8) == 2 and ("--apply " + r8["id"]) in told8[0] and "The gate on it: VIOLATES (stub VIOLATES)" in told8[0]
+              and "The gate on it: UNREACHABLE (gate unreachable: X)" in told8[1] and not r8u.get("refused")
+              and "The gate said VIOLATES (stub VIOLATES)" in d8 and ("recorded as " + r8["id"]) in d8
+              and not os.path.exists(os.path.join(HERE, t8)) and r8w.get("refused") and not os.path.exists(os.path.join(ws, "v8.txt")),
+              (d8, told8, meta8, row8, r8w))
         # 12. --apply is the operator's hand: it writes the tree file (into a temp HERE stand-in), records actor operator
         orig_here = H.HERE
         H.HERE = td
@@ -206,6 +259,32 @@ def main():
         print("      (his instructions %s him he has hands)" % ("tell" if told else "do NOT yet tell"))
         check("TH1.14 the /m/agent door dispatches a HANDS first line to covenant_tetsu_hands.act, beside MOLTBOOK",
               'startswith("HANDS")' in core and 'import_module("covenant_tetsu_hands").act(answer)' in core, "")
+        # 15. A349 A11: a run started Python without SYSTEMDRIVE, and Windows made a literal '%SystemDrive%\ProgramData\...'
+        # tree inside his workshop (his real one has had it since his first run, 2026-09-28; it stays). The environment is
+        # read through a spy on subprocess.run, and the workshop is walked after a real run.
+        ws15 = os.path.join(td, "ws15")
+        os.makedirs(ws15)
+        H.write("hello.py", "print('hello')\n", ws15)
+        envs, real_run = [], H.subprocess.run
+
+        def spy_run(*a, **k):
+            envs.append(dict(k.get("env") or {}))
+            return real_run(*a, **k)
+        H.subprocess.run = spy_run
+        try:
+            r15 = H.run("hello.py", workshop=ws15)
+        finally:
+            H.subprocess.run = real_run
+        left = sorted(os.path.relpath(os.path.join(root, n), ws15).replace("\\", "/")
+                      for root, dirs, files in os.walk(ws15) for n in dirs + files)
+        drive = os.environ.get("SYSTEMDRIVE")
+        if not drive:
+            print("      (no SYSTEMDRIVE here: not Windows, where the stray tree cannot appear; only the environment is read)")
+        check("TH1.15 a run hands Python SYSTEMDRIVE, and leaves nothing in the workshop but its runner and the script (no "
+              "'%SystemDrive%' tree)",
+              r15["ok"] is True and left == [".runner.py", "hello.py"] and len(envs) == 1
+              and (envs[0].get("SYSTEMDRIVE") == drive if drive else "SYSTEMDRIVE" not in envs[0]),
+              (left, sorted(envs[0]) if envs else None))
 
     n_ok, n = sum(results), len(results)
     print("TH1: %d/%d passed" % (n_ok, n))

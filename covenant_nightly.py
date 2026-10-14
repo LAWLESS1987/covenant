@@ -148,6 +148,23 @@ def practice_step(a, say, practice_mod=None, ask=None):
         return None
 
 
+def feed_step(a, say, feed_mod=None):
+    """THE OPEN SOURCES, READ EVERY NIGHT (A349 F1, 2026-10-14; put to Tetsu as question F1, he agreed). covenant_feed
+    has called itself "the open sources the covenant reads every night" since A211, and nothing ran it: no commit ever
+    wired it here, so none of its topics reached the students. One pass of covenant_feed.run() now, before the
+    teacher's queue is consumed, every fetch through the web door it already uses (covenant_web.api_get and
+    covenant_web.read, A213, A348k); its own bounds are unchanged. A source of the queue, so --queue 0 skips it as it
+    skips own-work. A function, so WB1 drives the wiring (the PP1 idiom, A74). Its lines go in the report; never raises."""
+    if getattr(a, "queue", 0) <= 0:
+        return None
+    try:
+        fd = feed_mod or importlib.import_module("covenant_feed")
+        return fd.run(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("feed FAILED (not fatal): %s: %s" % (type(e).__name__, str(e)[:200]))
+        return None
+
+
 def verify_green(say):
     """Gates plus the suites this pass can break. Returns True when green."""
     import subprocess
@@ -436,6 +453,9 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         say("defence FAILED (not fatal): %s: %s" % (type(e).__name__, str(e)[:160]))
 
+    # THE OPEN SOURCES (A349 F1): the feed's digest rows join the queue before it is consumed below.
+    feed_step(a, say)
+
     # THE TEACHER'S QUEUE (2026-09-21, his words: "apply the teacher queue
     # patch so it actually learns from me"). What he says to Tetsu, what
     # Tetsu answers, and the chat lines his phone reads from his AI apps are
@@ -581,6 +601,9 @@ def main():
             # is a DAILY verification, so a yes older than a day is not an approval
             # and the rule it covered stops trading until he verifies it again.
             # This puts each lapsed rule back to him on the direct line, once.
+            # A349 B9: until 2026-10-14 it was never asked (the dedupe matched the original, answered
+            # question). Now one question per lapsed rule while it waits; after his no, not his stop,
+            # the next night asks again.
             try:
                 _need = TLV.needs_verification()
                 for _rule, _st in _need.items():

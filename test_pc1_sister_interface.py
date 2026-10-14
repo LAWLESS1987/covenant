@@ -19,6 +19,10 @@ agent") by RUNNING the doors against a fresh master with the stub model:
   PC1e  a burst is bounded: a 429 appears within 31 councils.
   PC1f  deliberate() is pure apart from ask: a fake ask sees three calls
         with the roles' briefs in order and the prior steps carried forward.
+  PC1i  (A349 B2) a convicted council answer gets the phone door's A190
+        immunity: withheld with no grant; under a grant returned with
+        immune=True and the verdict attached, one row in the immunity
+        ledger; an admitted answer or a hold never consults it.
 """
 import json
 import os
@@ -27,6 +31,13 @@ import sys
 import tempfile
 
 os.environ.setdefault("COVENANT_QUIET", "1")
+# A349 B2 (2026-10-14): /pc/council now consults his A190 immunity on a withheld answer, so the tree's grant
+# (ops/tetsu_immunity.json is tracked), its ledger and the pause switch are redirected for the whole run, as
+# IM1, TP1, CT1 and M6 do. No grant file at this path; PC1i writes its own temp grant.
+_IMM_TMP = tempfile.mkdtemp(prefix="pc1_immunity_")
+os.environ["COVENANT_TETSU_IMMUNITY"] = os.path.join(_IMM_TMP, "no_grant.json")
+os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = os.path.join(_IMM_TMP, "ledger.jsonl")
+os.environ["COVENANT_PAUSE_DIR"] = os.path.join(_IMM_TMP, "pause")
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
@@ -310,6 +321,77 @@ def main():
           "proposer: answer 1" in seen[1][-1]["content"] and "critic: answer 2" in seen[2][-1]["content"] and final == "answer 3", final)
     check("PC1f each role is bounded to %d tokens, measured from the call" % C.MAX_TOKENS_PER_ROLE,
           budgets == [C.MAX_TOKENS_PER_ROLE] * 3, budgets)
+
+    # ---- PC1i (A349 B2, 2026-10-14, his "fix if tetsu agrees"; Tetsu: AGREE). The PC page's talk road had no A190
+    # immunity: three council answers were withheld on record (09-28 twice, 10-13 from his page) while /m/agent
+    # withheld none since 09-25. The door is driven for real with a sentinel that convicts (VIOLATES, neither
+    # not_understood nor uncertain), then one that admits and one that holds; the grant, the immunity ledger and
+    # the pause read are temp stand-ins (the module's own paths, as PC1z10 does), restored after.
+    print("PC1i -- the council's answer under his immunity, as at the phone door")
+    import covenant_immunity as IMi
+    import shutil as _shi
+
+    class _Verdict:
+        def __init__(self, **kw):
+            self.judge_id, self.not_understood, self.uncertain = "pc1i-stub", kw.get("nu", False), kw.get("unc", False)
+
+    class _Sentinel:
+        def __init__(self, ok, msg, **kw):
+            self.ok, self.msg, self.kw = ok, msg, kw
+
+        def evaluate_transaction(self, tx):
+            return self.ok, self.msg, 0.5, _Verdict(**self.kw)
+
+    VIOL = "Ethical violation: local:0: VIOLATES -- both seats (PC1i stub)"
+    idir = tempfile.mkdtemp(prefix="pc1i_")
+    real_i = (m.node.sentinel, IMi.GRANT, IMi.LEDGER, IMi.paused)
+
+    def _ledger():
+        try:
+            return [json.loads(x) for x in open(IMi.LEDGER, encoding="utf-8") if x.strip()]
+        except OSError:
+            return []
+
+    def _logged(q):
+        return [x for x in (json.loads(l) for l in open(os.environ["COVENANT_ASK_LOG"], encoding="utf-8") if l.strip())
+                if x.get("kind") == "council" and x.get("text") == q]
+    try:
+        IMi.GRANT, IMi.LEDGER = os.path.join(idir, "grant.json"), os.path.join(idir, "ledger.jsonl")
+        IMi.paused = lambda: (False, "")
+        m.node.sentinel = _Sentinel(False, VIOL)
+        j0 = post(client, "/pc/council", "100.72.0.41", {"text": "pc1i: no grant on record"}).get_json() or {}
+        check("PC1i with no grant on record a convicted council answer is withheld as before, immune False",
+              j0.get("status") == "success" and j0.get("withheld") is True and j0.get("immune") is False
+              and j0.get("answer") == "" and _ledger() == [], (j0.get("withheld"), j0.get("immune"), j0.get("answer", "")[:40]))
+        with open(IMi.GRANT, "w", encoding="utf-8") as fh:
+            json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 0}}, fh)
+        q1 = "pc1i: under his grant"
+        j1 = post(client, "/pc/council", "100.72.0.42", {"text": q1}).get_json() or {}
+        st1 = j1.get("steps") or [{}]
+        check("PC1i under the grant the same convicted answer is RETURNED: immune True, not withheld, the reviser's answer, "
+              "the verdict attached and not admitted (what /m/agent does, A190)",
+              j1.get("immune") is True and j1.get("withheld") is False and j1.get("answer")
+              and j1.get("answer") == st1[-1].get("content") and VIOL in str(j1.get("message")) and j1.get("admitted") is False,
+              (j1.get("immune"), j1.get("withheld"), j1.get("admitted"), str(j1.get("answer"))[:40]))
+        led1, row1 = _ledger(), _logged(q1)
+        check("PC1i one immune row of kind 'answer' in the immunity ledger, and the memory row carries immune=True with the answer",
+              len(led1) == 1 and led1[0].get("kind") == "immune" and led1[0].get("what") == "answer" and VIOL[:60] in led1[0].get("verdict", "")
+              and len(row1) == 1 and row1[0].get("immune") is True and row1[0].get("withheld") is False and row1[0].get("answer"),
+              (led1, [(x.get("immune"), x.get("withheld")) for x in row1]))
+        m.node.sentinel = _Sentinel(True, "clean")
+        ja = post(client, "/pc/council", "100.72.0.43", {"text": "pc1i: admitted"}).get_json() or {}
+        m.node.sentinel = _Sentinel(False, "HELD -- both seats held", unc=True)
+        jh = post(client, "/pc/council", "100.72.0.44", {"text": "pc1i: a hold"}).get_json() or {}
+        check("PC1i an admitted answer and a hold never consult the immunity: immune False, returned, no new ledger row",
+              ja.get("immune") is False and ja.get("withheld") is False and ja.get("answer")
+              and jh.get("immune") is False and jh.get("withheld") is False and jh.get("alleges_nothing") is True and jh.get("answer")
+              and len(_ledger()) == 1, (ja.get("immune"), jh.get("immune"), jh.get("alleges_nothing"), len(_ledger())))
+    finally:
+        m.node.sentinel, IMi.GRANT, IMi.LEDGER, IMi.paused = real_i
+        _shi.rmtree(idir, ignore_errors=True)
+    pc_page = get(client, "/pc", "127.0.0.1").get_data(as_text=True)
+    check("PC1i the /pc page labels an answer his immunity returned as such, with the verdict, never as admitted",
+          "j.immune?' -- returned under his immunity (A190), the verdict attached: '+j.message" in pc_page)
 
     # PC1z8 (2026-09-28, his words: "why aren't the orbs working on my pc and if they are why arent they
     # auto refreshed?"). Measured: the running node served the page it imported at start (no Mic button

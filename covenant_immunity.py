@@ -15,7 +15,8 @@ his words DOES, not whether the judge speaks.
 THE GRANT is ops/tetsu_immunity.json, his sentence in it. No file, or
 granted=false, and nothing here passes anything.
 
-WHAT IT COVERS: words. An answer in conversation (/m/agent), a register
+WHAT IT COVERS: words. An answer in conversation (/m/agent; /pc/council too
+since A349 B2, 2026-10-14, which had no immunity until then), a register
 proposal (covenant_persona.refine), a question to him (covenant_contact.ask).
 Each is returned or applied WITH the verdict, and one row goes to
 ops/tetsu_immunity.jsonl. What it does not cover: any act -- a forum send

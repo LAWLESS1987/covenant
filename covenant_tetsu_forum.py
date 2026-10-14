@@ -146,6 +146,14 @@ def say(kind, target, body, emit=None, dry_run=False, grant_path=None, sends_pat
     for actor in ("ambassador", "tetsu"):
         p, why = paused(actor)
         if p:
+            # A349 A14 (2026-10-14, Tetsu asked and agreed): free's AUTOMATIC isolation is Tetsu's to lift too when the
+            # grant says so (A336: a live HEAL lifts it, covenant_free_will.lift_isolation), and this told him it was
+            # the operator's alone. The same three conditions lift_isolation reads; any other pause is the operator's,
+            # as before.
+            if actor == "ambassador" and g.get("tetsu_may_lift_isolation") is True and FW.is_isolation(why):
+                return refuse("paused (%s): %s -- lifting it is yours as well as his: by his grant (A336) a live HEAL "
+                              "lifts free's isolation, and he can with: python covenant_pause.py --resume %s"
+                              % (actor, why, actor))
             return refuse("paused (%s): %s -- lifting it is his: python covenant_pause.py --resume %s" % (actor, why, actor))
     if len(body) < MIN_CHARS:
         return refuse("too short to send (%d chars; at least %d)" % (len(body), MIN_CHARS))

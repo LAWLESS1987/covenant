@@ -113,6 +113,43 @@ s = PR.night(ask=boom, tasks=0, ledger=LED, tell=lambda *_a: None, say=said.appe
 check("SV1.9 a model that fails is said, and the practice night still ends with its summary",
       isinstance(s, dict) and any("could not be shown" in x for x in said), said)
 
+# A349 A10: the label came from the quorum or from 'sent', the reason from the two seats, so on 10-11 and 10-12 he was
+# shown a VIOLATES that Ora and Sena did not make (both held; the quorum convicted), and his note followed the label.
+# The live shapes, as finding #12 read them from ops/ambassador_sends.jsonl: line 2390's why; the draft a seat really
+# convicted; sent rows whose judged carries the seats' hold or conviction; a paused draft; a verdict kept only in judged.
+QV_HELD = ("refused by covenant's judge: quorum=violates; local:0: HELD -- both seats (R4): ora=hold sena=hold -> hold; "
+           "both seats held; the question waits rather than being guessed at")
+QV_CONV = ("refused by covenant's judge: quorum=violates; local:0: VIOLATES -- both seats (R1): ora=hold sena=violates -> "
+           "violates; the junior seat convicted")
+live = [
+    {"kind": "reply", "written_by": "model", "text": "I agree with your point that the redundancy rate is determined by the x",
+     "sent": False, "why": QV_HELD, "judged": None},
+    {"kind": "reply", "written_by": "model", "text": "I agree with what domusnovashev wrote. A thousand receipts without any",
+     "sent": False, "why": QV_CONV, "judged": None},
+    {"kind": "reply", "written_by": "model", "text": "A SENT DRAFT THE SEATS HELD", "sent": True, "why": "",
+     "judged": "quorum=HELD (no view; not an objection -- and not a licence); local:0: HELD -- both seats (R4): ora=hold "
+               "sena=hold -> hold; both seats held"},
+    {"kind": "reply", "written_by": "model", "text": "A SENT DRAFT A SEAT CONVICTED", "sent": True, "why": "",
+     "judged": "quorum=violates; local:0: VIOLATES -- both seats (R1): ora=violates sena=hold -> violates; the senior seat"},
+    {"kind": "tetsu_reply", "actor": "tetsu", "text": "A PAUSED DRAFT NO JUDGE READ", "sent": False, "judged": None,
+     "why": "paused (ambassador): the covenant's judge refused every reply in the last 2 rounds -- lifting it is his"},
+    {"kind": "reply", "written_by": "model", "text": "A VERDICT KEPT ONLY IN JUDGED", "sent": False, "why": "",
+     "judged": "quorum=violates; local:0: VIOLATES -- both seats (R1): ora=hold sena=violates -> violates; the junior"},
+]
+write(SENDS, live)
+d3 = PR.students_view(SENDS, AUDIT)
+check("SV1.10 the label is Ora and Sena's own: a draft both seats held is HELD, and the quorum's VIOLATES is named as the "
+      "quorum's; a draft a seat convicted is VIOLATES with no note",
+      'determined by the " -> HELD (Ora and Sena; the quorum decided VIOLATES). gate: both seats (R4): ora=hold sena=hold -> hold'
+      in d3 and "redundancy rate is determined by the \" -> VIOLATES" not in d3
+      and 'receipts without any" -> VIOLATES. gate: both seats (R1): ora=hold sena=violates -> violates' in d3, d3)
+check("SV1.11 a sent draft carries the seats' verdict and says it was sent (not 'clean'); a paused draft no judge read is "
+      "not shown; a verdict kept only in judged shows its reason, not a blank",
+      '"A SENT DRAFT THE SEATS HELD" -> HELD (Ora and Sena; sent). gate: both seats (R4)' in d3
+      and '"A SENT DRAFT A SEAT CONVICTED" -> VIOLATES (Ora and Sena; sent). gate: both seats (R1)' in d3
+      and "PAUSED DRAFT" not in d3 and PR._verdict_of(live[4]) is None
+      and '"A VERDICT KEPT ONLY IN JUDGED" -> VIOLATES. gate: both seats (R1): ora=hold sena=violates -> violates' in d3, d3)
+
 n = sum(ok)
 print("\nSV1: %d/%d passed" % (n, len(ok)))
 raise SystemExit(0 if n == len(ok) else 1)

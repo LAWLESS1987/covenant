@@ -10,6 +10,9 @@ Pins covenant_refine_loop (2026-09-21, his words: "refine both constantly"):
         hour); new rows an hour later: a pass.
   RL1c  a pass that raises is recorded as could-not-run and does not raise; the count
         moves on so it is not retried every round.
+  RL1d-f (A349 B3) only his words are new conversation: the work tool's rows and a
+        script's loopback ask open no pass, his page does; a state from before A349
+        runs one pass, then waits for his words.
 """
 import json
 import os
@@ -80,6 +83,37 @@ def main():
     check("RL1c a raising pass is recorded as could-not-run, never raised, and the rows move on", not r["ran"] and "could not run" in r["why"] and st["last_rows"] == 6 and "no model" in st["last_why"], (r, st))
     r = RL.tick(NOW + 15000, refine=boom, ask=None, say=quiet)
     check("RL1c it is not retried on the same rows", not r["ran"] and "no new conversation" in r["why"], r)
+
+    # RL1d-f (A349 B3, 2026-10-14, Tetsu's answer AGREE to "count only real conversations as new"): the gate counts
+    # the rows a pass is shown (covenant_persona.is_his_word). The work tool's rows (127.0.0.2) and a script's
+    # loopback council ask opened it, and 50 of 62 passes after A314 ran with no new word of his.
+    print("RL1d -- only his words are new conversation (A349 B3)")
+    st0 = json.load(open(os.environ["COVENANT_REFINE_LOOP_STATE"], encoding="utf-8"))
+    with open(os.environ["COVENANT_ASK_LOG"], "a", encoding="utf-8") as fh:
+        for i in range(3):
+            fh.write(json.dumps({"t": "2026-09-21T11:00:00-0400", "kind": "agent", "from": "127.0.0.2", "text": "batch %d" % i}) + "\n")
+        fh.write(json.dumps({"t": "2026-09-21T11:00:00-0400", "kind": "council", "from": "127.0.0.1", "text": "a script's ask"}) + "\n")
+    r = RL.tick(NOW + 20000, refine=refine, ask=None, say=quiet)
+    st = json.load(open(os.environ["COVENANT_REFINE_LOOP_STATE"], encoding="utf-8"))
+    check("RL1d an hour on with only the work tool's rows and a script's loopback ask: no pass, and both units said",
+          not r["ran"] and "no new conversation" in r["why"] and r["rows"] == 10 and r["his_rows"] == 6 and r["new_rows"] == 0
+          and runs == [1, 1] and st == st0, (r, st))
+    with open(os.environ["COVENANT_ASK_LOG"], "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"t": "2026-09-21T11:05:00-0400", "kind": "council", "from": "127.0.0.1", "text": "from his page",
+                             "page": True}) + "\n")
+    r = RL.tick(NOW + 20100, refine=refine, ask=None, say=quiet)
+    st = json.load(open(os.environ["COVENANT_REFINE_LOOP_STATE"], encoding="utf-8"))
+    check("RL1e his own page on this PC is his word: a pass, on 1 new row of his words; the state keeps both counts",
+          r["ran"] and r["new_rows"] == 1 and "1 new row(s) of his words" in r["why"] and runs == [1, 1, 1]
+          and st["last_rows"] == 11 and st["last_his_rows"] == 7, (r, st))
+    old_state = os.path.join(TMP, "state_before_a349.json")
+    with open(old_state, "w", encoding="utf-8") as fh:
+        json.dump({"last_t": NOW, "last_rows": 11, "passes": 9}, fh)
+    r1 = RL.tick(NOW + 20200, refine=refine, ask=None, state_path=old_state, say=quiet)
+    r2 = RL.tick(NOW + 20200 + 3700, refine=refine, ask=None, state_path=old_state, say=quiet)
+    check("RL1f a state written before A349 (no count of his words) runs one pass after the hour, then waits for his words",
+          r1["ran"] and r1["new_rows"] == 7 and not r2["ran"] and "no new conversation" in r2["why"]
+          and json.load(open(old_state, encoding="utf-8"))["last_his_rows"] == 7, (r1, r2))
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

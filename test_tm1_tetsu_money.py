@@ -26,6 +26,12 @@ and one real price series from realdata/deep (tracked, so the runner has it):
   TM1f  his proposal prompt (A348h): every bound asks for ONE number, never a
         [lo, hi] list in params' shape; a refused proposal comes back to him
         with the lab's reason; a hypothesis that met no series reads untested.
+  TM1g  A349 B11: a hypothesis that met no price series is recorded untested,
+        is not counted against the deflated Sharpe (nor one written before
+        A349), and does not block its name; once tested, it does.
+  TM1h  A349 B12: a walk-forward the series cannot hold is recorded
+        UNDETERMINED with its reason, not as a failed test; with the other two
+        tests cleared the verdict is undetermined, and still not a pass.
 """
 import json
 import os
@@ -218,6 +224,62 @@ def main():
     check("TM1f a hypothesis that met no price series reads untested, a tested one still reads no",
           "- mean_revert 60/1.0 -> untested" in user_f and "- mean_revert 60/1.0 -> no" not in user_f and "- sma_cross 8/48 -> no" in user_f, user_f[:600])
     check("TM1f the prompt carries information only: his answer is still taken as he gave it", h_f == nxt, h_f)
+
+    print("TM1g -- a hypothesis that met no price series is untested (A349 B11)")
+    pg = os.path.join(tempfile.mkdtemp(prefix="tm1g_"), "strategy.jsonl")
+    base = TM.trials_so_far(pg)
+    hy = {"family": "mean_revert", "params": {"lookback": 30, "z_enter": 1.5}, "assets": ["BTCUSD"], "why": "w"}
+    said_g = []
+    out_g = TM.study(ask_with(hy), judge=clean, say=said_g.append, files={}, hold=hold, path=pg)
+    rg = TM._rows(pg)[-1]
+    check("TM1g recorded untested: the row says tested false, never a survivor, and the nightly line reads untested, not no",
+          out_g["recorded"] and rg["kind"] == "hypothesis" and rg.get("tested") is False and rg["survives"] is False
+          and said_g and " -- untested -- " in said_g[-1] and " -- no -- " not in said_g[-1], (rg, said_g[-1:]))
+    check("TM1g an untested hypothesis is not counted against the deflated Sharpe", base == len(L.build_grid()) and TM.trials_so_far(pg) == base, (base, TM.trials_so_far(pg)))
+    TM._append({"kind": "hypothesis", "name": "mean_revert 60/1.0", "survives": False, "result": {"assets": {}, "why": "no price series to test on (UNDETERMINED)"}}, pg)
+    check("TM1g nor is one written before A349, read from its empty result", TM.trials_so_far(pg) == base, TM.trials_so_far(pg))
+    out_g2 = TM.study(ask_with(hy), judge=clean, say=quiet, files=files, hold=hold, path=pg)
+    rg2 = TM._rows(pg)[-1]
+    check("TM1g its name is not blocked: the same params with a series are tested and counted, and only tested rows count",
+          "already on the record" not in out_g2["why"] and rg2["name"] == "mean_revert 30/1.5" and rg2.get("tested") is True and rg2["result"]["assets"]
+          and rg2["result"]["trials_counted"] == base + 1 and TM.trials_so_far(pg) == base + 1, (out_g2, rg2.get("result", {}).get("trials_counted")))
+    out_g3 = TM.study(ask_with(hy), judge=clean, say=quiet, files=files, hold=hold, path=pg)
+    check("TM1g once tested, its name is on the record as before", "already on the record" in out_g3["why"], out_g3)
+
+    print("TM1h -- a walk-forward that cannot run is UNDETERMINED, not failed (A349 B12)")
+    sym1, f1 = list(files.items())[0]
+    nb = len(SV.load_csv(f1))
+    res_u = TM.evaluate({"family": "sma_cross", "params": {"fast": 20, "slow": 100}}, files=files, holdings_=hold)
+    au = res_u["assets"].get(sym1, {})
+    check("TM1h a warm-up this series cannot hold at 5 folds: walk-forward recorded UNDETERMINED with its reason, wf unmeasured, not a survivor",
+          nb < 6 * (102 + 30) and au.get("wf") is None and au.get("wf_undetermined") == "UNDETERMINED: %d bars cannot support 5 folds with warmup 102" % nb
+          and au.get("survives") is False and res_u["survives"] is False and res_u.get("walk_forward_undetermined") == [sym1], (nb, au))
+    check("TM1h the why says walk-forward was UNDETERMINED, not failed, beside the measured fail (its deflated Sharpe did not clear)",
+          au.get("dsr", 1.0) < 0.95 and res_u["why"].startswith("no asset cleared") and ("walk-forward was UNDETERMINED, not failed, on %s" % sym1) in res_u["why"]
+          and not res_u.get("undetermined"), res_u["why"])
+    real_dsr, real_pbo = SV.deflated_sharpe, SV.pbo
+    try:
+        SV.deflated_sharpe = lambda r: dict(real_dsr(r), deflated_sharpe=0.99)
+        SV.pbo = lambda rets: (0.1, 4)
+        res_o = TM.evaluate({"family": "sma_cross", "params": {"fast": 20, "slow": 100}}, files=files, holdings_=hold)
+        res_m = TM.evaluate({"family": "sma_cross", "params": {"fast": 8, "slow": 48}}, files=files, holdings_=hold)
+    finally:
+        SV.deflated_sharpe, SV.pbo = real_dsr, real_pbo
+    check("TM1h the two measured tests cleared (stubbed) and walk-forward could not run: the verdict is UNDETERMINED, and still not a pass",
+          res_o.get("undetermined") == [sym1] and res_o["why"].startswith("UNDETERMINED: on %s the deflated Sharpe and PBO cleared but walk-forward could not run" % sym1)
+          and res_o["survives"] is False and res_o["assets"][sym1]["survives"] is False, res_o.get("why"))
+    check("TM1h what counts as a pass is unchanged: where walk-forward runs, the same stubs pass or fail on its consistency alone",
+          res_m["assets"][sym1]["wf"] is not None and "wf_undetermined" not in res_m["assets"][sym1]
+          and res_m["assets"][sym1]["survives"] is bool(res_m["assets"][sym1]["wf"]["consistent"]) and not res_m.get("undetermined"), res_m["assets"][sym1])
+    ph = os.path.join(tempfile.mkdtemp(prefix="tm1h_"), "strategy.jsonl")
+    TM._append({"kind": "hypothesis", "name": "sma_cross 20/100", "survives": False, "result": {k: v for k, v in res_o.items() if k != "consequence"}}, ph)
+    TM._append({"kind": "hypothesis", "name": "sma_longonly 5/200", "survives": False, "result": {k: v for k, v in res_u.items() if k != "consequence"}}, ph)
+    seen_h = []
+    TM.propose(lambda msgs, max_tokens=0: (seen_h.append(msgs) or "{}", {"model": "stub"}), ph, hold)
+    user_h = seen_h[-1][1]["content"] if seen_h else ""
+    check("TM1h his prompt reads the undetermined one as undetermined, not no and not untested; the measured fail still reads no; both count as trials",
+          "- sma_cross 20/100 -> undetermined: UNDETERMINED" in user_h and "- sma_longonly 5/200 -> no" in user_h and "untested" not in user_h
+          and TM.trials_so_far(ph) == len(L.build_grid()) + 2, user_h[:500])
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

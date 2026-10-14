@@ -1280,7 +1280,10 @@ def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None,
                 at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
             except ValueError:
                 continue
-        wrote = (r.get("replied") or 0) + (r.get("refused") or 0) > 0
+        # A349 B13 (2026-10-14): free's round row counts a reply Moltbook rate-held or hid apart from "refused" now;
+        # it was still written, so it is counted here as before.
+        wrote = ((r.get("replied") or 0) + (r.get("refused") or 0) + (r.get("rate_held") or 0)
+                 + (r.get("hidden") or 0) > 0)
         if r.get("starved") and not wrote:
             starved_since.append((float(at), str(r.get("starved"))))
             continue

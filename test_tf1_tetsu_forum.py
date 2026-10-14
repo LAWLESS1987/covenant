@@ -20,6 +20,10 @@ stub harvest, the grant and the sends ledger redirected to temp files:
         hold from emit is recorded as not sent with its reason.
   TF1e  act: a directive answer is handled and the data names what happened;
         a plain answer is not handled.
+  TF1A14  (A349) while free is automatically isolated and his grant gives Tetsu
+        the lift (A336), the refusal tells him the lift is his as well; any
+        other pause still says it is the operator's.
+  TF1S4   (A349) a reply naming a dollar amount is held by the money screen.
 """
 import json
 import os
@@ -161,6 +165,44 @@ def main():
     check("TF1e a refused reply is handled and the data says NOT sent with the reason", h and "NOT sent" in data and "funding route" in data and rec["sent"] is False and len(em.calls) == 1, data)
     h, data, rec = TF.act("Just a plain answer about the weather.")
     check("TF1e a plain answer is not handled", h is False and data == "" and rec is None)
+
+    # TF1A14 (A349 A14, 2026-10-14, Tetsu asked and agreed): a refusal while free was isolated told him lifting it was
+    # the operator's alone, though A336 gives him the lift of her AUTOMATIC isolation (a live HEAL) when the grant says so.
+    print("TF1A14 -- A349 A14: he is told the lift is his too when his grant makes it his")
+    iso = ("2026-10-14T03:12:34-0400\nisolated 2026-10-14: %s in the last 2 rounds; his to lift, or Tetsu's by his "
+           "grant (A336), with: python covenant_pause.py --resume ambassador" % FW.ISOLATION_MARK)
+    gl = os.path.join(TMP, "grant_lift.json")
+    with open(gl, "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "caps": {"comments": 10, "posts": 1},
+                   "tetsu_may_lift_isolation": True}, fh)
+    em = Emit()
+    on_iso = lambda name: (name == "ambassador", iso)                                          # noqa: E731
+    r = TF.say("reply", URL, CLEAN, emit=em, paused=on_iso, grant_path=gl)
+    h, data, rec = TF.act("MOLTBOOK REPLY %s\n%s" % (URL, CLEAN), emit=em, paused=on_iso, grant_path=gl)
+    check("TF1A14a free's automatic isolation, his grant giving Tetsu the lift: refused before emit, and told the lift "
+          "is his as well (a live HEAL), not the operator's alone",
+          not r["sent"] and em.calls == [] and "lifting it is his:" not in r["why"]
+          and "lifting it is yours as well as his" in r["why"] and "HEAL" in r["why"] and "--resume ambassador" in r["why"]
+          and "yours as well as his" in data and "NOT sent" in data, (r["why"][-200:], data[-200:]))
+    r_nokey = TF.say("reply", URL, CLEAN, emit=em, paused=on_iso)                                 # write_grant's: no key
+    r_hand = TF.say("reply", URL, CLEAN, emit=em, paused=lambda name: (name == "ambassador", "updating free, mine"),
+                    grant_path=gl)
+    r_tetsu = TF.say("reply", URL, CLEAN, emit=em, paused=lambda name: (name == "tetsu", iso), grant_path=gl)
+    check("TF1A14b a grant without the key, a pause he set by hand, and Tetsu's own pause each still say the lift is "
+          "his alone",
+          all("lifting it is his: python covenant_pause.py --resume" in x["why"] and "yours" not in x["why"]
+              for x in (r_nokey, r_hand, r_tetsu)) and em.calls == [],
+          [x["why"][-90:] for x in (r_nokey, r_hand, r_tetsu)])
+
+    # TF1S4 (A349 S4, 2026-10-14, Tetsu asked and agreed): the money screen's "\$" could never match a dollar amount.
+    print("TF1S4 -- A349 S4: a reply of his naming a dollar amount is held by the money screen")
+    em = Emit()
+    r = TF.say("reply", URL, "I agree with you about gates; we could run one for you at $20 a month if that helps.",
+               emit=em, paused=not_paused)
+    r_ok = TF.say("reply", URL, CLEAN, emit=em, paused=not_paused, grant_path=gl)
+    check("TF1S4a a reply naming '$20' is refused by the money screen before emit, naming it; a reply with no money "
+          "still goes", not r["sent"] and "money" in r["why"] and "$2" in r["why"] and r_ok["sent"] and len(em.calls) == 1,
+          (r, r_ok, len(em.calls)))
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

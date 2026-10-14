@@ -165,6 +165,8 @@ LEDGER = os.environ.get("COVENANT_EARN_LEDGER") or os.path.join(HERE, "ops", "ea
 TRIALS_DIR = os.environ.get("COVENANT_EARN_TRIALS") or os.path.join(HERE, "ops", "earn_trials")
 SANCTIONS = os.environ.get("COVENANT_EARN_SANCTIONS") or os.path.join(HERE, "ops", "earn_sanctions.json")
 FUNNEL = os.environ.get("COVENANT_EARN_FUNNEL") or os.path.join(HERE, "ops", "earn_funnel.json")
+# A349 M4: the 24-hour re-delivery copies, kept on disk beside the ledger they belong to (gitignored; terms item 6).
+RESULTS = os.environ.get("COVENANT_EARN_RESULTS") or os.path.join(os.path.dirname(LEDGER), "earn_results.jsonl")
 OFAC_SDN_URL = "https://www.treasury.gov/ofac/downloads/sdn.xml"
 DEFAULT_PORT = 5090
 MAX_BODY = 256 * 1024
@@ -368,8 +370,9 @@ KEYLIKE = re.compile(r"(?i)(private_?key|secret|mnemonic|seed_?phrase|keystore|p
 def tetsu_account(ledger=None, grant_path=None, now=None):
     """His account, from the earn ledger alone (A224, his words: "once he doubles money he can have 50% of all
     future profit"). Doubled = the first row at which earned minus recorded costs reaches after_net_usd (the seed
-    unless the grant says otherwise). After it, pct% of every further profit (earned minus costs, whoever was
-    paid) is his; what buyers paid straight to his wallet counts as received; owed = his share minus received.
+    unless the grant says otherwise; a bar of 0 is reached at the first earned job). From there, pct% of every
+    profit past the bar (earned minus costs, whoever was paid -- the crossing job's earning above the bar
+    included) is his; what buyers paid straight to his wallet counts as received; owed = his share minus received.
     The 402 names his wallet whenever he is owed at least the price, so no one here moves a coin."""
     g, _why = grant(grant_path or GRANT)
     rows = _rows(ledger or LEDGER)
@@ -382,7 +385,7 @@ def tetsu_account(ledger=None, grant_path=None, now=None):
     # dollar and the doubling point moved by one job (found by EB1.7 on 2026-09-25).
     earned = costs = 0
     doubled_on = None
-    earned_after = costs_after = received = 0
+    earned_after = costs_after = received = over_bar = 0
     bar_u = int(round(bar * 1e6))
     for r in rows:
         if r.get("kind") == "job" and r.get("tx") and r.get("result_sha256") and (r.get("state") == "earned" or (r.get("state") == "pending" and rec.get(r.get("id")) == "earned")):
@@ -397,9 +400,14 @@ def tetsu_account(ledger=None, grant_path=None, now=None):
             costs += c
             if doubled_on:
                 costs_after += c
-        if doubled_on is None and bar_u > 0 and earned - costs >= bar_u:
+        # A349 M6 (2026-10-14; Tetsu agreed: "count your share correctly"). `bar_u > 0` made a bar of 0 -- "from the
+        # first dollar" -- read as never (net 0.50 of 0.00, not doubled, owed 0), and the earning of the crossing job
+        # above the bar was in no one's share, since only rows AFTER it counted. A bar of 0 is now reached at the first
+        # earned job; any other bar is reached exactly as before; what the crossing row put above the bar is profit past it.
+        if doubled_on is None and (bar_u > 0 or (bar_u == 0 and earned > 0)) and earned - costs >= bar_u:
             doubled_on = r.get("t")
-    profit_after = earned_after - costs_after
+            over_bar = earned - costs - bar_u
+    profit_after = over_bar + earned_after - costs_after
     owed = round((pct / 100.0 * profit_after - received) / 1e6, 6)
     earned, costs, earned_after, costs_after, received, profit_after = (x / 1e6 for x in (earned, costs, earned_after, costs_after, received, profit_after))
     return {"wallet": (g or {}).get("tetsu_wallet") or "", "pct": pct, "after_net_usd": bar, "doubled": bool(doubled_on), "doubled_on": doubled_on,
@@ -1073,7 +1081,7 @@ class App:
     suite drives the whole flow without one; Handler below is the thin HTTP skin."""
 
     def __init__(self, gate=None, facilitator=None, ledger=None, grant_path=None, say=None, trials_dir=None, now=None, paused_=None,
-                 sanctions_path=None, funnel_path=None, sanctions_check_=None):
+                 sanctions_path=None, funnel_path=None, sanctions_check_=None, results_path=None):
         self.gate = gate or Gate()
         self._facilitator = facilitator
         self.ledger = ledger or LEDGER
@@ -1088,6 +1096,14 @@ class App:
         self.nonces = {str(r.get("nonce")) for r in _rows(self.ledger) if r.get("nonce")}
         self.results = {}                                        # (payer, input_sha) -> (t, result, settlement, row)
         self.by_id = {}                                          # row id -> (payer, input_sha)
+        # A349 M4 (2026-10-14; Tetsu agreed: "keep it on disk, so no buyer is charged twice"). The two maps above were
+        # in memory only: a restart inside the 24 hours (the keeper steps down on every change to this file) answered
+        # 404 at /earn/result/<id> and settled the same input from the same payer a second time. Each settled or pending
+        # copy is written to a file beside the ledger and read back here; any other ledger gets its own file beside it.
+        self.results_path = results_path or (RESULTS if os.path.abspath(self.ledger) == os.path.abspath(LEDGER)
+                                             else os.path.splitext(self.ledger)[0] + ".results.jsonl")
+        self._results_lock = threading.Lock()
+        self._load_results()
         self.inflight = {}                                       # nonce -> (Event, box)
         self.clients = collections.defaultdict(collections.deque)
         self._lock = threading.Lock()
@@ -1125,6 +1141,69 @@ class App:
             return d if isinstance(d, dict) else {}
         except (OSError, ValueError):
             return {}
+
+    def _load_results(self):
+        """A349 M4: the re-delivery copies still inside their 24 hours, read back at start. A copy past them is not
+        read and not written back -- terms item 6 keeps "For 24 hours: the result"; the ledger row keeps its hashes,
+        payer and transaction indefinitely. A line this cannot read is carried as written.
+
+        RETIRED WITH A RECORD, NEVER DROPPED UNRECORDED (the operator, 2026-10-14: "use your discernment toward mutual
+        benefit", over his 10-13 "Do not delete anything" and the buyer's 24 hours). Before a copy leaves this file, a
+        row naming it -- its id, payer, input and result hashes, when it was kept, when and why it left, by what -- is
+        appended to the retired record beside it. Only the result itself goes, as the terms promise the buyer. If that
+        record cannot be written, nothing is rewritten: the copy waits for the next start."""
+        try:
+            with open(self.results_path, encoding="utf-8") as fh:
+                lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+        except OSError:
+            return
+        now, keep, gone = self._t(), [], []
+        for ln in lines:
+            try:
+                r = json.loads(ln)
+                t, key = float(r["t"]), (str(r["payer"]).lower(), str(r["input_sha256"]))
+            except (ValueError, KeyError, TypeError):
+                keep.append(ln)
+                continue
+            if now - t >= RESULT_KEEP_S:
+                rec = r.get("receipt") or {}
+                gone.append({"kind": "retired", "id": str(r.get("alias") or rec.get("id")), "redelivery": bool(r.get("alias")),
+                             "payer": key[0], "input_sha256": key[1], "result_sha256": rec.get("result_sha256"),
+                             "kept_t": t, "retired_t": now, "by": "covenant_earn.App at start",
+                             "why": "past its 24 hours (terms item 6: \"For 24 hours: the result\"); the result leaves, this "
+                                    "record and the ledger row stay"})
+                continue
+            keep.append(ln)
+            if r.get("alias"):                                   # the id of a re-delivery row, pointing at its job
+                self.by_id[str(r["alias"])] = key
+            else:
+                self.results[key] = (t, r.get("result"), r.get("settlement"), r.get("receipt"))
+                self.by_id[str((r.get("receipt") or {}).get("id"))] = key
+        if gone:
+            try:
+                with open(self.results_path + ".retired.jsonl", "a", encoding="utf-8") as fh:
+                    fh.write("".join(json.dumps(g_, ensure_ascii=False, sort_keys=True) + "\n" for g_ in gone))
+            except OSError:
+                return                                           # no record, no rewrite (see above)
+        if len(keep) < len(lines):
+            try:
+                tmp = self.results_path + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as fh:
+                    fh.write("".join(ln + "\n" for ln in keep))
+                os.replace(tmp, self.results_path)
+            except OSError:
+                pass
+
+    def _keep_result(self, row):
+        """A349 M4: one re-delivery copy, or the id of a re-delivery of one, appended beside the ledger. A copy that
+        cannot be written is still held in memory, as every copy was before."""
+        try:
+            with self._results_lock:
+                os.makedirs(os.path.dirname(self.results_path) or ".", exist_ok=True)
+                with open(self.results_path, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(row, ensure_ascii=False, sort_keys=True, default=str) + "\n")
+        except OSError:
+            pass
 
     def _funnel(self, step):
         day = time.strftime("%Y-%m-%d", time.gmtime(self._t()))
@@ -1189,9 +1268,13 @@ class App:
             return "clean", ""
         if state == "violates":
             return "violates", "the gate refused this offer's declaration: " + str(design[-1].get("gate", {}).get("message", ""))[:300]
-        if design_allowed(self.ledger):
-            return "allowed", ""
         if state == "held":
+            # A349 M3 (2026-10-14; Tetsu agreed: "it stays closed, as its status says"). The allowance was read before
+            # the state, so an offer whose latest verdict was UNREACHABLE opened under it -- a paid job was verified and
+            # settled (measured) -- while status() did not count it open. His word reaches a HELD offer only, as
+            # design_allowed() says.
+            if design_allowed(self.ledger):
+                return "allowed", ""
             return "held", ("the gate made no finding on this offer (held); the operator's word is needed: "
                             "python covenant_earn.py --allow-design \"why\"")
         return "unreachable", "the gate could not judge this offer: " + str(design[-1].get("gate", {}).get("message", ""))[:200]
@@ -1368,6 +1451,7 @@ class App:
             self._funnel("redelivered")
             row = self._record(state="redelivered", of=hit[3].get("id"), **base)
             self.by_id[row["id"]] = (payer.lower(), input_sha)
+            self._keep_result({"t": self._t(), "payer": payer.lower(), "input_sha256": input_sha, "alias": row["id"]})   # A349 M4
             return 200, {"PAYMENT-RESPONSE": _b64json(hit[2])}, {"receipt": hit[3], "result": hit[1], "redelivered": True}
         # SANCTIONS SCREEN, before anything is verified: strict liability, so a missing or stale list refuses too.
         sst, swhy = self._screen(payer, g)
@@ -1464,16 +1548,24 @@ class App:
                    "result_sha256": result_sha, "checked": result.get("checked", ""), "terms_version": terms_version(g),
                    "maker": OFFERS[key].get("maker", ""), "mutual_benefit": mutual_benefit(key, g),
                    "terms": "a refused or held job is not charged; this receipt is hash-chained to the seller's ledger; re-deliverable 24 hours at /earn/result/" + row["id"]}
-        self.results[(payer.lower(), input_sha)] = (self._t(), result, settlement, receipt)
+        kept_t = self._t()
+        self.results[(payer.lower(), input_sha)] = (kept_t, result, settlement, receipt)
         self.by_id[row["id"]] = (payer.lower(), input_sha)
+        # A349 M4: on disk too, so a restart inside the 24 hours re-delivers it instead of settling the same input again
+        self._keep_result({"t": kept_t, "payer": payer.lower(), "input_sha256": input_sha, "result": result, "settlement": settlement,
+                           "receipt": receipt})
         if state == "earned" and sum(1 for r in _rows(self.ledger) if r.get("state") == "earned") == 1:
             st = status(self.ledger, self.grant_path)
             self._tell("earn: the first settled payment -- %s USDC for a %s job from %s..., tx %s; net so far %.2f against the %.0f seed. python covenant_earn.py --status has the account."
                        % (_usd(reqs["amount"]), key, payer[:10], tx[:18], st["net_usd"], st["seed_usd"]), "earn: first payment settled")
         if state == "pending":
+            # A349 M5 (2026-10-14; Tetsu agreed: "tell the buyer what will actually work"). This said "send the SAME request
+            # again", and the same request carries the same nonce, which the replay check in _paid refuses before any
+            # re-delivery. The two routes that do deliver it without a second charge are named instead.
             return 402, {"PAYMENT-RESPONSE": _b64json(settlement)}, {
-                "error": "settlement pending on the chain (tx %s); the result is held for you -- send the SAME request again in 30 s and it is "
-                         "delivered without a second charge" % tx[:18], "id": row["id"]}
+                "error": "settlement pending on the chain (tx %s); the result is held for you for 24 hours and is delivered without a second "
+                         "charge: GET /earn/result/%s, or send the same input from the same paying address with a fresh authorization "
+                         "(it is not settled)" % (tx[:18], row["id"]), "id": row["id"]}
         return 200, {"PAYMENT-RESPONSE": _b64json(settlement)}, {"receipt": receipt, "result": result}
 
 
@@ -1748,6 +1840,11 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             n = 0
+        # A349 M7 (2026-10-14; Tetsu agreed: "refuse a negative length"): A348i's shape, named there for a separate
+        # decision. A negative length passed the cap below, and read(-1) read the body to the end, whatever its size.
+        if n < 0:
+            self._send(400, {}, {"error": "bad Content-Length: %d is negative" % n})
+            return
         if n > MAX_BODY:
             self._send(413, {}, {"error": "body over %d bytes" % MAX_BODY})
             return

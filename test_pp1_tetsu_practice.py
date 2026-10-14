@@ -353,6 +353,26 @@ check("PP1.3a a file importing os is refused by the screen, and the screen's rea
       "without the allowed list that buried it (measured: the 3B sent the same refused import three rounds running)",
       res["passed"] == 0 and res["said"].startswith("the screen refused") and "import of os is refused" in res["said"]
       and "allowed:" not in res["said"] and "Remove it" in res["said"], res["said"])
+# A349 B6: parse importing his own tokenize (12 of 48 parse rounds) was told "Remove it, and whatever needs it", against a
+# task built on that file. The screen still refuses the import; what he is told is to copy its function into the file.
+# A module named after one of his tasks whose file is NOT in his workshop is not called his own, and reads as before.
+WS3G = tempfile.mkdtemp(prefix="pp1_3g_")
+HANDS.write("practice/solved/tokenize.py", TOKENIZE, WS3G)
+_body = PARSE[len(TOKENIZE):]
+said3g = {}
+for _label, _code, _task in (("from", "from tokenize import tokenize\n" + _body, "parse"),
+                             ("of", "import tokenize\n" + _body.replace("tokenize(src)", "tokenize.tokenize(src)"), "parse"),
+                             ("not his", "from evaluate import evaluate\n\ndef simplify(s):\n    return evaluate(s, {})\n", "simplify")):
+    _res, _st = PR.attempt(PR.BY_ID[_task], _code, gate=gate_clean, workshop=WS3G, hands_ledger=HLED)
+    said3g[_label] = (_res["passed"], _st, _res["said"])
+check("PP1.3g an import of his own earlier file (parse importing his tokenize) is still refused by the screen, and he is "
+      "told to copy its function into the file, not to remove what needs it; an import named after a task whose file he "
+      "does not have reads as before",
+      all(said3g[k][0] == 0 and said3g[k][1] is None and said3g[k][2].startswith("the screen refused it: import ")
+          and "That is your own tokenize" in said3g[k][2] and "copy its function into this file" in said3g[k][2]
+          and "whatever needs it" not in said3g[k][2] for k in ("from", "of"))
+      and said3g["not his"][0] == 0 and said3g["not his"][2].endswith(". Remove it, and whatever needs it.")
+      and "your own" not in said3g["not his"][2], said3g)
 res, _s = PR.attempt(PR.BY_ID["flatten"], "raise RuntimeError('boom at import')\n", gate=gate_clean, workshop=WS, hands_ledger=HLED)
 check("PP1.3b a file that raises before any check is told so, with the error line",
       res["passed"] == 0 and "before any check ran" in res["said"] and "boom at import" in res["said"], res["said"])
@@ -483,6 +503,36 @@ s = PR.night(ask=scripted([good] * 20, []), gate=gate_clean, workshop=w5, ledger
              tell=lambda t, w: None, say=lambda *_a: None, now=lambda: next(clock))
 check("PP1.7b past the night's clock no task starts, and the stop says so",
       s["tried"] == 0 and "clock" in (s["stop"] or "") and not PR._rows(l5)[:-1], s)
+# A349 B5: one passing model error (on 10-09 and 10-10 a ConnectionResetError after 14 and 16 answered rounds) ended the
+# night. It is asked again -- at most ASK_RETRIES more times, never past the clock -- and the round goes on; a model that
+# cannot start (a RuntimeError) is asked once and stops, as PP1.7.
+w4c, l4c = fresh()
+seen4c, said4c = [], []
+reset = ConnectionResetError(10054, "An existing connection was forcibly closed by the remote host")
+r = PR.practise(PR.BY_ID["flatten"], scripted([bad, reset, good, "Recursing into each nested list fixed it."], seen4c),
+                gate=gate_clean, workshop=w4c, ledger=l4c, hands_ledger=HLED, say=said4c.append)
+rows4c = [x for x in PR._rows(l4c) if x.get("kind") == "attempt"]
+check("PP1.7c a passing model error is asked again and the round goes on: solved in round 2, no stop, two rounds on the "
+      "record, and the retry said",
+      r["solved_round"] == 2 and not r.get("stop") and not r.get("passing") and len(seen4c) == 4 and len(rows4c) == 2
+      and seen4c[1] == seen4c[2] and any("failed in passing (ConnectionResetError" in x and "asked again" in x for x in said4c),
+      (r, len(seen4c), said4c))
+asks4d = {}
+for label, errs, clock4d in (("always", [reset] * 5, None), ("at the clock", [reset] * 5, [1000.0, 2000.0] + [1e12] * 9),
+                             ("no model", [RuntimeError("no model fits")] * 5, None)):
+    seen4d = []
+    tick = iter(clock4d) if clock4d else None
+    r = PR.practise(PR.BY_ID["flatten"], scripted(errs, seen4d), gate=gate_clean, workshop=fresh()[0], ledger=fresh()[1],
+                    hands_ledger=HLED, say=lambda *_a: None, deadline=1500.0 if tick else None,
+                    now=(lambda: next(tick)) if tick else (lambda: 0.0))
+    asks4d[label] = (len(seen4d), r.get("stop"), r.get("passing"), r["rounds"])
+check("PP1.7d the retries are bounded: a passing error that persists is asked 1 + ASK_RETRIES (%d) times, then stops "
+      "the task marked passing; never past the clock; a model that cannot start is asked once" % (1 + PR.ASK_RETRIES),
+      asks4d["always"][0] == 1 + PR.ASK_RETRIES and asks4d["always"][2] is True and asks4d["always"][3] == 0
+      and "failed in passing, asked %d time(s): ConnectionResetError" % (1 + PR.ASK_RETRIES) in (asks4d["always"][1] or "")
+      and asks4d["at the clock"][0] == 1 and asks4d["at the clock"][2] is True
+      and asks4d["no model"][0] == 1 and not asks4d["no model"][2]
+      and (asks4d["no model"][1] or "").startswith("the model could not answer: RuntimeError: no model fits"), asks4d)
 
 # ---- the curriculum's order, his own code as the next task's ground, and retention
 w6, l6 = fresh()
@@ -500,6 +550,21 @@ PR.practise(PR.BY_ID["parse"], scripted(["```python\n" + PARSE.strip() + "\n```"
 check("PP1.8c ...and its prompt hands him HIS OWN tokenize, as his passing file",
       "Your own solution to tokenize" in seen7[0][-1]["content"] and "def tokenize(src):" in seen7[0][-1]["content"],
       seen7[0][-1]["content"][:300] if seen7 else "")
+# A349 B6: driven through the loop -- the round after a refused import of his tokenize is told to copy it in, beside his
+# own tokenize, and no longer told to remove whatever needs it (the 10-09 prompt ended with exactly that).
+w6e, l6e = fresh()
+HANDS.write("practice/solved/tokenize.py", TOKENIZE, w6e)
+seen8e = []
+r8e = PR.practise(PR.BY_ID["parse"], scripted(["```python\nfrom tokenize import tokenize\n" + PARSE[len(TOKENIZE):].strip()
+                                               + "\n```", "```python\n" + PARSE.strip() + "\n```",
+                                               "Copying tokenize into the file fixed it."], seen8e),
+                  gate=gate_clean, workshop=w6e, ledger=l6e, hands_ledger=HLED, say=lambda *_a: None)
+_p8e = seen8e[1][-1]["content"] if len(seen8e) > 1 else ""
+check("PP1.8e ...and when he imports it instead, the next round tells him to copy its function into the file, not to "
+      "remove whatever needs it; with it copied in, parse passes",
+      "import from tokenize is refused. That is your own tokenize" in _p8e and "copy its function into this file" in _p8e
+      and "whatever needs it" not in _p8e and "Your own solution to tokenize" in _p8e and r8e["solved_round"] == 2,
+      (r8e, _p8e[-400:]))
 PR._save_lesson({"task": "flatten", "rounds": 2, "lesson": "open nested lists by recursing"}, w6)
 PR._save_lesson({"task": "evaluate", "rounds": 3, "lesson": "a lesson about evaluate itself"}, w6)
 msgs = PR.prompt(PR.BY_ID["evaluate"], w6)

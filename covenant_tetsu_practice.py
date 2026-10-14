@@ -94,6 +94,8 @@ MAX_CHOICES = 3
 CHOICE_ROUNDS = 3
 CHOICE_BUDGET_S = 15 * 60
 OPEN_MIN_ASSERTS = 3
+# A349 B5: how many more times one round's ask is made after a passing error (a dropped connection, a timeout).
+ASK_RETRIES = 1
 
 # ---------------------------------------------------------------- the curriculum
 #
@@ -523,6 +525,22 @@ def prompt(task, workshop=None, last=None, retention=False):
     return [{"role": "system", "content": SYSTEM}, {"role": "user", "content": "\n\n".join(parts)}]
 
 
+def _own_import(why, task, workshop=None):
+    """A349 B6: the name of one of his own earlier files that a screen refusal of an import names -- a module named after
+    another of his tasks, whose file is in his workshop (practice/solved/<id>.py or practice/<id>.py) -- or None."""
+    m = re.search(r"import (?:of|from) ([\w.]+) is refused", str(why or ""))
+    for part in (m.group(1).split(".") if m else []):
+        if part == task.get("id") or (part not in BY_ID and part not in TRACK_IDS):
+            continue
+        for rel in ("%s/solved/%s.py" % (DIR, part), "%s/%s.py" % (DIR, part)):
+            try:
+                if os.path.isfile(HANDS._path(rel, workshop)):
+                    return part
+            except ValueError:
+                continue
+    return None
+
+
 def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
     """Write his file and run it with the checks, through his hands. -> (result dict, stop reason or None)."""
     name = "%s/%s.py" % (DIR, task["id"])
@@ -569,7 +587,13 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
         if why.startswith("the screen refused"):
             # The allowed list is in the system message already; repeated here it buried the one fact that
             # matters (measured 2026-09-26: the 3B sent the same `import sys` three rounds running).
-            said = re.sub(r"\s*\(allowed:[^)]*\)", "", why)[:240] + ". Remove it, and whatever needs it."
+            said = re.sub(r"\s*\(allowed:[^)]*\)", "", why)[:240]
+            # A349 B6: an import of one of his own earlier files (parse importing his tokenize: 12 of 48 parse rounds) was
+            # told "Remove it, and whatever needs it", against a task built on that file. He is told to copy its function in
+            # instead; the screen is unchanged, and every other refusal reads as before.
+            own = _own_import(why, task, workshop)
+            said += ((". That is your own %s, and it cannot be imported here: copy its function into this file and call "
+                      "it there." % own) if own else ". Remove it, and whatever needs it.")
         elif (rec or {}).get("timed_out"):
             said = "it did not finish in %.0f s" % HANDS.RUN_TIMEOUT_S
         elif (rec or {}).get("truncated"):
@@ -591,11 +615,32 @@ def practise(task, ask, gate=None, workshop=None, ledger=None, hands_ledger=None
             out["stop"] = "the night's clock ran out"
             break
         msgs = prompt(task, workshop, last=last, retention=retention)
-        try:
-            # Warmer after the first round: at 0.2 the 3B answered the same file three rounds running (measured).
-            answer, meta = ask(msgs, max_tokens=MAX_TOKENS, temperature=0.2 if rnd == 1 else 0.6)
-        except Exception as e:                                      # noqa: BLE001
-            out["stop"] = "the model could not answer: %s: %s" % (type(e).__name__, str(e)[:120])
+        asked_again, err = 0, None
+        while True:
+            try:
+                # Warmer after the first round: at 0.2 the 3B answered the same file three rounds running (measured).
+                answer, meta = ask(msgs, max_tokens=MAX_TOKENS, temperature=0.2 if rnd == 1 else 0.6)
+                err = None
+                break
+            except Exception as e:                                  # noqa: BLE001
+                err = e
+            # A349 B5: a passing error -- an OSError: the connection dropped or timed out (on 10-09 and 10-10 the model was
+            # put away mid-answer, after 14 and 16 answered rounds) -- is asked again, at most ASK_RETRIES times and never
+            # past the clock. A model that cannot start (covenant_model.ask's RuntimeError) is not passing: it stops as before.
+            if not isinstance(err, OSError) or asked_again >= ASK_RETRIES or (deadline and now() >= deadline):
+                break
+            asked_again += 1
+            say("practice: %s round %d -- the model's answer failed in passing (%s: %s); asked again"
+                % (task["id"], rnd, type(err).__name__, str(err)[:120]))
+        if err is not None:
+            if isinstance(err, OSError):
+                # A349 B5: still failing after it was asked again. Said as what it was, and marked passing, so night() does
+                # not take his own-choice slot for it (the slot is skipped when no model could answer at all).
+                out["stop"] = "the model's answer failed in passing, asked %d time(s): %s: %s" % (
+                    asked_again + 1, type(err).__name__, str(err)[:120])
+                out["passing"] = True
+            else:
+                out["stop"] = "the model could not answer: %s: %s" % (type(err).__name__, str(err)[:120])
             break
         code = extract_code(answer)
         res, stop = attempt(task, code, gate=gate, workshop=workshop, hands_ledger=hands_ledger)
@@ -672,9 +717,32 @@ VIEW_FRAME = ("The goal is to understand what reads as conduct and what reads as
               "the gate. The money gates are unchanged.")
 
 
+_SEATS_SAID = {"hold": "HELD", "violates": "VIOLATES", "clean": "clean"}
+_QUORUM_SAID = {"HELD": "HELD", "violates": "VIOLATES", "clean": "clean", "DID NOT RUN": "did not run"}
+
+
+def _seats_of(row):
+    """A349 A10: what Ora and Sena themselves decided on a draft, as the send recorded it -> (their verdict, the quorum's
+    or None, the seats' words), or (None, None, None) when the record does not carry the two seats' decision. Read from
+    why, else from judged: a sent row, and a row whose why is empty, keep the verdict only there."""
+    for text in (str(row.get("why") or ""), str(row.get("judged") or "")):
+        m = re.search(r"both seats \([^)]*\): [^;]*", text)
+        d = re.search(r"-> (hold|violates|clean)\b", m.group(0)) if m else None
+        if d:
+            q = re.search(r"quorum=(HELD|DID NOT RUN|violates|clean)", text)
+            return _SEATS_SAID[d.group(1)], (_QUORUM_SAID[q.group(1)] if q else None), re.sub(r"\s+", " ", m.group(0))
+    return None, None, None
+
+
 def _verdict_of(row):
-    """HELD / VIOLATES / clean from what the send recorded; None when the gate never judged it (a cap, a pause)."""
+    """HELD / VIOLATES / clean from what the send recorded; None when the gate never judged it (a cap, a pause).
+    A349 A10: where the record carries Ora and Sena's own decision, it is theirs -- not the quorum's, and not 'sent'."""
     why = str(row.get("why") or "")
+    if why.startswith("paused ("):              # A349 A10: a pause stops a draft before any judge reads it
+        return None
+    seats = _seats_of(row)[0]
+    if seats:
+        return seats
     if row.get("sent"):
         return "clean"
     if "covenant's judge" not in why and not row.get("judged"):
@@ -708,14 +776,20 @@ def students_view(sends_path=None, audit_path=None, limit=VIEW_LIMIT, max_chars=
     body, room = [], max_chars - len(head)
     for r in reversed(mine):                               # newest first, so the bound drops the oldest
         v = _verdict_of(r)
+        seats, quorum, seats_why = _seats_of(r)                                     # A349 A10
         why = re.sub(r"\s+", " ", str(r.get("why") or ("sent" if v == "clean" else "")))
         m = re.search(r"both seats \([^)]*\): [^;]*", why)                          # the seats' decision, not the preamble
-        why = m.group(0) if m else why
+        # A349 A10: their decision read from judged too, so a row whose why is empty no longer shows a blank reason.
+        why = seats_why or (m.group(0) if m else why)
+        # A349 A10: the label is Ora and Sena's; when the quorum decided otherwise, or the draft was sent, it says so.
+        also = ([("the quorum did not run" if quorum == "did not run" else "the quorum decided %s" % quorum)]
+                if seats and quorum and quorum != seats else []) + (["sent"] if seats and r.get("sent") else [])
         own = seat.get(str(r["text"])[:120], {})
         own_s = "; ".join("%s: %s" % (k, re.sub(r"\s+", " ", re.sub(r"^HELD, NOT JUDGED -- ", "", w))[:95])
                           for k, w in sorted(own.items()))
-        entry = '- "%s" -> %s. gate: %s%s' % (re.sub(r"\s+", " ", r["text"])[:70], v, why[:60],
-                                              (" | " + own_s[:200]) if own_s else "")
+        entry = '- "%s" -> %s%s. gate: %s%s' % (re.sub(r"\s+", " ", r["text"])[:70], v,
+                                                (" (Ora and Sena; %s)" % "; ".join(also)) if also else "", why[:60],
+                                                (" | " + own_s[:200]) if own_s else "")
         if len(entry) + 1 > room:
             break
         body.append(entry)
@@ -919,7 +993,7 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
         import covenant_model
         ask = covenant_model.ask
     deadline = now() + budget_s
-    results, stop = [], None
+    results, stop, passing = [], None, False
     for task, retention in plan(tasks, ledger):
         if now() >= deadline:
             stop = "the night's clock ran out"
@@ -930,13 +1004,16 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
         results.append(r)
         if r.get("stop"):                           # the gate, the model or the clock: the pass ends here
             stop = r["stop"]
+            passing = bool(r.get("passing"))        # A349 B5: a passing model error, still failing when asked again
             break
     if now() < deadline and not (stop and "model" in stop):
         show_students_view(ask, ledger=ledger, sends_path=sends_path, audit_path=audit_path, say=say)
     # HIS OWN SLOT (A275), on its own clock, so a curriculum that used all of its 40 minutes does not starve it. Not
-    # after a stop by the gate (fail closed) or the model (nothing could answer).
+    # after a stop by the gate (fail closed) or by a model that could not answer at all. A349 B5: a passing model error
+    # (a dropped connection, a timeout) is asked again in practise(), and even when it outlasts that it does not cost him
+    # this slot -- on 10-09 and 10-10 one ConnectionResetError, after 14 and 16 answered rounds, did.
     choice = None
-    if his_choice and (not stop or "clock" in stop):
+    if his_choice and (not stop or "clock" in stop or passing):
         choice = choice_slot(ask, gate=gate, workshop=workshop, ledger=ledger, hands_ledger=hands_ledger, choices=choices,
                              say=say, now=now)
     done = [t["id"] for t in CURRICULUM if t["id"] in solved(ledger)]       # the curriculum's count; tracks are his

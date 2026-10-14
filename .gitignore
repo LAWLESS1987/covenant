@@ -457,6 +457,10 @@ ops/earn_ledger.jsonl
 ops/earn_trials/
 ops/earn_sanctions.json
 ops/earn_funnel.json
+# A349 M4 (2026-10-14): the 24-hour re-delivery copies (buyers' results), kept on disk so a restart never charges twice
+ops/earn_results.jsonl
+ops/earn_results.jsonl.tmp
+ops/earn_results.jsonl.retired.jsonl
 
 # Syncthing (2026-09-25): the binary and its config/keys never tracked
 tools/syncthing/

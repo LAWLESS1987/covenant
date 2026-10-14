@@ -29,6 +29,9 @@ THE CONTRACT, and every line of it is driven both ways here:
         in the report and in --list while they stand.
   G7.12 (A348j) every actor name a module passes to covenant_pause's paused()
         or pause(), found by walking the tree, is listed in ACTORS.
+  G7.13 (A349 S2) standing() reads a switch as it is on disk: None when absent,
+        and a present file stands whatever its bytes -- so free's isolation
+        never writes over a pause someone set by hand.
 
     python test_g7_pause.py
 """
@@ -257,6 +260,30 @@ def main():
               any(i.startswith("paused: earn for ") for i in infos3) and any(i.startswith("paused: tetsu for ") for i in infos3)
               and listed.get("earn") == "PAUSED" and listed.get("tetsu") == "PAUSED",
               "report %s; list earn=%s tetsu=%s" % ([i[:24] for i in infos3], listed.get("earn"), listed.get("tetsu")))
+
+        # ---- G7.13 (A349 S2): standing() -- what free's round re-reads before her automatic isolation, so a
+        # pause someone set by hand is never written over. A file that is present stands, whatever its bytes.
+        none_before = P.standing("ambassador")
+        P.pause("ambassador", "operator: holding free, G7")
+        by_pause = P.standing("ambassador")
+        P.resume("ambassador")
+        check("G7.13 standing() is None with no pause, and the reason of one pause() wrote",
+              none_before is None and by_pause is not None and "operator: holding free, G7" in by_pause
+              and P.standing("ambassador") is None, (none_before, by_pause))
+        os.makedirs(P.PAUSE_DIR, exist_ok=True)
+        hand = os.path.join(P.PAUSE_DIR, "ambassador")
+        with open(hand, "wb") as fh:                 # what Windows PowerShell 5.1's `"stop" > file` writes: UTF-16
+            fh.write("stop, mine\r\n".encode("utf-16"))
+        s_utf16 = P.standing("ambassador")
+        with open(hand, "wb") as fh:
+            pass
+        s_empty = P.standing("ambassador")
+        os.unlink(hand)
+        os.makedirs(hand)                            # present, and cannot be read as a file at all
+        s_dir = P.standing("ambassador")
+        os.rmdir(hand)
+        check("G7.13b a present switch stands whatever its bytes: UTF-16, empty, or unreadable (a directory in its place)",
+              s_utf16 is not None and s_empty == "" and s_dir == "", (s_utf16, s_empty, s_dir))
     finally:
         P.PAUSE_DIR, P.TRADER_HALT = real_dir, real_halt
 

@@ -126,7 +126,17 @@ def max_order_usd():
 STOP = re.compile(r"^\s*(stop|halt|no more|revoke)\b", re.I)
 
 
-def request_strategy(name, why, consequence="", ask_fn=None, judge=None, path=None, grant_path=None, now=None, say=print):
+def _waiting(req, ask_log=None, contact_state=None):
+    """A349 B9: True while an asked question has no yes or no from him yet. An unreadable answer counts as
+    waiting, so a doubt never puts a second question to him."""
+    try:
+        return his_answer(req, ask_log, contact_state)[0] is None
+    except Exception:                                             # noqa: BLE001
+        return True
+
+
+def request_strategy(name, why, consequence="", ask_fn=None, judge=None, path=None, grant_path=None, now=None, say=print,
+                     ask_log=None, contact_state=None):
     """His yes can cover a STRATEGY, not only an order (his words, 2026-09-21: "It can be a yes to a trading
     strategy also"). One straight question: may Tetsu trade this paper rule live inside the rails; a yes
     covers the orders its signal calls for, each still passing the trader's gate, until he says stop."""
@@ -146,7 +156,11 @@ def request_strategy(name, why, consequence="", ask_fn=None, judge=None, path=No
         row["state"] = "refused: a strategy request names the rule"
         say("live: " + row["state"])
         return _append(row, path)
-    if any(r.get("scope") == "strategy" and r.get("strategy") == name and r.get("state", "").startswith("asked") for r in _rows(path)):
+    # A349 B9: this matched the ORIGINAL question, answered long ago, so the nightly's daily
+    # re-verification of a lapsed yes (A211) was refused here every night and never asked.
+    # Only a question still waiting for his answer blocks another one now.
+    if any(r.get("scope") == "strategy" and r.get("strategy") == name and r.get("state", "").startswith("asked")
+           and _waiting(r, ask_log, contact_state) for r in _rows(path)):
         row["state"] = "already asked for this rule"
         say("live: " + row["state"])
         return _append(row, path)
@@ -282,13 +296,21 @@ def stopped(req, ask_log=None, contact_state=None):
 
 
 def request(side, sym, usd, why, consequence="", ask_fn=None, judge=None, path=None, grant_path=None,
-            preconditions=None, now=None, say=print, strategy=None, ask_log=None, contact_state=None):
+            preconditions=None, now=None, say=print, strategy=None, ask_log=None, contact_state=None, qty=None):
     """Tetsu's live request: bounded, gated, recorded, and put to him as a straight question -- unless it
     is covered by his yes to a strategy, in which case it is recorded as covered and not asked. Returns the row."""
     side, sym = str(side or "").lower(), str(sym or "").upper()
     row = {"kind": "request", "id": "", "side": side, "sym": sym, "usd": None, "why": str(why or "")[:240],
            "consequence": str(consequence or "")[:400], "blocks": [], "state": "", "question_id": None,
            "strategy": strategy, "covered": None}
+    if qty is not None and side == "sell":
+        # A349 M1: the units bought under the rule, written WITH the row. signals() used to set this
+        # on the copy _append returns, after the line was written, so the ledger never held it.
+        # settle() sizes a covered sell by it; the dollars the gate is shown stay as they were.
+        try:
+            row["qty_bought_under"] = float(qty)
+        except (TypeError, ValueError):
+            row["qty_bought_under"] = None
     g = grant(grant_path)
     if not g:
         row["state"] = "refused: no grant on record (ops/tetsu_coinbase_grant.json)"
@@ -442,9 +464,24 @@ def settle(dry_run=True, venue=None, path=None, grant_path=None, preconditions=N
             bid, ask = venue.best_bid_ask(venue.meta(req["sym"])["product_id"])
             px = ask if req["side"] == "buy" else bid
             qty = float(req["usd"]) / float(px)
+            units = {}
+            if req["side"] == "sell" and req.get("covered") and req.get("strategy"):
+                # A349 M1: a covered sell after a -1 was usd/bid, so a lower bid sold more units than
+                # the rule bought (2x at half the price), out of his other holdings, with no question.
+                # It is sized by the units bought under the rule, re-read now, and never above the
+                # cap's dollars it was gated at; what stays held waits for the next -1.
+                held_now = bought_under(req["strategy"], req["sym"], path)
+                units = {"qty_bought_under": held_now, "qty_cap": qty}
+                limits = [qty, held_now] + ([float(req["qty_bought_under"])] if req.get("qty_bought_under") is not None else [])
+                qty = min(limits)
+                if qty <= 0:
+                    _append({"kind": "not_placed", "request": req["id"], "why": "nothing bought under the rule %s is left to sell" % req.get("strategy")}, path)
+                    out.append({"request": req["id"], "outcome": "nothing bought under the rule is left to sell"})
+                    say("live: %s -- nothing bought under the rule %s is left to sell" % (req["id"], req.get("strategy")))
+                    continue
             res = venue.place(req["sym"], req["side"].upper(), qty, live=not dry_run)
-            _append({"kind": "placed", "request": req["id"], "dry_run": bool(dry_run), "qty": qty, "px": px,
-                     "venue": str(res)[:400]}, path)
+            _append(dict({"kind": "placed", "request": req["id"], "dry_run": bool(dry_run), "qty": qty, "px": px,
+                          "venue": str(res)[:400]}, **units), path)
             out.append({"request": req["id"], "outcome": ("dry run: would place" if dry_run else "PLACED") + " %s %.6f %s at %s" % (req["side"], qty, req["sym"], px)})
             say("live: %s -- %s" % (req["id"], out[-1]["outcome"]))
         except Exception as e:                                    # noqa: BLE001
@@ -520,8 +557,7 @@ def signals(rules=None, files=None, path=None, paper_path=None, ask_log=None, co
                 held = bought_under(name, sym, path)
                 if held > 0 and sym not in HOLD_ONLY:
                     r = request("sell", sym, max_order_usd(), "the rule %s reads -1 on the last bar; selling what it bought" % name, strategy=name, path=path,
-                                preconditions=preconditions, now=now, say=say, ask_log=ask_log, contact_state=contact_state)
-                    r["qty_bought_under"] = held
+                                preconditions=preconditions, now=now, say=say, ask_log=ask_log, contact_state=contact_state, qty=held)   # A349 M1
                     item["request"] = r.get("id")
                 else:
                     item["note"] = "nothing bought under this rule to sell" if held <= 0 else "%s is on the floor, never sold" % sym

@@ -105,6 +105,28 @@ def paused(name):
         return False, ""
 
 
+def standing(name):
+    """The reason of the pause that stands for `name` as it is on disk now, or None when none stands.
+
+    A349 S2 (2026-10-14): for a writer that must not replace a pause someone set by hand -- free's round
+    re-reads the switch here before her automatic isolation (covenant_free_will.run_round). Read from the
+    file itself, not through paused(): a file that is present stands even when its bytes are not UTF-8 or
+    cannot be read at all ("" then), so a reason nobody can read is never taken for an automatic one.
+    Never raises; paused() and what it reports are unchanged."""
+    try:
+        p = _path(name)
+        if not os.path.exists(p):
+            return None
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read(1200)
+        except OSError:
+            return ""
+        return raw.decode("utf-8", errors="replace")[:300].strip()
+    except Exception:                                            # noqa: BLE001
+        return ""
+
+
 def pause(name, why=""):
     if name == "trader":
         return False, ("the trader's switch is TRADER_HALT, owned by guards.py -- "

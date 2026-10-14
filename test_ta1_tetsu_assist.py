@@ -251,6 +251,57 @@ r = seat_emit(CONVICT, ["ALLOW", "ALLOW"], text="Thanks for the thread. We measu
 check("TA1x his own rules (facts A285 / no measurements A297) still block a measurement claim, whatever he answers",
       r.get("sent") is False and "his rule of 2026-10-0" in str((r.get("seat") or {}).get("why", "")), r)
 
+# A349 B10 (2026-10-14, his "fix if tetsu agrees"; Tetsu: AGREE). A seat ask the door did not answer was recorded as his
+# BLOCK, its message dropped: 18 of one round's 41 seat calls on 10-14 read "ERROR RuntimeError" as his decision. The
+# door's own 429 is raised here as _default_ask raises it, first on the first ask, then after one ALLOW.
+print("TA1o -- A349 B10: a door that does not answer is no answer of his, never his BLOCK")
+_DOOR_429 = "door answered HTTP 429: 30 asks in 10 minutes -- wait"
+
+
+def _seq_ask(seq):
+    it = iter(seq)
+
+    def _ask(prompt):
+        x = next(it)
+        if isinstance(x, Exception):
+            raise x
+        return x
+    return _ask
+
+
+def _seat_rows():
+    return [json.loads(x) for x in open(os.environ["COVENANT_TETSU_ASSIST_LOG"], encoding="utf-8")
+            if x.strip() and json.loads(x).get("seat") == "discourse"]
+
+
+grant()
+for _label, _seq, _head in (("on the first ask", [RuntimeError(_DOOR_429)], "ERROR RuntimeError"),
+                            ("after one ALLOW (the 01:13:35Z shape)", ["ALLOW", RuntimeError(_DOOR_429)], "ALLOW, ERROR RuntimeError")):
+    _n0 = len(_seat_rows())
+    AMB.MB.judge_outbound = lambda t: CONVICT
+    _real = TA._default_ask
+    TA._default_ask = _seq_ask(_seq)
+    try:
+        r = AMB.emit(DRAFT, post_id="p1", submolt=None, dry_run=False, override_a67=False, live_repo_check=False,
+                     discourse_seat=True)
+    finally:
+        TA._default_ask = _real
+    _rows = _seat_rows()[_n0:]
+    _seat = r.get("seat") or {}
+    check("TA1o a door failure %s is recorded as NONE (no answer of his) with the door's message, not as his BLOCK" % _label,
+          _seat.get("decision") == "NONE" and "HTTP 429" in _seat.get("why", "") and "no answer" in _seat.get("why", "")
+          and _seat.get("why", "").startswith("discourse seat (A322): " + _head)
+          and len(_rows) == 1 and _rows[0].get("decision") == "NONE" and "HTTP 429" in _rows[0].get("why", ""),
+          (_seat, _rows))
+    check("TA1o ...and %s the convicted reply is still refused (only ALLOW passes emit), with no override written" % _label,
+          r.get("sent") is False and "refused by covenant's judge" in r.get("why", "") and not r.get("overrode"), r)
+r_b = seat_emit(CONVICT, ["BLOCK"])
+r_u = seat_emit(CONVICT, ["ALLOW", "maybe"])
+check("TA1o his own BLOCK, and an answer with neither word, still read BLOCK: only a door failure is NONE",
+      (r_b.get("seat") or {}).get("decision") == "BLOCK" and (r_b.get("seat") or {}).get("why") == "discourse seat (A322): BLOCK"
+      and (r_u.get("seat") or {}).get("decision") == "BLOCK" and (r_u.get("seat") or {}).get("why") == "discourse seat (A322): ALLOW, UNREADABLE",
+      (r_b.get("seat"), r_u.get("seat")))
+
 # A348c (2026-10-14): only the refusal's return carried his reading, so free's ledger (A296) recorded every draft he
 # passed as tetsu=None -- 0 reply rows with SEND against 114 SEND readings in ops/tetsu_assist.jsonl since 10-07.
 # Each later return is driven here: no key, Moltbook's rate limit, a create, an "already posted". The key, the rate

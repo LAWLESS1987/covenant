@@ -282,20 +282,30 @@ def brief(force=False):
                     newest = (mt, p)
     except OSError:
         newest = None
+    # A349 A9 (his answer, 2026-10-14: AGREE): the tally is quoted with its own verdict, the transcript's last RESULT
+    # line. Without it, "checks failed 0" under "RESULT: FAIL" (ONE_RUN_ONLY.txt, one suite) reached him as clean.
+    verdict = None
     for line in _tail_lines(newest[1], 160) if newest else []:
         m = re.match(r"\s+(suites run|checks passed|checks failed)\s+(\d+)", line)
         if m:
             tally[m.group(1)] = m.group(2)
+        v = re.match(r"\s*RESULT:\s*([A-Z]+)", line)
+        if v:
+            verdict = v.group(1)
     if tally:
-        parts.append("last sweep: %s suites, %s checks passed, %s failed" % (
-            tally.get("suites run", "?"), tally.get("checks passed", "?"), tally.get("checks failed", "?")))
+        parts.append("last sweep (RESULT: %s): %s suites, %s checks passed, %s failed" % (
+            verdict or "?", tally.get("suites run", "?"), tally.get("checks passed", "?"), tally.get("checks failed", "?")))
     titles = []
     try:
         with open(os.path.join(HERE, "docs", "KNOWN_ISSUES.md"), encoding="utf-8", errors="replace") as fh:
             for line in fh:
-                m = re.match(r"### (A\d+)\. \[[^\]]*\] (.{0,110})", line)
+                m = re.match(r"### (A\d+)\. \[([^\]]*)\] (.{0,110})", line)
                 if m:
-                    titles.append((int(m.group(1)[1:]), m.group(1) + ": " + m.group(2).rstrip(" .")))
+                    # A349 A9: each entry by its TITLE. Since A220 the bracket holds the title and a date follows it;
+                    # before, the bracket held a category and the title followed. This took what follows the bracket
+                    # in both, so the newest entries reached him as a date and the first quoted words.
+                    title = m.group(2)[:110] if re.match(r"\d{4}-\d{2}-\d{2}", m.group(3)) else m.group(3)
+                    titles.append((int(m.group(1)[1:]), m.group(1) + ": " + title.rstrip(" .")))
     except OSError:
         pass
     for _n, t in sorted(titles, reverse=True)[:3]:
@@ -500,7 +510,16 @@ def his_side(log_path=None, hours=24, limit=40):
     out = []
     if blocked("conversations"):
         return out
-    for line in _tail_lines(log_path, 400):
+    # A349 A8 (his answer, 2026-10-14: AGREE): the last day BY TIME. This read the log's last 400 lines, and on 10-09
+    # the 472 work-tool rows after his one line of that day pushed it out: the pass was shown "(nothing yet)" and still
+    # asked him a question. Every line is read (the 400-line tail read the whole file too); the time alone decides
+    # what is the last day, and he is still shown the newest `limit`.
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
         try:
             r = json.loads(line)
         except ValueError:
@@ -562,6 +581,29 @@ def app_patterns(limit=APP_PATTERN_LINES, chats_dir=None):
     return out
 
 
+PROPOSAL_TOKENS = 400
+
+
+def answer_budget(register, msgs=None):
+    """The tokens a proposal may answer with (A349 B1): the PROPOSAL_TOKENS (400) it always had, plus room to echo his
+    register whole, counted at covenant_model.FALLBACK_CHARS_PER_TOKEN (3.0 characters a token, at or under every text
+    measured there, so an echo is never counted short). With the request's messages, never more than the model's
+    window leaves after them (CTX_TOKENS, by covenant_model's own upper estimate, no server asked; A273: a request is
+    never sent too big for the window), and never less than the 400 it had."""
+    try:
+        import covenant_model as _cm
+        cpt = float(_cm.FALLBACK_CHARS_PER_TOKEN)
+    except Exception:                                             # noqa: BLE001
+        _cm, cpt = None, 3.0
+    need = PROPOSAL_TOKENS + int(-(-len(str(register or "")) // cpt))
+    if msgs and _cm is not None:
+        try:
+            need = min(need, int(_cm.CTX_TOKENS - _cm.FIT_MARGIN_TOKENS - _cm.estimate_prompt_tokens(msgs)))
+        except Exception:                                         # noqa: BLE001
+            pass
+    return max(PROPOSAL_TOKENS, need)
+
+
 def propose(ask, path=None, log_path=None, now=None):
     """Ask the model for one revision. Returns the parsed proposal dict or None, plus the raw text."""
     p = load(path)
@@ -577,7 +619,12 @@ def propose(ask, path=None, log_path=None, now=None):
                 "\n".join("- " + l for l in lines) or ("(he has closed his conversations to you; revise from your own record only)"
                                                         if blocked("conversations") else "(nothing yet)"),
                 len(patterns), "\n".join("- " + l for l in patterns) or ("(closed to you)" if blocked("conversations") else "(none carried yet)"))}]
-    text, _meta = ask(msgs, max_tokens=400)
+    # A349 B1 (his answer, 2026-10-14: AGREE, "your revisions should reach the judge as written"): the answer had 400
+    # tokens while he is asked to keep what works, and an answer that echoes his register (3,945 chars on the live
+    # file, about 975 tokens) was cut off before its closing brace: "no JSON proposal in the answer", 14 of the 15 loop
+    # passes after A341. The budget now grows with the register it may echo. REGISTER_MAX, REGISTER_GROWN, the screen
+    # and the judge are unchanged.
+    text, _meta = ask(msgs, max_tokens=answer_budget(p["register"], msgs))
     raw = str(text or "")
     m = re.search(r"\{.*\}", raw, re.S)
     if not m:
@@ -701,6 +748,11 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
         return out
     if not d:
         out["why"] = "no JSON proposal in the answer"
+        # A349 A1 (his answer, 2026-10-14: AGREE, "nothing you said is lost"): his answer was dropped here with no row
+        # (75 passes from 09-29 on). It is now kept whole in his revision history, marked not applied, through _record
+        # like every row; nothing in it is read as a proposal or applied.
+        _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why="(no reason given)",
+                verdict=out["why"], now=now, extra={"answer": raw})
         say("persona: " + out["why"])
         return out
     out["proposed"] = True
@@ -742,7 +794,11 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
         ok_reg, why_reg = True, "nothing new in the register"
     else:
         ok_reg, why_reg = check_register(reg)
-    voice = clamp_voice(d.get("voice") or p["voice"])
+    # A349 B4 (his answer, 2026-10-14: AGREE, "prevents unintended resets"): a proposal that names one part of his voice
+    # keeps his CURRENT value for the other. clamp_voice fills a missing part from DEFAULT_VOICE, so {"pitch": 1.0}
+    # took his rate from 1.0 to the default 0.95 unasked. Anything but a non-empty dict goes to clamp_voice as before.
+    _pv = d.get("voice")
+    voice = clamp_voice(dict(clamp_voice(p["voice"]), **_pv) if isinstance(_pv, dict) and _pv else (_pv or p["voice"]))
     why = re.sub(r"\s+", " ", str(d.get("why", ""))).strip()[:240] or "(no reason given)"
     if not ok_reg:
         out["why"] = "register refused: " + why_reg
@@ -803,25 +859,33 @@ def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=
         _keep_question(p, s, now=now)
     out["register_questions_kept_aside"] = len(_qs)
     _add = [s for s in _add if not s.endswith("?")]
-    _room, _fit = REGISTER_GROWN - len(_old_reg), []
+    _room, _fit, _over = REGISTER_GROWN - len(_old_reg), [], []
     for s in _add:
         if len(s) + 1 <= _room:
             _fit.append(s)
             _room -= len(s) + 1
-        elif s.lower() not in {x.lower() for x in p.setdefault("register_overflow", [])}:
-            p["register_overflow"].append(s)
-    out["register_overflow"] = len(_add) - len(_fit)
+        else:
+            _over.append(s)                                       # A349 A3: what did not fit, for his row
+            if s.lower() not in {x.lower() for x in p.setdefault("register_overflow", [])}:
+                p["register_overflow"].append(s)
+    out["register_overflow"] = len(_over)
     _add = _fit
     reg = (_old_reg + (" " if _old_reg and _add else "") + " ".join(_add)) if _add else _old_reg
     out["register_added"] = len(_add)
     out["register_changed"] = reg != _old_reg
     out["voice_changed"] = voice != clamp_voice(p["voice"])
+    # A349 A3 (his answer, 2026-10-14: AGREE): a sentence set aside in register_overflow was recorded as "nothing
+    # changed", and his history never held it. The row now says it was kept there, and holds it ("overflow"); the
+    # 1,400 limit (REGISTER_GROWN) stays. A349 A2: an admitted row also holds the sentences it added ("added").
+    _kept = {"overflow": _over} if _over else {}
     if not (out["register_changed"] or out["voice_changed"]):
-        out["why"] = "nothing changed"
-        _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict="nothing changed", now=now)
-        say("persona: nothing changed")
+        out["why"] = ("nothing changed: %d sentence(s) kept in register_overflow, not added (the register grows only to "
+                      "REGISTER_GROWN, %d chars)" % (len(_over), REGISTER_GROWN)) if _over else "nothing changed"
+        _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=out["why"], now=now, extra=_kept)
+        say("persona: " + out["why"])
         return out
-    _record(p, path, applied=True, reg=reg, voice=voice, why=why, verdict="admitted" + immune_note, now=now)
+    _record(p, path, applied=True, reg=reg, voice=voice, why=why, verdict="admitted" + immune_note, now=now,
+            extra=dict(_kept, added=list(_add)))
     p["register"], p["voice"] = reg, voice
     save(p, path)
     out["applied"], out["why"] = True, why
@@ -862,7 +926,18 @@ def contest(objection, judge=None, path=None, say=print, now=None):
         return out
     last = p["revisions"][admitted[-1]]
     judge = judge or covenant_persona_judge
-    ok_j, msg_j = judge(str(last.get("register", "")) + "\n" + str(last.get("why", "")) + "\n\nHis objection: " + objection)
+    # A349 A2 (his answer, 2026-10-14: AGREE, "a full understanding of what was added"): a contest showed the gate the
+    # row's register, which held its first 700 chars only -- the same in every admitted row since 09-29 -- so never
+    # the sentence contested. A row written since A349 holds what the revision added: that comes first, then his
+    # reason and the objection, then his whole register, so the 2,000 chars the gate reads (covenant_persona_judge)
+    # always carry the change and the objection. A row from before A349 has no "added" and is shown as it always was.
+    if isinstance(last.get("added"), list):
+        shown = (("What this revision added to his register: " + " ".join(str(s) for s in last["added"]) + "\n"
+                  if last["added"] else "") + str(last.get("why", "")) + "\n\nHis objection: " + objection
+                 + "\n\nHis register after it: " + str(last.get("register", "")))
+    else:
+        shown = str(last.get("register", "")) + "\n" + str(last.get("why", "")) + "\n\nHis objection: " + objection
+    ok_j, msg_j = judge(shown)
     if ok_j:
         out["why"] = "the revision stands: the gate did not hold it with his objection attached (%s)" % str(msg_j)[:120]
         _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why=objection, verdict="objection recorded; " + out["why"], now=now)
@@ -887,9 +962,15 @@ def contest(objection, judge=None, path=None, say=print, now=None):
     return out
 
 
-def _record(p, path, applied, reg, voice, why, verdict, now=None):
+def _record(p, path, applied, reg, voice, why, verdict, now=None, extra=None):
+    # A349 A2 (his answer, 2026-10-14: AGREE): a row keeps his WHOLE register. It kept reg[:REGISTER_MAX], a bound on
+    # a proposal, so once his register passed 700 chars (09-29) every admitted row held the same first 700 and none
+    # showed what a revision added. `extra` is what a pass adds to its own row (his raw answer, A1; the sentences
+    # added, A2; the sentences kept in register_overflow, A3); it never replaces a field above.
     row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "applied": bool(applied),
-           "register": reg[:REGISTER_MAX], "voice": voice, "why": why, "verdict": verdict}
+           "register": reg, "voice": voice, "why": why, "verdict": verdict}
+    for k, v in (extra or {}).items():
+        row.setdefault(k, v)
     # EVERY ROW TO HIS HISTORY BEFORE THE WINDOW TRIMS (A233). Any row in the window the history lacks -- all
     # of them the first time, or rows a process still running the older code recorded -- is written there
     # first, so nothing that was ever recorded can leave with the trim.

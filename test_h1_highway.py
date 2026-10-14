@@ -1587,6 +1587,15 @@ def main():
           and "ConnectionResetError" in (am_p["part"]["measured"].get("part_starved") or "")
           and "starved" not in am_p["part"]["measured"]
           and am_p["none_written"]["state"] == H.PRESENT and am_p["none_written"]["measured"]["starved"]["rounds"] == 1, am_p)
+    # A349 B13 (2026-10-14): free's round row counts a reply Moltbook's rate limit held, or that Moltbook created and hid,
+    # apart from "refused" now. Such a round still wrote.
+    am_b13 = H.detect_ambassador_stalled(grant=_g, paused=(False, ""), now=_n, rounds=[
+        {"at": _n - 20 * 3600}, dict(_pr, replied=0, refused=0, rate_held=2, hidden=1)])
+    check("H1amB13 a round that wrote 3 replies Moltbook rate-held or hid before its model failed could write: it resets "
+          "the clock and is named part_starved, not a stall (A349 B13)",
+          am_b13["state"] == H.ABSENT and am_b13["measured"]["last_live_round_h"] == 2.0
+          and "ConnectionResetError" in (am_b13["measured"].get("part_starved") or "")
+          and "starved" not in am_b13["measured"], am_b13)
     _am_paired =[n for n, r in H.REMEDIES.items() if "ambassador_stalled" in (r.get("for") or [])]
     check("H1am no remedy: lifting a pause is his, and a round speaks in public", _am_paired == [], _am_paired)
 

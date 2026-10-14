@@ -65,7 +65,12 @@ def apply_quorum_policy():
     the core is imported. Without it build_semantic_quorum falls back to the
     keyless 'claude' provider and refuses EVERYTHING -- measured 2026-09-05
     when the first opinion run did exactly that. COVENANT_JUDGE_PROVIDERS
-    already in the environment wins, as it does for the node."""
+    already in the environment wins, as it does for the node.
+
+    [A349 S3 (A349-S3-AS-THE-NODE), 2026-10-14: not as it does for the node. run_node.py applies the
+    policy over the environment, and only COVENANT_JUDGE_PROVIDERS_OVERRIDE
+    beats it. Here the environment wins on purpose (A335: the sweep's mock;
+    G21 pins it), and that is unchanged. The sentence is kept as written.]"""
     if os.environ.get("COVENANT_JUDGE_PROVIDERS"):
         return os.environ["COVENANT_JUDGE_PROVIDERS"]
     try:
@@ -78,10 +83,24 @@ def apply_quorum_policy():
     return providers
 
 
-def build_default_sentinel():
+# A349 S3 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). What run_node.py seats when nothing
+# is exported and there is no ops/quorum_policy.json: the operator's decision of 2026-09-12 that closed A93,
+# "change the fallback to deferring,semantic". That fix was made in step across the start paths before
+# default_sentinel existed (A223), so a policy-less tree -- every clone, the policy is gitignored -- built
+# Tetsu's helpers a keyless 'claude' seat that refuses everything. RG1.7 runs run_node and compares.
+NODE_NO_POLICY_PROVIDERS = "deferring,semantic"
+
+
+def build_default_sentinel(no_policy=""):
     """The node's own gate. Imported here, not at module top, so --selftest
-    and the tests can run with a mock and never touch the real providers."""
-    apply_quorum_policy()
+    and the tests can run with a mock and never touch the real providers.
+
+    no_policy (A349 S3): the providers seated when nothing is exported and the
+    policy names none. Empty, the default, keeps the core's own fallback as
+    before (earn, outside_eval and this proxy's own listener call it so);
+    default_sentinel passes NODE_NO_POLICY_PROVIDERS. Nothing is written to the
+    environment for it, so no later build in the process inherits it."""
+    providers = apply_quorum_policy()
     import covenant_unified_v8 as core
     # The same companions, in the same order, as run_node.py:
     # each registers a provider the policy may name ("deferring" lives in
@@ -90,7 +109,10 @@ def build_default_sentinel():
     import covenant_judge_local    # noqa: F401
     import covenant_judge_fallback  # noqa: F401
     import covenant_judge_defer    # noqa: F401
-    judge = core.build_semantic_quorum()
+    if not providers and no_policy:
+        judge = core.build_semantic_quorum([p.strip() for p in str(no_policy).split(",") if p.strip()])
+    else:
+        judge = core.build_semantic_quorum()
     return core.ReasoningSentinel(judge, core.DIVINE_PRINCIPLES)
 
 
@@ -113,10 +135,17 @@ def default_sentinel():
     to. His words: "fix it aslong as it doesn't put backdoors or forcefully
     alter tetsu". So: the same quorum the node and this proxy use, cached;
     NO switch, NO new semantics in the callers; a build that fails RAISES,
-    and every caller already turns that into a refusal (fails closed)."""
+    and every caller already turns that into a refusal (fails closed).
+
+    [A349 S3 (A349-S3-AS-THE-NODE), 2026-10-14: "the same quorum the node ... use" was not so on a
+    tree with no policy and nothing exported -- the node seats deferring,
+    semantic, this built the core's keyless 'claude' -- and it now seats the
+    node's (NODE_NO_POLICY_PROVIDERS). Still not the node's: a provider list
+    exported in the environment wins here, on purpose (A335, G21), while the
+    node's policy beats it. The sentence above is kept as written.]"""
     with _DEFAULT_LOCK:
         if _DEFAULT["sentinel"] is None:
-            _DEFAULT["sentinel"] = build_default_sentinel()
+            _DEFAULT["sentinel"] = build_default_sentinel(no_policy=NODE_NO_POLICY_PROVIDERS)
         return _DEFAULT["sentinel"]
 
 

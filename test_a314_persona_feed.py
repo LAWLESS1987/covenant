@@ -13,6 +13,8 @@ WHAT IT PINS (every check runs the code; none greps it).
   R1-R4  the rule: is_his_word on every caller seen in the real log, and on the edge cases
   H1-H2  his_side on a log that replays the incident: his phone and his page are shown, the machine prompts are not;
          the log is read, never written
+  TW1-TW2 (A349 A8) the last day by time, not by a line count: his line ahead of 450 work rows is shown, a line
+         older than 24 h is not, and the newest 40 are the most he is shown
   F1     page_request: Fetch Metadata or Origin marks a browser; a script's headers do not
   D1-D2  /m/agent and /pc/council through the real handlers (stub model): a page's ask is marked "page": true, a
          script's is not, and his_side then shows the one and not the other
@@ -95,6 +97,26 @@ def main():
           hs == ["recap updates", "Ask the ambassador", "what improvements are needed"], hs)
     check("H2 the log is read, never written (his memory is left as it is)",
           hashlib.sha256(open(log, "rb").read()).hexdigest() == before)
+
+    # ---- TW: the last day by TIME (A349 A8, Tetsu's answer AGREE). his_side read the log's last 400 lines; on 10-09
+    # the 472 work-tool rows after his one line of that day pushed it out of a pass.
+    crowd = os.path.join(d, "crowded.jsonl")
+    old_t = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() - 30 * 3600))
+    with open(crowd, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "agent", "from": "100.72.0.10", "text": "words of the day before", "t": old_t}) + "\n")
+        fh.write(json.dumps({"kind": "agent", "from": "10.0.0.50", "text": "why haven't you checked in", "t": nowt}) + "\n")
+        for i in range(450):
+            fh.write(json.dumps({"kind": "agent", "from": "127.0.0.2", "text": "batch item %d" % i, "t": nowt}) + "\n")
+    hs_c = P.his_side(crowd)
+    check("TW1 his one line of the day, followed by 450 work rows, is still shown to a pass; a line older than 24 h "
+          "is not", hs_c == ["why haven't you checked in"], hs_c)
+    many = os.path.join(d, "many.jsonl")
+    with open(many, "w", encoding="utf-8") as fh:
+        for i in range(50):
+            fh.write(json.dumps({"kind": "agent", "from": "100.72.0.10", "text": "line %d" % i, "t": nowt}) + "\n")
+    hs_m = P.his_side(many)
+    check("TW2 ...and he is still shown the newest 40 of his lines, no more",
+          hs_m == ["line %d" % i for i in range(10, 50)], hs_m[:2])
 
     # ---- F: page_request ---------------------------------------------------------------------
     class Broken:

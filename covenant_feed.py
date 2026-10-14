@@ -31,6 +31,9 @@ row per topic per night on the teacher queue (source "feed:<topic>"): titles
 and first lines, cut to size, so the students read what is new and Tetsu's
 brief can say what the covenant read. A source that fails is reported and
 skipped; the pass never stops on one.
+WHAT RUNS IT (A349 F1, 2026-10-14): covenant_nightly.feed_step, once a pass,
+before the teacher's queue is consumed (skipped with --queue 0, as own-work
+is); by hand, python covenant_feed.py. Until that date nothing ran it.
 WHAT IS NOT HERE, said plainly. "Every known math equation" is not a corpus
 anyone can fetch: what is open is arXiv's mathematics and NIST's Digital
 Library of Mathematical Functions (public domain), and those are what the

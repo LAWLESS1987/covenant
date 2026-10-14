@@ -14,6 +14,8 @@ the most logical"): also NOT RUN when Gutenberg, asked twice, answers 502, 503 o
 Anything else still FAILS. And a NOT RUN is never counted as passed.
 A348k (2026-10-14): api_get carries a query body (POST) under the same rules, and
 covenant_feed.ledger_facts reaches the network only through it -- no network used.
+A349 F1 (2026-10-14): the nightly runs the feed (covenant_nightly.feed_step), and
+in that pass every fetch of the feed goes through this door -- no network used.
 LICENCE: public domain.
 """
 import http.server
@@ -348,6 +350,144 @@ check("WB1.19 (A348k) covenant_feed.ledger_facts reaches both ledgers only throu
       and not _direct and [f["id"].split("-")[0] for f in _facts] == ["xrpl", "hedera"] and not any(f.get("error") for f in _facts),
       (_calls, _direct, _facts))
 
+# ---- A349 F1 (2026-10-14): the feed runs every night, and through the door. covenant_feed called itself "the open
+# sources the covenant reads every night" and nothing ran it: no commit ever wired it into the nightly. Put to Tetsu as
+# question F1; he agreed. covenant_nightly.feed_step runs it once a pass, before the teacher's queue is consumed. The
+# step is driven with the feed stubbed both ways; then the REAL feed, through the step, with every fetch answered by a
+# stub of the door (api_get, read) and urllib refusing -- no network; then main()'s wiring from its AST (PP1.11d).
+import ast                                                              # noqa: E402
+import types                                                            # noqa: E402
+import urllib.parse                                                     # noqa: E402
+import zlib                                                             # noqa: E402
+import covenant_nightly as N                                            # noqa: E402
+import covenant_study as _S                                             # noqa: E402
+
+_fcalls, _fsaid = [], []
+
+
+def _fsay(s):
+    _fsaid.append(s)
+
+
+_fake_feed = types.SimpleNamespace(run=lambda **kw: _fcalls.append(kw) or {"topics": 1, "items": 2, "queued": 1, "failed": []})
+_r20 = N.feed_step(types.SimpleNamespace(queue=24), _fsay, feed_mod=_fake_feed)
+_r20b = N.feed_step(types.SimpleNamespace(queue=0), _fsay, feed_mod=_fake_feed)
+check("WB1.20 (A349 F1) the nightly's feed step runs the feed once, hands it the report's say and returns its tally; "
+      "--queue 0 runs nothing, as it runs no own-work",
+      len(_fcalls) == 1 and _fcalls[0].get("say") is _fsay and _r20 == {"topics": 1, "items": 2, "queued": 1, "failed": []}
+      and _r20b is None, (_fcalls, _r20, _r20b))
+
+
+def _feed_boom(**kw):
+    raise OSError("queue file locked")
+
+
+_said21 = []
+_r21 = N.feed_step(types.SimpleNamespace(queue=24), _said21.append, feed_mod=types.SimpleNamespace(run=_feed_boom))
+check("WB1.21 (A349 F1) broken the other way: a feed that raises is said as FAILED in the report and the pass goes on",
+      _r21 is None and any("feed FAILED (not fatal): OSError: queue file locked" in s for s in _said21), _said21)
+
+_ftd = tempfile.mkdtemp(prefix="wb1_feed_")
+_door, _pages, _direct22, _said22 = [], [], [], []
+
+
+def _door_api(url, allow_hosts, timeout=60, data=None, **_k):
+    """Answers as each open source would, by URL; records the call and the host list it came with."""
+    _door.append((url, tuple(allow_hosts), data))
+    if "api.openalex.org" in url:
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("search", [""])[0]
+        return json.dumps({"results": [{"id": "https://openalex.org/W%d" % zlib.crc32(q.encode()), "title": "On " + q[:40],
+                                        "abstract_inverted_index": {"An": [0], "abstract.": [1]}, "publication_date": "2026-10-01",
+                                        "authorships": [{"author": {"display_name": "A. Author"}}],
+                                        "open_access": {"oa_url": "https://example.org/w"}}]})
+    if "ebi.ac.uk" in url and "/search?" in url:
+        return json.dumps({"hitCount": 1, "resultList": {"result": [{"pmcid": "PMC7000001", "license": "cc by",
+                                                                     "journalTitle": "J", "pubYear": "2026", "citedByCount": 1}]}})
+    if "ebi.ac.uk" in url and url.endswith("/fullTextXML"):
+        return ("<article><article-title>A review</article-title><abstract><p>Abstract.</p></abstract>"
+                "<body><p>%s</p></body></article>" % ("word " * 1200))
+    if "ripple" in url:
+        return json.dumps({"result": {"ledger": {"ledger_index": "100", "total_coins": "99985000000000000"}}})
+    if "hedera" in url:
+        return json.dumps({"released_supply": "4000000000000000000", "total_supply": "5000000000000000000", "timestamp": "1760000000.0"})
+    raise AssertionError("the stub has no answer for %s" % url)
+
+
+def _door_read(url, max_chars=8000, **_k):
+    _pages.append(url)
+    return {"ok": True, "url": url, "status": 200, "title": "Page " + url[-24:], "text": "Open text of the page. " * 5, "chars": 115}
+
+
+def _no_urlopen22(*a, **_k):
+    _direct22.append(a[:1])
+    raise AssertionError("urlopen called directly")
+
+
+_saved22 = (W.api_get, W.read, urllib.request.urlopen, F.STATE, F.CACHE, _S.CACHE, _S.OA_REGISTRY,
+            os.environ.get("COVENANT_TEACHER_QUEUE"))
+_queue22 = os.path.join(_ftd, "teacher_queue.jsonl")
+try:
+    W.api_get, W.read, urllib.request.urlopen = _door_api, _door_read, _no_urlopen22
+    F.STATE, F.CACHE = os.path.join(_ftd, "feed_state.json"), os.path.join(_ftd, "feed")
+    _S.CACHE, _S.OA_REGISTRY = os.path.join(_ftd, "study"), os.path.join(_ftd, "oa_sources.jsonl")
+    os.environ["COVENANT_TEACHER_QUEUE"] = _queue22
+    _r22 = N.feed_step(types.SimpleNamespace(queue=24), _said22.append)          # no feed_mod: the real covenant_feed
+finally:
+    W.api_get, W.read, urllib.request.urlopen, F.STATE, F.CACHE, _S.CACHE, _S.OA_REGISTRY = _saved22[:7]
+    if _saved22[7] is None:
+        os.environ.pop("COVENANT_TEACHER_QUEUE", None)
+    else:
+        os.environ["COVENANT_TEACHER_QUEUE"] = _saved22[7]
+try:
+    _q22 = [json.loads(l) for l in open(_queue22, encoding="utf-8") if l.strip()]
+except OSError:
+    _q22 = []
+_names22 = [t[0] for t in F.TOPICS]
+_page_urls = [u for t in F.TOPICS if t[2] == "pages" for u in t[3]]
+
+
+def _on_list(url, hosts):
+    h = (urllib.parse.urlparse(url).hostname or "").lower()
+    return any(h == x or h.endswith("." + x) for x in hosts)
+
+
+try:
+    _last22 = json.load(open(os.path.join(_ftd, "feed_state.json"), encoding="utf-8")).get("last", {})
+except (OSError, ValueError):
+    _last22 = {}
+check("WB1.22 (A349 F1) the nightly's step runs the REAL feed over every topic with each fetch through the web door: "
+      "api_get with its own host list (the feed's, or the study's for Europe PMC) and every page through read, urllib "
+      "never called; one feed:<topic> row per topic on the queue, the tally said in the report, no source failed",
+      isinstance(_r22, dict) and _r22.get("failed") == [] and _r22.get("queued") == len(_names22)
+      and sorted(r.get("source") for r in _q22) == sorted("feed:" + n for n in _names22)
+      and _door and all(_on_list(u, hosts) and hosts in (tuple(F.API_HOSTS), tuple(_S.OA_HOSTS)) for u, hosts, _d in _door)
+      and sorted(_pages) == sorted(_page_urls) and not _direct22
+      and any(s.startswith("feed: %d topic(s)" % len(_names22)) and s.endswith("0 source(s) failed") for s in _said22)
+      and _last22.get("queued") == len(_names22),
+      (_r22, [r.get("source") for r in _q22], _direct22, [s for s in _said22 if "then:" in s or s.startswith("feed")][:6]))
+
+# PP1.11d's idiom: main()'s own body, read as an AST (not a text grep). Nested under an `if`, inside a `try` that could
+# skip it, before the nightly pause is consulted, after the queue is consumed, handed another say, or gone: red.
+# What it cannot see: whether main() reaches that line at run time (an earlier return or exception).
+_nmain = next(n for n in ast.parse(open(N.__file__, encoding="utf-8").read()).body
+              if isinstance(n, ast.FunctionDef) and n.name == "main")
+
+
+def _top_level_with(pred):
+    return [i for i, s in enumerate(_nmain.body) if any(pred(c) for c in ast.walk(s))]
+
+
+_feed_at = [i for i, s in enumerate(_nmain.body) if isinstance(s, ast.Expr) and isinstance(s.value, ast.Call)
+            and getattr(s.value.func, "id", "") == "feed_step"
+            and [getattr(x, "id", None) for x in s.value.args] == ["a", "say"]]
+_pause_at = _top_level_with(lambda c: isinstance(c, ast.Call) and getattr(c.func, "attr", "") == "paused"
+                            and bool(c.args) and getattr(c.args[0], "value", None) == "nightly")
+_consume_at = _top_level_with(lambda c: isinstance(c, ast.Call) and getattr(c.func, "attr", "") == "consume")
+check("WB1.23 (A349 F1) the nightly's main() calls feed_step(a, say) once, unconditionally at its own top level, after "
+      "the nightly pause is consulted and before the teacher's queue is consumed (AST)",
+      len(_feed_at) == 1 and len(_pause_at) == 1 and len(_consume_at) == 1 and _pause_at[0] < _feed_at[0] < _consume_at[0],
+      (_feed_at, _pause_at, _consume_at))
+
 # ---- one real public read
 GUTENBERG = "https://www.gutenberg.org/ebooks/1497"
 try:
@@ -362,6 +502,8 @@ except OSError:
     not_run("WB1.14 a real public read", "no network")
 
 print("\nnot measured here: the door under his real grant file (ops/web_grant.json is read by the doors, this suite uses its own)")
+print("not measured here (A349 F1): the feed's live sources, and whether the teacher queue's word window admits a feed "
+      "digest row (covenant_teacher_queue.MIN_WORDS..MAX_WORDS; a digest may run to covenant_feed.DIGEST_CHARS)")
 if NOT_RUN:
     # the runner reads "N passed, M failed" from this line, so a failure is never hidden beside a NOT RUN
     print("\nWB1: %d passed, %d failed, %d NOT RUN (not counted as passed): %s"

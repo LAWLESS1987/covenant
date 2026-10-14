@@ -331,6 +331,67 @@ def main():
        not err and at >= 0 and len(companions) == 3 and all(log.index(c) < at for c in companions)
        and isinstance(built, tuple) and built[0] == "sentinel", err or log)
 
+    # A349 S3 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). default_sentinel -- the gate on
+    # Tetsu's hands, registers, questions and strategy reasons -- built the core's keyless 'claude' seat on a
+    # tree with no policy and nothing exported, where run_node seats A93's "deferring,semantic". The fake core
+    # below writes down the providers it is handed and the environment it sees (no real judge in this suite;
+    # RG1.7 builds the real one and runs run_node beside it).
+    class ProvidersQuorum(RecordingQuorum):
+        def exec_module(self, module):
+            RecordingQuorum.exec_module(self, module)
+            if module.__name__ == "covenant_unified_v8":
+                seen = self.log
+
+                def build_semantic_quorum(providers=None):
+                    seen.append(("<quorum>", providers, os.environ.get("COVENANT_JUDGE_PROVIDERS")))
+                    return "quorum"
+                module.build_semantic_quorum = build_semantic_quorum
+
+    def built_by(fn, here, exported):
+        """[(providers handed to the core, the environment it saw)], and the environment after, for one build
+        of fn() with HERE at `here` and COVENANT_JUDGE_PROVIDERS exported as `exported` (None: unset)."""
+        seen = []
+        finder = ProvidersQuorum(seen)
+        mods = dict((n, sys.modules.pop(n, None)) for n in RecordingQuorum.NAMES)
+        keep = (GP.HERE, GP._DEFAULT["sentinel"], os.environ.get("COVENANT_JUDGE_PROVIDERS"))
+        if exported is None:
+            os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        else:
+            os.environ["COVENANT_JUDGE_PROVIDERS"] = exported
+        GP.HERE, GP._DEFAULT["sentinel"] = here, None
+        sys.meta_path.insert(0, finder)
+        try:
+            fn()
+            after = os.environ.get("COVENANT_JUDGE_PROVIDERS")
+        except Exception as exc:                  # a gate that cannot be built is a failure, named
+            after = "%s: %s" % (type(exc).__name__, exc)
+        finally:
+            sys.meta_path.remove(finder)
+            for name, mod in mods.items():
+                sys.modules.pop(name, None)
+                if mod is not None:
+                    sys.modules[name] = mod
+            GP.HERE, GP._DEFAULT["sentinel"] = keep[0], keep[1]
+            if keep[2] is None:
+                os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+            else:
+                os.environ["COVENANT_JUDGE_PROVIDERS"] = keep[2]
+        return [(p, e) for (_t, p, e) in [x for x in seen if isinstance(x, tuple)]], after
+
+    nopol, withpol = tempfile.mkdtemp(prefix="g20_nopol_"), tempfile.mkdtemp(prefix="g20_pol_")
+    os.makedirs(os.path.join(withpol, "ops"))
+    with open(os.path.join(withpol, "ops", "quorum_policy.json"), "w", encoding="utf-8") as fh:
+        json.dump({"providers": "p1,p2"}, fh)
+    got_b = built_by(GP.default_sentinel, nopol, None)
+    ok("G20b", "no policy and nothing exported: default_sentinel seats the node's fallback, deferring,semantic, "
+       "not the core's 'claude' -- and writes nothing to the environment", got_b == ([(["deferring", "semantic"], None)], None), got_b)
+    got_c_env, got_c_pol = built_by(GP.default_sentinel, nopol, "x,y"), built_by(GP.default_sentinel, withpol, None)
+    ok("G20c", "unchanged where a list is given: an exported one still wins (A335, G21), else the policy's",
+       got_c_env == ([(None, "x,y")], "x,y") and got_c_pol == ([(None, "p1,p2")], "p1,p2"), (got_c_env, got_c_pol))
+    got_d = built_by(GP.build_default_sentinel, nopol, None)
+    ok("G20d", "and A349 S3 is default_sentinel's only: build_default_sentinel() as earn, outside_eval and the "
+       "listener call it is unchanged (the core's own fallback; named, not fixed)", got_d == ([(None, None)], None), got_d)
+
     # A348i: G10's judge never answers. This one answers just after the deadline, while the refusal is
     # being audited -- and decide read its "clean" back out of the shared box and returned it, so the
     # proxy forwarded what the docstring calls a refusal (measured 2026-10-14: (True, 'clean (late)')).

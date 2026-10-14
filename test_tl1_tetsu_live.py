@@ -24,6 +24,14 @@ wetsuit permission in coinbase. He's free to ask me anything."):
   TL1e  the module never imports the venue or the guards at module level
         (only inside the calls), and the real gate on this tree blocks today
         with its reasons named (measured).
+  TL1g  A349 B9: a strategy yes older than a day is put back to him by the
+        nightly's own loop -- a new question, not refused against the original
+        answered one; a second ask while it waits is refused; his fresh yes
+        approves the rule again.
+  TL1h  A349 M1: a covered SELL after a -1 carries the units bought under the
+        rule in the ledger and places those units, never cap/bid (2x at half
+        the bid), never above the cap's dollars, re-read at settlement; the
+        gate is shown the same order as before.
 """
 import json
 import os
@@ -233,6 +241,83 @@ def main():
     check("TL1f after the stop an order under the rule is asked per order again", cr3["state"] == "asked" and cr3["covered"] is None and len(asked) == n_asked + 1)
     outs = TL.settle(dry_run=False, venue=Venue(), preconditions=lambda o: [], say=quiet)
     check("TL1f the pending covered sell raised before the stop is NOT placed after it", any("stopped or missing" in o["outcome"] for o in outs), outs)
+
+    # ---- TL1g (A349 B9, his words 2026-09-21: "just verify strategy with me daily")
+    print("TL1g -- the daily re-verification of a lapsed yes is asked")
+    rule = "breakout 30"
+    n0 = len(asked)
+    g1 = TL.request_strategy(rule, "it cleared the three tests on paper", ask_fn=ask_fn, say=quiet)
+    CT.mark_seen([g1["question_id"]], now=NOW + 1000)
+    chat("yes to the rule", NOW + 1010)
+    TL.settle(dry_run=True, venue=Venue(), preconditions=lambda o: [], say=quiet)
+    day2 = NOW + 1010 + TL.VERIFY_EVERY_S + 3600
+    need = TL.needs_verification(now=day2)
+    check("TL1g a yes older than a day lapses: not approved, and needs_verification names the rule",
+          g1["state"].startswith("asked") and rule not in TL.approved_strategies(now=day2) and rule in need and "verification expired" in need[rule]["state"], (g1["state"], need))
+    # the nightly's own loop (covenant_nightly.py, A211): each lapsed rule is put back to him
+    reasks = {k: TL.request_strategy(k, "daily verification you asked for: this rule traded under your yes and the day has run out",
+                                     consequence="until you answer, this rule places nothing", ask_fn=ask_fn, say=quiet) for k in need}
+    g2 = reasks.get(rule) or {}
+    check("TL1g the lapsed rule IS put back to him: a new question, not 'already asked' against the original answered one",
+          str(g2.get("state", "")).startswith("asked") and g2.get("question_id") and g2.get("id") != g1["id"] and len(asked) == n0 + 2
+          and ("trade the paper rule %s live" % rule) in asked[-1] and "daily verification" in asked[-1], (g2.get("state"), len(asked) - n0))
+    g3 = TL.request_strategy(rule, "the same night again", ask_fn=ask_fn, say=quiet)
+    check("TL1g while that question waits, a second ask is refused and nothing more is asked", g3["state"] == "already asked for this rule" and len(asked) == n0 + 2, g3["state"])
+    CT.mark_seen([g2.get("question_id")], now=day2)
+    chat("yes", day2 + 10)
+    check("TL1g his fresh yes approves the rule again, under the new question", TL.approved_strategies(now=day2 + 60).get(rule) == g2.get("id"), TL.approved_strategies(now=day2 + 60))
+
+    # ---- TL1h (A349 M1): a covered SELL is sized by the units bought under the rule
+    print("TL1h -- a covered SELL sells the units the rule bought")
+
+    class PricedVenue(Venue):
+        def __init__(self, bid, ask_):
+            Venue.__init__(self)
+            self.bid, self.ask_ = bid, ask_
+
+        def best_bid_ask(self, pid):
+            return self.bid, self.ask_
+
+    gated = []
+    gate = lambda o: (gated.append(dict(o)) or [])    # noqa: E731
+    TL.signals(rules=[(rule, up, [sym])], files=files, preconditions=gate, say=quiet)
+    TL.settle(dry_run=False, venue=PricedVenue(99.0, 100.0), preconditions=gate, say=quiet)      # the covered buy, live (stub venue)
+    held = TL.bought_under(rule, sym)
+    check("TL1h the covered buy at ask 100 holds cap/100 units under the rule", abs(held - cap / 100.0) < 1e-12, held)
+    TL.signals(rules=[(rule, down, [sym])], files=files, preconditions=gate, say=quiet)
+    srow = TL._rows()[-1]
+    check("TL1h the -1 sell request carries the units bought under the rule IN THE LEDGER (they were set on a copy after the write)",
+          srow["side"] == "sell" and srow["covered"] == g2.get("id") and srow.get("qty_bought_under") == held, srow)
+    vs = PricedVenue(50.0, 51.0)                       # the bid has halved since the buy
+    outs = TL.settle(dry_run=False, venue=vs, preconditions=gate, say=quiet)
+    sells = [c for c in vs.calls if c["side"] == "SELL"]
+    placed = [x for x in TL._rows() if x.get("kind") == "placed" and x.get("request") == srow["id"]]
+    check("TL1h at half the bid the covered SELL places the units the rule bought, not cap/bid (twice as many)",
+          len(sells) == 1 and abs(sells[0]["qty"] - held) < 1e-12 and sells[0]["live"] is True and TL.bought_under(rule, sym) == 0.0, (sells, held, outs))
+    check("TL1h the placed row records the units it was sized by", placed and placed[0]["qty"] == sells[0]["qty"] and placed[0].get("qty_bought_under") == held, placed)
+    TL.signals(rules=[(rule, up, [sym])], files=files, preconditions=gate, say=quiet)
+    TL.settle(dry_run=False, venue=PricedVenue(99.0, 100.0), preconditions=gate, say=quiet)
+    held2 = TL.bought_under(rule, sym)
+    TL.signals(rules=[(rule, down, [sym])], files=files, preconditions=gate, say=quiet)
+    vd = PricedVenue(200.0, 201.0)                     # the bid has doubled: all the units are worth twice the cap
+    TL.settle(dry_run=False, venue=vd, preconditions=gate, say=quiet)
+    sells2 = [c for c in vd.calls if c["side"] == "SELL"]
+    check("TL1h never above the cap's dollars it was gated at: at double the bid it sells cap/bid and the rest stays held under the rule",
+          len(sells2) == 1 and abs(sells2[0]["qty"] - cap / 200.0) < 1e-12 and sells2[0]["qty"] * 200.0 <= cap + 1e-9
+          and abs(TL.bought_under(rule, sym) - (held2 - cap / 200.0)) < 1e-12, (sells2, held2))
+    left = TL.bought_under(rule, sym)
+    TL.signals(rules=[(rule, down, [sym])], files=files, preconditions=gate, say=quiet)
+    TL.signals(rules=[(rule, down, [sym])], files=files, preconditions=gate, say=quiet)   # two sells raised before either settles
+    two = [x["id"] for x in TL._rows() if x.get("kind") == "request" and x.get("side") == "sell"][-2:]
+    vt = PricedVenue(50.0, 51.0)
+    outs_t = TL.settle(dry_run=False, venue=vt, preconditions=gate, say=quiet)
+    by_t = {o["request"]: o["outcome"] for o in outs_t}
+    check("TL1h the units are re-read at settlement: of two pending sells the first sells what is left, the second finds nothing and is not placed",
+          len(vt.calls) == 1 and abs(vt.calls[0]["qty"] - left) < 1e-12 and TL.bought_under(rule, sym) == 0.0
+          and by_t.get(two[1]) == "nothing bought under the rule is left to sell", (vt.calls, left, by_t))
+    sell_gated = [o for o in gated if o.get("side") == "sell"]
+    check("TL1h the gate is shown the same order as before: every covered sell as the cap in dollars, at request and at settlement",
+          len(sell_gated) >= 8 and all(o == {"side": "sell", "usd": cap, "sym": sym} for o in sell_gated), sell_gated[:3])
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

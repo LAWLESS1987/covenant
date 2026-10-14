@@ -210,10 +210,11 @@ PAGE = """<!doctype html>
 async function post(path, body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 async function talk(){const t=document.getElementById('t_in').value.trim();if(!t)return;const o=document.getElementById('t_out');o.className='';o.textContent='thinking...';
  const j=await post('/m/agent',{text:t});o.textContent=j.status==='success'?(j.withheld?'(withheld by the gate: '+j.message+')':j.answer)+'\\n\\n'+(j.model||'')+' '+(j.ms||'')+' ms':('error: '+j.message);}
+// A349 B2: an answer his immunity returned is labelled so, with the verdict attached, never as admitted.
 async function council(){const t=document.getElementById('c_in').value.trim();if(!t)return;const o=document.getElementById('c_out');o.className='';o.textContent='convening...';
  const j=await post('/pc/council',{text:t});if(j.status!=='success'){o.textContent='error: '+j.message;return;}
  let s='';for(const st of j.steps){s+=st.role.toUpperCase()+' ('+st.ms+' ms)\\n'+st.content+'\\n\\n';}
- s+='COUNCIL ANSWER'+(j.withheld?' -- WITHHELD by the gate: '+j.message:' -- admitted by '+j.judge)+'\\n'+(j.withheld?'':j.answer);o.textContent=s;}
+ s+='COUNCIL ANSWER'+(j.withheld?' -- WITHHELD by the gate: '+j.message:j.immune?' -- returned under his immunity (A190), the verdict attached: '+j.message:' -- admitted by '+j.judge)+'\\n'+(j.withheld?'':j.answer);o.textContent=s;}
 async function training(){const o=document.getElementById('g_out');o.className='';o.textContent='measuring...';const r=await fetch('/pc/training');const j=await r.json();
  let s='queue: '+JSON.stringify(j.queue)+'\\nledger: rows '+(j.ledger.rows)+', teaching '+(j.ledger.teaching)+', panel coverage '+(j.ledger.panel_coverage)+' (bar '+(j.ledger.coverage_bar)+')\\nexam: '+JSON.stringify(j.exam)+'\\nnightly: '+JSON.stringify(j.nightly)+'\\n\\nGRADUATION\\n';
  for(const c of j.graduation.criteria){s+=(c.met===true?'[met]      ':c.met===false?'[not met]  ':'[unknown]  ')+c.n+'. '+c.what+' -- '+JSON.stringify(c.value)+'\\n';}
@@ -400,6 +401,15 @@ def register(api):
         alleges_nothing = bool(result is not None and not ok2 and (
             getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
         withheld = bool(not ok2 and not alleges_nothing)
+        immune = False
+        if withheld:
+            # A349 B2 (2026-10-14, his "fix if tetsu agrees"; Tetsu: AGREE): the same A190 immunity as the phone
+            # door, the block copied from /m/agent. This road had none, so the PC page's answers were withheld.
+            try:
+                immune, _iwhy = importlib.import_module("covenant_immunity").immune("answer", verdict=str(message)[:200], text=final[:200], say=lambda *_a: None)
+            except Exception as _ie:                              # noqa: BLE001
+                immune = False
+            withheld = withheld and not immune
         try:
             importlib.import_module("covenant_daily_plan").teacher_queue_append(
                 [{"text": text[:4000], "source": "you:" + str(addr)[:40], "private": private},
@@ -408,7 +418,7 @@ def register(api):
             print("council: teacher queue row not written: %s: %s" % (type(_qe).__name__, str(_qe)[:200]), flush=True)
         _row = {"kind": "council", "from": addr, "text": text, "answer": "" if withheld else final[:4000],
                 "steps": [{"role": s["role"], "content": s["content"][:1500], "ms": s["ms"]} for s in steps],
-                "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
+                "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "immune": immune,
                 "message": str(message)[:2000], "model": steps[-1].get("model") if steps else None,
                 "fit": [s["fit"] for s in steps if s.get("fit")]}
         try:                                                      # A314: a browser page's ask is his word
@@ -416,7 +426,7 @@ def register(api):
                 _row["page"] = True
         except Exception:                                         # noqa: BLE001 -- a label, never a gate
             pass
-        _out = {"status": "success", "answer": "" if withheld else final, "withheld": withheld,
+        _out = {"status": "success", "answer": "" if withheld else final, "withheld": withheld, "immune": immune,
                 "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
                 "judge": getattr(result, "judge_id", "") if result is not None else "",
                 "steps": steps, "model": steps[-1].get("model") if steps else None,
