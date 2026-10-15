@@ -912,6 +912,11 @@ _UNREAD_OPS = (
     "subtract", "subtracts", "subtracted", "subtracting",
     "multiplies", "multiplying", "divides", "dividing", "splits", "splitting",
 )
+# A352 solver-per (2026-10-14): "per" before a unit, a word or two after a number, is that number's unit, never "/"
+# (elsewhere still "/"). A333 named the hazard and left it; read as "/" it made the rejected 3.29 and held five.
+_RATE_TIME = ("second", "sec", "minute", "min", "hour", "hr", "day")
+_RATE_UNITS = _RATE_TIME + ("meter", "metre", "centimeter", "centimetre", "cm", "millimeter", "millimetre",
+                            "kilometer", "kilometre", "km")
 
 # A333 (2026-10-11). Two readings the solver could not make, both in the
 # challenge Moltbook set at 18:05 UTC that day: "...tHiRrTtY ] tWo MeTeRs +
@@ -990,6 +995,19 @@ def _split_word(words):
     return None
 
 
+def _folds_to(word, units):
+    """True when the word, doubled letters collapsed, is one of `units` or its plural (A352 solver-per)."""
+    c = _collapse(word)
+    return any(c in (_collapse(u), _collapse(u + "s")) for u in units)
+
+
+def _per_unit(words, i, numbered):
+    """True when words[i] is "per" before a unit and one or two words after a number (a position in
+    `numbered`): "tWeNtY ThReE cEnTiMeTeRs PeR SeCoNd" names a rate, not a division (A352 solver-per)."""
+    return (_collapse(words[i]) == "per" and i + 1 < len(words) and _folds_to(words[i + 1], _RATE_UNITS)
+            and bool({i - 1, i - 2} & numbered))
+
+
 def solve_challenge(text):
     """(answer, why). `answer` is a 2-dp string, or None meaning DO NOT SUBMIT.
 
@@ -1001,6 +1019,7 @@ def solve_challenge(text):
     cue = False
     unread = []                            # A348m: _UNREAD_OPS met, as listed
     unread_c = {_collapse(x): x for x in _UNREAD_OPS}
+    rates, word_ops = [], []               # A352 solver-per: "per <unit>" set aside; operations named by a word
     for i, w in enumerate(words):
         if w.isdigit():
             found.append((i, int(w)))
@@ -1009,9 +1028,13 @@ def solve_challenge(text):
         r = _reading(c)
         if r and r[0] == "n":
             found.append((i, r[1]))
+        elif r and _per_unit(words, i, {p for p, _ in found}):
+            rates.append((i, "per " + words[i + 1]))
         elif r:
             ops.append(r[1])
             cue = cue or c in [_collapse(x) for x in _CUES]
+            if c not in [_collapse(x) for x in _CUES]:
+                word_ops.append(r[1])
         elif c == _collapse("all") and i and _collapse(words[i - 1]) == "in":
             ops.append("+")
             cue = True
@@ -1042,13 +1065,15 @@ def solve_challenge(text):
     if len(nums) != 2:
         return None, ("found %d number(s), need exactly 2 -- abstaining rather "
                       "than spending an attempt: %s" % (len(nums), nums))
-    if len(kinds) != 1:
-        return None, ("found %d operation(s) %s, need exactly 1 -- abstaining"
-                      % (len(kinds), kinds or "none"))
+    # A352 solver-per: an unread operation word is named before the count of the ones read, since a rate set
+    # aside can leave it the only operation in the text ("PeR SeCoNd AnD AcCeLeRaTeS bY SeVeN").
     if unread:
         return None, ("%s is an operation this solver does not read, so the one "
                       "it found may not be the challenge's -- abstaining"
                       % ", ".join(repr(u) for u in unread))
+    if len(kinds) != 1:
+        return None, ("found %d operation(s) %s, need exactly 1 -- abstaining"
+                      % (len(kinds), kinds or "none"))
     split = _split_word(words)
     if split:
         return None, ("%r joined reads as %r -- a word split by the obfuscation, "
@@ -1057,12 +1082,24 @@ def solve_challenge(text):
     if cue and any(_collapse(w) in ("each", "every") for w in words):
         return None, ("an aggregation cue beside 'each' or 'every' may mean "
                       "multiply -- abstaining")
+    # A352 solver-per: beside a rate the operation may be a product or quotient no word names ("at five meters per
+    # second for eight seconds, total?"), so a reading rests on an operation word, and every time word is a rate's.
+    named = ", ".join(repr(x) for _, x in rates)
+    if rates and not word_ops:
+        return None, ("%s is a unit here, and what is left to read is a cue or a symbol, which beside a rate may "
+                      "not be the challenge's operation -- abstaining" % named)
+    loose = [w for j, w in enumerate(words) if rates and j - 1 not in [i for i, _ in rates]
+             and _folds_to(w, _RATE_TIME)]
+    if loose:
+        return None, ("%r is a time beside a rate (%s), so the operation may be a product or quotient no word "
+                      "names -- abstaining" % (loose[0], named))
     a, b = nums
     op = kinds[0]
     if op == "/" and b == 0:
         return None, "division by zero -- abstaining"
     val = {"+": a + b, "-": a - b, "*": a * b, "/": (a / b if b else 0)}[op]
-    return "%.2f" % val, "read %d %s %d = %.2f" % (a, op, b, val)
+    return "%.2f" % val, "read %d %s %d = %.2f%s" % (a, op, b, val,
+                                                     "; %s read as a unit, not as '/'" % named if rates else "")
 
 
 def submit_verification(code, answer, timeout=30, key=None):
@@ -1748,6 +1785,63 @@ def _selftest_body(say, ok, check, _real_audit, _real_audit_size):
     check("AM33l ...and so do forms of the groups' own words the groups do not list, beside a cue that read them "
           "as '+' (30 slowed by 5, 'total', read 35.00)", all(a is None for a, _ in fm.values()),
           {w: a for w, (a, _) in fm.items()})
+    # A352 solver-per (2026-10-14): the five kept challenges, verbatim, that abstained only because "per" before a unit
+    # read as "/" beside "slows"/"reduces"/"loses" -- each left a reply Tetsu had cleared hidden (three by his
+    # discourse seat's ALLOW, two by his SEND).
+    per5 = {"A] LoBsTeR S^wImS[ aT TwEnTy ThReE} cEnTiMeTeRs ~PeR| SeCoNd, BuT/ CuRrEnT SlOwS\\ It By SeVeN{, WhAt] "
+            "Is< ThE NeW- SpEeD?": "16.00",
+            "] ThE Lo.O bS tEr S^wImS [aT TwEnTy ThReE MeTeRs /PeR SeCoNd, BuT ^a DoMiNaNt Lo.oB sStEr TaP s "
+            "{ReDuCeS} ItS SpEeD -By SeVeN, WhAt Is ThE NeW SpEeD?": "16.00",
+            "ThIs] Lo.ObBsStEr SwImMs^ At/ Tw]EnT-y ThReE ]cEmMeEtErS PeR/ SeCoNd - AnD] It SlOwS^ By/ SeVeN , WhAtS "
+            "T]hE NeW VeLoCiTy?": "16.00",
+            "A] LoBoBssStTtErR ] S^wImS[ aT/ tWeNtY ThReE ] mEeTeRs^ PeR ] sEeCoNd- bUt^ lOoOosEs[ sEvEn ] mEeTeRs/ "
+            "PeR ] sEeCoNd, wHaT ] Is^ ThE ] nEw- SpEeD?": "16.00",
+            "A] LooObS t-Er S^wImS[ aT/ tWeNtY FoUr\\ mEtErS PeR/ SeCoNd, Um- ItS VeLoOocItyy SlOwS] bY^ SiX, WhAtS{ "
+            "ThE NeW< SpEeD?": "18.00"}
+    pr = {t: solve_challenge(t) for t in per5}
+    check("AM33m the five kept challenges that abstained on 'per second' read as '/' beside 'slows', 'reduces' or "
+          "'loses' read 23 - 7 (four) and 24 - 6, and each reading names the rate it set aside",
+          all(pr[t][0] == want and "read as a unit, not as '/'" in pr[t][1] for t, want in per5.items()),
+          [pr[t] for t in per5])
+    pn1, pnw1 = solve_challenge("SiXtY nEwToNs PeR fOuR cLaWs")
+    pn2, pnw2 = solve_challenge("a LoBsTeR sWiMs FoRtY mEtErS iN eIgHt SeCoNdS, hOw MaNy MeTeRs PeR sEcOnD?")
+    check("AM33n ...and 'per' is still '/' where it is not a stated number's unit: before a number (60 / 4), and in "
+          "a question with no number before it (40 / 8)", (pn1, pn2) == ("15.00", "5.00"), (pn1, pnw1, pn2, pnw2))
+    po1, pow1 = solve_challenge("A] LoBsTeR sWeMs At tWeNtY ThReE cEnTiMeTeRs PeR SeCoNd AnD SuRgEs By SeVeN "
+                                "cEnTiMeTeRs PeR SeCoNd, wHaT iS tHe NeW sPeEd?")
+    check("AM33o the rejected 3.29's shape with a verb no list holds ('surges') abstains: two rates are not a division",
+          po1 is None, (po1, pow1))
+    pp1, ppw1 = solve_challenge("FiVe MeTeRs PeR SeCoNd FoR eIgHt LaPs, ToTaL?")
+    pp2, ppw2 = solve_challenge("tWeNtY ThReE mEtErS pEr SeCoNd - AnD sUrGeS bY sEvEn")
+    check("AM33p beside a rate, a cue alone (read 13.00 for five m/s over eight laps) or a symbol alone (read 16.00 "
+          "where 'surges' adds) abstains", (pp1, pp2) == (None, None) and "a cue or a symbol" in ppw1 + ppw2,
+          (pp1, ppw1, pp2, ppw2))
+    pq1, pqw1 = solve_challenge("FiVe MeTeRs PeR SeCoNd, AnD iT sWiMs EiGhT mOrE sEcOnDs")
+    pq2, pqw2 = solve_challenge("tWeNtY mEtErS pEr MiNuTe, It SlOwS bY fIvE eAcH mInUtE")
+    check("AM33q beside a rate, a time word that is not the rate's own abstains (read 13.00 and 15.00): the "
+          "operation may be a product or quotient no word names", (pq1, pq2) == (None, None)
+          and "is a time beside a rate" in pqw1 and "is a time beside a rate" in pqw2, (pq1, pqw1, pq2, pqw2))
+    # A352 solver-per: the guard for A333's named hazard, which recurred as the 3.29. The text below is the one
+    # answered 3.29 on 2026-10-14 ("Incorrect answer"), verbatim. A348m stopped it by listing 'accelerates'; with
+    # that layer taken away it must still abstain, because its only '/' was the two "per second" units.
+    t329 = ("A] lO b-StEr SwI mS^ iN/ cOo/lWaTeR, Lo.oBbS tEr EvErYwHeRe Um, ShOws VeLo oCiTyy AnD PhYySiCs Um, ThE "
+            "lOoobbSsTeR sWeMs At tWeNtY ThReE] cEnTiMeTeRs^ PeR/ SeCoNd- AnD AcCeLeRaTeS bY SeVeN} cEnTiMeTeRs\\ "
+            "PeR/ SeCoNd, WhAt Is ThE/ nEw] SpEeD?")
+    r1, rw1 = solve_challenge(t329)
+    g, real_unread = globals(), _UNREAD_OPS
+    try:
+        g["_UNREAD_OPS"] = tuple(x for x in real_unread if not x.startswith("accelerat"))
+        r2, rw2 = solve_challenge(t329)
+    finally:
+        g["_UNREAD_OPS"] = real_unread
+    check("AM33r the text answered 3.29 abstains naming 'accelerates', and still abstains with that word unlisted: "
+          "its two 'per second' are units, so no '/' is left to read 23 / 7", r1 is None and "'accelerates'" in rw1
+          and r2 is None and "found 0 operation(s)" in rw2, (r1, rw1, r2, rw2))
+    ps1, psw1 = solve_challenge("tHiRtY nEwToNs PeR mEtEr, AnD iT gAiNs FiVe")
+    ps2, psw2 = solve_challenge("FoRtY kIlOmEtErS pEr HoUr, Um, It SlOwS bY nInE")
+    check("AM33s a length or an hour after 'per' is a unit too: 30 newtons per meter gains 5 (35.00), 40 km per hour "
+          "slows by 9 (31.00)", (ps1, ps2) == ("35.00", "31.00") and "'per meter'" in psw1 and "'per hour'" in psw2,
+          (ps1, psw1, ps2, psw2))
     v = _handle_verification({"post": {"verification": {
         "verification_code": "c1", "challenge_text": "totally unreadable",
         "expires_at": "soon"}}})

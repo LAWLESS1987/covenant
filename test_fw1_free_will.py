@@ -645,6 +645,33 @@ def main():
           and r_none[0]["verdict"] == "abstains where 10.00 was accepted"
           and r_wrong[2]["verdict"].endswith("whether that is right is UNDETERMINED"),
           (r_wrong[0]["verdict"], r_none[0]["verdict"], r_wrong[2]["verdict"]))
+    # FW1A352per (A352 solver-per, 2026-10-14): ledger rows as kept, replayed through the real solver -- "per second"
+    # after a number is its unit, so two that abstained read; the accepted answer and the rejected 3.29 are unmoved.
+    print("FW1A352per -- A352: kept challenges whose 'per second' read as '/' replay as answered, nothing accepted moves")
+    _kept = lambda t, text, **v: {"kind": "reply", "t": t, "verification": dict(required=True, challenge_text=text,
+                                                                                **v)}         # noqa: E731
+    per_rows = [
+        _kept("2026-10-13T01:03:13Z", "Lo]bS-tEr^ sW/iMmS lIkE um Lo.oBbSsTtEeR] aNd- tHe^ cLaW| eXeR/ts~ fOrCe{ ThIrTy "
+              "FiVe } nEu-ToNs+ aNd] aNtEnNa- puShEs< TwElVe > nEu-ToNs, HoW/ mUcH} tOtAl^ fOrCe?",
+              solved=True, abstained=False, answer="47.00"),
+        _kept("2026-10-13T04:13:06Z", "A] LoBsTeR S^wImS[ aT TwEnTy ThReE} cEnTiMeTeRs ~PeR| SeCoNd, BuT/ CuRrEnT "
+              "SlOwS\\ It By SeVeN{, WhAt] Is< ThE NeW- SpEeD?", solved=False, abstained=True),
+        _kept("2026-10-14T07:03:13Z", "A] LooObS t-Er S^wImS[ aT/ tWeNtY FoUr\\ mEtErS PeR/ SeCoNd, Um- ItS VeLoOocItyy "
+              "SlOwS] bY^ SiX, WhAtS{ ThE NeW< SpEeD?", solved=False, abstained=True),
+        _kept("2026-10-14T07:02:48Z", "A] lO b-StEr SwI mS^ iN/ cOo/lWaTeR, Lo.oBbS tEr EvErYwHeRe Um, ShOws VeLo "
+              "oCiTyy AnD PhYySiCs Um, ThE lOoobbSsTeR sWeMs At tWeNtY ThReE] cEnTiMeTeRs^ PeR/ SeCoNd- AnD AcCeLeRaTeS "
+              "bY SeVeN} cEnTiMeTeRs\\ PeR/ SeCoNd, WhAt Is ThE/ nEw] SpEeD?", solved=False, abstained=False,
+              answer="3.29")]
+    rper = RC.replay(per_rows)
+    check("FW1A352per the accepted 47.00 reads the same; 'slows by seven' after 23 cm per second reads 16.00 and 'by six' "
+          "after 24 m per second 18.00, each UNDETERMINED until Moltbook answers; the 3.29 shape still abstains",
+          [(i["replay"], i["verdict"]) for i in rper["rows"]]
+          == [("47.00", "same as the accepted answer"),
+              ("16.00", "answers 16.00 where it abstained; whether that is right is UNDETERMINED"),
+              ("18.00", "answers 18.00 where it abstained; whether that is right is UNDETERMINED"),
+              (None, "abstains where 3.29 was not solved")]
+          and rper["counts"]["wrong_against_accepted"] == 0,
+          [(i["replay"], i["verdict"]) for i in rper["rows"]])
 
     # FW1l (A348m, 2026-10-14): content CREATED and then hidden by Moltbook's challenge is not a hold. On 10-14 the
     # digest Tetsu reads said "held, to u/<author>: " with nothing after the colon for three replies he had sent (one
