@@ -6,8 +6,13 @@ and a temp models directory; no server is started.
 Pins covenant_model.step_up (2026-09-21, his words: "we need to rapidly make up the gap in
 ai"; measured that day: 15.3 GB RAM, 4.8 free with the 3B holding 2.0, the 7B needing 6.0 --
 so the 7B fit only once the 3B was put away, which the plain pick never saw).
+
+MK1o (A351, 2026-10-14): no wait the keeper does not keep is handed out -- time_needed is cut to wait_cap (IDLE_S less
+one watcher round), driven through the real ask() and the real idle watcher against a slow loopback stand-in, its
+clocks scaled 1/150, both ways (MK1o4 hands the uncut wait by hand and sees the keeper cut it).
 """
 import json
+import math
 import os
 import sys
 import tempfile
@@ -28,6 +33,138 @@ def check(label, ok, detail=""):
         PASSED[0] += 1
     else:
         FAILURES.append(label)
+
+
+def mk1o():
+    """MK1o (A351, the review of 2026-10-14): a wait the keeper does not keep is never handed out. A351 gave Tetsu's
+    revision a wait sized to its answer (time_needed: 751 s for his register at the floor speeds), and the keeper's
+    idle watcher stops the server IDLE_S (600 s) after the last marked use -- an ask marks use when it starts and when
+    it is answered, not while it waits -- so a 751 s wait was cut at 601.3 s. time_needed now cuts every wait to
+    wait_cap (IDLE_S less one watcher round). Driven here: the REAL ask() and the REAL watcher thread (_watch_idle,
+    running the real _idle_tick each round) against a slow stand-in llama-server on loopback, the keeper's clocks
+    scaled 1/150 (IDLE_S 600 s -> 4 s, its 30 s round -> 0.2 s, the 180 s floor -> 1.2 s). start() is a stand-in and
+    stop() a recorder that drops the stand-in's answer in flight, as ending llama-server would; the shared stamp and the
+    ledger are in a temp directory; nothing else is reached."""
+    import http.server
+    import socket
+    import threading
+    import time as _t
+    scale = 150.0
+    tmp = tempfile.mkdtemp(prefix="mk1o_")
+    names = ("IDLE_S", "IDLE_ROUND_S", "ASK_TIMEOUT_S", "PORT", "start", "stop", "alive", "_read_state", "USED", "ASKS")
+    keep = {k: getattr(M, k) for k in names}
+    keep_last, stub_env = M._last_used[0], os.environ.pop("COVENANT_MODEL_STUB", None)
+    small = M.CANDIDATES[-1][0]                                   # a rung in ALWAYS_ANSWER: never put away for pressure
+    sv = {"delay": 0.0, "stopped": False, "in_flight": False, "stops": []}
+
+    class Slow(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            end = _t.time() + sv["delay"]
+            while _t.time() < end:
+                if sv["stopped"]:                                 # the server was ended: the answer never comes
+                    try:
+                        self.connection.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        pass
+                    return
+                _t.sleep(0.01)
+            body = json.dumps({"choices": [{"message": {"content": "ok"}}], "usage": {"completion_tokens": 9}}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:                                       # the asker gave up first
+                pass
+
+        def log_message(self, *_a):
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    srv.daemon_threads = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    def rec_stop(say=print):
+        sv["stops"].append((_t.time(), sv["in_flight"]))
+        sv["stopped"] = True
+        return True, "stopped"
+
+    def one(delay, timeout):
+        """One ask through the real ask() with the real watcher armed; returns what happened, after the watcher's own
+        round has ended (it ends when it stops the server)."""
+        sv.update(delay=delay, stopped=False, in_flight=True, stops=[])
+        t0 = _t.time()
+        try:
+            M.ask([{"role": "user", "content": "x"}], max_tokens=16, timeout=timeout)
+            outcome = "answered"
+        except Exception as e:                                    # noqa: BLE001
+            outcome = type(e).__name__
+        t_end = _t.time()
+        sv["in_flight"] = False
+        th = M._idle_thread[0]
+        if th is not None:
+            th.join(timeout=M.IDLE_S * 3)
+        return {"outcome": outcome, "took": round(t_end - t0, 2), "watcher_alive": bool(th and th.is_alive()),
+                "stops": [(round(s - t0, 2), f) for s, f in sv["stops"]], "watcher": th is not None}
+
+    try:
+        M.IDLE_S, M.IDLE_ROUND_S, M.ASK_TIMEOUT_S = 600 / scale, 30 / scale, 180 / scale
+        M.PORT = srv.server_address[1]
+        M.start = lambda say=print: (True, "up (stand-in)")
+        M.stop = rec_stop
+        M.alive = lambda: not sv["stopped"]
+        M._read_state = lambda: {"model": small}
+        M.USED = os.path.join(tmp, "last_use.stamp")
+        M.ASKS = os.path.join(tmp, "model_asks.jsonl")
+        M._last_used[0] = 0.0
+        # A request whose need at the given speeds is 1.125 x IDLE_S: the margin puts its uncut wait past IDLE_S.
+        msgs, tok = [{"role": "user", "content": "x"}], 700
+        g = tok / (M.IDLE_S * 1.125)
+        cut, info = M.time_needed(msgs, tok, gen_tps=g, prompt_tps=1e9)
+        check("MK1o1 a request needing %.1f s at its speed (IDLE_S %.1f s, scaled) is handed %s s: wait_cap, IDLE_S less "
+              "one watcher round, said capped -- never a wait past IDLE_S" % (info["need_s"], M.IDLE_S, cut),
+              cut == int(M.wait_cap()) and cut <= M.IDLE_S - M.IDLE_ROUND_S and info["capped"] is True
+              and info["need_s"] > M.IDLE_S, (cut, info, M.wait_cap()))
+        fits = one(cut / 2.0, cut)                                # an answer inside the wait
+        check("MK1o2 the real watcher against the stand-in: an answer inside its wait (%.1f s of %s) arrives, and the "
+              "server is not stopped under it; the watcher puts it away IDLE_S after the answer (his rule, unchanged)"
+              % (cut / 2.0, cut), fits["outcome"] == "answered" and fits["watcher"] and not fits["watcher_alive"]
+              and len(fits["stops"]) == 1 and fits["stops"][0][1] is False and fits["stops"][0][0] >= fits["took"] + M.IDLE_S - 0.05,
+              fits)
+        slow = one(M.IDLE_S * 1.25, cut)                          # an answer slower than IDLE_S, under the uncut wait
+        check("MK1o3 an answer slower than IDLE_S (%.1f s) ends on the ask's own clock (TimeoutError at %s s), the server "
+              "is not stopped under it, and is put away IDLE_S after the ask began (the last marked use)"
+              % (M.IDLE_S * 1.25, cut), slow["outcome"] == "TimeoutError" and abs(slow["took"] - cut) < 0.5
+              and len(slow["stops"]) == 1 and slow["stops"][0][1] is False and slow["stops"][0][0] >= M.IDLE_S - 0.05, slow)
+        uncut = math.ceil(info["need_s"] * M.TIME_MARGIN)
+        by_hand = one(M.IDLE_S * 1.25, uncut)                     # the same answer handed the uncut wait by hand
+        check("MK1o4 broken the other way: the same answer handed its uncut %s s by hand is cut by the keeper -- the "
+              "watcher stops the server under it at about IDLE_S (%.2f s) and the ask fails (%s), the A351 review's "
+              "601.3 s, scaled; so the harness sees the cut it guards" % (uncut, (by_hand["stops"] or [(-1, 0)])[0][0],
+                                                                          by_hand["outcome"]),
+              by_hand["outcome"] not in ("answered", "TimeoutError") and len(by_hand["stops"]) == 1
+              and by_hand["stops"][0][1] is True and M.IDLE_S - 0.05 <= by_hand["stops"][0][0] <= M.IDLE_S + 4 * M.IDLE_ROUND_S,
+              by_hand)
+    finally:
+        for k, v in keep.items():
+            setattr(M, k, v)
+        M._last_used[0] = keep_last
+        if stub_env is not None:
+            os.environ["COVENANT_MODEL_STUB"] = stub_env
+        srv.shutdown()
+        srv.server_close()
+    # Arithmetic at the keeper's own defaults (no clock): every wait handed out sits in [ASK_TIMEOUT_S, wait_cap].
+    worst = []
+    for gtps in (0.05, 0.5, 1.0, 2.0, 4.0, 6.27, 20.0, 200.0):
+        for n in (0, 400, 1715, 4000, 8000):
+            s, i = M.time_needed([{"role": "user", "content": "y" * 3000}], n, gen_tps=gtps, prompt_tps=58.5)
+            if not (M.ASK_TIMEOUT_S <= s <= max(M.ASK_TIMEOUT_S, M.wait_cap())):
+                worst.append((gtps, n, s))
+    check("MK1o5 at the keeper's defaults (IDLE_S %d s, round %d s) no wait handed out is past wait_cap (%d s) or under "
+          "the %d s every ask had, over 40 speeds and sizes" % (M.IDLE_S, M.IDLE_ROUND_S, M.wait_cap(), M.ASK_TIMEOUT_S),
+          worst == [] and M.wait_cap() == M.IDLE_S - M.IDLE_ROUND_S, worst)
 
 
 def main():
@@ -358,6 +495,8 @@ def main():
     finally:
         for k, v in keep.items():
             setattr(M, k, v)
+
+    mk1o()
     # The weights are not tracked (models/ is gitignored), so the runner's staged copy has none: the file
     # check is made only where the directory exists, and says so otherwise.
     have = os.path.isdir(M.MODELS) and any(os.path.isfile(os.path.join(M.MODELS, n)) for n, _ in M.CANDIDATES)

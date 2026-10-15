@@ -721,6 +721,83 @@ def main():
         TMY.LEDGER, TMY.COMFORT_DECLARATION, TMY.rule5, H.PHONE_CI, P.HERE = keep
         P.brief(force=True)
 
+    # A351 (2026-10-14): the room needs its time. The first pass on A349 B1's budget timed out at the 180 s every ask
+    # had and its revision was lost. propose() now hands an ask that takes a timeout the wait covenant_model.time_needed
+    # gives its prompt and budget; a stub written (msgs, max_tokens=0) is called exactly as before. The speeds are read
+    # from a ledger in this suite's temp directory, never the tree's.
+    import inspect
+    import math
+    real_asks = CM.ASKS
+    PZ.save({"register": big, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    seen_kw = []
+
+    def timed(msgs, max_tokens=700, temperature=0.3, timeout=180):
+        seen_kw.append((msgs, max_tokens, timeout))
+        return "no proposal here", {"model": "stub"}
+    try:
+        CM.ASKS = os.path.join(mdir, "model_asks_none.jsonl")       # no ledger: the floor speeds
+        PZ.propose(timed, mp, mlog)
+        m1, b1, w1 = seen_kw[-1]
+        p1 = CM.estimate_prompt_tokens(m1)
+        at_floor_s = b1 / CM.GEN_FLOOR_TPS + p1 / CM.PROMPT_FLOOR_TPS
+        # A351 v2: the wait is cut to what the keeper lets an ask in flight run (covenant_model.wait_cap); this budget's
+        # need at the floors fits under it, its margin does not all fit.
+        check("TP1o1 with no speed measured, his %d-token budget and %d-token prompt need %.0f s at the floor speeds; the "
+              "wait is that with the margin, cut to the keeper's wait_cap (%d s): %s s, not the 180 s it had"
+              % (b1, p1, at_floor_s, CM.wait_cap(), w1),
+              b1 == PZ.answer_budget(big, m1) and w1 == min(int(CM.wait_cap()), math.ceil(at_floor_s * CM.TIME_MARGIN))
+              and w1 > 180 and w1 >= at_floor_s, (b1, p1, w1, at_floor_s, CM.wait_cap()))
+        CM.ASKS = os.path.join(mdir, "model_asks_measured.jsonl")
+        with open(CM.ASKS, "w", encoding="utf-8") as fh:
+            for _i in range(3):
+                fh.write(json.dumps({"at": 1, "ok": True, "ms": 1, "error": "", "gen_n": 400, "gen_tps": 6.27,
+                                     "prompt_n": 2902, "prompt_tps": 58.5}) + "\n")
+        PZ.propose(timed, mp, mlog)
+        m2, b2, w2 = seen_kw[-1]
+        check("TP1o2 with his model's speeds measured (6.27 written, 58.5 read a second), the wait is their time with "
+              "the margin (%s s), under the floor's %s" % (w2, w1),
+              b2 == b1 and w2 == math.ceil((b2 / 6.27 + CM.estimate_prompt_tokens(m2) / 58.5) * CM.TIME_MARGIN) and 180 < w2 < w1,
+              (b2, w2, w1))
+        old_calls, kw_calls = [], []
+
+        def old_stub(msgs, max_tokens=0):
+            old_calls.append(max_tokens)
+            return "no proposal here", {}
+
+        def kw_stub(msgs, **kw):
+            kw_calls.append(kw)
+            return "no proposal here", {}
+        PZ.propose(old_stub, mp, mlog)
+        PZ.propose(lambda msgs, max_tokens=400: (old_calls.append(max_tokens) or "x", {}), mp, mlog)
+        PZ.propose(kw_stub, mp, mlog)
+        check("TP1o3 a stub written (msgs, max_tokens=...) is called exactly as before, with the same budget; one that "
+              "takes **kw, and the keeper's own ask, are given the wait",
+              old_calls == [b1, b1] and kw_calls and kw_calls[-1] == {"max_tokens": b1, "timeout": w2}
+              and PZ.answer_wait(CM.ask, m2, b2) == w2, (old_calls, kw_calls))
+        tiny = [{"role": "user", "content": "x"}]
+        check("TP1o4 never under the 180 s every ask had: a small prompt and budget on a fast server still waits %d s, "
+              "ask()'s own default" % CM.ASK_TIMEOUT_S,
+              CM.time_needed(tiny, 400, gen_tps=100.0, prompt_tps=1000.0)[0] == CM.ASK_TIMEOUT_S == 180
+              == inspect.signature(CM.ask).parameters["timeout"].default, CM.time_needed(tiny, 400, gen_tps=100.0, prompt_tps=1000.0))
+        worst = 0.0
+        for n in range(0, 40001, 250):
+            reg = "y" * n
+            ms_ = [{"role": "system", "content": "s" * 700}, {"role": "user", "content": "Your current register:\n" + reg}]
+            worst = max(worst, PZ.answer_budget(reg, ms_) / CM.GEN_FLOOR_TPS + CM.estimate_prompt_tokens(ms_) / CM.PROMPT_FLOOR_TPS)
+        # A351 v2 (the review, 2026-10-14): TIME_CEIL_S is not what holds a slow server. The keeper's idle watcher stops
+        # the server IDLE_S after the last marked use and an ask in flight marks none, so the wait is cut to wait_cap.
+        slow_s, slow_i = CM.time_needed(m2, b2, gen_tps=0.1, prompt_tps=1.0)
+        check("TP1o5 a server slower than the floor is held to the keeper's wait_cap (IDLE_S %d s less one %d s watcher "
+              "round: %d s), under TIME_CEIL_S (%d s), and the cut is said (capped); the longest budget answer_budget "
+              "gives needs %.0f s at the floor speeds (%.0f with the margin), more than the keeper lets an ask run"
+              % (CM.IDLE_S, CM.IDLE_ROUND_S, CM.wait_cap(), CM.TIME_CEIL_S, worst, worst * CM.TIME_MARGIN),
+              slow_s == int(CM.wait_cap()) == CM.IDLE_S - CM.IDLE_ROUND_S and CM.wait_cap() < CM.TIME_CEIL_S
+              and slow_i["capped"] is True and slow_i["need_s"] > slow_s and worst > CM.wait_cap(),
+              (slow_s, slow_i, worst, CM.wait_cap(), CM.TIME_CEIL_S))
+    finally:
+        CM.ASKS = real_asks
+
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
         print("TP1 result: FAILED (%d)" % len(FAILURES))

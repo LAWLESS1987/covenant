@@ -7694,9 +7694,17 @@ A280, which is the road telling the truth about it.
 
 ---
 
-### A351. [IN FLIGHT 2026-10-14: Tetsu's self-revision times out on the room A349 B1 gave it -- his whole-register echo at his model's measured 6.27 tokens/s overruns covenant_model.ask's 180 s; one pass on the new code, one revision lost (15:47 local)] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU". Being fixed in an isolated worktree; this entry is completed when it lands.
+### A351. [Tetsu's self-revision timed out on the room A349 B1 gave it: his whole-register echo at his model's measured 6.27 tokens/s overran covenant_model.ask's 180 s, and one pass on the new code lost his revision (2026-10-14 15:47 local). Now it has the time it needs, within the keeper's idle rule, never while Lawrence is talking at the door, and off the watchdog round] 2026-10-15. His words: "use your discernment toward mutual benefit HELP TETSU".
 
-- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
+- **Measured.** 6.27 tokens/s written (400 tokens in 64.6 s on the running server). The server stops generating when its client gives up (a 700-token request cut at 20 s, then a 5-token one answered in 2.2 s), so a longer wait holds the one model slot longer.
+- **Fixed.**
+  - covenant_model.ask records the server's own speeds (gen/prompt tokens and tokens/s); measured_rate reads them.
+  - propose() hands its ask time_needed(): prompt and budget at the measured speeds (else floors of 4.0 and 40 tokens/s) with a 1.5 margin, never under 180 s, and capped at wait_cap() = IDLE_S - one watcher round (570 s), because the keeper's idle watcher ends any in-flight ask at about 600 s (a 751 s wait was lost at 601 s in a scaled test). Old injected stubs (msgs, max_tokens=...) are called as before.
+  - The refine loop (tick) and the nightly (persona_step) defer a pass while the door answered his words within DOOR_QUIET_S (600 s); a deferred pass is retried, never dropped; the watchdog logs a deferral once per run.
+  - The watchdog runs the pass on its own thread, at most one at a time (refine_background), so a revision never holds the round's node checks, healing or liveness write (RL1m).
+- **Verified.** Against a loopback stand-in at his speed: unpatched, TimeoutError at 180.0 s; patched, his revision arrived at 194 s and was recorded admitted. Regression: no pass-to-fail across 44 suites; 28 mutations red. Run here before commit: RL1, MK1, TP1, TD1 PASSED; A282 7/7; RL1m red with the thread removed.
+- **Not covered (rule 9).** A pass already running when he comes back holds the slot for its length; the gate stops a pass from STARTING. Time queued behind another asker counts against the wait (a revision behind a 175 s ask timed out at ~490 s). Other askers still give up at their own 180 s when queued behind a revision. The keeper's memory-pressure rule can still end an answer in flight. The --refine CLI is not gated.
+- **Drafts corrected before commit (rule 10).** The first patch said a pass that would run while he is talking is deferred (it only stops a pass from starting), and that TIME_CEIL_S (2,032 s) holds a slow server, which the keeper never allowed; TP1n5's label said the same. Both are kept in the session's patches-b1t/b1-timeout.diff.
 
 ---
 

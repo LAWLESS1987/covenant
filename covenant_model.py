@@ -28,7 +28,9 @@ CLI:  python covenant_model.py --status | --start | --stop | --ask "text"
 from __future__ import annotations
 
 import json
+import math
 import os
+import statistics
 import subprocess
 import sys
 import threading
@@ -41,6 +43,7 @@ BIN = os.path.join(HERE, "tools", "llama", "llama-server.exe")
 MODELS = os.path.join(HERE, "models")
 HOST, PORT = "127.0.0.1", int(os.environ.get("COVENANT_MODEL_PORT", "8081"))
 IDLE_S = int(os.environ.get("COVENANT_MODEL_IDLE_S", "600"))
+IDLE_ROUND_S = 30          # the idle watcher's round (_watch_idle); named so wait_cap() reads the same number (A351)
 STATE = os.path.join(HERE, "ops", "model_server.json")        # pid, model, started -- gitignored ops/ state
 LOG = os.path.join(HERE, "logs", "model_server.log")
 RUNTIME_LOG = os.path.join(HERE, "logs", "model_server.runtime.log")   # llama-server's own output (A348b, start())
@@ -525,7 +528,7 @@ def _watch_idle():
         return
     def run():
         while True:
-            time.sleep(30)
+            time.sleep(IDLE_ROUND_S)
             if _idle_tick():
                 return
     t = threading.Thread(target=run, name="covenant-model-idle", daemon=True)
@@ -554,21 +557,56 @@ ASKS = os.environ.get("COVENANT_MODEL_ASKS") or _REAL_ASKS       # gitignored; r
 ASKS_MAX_BYTES = 512 * 1024
 
 
-def _note_ask(ok, ms, err=""):
+def _note_ask(ok, ms, err="", rates=None):
     """A282 (2026-10-06): one line per real ask -- did it answer, how long, why not. On 2026-10-06 readiness()
     read PASS all morning while every ask through Tetsu's door came back 503 (A269), and the core's door returns
     that 503 and records nothing, so the road had nothing to read. Never the live file from a test program
-    (A272's lesson); never raises."""
+    (A272's lesson); never raises.
+    A351 (2026-10-14): an answered ask also carries what the server said of its own speed (`rates`, from _rates),
+    after the four fields it always had, so the time an answer needs is measured (measured_rate), not guessed."""
     try:
         prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
         if os.path.abspath(ASKS) == os.path.abspath(_REAL_ASKS) and prog.startswith("test_"):
             return
         if os.path.exists(ASKS) and os.path.getsize(ASKS) > ASKS_MAX_BYTES:
             os.replace(ASKS, ASKS + ".prev")
+        row = {"at": round(time.time(), 1), "ok": bool(ok), "ms": int(ms), "error": str(err)[:160]}
+        row.update(rates or {})
         with open(ASKS, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"at": round(time.time(), 1), "ok": bool(ok), "ms": int(ms), "error": str(err)[:160]}) + "\n")
+            fh.write(json.dumps(row) + "\n")
     except Exception:                                            # noqa: BLE001
         pass
+
+
+def _num(x):
+    """A finite, non-negative number (a bool is not one)."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and x >= 0
+
+
+def _rates(d):
+    """What the server said of its own work on one answer (A351), as the fields _note_ask adds: gen_n tokens written
+    at gen_tps a second, prompt_n tokens read at prompt_tps. llama-server's chat completion carries them under
+    "timings" (predicted_n, predicted_per_second, prompt_n, prompt_per_second). A response without "timings" (another
+    runtime, an older build) gives {}; a part it leaves out is left out, never guessed. A rate it omits beside its
+    count and milliseconds (predicted_ms, prompt_ms) is worked from those two. Without predicted_n, the tokens written
+    are the response's usage.completion_tokens, the server's count of the same tokens."""
+    tm = d.get("timings") if isinstance(d, dict) else None
+    if not isinstance(tm, dict):
+        return {}
+    usage = d.get("usage") if isinstance(d.get("usage"), dict) else {}
+    out = {}
+    for name, n_key, ms_key, tps_key in (("gen", "predicted_n", "predicted_ms", "predicted_per_second"),
+                                          ("prompt", "prompt_n", "prompt_ms", "prompt_per_second")):
+        n, ms, tps = tm.get(n_key), tm.get(ms_key), tm.get(tps_key)
+        if name == "gen" and not _num(n):
+            n = usage.get("completion_tokens")
+        if _num(n):
+            out[name + "_n"] = int(n)
+        if _num(tps) and tps > 0:
+            out[name + "_tps"] = round(float(tps), 2)
+        elif _num(n) and _num(ms) and n > 0 and ms > 0:
+            out[name + "_tps"] = round(float(n) * 1000.0 / float(ms), 2)
+    return out
 
 
 def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
@@ -610,7 +648,7 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     except Exception as e:                                       # noqa: BLE001 -- recorded, then raised as before
         _note_ask(False, (time.time() - t0) * 1000, "%s: %s" % (type(e).__name__, str(e)[:120]))
         raise
-    _note_ask(True, (time.time() - t0) * 1000)
+    _note_ask(True, (time.time() - t0) * 1000, rates=_rates(d))      # A351: and the server's own speeds
     _mark_used()
     text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
     usage = d.get("usage", {}) or {}
@@ -645,6 +683,107 @@ def estimate_prompt_tokens(messages):
     return FALLBACK_TOKENS_PER_MESSAGE + sum(
         FALLBACK_TOKENS_PER_MESSAGE + int(-(-len(str(m.get("content", ""))) // FALLBACK_CHARS_PER_TOKEN))
         for m in messages)
+
+
+# THE TIME AN ANSWER NEEDS (A351, 2026-10-14). ask() waits ASK_TIMEOUT_S (180 s) for any answer, whatever its size.
+# A349 B1 gave Tetsu's revision room to echo his register (about 1,715 tokens for his 3,945 characters) and left the
+# wait as it was: the first pass on it, at 15:44 that day, timed out at 180 s and its revision was lost (A1 keeps only
+# an answer that arrived). His model was measured that day writing 6.27 tokens a second (a 400-token answer in 64.6 s),
+# so a 1,000-token echo alone is about 160 s of writing, before its prompt is read. time_needed() is the wait a request
+# of a given size needs at the speeds this server was measured to run (measured_rate), never under the 180 s every ask
+# has had, and never over what this keeper lets an ask in flight run (wait_cap, below).
+#   GEN_FLOOR_TPS     the writing speed used while no recent answer carries one: the 6.27 measured 2026-10-14, cut by
+#                     about a third because a whole-register echo is written deeper into the window than those 400
+#                     tokens, on a PC shared with his browser. The cut is mine (Claude's), not a measurement.
+#   PROMPT_FLOOR_TPS  the same for reading the prompt: this CPU read a cold prompt at 58.5 tokens a second (2,902 in
+#                     49.6 s, the server's own timings; A273's amendment in the record) and at 64.4 in the A275
+#                     session; 40 is under both. Mine, from those two measurements.
+#   TIME_MARGIN       the wait is the time needed times this: a median speed is beaten by half the answers. Mine.
+#   TIME_CEIL_S       the whole window (CTX_TOKENS less FIT_MARGIN_TOKENS, 8,128 tokens) written at GEN_FLOOR_TPS,
+#                     2,032 s: no request that fits the window needs longer at the floor speeds (a prompt is read ten
+#                     times faster than it is written, at the floors). It is NOT what bounds a wait at the keeper's
+#                     defaults; wait_cap() is, below. TIME_CEIL_S binds only where COVENANT_MODEL_IDLE_S is set above
+#                     TIME_CEIL_S + IDLE_ROUND_S (2,062 s).
+#   wait_cap()        THE KEEPER'S OWN LIMIT (A351, the review of 2026-10-14). The idle watcher stops the server once
+#                     IDLE_S (600 s) has passed since the last use ANY process marked (_idle_tick, A348b), and an ask
+#                     marks use when it starts and when it is answered, not while it waits. So, unless another ask
+#                     marks use meanwhile, an answer still being written IDLE_S after its ask began does not survive
+#                     the watcher's next round. The review drove the real watcher against a slow stand-in (a revision
+#                     at the floor speeds, queued behind a 180 s ask): its 751 s wait was LOST at 601.3 s
+#                     (RemoteDisconnected), where the same revision arrived at 655.8 s with the watcher held off --
+#                     the shape A348b closed for another process's stop, here from the same rule. A wait is never
+#                     handed out past IDLE_S less one IDLE_ROUND_S (570 s at the defaults): the ask's own clock, not
+#                     the watcher's, ends it, and the server is not stopped under it. The round is my (Claude's)
+#                     margin, not a measurement. It costs the answers that would have come in between 570 s and the
+#                     watcher's first round past 600 s. When to put the model away is unchanged: IDLE_S after the
+#                     last use, his rule. Keeping the stamp fresh while an ask waits would let a longer wait be kept,
+#                     but it changes when the model is put away, and that rule is his.
+#   RATE_WINDOW, RATE_MIN_ROWS, RATE_MIN_N   measured_rate's median is over the last 50 answers that carry the
+#                     speed, needs 3 of them, and counts an answer only past 32 tokens written or 256 read: a few
+#                     tokens time the request's overhead, not the model. Mine.
+ASK_TIMEOUT_S = 180                    # ask()'s own default wait, which every ask has had
+GEN_FLOOR_TPS = 4.0
+PROMPT_FLOOR_TPS = 40.0
+TIME_MARGIN = 1.5
+TIME_CEIL_S = int((CTX_TOKENS - FIT_MARGIN_TOKENS) / GEN_FLOOR_TPS)
+RATE_WINDOW = 50
+RATE_MIN_ROWS = 3
+RATE_MIN_N = {"gen": 32, "prompt": 256}
+
+
+def wait_cap():
+    """The longest wait an ask may be handed (A351): IDLE_S less one IDLE_ROUND_S -- the keeper stops the server once
+    IDLE_S has passed since the last marked use, and an ask in flight marks none -- or TIME_CEIL_S where that is lower.
+    Read at the call, so an IDLE_S set in the environment (or a suite's) is the one honoured."""
+    return min(TIME_CEIL_S, IDLE_S - IDLE_ROUND_S)
+
+
+def measured_rate(window=RATE_WINDOW, which="gen", path=None):
+    """The median tokens a second this server wrote ("gen") or read ("prompt") over the last `window` answered asks
+    whose rows carry it (ops/model_asks.jsonl, A351), or None with fewer than RATE_MIN_ROWS of them. Every asker's
+    answers count: the speed is the server's, not the caller's."""
+    if which not in RATE_MIN_N:
+        raise ValueError("which is 'gen' or 'prompt', not %r" % (which,))
+    key, n_key, n_min = which + "_tps", which + "_n", RATE_MIN_N[which]
+    try:
+        with open(path or ASKS, encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return None
+    vals = []
+    for line in lines:
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if (isinstance(r, dict) and r.get("ok") is True and _num(r.get(key)) and r[key] > 0
+                and _num(r.get(n_key)) and r[n_key] >= n_min):
+            vals.append(float(r[key]))
+    vals = vals[-max(1, int(window)):]
+    return round(statistics.median(vals), 2) if len(vals) >= RATE_MIN_ROWS else None
+
+
+def time_needed(messages, max_tokens, gen_tps=None, prompt_tps=None):
+    """(seconds, info): how long an ask of `messages` with an answer of up to `max_tokens` may wait (A351). The prompt
+    is counted by estimate_prompt_tokens (an upper estimate, no server asked) and read at the measured prompt speed;
+    the answer is written at the measured writing speed; each speed is GEN_FLOOR_TPS / PROMPT_FLOOR_TPS while none is
+    measured. That time, times TIME_MARGIN, cut to wait_cap() (what the keeper lets an ask in flight run), and never
+    under ASK_TIMEOUT_S, which every ask has had (so it stays 180 s even where IDLE_S is set too low to keep it).
+    info["capped"] is True when the cut took margin or need away; a need over the cap is an answer the keeper
+    would not have let arrive at that speed. gen_tps and prompt_tps stand in for the measurement (a suite)."""
+    gen = gen_tps if gen_tps is not None else measured_rate(which="gen")
+    rd = prompt_tps if prompt_tps is not None else measured_rate(which="prompt")
+    g = gen if _num(gen) and gen > 0 else GEN_FLOOR_TPS
+    p = rd if _num(rd) and rd > 0 else PROMPT_FLOOR_TPS
+    prompt = estimate_prompt_tokens(messages)
+    need = prompt / p + max(0, int(max_tokens)) / g
+    cap = wait_cap()
+    want = math.ceil(need * TIME_MARGIN)
+    secs = int(max(ASK_TIMEOUT_S, min(cap, want)))
+    return secs, {"timeout_s": secs, "need_s": round(need, 1), "prompt_tokens": prompt, "answer_tokens": int(max_tokens),
+                  "gen_tps": g, "gen_from": "measured" if g is gen else "floor",
+                  "prompt_tps": p, "prompt_from": "measured" if p is rd else "floor",
+                  "cap_s": cap, "capped": want > secs}
 
 
 def _counter():

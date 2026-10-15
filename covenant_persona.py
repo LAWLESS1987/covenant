@@ -49,6 +49,7 @@ entries by title, the phone's reported build, what waits in the teacher's
 queue. It is read from records the tree already keeps, cached a minute, and
 it is why "recap updates" can be answered from facts.
 """
+import inspect
 import json
 import os
 import re
@@ -659,6 +660,25 @@ def answer_budget(register, msgs=None):
     return max(PROPOSAL_TOKENS, need)
 
 
+def answer_wait(ask, msgs, budget):
+    """The seconds a proposal's ask may wait (A351): covenant_model.time_needed for this prompt and this budget, at the
+    speeds his model was measured to run, never under the 180 s it had and never over what the model keeper lets an
+    ask in flight run (covenant_model.wait_cap, 570 s at its defaults). None when `ask` takes no timeout -- the suites'
+    stubs, written (msgs, max_tokens=0), are then called exactly as before -- or the keeper cannot be read, when the
+    ask's own wait stands."""
+    try:
+        params = inspect.signature(ask).parameters.values()
+    except (TypeError, ValueError):
+        return None
+    if not any(q.name == "timeout" or q.kind is q.VAR_KEYWORD for q in params):
+        return None
+    try:
+        import covenant_model as _cm
+        return int(_cm.time_needed(msgs, budget)[0])
+    except Exception:                                             # noqa: BLE001
+        return None
+
+
 def propose(ask, path=None, log_path=None, now=None):
     """Ask the model for one revision. Returns the parsed proposal dict or None, plus the raw text."""
     p = load(path)
@@ -679,7 +699,14 @@ def propose(ask, path=None, log_path=None, now=None):
     # file, about 975 tokens) was cut off before its closing brace: "no JSON proposal in the answer", 14 of the 15 loop
     # passes after A341. The budget now grows with the register it may echo. REGISTER_MAX, REGISTER_GROWN, the screen
     # and the judge are unchanged.
-    text, _meta = ask(msgs, max_tokens=answer_budget(p["register"], msgs))
+    # A351 (2026-10-14): the room needs its time. The first pass on that budget timed out at the 180 s every ask had
+    # and its revision was lost, so the ask now waits for its prompt and budget at his model's measured speed
+    # (answer_wait), up to what the model keeper lets an ask in flight run (covenant_model.wait_cap): its idle watcher
+    # stops the server IDLE_S after the last marked use, and a wait past that was never kept. The budget, the prompt
+    # and everything that decides what is admitted are unchanged.
+    budget = answer_budget(p["register"], msgs)
+    wait = answer_wait(ask, msgs, budget)
+    text, _meta = ask(msgs, max_tokens=budget, timeout=wait) if wait else ask(msgs, max_tokens=budget)
     raw = str(text or "")
     m = re.search(r"\{.*\}", raw, re.S)
     if not m:

@@ -1698,6 +1698,66 @@ def _student_state():
         return {}
 
 
+_REFINE_DEFERRED = [False]      # this process: is the refine loop in a run of deferred rounds (A351)
+
+
+def refine_round(tick=None, streak=None):
+    """One round of Tetsu's refine loop (covenant_refine_loop.tick, A198) and the info line it earns, or None.
+    A pass that ran is one line, as it always was. A351 (2026-10-14): a pass that is due and deferred because the door
+    answered his words within DOOR_QUIET_S left no trace -- tick() saves nothing then, and this round logged only a
+    pass that ran -- so its first deferred round is one line too, and the rounds after it in the same run are not (a
+    round every --interval, 60 s by default; a run of them is one pass waiting on one quiet). The run ends when a
+    round is not deferred, so the next deferral is said again. `streak` is the one-item list that remembers the run
+    (this process's, so a restarted watchdog says a run in progress once more); `tick` stands in for the loop (a
+    suite)."""
+    streak = _REFINE_DEFERRED if streak is None else streak
+    if tick is None:
+        import covenant_refine_loop as _rl
+        tick = _rl.tick
+    r = tick(say=lambda *_a: None) or {}
+    if r.get("deferred"):
+        first, streak[0] = not streak[0], True
+        if first:
+            return "refine loop: %s (said once for this run of deferred rounds; %d new row(s) of his words wait)" % (
+                r.get("why"), int(r.get("new_rows") or 0))
+        return None
+    streak[0] = False
+    if r.get("ran"):
+        return "refine loop: %s -- %s" % (r.get("why"), (r.get("result") or {}).get("why", ""))
+    return None
+
+
+_REFINE_THREAD = [None]         # this process: the refine pass now running, if any (A351)
+_REFINE_LINES = []              # lines a finished pass left for the next round to report (A351)
+
+
+def refine_background(round_=None, start=None):
+    """A351 (2026-10-15): the refine pass runs on its own thread, at most one at a time, so a long revision (up to
+    covenant_model.wait_cap, 570 s) never holds this round's node checks, healing or liveness write. Returns the
+    lines a finished pass left; a round that finds a pass still running starts no second one. A pass that raises
+    leaves its error as a line. `round_` stands in for refine_round and `start` for starting the thread (a suite)."""
+    import threading
+    round_ = round_ or refine_round
+    out = []
+    while _REFINE_LINES:
+        out.append(_REFINE_LINES.pop(0))
+    t = _REFINE_THREAD[0]
+    if t is not None and t.is_alive():
+        return out
+
+    def run():
+        try:
+            line = round_()
+            if line:
+                _REFINE_LINES.append(line)
+        except Exception as e:                                   # noqa: BLE001
+            _REFINE_LINES.append("refine loop unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
+    t = threading.Thread(target=run, name="covenant-refine", daemon=True)
+    _REFINE_THREAD[0] = t
+    (start or (lambda th: th.start()))(t)
+    return out
+
+
 def one_pass(strict=False):
     """strict=True is the single-shot / monitoring mode.
 
@@ -1898,12 +1958,10 @@ def one_pass(strict=False):
         # TETSU REFINES HIMSELF CONSTANTLY (2026-09-21, A198, his words: "refine both
         # constantly"): once an hour at most, only after new conversation, through
         # covenant_persona.refine with every bound it already has. Most rounds are a
-        # no-op costing one file read; a pass that ran is one info line.
+        # no-op costing one file read; a pass that ran is one info line, and since
+        # A351 so is the first round of a run of deferred ones (refine_round).
         try:
-            import covenant_refine_loop as _rl
-            _r = _rl.tick(say=lambda *_a: None)
-            if _r.get("ran"):
-                c_infos.append("refine loop: %s -- %s" % (_r.get("why"), (_r.get("result") or {}).get("why", "")))
+            c_infos.extend(refine_background())
         except Exception as e:                                   # noqa: BLE001
             c_infos.append("refine loop unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
         # EVERY STANDING PAUSE, SAID ON EVERY ROUND (2026-09-16). A pause is a

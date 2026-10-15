@@ -165,6 +165,40 @@ def feed_step(a, say, feed_mod=None):
         return None
 
 
+def persona_step(say, persona_mod=None, ask=None, door=None):
+    """TETSU REFINES HIMSELF, ONCE A NIGHT (A174), and, since A351 (2026-10-14), not while he is talking with Tetsu.
+    A351 gave a revision the wait its size needs (covenant_model.time_needed, up to the keeper's wait_cap, 570 s), so
+    this pass can hold the model's one slot for minutes, and his door ask behind it gives up at 180 s. The hourly loop
+    does not start a pass while the door has answered his words within DOOR_QUIET_S; this step called refine()
+    outside that loop, so it asks the same check (covenant_refine_loop.door_deferral) first. Deferred, it refines
+    nothing tonight and the report says so, with the why; the hourly loop refines when its own gates open (an hour
+    since its last pass and new words of his). A door check that cannot be read is said and the pass runs, as it did
+    before A351. Like the loop's gate, this keeps a pass from starting, not one already running from holding the slot.
+    A function, so a suite drives it (the PP1 idiom, A74). Its failure is said; never raises."""
+    try:
+        try:
+            if door is None:
+                import covenant_refine_loop as _rl
+                door = _rl.door_deferral
+            why = door()
+        except Exception as e:                                   # noqa: BLE001
+            why = ""
+            say("persona: the door check could not be read (%s: %s); the pass runs, as before A351"
+                % (type(e).__name__, str(e)[:120]))
+        if why:
+            say("persona: deferred, not refined in this pass (A351): %s. The hourly refine loop refines when its own "
+                "gates open." % why)
+            return {"proposed": False, "applied": False, "deferred": True, "why": why}
+        tp = persona_mod or importlib.import_module("covenant_persona")
+        if ask is None:
+            import covenant_model as _cm
+            ask = _cm.ask
+        return tp.refine(ask, say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("persona FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+        return None
+
+
 def verify_green(say):
     """Gates plus the suites this pass can break. Returns True when green."""
     import subprocess
@@ -516,13 +550,9 @@ def main():
     # himself including his voice"). Once a day: his register and his voice,
     # from the operator's side of the day's conversations, bounded, judged by
     # the gate, recorded, and told to the operator on the direct line. Its
-    # failure is reported and does not stop the pass.
-    try:
-        import covenant_persona as TP
-        import covenant_model as _cm
-        TP.refine(_cm.ask, say=say)
-    except Exception as e:                                       # noqa: BLE001
-        say("persona FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+    # failure is reported and does not stop the pass. (A351: persona_step,
+    # which first asks the refine loop's door check.)
+    persona_step(say)
 
     # THE SCREENS AND GATES, PROBED (2026-09-21, A176, his words: "Evolving
     # cyber security protection"). The probe set grows from the forum
