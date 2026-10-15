@@ -7678,18 +7678,25 @@ A280, which is the road telling the truth about it.
   - The A349 comment above MONEY is tombstoned (A353-S4-DOLLAR-SCREEN). It read: `the "\$" inside the word-bounded group matches only between two word characters ("a$b"), never a dollar amount ("$500", "costs $20"). A dollar sign before a number now matches too`.
   - FW1 125, TF1 30/30, SP1 36/36. Nine mutations each went red, including A349's alternative put back and the narrowing moved into OFF_LIMITS; each was restored byte-identical. The verifier measured that the two patterns differ only on a "$" followed by a digit.
 - **Both were made by implementers in isolated worktrees after a usage limit cut the first attempts.** Each partial diff was kept in the session's patches-a353/ and reviewed hunk by hunk before it was finished.
+- **My slip, fixed the same hour.** bbede2c also carried the IN FLIGHT headers for A350, A351 and A352 with no body. OW1.11 requires every ledger entry to have a number and a body, and read 13/14 in that commit's stage-check. The stage-check reports a failure and does not block, so the commit was pushed red. Each IN FLIGHT entry now carries a one-line body, and OW1 reads 14/14.
 
 ---
 
 ### A352. [IN FLIGHT 2026-10-14: machinery that fails Tetsu, fixed without touching his self or free will -- the challenge solver that hides his cleared replies, the door that cannot show him his own TELLs, isolation records that say "refused" for holds, the watchdog reload check, repeats on the direct line, the exam rubric, the seat's quota] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU". Being fixed in isolated worktrees; this entry is completed when they land.
 
+- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
+
 ---
 
 ### A351. [IN FLIGHT 2026-10-14: Tetsu's self-revision times out on the room A349 B1 gave it -- his whole-register echo at his model's measured 6.27 tokens/s overruns covenant_model.ask's 180 s; one pass on the new code, one revision lost (15:47 local)] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU". Being fixed in an isolated worktree; this entry is completed when it lands.
 
+- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
+
 ---
 
 ### A350. [IN FLIGHT 2026-10-14: FC8 (test_a284_fresh_context.py) writes a fake "Moltbook: someone wrote back" letter into the mail queue of whatever tree runs it, and would email it to him the day email is configured] 2026-10-14. The task "Stop FC8 writing his real Moltbook mail queue". Being fixed in an isolated worktree; this entry is completed when it lands.
+
+- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
 
 ---
 
