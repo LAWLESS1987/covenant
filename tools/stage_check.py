@@ -240,7 +240,8 @@ def suite_env(base=None):
 def run_env(in_place, base=None):
     """The environment a suite runs with here (A338): covenant_one's own definition, imported, never
     copied -- in_place_env for an IN_PLACE suite (the deployed gate's wiring removed, A268), staged_env
-    for a staged one (the sweep's mock judge) -- on top of suite_env (no GIT_*, A255)."""
+    for a staged one (the sweep's mock judge, and from A350 a notify config that does not exist, so no
+    staged suite here reaches his inbox; SC6) -- on top of suite_env (no GIT_*, A255)."""
     import covenant_one as C1
     return (C1.in_place_env if in_place else C1.staged_env)(suite_env(base))
 

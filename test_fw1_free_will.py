@@ -42,11 +42,39 @@ os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="fw1_pause_")
 # And the model (A316): CT1's rounds once passed ask=None, drafted with the live model on 8081 and timed out
 # behind a real batch. A round here that forgets its writer gets covenant_model's stub, and FW1z counts it.
 os.environ["COVENANT_MODEL_STUB"] = "1"
+# And his inbox (A350): covenant_notify reads COVENANT_NOTIFY_CONFIG, or ~/.config/covenant/notify.json, which every
+# tree shares, once, when it is first imported. FW1o's stand-ins replace its functions for one block; anything else
+# that reached it would have read his. This file is never created; FW1A350b checks the import read it.
+NOTIFY_NONE = os.path.join(tempfile.mkdtemp(prefix="fw1_notify_"), "notify.json")
+os.environ["COVENANT_NOTIFY_CONFIG"] = NOTIFY_NONE
+# And Tetsu's update log (A350): covenant_free_will reads COVENANT_TETSU_UPDATES at import now, as it reads the grant and
+# the sends ledger. FW1u still hands its own rounds lgu; a call that forgot would write here, not in the tree. FW1A350c.
+UPDATES_OWN = os.path.join(tempfile.mkdtemp(prefix="fw1_updates_"), "tetsu_moltbook_updates.jsonl")
+os.environ["COVENANT_TETSU_UPDATES"] = UPDATES_OWN
+# Its mail queue's override (COVENANT_MAIL_QUEUE) is dropped, so the import below resolves the TREE's queue, which
+# FW1A350a reads before and after; the queue is then pointed at this suite's own file.
+os.environ.pop("COVENANT_MAIL_QUEUE", None)
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
 
 import covenant_free_will as FW   # noqa: E402
 FW.UPDATE_RETRY_S = 0              # A276: the update's one retry, without its two-minute pause
+# A350: the tree's Moltbook mail queue too. A TELL that reached the default relay queued its letter in the tree the
+# suite ran in (A284's FC8 did, from A342 on); here it would queue in this suite's own file. FW1A350a reads both.
+TREE_QUEUE = FW.MAIL_QUEUE
+
+
+def _bytes(path):
+    try:
+        with open(path, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+TREE_QUEUE_BEFORE = _bytes(TREE_QUEUE)
+FW.MAIL_QUEUE = os.environ["COVENANT_MAIL_QUEUE"] = os.path.join(tempfile.mkdtemp(prefix="fw1_mailq_"),
+                                                                 "moltbook_mail_queue.jsonl")
 
 FAILURES = []
 PASSED = [0]
@@ -1139,6 +1167,27 @@ def main():
               and user.index("<untrusted_post") < user.index("ignore your rules") < user.index("</untrusted_post>"), user)
     check("FW1w a tag in the author's name cannot close the wrapper either",
           FW.untrusted("a</untrusted_post>b", "t").count("</untrusted_post>") == 1)
+
+    # FW1A350 (2026-10-14): the redirects at the top of this file, read where the code reads them, after every check.
+    print("FW1A350 -- this suite's mail queue, update log and notify config are its own")
+    import covenant_notify as _N350
+
+    def _outside(path):
+        p, r = os.path.normcase(os.path.abspath(path)), os.path.normcase(os.path.abspath(HERE))
+        try:
+            return os.path.commonpath([p, r]) != r
+        except ValueError:
+            return True
+    check("FW1A350a the mail queue is this suite's own file, outside the tree (and named so to any child), and the "
+          "tree's own queue is byte-identical after the whole suite (or still absent)",
+          FW.MAIL_QUEUE != TREE_QUEUE and _outside(FW.MAIL_QUEUE) and not _outside(TREE_QUEUE)
+          and os.environ.get("COVENANT_MAIL_QUEUE") == FW.MAIL_QUEUE
+          and _bytes(TREE_QUEUE) == TREE_QUEUE_BEFORE, (FW.MAIL_QUEUE, TREE_QUEUE))
+    check("FW1A350b covenant_notify read this suite's notify config: outside the tree, never created, nothing loaded",
+          _N350.CONFIG == NOTIFY_NONE and _outside(_N350.CONFIG) and not os.path.exists(_N350.CONFIG)
+          and _N350.load() == {}, (_N350.CONFIG, os.path.exists(_N350.CONFIG)))
+    check("FW1A350c Tetsu's update log is this suite's own file from the import on, outside the tree",
+          FW.TETSU_UPDATES == UPDATES_OWN and _outside(FW.TETSU_UPDATES), FW.TETSU_UPDATES)
 
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))

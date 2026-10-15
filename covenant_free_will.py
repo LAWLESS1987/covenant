@@ -388,7 +388,9 @@ def _attempted_recently(rows, now, hours=ROTATE_HOURS):
 # i should know about"). After a live round that did anything, Tetsu reads a digest of it and decides:
 # TELL (a few sentences in his own words, onto the direct line) or NOTHING. The choice is his; every
 # decision is recorded, told or not.
-TETSU_UPDATES = os.path.join(HERE, "ops", "tetsu_moltbook_updates.jsonl")
+# A350 (2026-10-14): an environment override, as GRANT, SENDS, the contact line and the ask log have, so a suite or a
+# runner can move it before anything imports this file. The default is unchanged.
+TETSU_UPDATES = os.environ.get("COVENANT_TETSU_UPDATES") or os.path.join(HERE, "ops", "tetsu_moltbook_updates.jsonl")
 UPDATE_PROMPT = (
     "He asked: \"have tetsu update me on moltbook interactions that he thinks i should know about\". "
     "Below is what free (the ambassador) did on Moltbook in the round that just ended, and your own reviews "
@@ -501,7 +503,9 @@ def _round_digest(out, rows, reviews=()):
 # back, with the link and, for a write-back, what they wrote (read from Moltbook's public API). The facts ride with
 # his words because his notes have mixed up who wrote to whom (the 2026-10-13 reading of four notes). Nothing is lost
 # while email is not configured: each letter waits in MAIL_QUEUE and the next round sends the backlog, oldest first.
-MAIL_QUEUE = os.path.join(HERE, "logs", "moltbook_mail_queue.jsonl")
+# A350 (2026-10-14): an environment override too (COVENANT_MAIL_QUEUE), the shape of every path beside it; A284's FC8
+# queued a fake letter in each tree it ran in, and no runner or suite could move the queue. The default is unchanged.
+MAIL_QUEUE = os.environ.get("COVENANT_MAIL_QUEUE") or os.path.join(HERE, "logs", "moltbook_mail_queue.jsonl")
 MOLTBOOK_POST = "https://www.moltbook.com/post/%s"
 
 

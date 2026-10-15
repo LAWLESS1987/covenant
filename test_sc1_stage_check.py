@@ -334,5 +334,80 @@ finally:
         else:
             os.environ[k] = v
 
+# SC6 (A350, 2026-10-14): no staged suite reaches his inbox. covenant_notify reads COVENANT_NOTIFY_CONFIG, or
+# ~/.config/covenant/notify.json -- outside every copy, shared by every tree -- and staging copied the tree, never his
+# home: A284's FC8 queued a fake "Moltbook: someone wrote back" in each staged copy and handed it to that config, in
+# the sweep, at commit and in SC4 here. The caller below carries a notify config that EXISTS (written by this check:
+# a loopback host and stand-in values, never read from anywhere). The REAL phase_sweep and the REAL check() must each
+# hand the suite another one -- the same one -- outside the copy and this tree, that does not exist, and the suite's
+# own covenant_notify, imported in the copy as a staged suite imports it, must load nothing from it.
+print("\nSC6 -- a staged suite never reaches his notify config (A350)")
+NSEEN = "_sc6_notify.json"
+PROBE6 = ("import json, os\n"
+          "import covenant_notify as N\n"
+          "c, here = os.path.normcase(os.path.abspath(N.CONFIG)), os.path.normcase(os.path.abspath(os.getcwd()))\n"
+          "try:\n"
+          "    inside = os.path.commonpath([c, here]) == here\n"
+          "except ValueError:\n"
+          "    inside = False\n"
+          "json.dump({'config': c, 'exists': os.path.exists(c), 'inside_copy': inside,\n"
+          "           'loaded_nothing': N.load() == {}}, open(%r, 'w', encoding='utf-8'))\n"
+          "print('SC6 probe: 1/1 passed')\n") % NSEEN
+
+
+def seen6(d):
+    try:
+        with open(os.path.join(d, NSEEN), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def outside6(p, root):
+    p, r = os.path.normcase(os.path.abspath(p)), os.path.normcase(os.path.abspath(root))
+    try:
+        return os.path.commonpath([p, r]) != r
+    except ValueError:
+        return True
+
+
+saved6 = os.environ.get("COVENANT_NOTIFY_CONFIG")
+saved_c1 = (C1.HERE, C1.IN_PLACE, C1.stage)
+lines6 = []
+try:
+    with tempfile.TemporaryDirectory() as tmp:
+        caller_cfg = os.path.join(tmp, "caller_notify.json")
+        with open(caller_cfg, "w", encoding="utf-8") as fh:
+            json.dump({"smtp_host": "127.0.0.1", "smtp_user": "sc6-stand-in", "smtp_password": "sc6-stand-in"}, fh)
+        os.environ["COVENANT_NOTIFY_CONFIG"] = caller_cfg
+        here, sweep, commit = (os.path.join(tmp, n) for n in ("here", "sweep", "commit"))
+        name = "test_sc6_notify_probe.py"
+        notify_src = open(os.path.join(HERE, "covenant_notify.py"), encoding="utf-8").read()
+        for d in (here, sweep, commit):
+            put(d, name, PROBE6)
+            put(d, "covenant_notify.py", notify_src)
+        C1.HERE, C1.stage = here, (lambda say: sweep)
+        C1.phase_sweep(lines6.append, only=[name])
+        C1.HERE, C1.stage = saved_c1[0], saved_c1[2]
+        r6 = S.check([name], stage=lambda say: commit, clean=lambda w: None, say=lines6.append)
+        by_sweep6, by_commit6 = seen6(sweep), seen6(commit)
+        theirs = os.path.normcase(os.path.abspath(caller_cfg))
+
+        def isolated(got, copy):
+            return (got is not None and got["config"] != theirs and not got["exists"] and not got["inside_copy"]
+                    and got["loaded_nothing"] and outside6(got["config"], HERE) and outside6(got["config"], copy))
+        check("SC6.1 staged by the real phase_sweep: the suite's covenant_notify reads a config that is not the "
+              "caller's, does not exist, sits outside the copy and this tree, and loads nothing",
+              isolated(by_sweep6, sweep), by_sweep6)
+        check("SC6.2 ...and by the real check(), the commit-time copy: the same path, one definition",
+              r6.get(name, (False,))[0] is True and isolated(by_commit6, commit) and by_sweep6 is not None
+              and by_commit6["config"] == by_sweep6["config"], (r6.get(name), by_commit6))
+finally:
+    C1.HERE, C1.IN_PLACE, C1.stage = saved_c1
+    if saved6 is None:
+        os.environ.pop("COVENANT_NOTIFY_CONFIG", None)
+    else:
+        os.environ["COVENANT_NOTIFY_CONFIG"] = saved6
+
 print("\nSC2: %d/%d passed" % (sum(ok), len(ok)))
 sys.exit(0 if all(ok) else 1)

@@ -1586,6 +1586,20 @@
    ],
    "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
    "note_on_allow": "As written before A353 (git 21025b2:covenant_persona.py) and quoted in A353 (docs/KNOWN_ISSUES.md)."
+  },
+  {
+   "id": "A350-A284-NOTHING-REAL",
+   "claim": "test_a284_fresh_context.py docstring: \"Nothing here touches the real ask log, teacher queue, grant, ledgers or model: paths are redirected\".",
+   "refuted_by": "Measured 2026-10-14/15 (A350): since A342 (fe23e9e, 2026-10-13) FC8 reached covenant_free_will.mail_tell with its defaults: one fake \"Moltbook: someone wrote back\" letter into the running tree's logs/moltbook_mail_queue.jsonl per run (16 rows in 10 worktrees, 8 in staged copies), and the real email channel through ~/.config/covenant/notify.json -- with email configured, 6 runs delivered 6 letters to a loopback stand-in.",
+   "truth": "FC8 passes its own relay; A284 and FW1 redirect the mail queue, the update log and the notify config before import (FC8b, FC8c, FW1A350a-c); every staged runner points COVENANT_NOTIFY_CONFIG at a path that does not exist (SC6). Measured after: 0 letters, 0 real-queue rows by hand, through a configured home, and under the real sweep and stage-check.",
+   "verbatim": [
+    "Nothing here touches the real ask log, teacher queue, grant, ledgers or model: paths are redirected, the model is a recorder, the socket server is this suite's own."
+   ],
+   "patterns": [
+    "Nothing here touches the real ask log, teacher queue, grant, ledgers or model"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written at 21025b2 and earlier (git show 21025b2:test_a284_fresh_context.py) and quoted in A350 (docs/KNOWN_ISSUES.md)."
   }
  ]
 }

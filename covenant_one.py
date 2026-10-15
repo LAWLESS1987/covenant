@@ -1263,8 +1263,15 @@ def in_place_env(base=None):
 # copy. Until A338 that copy ran staged suites under the hook's own environment, without the mock judge:
 # A327's OE1 passed at commit and failed OE1.11 in the 2026-10-12 sweep (A335), the shape RG1 met in
 # A223. The mock is deliberate: no staged suite may reach a real provider.
+#
+# A350 (2026-10-14). Nor his inbox. covenant_notify reads COVENANT_NOTIFY_CONFIG, or ~/.config/covenant/notify.json:
+# outside every copy, shared by every tree. Staging copied the tree and never his home, so A284's FC8 queued a fake
+# "Moltbook: someone wrote back" in each staged copy and handed it to that config, on every sweep, every commit that
+# touched a .py (stage_check) and every SC1 run -- nothing went out only because email is not set up yet. A staged
+# suite now reads a config that does not exist, outside the copy; nothing creates it, and SC6 fails if it exists.
+NOTIFY_NONE = os.path.join(tempfile.gettempdir(), "covenant_no_notify", "notify.json")
 STAGED_ENV = {"COVENANT_INSECURE_MOCK_JUDGE": "1", "COVENANT_JUDGE_PROVIDERS": "mock",
-              "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf8"}
+              "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf8", "COVENANT_NOTIFY_CONFIG": NOTIFY_NONE}
 STAGED_ENV_DROP = ("COVENANT_WSGI",)
 
 

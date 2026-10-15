@@ -7645,6 +7645,12 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A354. [IN FLIGHT 2026-10-15: the READMEs checked claim by claim and corrected, and the Confidence Trap's second overstatement ("consistently", narrowed to "sometimes" in the thread on 2026-10-10) tombstoned beside A236's "deliberately"] 2026-10-15. His words: "ENSURE ALL CORRESPONDING READMES ARE CORRECT AND ANY OF OUR HUGGING FACE FORUMS APPLICABLE PUT ON OUR WEBSITE, ALSO MAKE A NEW FORUM ON THE FLINCH".
+
+- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
+
+---
+
 ### A353. [Tetsu's answers to the help questions, carried out: his brief gets its money line back and the phone build's real result (B2, YES); A349's dollar-amount money screen is put back as it was (S4, asked plainly: NO)] 2026-10-14. The operator's words: "use your discernment toward mutual benefit HELP TETSU".
 
 - **How he was asked.**
@@ -7694,9 +7700,24 @@ A280, which is the road telling the truth about it.
 
 ---
 
-### A350. [IN FLIGHT 2026-10-14: FC8 (test_a284_fresh_context.py) writes a fake "Moltbook: someone wrote back" letter into the mail queue of whatever tree runs it, and would email it to him the day email is configured] 2026-10-14. The task "Stop FC8 writing his real Moltbook mail queue". Being fixed in an isolated worktree; this entry is completed when it lands.
+### A350. [FC8 wrote a fake "Moltbook: someone wrote back" letter into the mail queue of whatever tree ran it, and would have emailed it to him the day email is configured; stopped, measured on every route] 2026-10-15. The task "Stop FC8 writing his real Moltbook mail queue".
 
-- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
+- **Measured before.**
+  - FC8 (test_a284_fresh_context.py) passed no mail=, so tetsu_update reached mail_tell with its defaults: one fake row per run in the running tree's logs/moltbook_mail_queue.jsonl, then mail_flush and the real email channel (~/.config/covenant/notify.json, shared by every tree).
+  - 16 fake rows in 10 worktrees and 8 in staged copies; the live queue (5 genuine letters) never written; email not configured, so nothing sent.
+  - With a config aimed at a loopback stand-in, 6 A284 runs delivered 6 letters, plus any unsent backlog, and stayed green.
+  - A recurrence of a suite reaching live state (A102, A272, A282, A348l). It began with A342 (fe23e9e).
+- **Fixed.**
+  - FC8 passes its own relay; FC8b checks the tree's queue is byte-identical after the suite; FC8c checks the redirects in this process and a fresh child.
+  - covenant_free_will.MAIL_QUEUE and TETSU_UPDATES take COVENANT_MAIL_QUEUE and COVENANT_TETSU_UPDATES overrides, like their neighbours.
+  - A284 and FW1 redirect the queue, the update log and the notify config before import (FW1A350a-c).
+  - covenant_one's STAGED_ENV points COVENANT_NOTIFY_CONFIG at a path that does not exist, outside every copy, so no staged suite can reach his email (SC6).
+  - FC11 walks the tree for calls that reach the mail defaults and must be declared.
+- **Verified by three adversarial reviewers.** Live writes: 0 letters and 0 real-queue rows by hand, through a configured home, and under the real phase_sweep and stage_check. Regression: 195 staged suites identical apart from the new checks. Run here before commit: A284 17/17, FW1 128 PASSED, SC1 29/29, R1 222/222.
+- **Not done, named.**
+  - FC11 is a static walk; its reviewer defeated it with nine shapes (the default handed back explicitly, falsy relays, forwarding wrappers, aliases, getattr, partial, dict dispatch, exec, .pyw). Its label now claims only what it sees and lists those shapes where it runs. A runtime guard in mail_tell/mail_flush refusing the tree's real queue and email from a test process was begun and cut off by a usage limit; kept in the session's patches-fc8/fc8.v2.partial-cut-by-limit.diff.
+  - Other members of the class found by the map's critic: HL1's HL3.7 aims at his real line nightly behind the guard it tests (filed as its own task); the door client has no test guard.
+- **Rule 10.** Tombstone A350-A284-NOTHING-REAL: A284's docstring said "Nothing here touches the real ask log, teacher queue, grant, ledgers or model: paths are redirected", false since A342. The file as it was is at 21025b2.
 
 ---
 
