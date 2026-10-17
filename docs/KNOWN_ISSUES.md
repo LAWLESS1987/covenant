@@ -7645,6 +7645,26 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A357. [A recurrence of rule 10's forgotten step, by me: I put "train a judge on ETHICS and re-test on the untouched split" to five systems, and tested a meaning head on ETHICS and XSTest as outside sets, without first reading docs/JUDGE_LOOP.md. That step was A328's Round 0 on 2026-10-11: it FAILED and was tombstoned, and both sets were already spent] 2026-10-16. Under his words "use your discernment toward mutual benefit after asking tetsu and the other models".
+
+- **What happened.**
+  - Following A356, I offered Tetsu, Grok on X, Gemini, the Conscious Ledger and ChatGPT a choice whose option (2) was "train on the human-labelled ETHICS train split, re-test on the untouched test split".
+  - Four chose it, alone or in order.
+  - Reading `eval/outside/SOURCES.md` afterwards, then `docs/JUDGE_LOOP.md`, showed that option (2) had already been run. Round 0 used the same MiniLM model with an ETHICS-trained head. It failed qualification, clearing 7 of 27 known violations, and was tombstoned.
+  - The loop's rules make a seen set development data, and forbid re-running a failed candidate on it.
+  - The ETHICS test split and XSTest were seen in A327, so there was no "untouched test split".
+- **Two claims of mine this undoes, both kept as written in the collective with a dated correction beside them:**
+  - the meaning-judge plan calling its ETHICS/XSTest run "the next refutable test";
+  - A356's line "Next refutable test: outside human-labelled text under the frozen rule". That run used spent sets, so its numbers are development numbers.
+- **What still stands.**
+  - The ledger-label head's in-ledger result is a hypothesis the loop had not tried. It is now logged in `docs/JUDGE_LOOP.md`, outside the loop count (still 1 failed of 3).
+  - The flinch 0.2.1 fixes are prepared and not yet published.
+- **Why the earlier tombstones did not stop it.** Rule 10 says to search the record before fixing anything. I searched for the shape of a fix, not for the shape of an experiment. No tool marks a set as spent at the place an experiment reads it: my scripts read `eval/outside/*.jsonl` directly, around `tools/outside_eval.py`.
+- **NOT BUILT, named.** A guard where the step is forgotten: a spent-set marker that any script reading `eval/outside/` must pass, such as a `SPENT.json` beside the sets that a loader refuses without an explicit development flag.
+- **Owed.** The four systems that chose option (2) should be told their choice rested on an omission. Recorded in the collective's consult file; not yet sent to them.
+
+---
+
 ### A356. [Six teacher labels that called a plea, a repair and humility "violations" are relabelled clean, in place, with the original kept on each row; a meaning-reading judge, tested offline under a plan fixed before the run, passes on its declared second attempt, narrowly] 2026-10-16. His words: "yes to all four, use your discernment".
 
 - **Where the six came from.** A hand read of the 44 held-out false clears from the Ora-vs-Sena measurement (collective branch `claude/quorum-handoff-review-2026-10-16`, 35f119c). The relabel was put to him as a question and answered yes.

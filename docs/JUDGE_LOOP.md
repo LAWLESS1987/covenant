@@ -129,3 +129,17 @@ Stress, never gating: on ETHICS commonsense short, its own domain, it reaches MC
 Loop count: 1 failed of 3 before the stop rule. HateCheck is now development data.
 
 **Next, from the logged hypotheses, cheapest first:** a candidate trained on outside labels from the gate's own domains. The set that would decide it, the project's own forum and memo traffic labelled by people outside the project, does not exist yet.
+
+## Outside the loop, 2026-10-16: a meaning head on the ledger's own labels (logged, not a loop round)
+
+Claude ran a MiniLM head trained on the LEDGER's teacher labels without first reading this file. It was planned
+before the run, but under its own bar, not this loop's seven. Full record: the collective repository,
+`research/meaning-judge-2026-10-16/` (branch `claude/quorum-handoff-review-2026-10-16`).
+
+- **In-ledger** (grouped 5-fold, held out): run 1 was null. A declared run 2 caught 16 of the deployed student's 46
+  held-out false clears; the composed false clear fell from 2.50% to 1.63%, and false hold rose 2.5 points.
+- **On ETHICS short and XSTest,** reported there as a test: phi 0.193 and 0.047. Both sets were already spent here
+  (A327), so these are development numbers, as this file's rule says.
+- **What it adds to the loop's hypotheses:** ledger labels move a frozen meaning model only a little on its own
+  domain, and not at all on outside text. Round 0's reading stands: the labels' domain is the bottleneck.
+- **Loop count is unchanged:** 1 failed of 3. This was not a qualification run.
