@@ -704,6 +704,8 @@ SUITES = [
     ("test_a357_spent_sets.py", 120, "JUDGE"),
     # NV1 (2026-10-17): the nightly names the gate that is not PASS, with its detail line (launch_check stubbed).
     ("test_nv1_nightly_verify.py", 60, "JUDGE"),
+    # A361 (2026-10-17): the quiet-window reader (busy 03:20-05:45 local or while a scheduled check runs).
+    ("test_qw2_quiet_window.py", 30, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

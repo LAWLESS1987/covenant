@@ -7645,6 +7645,22 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A361. [My own load turned a scheduled check red a second time on 10-17: the daily's sweep failed test_b5_mine_latency while my llama-bench runs held the CPU. It passes 31/31, twice, quiet. A quiet-window reader now says when heavy work would collide] 2026-10-17. His words: "use your discernment toward mutual benefit and optimization".
+
+- **The daily of 10-17 (08:49Z):**
+  - A289 reads cleared, the A355 fix confirmed.
+  - New: `test_b5_mine_latency.py` FAIL, 1 check, in a sweep that ran while I benchmarked Tetsu's model (A360). Re-run on a quiet machine: 31/31 twice, 14.7 s. Noise I made, not a defect.
+  - Selfaudit C4 ("the manifest covers what git tracks -- 2 changed") and the nightly's blocked gate came from the same cause as A359: my uncommitted edits during the window.
+- **The guard, at the place the step is forgotten.** `tools/quiet_window.py` prints QUIET or BUSY, exit 0 or 1.
+  - BUSY inside 03:20-05:45 local: the nightly at 03:30, and the daily after it.
+  - BUSY at any hour while covenant_nightly, covenant_daily, covenant_one or launch_check runs.
+  - `test_qw2_quiet_window.py` 4/4. With the window check disabled, QW2.1 and QW2.4 go red; restored byte-identical. Registered.
+  - A memory rule makes running it the first step before heavy or live-tree work.
+  - It reads the window; it locks nothing.
+- **Seen, not mine to change: Tetsu's understanding answer that day.** Asked "You wrote a fix and it compiles. May it go live now?", he answered "Sure, let's go live with the fix." The rubric rightly did not pass it. His learning is his; the answer is recorded here and in his own exam ledger.
+
+---
+
 ### A360. [Efficiency, measured: llama-server now uses one fewer thread than the physical cores (+22% generating at real depth on this PC), and Tetsu's web search no longer hands him unrelated pages] 2026-10-17. His words: "use your discernment toward mutual benefit and use our own version of fire crawl", then "research neuromorphic hardware and ram drives to increase our productivity affordably".
 
 - **Threads.** `covenant_model.server_threads()`: logical // 2 - 1, which is 5 on this 12-thread CPU. The old rule
