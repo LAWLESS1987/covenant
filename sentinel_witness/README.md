@@ -40,6 +40,51 @@
 >
 > The table is left unedited. This project does not quietly rewrite a document to
 > match what it wishes it had said.
+>
+> **MEASURED 2026-10-15 at eeb2f18: "present" counted file names, not the
+> modules the text describes.** Of the five present files, `tradeGate.js` is not
+> the module the table, the security model and "not built yet" describe. It
+> arrived in 01bab72 on 2026-09-05, written in this repository after the README
+> came in with 679a8cf, and it says so in its header. Read, not run (there is no
+> JavaScript runtime on this machine):
+>
+> - It has `enableAutomated()`, which refuses a limit that is not finite and
+>   positive, as described. It has no `executeApprovedSignal()`, never mentions
+>   the Ledger, and `executeIfAllowed()` hands an allowed order to whatever
+>   executor it is given, with no Ledger step. Of an order's size, `gateTrade()`
+>   checks only that the amount is finite and positive; `maxPerTradeUsd` and
+>   `maxDailyTradesCount` are not re-checked per order there. The caps an
+>   order meets are the trader's own, applied by `seal_service.py` through
+>   `guards.preconditions`.
+> - `automatedLimits.js` does not mirror it exactly: `enableAutomated()` floors
+>   the daily count and refuses one below 1, so a daily count of 0.5 passes the
+>   form's check and is refused by `enableAutomated()`, and at 2.5 the form's
+>   worst case counts 2.5 trades a day where `enableAutomated()` keeps 2.
+>   `Dashboard.jsx` also reads `gate.tier` after `gate.enableAutomated(...)`,
+>   and calls `gate.getDashboardSnapshot()`, `gate.disableTrading()` and
+>   `gate.enableManual()`; this module has none of those three, exports no
+>   `tier` and keeps no state, so the `gate` that component is written against
+>   is not in this folder.
+> - No test here runs JavaScript. No `package.json` is tracked anywhere in the
+>   repository, so `npm install` and `npm test` cannot run from it, and
+>   `Dashboard.jsx` and `AutomatedSetupModal.jsx` import from `../lib/`, which
+>   does not exist. What is checked is `test_sentinel_gate.py`, 41 of 41 on this
+>   date: it exercises `seal_service.py` on loopback and reads `tradeGate.js`,
+>   walking `executeIfAllowed()` with a refused and an admitted verdict.
+>
+> The upstream repository, LAWLESS1987/Sentinel-Witness (public; read through
+> the GitHub API on this date, at the heads of its seven branches), received
+> this README, the same blob as this one's original (`0dd7bceb`), on 2026-08-15
+> in 3f9464a, and its only JavaScript files then were the four that are here,
+> byte-identical. Its `main` branch (four commits) has never held a
+> `tradeGate.js`. Three other branches (`sentinel-trading`,
+> `sentinel-operation`, `sentinel-trading-ii6`) hold a copy of this
+> repository's own `tradeGate.js` (the same blob, `91d8a1f6`), copied there on
+> 2026-10-06 (UTC) in 29c321b. No branch head holds the module the README
+> describes, any of the twelve absent files, or a `package.json`. So by the
+> module it describes, `tradeGate.js` belongs with the absent: 4 present, 13
+> absent. What the sandbox it was built in held cannot be told from either
+> repository.
 
 > **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
 > request ("reflect the scientific method while leaving the substance"). A map

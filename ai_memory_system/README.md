@@ -17,6 +17,21 @@
 >    ledger records only a `sha256`, never the text. Measured: after overwriting,
 >    the original body is unrecoverable. *This is the same failure this project
 >    diagnosed in other systems, present here, on this path.*
+>
+>    *(AIMEM-CITE-2026-10-15, proposed tombstone; dated note, README audit,
+>    2026-10-15. The two line numbers in items 1 and 2 did not point at the
+>    code they name on the day this block was written. They came from the field
+>    test, and were right on 2026-08-29: at cdd4d2d, the last commit of that day
+>    and the only one of the eight that touched either file from 2026-08-29 to
+>    2026-08-31 where both fit, `memory_store.py:348` is `put()`'s call to
+>    `_atomic_write`, and `server.py:398-405` is the PUT handler's SUPERSEDE
+>    branch, which acts on the reconcile step above it (366-384). This block
+>    restated them on 2026-09-17 without re-measuring. By then, at e366b25, the
+>    call was at 693 and the SUPERSEDE branch at 462-469, after the reconcile
+>    step at 420-438; line 348 was inside the store-size check, and 398-405 held
+>    the last line of `do_GET` and the start of `do_PUT`. At eeb2f18: the call
+>    at `memory_store.py:703`, with the archive copy at 701; the reconcile step
+>    at `server.py:433-451` and the SUPERSEDE branch at 475-482.)*
 > 3. **`superseded_by` is write-only.** Nothing in `score_explain`, `rank` or
 >    `context_window` reads it. A superseded memory and its correction score
 >    identically, `context_window` emits **both** bodies, and because
@@ -41,7 +56,8 @@
 > - Item 2 is **outdated as written**: `put()` archives the prior text to
 >   `.trash/` before a content-changing overwrite (`memory_store.py:665`,
 >   "THE PRIOR WORDING SURVIVES AN OVERWRITE" -- line 668 since the code above
->   it grew; re-pointed 2026-10-04, A257) and the ledger records the
+>   it grew; re-pointed 2026-10-04, A257; line 675 since 900a257, 2026-10-07,
+>   re-pointed 2026-10-15) and the ledger records the
 >   archive name. `_atomic_write` itself still overwrites; the copy is taken
 >   above it.
 > - Item 3 is **half outdated**: `context_window` now reads the link and
@@ -62,7 +78,8 @@
 > named in `omitted`. `/recall` brings each candidate's correction into the
 > candidates (`recall.with_successors`), so the shortlist cannot hand back
 > only the stale version. (The context mark cited as `recall.py:195` above is
-> at `recall.py:367` since this change.)
+> at `recall.py:367` since this change. *Re-pointed 2026-10-15: at
+> `recall.py:405` since 93f7136, the A253 G3 commit of the same day.*)
 >
 > Limits added on purpose, each stated in `because` as `supersede_withheld`:
 > only a write the ethics gate ALLOWED counts as checked, and a link from a
@@ -143,6 +160,18 @@ conflict to auto-resolve.
 Deletes are **tombstones**: the file moves to `.trash/` and the ledger records
 who retired it and why. What one agent writes, another may retire — never erase.
 
+*AIMEM-WHY-2026-10-15, proposed tombstone; measured 2026-10-15 at eeb2f18. The
+ledger records WHO, and only a digest of WHY.* `delete()` writes the tombstone
+line with the agent and `sha256` of the reason; the reason itself is kept
+nowhere. On a throwaway store, a delete with a reason left that text in no
+file under the store (not `audit.jsonl`, not `.trash/`), while the same byte
+search found it once it was stored in a memory body; the line's `sha256`
+equalled the reason's hash, and a delete with no reason records the hash of
+the empty string. The same code wrote the same line on 2026-08-29, when this
+sentence was written (838553e). One exception: a memory retired by `rereview`
+has the gate's verdict, reason included, on the `rereview` line written just
+before its tombstone.
+
 ## API
 
 | Route | Does |
@@ -158,6 +187,25 @@ who retired it and why. What one agent writes, another may retire — never eras
 | `GET /context?unreviewed=withhold` | Since 2026-10-05 (A253 G3): core memories the gate did not ALLOW come after every checked one, quoted line by line under a never-act rule (`fenced` counts them), or with `withhold` are left out and named in `withheld`. Any other value is refused with 400. |
 | `GET /audit` | The hash-chained write ledger. |
 | `GET /openapi.json` | The machine-readable contract. |
+
+*Measured 2026-10-15 at eeb2f18 against `server.py`; the rows above are left as
+written. Two of them were true when written (838553e, 2026-08-29) and changed
+later that same day, and one route is missing:*
+
+- `/search` asks the full-text index when the SQLite build has FTS5, which
+  this one has, and that matches whole words (since c648173). Substring recall
+  happens only on the fallback paths: no FTS5, a full-text query that raises
+  an error (`index_db.py` then runs a LIKE match), or an index that fails
+  (`memory_store.py` then scans the files). On a throwaway store whose memory
+  read "vermilion", `q=vermilion` found it and `q=ermilio`, `q=ermil` and
+  `q=vermil` found nothing; on each of the three fallback paths, forced in
+  turn, all four found it.
+- `/recall` counts a use for the top three results, not every result
+  (`TOUCH_PER_RECALL = 3`, since 30eefd5).
+- `GET /mycelium?name=` has existed since a219f25. It returns the edge layer's
+  stats, its fingerprint (added in cdd4d2d) and the neighbours of `name`. It is
+  not in this table, in `/openapi.json`, or in `/health`'s route list, so an
+  agent that learns the API from `/openapi.json` does not find it.
 
 ```bash
 curl -X PUT localhost:8000/memories/user-prefers-outcomes \

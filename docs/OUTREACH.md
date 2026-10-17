@@ -159,6 +159,12 @@ For a forum, a mailing list, or anyone who asks what you have been doing.
 > Write-up, including two of my own claims that did not survive checking:
 > github.com/LAWLESS1987/covenant → docs/WHAT_WE_FOUND.md
 
+*FRONT-TWO-CLAIMS, 2026-10-15: the last line of this draft is wrong about whose
+claims they were: section 7 of WHAT_WE_FOUND holds two claims that did not survive,
+and only one of them was the author's. The other was a model's account of its own
+transcript, which contradicted his memory; reading the transcript upheld him.
+Correct it before any reuse of the draft.*
+
 ---
 
 ## Before you send

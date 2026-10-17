@@ -143,6 +143,7 @@ SUITES = [
     # It also pins the two wrong versions that shipped before it, both caught
     # by these tests. 23/23 before wiring.
     ("test_s1_scale.py",                 120,  "SECURITY"),
+    # (FRONT-SHORTLIST: not a shortlist -- that year's winners of two awards.)
     # N1 (2026-08-30). From the 2025 Misha Mahowald Prize shortlist, read for
     # what it implies rather than what it builds: Pedersen's Neuromorphic
     # Intermediate Representation stops comparing IMPLEMENTATIONS and compares

@@ -8,6 +8,8 @@ WHERE THIS CAME FROM
 
   The 2025 Misha Mahowald Prize shortlist, read for what it implies rather than
   for what it builds. Three works, and one idea underneath all of them:
+  (FRONT-SHORTLIST, 2026-10-15: not a shortlist -- the three were that year's
+  winners of the Mahowald Prize and of the Mahowald Early Career Award.)
 
     * Jens Egholm Pedersen (DTU), Neuromorphic Intermediate Representation --
       a standardised set of computational primitives so a model defined once

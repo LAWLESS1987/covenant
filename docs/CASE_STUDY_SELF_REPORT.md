@@ -22,6 +22,11 @@ constitution whose one rule is mutual benefit for people and machines, and a tes
 that catches its own lies. Two of my own claims did not survive checking and are
 written out in [What we found](WHAT_WE_FOUND.md), section 7.
 
+*(FRONT-TWO-CLAIMS, 2026-10-15: section 7 of WHAT_WE_FOUND holds two claims that did
+not survive, and only one of them was the author's. The other was a model's account
+of its own transcript, which contradicted his memory; reading the transcript upheld
+him.)*
+
 ## The protocol
 
 On 2026-09-03 I put one message, unchanged, to five readers in fresh chats with no

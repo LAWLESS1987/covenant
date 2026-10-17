@@ -214,6 +214,13 @@ computation. The 2025 Misha Mahowald Prize shortlist is credited in the
 repository, because taking an idea without saying where it came from is the
 thing this project is against.
 
+*FRONT-SHORTLIST, 2026-10-15: not a shortlist. The awarding body's page Prizes 2025
+(mahowaldmeadprize.org, 27 January 2025) names this work, the Neuromorphic
+Intermediate Representation, as one of two projects awarded the 2025 Mahowald Early
+Career Award equally; the 2025 Misha Mahowald Prize itself went to a different team.
+The same site's Jury & Evaluation page says that only the winner is announced.
+Correct this paragraph before any reuse of the draft.*
+
 **What it is not.** Not a governance system ready for use. One operator holds
 every key; amendment by quorum is an intention, not a mechanism; seven of the fifteen defects in an
 earlier audit are still unverified; the verifier runs on the machine it verifies, so tampering

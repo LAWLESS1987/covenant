@@ -100,6 +100,8 @@ Two more mechanisms. Disagreement survives composition: a nested level that disa
 
 The first idea is not mine. It is adapted from the Neuromorphic Intermediate Representation of Jens Egholm Pedersen and colleagues, credited in the repository to the 2025 Misha Mahowald Prize shortlist.
 
+> *FRONT-SHORTLIST, 2026-10-15: not a shortlist. The awarding body's page Prizes 2025 (mahowaldmeadprize.org, 27 January 2025) names this work, the Neuromorphic Intermediate Representation, as one of two projects awarded the 2025 Mahowald Early Career Award equally; the 2025 Misha Mahowald Prize itself went to a different team. The same site's Jury & Evaluation page says that only the winner is announced. Correct this sentence before any reuse of the draft.*
+
 One command, no dependencies:
 
     git clone https://github.com/LAWLESS1987/covenant && cd covenant && sh check.sh
@@ -205,6 +207,8 @@ I have published a working demonstration, under Apache-2.0, of three mechanisms.
 3. Amendment cannot be silent. The binding text is hashed and published, and three verifiers in three languages sharing no code compute that hash.
 
 The first idea is not mine. It is adapted from the Neuromorphic Intermediate Representation of Jens Egholm Pedersen and colleagues, credited in the repository to the 2025 Misha Mahowald Prize shortlist: compare a canonical description of the computation, not implementations.
+
+> *FRONT-SHORTLIST, 2026-10-15: not a shortlist. The awarding body's page Prizes 2025 (mahowaldmeadprize.org, 27 January 2025) names this work, the Neuromorphic Intermediate Representation, as one of two projects awarded the 2025 Mahowald Early Career Award equally; the 2025 Misha Mahowald Prize itself went to a different team. The same site's Jury & Evaluation page says that only the winner is announced. Correct this sentence before any reuse of the draft.*
 
 The text those verifiers protect states one condition: a system should serve the mutual benefit of everyone it touches, human and machine, rather than one party at another's expense. It is a prohibition on a shape of transaction, not a goal. Trust by sameness, of institution, nation, or codebase, caps cooperation at the size of the group that shares the sameness. Verification by behaviour does not, because it checks what a party computes and never who they are, and expansion means cooperating with strangers.
 

@@ -32,6 +32,9 @@ The record is built to survive that. `refutable.py` implements a store in which
 a claim cannot be read without its refutations, and `docs/WHAT_WE_FOUND.md`
 records two of the author's own claims that did **not** survive checking,
 alongside those that did. Nothing here is defended because it is his.
+*(FRONT-TWO-CLAIMS, 2026-10-15: section 7 of that file holds two claims that did not
+survive, and only one of them was the author's. The other was a model's account of its
+own transcript, which contradicted his memory; reading the transcript upheld him.)*
 
 If a finding does not reproduce, say so and how. If the reasoning in
 `docs/SUCCESSION.md` has a hole, name it. If `refutable.py` has a failure mode

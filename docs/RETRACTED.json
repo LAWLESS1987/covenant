@@ -1600,6 +1600,83 @@
    ],
    "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
    "note_on_allow": "As written at 21025b2 and earlier (git show 21025b2:test_a284_fresh_context.py) and quoted in A350 (docs/KNOWN_ISSUES.md)."
+  },
+  {
+   "id": "FRONT-TWO-CLAIMS",
+   "claim": "README, CONTRIBUTING, CASE_STUDY_SELF_REPORT, CORRECTIONS and OUTREACH: the two claims that did not survive checking in WHAT_WE_FOUND section 7 were both the author's own.",
+   "refuted_by": "README audit 2026-10-15 (A354), reading WHAT_WE_FOUND section 7: of its two claims that did not survive, one was the author's. The other was a model's account of its own transcript, which contradicted his memory; reading the transcript upheld him. Section 7 has said so since it was published.",
+   "truth": "Section 7 holds two claims that did not survive checking; one was the author's, the other a model's account of its own transcript, refuted in his favour.",
+   "verbatim": [
+    "records two of the author's own claims that did **not** survive checking,",
+    "Two further claims of the author's that did not survive checking are written out in [What we found](docs/WHAT_WE_FOUND.md), section 7.",
+    "Two claims of the author's that did **not** survive checking are recorded alongside those that did.",
+    "This project keeps its own failed claims — two of the author's that did not survive checking are written out in",
+    "Two of my own claims did not survive checking and are written out in [What we found](WHAT_WE_FOUND.md), section 7.",
+    "Write-up, including two of my own claims that did not survive checking:"
+   ],
+   "patterns": [
+    "two\\s+of\\s+the\\s+author's\\s+own\\s+claims\\s+that\\s+did",
+    "two\\s+further\\s+claims\\s+of\\s+the\\s+author's\\s+that\\s+did\\s+not\\s+survive",
+    "two\\s+claims\\s+of\\s+the\\s+author's\\s+that\\s+did",
+    "two\\s+of\\s+the\\s+author's\\s+that\\s+did\\s+not\\s+survive",
+    "two\\s+of\\s+my\\s+own\\s+claims\\s+(that\\s+)?did\\s+not\\s+survive"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written at 4f23fb3 and earlier, in the six files named; each keeps its sentence with a dated FRONT-TWO-CLAIMS note beside it (A354)."
+  },
+  {
+   "id": "FRONT-TEST-FILES",
+   "claim": "README: there are more test files on disk than either runner figure, and the extras are .PRE-* snapshots.",
+   "refuted_by": "README audit 2026-10-15 (A354): written 2026-09-17 (261de87) about the operator's disk. The .PRE-* snapshots are gitignored (.gitignore line 29, since the first commit), so a clone has none; on a clone every tracked test_*.py is registered, in the sweep, in place, or switched off on the record.",
+   "truth": "True of the machine it was written on, never of a clone. The runner's figures count suites, not test files.",
+   "verbatim": [
+    "There are more test files on disk than either number, and the extras are `.PRE-*` snapshots kept deliberately *because* they fail"
+   ],
+   "patterns": [
+    "more\\s+test\\s+files\\s+on\\s+disk\\s+than\\s+either\\s+number"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written at 4f23fb3 and earlier (README.md, the suite-count paragraph), kept with a dated FRONT-TEST-FILES note (A354)."
+  },
+  {
+   "id": "FRONT-SHORTLIST",
+   "claim": "README, OUTREACH drafts and three code comments: the work credited is from 'the 2025 Misha Mahowald Prize shortlist'.",
+   "refuted_by": "README audit 2026-10-15 (A354): the awarding body's page Prizes 2025 (mahowaldmeadprize.org, 27 January 2025) names the three as that year's winners of two awards, the Misha Mahowald Prize (one team) and the Mahowald Early Career Award (shared by two); its Jury & Evaluation page says only the winner is announced. There is no published shortlist.",
+   "truth": "The three works credited were the 2025 winners of the Misha Mahowald Prize and of the Mahowald Early Career Award, not a shortlist of one prize.",
+   "verbatim": [
+    "### A debt to the Mahowald Prize shortlist",
+    "The 2025 Misha Mahowald Prize shortlist was read here for what it implies, not for what it builds",
+    "credited in the repository to the 2025 Misha Mahowald Prize shortlist"
+   ],
+   "patterns": [
+    "Mahowald\\s+Prize\\s+shortlist"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written at 4f23fb3 and earlier, in README.md, docs/OUTREACH_COMPILED.md, docs/OUTREACH_US_IL.md, conformance.py, covenant_one.py and test_n1_conformance.py; each now cites FRONT-SHORTLIST beside it (A354)."
   }
  ]
 }

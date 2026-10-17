@@ -2,7 +2,7 @@
 """test_n1_conformance.py -- N1: compare the computation, not the artefact.
 
 WHERE THIS CAME FROM. The 2025 Misha Mahowald Prize shortlist, read for what it
-implies. Pedersen's Neuromorphic Intermediate Representation stops comparing
+implies. (FRONT-SHORTLIST, 2026-10-15: not a shortlist -- that year's winners of two awards.) Pedersen's Neuromorphic Intermediate Representation stops comparing
 IMPLEMENTATIONS and compares a canonical description of the COMPUTATION.
 Iskarous's tactile work keeps the identity of a texture while discarding force
 and speed. Camsari's p-bits reach agreement asynchronously, with no clock and no

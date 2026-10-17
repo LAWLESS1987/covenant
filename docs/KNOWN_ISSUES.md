@@ -7660,9 +7660,42 @@ A280, which is the road telling the truth about it.
 
 ---
 
-### A354. [IN FLIGHT 2026-10-15: the READMEs checked claim by claim and corrected, and the Confidence Trap's second overstatement ("consistently", narrowed to "sometimes" in the thread on 2026-10-10) tombstoned beside A236's "deliberately"] 2026-10-15. His words: "ENSURE ALL CORRESPONDING READMES ARE CORRECT AND ANY OF OUR HUGGING FACE FORUMS APPLICABLE PUT ON OUR WEBSITE, ALSO MAKE A NEW FORUM ON THE FLINCH".
+### A354. [This repository's READMEs checked claim by claim on 2026-10-15 and corrected beside the original wording on 2026-10-16. Three claims that were false when written are now tombstones: FRONT-TWO-CLAIMS, FRONT-TEST-FILES and FRONT-SHORTLIST. The other repositories, the website and the Confidence Trap's "consistently" are not landed here] 2026-10-15/16. His words: "ENSURE ALL CORRESPONDING READMES ARE CORRECT AND ANY OF OUR HUGGING FACE FORUMS APPLICABLE PUT ON OUR WEBSITE, ALSO MAKE A NEW FORUM ON THE FLINCH".
 
-- **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.
+- **How it was checked.** On 2026-10-15, at eeb2f18, every claim in the front documents and four sub-READMEs was audited against the code, git history and the named outside pages, and patches were drafted. Each original sentence is kept, with a dated note beside it. On 2026-10-16 the patches were re-read line by line and re-checked against today's tree before landing:
+  - `realdata/deep/` holds 15 series;
+  - `HBAR_c.csv` has 419 rows and `WLFI_c.csv` 110;
+  - `memory_store.py:703` is the `_atomic_write` call;
+  - `server.py:475` is the SUPERSEDE branch;
+  - `TOUCH_PER_RECALL = 3`;
+  - no commit has touched `ai_memory_system/`, `realdata/`, `conformance_indep/` or `sentinel_witness/` since 900a257.
+- **Front documents** (README, CONTRIBUTING, CASE_STUDY_SELF_REPORT, CORRECTIONS, OUTREACH, OUTREACH_COMPILED, OUTREACH_US_IL, OUTREACH_INSTITUTIONAL):
+  - **FRONT-TWO-CLAIMS, false when written.** WHAT_WE_FOUND section 7's two claims that did not survive were not both the author's. One was a model's account of its own transcript, refuted in his favour. Restated in six places.
+  - **FRONT-TEST-FILES, false of every clone.** The extra test files are gitignored `.PRE-*` snapshots that exist only on his disk.
+  - **FRONT-SHORTLIST, false when written.** There is no published shortlist. The awarding body's own page names the three works as that year's winners of two awards. Restated in three code comments too, which now cite the id.
+  - **FRONT-QUORUM-FILE, stale.** True when written; the policy file left the repository in 11f22a8.
+- **Sub-READMEs:** dated notes, each measured, in `ai_memory_system/`, `conformance_indep/`, `realdata/` and `sentinel_witness/`.
+  - AIMEM-CITE: line numbers that did not point at the code.
+  - AIMEM-WHY: the ledger keeps a digest of the reason, not the reason.
+  - CONF-BOTH, CONF-SORTED, CONF-SIZES.
+  - REALDATA-TWELVE: fifteen series, not twelve.
+  - REALDATA-C220 and REALDATA-SHARPE20.
+  - The `sentinel_witness` "present" count: file names counted, not the modules described.
+  - These are dated notes only; they have no RETRACTED entry. Each names itself a proposed tombstone.
+- **Tombstones, driven both ways.** Three entries were added to `docs/RETRACTED.json`, and the earlier file is kept as `.trash/RETRACTED.json.before-A354-2026-10-16`.
+  - Green: R1 234/234 with every citation in place.
+  - Red: a probe in `docs/` restating all three without citation read 231/234, one violation per id.
+  - The probe was retired to `.trash/a354_probe.md.retired`.
+  - The first green run caught the three code comments uncited (3 violations). They were cited, and R1 then read 234/234.
+- **Totals.** The README's marked totals are rewritten by `readme_totals.py --write` from the newest full sweep transcript. The 10-15 patch's typed figures (5,808 checks, 2026-10-14) were not kept.
+  - Before: 176 suites and 4,804 checks, from 2026-10-05.
+  - Now: 195 suites, 5,860 checks, 0 failed: the full sweep of 2026-10-16 at 42b60f6, the A355 commit.
+  - That sweep's RESULT read FAIL on one in-place gate: bundle integrity, naming 12 changed files. Those were these README patches, applied while the sweep ran and uncommitted at that moment. Committing them regenerates the manifest.
+- **Not landed here, and why:**
+  - The collective's READMEs: another repository, with its own patch.
+  - The public flinch README: its "a hash of every rule and threshold" is false (`_SPLIT` is outside `_rules_hash`), and correcting a public repository is his to approve.
+  - The website READMEs and forum cards: his approval.
+  - The Confidence Trap's "consistently": not yet tombstoned. It is the next piece of this entry.
 
 ---
 

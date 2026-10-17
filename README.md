@@ -4,7 +4,7 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
-**v8.40** (label since 2026-08-29, 60 core changes ago) · source `ee4e0db9047d` · 12,813 lines · **176 suites, 4,804 checks, 0 failed** on win32, 2026-10-05 <!--TOTALS-->
+**v8.40** (label since 2026-08-29, 71 core changes ago) · source `08c05f7c537f` · 13,427 lines · **195 suites, 5,860 checks, 0 failed** on win32, 2026-10-16 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
 *[A262-VERSION: not the version -- it is copied; see the note under this paragraph]*
 the version, hash and line count from the core module itself, the suite and
@@ -123,7 +123,11 @@ misstep this project has made is indexed in one place:
 [Corrections and missteps](docs/CORRECTIONS.md)** — including the one that cost the most,
 when the author of the idea `conformance.py` was built on read it and refuted its central
 claim on 2026-09-15. Two further claims of the author's that did not survive checking are
-written out in [What we found](docs/WHAT_WE_FOUND.md), section 7. On 2026-09-03 the same
+written out in [What we found](docs/WHAT_WE_FOUND.md), section 7.
+*(FRONT-TWO-CLAIMS, 2026-10-15: two claims did not survive there, and only one was the
+author's. The other was a model's account of its own transcript, which contradicted his
+memory; reading the transcript upheld him. Section 7 has said so since it was published.)*
+On 2026-09-03 the same
 message was put to Grok, ChatGPT, Gemini, DeepSeek and the local judge; what came
 back, refutations included, and what changed because of it:
 [Roundtable](docs/ROUNDTABLE_2026-09-03.md). One of them cloned this repository and
@@ -173,6 +177,8 @@ memory retains your claims and discards their corrections), why demanding
 honesty produces compliance while supplying a checkable contradiction does not,
 and why fluency can never distinguish a sound claim from a generated one. Two
 claims of the author's that did **not** survive checking are recorded alongside those that did.
+*(FRONT-TWO-CLAIMS, 2026-10-15: one of the two was the author's. The other was a model's
+account of its own transcript, and the transcript upheld the author.)*
 
 No names, no personal data, nothing that requires trusting the author.
 
@@ -411,6 +417,17 @@ self-send from a key on the operator's own machine, where a judge that stayed
 silent stops counting as a judge that objected. One exception, in a file you can
 read, is the difference between a rule and a slogan.
 
+*FRONT-QUORUM-FILE, 2026-10-15: true when written (2026-09-09), not since 2026-09-11.*
+That file is the operator's own decision, and commit 11f22a8 took it out of the
+repository (`.gitignore` line 281), so a clone does not have it. With no policy file
+the gate applies no policy, and the exception is off: a judge that stays silent still
+counts as one that objected. What a clone gets instead is
+`ops/quorum_policy.example.json`, which the gate does not read. It describes the same
+exception (`relax_valueless_for_local_nodes`), and if you copy it into place it also
+leaves the exception off (`false`). On the operator's machine his own file sets it
+`true`. The one exception is his choice, and the file you can read is the question it
+answers, not his answer.
+
 I am not looking for users or contributors. **Allies.**
 
 One person selfless enough to run this node knowing it might be completely
@@ -451,6 +468,9 @@ trade badly described. Here is the honest other side, and none of it is money.
   [WHAT_WE_FOUND](docs/WHAT_WE_FOUND.md) §7. A refutation you bring is kept the
   same way, under your name, next to the claim it killed. Most projects publish
   the corrections that flatter them.
+  *(FRONT-TWO-CLAIMS, 2026-10-15: §7 holds two claims that did not survive, and one
+  of them was the author's. The other was a model's account of its own transcript,
+  which the transcript refuted in his favour.)*
 - **Standing that nobody else can have.** Right now every statement about what
   this is comes from one person who built it. You would be the only other human
   who can say what it does from inside, and your word about it would carry
@@ -533,6 +553,15 @@ must run in place, and it prints both figures every run. There are more test
 files on disk than either number, and the extras are `.PRE-*` snapshots kept
 deliberately *because* they fail — they are the "before" halves of fixes already
 landed, and running them outside the sweep produces failures that mean nothing.
+
+*FRONT-TEST-FILES, 2026-10-15: true of the machine it was written on, never of a
+clone.* The second sentence was written on 2026-09-17 (commit 261de87), and "on disk"
+meant the operator's disk, where the `.PRE-*` snapshots are. They are gitignored
+(`.gitignore` line 29, since the first commit), so a clone has none, and on a clone
+there are no extras: every tracked `test_*.py` is registered, in the sweep, in place,
+or switched off on the record. The runner's figures count suites, not test files, and
+a few registered suites are not `test_` files at all. Its orphan search skips the
+snapshots by name.
 
 And a green check count is not a green run: the sweep's verdict has read
 **`RESULT: FAIL`** with zero check failures, because it also counts in-place
@@ -685,7 +714,7 @@ The same work, and the person behind it, in the other places it lives:
 
 ## Suite coverage
 
-**176 suites · 4,804 checks · 0 failed**, win32, 2026-10-05 <!--TOTALS-->
+**195 suites · 5,860 checks · 0 failed**, win32, 2026-10-16 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.
@@ -792,6 +821,13 @@ missed all four that reach it through `covenant_xrp_mainnet`.
 The 2025 Misha Mahowald Prize shortlist was read here for what it implies, not
 for what it builds, and one idea runs under all three entries: **canonical
 meaning survives incidental form.**
+
+*FRONT-SHORTLIST, 2026-10-15: not a shortlist, and not one prize.* The awarding body's
+own page, *Prizes 2025* at mahowaldmeadprize.org (dated 27 January 2025), names these
+three as that year's winners of two awards: the Misha Mahowald Prize went to the OPUS
+team at UC Santa Barbara led by Kerem Y. Çamsarı, and the Mahowald Early Career Award
+was shared equally by Mark M. Iskarous and Jens Egholm Pedersen. The same site's
+*Jury & Evaluation* page says that only the winner is announced.
 
 - **Jens Egholm Pedersen** (DTU), *Neuromorphic Intermediate Representation* —
   stop comparing implementations, compare a canonical description of the
