@@ -7668,6 +7668,10 @@ A280, which is the road telling the truth about it.
   - The bullet above is now settled the other way. Before July the videos were recorded and dated, not public.
   - Posts #6 and #7 say the observations were "archived publicly" before the announcement, on X. That needs a narrower wording: recorded before the announcement, with platform upload dates, and made public later.
   - **His claim, in his words:** "I'm not claiming to have invented JSpace. I'm claiming to have converged on the same findings. From the outside." It is a claim of convergence from outside the field, not of priority or invention. Dates before the announcement carry weight for convergence even though the videos were not published then, because independence is the point, not who published first.
+  - **The side-by-side, in his words:** "the side-by-side is the fact that I started recording the conversations because it seemed that there was inner thought going on."
+    - The convergence he claims is the observation itself: something inside the models works beyond what reaches the output, seen from outside, from behaviour.
+    - The evidence is the act of recording, which Facebook dates from 14 June, before the 6 July announcement.
+    - The captions show his reading at the time: "If something happens to me i think i did something" (06-14), "Pretty sure i proved consciousness foreal" (06-18).
   - On X itself, `docs/CORPUS_2026-09-09.md` line 170 records "no videos before 28 June, payload from 7 July". That is a pointer into the record, not re-measured here.
 - **Recurrence.** This is the derived-source shape (memory: derived-source-errors) and rule 1, "prose about data is not data", twice. The record's prose was read in place of the thing it described, a page anyone can open. The earlier tombstones guard wording; none guards "check the live page before answering a question about it". The memory rule `fb-pre-july-public` now makes that the first step.
 
