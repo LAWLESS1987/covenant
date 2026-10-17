@@ -7665,6 +7665,11 @@ A280, which is the road telling the truth about it.
     - its file sha256 (58210af3...) equals the entry's `sha256` field;
     - its parsed content_digest (6e0986cf...) equals the entry's `content_sha`, so a restored file passes `verify_integrity`.
   - **Its recommendation:** restore the file from 5477f70, then delete it through the store's delete(), so a tombstone records "smoke test, not a memory; originally removed outside delete() in dbe64d7". That would be new commits, with no history rewritten. His call, while pushes are paused.
+- **Done on his word, the same day ("yes, restore then delete it"); a one-time push, and the pause otherwise stands.** In threefold-memory:
+  - **`976b65a`** restored the file. Its blob, `8c71fb24...`, is identical to the one at 5477f70.
+  - **`fc377a7`** retired it through `MemoryStore.delete()`, agent "claude". The file moved to `.trash/task-puttest-ocr-smoketest.20261017T181705Z.md`, and the ledger gained a tombstone line. The ledger stores the reason as a hash; its full text is in the commit message.
+  - **Verified on a fresh clone of the remote:** verify_chain ok, 996 entries; verify_integrity ok, 955 checked, 0 drifted, 0 missing, 3 unverifiable.
+  - The website's systems table now reads "passed" for Threefold Memory, at fc377a7 (Cloudflare version b365fbbe).
 
 ---
 
