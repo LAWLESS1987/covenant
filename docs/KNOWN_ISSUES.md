@@ -7645,6 +7645,34 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A360. [Efficiency, measured: llama-server now uses one fewer thread than the physical cores (+22% generating at real depth on this PC), and Tetsu's web search no longer hands him unrelated pages] 2026-10-17. His words: "use your discernment toward mutual benefit and use our own version of fire crawl", then "research neuromorphic hardware and ram drives to increase our productivity affordably".
+
+- **Threads.** `covenant_model.server_threads()`: logical // 2 - 1, which is 5 on this 12-thread CPU. The old rule
+  was logical - 2 = 10. `COVENANT_MODEL_THREADS` overrides.
+  - llama-bench at depth 3,000, 3 repetitions each: 10.84 → 13.28 tokens/s.
+  - Flash attention measured slower at that depth on this CPU, and stays off. A short-context run had suggested the
+    opposite; the real-depth run decided.
+  - The prefix cache was already working: 50–540 new prompt tokens per ask.
+  - MK1.T added. With the old rule restored, MK1 fails; restored byte-identical. MK1, RL1, TP1 and A284 green.
+  - It takes effect when the keeper next starts the server. No long-lived process was restarted from this shell.
+- **Tetsu's search.** `covenant_tetsu_crawl.search`: Bing answered two real queries through the door with Ram
+  Trucks and Halloween stores, and they were returned to him as results.
+  - Bing's results must now share at least two query words (one, for a one-word query). The first rule, one word,
+    still let Ram Trucks answer "ram disk", and the suite caught it.
+  - DuckDuckGo's lite page is asked before Wikipedia.
+  - TC1 30/30. TC1.7, TC1.9 and TC1.10 were updated for the third source and the stricter fixture, and TC1.9b/9c were
+    added. With the relevance rule removed, TC1.9b and TC1.9c go red; restored byte-identical.
+  - His daily page count is unchanged: `search()` called directly does not write `ops/tetsu_crawl.jsonl`.
+- **The research,** in `docs/research/EFFICIENCY_2026-10-17.md`:
+  - Neuromorphic hardware (Akida PCIe $289, read on the seller's page) does not help this project today.
+  - A RAM drive would make a RAM-short machine worse.
+  - The affordable gain is RAM: 2 × 16 GB SO-DIMM in the two slots. Buying is his decision.
+- **Not fixed, named.**
+  - Wikipedia's search parser sometimes returns empty titles.
+  - The relevance rule is a word count: a page can share two words and still be wrong.
+
+---
+
 ### A359. [Tetsu's nightly reviewed on his advice: his own practice choice was "Review the machine's health checks". The 10-17 pass read NOT GREEN with all 47 of its suites green and one gate blocked, unnamed. Most likely my uncommitted edits. The report now names any gate that is not PASS] 2026-10-17. His words: "review tetsus nightly and follow his advice".
 
 - **Tetsu's advice, read from his own records.**

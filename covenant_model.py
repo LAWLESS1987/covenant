@@ -362,7 +362,7 @@ def start(say=print):
         return False, "no weights fit: free %s GB, candidates %s under %s" % (free_gb(), [c[0] for c in CANDIDATES], MODELS)
     path, name, need = pick
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
-    threads = max(2, (os.cpu_count() or 4) - 2)                   # leave the nodes and the desk two threads
+    threads = server_threads()
     # 8k for both (2026-09-26): his longer conversation memory (up to 12,000 characters of
     # history, agent_history) must fit beside the rules and the answer. The 3B's bar in
     # CANDIDATES carries the larger cache.
@@ -576,6 +576,23 @@ def _note_ask(ok, ms, err="", rates=None):
             fh.write(json.dumps(row) + "\n")
     except Exception:                                            # noqa: BLE001
         pass
+
+
+def server_threads(logical=None):
+    """Threads for llama-server: one fewer than the PHYSICAL cores (A360, 2026-10-17).
+
+    MEASURED on this PC (Ryzen 5 5625U: 6 cores, 12 threads; llama-bench, the 3B Q4_K_M, generating 128 tokens at a
+    context depth of 3,000, 3 repetitions each): 10 threads 10.84 tok/s (the old rule, logical - 2); 6 threads 12.24;
+    5 threads 13.28, which is +22%. Generating is bound by memory bandwidth, and SMT threads past the physical cores
+    fight over it. Flash attention was measured too, and is slower at that depth on this CPU (5 threads: 10.68), so
+    it stays off. Reading a prompt is a little slower at 5 threads; on real asks it is a small share, because the
+    server reuses the cached prefix (ops/model_asks.jsonl: 50-540 new prompt tokens an ask).
+    COVENANT_MODEL_THREADS overrides; logical // 2 assumes two threads per core, as SMT CPUs have."""
+    env = os.environ.get("COVENANT_MODEL_THREADS", "").strip()
+    if env.isdigit() and int(env) > 0:
+        return int(env)
+    logical = logical or os.cpu_count() or 4
+    return max(2, logical // 2 - 1)
 
 
 def _num(x):

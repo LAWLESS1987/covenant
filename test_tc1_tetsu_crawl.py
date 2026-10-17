@@ -77,28 +77,48 @@ def main():
         # --- search: Bing's wrapped links unwrapped; snippet kept; fallback only when empty
         real = "https://example.org/page?a=1"
         wrapped = "https://www.bing.com/ck/a?!&&p=x&u=a1" + base64.urlsafe_b64encode(real.encode()).decode().rstrip("=") + "&ntb=1"
-        bing = ('<ol><li class="b_algo"><h2><a href="%s">Example <b>Page</b></a></h2><div><p>A snippet &amp; more.</p></div></li>'
-                '<li class="b_algo"><h2><a href="https://plain.test/p">Plain</a></h2><p>Second</p></li></ol>' % wrapped)
+        bing = ('<ol><li class="b_algo"><h2><a href="%s">Example <b>Page</b></a></h2><div><p>A query snippet &amp; more.</p></div></li>'
+                '<li class="b_algo"><h2><a href="https://plain.test/p">Plain example</a></h2><p>Second query result</p></li></ol>' % wrapped)
         log = []
         rd = mkread({"https://www.bing.com/search?q=example+query&setlang=en&count=10": (bing, None)}, log)
         res, note, fetched = C.search("example query", read=rd)
         check("TC1.7 search parses two results, unwraps the ck/a link, strips tags, keeps the snippet",
-              len(res) == 2 and res[0]["url"] == real and res[0]["title"] == "Example Page" and res[0]["snippet"] == "A snippet & more."
+              len(res) == 2 and res[0]["url"] == real and res[0]["title"] == "Example Page" and res[0]["snippet"] == "A query snippet & more."
               and res[1]["url"] == "https://plain.test/p", (res, note))
         check("TC1.8 with results from bing, wikipedia is never asked", fetched == 1 and len(log) == 1 and "wikipedia" not in log[0], log)
         wiki = ('<ul><li class="mw-search-result"><div class="mw-search-result-heading"><a href="/wiki/Thing" title="Thing">Thing</a></div>'
                 '<div class="searchresult">About <b>things</b></div></li></ul>')
         log = []
         rd = mkread({"https://www.bing.com/search?q=nothing+here&setlang=en&count=10": ("<html>no algo blocks</html>", None),
+                     "https://lite.duckduckgo.com/lite/?q=nothing+here": ("<html>no results</html>", None),
                      "https://en.wikipedia.org/w/index.php?search=nothing+here&fulltext=1&ns0=1": (wiki, None)}, log)
         res, note, fetched = C.search("nothing here", read=rd)
-        check("TC1.9 bing empty -> wikipedia's search parsed, both asks counted",
-              len(res) == 1 and res[0]["url"] == "https://en.wikipedia.org/wiki/Thing" and res[0]["snippet"] == "About things" and fetched == 2, (res, note, log))
+        check("TC1.9 bing empty and duckduckgo lite empty -> wikipedia's search parsed, all three asks counted (A360)",
+              len(res) == 1 and res[0]["url"] == "https://en.wikipedia.org/wiki/Thing" and res[0]["snippet"] == "About things" and fetched == 3, (res, note, log))
+        # A360 (2026-10-17): Bing's results that share no query word are dropped, and DuckDuckGo lite is asked next
+        junk = ('<ol><li class="b_algo"><h2><a href="https://www.ramtrucks.com/">Ram Trucks | Build &amp; Price</a></h2>'
+                '<p>Towing and engines</p></li></ol>')
+        ddg = ('<table><tr><td><a rel="nofollow" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2FLTRData%2FImDisk&amp;rut=x" '
+               "class='result-link'>ImDisk RAM disk driver</a></td></tr>"
+               "<tr><td class='result-snippet'>Virtual <b>disk</b> driver for Windows</td></tr></table>")
+        log = []
+        rd = mkread({"https://www.bing.com/search?q=ram+disk+windows&setlang=en&count=10": (junk, None),
+                     "https://lite.duckduckgo.com/lite/?q=ram+disk+windows": (ddg, None)}, log)
+        res, note, fetched = C.search("ram disk windows", read=rd)
+        check("TC1.9b bing's results sharing no query word are dropped, said so, and duckduckgo lite's result is parsed "
+              "(uddg unwrapped) instead; wikipedia not asked",
+              len(res) == 1 and res[0]["url"] == "https://github.com/LTRData/ImDisk" and "none sharing a query word" in note
+              and fetched == 2 and not any("wikipedia" in u for u in log), (res, note, log))
+        mixed = C._relevant([{"title": "Ram Trucks", "snippet": "", "url": "https://ramtrucks.com"},
+                             {"title": "RAM disk guide", "snippet": "", "url": "https://x.test"}], "ram disk windows")
+        check("TC1.9c two shared query words are needed (one for a one-word query): 'Ram Trucks' shares only 'ram' with "
+              "'ram disk windows' and is dropped; 'RAM disk guide' shares two and is kept",
+              [m["title"] for m in mixed] == ["RAM disk guide"] and len(C._relevant([{"title": "Disk", "snippet": "", "url": ""}], "disk")) == 1, mixed)
         log = []
         rd = mkread({}, log)
         h, data, rec = C.act("WEB SEARCH anything", read=rd, **kw)
-        check("TC1.10 both sources refused -> handled, the reasons in the data, no raise, results 0",
-              h and "refused" in data and "(no results)" in data and rec["results"] == 0 and rec["pages"] == 2, data[:200])
+        check("TC1.10 all three sources refused -> handled, the reasons in the data, no raise, results 0",
+              h and "refused" in data and "(no results)" in data and rec["results"] == 0 and rec["pages"] == 3, data[:200])
 
         # --- crawl: same host only, no duplicates, binaries skipped, bounded
         site = {

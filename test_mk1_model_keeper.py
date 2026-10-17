@@ -503,6 +503,20 @@ def main():
     check("MK1g the candidates are listed largest first%s" % ("; every weight file is on this tree" if have else " (no weights here: the staged runner)"),
           M.CANDIDATES[0][1] > M.CANDIDATES[-1][1] and (not have or all(os.path.isfile(os.path.join(M.MODELS, n)) for n, _ in M.CANDIDATES)))
 
+    # A360 (2026-10-17): llama-server gets one fewer thread than the physical cores, measured +22% generating at real
+    # depth on this PC against the old logical-minus-two; an override wins; never fewer than 2.
+    saved = os.environ.pop("COVENANT_MODEL_THREADS", None)
+    try:
+        t12, t4, t2 = M.server_threads(12), M.server_threads(4), M.server_threads(2)
+        os.environ["COVENANT_MODEL_THREADS"] = "7"
+        t_env = M.server_threads(12)
+    finally:
+        os.environ.pop("COVENANT_MODEL_THREADS", None)
+        if saved is not None:
+            os.environ["COVENANT_MODEL_THREADS"] = saved
+    check("MK1.T threads: 12 logical -> 5 (not the old 10), 4 -> 2, 2 -> 2 (the floor), and COVENANT_MODEL_THREADS=7 -> 7",
+          (t12, t4, t2, t_env) == (5, 2, 2, 7), (t12, t4, t2, t_env))
+
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:

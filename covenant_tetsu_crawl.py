@@ -152,6 +152,49 @@ def _bing_results(page_html, n=RESULTS):
     return out
 
 
+_STOP = {"the", "and", "for", "with", "from", "that", "this", "what", "how", "are", "was", "who", "why", "when", "where",
+         "which", "into", "about", "your", "you", "our", "its", "can", "not", "all", "any", "but", "has", "have", "free"}
+
+
+def _words(s):
+    return {w for w in re.findall(r"[a-z0-9]{3,}", (s or "").lower()) if w not in _STOP}
+
+
+def _relevant(results, query):
+    """Results sharing at least two query words (one, for a one-word query) in title, snippet or address (A360, 2026-10-17). Measured that day
+    through this door: Bing answered 'RAM disk software Windows' with Ram Trucks and 'neuromorphic hardware
+    development kit' with Halloween stores, and this module handed them to him as results. A word test is crude
+    (a page can share a word and still be wrong), but a page sharing none is not an answer to the query."""
+    want = _words(query)
+    if not want:
+        return list(results)
+    need = min(2, len(want))    # one shared word let 'Ram Trucks' answer 'RAM disk software Windows' (it shares 'ram')
+    return [r for r in results
+            if len(want & _words(" ".join((r.get("title", ""), r.get("snippet", ""), r.get("url", ""))))) >= need]
+
+
+def _ddg_results(page_html, n=RESULTS):
+    """DuckDuckGo's lite page: result-link anchors whose href wraps the address as uddg=; snippets in result-snippet."""
+    out, seen = [], set()
+    h = page_html or ""
+    links = re.findall(r"""(?is)<a[^>]*?href\s*=\s*["']([^"']+)["'][^>]*class\s*=\s*['"]result-link['"][^>]*>(.*?)</a>""", h) or \
+        re.findall(r"""(?is)<a[^>]*class\s*=\s*['"]result-link['"][^>]*href\s*=\s*["']([^"']+)["'][^>]*>(.*?)</a>""", h)
+    snips = re.findall(r"""(?is)<td[^>]*class\s*=\s*['"]result-snippet['"][^>]*>(.*?)</td>""", h)
+    for i, (href, title) in enumerate(links):
+        href = _html.unescape(href)
+        m = re.search(r"uddg=([^&]+)", href)
+        url = urllib.parse.unquote(m.group(1)) if m else href
+        if url.startswith("//"):
+            url = "https:" + url
+        if not url.startswith("http") or url in seen:
+            continue
+        seen.add(url)
+        out.append({"url": url[:300], "title": _strip(title)[:160], "snippet": _strip(snips[i])[:SEARCH_CHARS] if i < len(snips) else ""})
+        if len(out) >= n:
+            break
+    return out
+
+
 def _wiki_results(page_html, n=RESULTS):
     out = []
     for block in re.findall(r"(?is)<li class=\"mw-search-result[^\"]*\".*?</li>", page_html or ""):
@@ -174,12 +217,24 @@ def search(query, read=None, n=RESULTS):
     r = read("https://www.bing.com/search?q=%s&setlang=en&count=10" % q, max_chars=PAGE_CHARS, keep_html=True)
     fetched += 1
     if r.get("ok"):
-        res = _bing_results(r.get("html", ""), n)
+        raw = _bing_results(r.get("html", ""), n)
+        res = _relevant(raw, query)
         if res:
-            return res, "%d results from bing" % len(res), fetched
-        note = "bing answered with no results"
+            return res, "%d results from bing%s" % (len(res), "" if len(res) == len(raw) else
+                                                    " (%d dropped: no query word)" % (len(raw) - len(res))), fetched
+        note = ("bing answered with %d result(s), none sharing a query word" % len(raw)) if raw else "bing answered with no results"
     else:
         note = "bing refused: %s" % r.get("reason")
+    # A360: DuckDuckGo's lite page answered through this door on 2026-10-17 with relevant results where Bing did not
+    rd = read("https://lite.duckduckgo.com/lite/?q=%s" % q, max_chars=PAGE_CHARS, keep_html=True)
+    fetched += 1
+    if rd.get("ok"):
+        res = _relevant(_ddg_results(rd.get("html", ""), n), query)
+        if res:
+            return res, "%s; %d results from duckduckgo lite" % (note, len(res)), fetched
+        note += "; duckduckgo lite gave nothing relevant"
+    else:
+        note += "; duckduckgo lite refused: %s" % rd.get("reason")
     r2 = read("https://en.wikipedia.org/w/index.php?search=%s&fulltext=1&ns0=1" % q, max_chars=PAGE_CHARS, keep_html=True)
     fetched += 1
     if r2.get("ok"):
