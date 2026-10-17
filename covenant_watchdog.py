@@ -299,6 +299,111 @@ def push_alert(text, now=None, url=None, opener=None):
         return "failed", type(e).__name__
 
 
+# --------------------------------------------------------------------------
+# A367 (2026-10-17), his words: "yes turn alert push on". Pushing every rendered
+# ALERT line would send about 1,250 a day (the 09-30..10-17 logs replayed): a
+# number ticking in the text is a new line, and every standing condition rolls
+# up every 30 rounds. So what reaches his phone is a STATE CHANGE, not a line:
+#   * one identity per condition: "highway: sweep_red" however its remedy note
+#     reads; node lines by node and kind, with digits ignored;
+#   * a hold-down: told it started only after HOLD consecutive rounds present,
+#     told it cleared only after HOLD consecutive rounds absent, so a planned
+#     rolling restart (about 3 minutes) never reaches him and a real outage does;
+#   * the phone peer's heartbeat backoff is left out: the phone sleeping off the
+#     tailnet is normal, and phone_silent (3 h) is the alert for its absence.
+# Replayed over the same logs: about 25 episodes a day with the backoff line,
+# about 11 without it, and 5-7 on 10-16/10-17.
+# Delivery: the direct line (covenant_contact.say, A169) when ops/alert_push.json
+# says {"direct_line": true}; the POST URL above as before when it is set.
+# --------------------------------------------------------------------------
+PUSH_HOLD_ROUNDS = 3
+PUSH_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "alert_push.json")
+_PUSH_EXCLUDE = re.compile(r"peer\(s\) unreachable -- heartbeats backed off")
+
+
+def alert_identity(text):
+    """The condition a rendered alert line is about, so its wording can change without it being 'new'."""
+    t = re.sub(r"\s+\[unchanged, \d+ rounds\]$", "", str(text)).lower()
+    m = re.match(r"highway: ([a-z_]+) is present", t)
+    if m:
+        return "highway: " + m.group(1)
+    m = re.match(r"(node [a-z0-9]+): (.*)", t)
+    if m:
+        return m.group(1) + ": " + re.sub(r"\d+", "#", m.group(2))[:40]
+    return re.sub(r"\d+", "#", t)[:60]
+
+
+class PushGate:
+    """Turns each round's alert list into the few messages worth his phone: starts and clears, held down."""
+
+    def __init__(self, hold=PUSH_HOLD_ROUNDS):
+        self.hold = max(1, int(hold))
+        self._present = {}      # identity -> (consecutive rounds present, latest text)
+        self._absent = {}       # identity -> consecutive rounds absent (only for identities already told)
+        self._told = set()      # identities he has been told started
+
+    def observe(self, alerts):
+        """One round's alert texts in; the list of messages to send out."""
+        now = {}
+        for a in alerts:
+            if _PUSH_EXCLUDE.search(str(a)):
+                continue
+            now.setdefault(alert_identity(a), str(a))
+        out = []
+        for ident, text in now.items():
+            n = self._present.get(ident, (0, ""))[0] + 1
+            self._present[ident] = (n, text)
+            self._absent.pop(ident, None)
+            if n >= self.hold and ident not in self._told:
+                self._told.add(ident)
+                out.append("ALERT started: " + text)
+        for ident in [i for i in self._present if i not in now]:
+            self._present.pop(ident)
+        for ident in [i for i in self._told if i not in now]:
+            k = self._absent.get(ident, 0) + 1
+            self._absent[ident] = k
+            if k >= self.hold:
+                self._told.discard(ident)
+                self._absent.pop(ident, None)
+                out.append("CLEARED: " + ident)
+        return out
+
+
+def push_config(path=None):
+    try:
+        with open(path or PUSH_CONFIG, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        return cfg if isinstance(cfg, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def deliver(messages, cfg=None, say=None, post=None):
+    """Send each message by every channel that is on. Returns [(channel, action, detail)]. Never raises."""
+    cfg = push_config() if cfg is None else cfg
+    post = post or push_alert
+    results = []
+    for msg in messages:
+        if cfg.get("direct_line"):
+            try:
+                if say is None:
+                    import covenant_contact
+                    say_fn = covenant_contact.say
+                else:
+                    say_fn = say
+                row = say_fn(msg, "watchdog alert (A367)", "watchdog")
+                results.append(("direct_line", "sent" if row else "refused", ""))
+            except Exception as e:                      # noqa: BLE001 -- a channel never breaks a round
+                results.append(("direct_line", "failed", type(e).__name__))
+        action, detail = post(msg)
+        if action != "disabled":
+            results.append(("post", action, detail))
+    return results
+
+
+_push_gate = PushGate()
+
+
 def anomalies(port, timeout=8):
     """The node's own interoception. Until now only dashboard_render.py read it.
 
@@ -2053,17 +2158,23 @@ def one_pass(strict=False):
         rendered = _adapt_alert.observe(key, a)
         if rendered:
             log("ALERT", rendered)
-            action, detail = push_alert(rendered)
-            if action == "disabled" and not _push_state["announced"]:
-                _push_state["announced"] = True
-                log("INFO", "alert push is off (set COVENANT_ALERT_PUSH_URL "
-                            "to send surviving alerts to a phone)")
-            elif action == "failed":
-                log("INFO", f"alert push failed ({detail}) -- logged only")
-            elif action == "rate-limited" and not _push_state["clipped"]:
+    # A367: what reaches his phone is a held-down state change, not a log line.
+    _msgs = _push_gate.observe(alerts)
+    _cfg = push_config()
+    if not _cfg.get("direct_line") and not PUSH_URL:
+        if not _push_state["announced"]:
+            _push_state["announced"] = True
+            log("INFO", "alert push is off (ops/alert_push.json direct_line, or "
+                        "COVENANT_ALERT_PUSH_URL, sends condition starts and clears to a phone)")
+    elif _msgs:
+        for channel, action, detail in deliver(_msgs, _cfg):
+            if action == "sent":
+                continue
+            if action == "rate-limited" and _push_state["clipped"]:
+                continue
+            if action == "rate-limited":
                 _push_state["clipped"] = True
-                log("INFO", f"alert push rate limit hit ({detail}) -- further "
-                            f"alerts this hour are logged, not pushed")
+            log("INFO", f"alert push via {channel}: {action} ({detail}) -- logged only")
     for cleared in _adapt_alert.sweep(live):
         log("INFO", cleared)
     if not alerts:

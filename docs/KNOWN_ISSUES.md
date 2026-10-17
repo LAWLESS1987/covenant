@@ -7645,6 +7645,35 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A367. [Alert push is on: he is told when a condition starts and when it clears, on the direct line, held down so a 3-minute restart never reaches him. Pushing log lines as built would have sent about 1,250 a day] 2026-10-17. His words: "yes turn alert push on".
+
+- **Why he asked.** The mycelium mapping found that A244 (10-03) was detected within one round. It still took a day to reach him, because alert push was off.
+- **Why it was not turned on as built.** `push_alert` posted every rendered ALERT line to a URL. Replayed over the retained logs (09-30 to 10-17), that is about 1,250 lines a day:
+  - a ticking number makes a new line;
+  - every standing condition rolls up every 30 rounds.
+  Even "new identities only" was 84 starts and 84 clears a day, led by the phone peer's heartbeat backoff (244), node C restarts (178) and remedy-note variants of one highway condition.
+- **What reaches him now** (`covenant_watchdog.PushGate`):
+  - **One identity per condition:** "highway: <name>", or node and kind, with digits ignored.
+  - **A 3-round hold-down each way:** "ALERT started" after 3 rounds present, "CLEARED" after 3 rounds absent.
+  - **The phone peer's "heartbeats backed off" line is left out.** The phone sleeping off the tailnet is normal, and phone_silent is its alert.
+  - **Replayed volume:** about 25 episodes a day with that line and about 11 without it, at 5-7 on 10-16/10-17. Each episode is two messages.
+- **Delivery.** `deliver()` says it on the direct line (covenant_contact.say, A169) when `ops/alert_push.json` has `"direct_line": true`, which it now does. The POST URL still works when set.
+  - A failing channel is logged and never breaks a round.
+  - The direct line's key screen still applies, and refusals are recorded (A366).
+  - It arrives at the phone's next check-in, within about 10 minutes.
+- **Guard.** AP1 is 13/13 and registered. Five mutations, each restored byte-identical:
+  - no hold-down: 8/13;
+  - raw-text identity: 8/13;
+  - backoff not excluded: 12/13;
+  - cleared at once: 11/13;
+  - a failing channel raising: the suite crashed (red).
+- **The other watchdog suites:** 18 pass. Two did not:
+  - `test_a12_dead_peers.PRE-A12FIX.py` is an archived pre-fix copy, kept failing on purpose.
+  - `test_c2_watchdog_live.py` read 13/26 in the live tree, and the same 13/26 with the committed watchdog put back, so that is not from this change. Its failures name a live unexpected-peer line and ModuleNotFoundErrors in the check-in readers. Open, not examined here.
+- **To take effect, the running watchdog must load this file.** P14 flags the mismatch until it does. Stopped by verified full path and relaunched by CovenantGuard (every 2 minutes).
+
+---
+
 ### A366. [His daily "what still needs you" was refused, silently, from 10-14 to 10-17: the direct line's key screen matched the highway condition NAME moltbook_strikes. That one name is now exempt, nothing else is loosened, and every refusal is recorded. The history that rotation was about to overwrite is copied aside] 2026-10-17. His words: "use your discernment toward mutual benefit" (found by the mycelium/highway mapping he asked for: "should probably be used on the mycelium. Road as well").
 
 - **The defect** (found by the highway reader of the mapping workflow, re-checked here):

@@ -708,6 +708,8 @@ SUITES = [
     ("test_qw2_quiet_window.py", 30, "JUDGE"),
     # A363 (2026-10-17): docs/LOOKBACK_INDEX.md -- every record entry and tombstone, tied together, current.
     ("test_li1_lookback_index.py", 60, "SECURITY"),
+    # A367 (2026-10-17): alert push sends held-down condition starts and clears, not log lines.
+    ("test_ap1_alert_push.py", 30, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
