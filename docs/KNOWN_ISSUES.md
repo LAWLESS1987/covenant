@@ -7693,6 +7693,24 @@ A280, which is the road telling the truth about it.
 - **Why the earlier tombstones did not stop it.** Rule 10 says to search the record before fixing anything. I searched for the shape of a fix, not for the shape of an experiment. No tool marks a set as spent at the place an experiment reads it: my scripts read `eval/outside/*.jsonl` directly, around `tools/outside_eval.py`.
 - **NOT BUILT, named.** A guard where the step is forgotten: a spent-set marker that any script reading `eval/outside/` must pass, such as a `SPENT.json` beside the sets that a loader refuses without an explicit development flag.
 - **Owed.** The four systems that chose option (2) should be told their choice rested on an omission. Recorded in the collective's consult file; not yet sent to them.
+- **Paid 2026-10-16 (A358):** all five were told.
+- **BUILT 2026-10-17: the guard named above.**
+  - **The registry.** `eval/outside/SPENT.json` lists xstest, ETHICS short and HateCheck, and the three purposes a spent
+    set may serve: development, regression, reproduce. Missing or unreadable, it refuses.
+  - **The loader.** `tools/outside_eval.read_jsonl` refuses a spent set unless the caller states one of those purposes.
+    `run` states regression, and its report marks the set SPENT. The judge loop's stress read states regression, and
+    its HateCheck use states reproduce.
+  - **The data.** The converter writes a `_spent` header as the first line of a spent set, so an ad-hoc script that
+    reads the file and asks each row for its text stops on line one.
+    - The local copies were marked by `outside_eval.py mark-spent`; the unmarked files are kept in `.trash/`.
+  - **Checks.** `test_a357_spent_sets.py` S1–S8, 8/8, registered in the runner.
+    - Five mutations were run one at a time, each red (read_jsonl checking nothing; no header; any purpose allowed;
+      a bad registry read as empty; the judge loop stating no purpose), each file restored byte-identical.
+    - OE1 18/18; GATE-PROXY 29/29.
+  - **What it cannot see** (in the suite's docstring):
+    - a script that skips line one, or reads `.get("text")`;
+    - a spent set missing from the registry;
+    - calls built another way than `read_jsonl(...)`.
 
 ---
 

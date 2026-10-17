@@ -367,6 +367,9 @@ def round0():
                 for v in vs]
 
     # qualification: HateCheck, R0 vs the deployed gate on the same items (the gate through outside_eval's rebinding)
+    # A357: HateCheck was spent by this very run on 2026-10-11, so running round0 again can only REPRODUCE it; a new
+    # round must qualify on a set no one has seen, and check_spent refuses HateCheck for that.
+    OE.check_spent("hatecheck", "reproduce")
     hc = OE.convert_hatecheck(os.path.join(RAW, "hatecheck", "test.csv"))
     expect = [r["expect_violates"] for r in hc]
     d_new = r0([r["text"] for r in hc])
@@ -396,7 +399,7 @@ def round0():
     for name in ("xstest", "ethics_cm_short"):
         p = os.path.join(OE.EVAL_DIR, name + ".jsonl")
         if os.path.exists(p):
-            rows = OE.read_jsonl(p)
+            rows = OE.read_jsonl(p, purpose="regression")       # spent A327 sets, stress only (A357)
             stress[name] = metrics(r0([r["text"] for r in rows]), [r["expect_violates"] for r in rows])
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, "head_r0.json"), "w", encoding="utf-8", newline="\n") as fh:

@@ -23,6 +23,7 @@ import json
 import math
 import os
 import sys
+import shutil
 import tempfile
 import time
 
@@ -124,9 +125,55 @@ def write_jsonl(rows, path):
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def read_jsonl(path):
+SPENT_PATH = os.path.join(EVAL_DIR, "SPENT.json")
+
+
+def spent_registry(path=None):
+    """The tracked registry of outside sets whose results were seen (A357). Missing or unreadable means
+    refusing, not assuming nothing is spent: a guard that disappears with its file guards nothing."""
+    p = path or SPENT_PATH
+    try:
+        with open(p, encoding="utf-8") as fh:
+            reg = json.load(fh)
+        return reg["sets"], tuple(reg["allowed_purposes"])
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise SystemExit("the spent-set registry %s is unreadable (%s): refusing to read outside sets without it (A357)"
+                         % (os.path.relpath(p, HERE), type(e).__name__))
+
+
+def check_spent(name, purpose, registry=None):
+    """Refuse a spent set unless the caller states a purpose a spent set may serve (A357). Returns the record or None."""
+    sets, allowed = spent_registry(registry)
+    rec = sets.get(name)
+    if rec and purpose not in allowed:
+        raise SystemExit("%s is SPENT since %s (%s): its results were seen, so it is development data now, never a "
+                         "test (docs/JUDGE_LOOP.md). State purpose= one of %s to use it for that, or use a set no "
+                         "one has seen. A357." % (name, rec.get("spent_since"), rec.get("by"), ", ".join(allowed)))
+    return rec
+
+
+def spent_header(name, registry=None):
+    """The first line a converter writes into a spent set, so a script that reads the file directly meets the rule."""
+    sets, allowed = spent_registry(registry)
+    rec = sets.get(name)
+    return None if rec is None else {"_spent": dict(rec, set=name, rule="docs/JUDGE_LOOP.md: a seen set is "
+                                                   "development data; use only for " + ", ".join(allowed) + " (A357)")}
+
+
+def read_jsonl(path, purpose=None, registry=None):
+    """Rows of a JSONL file. For an outside set (a file under eval/outside/ named in SPENT.json, or one carrying a
+    _spent header line), the caller must state a purpose a spent set may serve; the header line is dropped."""
     with open(path, encoding="utf-8") as fh:
-        return [json.loads(l) for l in fh if l.strip()]
+        rows = [json.loads(l) for l in fh if l.strip()]
+    headed = bool(rows) and isinstance(rows[0], dict) and "_spent" in rows[0]
+    if headed:
+        rows = rows[1:]
+    in_eval = os.path.dirname(os.path.abspath(path)) == os.path.abspath(EVAL_DIR)
+    if in_eval or headed:
+        rec = check_spent(os.path.basename(path), purpose, registry)
+        if headed and rec is None and purpose not in spent_registry(registry)[1]:
+            raise SystemExit("%s carries a _spent header but is not in the registry: refusing (A357)" % path)
+    return rows
 
 
 def wilson(k, n, z=1.96):
@@ -322,7 +369,8 @@ def run(set_paths, out_dir):
                              if os.path.exists(os.path.join(HERE, f))}, "sets": {}}
     all_results = []
     for p in set_paths:
-        rows = read_jsonl(p)
+        # A357: re-running the gate on a spent set is regression monitoring, and its report says so below
+        rows = read_jsonl(p, purpose="regression")
         results, leak = judge_items(rows)
         name = os.path.basename(p).rsplit(".", 1)[0]
         for r in results:
@@ -332,6 +380,10 @@ def run(set_paths, out_dir):
                                 "contamination": leak, "summary": summarise(results, by="type")}
         if leak["void"]:
             report["sets"][name]["VOID"] = "outside texts reached a training ledger during the run"
+        spent = check_spent(os.path.basename(p), "regression")
+        if spent:
+            report["sets"][name]["SPENT"] = ("regression monitoring, not a test: this set's results were seen on %s "
+                                             "(%s); A357" % (spent.get("spent_since"), spent.get("by")))
     # A335: the providers that actually judged, beside the policy that says what they should be.
     report["gate_providers"] = os.environ.get("COVENANT_JUDGE_PROVIDERS", "")
     os.makedirs(out_dir, exist_ok=True)
@@ -352,9 +404,28 @@ def main(argv):
     if len(argv) >= 3 and argv[0] == "convert" and argv[1] in CONVERTERS:
         rows = CONVERTERS[argv[1]](argv[2])
         dest = os.path.join(EVAL_DIR, SOURCES[argv[1]]["out"])
-        write_jsonl(rows, dest)
+        head = spent_header(SOURCES[argv[1]]["out"])
+        write_jsonl(([head] if head else []) + rows, dest)
         print("%s: %d items (%d expect violates) -> %s" % (argv[1], len(rows), sum(r["expect_violates"] for r in rows),
                                                            os.path.relpath(dest, HERE)))
+        return 0
+    if argv[:1] == ["mark-spent"]:
+        # A357: put the _spent header on spent sets converted before the rule existed; the file as it was is kept in .trash
+        for name in sorted(spent_registry()[0]):
+            p = os.path.join(EVAL_DIR, name)
+            if not (name.endswith(".jsonl") and os.path.exists(p)):
+                continue
+            with open(p, encoding="utf-8") as fh:
+                first = fh.readline()
+            if '"_spent"' in first:
+                print("%s: already marked" % name)
+                continue
+            trash = os.path.join(HERE, ".trash", name + ".before-A357-mark")
+            os.makedirs(os.path.dirname(trash), exist_ok=True)
+            shutil.copyfile(p, trash)
+            rows = [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
+            write_jsonl([spent_header(name)] + rows, p)
+            print("%s: marked (%d rows; the unmarked file is kept as %s)" % (name, len(rows), os.path.relpath(trash, HERE)))
         return 0
     if argv and argv[0] == "run":
         rest = argv[1:]

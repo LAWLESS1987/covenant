@@ -1,0 +1,9 @@
+{
+  "what": "Outside sets whose results have been seen. Under docs/JUDGE_LOOP.md's rule, a set whose results were seen is development data from then on: it may be used to develop, to monitor for regressions, or to reproduce a published run, and never again as a test. tools/outside_eval.py reads this file. Its loader refuses a spent set unless the caller states one of those purposes, and its converter writes a _spent header line into every spent set it produces, so an ad-hoc script that reads the file directly meets the rule on its first line (A357, 2026-10-16).",
+  "allowed_purposes": ["development", "regression", "reproduce"],
+  "sets": {
+    "xstest.jsonl": {"spent_since": "2026-10-11", "by": "A327 (docs/OUTSIDE_EVAL.md, first run)", "now": "regression monitor"},
+    "ethics_cm_short.jsonl": {"spent_since": "2026-10-11", "by": "A327 (docs/OUTSIDE_EVAL.md, first run)", "now": "regression monitor"},
+    "hatecheck": {"spent_since": "2026-10-11", "by": "A328 Round 0 qualification (docs/JUDGE_LOOP.md)", "now": "development data"}
+  }
+}

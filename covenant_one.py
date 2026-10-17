@@ -699,6 +699,9 @@ SUITES = [
     # the node's own gate on published, human-labelled sets and reports BOTH error rates; the deferring judge's
     # ledger paths are rebound for the run so no outside item reaches training, driven both ways on temp ledgers.
     ("test_oe1_outside_eval.py", 300, "JUDGE"),
+    # A357 (2026-10-17): a spent outside set is never read as a test -- the registry eval/outside/SPENT.json,
+    # the loader's purpose rule and the _spent header line, driven both ways (five mutations, each red).
+    ("test_a357_spent_sets.py", 120, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
