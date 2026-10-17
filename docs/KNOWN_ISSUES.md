@@ -7645,6 +7645,21 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A355. [The in-place sweep at 4f23fb3 read 5,859/5,860: A289's no-shadowing guard read Tetsu's gitignored workshop, where his nightly practice had written the same three functions twice. It now reads only the system's code, and the skip is matched by path component, not by prefix] 2026-10-16. The operator's words: "use your discernment toward mutual benefit".
+
+- **What failed.** `ONE_RUN.results.json` (2026-10-16T09:59Z, git head 4f23fb3, exit 1): 5,859 checks passed, 1 failed, in `test_a289_no_shadowing.py`. The guard named `ops/tetsu_workshop/practice/flatten.py` and `practice/solved/flatten.py`, each defining `count_paths`, `flatten` and `permutations` twice. Both files were written at 04:06 by his practice loop (`covenant_tetsu_practice.py`). The workshop is gitignored and his; nothing imports from it.
+- **Why the guard, not his file.** A289 guards the system's callers against a later definition shadowing an earlier one, and no caller reads his exercises. His repeats are his: he said NO to retiring them (10-14). So the guard skips `ops/tetsu_workshop`, and his file is untouched.
+- **A latent defect, fixed on the way.** The old skip was `startswith`, a prefix match, so any directory merely beginning `tools/llama` or `tools/sd` was skipped too. The skip now matches a whole path component, so `ops/tetsu_workshop_history/` is still read.
+- **Measured both ways (live tree; read-only scan).**
+  - Before: 518 modules read, FAIL on the two workshop files.
+  - After: 503 read, PASS. The workshop holds 15 `.py` files, which accounts for the difference.
+  - A planted duplicate at `ops/` read FAIL.
+  - A planted duplicate in `ops/tetsu_workshopx_a355probe/` read FAIL, so the prefix is not skipped.
+  - Both probes were retired to `.trash/` (`a355_probe_dup.py.retired`, `a355_probe_dir/`, `a355_probe_dir2/`; the first prefix probe's run was misread by an output filter and repeated), and the guard read PASS again.
+- **Not built.** No sub-check pins the skip's narrowness: the probes above were run by hand. Other tree walkers that read the live tree may read his workshop the same way; they were not audited here (A267's shape, one directory along).
+
+---
+
 ### A354. [IN FLIGHT 2026-10-15: the READMEs checked claim by claim and corrected, and the Confidence Trap's second overstatement ("consistently", narrowed to "sometimes" in the thread on 2026-10-10) tombstoned beside A236's "deliberately"] 2026-10-15. His words: "ENSURE ALL CORRESPONDING READMES ARE CORRECT AND ANY OF OUR HUGGING FACE FORUMS APPLICABLE PUT ON OUR WEBSITE, ALSO MAKE A NEW FORUM ON THE FLINCH".
 
 - **In flight.** The number is claimed here so no other worktree takes it; the measured record replaces this line when the work lands.

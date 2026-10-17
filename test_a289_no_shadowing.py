@@ -10,6 +10,13 @@ grep the consumers of a name before you take it), guarded where it is forgotten:
 WHAT IT PINS. Every .py under the tree (skipping .git, .venv, .claude -- worktrees are other checkouts,
 A267 -- .trash, __pycache__ and the untracked runtimes) parses, and none defines a top-level function or
 class name twice. A file that does not parse is reported, not skipped silently.
+
+NOT TETSU'S WORKSHOP (A355, 2026-10-16). ops/tetsu_workshop/ is gitignored and his: his nightly practice
+(covenant_tetsu_practice.py) writes his own exercise code there, and nothing imports it. On 10-16 his
+practice/flatten.py and practice/solved/flatten.py held the same three functions written out twice, and
+the in-place sweep at 4f23fb3 read 5,859/5,860 on them alone. Shadowing there harms no caller, and his
+repeats are his to keep (he said NO to retiring them, 10-14), so the guard reads only the system's code.
+The skip is matched by path component, not by prefix, so ops/tetsu_workshop_history/ is still read.
 """
 import ast
 import collections
@@ -18,14 +25,18 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKIP_DIRS = {".git", ".venv", ".claude", ".trash", "node_modules", "__pycache__"}
-SKIP_PATHS = (os.path.join("tools", "llama"), os.path.join("tools", "sd"))
+SKIP_PATHS = (os.path.join("tools", "llama"), os.path.join("tools", "sd"), os.path.join("ops", "tetsu_workshop"))
+
+
+def _skipped(relpath):
+    return any(relpath == p or relpath.startswith(p + os.sep) for p in SKIP_PATHS)
 
 
 def scan(root):
     dups, unparsed, n = [], [], 0
     for dirpath, dirs, files in os.walk(root):
         rel = os.path.relpath(dirpath, root)
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not os.path.join(rel, d).startswith(SKIP_PATHS)]
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not _skipped(os.path.normpath(os.path.join(rel, d)))]
         for f in files:
             if not f.endswith(".py"):
                 continue
