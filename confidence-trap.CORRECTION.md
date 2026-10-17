@@ -30,3 +30,21 @@ everything this project has got wrong and said so is
 **Why it is done this way.** Covenant records its own errors rather than editing them
 away, because a system that governs whoever runs it has to survive being checked, and
 that only works if correction is welcome. If you find another, say so.
+
+## A second overstatement: "consistently" (A354-CONSISTENTLY, recorded 2026-10-16)
+
+**What was wrong.** The post's second paragraph says human raters "consistently give
+higher scores" to responses that sound confident. The evidence does not support
+"consistently".
+
+**Who said so first.** The operator, in the same thread, post 8, on 2026-10-10: he
+wrote that he had overstated two things, the title's "deliberately" and the post's
+"consistently", and that the evidence supports "sometimes". The study he cited there,
+Sharma et al. (2023), found the preference for convincingly written answers over
+correct ones held "a non-negligible fraction of the time".
+
+**Why it is recorded only now.** The thread corrected it in public, but nothing in this
+repository did until a README audit (A354) found it on 2026-10-15. The original stays
+unedited. The retraction is in [docs/RETRACTED.json](docs/RETRACTED.json) as
+A354-CONSISTENTLY, so `test_r1_retracted.py` fails the build if the phrasing returns
+without that id nearby.

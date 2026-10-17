@@ -1677,6 +1677,29 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "As written at 4f23fb3 and earlier, in README.md, docs/OUTREACH_COMPILED.md, docs/OUTREACH_US_IL.md, conformance.py, covenant_one.py and test_n1_conformance.py; each now cites FRONT-SHORTLIST beside it (A354)."
+  },
+  {
+   "id": "A354-CONSISTENTLY",
+   "claim": "confidence-trap.md (posted 2026-09-24): 'During Reinforcement Learning from Human Feedback (RLHF), human raters consistently give higher scores to responses that sound confident, authoritative, and definitive.'",
+   "refuted_by": "The operator's own reply in the thread, post 8, 2026-10-10 (topic 180706): 'I overstated two things: my title said âdeliberatelyâ and my post said raters âconsistentlyâ reward confidence. The evidence supports incentives, not intent, and âsometimesâ, not âconsistentlyâ.' The study he cites there, Sharma et al. (2023), found the preference for convincingly written answers held 'a non-negligible fraction of the time', not consistently.",
+   "truth": "Human raters sometimes score confident-sounding answers above correct but hedged ones; published work supports an incentive that operates some of the time, not a consistent rule.",
+   "verbatim": [
+    "During Reinforcement Learning from Human Feedback (RLHF), human raters consistently give higher scores to responses that sound confident, authoritative, and definitive."
+   ],
+   "patterns": [
+    "raters\\s+consistently\\s+give\\s+higher\\s+scores"
+   ],
+   "allow": [
+    "confidence-trap.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "confidence-trap.md is the original and is allowed, as for A236: its purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md is not allowed; it quotes the phrase beside this id."
   }
  ]
 }

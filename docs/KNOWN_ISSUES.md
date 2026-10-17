@@ -7719,7 +7719,9 @@ A280, which is the road telling the truth about it.
   - The collective's READMEs: another repository, with its own patch.
   - The public flinch README: its "a hash of every rule and threshold" is false (`_SPLIT` is outside `_rules_hash`), and correcting a public repository is his to approve.
   - The website READMEs and forum cards: his approval.
-  - The Confidence Trap's "consistently": not yet tombstoned. It is the next piece of this entry.
+  - The Confidence Trap's "consistently": tombstoned 2026-10-16 as A354-CONSISTENTLY, on the operator's own public narrowing in the thread (post 8, 2026-10-10).
+    - The original stays unedited; `confidence-trap.CORRECTION.md` gains a second section.
+    - Driven both ways: R1 237/237; a probe restating it read 236/237, then was retired to `.trash/a354c_probe.md.retired`.
 - **A354b: a false red at commit time, found by landing this entry.**
   - The commit's stage-check read `test_ci1_corrections_index.py` 6/10 and said "CI will be red on this push".
   - The committed index was correct: it carries all three new ids, and CI1 read 10/10 in the working tree and in a `git archive` copy of the commit.
