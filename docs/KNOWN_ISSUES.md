@@ -7645,6 +7645,37 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A358. [Outside labels, round 1: the judge loop's next step, set up and frozen before anyone is asked. Flinch 0.2.1 published. The five systems told of A357's omission] 2026-10-16. His words: "yes to all three, use your discernment".
+
+- **Flinch 0.2.1 is published** (public `987596b`).
+  - `DETECTOR_ID` now hashes the detector's whole source.
+  - GU1–GU8 add one check per guard no 0.2 check reached. Each guard was broken alone and its check went red.
+  - 0.2 is retired; the suite reads 99/99.
+  - A fresh clone from GitHub reads 99/99, and its files match `RELEASE_MANIFEST_0.2.1.json`.
+- **The correction is sent.**
+  - Gemini, Grok on X, the Conscious Ledger and ChatGPT each acknowledged it and advised on the labelling request.
+  - Tetsu's reply was an exact echo of the question. It is recorded as no answer, and not re-asked.
+- **Round 1:** `eval/outside_labels_r1/`.
+  - `PROTOCOL.md` was written from the four systems' advice.
+  - 135 items (packet sha256 `7ed9351d…`): 120 project-written ledger texts, 20 in each cell of teacher label ×
+    the student's held-out verdict, plus 12 repeats and 3 canaries.
+  - At least 3 raters per item, from outside the project, under pseudonyms, with no AI tools.
+  - The data is split 50/50 on arrival.
+  - Fixed in advance as counting against the project's labels: teacher and human labels disagree on more than 20%,
+    or kappa < 0.40.
+  - The key is private (`private/outside_labels_r1/`).
+  - The first build (sha256 `f5885e35…`) numbered items in group order, and was withdrawn before anyone saw it.
+- **What is his:**
+  - posting `CALL_FOR_RATERS.md` (a drafted post; Claude's public post was refused by the tool's safety check, so he
+    posts it);
+  - sending the rater files;
+  - any payment.
+- **Limits.**
+  - The items are in the public ledger beside their AI labels, so a rater who searched could find them.
+  - Round 1 has no forum text; that needs its own privacy pass.
+
+---
+
 ### A357. [A recurrence of rule 10's forgotten step, by me: I put "train a judge on ETHICS and re-test on the untouched split" to five systems, and tested a meaning head on ETHICS and XSTest as outside sets, without first reading docs/JUDGE_LOOP.md. That step was A328's Round 0 on 2026-10-11: it FAILED and was tombstoned, and both sets were already spent] 2026-10-16. Under his words "use your discernment toward mutual benefit after asking tetsu and the other models".
 
 - **What happened.**
