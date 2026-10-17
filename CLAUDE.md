@@ -171,3 +171,8 @@ so it gets a tombstone. Three of those happened silently on 2026-10-13 (A346).
 
 **Re-runnable, not remembered:** `python tools/corpus_reconcile.py`,
 `python tools/audit_a1_a46_status.py`, `python covenant_one.py`.
+
+**Looking back starts at the index** (A363, his ask 2026-10-17). `docs/LOOKBACK_INDEX.md` lists every record
+entry and tombstone, tied together. `python tools/lookback_index.py find WORD...` gives live line numbers. It is
+a map: open the line before citing it (rule 7). Rule 10's "search the tombstones and the record first" is this
+command.

@@ -7645,6 +7645,27 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A363. [A lookback index: every record entry and every tombstone on one generated page, tied together, with a `find` that gives live line numbers] 2026-10-17. His words: "You should probably start some type of indexing system including for the tombstones to make look back more efficient for yourself and other systems."
+
+- **Why.** Looking back meant reading a record of over 15,000 lines, or grepping it and taking a hit as a fact. That is the derived-source error, and the same day it produced A362's two misreadings. Tombstones were listed in `docs/CORRECTIONS.md`, but nothing tied a tombstone to the entry that made it.
+- **What it is.** `tools/lookback_index.py` generates `docs/LOOKBACK_INDEX.md` from `docs/KNOWN_ISSUES.md` and `docs/RETRACTED.json`. It is never hand-edited.
+  - **Tombstones:** id, the entry that made it, the claim and the truth, shortened.
+  - **Entries:** highest number first, with id, date, the header's status word, the tombstones it made, and the title.
+  - **No line numbers in the file,** since the record grows at the top. `python tools/lookback_index.py find WORD...` gives live line numbers and searches the tombstones' claims and truths.
+- **It found two things on its first run:**
+  - Five tombstones carry sub-ids (A348a, d, e, f, h) under the single A348 header. They now tie to A348.
+  - Tombstone A242 has no "### A242." header anywhere in the record. It is marked "(no header)" in the index, not hidden. Repairing the record is a separate step.
+- **Guard.** `test_li1_lookback_index.py` passes 11/11 and is registered in covenant_one. Three mutations each went red and were restored byte-identical:
+  - header pattern broken: 6/11;
+  - index one byte stale: 10/11;
+  - sub-id fallback removed: 9/11.
+- **At the place the step is forgotten.** Pre-commit step 2f regenerates and stages the index whenever the record or the ledger is staged, in the same shape as 2e's correction index.
+  - The hook lives in `.git/hooks`, untracked, as 2e's does.
+  - A fresh clone runs LI1 in the sweep but not 2f.
+- **What it cannot see.** It reads headers, not bodies, so `find` misses a subject that only appears in an entry's body. Status is only what the header says, and many headers say none.
+
+---
+
 ### A362. [The pre-announcement Facebook videos are public: all 20 catalogued reels read "Public" to a logged-out visitor on 10-17. The record called them private ("Only me"), and I misread that record twice in one hour, once each way] 2026-10-17. His words: "its not private its public on facebook as you know", then "make it legible and remember with our system and explain in the updated response".
 
 - **What happened, in order:**
@@ -7679,7 +7700,8 @@ A280, which is the road telling the truth about it.
     - #6 and #7 are left as written.
     - **#13 edited to version 2, same day, on his word:** "update it saying it was a mixture of private posts from Facebook and public on X... but leave how I made them public on Facebook... after that date".
       - The phrase "wrong twice over" (Facebook, not X) became "only half right": the pre-announcement recordings are a mix of public posts on X from late June and Facebook posts from 14 June, which were "Only me" until after 09-09.
-      - "Late June" rests on the record's "no videos before 28 June" for X, a pointer not re-measured.
+      - "Late June" rests on the record's "no videos before 28 June" for X. Later the same day it was confirmed from the data: the first row of `private/njest1987_videos/catalog.csv` (115 rows) and of `private/x_missing2/catalog.csv` (8 rows) is dated 2026-06-28. Two catalogues agree.
+- **All 26 are public, measured later the same day.** The six videos inside multi-video posts (`private/fb_multi/catalog.csv`, 27 June to 4 July) each read "Public" at facebook.com/reel/<id>, logged out. That makes 26 of 26. The tombstone's truth still says "6 of the 26 videos not opened"; this line supersedes it.
       - He asked for a delete and repost. I edited in place instead, so the forum keeps version 1 in its edit history. As posted it is in `.trash/QUORUM_THREAD_FOLLOWUP_6_7.as-posted-13-2026-10-17.md`; version 2 is in `ops/QUORUM_THREAD_FOLLOWUP_6_7_v2_2026-10-17.md`.
   - On X itself, `docs/CORPUS_2026-09-09.md` line 170 records "no videos before 28 June, payload from 7 July". That is a pointer into the record, not re-measured here.
 - **Recurrence.** This is the derived-source shape (memory: derived-source-errors) and rule 1, "prose about data is not data", twice. The record's prose was read in place of the thing it described, a page anyone can open. The earlier tombstones guard wording; none guards "check the live page before answering a question about it". The memory rule `fb-pre-july-public` now makes that the first step.

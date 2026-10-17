@@ -706,6 +706,8 @@ SUITES = [
     ("test_nv1_nightly_verify.py", 60, "JUDGE"),
     # A361 (2026-10-17): the quiet-window reader (busy 03:20-05:45 local or while a scheduled check runs).
     ("test_qw2_quiet_window.py", 30, "JUDGE"),
+    # A363 (2026-10-17): docs/LOOKBACK_INDEX.md -- every record entry and tombstone, tied together, current.
+    ("test_li1_lookback_index.py", 60, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
