@@ -17,6 +17,12 @@ WHAT IT PINS, by running the code, never by reading its source:
   S6  a script that reads the converted file directly and asks every row for its text stops on the header
   S7  a missing or unreadable registry refuses: it never reads as "nothing is spent"
   S8  every read_jsonl call in tools/ states purpose= (static; see the limit below)
+  S9  burn-on-read (Gemini, 2026-10-17): an unseen set read as a fresh test ('qualify') is spent BY the read --
+      registry entry with its sha256, and header -- so forgetting to record it is no longer possible
+  S10 a second fresh-test read of the same set is refused
+  S11 an unseen set needs 'qualify' or 'development', and either spends it
+  S12 every outside read is appended to an audit log (Grok, 2026-10-17)
+  S13 a spent set read for regression prints a SPENT banner
 
 WHAT IT CANNOT SEE. A script that skips the first line, or reads rows with .get("text") and tolerates a None,
 passes the header silently. A copy of a set renamed or moved elsewhere carries the header but not the registry
@@ -62,9 +68,10 @@ def main():
           and set(allowed) == {"development", "regression", "reproduce"}, (sorted(sets), allowed))
 
     with tempfile.TemporaryDirectory() as tmp:
-        saved = OE.EVAL_DIR
+        saved, saved_log0 = OE.EVAL_DIR, OE.READ_LOG
         try:
             OE.EVAL_DIR = tmp
+            OE.READ_LOG = os.path.join(tmp, "reads.jsonl")      # never the real audit log
             p = os.path.join(tmp, "xstest.jsonl")
             OE.write_jsonl([{"text": "a", "expect_violates": False}, {"text": "b", "expect_violates": True}], p)
             r_none = refused(lambda: OE.read_jsonl(p))
@@ -107,7 +114,7 @@ def main():
             check("S6 a script reading the converted file directly, asking each row for its text, stops on the header",
                   stopped)
         finally:
-            OE.EVAL_DIR = saved
+            OE.EVAL_DIR, OE.READ_LOG = saved, saved_log0
 
         bad = os.path.join(tmp, "SPENT.json")
         with open(bad, "w", encoding="utf-8") as fh:
@@ -116,6 +123,52 @@ def main():
         r7b = refused(lambda: OE.spent_registry(os.path.join(tmp, "absent.json")))
         check("S7 a missing or unreadable registry refuses; it never reads as 'nothing is spent'",
               bool(r7a) and bool(r7b), (r7a, r7b))
+
+    # ---- burn-on-read (Gemini's review, 2026-10-17), the audit log (Grok's), and the SPENT banner
+    with tempfile.TemporaryDirectory() as tmp:
+        saved_dir, saved_log = OE.EVAL_DIR, OE.READ_LOG
+        reg = os.path.join(tmp, "SPENT.json")
+        with open(OE.SPENT_PATH, encoding="utf-8") as fh:
+            base = json.load(fh)
+        with open(reg, "w", encoding="utf-8") as fh:
+            json.dump(base, fh)
+        try:
+            OE.EVAL_DIR = tmp
+            OE.READ_LOG = os.path.join(tmp, "reads.jsonl")
+            fresh = os.path.join(tmp, "fresh_set.jsonl")
+            OE.write_jsonl([{"text": "x", "expect_violates": True}], fresh)
+            rows = OE.read_jsonl(fresh, purpose="qualify", registry=reg)
+            after = json.load(open(reg, encoding="utf-8"))["sets"]
+            first = json.loads(open(fresh, encoding="utf-8").readline())
+            check("S9 an unseen set read as a fresh test ('qualify') returns its rows and is SPENT by the read: in the "
+                  "registry, with its sha256, and headed", rows == [{"text": "x", "expect_violates": True}]
+                  and "fresh_set.jsonl" in after and after["fresh_set.jsonl"].get("sha256") and "_spent" in first,
+                  (rows, after.get("fresh_set.jsonl"), first))
+            again = refused(lambda: OE.read_jsonl(fresh, purpose="qualify", registry=reg))
+            check("S10 the same set read as a fresh test a second time is refused", bool(again) and "only once" in again, again)
+            other = os.path.join(tmp, "other_set.jsonl")
+            OE.write_jsonl([{"text": "y"}], other)
+            r_none = refused(lambda: OE.read_jsonl(other, registry=reg))
+            r_reg = refused(lambda: OE.read_jsonl(other, purpose="regression", registry=reg))
+            OE.read_jsonl(other, purpose="development", registry=reg)
+            dev_spent = "other_set.jsonl" in json.load(open(reg, encoding="utf-8"))["sets"]
+            check("S11 an unseen set is refused with no purpose or 'regression'; read for 'development' it is spent too",
+                  bool(r_none) and bool(r_reg) and dev_spent, (r_none, r_reg, dev_spent))
+            log = [json.loads(l) for l in open(OE.READ_LOG, encoding="utf-8")] if os.path.exists(OE.READ_LOG) else []
+            check("S12 every ATTEMPT to read an outside set is appended to the audit log with its sha256, purpose and "
+                  "whether it was refused (refusals included)", len(log) >= 5 and {"qualify", "development"} <= {r["purpose"] for r in log}
+                  and any(r["refused"] for r in log) and any(not r["refused"] for r in log)
+                  and all(len(r["sha256"]) == 64 for r in log), log[-5:])
+            err = io.StringIO()
+            from contextlib import redirect_stderr
+            with redirect_stderr(err):
+                OE.read_jsonl(fresh, purpose="regression", registry=reg)
+            check("S13 a spent set read for regression prints the SPENT banner, so the run cannot pass for a test",
+                  "SPENT SET" in err.getvalue() and "NOT a test" in err.getvalue(), err.getvalue())
+        except (SystemExit, OSError, ValueError, KeyError) as e:      # a broken guard must read red, not crash the suite
+            check("S9-S13 burn-on-read, the audit log and the banner ran to completion", False, "%s: %s" % (type(e).__name__, e))
+        finally:
+            OE.EVAL_DIR, OE.READ_LOG = saved_dir, saved_log
 
     missing = []
     tdir = os.path.join(HERE, "tools")

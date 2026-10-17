@@ -7711,6 +7711,21 @@ A280, which is the road telling the truth about it.
     - a script that skips line one, or reads `.get("text")`;
     - a spent set missing from the registry;
     - calls built another way than `read_jsonl(...)`.
+- **Reviewed the same day by two other systems, and strengthened.**
+  - **Gemini (context reader):** the guard protects only sets someone remembered to list, and forgetting is the mistake
+    it exists for. So burn-on-read: an unseen set read as a fresh test (`purpose='qualify'`), or for development, is
+    spent BY that read. The registry entry, with the file's sha256, and the header are written before a single row is
+    returned. A second fresh-test read is refused. This closes "a spent set missing from the registry" for every set
+    read through the loader.
+  - **Grok on X (fresh reader, asked cold, with no project context):** "the leak is the human". It proposed file
+    permissions, which do not apply on a one-account PC, and an audit trail. Every attempt to read an outside set is
+    now appended to `logs/outside_reads.jsonl` with its sha256, purpose and whether it was refused.
+  - **A SPENT banner** prints on every regression or development read of a spent set.
+  - **Checks:** S9–S13 added, 13/13.
+    - Nine mutations, one at a time, each turned a named check red, and each file was restored byte-identical. Three
+      first crashed the suite instead; the checks now report a failure rather than crash.
+  - **A leak of mine, recorded:** the first run of S2–S8 wrote 2 test rows into the real `logs/outside_reads.jsonl`,
+    before the suite pointed the log at a temp file. They are kept there, and they are not real reads.
 
 ---
 

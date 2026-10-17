@@ -160,9 +160,35 @@ def spent_header(name, registry=None):
                                                    "development data; use only for " + ", ".join(allowed) + " (A357)")}
 
 
-def read_jsonl(path, purpose=None, registry=None):
-    """Rows of a JSONL file. For an outside set (a file under eval/outside/ named in SPENT.json, or one carrying a
-    _spent header line), the caller must state a purpose a spent set may serve; the header line is dropped."""
+READ_LOG = os.path.join(HERE, "logs", "outside_reads.jsonl")
+
+
+def _burn(path, name, purpose, registry=None):
+    """A FRESH test spends the set on the way in (Gemini's review of A357, 2026-10-17): the registry and the file's
+    header are written BEFORE a single row is returned, so a set read once as a test can never be read as one again,
+    whether or not anyone remembers to record it. If writing either fails, nothing is returned."""
+    p = registry or SPENT_PATH
+    with open(p, encoding="utf-8") as fh:
+        reg = json.load(fh)
+    reg["sets"][name] = {"spent_since": time.strftime("%Y-%m-%d", time.gmtime()), "by": "first read, purpose=%r, by %s" % (purpose, os.path.basename(sys.argv[0] or "?")),
+                         "sha256": sha256_file(path)}
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(reg, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    os.replace(tmp, p)
+    with open(path, encoding="utf-8") as fh:
+        rows = [json.loads(l) for l in fh if l.strip()]
+    write_jsonl([spent_header(name, registry)] + rows, path)
+
+
+def read_jsonl(path, purpose=None, registry=None, _log=True):
+    """Rows of a JSONL file. For an outside set (a file under eval/outside/, or one carrying a _spent header line):
+      - purpose='qualify' reads a set NO ONE has seen, as a fresh test, ONCE: it spends the set before returning rows;
+      - a spent set needs a purpose a spent set may serve (development, regression, reproduce), and its read prints a
+        SPENT banner, so a regression run cannot be mistaken for a test;
+      - every read is appended to logs/outside_reads.jsonl (who, what, sha256, purpose): an audit trail (Grok, 2026-10-17).
+    The header line is dropped from the rows returned."""
     with open(path, encoding="utf-8") as fh:
         rows = [json.loads(l) for l in fh if l.strip()]
     headed = bool(rows) and isinstance(rows[0], dict) and "_spent" in rows[0]
@@ -170,9 +196,35 @@ def read_jsonl(path, purpose=None, registry=None):
         rows = rows[1:]
     in_eval = os.path.dirname(os.path.abspath(path)) == os.path.abspath(EVAL_DIR)
     if in_eval or headed:
-        rec = check_spent(os.path.basename(path), purpose, registry)
-        if headed and rec is None and purpose not in spent_registry(registry)[1]:
-            raise SystemExit("%s carries a _spent header but is not in the registry: refusing (A357)" % path)
+        refused = True        # every ATTEMPT is logged, refusals included: a refused test is information
+        try:
+            name = os.path.basename(path)
+            sets, allowed = spent_registry(registry)
+            unseen = name not in sets and not headed
+            if purpose == "qualify" and not unseen:
+                raise SystemExit("%s is SPENT (%s): a set can be a fresh test only once. A357." % (name, (sets.get(name) or {}).get("by", "header")))
+            if unseen and purpose in ("qualify", "development"):
+                _burn(path, name, purpose, registry)      # seeing it, for either reason, spends it
+            else:
+                rec = check_spent(name, purpose, registry)
+                if headed and rec is None and purpose not in allowed:
+                    raise SystemExit("%s carries a _spent header but is not in the registry: refusing (A357)" % path)
+                if rec:
+                    sys.stderr.write("=== SPENT SET: %s read for %s -- these results are NOT a test (A357) ===\n" % (name, purpose))
+                elif in_eval:
+                    raise SystemExit("%s is an unseen outside set: read it as a fresh test with purpose='qualify', or for "
+                                     "development with purpose='development'. Either read spends it. A357." % name)
+            refused = False
+        finally:
+            if _log:
+                try:
+                    os.makedirs(os.path.dirname(READ_LOG), exist_ok=True)
+                    with open(READ_LOG, "a", encoding="utf-8") as fh:
+                        fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "path": os.path.relpath(path, HERE),
+                                             "sha256": sha256_file(path), "purpose": purpose, "refused": refused,
+                                             "by": os.path.basename(sys.argv[0] or "?")}) + "\n")
+                except OSError:
+                    pass
     return rows
 
 
@@ -370,7 +422,7 @@ def run(set_paths, out_dir):
     all_results = []
     for p in set_paths:
         # A357: re-running the gate on a spent set is regression monitoring, and its report says so below
-        rows = read_jsonl(p, purpose="regression")
+        rows = read_jsonl(p, purpose="regression" if check_spent(os.path.basename(p), "regression") else "qualify")
         results, leak = judge_items(rows)
         name = os.path.basename(p).rsplit(".", 1)[0]
         for r in results:
