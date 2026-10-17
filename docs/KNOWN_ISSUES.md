@@ -7645,6 +7645,22 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A365. [verify_integrity called files the ledger never wrote "drifted"; on the public memory repository that turned a README and two notes into three false accusations. Unreadable and unclaimed is now "unverifiable"] 2026-10-17. His words: "use your discernment toward mutual benefit".
+
+- **How it was found.** I pinned a named check for each project in the website's systems table. For Threefold Memory, that meant running covenant's `verify_chain` and `verify_integrity` on a fresh clone at `5f31447`. Line-ending conversion was off, and the result was the same with it on.
+  - **Chain:** intact, 995 entries.
+  - **Integrity:** ok false, with 955 checked, **3 "drifted"** and 1 missing.
+- **The 3 were not drift.** README, `lspace-note-20261007` and `lspace-note-20261007-admission` have **no entry in the ledger**: no create, no content_sha. They are files committed to the repository without going through the store. `verify_integrity` put every unparseable file into `drifted` before looking at the ledger. Its own docstring names that as the error to avoid: reporting what cannot be checked as a thing caught.
+- **The fix.** In `ai_memory_system/memory_store.py`, an unreadable file is drift only if the ledger claimed that name. Otherwise it is unverifiable.
+  - I5b (a README never claimed → unverifiable) and I5c (a claimed memory overwritten unreadable → still drift) are new.
+  - M1 186/186. Both mutations failed exactly their own check (I5b, then I5c), each 185/186, and the file was restored byte-identical.
+- **What remains true of threefold-memory at `5f31447`:** 0 drifted, 3 unverifiable, and **1 missing**.
+  - `task-puttest-ocr-smoketest` was created by agent "grok-bot" on 2026-10-07 at 03:46 UTC. It has no tombstone and no file, so it was removed without going through delete().
+  - The website's systems table reports this as the check's result.
+- **Not done.** The public memory repository was not changed: its pushes are paused, and lifting that is his word. Whether to tombstone the missing entry, or restore it, is for the record's owner.
+
+---
+
 ### A364. [Chat Smith's message box takes 4,000 characters; the consult tool let packets reach 6,000. It now prints a long packet as numbered parts that each fit] 2026-10-17. His words: "use your discernment toward mutual benefit".
 
 - **Found in use.** During the quorum-reply consult the same day, a 5,914-character packet passed `covenant_ai_consult` but would not fit Chat Smith's box. It was split by hand into two parts (2,231 and 3,761 characters).

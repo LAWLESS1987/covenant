@@ -726,6 +726,21 @@ def i_integrity(root):
               "legacy" in res["unverifiable"] and
               "legacy" not in [d["name"] for d in res["drifted"]], res)
 
+        # A365 (2026-10-17): the public memory repository carries a README and two hand-committed notes that the
+        # ledger never wrote; the check called all three "drifted". Unreadable AND unclaimed is unverifiable;
+        # unreadable AND claimed is still drift.
+        with open(os.path.join(r2, "README.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("# a repository readme, never written through the store\n")
+        st.put("kept", "d", "user", "A claimed memory.", "a")
+        with open(os.path.join(r2, "kept.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("overwritten by hand, no frontmatter at all\n")
+        res = st.verify_integrity()
+        drifted_names = [d["name"] for d in res["drifted"]]
+        check("I5b A NON-MEMORY FILE THE LEDGER NEVER CLAIMED is 'unverifiable', not 'drifted'",
+              "README" in res["unverifiable"] and "README" not in drifted_names, res)
+        check("I5c ...while a CLAIMED memory made unreadable on disk is still caught as drift",
+              "kept" in drifted_names and "kept" not in res["unverifiable"], res)
+
         check("I6 every memory carries a creation time that a read cannot "
               "move -- `last_used` is destroyed by the next recall, so "
               "without this the store could not say how old anything was",

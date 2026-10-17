@@ -504,7 +504,12 @@ class MemoryStore:
                 with open(os.path.join(self.root, fn), encoding="utf-8") as fh:
                     rec = parse_memory(fh.read())
             except (OSError, ValueError) as exc:
-                drifted.append({"name": name, "why": f"unreadable: {exc}"})
+                # A365: only a name the ledger CLAIMED can drift. A file the ledger never wrote (a repository
+                # README, a note committed by hand) is a thing we cannot check, not a thing we caught.
+                if name in claimed:
+                    drifted.append({"name": name, "why": f"unreadable: {exc}"})
+                else:
+                    unverifiable.append(name)
                 continue
             want = claimed.get(name)
             if want is None:
