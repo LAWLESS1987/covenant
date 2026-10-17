@@ -31,7 +31,7 @@ echo of the question, and is recorded as no answer.
 - **A blinding limit that cannot be removed:** these sentences are in the project's public ledger, beside their AI
   labels, so a rater who searched could find them. Raters are asked not to look anything up, and to say if they
   recognise an item. Labels from a rater who did look are not blind.
-- **The key** (groups, teacher labels, repeats, canaries) stays private (`covenant/private/outside_labels_r1/`) until
+- **The key** (groups, teacher labels, repeats, canaries) stays private (`covenant/private/outside_labels_r1/`; until then a reader cannot check it, though the packet's sha256 above can be) until
   the analysis.
 
 ## What raters see
