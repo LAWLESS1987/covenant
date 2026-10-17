@@ -702,6 +702,8 @@ SUITES = [
     # A357 (2026-10-17): a spent outside set is never read as a test -- the registry eval/outside/SPENT.json,
     # the loader's purpose rule and the _spent header line, driven both ways (five mutations, each red).
     ("test_a357_spent_sets.py", 120, "JUDGE"),
+    # NV1 (2026-10-17): the nightly names the gate that is not PASS, with its detail line (launch_check stubbed).
+    ("test_nv1_nightly_verify.py", 60, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

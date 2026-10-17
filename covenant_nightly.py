@@ -39,6 +39,7 @@ import argparse
 import importlib
 import io
 import os
+import re
 import subprocess
 import sys
 import time
@@ -211,6 +212,15 @@ def verify_green(say):
     if "0 BLOCKED" not in gates or "0 UNKNOWN" not in gates:
         ok = False
     say("gates: %s" % gates)
+    # NV1 (2026-10-17): name every gate that is not PASS, with its detail line. The 10-17 pass read "11 PASS 1 BLOCKED"
+    # and nothing else, so neither he nor Tetsu could tell which gate went red, or whether a change in progress in the
+    # working tree had caused it (it most likely had: G1 bundle integrity reads uncommitted edits as changed files).
+    out = (r.stdout or "").splitlines()
+    for i, x in enumerate(out):
+        m = re.match(r"\s*(G\d+)\s+(BLOCKED|UNKNOWN)\b(.*)", x)
+        if m:
+            detail = out[i + 1].strip() if i + 1 < len(out) else ""
+            say("  gate %s %s:%s | %s" % (m.group(1), m.group(2), m.group(3).rstrip(), detail[:240]))
     for suite in GREEN_SUITES:
         try:
             r = Q.run([sys.executable, suite], cwd=HERE, capture_output=True,
