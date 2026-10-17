@@ -7645,6 +7645,28 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A366. [His daily "what still needs you" was refused, silently, from 10-14 to 10-17: the direct line's key screen matched the highway condition NAME moltbook_strikes. That one name is now exempt, nothing else is loosened, and every refusal is recorded. The history that rotation was about to overwrite is copied aside] 2026-10-17. His words: "use your discernment toward mutual benefit" (found by the mycelium/highway mapping he asked for: "should probably be used on the mycelium. Road as well").
+
+- **The defect** (found by the highway reader of the mapping workflow, re-checked here):
+  - `covenant_contact.REFUSED` contains `moltbook_[a-z0-9]`, meant for a Moltbook key. It matches the condition name "moltbook_strikes", which `covenant_heal.tell_left` puts in the daily's "what still needs you" text.
+  - From 10-14, every daily left-set included moltbook_strikes. `told_left` was False on 10-14, 10-15, 10-16 and 10-17, and the last "heal: what still needs you" row in the outbox is 10-13T09:42:11Z.
+  - The refusal printed only to stdout, so nothing recorded it.
+- **The fix** (`covenant_contact.py`):
+  - **The pattern** is now `moltbook_(?!strikes\b)[a-z0-9]`. Exactly that name is exempt. A key's shape is not known here, so nothing else was loosened: moltbook_strikes9, moltbook_sk_... and moltbook_strike are still refused.
+  - **Every refusal now writes one row** to `ops/contact_refused.jsonl`. The row holds the time, actor, reason and the rule's class, never the text.
+- **Guard.** CT1a6, CT1a7 and CT1a8 are new; CT1 is 36/36. The suite writes its refusals to a temp log, never to ops/. Three mutations, each restored byte-identical:
+  - the old pattern: CT1a6, a7 and a8 fail (33/36);
+  - an exemption too wide, `(?!strike)`: a7 and a8 fail (34/36);
+  - refusals not recorded: a8 fails (35/36).
+- **Delivery after the fix.** The daily's next tell carries the left-set as usual, from tomorrow's run. The watchdog's own say() calls load the module at start, so they pick up the fix at its next restart. None of those calls names moltbook_strikes.
+- **The history copy** (rule 10, nothing erased):
+  - SELF_EVAL.md rotates to .prev at 512 KiB, which overwrites the old .prev. That .prev holds the 706 blocks from 08-29 to 10-02, including A164.
+  - watchdog.log.5 holds A243 and is dropped at the next 5 MiB rotation. The reader estimated (not measured) that both would come within 3-4 days.
+  - Copies of SELF_EVAL.md, SELF_EVAL.md.prev and watchdog.log through watchdog.log.5 are in `private/archives/history-2026-10-17/` with SHA256SUMS. The originals are untouched.
+  - **Not done:** the rotation itself still overwrites and drops. Making it archive instead means editing the running watchdog (P14 would read a mismatch until its restart). That is the next repair, not this one.
+
+---
+
 ### A365. [verify_integrity called files the ledger never wrote "drifted"; on the public memory repository that turned a README and two notes into three false accusations. Unreadable and unclaimed is now "unverifiable"] 2026-10-17. His words: "use your discernment toward mutual benefit".
 
 - **How it was found.** I pinned a named check for each project in the website's systems table. For Threefold Memory, that meant running covenant's `verify_chain` and `verify_integrity` on a fresh clone at `5f31447`. Line-ending conversion was off, and the result was the same with it on.

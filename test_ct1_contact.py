@@ -59,6 +59,8 @@ def check(label, ok, detail=""):
 def main():
     td = tempfile.mkdtemp(prefix="ct1_")
     ob, st = os.path.join(td, "outbox.jsonl"), os.path.join(td, "state.json")
+    rl = os.path.join(td, "refused.jsonl")
+    CT.REFUSED_LOG = rl                       # A366: refusals in this suite never reach the real ops/ log
 
     print("CT1a -- say()")
     r1 = CT.say("The nightly was NOT GREEN: test_a126 failed after the promotion.", "nightly: not green", "nightly", outbox=ob)
@@ -70,6 +72,20 @@ def main():
                 "-----BEGIN RSA PRIVATE KEY-----"):
         CT.say(bad, "leak test", "x", outbox=ob)
     check("CT1a a key, a password, private/, a Moltbook key or a PEM block never leaves: five refused", len(CT._rows(ob)) == 1)
+    # A366 (2026-10-17): the highway condition name moltbook_strikes is not a key. It blocked every daily
+    # "what still needs you" from 10-14 to 10-17, silently.
+    ob6 = os.path.join(td, "outbox_a366.jsonl")   # its own outbox: the CT1b counts below stay as they were
+    r_ms = CT.say("heal: still needs you -- moltbook_strikes (paused)", "heal: what still needs you", "heal", outbox=ob6)
+    check("CT1a6 the condition name moltbook_strikes is carried (A366)", r_ms is not None and len(CT._rows(ob6)) == 1, r_ms)
+    for bad in ("moltbook_strikes9 is the key", "key moltbook_sk_live_4f9a", "moltbook_strike"):
+        CT.say(bad, "leak test", "x", outbox=ob6)
+    check("CT1a7 ...and nothing else is loosened: moltbook_strikes9, moltbook_sk_..., moltbook_strike still refused",
+          len(CT._rows(ob6)) == 1, [r["text"] for r in CT._rows(ob6)])
+    refusals = CT._rows(rl)
+    check("CT1a8 every refusal is recorded, with its rule and reason and never its text (A366): 8 rows, no secret in them",
+          len(refusals) == 8 and all(set(r) == {"t", "actor", "why", "rule"} for r in refusals)
+          and not any("hunter2" in json.dumps(r) or "4f9a" in json.dumps(r) or "abc123" in json.dumps(r) for r in refusals)
+          and sum(r["rule"] == "moltbook key shape" for r in refusals) == 4, refusals)
     # A221 (2026-09-25, his words: "lift the immunity cap and the other four limits"): the
     # 600-character cap was an assistant's (A211). A long message is carried whole.
     r2 = CT.say("x" * 5000, "long", "x", outbox=ob)

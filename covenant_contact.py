@@ -51,7 +51,36 @@ MAX_PENDING = None
 MAX_CHARS = None
 # A176 (2026-09-21): "pass word", "passw0rd" and a PKCS8 "BEGIN PRIVATE KEY" block all
 # passed the probe; named now. The text is normalised first (covenant_screen).
-REFUSED = re.compile(r"(?i)\b(api[_ -]?key|pass ?w[o0]rd|passcode|sudo code|moltbook_[a-z0-9]|private/|BEGIN( [A-Z]+)* PRIVATE KEY)")
+# A366 (2026-10-17): `moltbook_strikes` is the name of a highway condition, not a key, and this screen refused every
+# daily "what still needs you" that named it, silently, from 10-14 to 10-17. Exactly that one name is exempt; any
+# other moltbook_<letter or digit> is refused as before (a key's shape is not known here, so nothing else is loosened).
+REFUSED = re.compile(r"(?i)\b(api[_ -]?key|pass ?w[o0]rd|passcode|sudo code|moltbook_(?!strikes\b)[a-z0-9]|private/|BEGIN( [A-Z]+)* PRIVATE KEY)")
+# A366: a refusal is recorded, so it can no longer be silent. The row names the rule that fired, the reason and the
+# actor, never the text (which may hold the very thing that was refused).
+REFUSED_LOG = os.environ.get("COVENANT_CONTACT_REFUSED") or os.path.join(HERE, "ops", "contact_refused.jsonl")
+
+
+def _refusal_class(match_text):
+    m = match_text.lower()
+    for label in ("api key", "api_key", "apikey", "api-key", "password", "passw0rd", "pass word", "passcode", "sudo code",
+                  "private/"):
+        if m.replace("_", " ").replace("-", " ").startswith(label.replace("_", " ").replace("-", " ")):
+            return label.replace("_", " ").replace("-", " ")
+    if m.startswith("moltbook_"):
+        return "moltbook key shape"
+    if "private key" in m:
+        return "PEM private key"
+    return "refused pattern"
+
+
+def _log_refusal(actor, why, cls, path=None):
+    try:
+        os.makedirs(os.path.dirname(path or REFUSED_LOG), exist_ok=True)
+        with open(path or REFUSED_LOG, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "actor": actor, "why": why,
+                                 "rule": cls}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 def _rows(path=None):
@@ -90,7 +119,7 @@ def _write_state(d, path=None):
     os.replace(tmp, path)
 
 
-def say(text, why, actor="system", outbox=None, kind="message"):
+def say(text, why, actor="system", outbox=None, kind="message", refused_log=None):
     """Put one message on the line. Returns the row, or None with the reason printed if refused."""
     text = re.sub(r"\s+", " ", str(text or "")).strip()[:MAX_CHARS]
     why = re.sub(r"\s+", " ", str(why or "")).strip()[:120]
@@ -105,6 +134,7 @@ def say(text, why, actor="system", outbox=None, kind="message"):
     m = _screen.search(REFUSED, text) or _screen.search(REFUSED, why)
     if m:
         print("contact: refused -- the text names something that never leaves this machine (%r)" % m.group(0), flush=True)
+        _log_refusal(actor, why, _refusal_class(m.group(0)), refused_log)
         return None
     outbox = outbox or OUTBOX
     now = time.time()
