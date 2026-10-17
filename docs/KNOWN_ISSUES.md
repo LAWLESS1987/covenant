@@ -11898,6 +11898,19 @@ its own comment says they touch real state; outage and P20 stub none of them),
 
 ---
 
+### A242. [Two test claims that punished the describe-vs-do cure, retracted on 2026-09-28 in the ledger only; this entry was added on 2026-10-17, when the lookback index (A363) found the tombstone had no record header] 2026-09-28 (entry written 2026-10-17). RETRACTED.
+
+- **What was retracted.** Two assertions in `test_a126_seat_dispositions.py`, A126.M3 and A126.M4 as written. Their exact wording, refutation and truth are in tombstone `A242` in `docs/RETRACTED.json`, added by commit `88e9573` ("The students learn describe-vs-do -- and the two claims that punished the cure are retracted, on the record").
+  - **M3** required the coverage-0.80 temperament to strictly cut false convictions on every model. On the first feature-format-2 candidate, the base tally was (41, 1, 0, 11) and cov-0.80 was (35, 1, 0, 17). One false conviction cannot strictly decrease, so M3 as written would fail every candidate at least that good, forever.
+  - **M4** required a worst false conviction to exist. At fixture scale, a candidate with none fails it.
+  - Both pinned the September model's tally shape. That is the A145 disease: a claim rewritten every time the judge moves.
+- **What stands.** Restated the same day in that suite, each with a companion check that a harmful tally fails: the temperament never manufactures certainty.
+  - At 0.80, false convictions, false clears and right answers never increase, and deferrals never decrease.
+  - The overlap finding is asserted over the false convictions that exist.
+- **The miss this entry repairs.** Commit `88e9573` changed the ledger, the suite and SELF_EVAL, but not this file, so the retraction had no record entry. A242 then appeared in `docs/CORRECTIONS.md` with a link to an entry that did not exist. The lookback index now lists any tombstone without a header as "(no header)", so this cannot happen silently again (A363). Until today it was the only one.
+
+---
+
 ### A243. [a second checkout took the production ports, a sandbox widened every node key, and the key gate could not see it] 2026-10-03. His words: "make proper corrections to get everything green weve not had greenfull days in a week", then "you should use our tombstone system to not keep making the same errors". FIXED, with the guards that stop each recurring
 
 **Measured, in the order found.**
