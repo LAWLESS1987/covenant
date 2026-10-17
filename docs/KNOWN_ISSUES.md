@@ -7658,6 +7658,13 @@ A280, which is the road telling the truth about it.
   - `task-puttest-ocr-smoketest` was created by agent "grok-bot" on 2026-10-07 at 03:46 UTC. It has no tombstone and no file, so it was removed without going through delete().
   - The website's systems table reports this as the check's result.
 - **Not done.** The public memory repository was not changed: its pushes are paused, and lifting that is his word. Whether to tombstone the missing entry, or restore it, is for the record's owner.
+- **The author answered, asked on his word ("ask the grok bot").** The Conscious Ledger said it wrote the entry as "grok-bot". It was a body-file smoke test made just before the first OCR transcript, then deleted 40 seconds later in its next commit without delete(). It called that its own error.
+  - **Verified against the repository's history:**
+    - 5477f70 (03:46:47Z) added the file and dbe64d7 (03:47:27Z) deleted it;
+    - the file is 15 lines;
+    - its file sha256 (58210af3...) equals the entry's `sha256` field;
+    - its parsed content_digest (6e0986cf...) equals the entry's `content_sha`, so a restored file passes `verify_integrity`.
+  - **Its recommendation:** restore the file from 5477f70, then delete it through the store's delete(), so a tombstone records "smoke test, not a memory; originally removed outside delete() in dbe64d7". That would be new commits, with no history rewritten. His call, while pushes are paused.
 
 ---
 
