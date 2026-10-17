@@ -159,6 +159,31 @@ def roster_set(add=None, final=None, path=None):
 
 MAX_PACKET_CHARS = 6000           # a packet carries a question and an excerpt, never a tree
 MAX_QUESTION_CHARS = 2000         # a real question, not an accidental paste of a file
+# Chat Smith's message box takes 4,000 characters (measured 2026-10-17: a 5,914-char packet had to be split by hand).
+# A packet longer than that is still one packet -- gated, logged and answered as one -- but it is pasted in parts.
+CHATSMITH_BOX_CHARS = 4000
+
+
+def paste_parts(packet, limit=CHATSMITH_BOX_CHARS):
+    """The packet split for a message box of `limit` characters, at paragraph breaks where possible.
+    One part when it fits. Otherwise each part opens with "(part i of n ...)" and is at most `limit` long,
+    and every part but the last asks the reader to wait, so no seat answers half a question."""
+    if len(packet) <= limit:
+        return [packet]
+    room = limit - 120                                    # the header never pushes a part over the box
+    chunks, rest = [], packet
+    while rest:
+        if len(rest) <= room:
+            chunks.append(rest)
+            break
+        cut = rest.rfind("\n\n", 0, room)
+        cut = cut if cut > room // 2 else rest.rfind(" ", 0, room)
+        cut = cut if cut > room // 2 else room
+        chunks.append(rest[:cut])
+        rest = rest[cut:].lstrip("\n ")
+    n = len(chunks)
+    return [("(part %d of %d%s)\n\n" % (i + 1, n, "; reply only 'waiting' until the last part" if i + 1 < n else "; now answer the whole")) + c
+            for i, c in enumerate(chunks)]
 
 # What a question bound for someone else's service must never carry -- checked
 # deterministically, not by a model. Found the hard way, 2026-09-14: the
@@ -478,7 +503,14 @@ def main(argv=None):
                 excerpt = fh.read()[:MAX_PACKET_CHARS]
         models = [m.strip() for m in a.models.split(",")] if a.models else None
         packet, cid, intents, refused = cycle_packet(a.cycle, excerpt, models)
-        print("=== PASTE THIS, THE SAME TEXT, TO EACH SEAT ===\n" + packet + "\n=== END ===")
+        parts = paste_parts(packet)
+        if len(parts) == 1:
+            print("=== PASTE THIS, THE SAME TEXT, TO EACH SEAT ===\n" + packet + "\n=== END ===")
+        else:
+            print("=== %d chars: over Chat Smith's %d-char box, so PASTE THESE %d PARTS IN ORDER TO EACH SEAT ===" % (len(packet), CHATSMITH_BOX_CHARS, len(parts)))
+            for i, part in enumerate(parts, 1):
+                print("--- part %d of %d (%d chars) ---\n%s" % (i, len(parts), len(part), part))
+            print("=== END ===")
         print("cycle:", cid or "(none -- every seat refused)")
         for m, row in intents:
             print("seat %-12s intent %s   (record with: --answer %s --file <answer.txt>)" % (m, row["id"], row["id"]))

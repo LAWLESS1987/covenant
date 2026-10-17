@@ -7645,6 +7645,21 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A364. [Chat Smith's message box takes 4,000 characters; the consult tool let packets reach 6,000. It now prints a long packet as numbered parts that each fit] 2026-10-17. His words: "use your discernment toward mutual benefit".
+
+- **Found in use.** During the quorum-reply consult the same day, a 5,914-character packet passed `covenant_ai_consult` but would not fit Chat Smith's box. It was split by hand into two parts (2,231 and 3,761 characters).
+- **The fix.** `paste_parts(packet, limit=CHATSMITH_BOX_CHARS)` splits at paragraph breaks.
+  - Every part is at most 4,000 characters and opens with "(part i of n ...)".
+  - Every part but the last asks the reader to reply only "waiting".
+  - The packet is still one packet: gated, logged and answered as one. `MAX_PACKET_CHARS` (6,000) is unchanged.
+  - `--cycle` prints the parts when the packet does not fit the box.
+- **Guard.** AC1.25 and AC1.25b pass; AC1 is 44/44. Two mutations, each restored byte-identical:
+  - parts allowed over the box: AC1.25 FAIL, 43/44;
+  - headers removed: the suite crashed on AC1.25 (red, but a crash rather than a clean FAIL).
+- **Seen, not changed.** The roster still names `gpt-6-astra` as the final scan (AC1.24). Chat Smith no longer offered that model on 10-17; GPT-6 Luna stood in. The roster's final seat is his to name (A180).
+
+---
+
 ### A363. [A lookback index: every record entry and every tombstone on one generated page, tied together, with a `find` that gives live line numbers] 2026-10-17. His words: "You should probably start some type of indexing system including for the tombstones to make look back more efficient for yourself and other systems."
 
 - **Why.** Looking back meant reading a record of over 15,000 lines, or grepping it and taking a hit as a fact. That is the derived-source error, and the same day it produced A362's two misreadings. Tombstones were listed in `docs/CORRECTIONS.md`, but nothing tied a tombstone to the entry that made it.

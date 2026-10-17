@@ -181,6 +181,16 @@ def main():
     check("AC1.24 a packet longer than a question's cap but under the packet's is admitted (the cycle's length rule reaches the gate)",
           cid4 and len(intents4) == 1 and not refused4 and 3000 < len(_p4) <= AC.MAX_PACKET_CHARS, (len(_p4), refused4))
 
+    # AC1.25 (2026-10-17): a packet over Chat Smith's 4,000-char box is pasted in parts, each fitting the box, in order.
+    long_pkt = "\n\n".join(("para %d " % i) + ("w" * 300) for i in range(19))       # ~5,900 chars, like the 10-17 packet
+    parts = AC.paste_parts(long_pkt)
+    body = "\n\n".join(p.split(")\n\n", 1)[1] for p in parts)
+    check("AC1.25 a packet over the 4,000-char box is split into parts that each fit, numbered, and rejoin to the packet",
+          len(parts) >= 2 and all(len(p) <= AC.CHATSMITH_BOX_CHARS for p in parts)
+          and parts[0].startswith("(part 1 of %d" % len(parts)) and "now answer the whole" in parts[-1]
+          and body.split() == long_pkt.split(), [len(p) for p in parts])
+    check("AC1.25b a packet that fits the box is one part, unchanged", AC.paste_parts("short") == ["short"])
+
     n, good = len(results), sum(results)
     print("AC1: %d/%d passed" % (good, n))
     return 0 if good == n else 1
