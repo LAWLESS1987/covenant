@@ -7645,6 +7645,28 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A362. [The pre-announcement Facebook videos are public: all 20 catalogued reels read "Public" to a logged-out visitor on 10-17. The record called them private ("Only me"), and I misread that record twice in one hour, once each way] 2026-10-17. His words: "its not private its public on facebook as you know", then "make it legible and remember with our system and explain in the updated response".
+
+- **What happened, in order:**
+  - I told him posts #6 and #7 of Hugging Face topic 180652 are contradicted by our record, because the pre-July evidence is 26 private videos.
+  - He said they are public on Facebook.
+  - I then said "private" was only the name of our local folder, and that the catalogue never says either way whether the videos are public. That was wrong: `docs/CORPUS_2026-09-09.md` line 156 says every one was private ("Only me").
+  - Neither answer opened Facebook. Both were readings of prose.
+- **The measurement.** Each of the 20 reels in `private/fb_pre_july/catalog.csv` (2026-06-14 to 2026-07-04) was opened at `facebook.com/reel/<id>` in the built-in browser, which has no Facebook sign-in.
+  - All 20 show "Public".
+  - Four first showed a login wall and showed "Public" when reopened after 4 s.
+- **Not settled:**
+  - **When they became public.** Facebook shows no audience history, so "Only me" may have been true on 09-09, or wrong then.
+  - **The other 6 of the 26 videos** (23 upload events) were not opened.
+- **What changed:**
+  - `docs/CORPUS_2026-09-09.CORRECTION.md` sits beside the unedited original.
+  - Tombstone `A362-FB-PRIVATE` in `docs/RETRACTED.json` covers the "private ("Only me")" wording, "all private, all listed by id", "26/twenty private Facebook videos/reels", and my own chat wording "never says either way whether". Driven both ways.
+  - The record's other uses of "private" mostly mean the gitignored `private/` folder. That folder says where our copy is kept, not who can see a video.
+- **Posts #6 and #7 stand** on this point: the videos are dated before the announcement and are public now. Whether they were public in June is his to state; Facebook does not show it.
+- **Recurrence.** This is the derived-source shape (memory: derived-source-errors) and rule 1, "prose about data is not data", twice. The record's prose was read in place of the thing it described, a page anyone can open. The earlier tombstones guard wording; none guards "check the live page before answering a question about it". The memory rule `fb-pre-july-public` now makes that the first step.
+
+---
+
 ### A361. [My own load turned a scheduled check red a second time on 10-17: the daily's sweep failed test_b5_mine_latency while my llama-bench runs held the CPU. It passes 31/31, twice, quiet. A quiet-window reader now says when heavy work would collide] 2026-10-17. His words: "use your discernment toward mutual benefit and optimization".
 
 - **The daily of 10-17 (08:49Z):**

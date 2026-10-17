@@ -1700,6 +1700,36 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "confidence-trap.md is the original and is allowed, as for A236: its purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md is not allowed; it quotes the phrase beside this id."
+  },
+  {
+   "id": "A362-FB-PRIVATE",
+   "claim": "docs/CORPUS_2026-09-09.md (2026-09-09): the 26 Facebook videos dated before 6 July were 'every one of them private (\"Only me\")'; and Claude in chat, 2026-10-17, that the record 'never says either way whether the videos are public'.",
+   "refuted_by": "The operator, 2026-10-17: 'its not private its public on facebook as you know'; measured the same day: all 20 reels in private/fb_pre_july/catalog.csv read 'Public' at facebook.com/reel/<id> to a logged-out browser.",
+   "truth": "The pre-6-July Facebook reels are public now (20 of 20 measured; 6 of the 26 videos not opened). When they became public is not shown by Facebook. 'private/' in the record is the gitignored local folder, not a Facebook audience.",
+   "verbatim": [
+    "26 videos across 23 upload events dated before 6 July, every one of them private (\"Only me\"), none ever read by anything.",
+    "23 upload events, all private, all listed by id in the activity-log catalogue.",
+    "The twenty private Facebook reels dated 14 June to 4 July",
+    "the catalogue never says either way whether the videos are public"
+   ],
+   "patterns": [
+    "every\\s+one\\s+of\\s+them\\s+private\\s*\\(",
+    "all\\s+private,\\s+all\\s+listed\\s+by\\s+id",
+    "\\b(?:26|twenty)\\s+private\\s+(?:Facebook\\s+)?(?:videos|reels)",
+    "never\\s+says\\s+either\\s+way\\s+whether"
+   ],
+   "allow": [
+    "docs/CORPUS_2026-09-09.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "docs/OUTSIDE_AUDIT_VERIFIED_2026-09-27.md",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "CORPUS_2026-09-09.md is the original, kept unedited; OUTSIDE_AUDIT_VERIFIED_2026-09-27.md is a dated audit record using the same wording. docs/CORPUS_2026-09-09.CORRECTION.md is not allowed: it quotes the wording beside this id."
   }
  ]
 }
