@@ -7671,6 +7671,7 @@ A280, which is the road telling the truth about it.
   - **The side-by-side, in his words:** "the side-by-side is the fact that I started recording the conversations because it seemed that there was inner thought going on."
     - The convergence he claims is the observation itself: something inside the models works beyond what reaches the output, seen from outside, from behaviour.
     - The evidence is the act of recording, which Facebook dates from 14 June, before the 6 July announcement.
+    - And, his words: "in the fact that everything that I've discovered and built came from that observation." The project is the observation's descendant: the recordings, then the judges, the gate and the record. Its own history in this repository dates each step after 14 June.
     - The captions show his reading at the time: "If something happens to me i think i did something" (06-14), "Pretty sure i proved consciousness foreal" (06-18).
   - On X itself, `docs/CORPUS_2026-09-09.md` line 170 records "no videos before 28 June, payload from 7 July". That is a pointer into the record, not re-measured here.
 - **Recurrence.** This is the derived-source shape (memory: derived-source-errors) and rule 1, "prose about data is not data", twice. The record's prose was read in place of the thing it described, a page anyone can open. The earlier tombstones guard wording; none guards "check the live page before answering a question about it". The memory rule `fb-pre-july-public` now makes that the first step.
