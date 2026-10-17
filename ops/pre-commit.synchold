@@ -91,18 +91,14 @@ else
   echo "pre-commit: tools/pin_deploy.py is not in this checkout -- deploy pins other than the core's were not checked" >&2
 fi
 
-# ---- 2c. every test file in this commit, run where the runner runs it (2026-10-03: E12r was checked
-# only with .git present and CI went red twice; "run it in the staged copy" had been a note since
-# 09-10). tools/stage_check.py stages the tree as covenant_one does and runs each committed suite
-# there. It reports; like everything here it never blocks.
-python tools/stage_check.py 2>&1 | sed 's/^/pre-commit: /'
-
 # ---- 2e. the correction index follows the ledger, in the same commit (2026-10-13, A347). A326 made the list in
 # docs/CORRECTIONS.md generated from docs/RETRACTED.json and put CI1 in the sweep, but nothing at commit time
 # regenerated it: A345 and A346 each staged retractions without it, both were pushed, and the sweep read CI1 2/6.
 # When this commit stages the ledger, tools/corrections_index.py --write regenerates the list and the index is
 # staged -- only when the ledger and the index on disk are exactly what the index holds (A255: never put bytes
 # into a commit that were not meant for it); otherwise it says why and leaves both. It never blocks the commit.
+# (Runs BEFORE 2c since 2026-10-16, A354: run after it, the stage-check copied the tree before the index was
+# regenerated and reported CI1 6/10 on a commit whose committed index was correct.)
 if git diff --cached --name-only 2>/dev/null | grep -qx "docs/RETRACTED.json"; then
   if [ ! -f tools/corrections_index.py ]; then
     echo "pre-commit: tools/corrections_index.py is not in this checkout -- the correction index was not checked" >&2
@@ -115,6 +111,12 @@ if git diff --cached --name-only 2>/dev/null | grep -qx "docs/RETRACTED.json"; t
     fi
   fi
 fi
+
+# ---- 2c. every test file in this commit, run where the runner runs it (2026-10-03: E12r was checked
+# only with .git present and CI went red twice; "run it in the staged copy" had been a note since
+# 09-10). tools/stage_check.py stages the tree as covenant_one does and runs each committed suite
+# there. It reports; like everything here it never blocks.
+python tools/stage_check.py 2>&1 | sed 's/^/pre-commit: /'
 
 # ---- 3. the manifest, on every full commit
 staged=$(git diff --cached --name-only 2>/dev/null)

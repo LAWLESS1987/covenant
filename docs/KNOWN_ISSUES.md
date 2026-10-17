@@ -7696,6 +7696,14 @@ A280, which is the road telling the truth about it.
   - The public flinch README: its "a hash of every rule and threshold" is false (`_SPLIT` is outside `_rules_hash`), and correcting a public repository is his to approve.
   - The website READMEs and forum cards: his approval.
   - The Confidence Trap's "consistently": not yet tombstoned. It is the next piece of this entry.
+- **A354b: a false red at commit time, found by landing this entry.**
+  - The commit's stage-check read `test_ci1_corrections_index.py` 6/10 and said "CI will be red on this push".
+  - The committed index was correct: it carries all three new ids, and CI1 read 10/10 in the working tree and in a `git archive` copy of the commit.
+  - Cause: the hook ran the stage-check (step 2c) before step 2e regenerated the index (A347). The staged copy held the new ledger ids and the old index.
+  - A warning that cries wolf on every tombstone commit teaches a reader to skip it, so the order is swapped: 2e now runs before 2c.
+  - The earlier hook is kept as `.trash/pre-commit.before-A354b-2026-10-16`. The new one is installed byte-identical.
+  - A117 23, A255 23/23, CI1 10/10, PC2 25/25, R1 234/234, SC2 29/29.
+  - **Not yet observed:** a commit staging the ledger under the new order. The next tombstone commit is the first.
 
 ---
 
