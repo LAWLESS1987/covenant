@@ -2242,15 +2242,41 @@ def _port_listening(port, host="127.0.0.1"):
         return False
 
 
+def _tend_may_act():
+    """A370 (2026-10-18): (ok, why). ONLY THE DAEMON TENDS, and only in a tree that can relaunch its own nodes.
+
+    On 2026-10-15 at 01:11:56 one process in worktree wf_50df637b-e4d-1 started six seal services, which ran for
+    three days, all LISTENING on 127.0.0.1:8433 beside the real one. Python's HTTPServer sets SO_REUSEADDR, which
+    on Windows lets a second bind share the port instead of failing. Six is exactly the number of passes in
+    test_watchdog_outage.py that are not a total outage, and that suite stubs health and start_node but not the
+    tends. The worktree had no .venv, so the launch fell back to the main venv's python.exe: the strays' launcher.
+
+    This is A244's shape again. A244 fenced the highway, the remedy that acted THAT time, from these same suites,
+    and left the other remedies in one_pass open. The fence is now on the class: a remedy that starts a process
+    or signs with the node key acts only from the daemon (_self_eval["persist"], set only by main()'s loop, as
+    for the direct line) and only where highway_may_act() holds. Tests that pass spawn= or signer= are not
+    affected; they never reach the real launch."""
+    if not _self_eval.get("persist", False):
+        return False, "outside the daemon (a test, an import or --once): only the daemon starts services (A370)"
+    if not highway_may_act():
+        return False, ("this tree cannot relaunch its own nodes (a staged copy, a worktree or a fresh clone): "
+                       "it starts nothing (A370, as A244 for the highway)")
+    return True, ""
+
+
 def tend_seal_service(spawn=None):
     """Start the Sentinel-Witness seal service if nothing listens on 8433.
     The Startup-folder copy needed administrator hands; this guard runs every
     two minutes under the scheduler regardless, so it is the layer that makes
-    the service survive a reboot. Returns 'up', 'started' or 'failed: ...'."""
+    the service survive a reboot. Returns 'up', 'started', 'not started: ...'
+    (A370) or 'failed: ...'."""
     if _port_listening(8433):
         return "up"
     try:
         if spawn is None:
+            ok, why = _tend_may_act()
+            if not ok:
+                return "not started: " + why
             pyw = os.path.join(HERE, ".venv", "Scripts", "pythonw.exe")
             if not os.path.exists(pyw):
                 pyw = sys.executable
@@ -2285,6 +2311,9 @@ def tend_earn_service(spawn=None, port=None):
         return "up"
     try:
         if spawn is None:
+            ok, why = _tend_may_act()                        # A370
+            if not ok:
+                return "not started: " + why
             pyw = os.path.join(HERE, ".venv", "Scripts", "pythonw.exe")
             if not os.path.exists(pyw):
                 pyw = sys.executable
@@ -2304,6 +2333,10 @@ def tend_pending(port=5000, http=None, signer=None):
     and a node restart discards them (A53). Operator-signed with the node key,
     exactly as covenant_trader.seal_decision and covenant_client.cmd_mine do.
     Returns a one-line result; never raises."""
+    if signer is None:                                       # A370: the real path signs with the node key
+        ok, why = _tend_may_act()
+        if not ok:
+            return "not mined: " + why
     try:
         import json as _json
         import urllib.request

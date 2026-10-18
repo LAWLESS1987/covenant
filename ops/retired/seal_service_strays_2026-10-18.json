@@ -1,0 +1,184 @@
+﻿{
+    "recorded":  "2026-10-18T11:24:37",
+    "by":  "Claude, on his word 2026-10-18 (\"yes check them and retire the strays\")",
+    "why":  "6 seal_service chains launched 2026-10-15 01:11:56 from worktree wf_50df637b-e4d-1 (at eeb2f18), all LISTENING on 127.0.0.1:8433 beside the main copy (pid 24680, 10-14 14:40) through SO_REUSEADDR; seal-path code identical to HEAD (git diff empty for seal_service, guards, covenant_trader, order_claims, trader_config)",
+    "netstat_8433":  [
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       23492",
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       27872",
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       24680",
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       8952",
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       26356",
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       26420",
+                         "TCP    127.0.0.1:8433         0.0.0.0:0              LISTENING       8620"
+                     ],
+    "processes":  [
+                      {
+                          "pid":  17240,
+                          "ppid":  3748,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  25788,
+                          "ppid":  17240,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  19472,
+                          "ppid":  3748,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  15408,
+                          "ppid":  3748,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  13624,
+                          "ppid":  3748,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  26220,
+                          "ppid":  19472,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  15724,
+                          "ppid":  3748,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  28264,
+                          "ppid":  15408,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  11932,
+                          "ppid":  3748,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  27276,
+                          "ppid":  13624,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  24392,
+                          "ppid":  15724,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  25948,
+                          "ppid":  11932,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\ops\\hidden_task.py sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  19428,
+                          "ppid":  25788,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  5208,
+                          "ppid":  26220,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  8620,
+                          "ppid":  19428,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  23492,
+                          "ppid":  5208,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:56",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  24812,
+                          "ppid":  28264,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  15568,
+                          "ppid":  27276,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  26356,
+                          "ppid":  24812,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  8776,
+                          "ppid":  24392,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  8952,
+                          "ppid":  15568,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  5196,
+                          "ppid":  25948,
+                          "name":  "python.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  26420,
+                          "ppid":  8776,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      },
+                      {
+                          "pid":  27872,
+                          "ppid":  5196,
+                          "name":  "python3.12.exe",
+                          "created":  "2026-10-15T01:11:57",
+                          "cmd":  "\"C:\\Users\\Lawre\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\python.exe\" C:\\Users\\Lawre\\covenant\\.claude\\worktrees\\wf_50df637b-e4d-1\\sentinel_witness/seal_service.py"
+                      }
+                  ]
+}

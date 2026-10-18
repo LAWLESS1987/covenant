@@ -371,6 +371,9 @@ SUITES = [
     ("test_r6_contribution.py",           60,  "MONEY"),
     ("test_xrpl_record.py",               60,  "MONEY"),
     ("test_watchdog_outage.py",           90,  "SECURITY"),
+    # A370 (2026-10-18): only the daemon, in a tree that can relaunch its own nodes, starts a service or mines.
+    # Six seal services launched from a worktree by the outage suite's passes listened on 8433 for three days.
+    ("test_a370_only_daemon_tends.py",    120, "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.

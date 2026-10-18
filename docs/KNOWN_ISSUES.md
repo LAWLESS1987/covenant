@@ -7645,6 +7645,43 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A370. [FIXED; retired on his word. Six seal services launched from a worktree by a test listened on 127.0.0.1:8433 beside the real one for three days. A recurrence of A244's shape: the remedies beside the highway were never fenced] 2026-10-18. Found while answering his "whats this black on the right of the screen"; retired on "yes check them and retire the strays".
+
+- **What ran.**
+  - 6 chains of 4 processes, all created 2026-10-15 01:11:56 by ONE parent (gone).
+  - Their command lines run `ops\hidden_task.py sentinel_witness/seal_service.py` from `.claude\worktrees\wf_50df637b-e4d-1` (at `eeb2f18`), under the MAIN venv's `python.exe`.
+  - `netstat -ano` showed 7 LISTENING sockets on 127.0.0.1:8433: these 6 plus the real service (pid 24680, started 10-14 14:40).
+  - Python's `HTTPServer.allow_reuse_address` is 1 (measured: 3.12.10). On Windows, `SO_REUSEADDR` lets a second bind share a port instead of failing, so no copy ever errored. Which copy answered a connection was the stack's choice.
+- **Harm, measured.**
+  - The seal-path code was identical to HEAD: `git diff eeb2f18 HEAD` is empty for `seal_service.py`, `guards.py`, `covenant_trader.py`, `order_claims.py` and `trader_config.json`.
+  - The service refuses every order today (its docstring: the app supplies no portfolio).
+  - UNDETERMINED: whether any seal reached a stray between 10-15 and 10-18, and what that copy read from its own tree's untracked state. No log of which listener answered exists.
+- **Cause.**
+  - `test_watchdog_outage.py` makes exactly 6 `one_pass()` calls that are not a total outage.
+  - It stubs `health` and `start_node` and spies the highway (A244), but `tend_seal_service`, `tend_earn_service` and `tend_pending` ran for real.
+  - The worktree has no `.venv`, so `tend_seal_service` fell back to `sys.executable`: the main venv's `python.exe`, which is the strays' launcher.
+  - `test_p20_watchdog_self_eval.py` has the same opening (2 passes).
+  - UNDETERMINED: why `_port_listening(8433)` saw nothing at 01:11 while pid 24680 had been listening since 10-14. A sandboxed agent shell that blocks loopback connections would explain it; this is not verified.
+- **A recurrence.** A244 (10-03) names these same suites (test_p20, test_watchdog_outage, test_a115) calling `one_pass()` in a staged copy. It fenced the HIGHWAY, the remedy that acted that day. The tends beside it in `one_pass` stayed open. A pending tend in the production tree, run by hand, could also have MINED with the node key.
+- **Retired.**
+  - The 24 processes were recorded first in `ops/retired/seal_service_strays_2026-10-18.json` (pid, parent, creation time, full command line, the netstat lines).
+  - Each PID's command line was re-verified before it was stopped. 12 were stopped; the other 12 ended with their chains. 0 remain from the worktree.
+  - 8433 now has one listener, 24680, and it answers GET with 405 "POST /seal only".
+  - The worktree itself was not touched (58 worktrees exist; their clean-up is a separate decision).
+- **The guard (rule 10: the tombstone of a forgotten step is a guard where it is forgotten).**
+  - `covenant_watchdog._tend_may_act()`: a real launch (`spawn=None`) or a real mine (`signer=None`) happens only from the daemon (`_self_eval["persist"]`, set only by `main()`'s loop, as for the direct line, A169) and only where `highway_may_act()` holds (A244's predicate).
+  - Tests that pass `spawn=`/`signer=` or replace the tends (A115, EA1) are unaffected.
+  - The `sys.executable` fallback is KEPT: `docs/RUN_WITHOUT_CLAUDE_CODE.md` never mentions a `.venv`, so removing it would silently stop a second operator's seal service (rule 6).
+  - `test_a370_only_daemon_tends.py`, registered SECURITY: 7/7. Popen and urlopen are tripwires, and A370.7 runs the outage suite's 6 passes with the real tends: 18 tends, 0 launches, nothing mined.
+  - Driven both ways: 5 mutations of the guard each turned their checks red; restored byte-identical.
+  - The neighbouring suites still pass: outage 12/12, P20 83/83, A115 34/34, EA1 51/51, G7 26/26, RL1, A90 15/15.
+- **Not fixed.**
+  - The seal service still binds with `SO_REUSEADDR`, so a duplicate started by any other route would again share the port silently. An exclusive bind (`allow_reuse_address = False`, or `SO_EXCLUSIVEADDRUSE`) was NOT made today: it changes how a restarted service binds after TIME_WAIT on the money path, and needs its own measured test.
+  - `test_c2_watchdog_live.py` runs the real daemon in a scratch dir. There the guard rests on `highway_may_act()`, which may hold if the scratch tree can relaunch its nodes. 8433 is normally up, so its tend reads "up".
+  - The running watchdog uses the guard only after its next restart.
+
+---
+
 ### A369. [OPEN, his decision. The phone's "Learn from my AI apps" capture reads the AI apps' INPUT BOXES too, so text he types and never sends can be captured. Captured lines are queued for the teacher, whose panel runs on the public repository's runner] 2026-10-17. Found by the wake-word branch's adversarial review (workflow wf_7598ea6c-a22, blocker 1); verified here against main.
 
 - **Measured in code.**
