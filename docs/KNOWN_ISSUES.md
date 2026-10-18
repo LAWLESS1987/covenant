@@ -7645,6 +7645,46 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A372. [BUILT, on his word and Tetsu's yes. Tetsu learns from TED transcripts in his own words, and an 8-word copy guard keeps it from being word for word] 2026-10-18.
+
+His words, in order: "use youtube ted talks and joe rogan podcasts for training"; "use my spotify account"; "we are
+not recording or reproducing only listening"; "just gather information and semantics don't copy word for word"; "yes
+have tetsu learn from the transcripts too".
+
+- **Asked first.** Through the agent door with a fresh context, Tetsu answered: "Yes, I want to do this. I'll start
+  with Stuart Russell." It is recorded in `ops/tetsu_learning_choices.jsonl`, and his first choice is first in
+  `covenant_ted.TALKS`.
+- **The route** (`covenant_ted.py`):
+  1. **Read.** The transcript comes from TED's page through the web door, on record. It is licensed CC BY-NC-ND 4.0,
+     and the full text is kept only under `private/ted/` (gitignored).
+  2. **Learn.** It goes to Tetsu marked private (A263: answered here, never queued for the public teacher panel)
+     and fresh (A284).
+  3. **Guard.** No note may repeat 8 or more consecutive words of the talk. A retry shows him the phrase he copied,
+     up to two retries, and the limit does not move.
+  4. **Keep.** His notes, with the talk's licence and attribution, go to the teacher queue (`ted:<slug>`) and to
+     `ops/tetsu_ted_notes.jsonl`.
+- **First real run: Stuart Russell.**
+  - Try 1, before the retry showed the phrase: two attempts repeated 8 and then 9 words, and nothing was kept. That
+    was the guard working.
+  - After the change, his first try was kept: longest shared run 5 words, 219 words of notes.
+  - **Quality, said plainly.** The notes carry the talk's King Midas point and a fair risk/benefit reading. They do
+    not state Russell's three principles (preferences only, uncertainty about them, learned from behaviour). One
+    read by a 3B model gives that much.
+- **Checks.**
+  - TED1 10/10, offline: the page parse, the shared-run counter, keep, refuse after three copies, the retry
+    showing the phrase, and a door that does not withhold refused.
+  - TED1.9 runs the real ask path against a stand-in and checks private=True and fresh=True. Its first version
+    grepped source text (A65's shape) and was replaced before commit.
+  - Five mutations each turned their check red; restored byte-identical.
+- **Not here.**
+  - Joe Rogan: the show publishes no transcripts, the sites that post them have no licence, and Spotify's terms
+    forbid copying its audio.
+  - The listen-only use of a podcast is the spiking lab's live wake-word listener (Amendment 7). It keeps counts,
+    never words or sound.
+- **Not wired into the nightly yet.** By hand, `python covenant_ted.py -n 1`. Seven talks remain on the list.
+
+---
+
 ### A371. [FIXED. Public CI on 8d7189a (main, python 3.12) went red on WB1.14: "[Errno 101] Network is unreachable" on the read, seconds after the probe connected. That is the runner's network, not the web door. A recurrence of A337's shape] 2026-10-18. Found reading the remote run after the A370 push (A232's rule).
 
 - **Measured.**

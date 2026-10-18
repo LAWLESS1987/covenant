@@ -1,0 +1,14 @@
+{
+ "learned": {
+  "stuart_russell_3_principles_for_creating_safer_ai": {
+   "t": "2026-10-18T17:25:27-0400",
+   "longest_shared_run": 5
+  }
+ },
+ "refused": {
+  "stuart_russell_3_principles_for_creating_safer_ai": {
+   "t": "2026-10-18T17:24:13-0400",
+   "why": "notes repeated [8, 9] consecutive words of the talk twice"
+  }
+ }
+}
