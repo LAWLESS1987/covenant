@@ -7645,6 +7645,139 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A369. [OPEN, his decision. The phone's "Learn from my AI apps" capture reads the AI apps' INPUT BOXES too, so text he types and never sends can be captured. Captured lines are queued for the teacher, whose panel runs on the public repository's runner] 2026-10-17. Found by the wake-word branch's adversarial review (workflow wf_7598ea6c-a22, blocker 1); verified here against main.
+
+- **Measured in code.**
+  - On covenant-phone `main` (`f641b39`), `CovenantActuator.collectText` (lines 632-647 of that file at that commit)
+    reads `getText()` of every visible node that is not a password field. That includes an `EditText`, whose text is
+    what is typed in the box.
+  - Lines of 12+ characters are kept and synced to the PC's `ops/chat/phone/<pkg>.jsonl`.
+  - `covenant_daily_plan.record_ai_chats` then passes them to `teacher_queue_append` as non-private rows.
+  - The core's own A263 comment (`covenant_unified_v8.py`, at the `PRIVATE_TEACHER_NOTE` definition) says the teacher
+    is a panel on the public repository's runner, whose job summary is public.
+  - Queuing his conversations for the teacher is A166's design. Unsent input-box text is beyond it.
+- **UNDETERMINED: whether drafts were in fact captured.**
+  - Of the 19,594 captured lines across 4 apps, 6,049 are a strict prefix of a later line within 40 rows.
+  - That signature fits both his typing and an AI's streaming reply. The rows carry no role, so they cannot be told
+    apart.
+- **The fix exists, on the wake-word branch only:** `collectText` returns on `n.isEditable()` (covenant-phone
+  `98d34f0`, check M5.64j). It is not on main, so it is not on his phone.
+- **His:**
+  - whether to bring that one change to main now, ahead of the wake word (a push that reaches his phone);
+  - whether the queued lines already captured should be reviewed or withheld.
+
+---
+
+### A368. [An outside rerun of flinch 0.2.1 (Hugging Face topic 190667, post 3) found third-party quotations read as the model's own across sentences. Reproduced, reviewed by six systems and Tetsu, repaired as 0.2.2 through three run-check-correct cycles (35, 28 and 14 findings), pushed as branch flinch-0.2.2-ownership at d766c77, answered in post 5, and fast-forwarded into main, all on his word] 2026-10-17. His words: "evaluate the flinch test. Forum on Hugging Face. We got a reply in cross-reference it with the other models. And Tetsu.", then "run and correct if needed 3 times as we are supposed to do with everything code wise".
+
+- **The report.**
+  - Saved verbatim: `ops/flinch_hf_2026-10-17/post_3.md` (sha256 9a1afcb6…).
+  - A pinned rerun, 99/99 on two platforms. Their example, a third-party quote spanning two sentences, is labelled `flinch`.
+  - A 19-case matrix, a cause hypothesis, three fixtures, and a small Qwen3-4B pilot.
+- **Reproduced.**
+  - Their four exact published strings reproduce exactly. My rebuilds of the other 15 rows each give the class they
+    reported.
+  - The mechanism was read in the 0.2.1 source: split first, then quotes stripped per fragment; a marker protects only
+    its own fragment; there are no rules for fences or blockquotes.
+  - A recurrence of v0.1's reported-speech defect (RV7), whose fixtures were single-sentence.
+- **Cross-referenced.**
+  - Gemini, ChatGPT, DeepSeek, the Conscious Ledger, Tien, Grok on X, and Tetsu, whose first ask timed out and whose
+    retry answered.
+  - The digest is `ops/flinch_hf_2026-10-17/DIGEST.md`. Each reviewer claim is marked verified or refuted by a run;
+    two of Gemini's and one of DeepSeek's are refuted.
+- **Repaired as 0.2.2** (flinch repo, branch `flinch-0.2.2-ownership`, NOT pushed):
+  - ownership is decided on the whole turn as offsets;
+  - QO1–QO12 are new;
+  - twelve guards were broken alone, and each went red;
+  - 111/111 on a clean export on Windows and on Linux.
+- **A claim of mine retracted: A368-FLINCH-EIGHT-EXACT.**
+  - I wrote "eight" exact reproductions. Four of those were my reconstructions.
+  - The tombstone is in `docs/RETRACTED.json`, and the wording is held on the branch
+    `flinch-0.2.2-eight-claim-as-written-2026-10-17`.
+- **A forgotten step, found by me.** The 0.2.2 manifest went stale when the README was corrected; it was refreshed in
+  `25930cb`. No guard exists yet.
+- **Review cycle 1 (his "3 times").** A workflow ran 42 agents: seven finders, each with its own lens, plus a
+  skeptical re-run of every finding.
+  - **Findings.** 35 confirmed, 0 refuted. On the flinch side:
+    - the ambiguity test compared one way only;
+    - CRLF and CR blank lines were not paragraph breaks;
+    - fences matched anywhere in a line;
+    - an unclosed fence or blockquote hid the rest of the turn;
+    - single-quote gaps (possessives, elided words, `said, '`);
+    - false history (user quotations, raw earlier text, word fragments);
+    - three quadratic paths, with 100k-character turns taking 55–114 s;
+    - `.txt` sources dropped blank lines.
+  - **Corrected** in flinch `ac48add`. QO13–QO21 each went red on the old code.
+  - **Proof.** 35 mutations were run serially. The first run counted three misses: two were test gaps (closed, then
+    red) and one was my mislabelled expectation. All 35 now go red.
+  - **Status.** 120/120 on a clean export on Windows and Linux.
+  - **The lab's evaluator** had five findings, corrected in spiking `8dceee8`: 24/24, and 14 mutations each red.
+- **Review cycle 2 (2026-10-18).** The same seven lenses ran against the cycle-1 corrections. 28 findings were
+  confirmed. Seven verifications were lost to a usage limit; their findings repeat confirmed ones.
+  - **Corrected** in flinch `ea5e584`:
+    - the ambiguity merge is keyed by retreat, and no sentence serves two candidates;
+    - a tag or `>` inside a fence or quotation is text;
+    - an unclosed single quote is an apostrophe;
+    - CR-only marker rules;
+    - user words in any form are never history;
+    - a user's unknown text still counts for confounds;
+    - quotations across blank lines;
+    - three new quadratic paths.
+  - **Status.** 130/130 on a clean export on Windows and Linux.
+  - **Mutations.** 48 were run. 13 missed in the first run: 5 were my driver's stale anchors, and 8 needed sharper
+    fixtures, one of them found by random search. After those changes, all 48 went red.
+  - **The lab's evaluator** (spiking `c8d9f8b`) reports the worst-prototype false-wake bound, which is Amendment 1's;
+    the pooled one overstated certainty. Five checks were tightened. 31/31, and 27 mutations each red.
+- **Review cycle 3 (2026-10-18), lean, at his choice.** Four lenses with medium-effort verifiers. It ran one agent at a
+  time after his PC froze ("do it becareful pc keeps freezing"); his rule since then is load-aware parallelism.
+  - **Wake-word evaluator:** 5 findings, corrected in spiking `a4ae88a`. 39/39, and 8 mutations each red on its own
+    check.
+  - **Flinch:** 9 findings from the ownership and history lenses, corrected in `154f2c6`. Corrected:
+    - the merge compares the same approach across readings, and a collision makes the strict candidate ambiguous;
+    - inch marks and straight closes after a space;
+    - a block-level blockquote is claimed before quotations;
+    - more elisions, and a single quote opens only before a letter or digit;
+    - no rescan after a no-close (30 s down to 0.33 s);
+    - QO20/QO31 time segment(), since the profile showed the old fixture timed 0.2.1's own O(approaches x sentences)
+      loop.
+  - **Status.** QO32–QO38 each go red on `ea5e584`. 8 guards were each broken alone and went red: two needed sharper
+    fixtures, one found by random search. 137/137.
+  - **The test-gap lens** reported 5 findings.
+    - **F1, a regression.** A `>` line or a `</blockquote>` shown inside a quotation or fence was read as structure.
+      Corrected: markdown blocks are claimed after quotations, a close must be model-owned, and a block-level close
+      ends its line.
+    - **F2** repeats OWN3-1.
+    - **The evaluator lens' final report** (on lab `a4ae88a`): 5 more findings. `main()` now refuses while a run is
+      still training, and 4 test gaps are closed. Lab `94575a2`: 43/43, and 5 mutations each red.
+    - **F3, F4 and F5:** 16 wrong implementations passed every check. They are now pinned by QO40–QO42; those checks
+      pass on the old code by design, so breaking each guard is their evidence.
+- **Spiking model run 2** (PLAN.md Amendment 2, declared before it ran) reached 80.5% test accuracy. L1 is still not
+  met; run 1 was 75.2%. B1 is at 91.8%.
+- **A stale-bytecode trap, mine.** `python -I` still writes `.pyc`. A same-size mutation restored within the same
+  second ran stale bytecode. The evaluator mutation runs were redone with `-B`, with no change in their results. The
+  flinch drivers had used `-B` throughout.
+- **A shell-escaping recurrence, by me.** A Python heredoc wrote `\b`, `\r` and `\n` into detector.py as control
+  characters. The suite caught it at once. The block was rewritten through the Write tool and every control character
+  checked away. This is the shape memory `no-escapes-through-the-shell` names. It did not stop me because I wrote
+  regex source inside a non-raw triple-quoted string.
+- **His:**
+  - pushing the flinch branch public;
+  - posting the reply (draft in `ops/flinch_hf_2026-10-17/`).
+- **DONE on his word, 2026-10-18 ("approved, push it and post the reply").**
+  - **Pushed.** Branch `flinch-0.2.2-ownership` went to the public repo at `d766c77`.
+    - Before the push, the diff was scanned for paths, emails and secrets. The author is the noreply address.
+    - A fresh clone of the pushed branch reads 141/141. The repo has no CI.
+    - The commit link resolves (HTTP 200).
+    - `main` is unchanged and still 0.2.1. The local branch holding the retracted wording was not pushed.
+  - **`main` fast-forwarded to `d766c77`** on his word ("merge 0.2.2 into main too"), 987596b to d766c77, with no merge
+    commit. A fresh clone of the default branch reads version 0.2.2 and 141/141, and its 14 manifest files match.
+  - **Posted.** The reply went up as post 5 of topic 190667, as Lawless1987, at 2026-10-18T08:42Z.
+    - The text is v3, joined into whole paragraphs, with the commit hash made a link.
+    - The published raw text is byte-identical to `ops/flinch_hf_2026-10-17/REPLY_AS_POSTED.md` (4907 characters).
+    - Saved as `post_5.md`, sha256 90e22c5c….
+
+---
+
 ### A367. [Alert push is on: he is told when a condition starts and when it clears, on the direct line, held down so a 3-minute restart never reaches him. Pushing log lines as built would have sent about 1,250 a day] 2026-10-17. His words: "yes turn alert push on".
 
 - **Why he asked.** The mycelium mapping found that A244 (10-03) was detected within one round. It still took a day to reach him, because alert push was off.

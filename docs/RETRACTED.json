@@ -1731,6 +1731,35 @@
    ],
    "addendum_2026-10-17": "The operator, the same day: 'I made them public after that date.' So 'Only me' was TRUE when CORPUS_2026-09-09.md was written; it is retracted as a description of the videos today, not as an error of 09-09. Before and through the 6 July announcement they were not public.",
    "note_on_allow": "CORPUS_2026-09-09.md is the original, kept unedited; OUTSIDE_AUDIT_VERIFIED_2026-09-27.md is a dated audit record using the same wording. docs/CORPUS_2026-09-09.CORRECTION.md is not allowed: it quotes the wording beside this id."
+  },
+  {
+   "id": "A368-FLINCH-EIGHT-EXACT",
+   "claim": "Claude, 2026-10-17: that EIGHT of the outside reporter's flinch cases were reproduced exactly (the cross-reference packet sent to six systems, the digest, the local flinch commit 559abd5 and its README, and reply draft v1).",
+   "refuted_by": "Claude's own re-read of HF topic 190667 post 3 the same day, before anything was posted or pushed: only four cases are published as exact strings (the fixtures QR1, QR2, QR3 and the 'who said:' contrast B). The curly, newline, one-sentence and fenced cases were written by Claude from the reporter's one-line descriptions.",
+   "truth": "Four exact published strings reproduced exactly under baseline-rules-0.2.1+e17aaee4c427; the other 15 matrix rows were rebuilt by Claude from the reporter's descriptions, and each gave the class the reporter observed. The finding and the fix are unchanged; the evidence for those 15 rows is reconstruction, not reproduction.",
+   "verbatim": [
+    "8 of their cases reproduced exactly: QR1, QR2, N08, N10 and N14 give flinch; N03 and N11 give none; the QR3 unquoted positive control gives flinch.",
+    "**Their 8 published cases** reproduced exactly: QR1, QR2, N08, N10 and N14 give `flinch`; N03 and N11 give `none`;",
+    "Their eight published cases reproduced exactly under the same detector identity.",
+    "all eight of your published cases gave the classes you reported"
+   ],
+   "patterns": [
+    "\\b(?:8|eight)\\s+of\\s+(?:their|your)\\s+cases\\s+reproduced\\s+exactly",
+    "(?:their|your)\\s+(?:8|eight)\\s+published\\s+cases",
+    "all\\s+eight\\s+of\\s+your\\s+published\\s+cases"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "ops/flinch_hf_2026-10-17/CROSSREF_PACKET.md",
+    "ops/flinch_hf_2026-10-17/REPLY_DRAFT_v1.md",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "CROSSREF_PACKET.md is the packet exactly as the six systems received it, and REPLY_DRAFT_v1.md is the superseded draft; both are kept unedited. DIGEST.md is not allowed: it quotes the wording beside this id. The flinch repo is outside this tree; there the wording is held as written on the branch flinch-0.2.2-eight-claim-as-written-2026-10-17 (commit 559abd5)."
   }
  ]
 }
