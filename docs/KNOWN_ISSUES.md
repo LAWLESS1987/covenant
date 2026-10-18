@@ -7682,6 +7682,17 @@ have tetsu learn from the transcripts too".
   - The listen-only use of a podcast is the spiking lab's live wake-word listener (Amendment 7). It keeps counts,
     never words or sound.
 - **Not wired into the nightly yet.** By hand, `python covenant_ted.py -n 1`. Seven talks remain on the list.
+- **The first commit (deddc12) failed two suites where the runner runs them.** The pre-commit stage check said so,
+  and the push went anyway because the hook never blocks.
+  - A255 C1: the new tracked `ops/tetsu_ted_notes.jsonl` was in neither OUTPUTS nor INPUT_LEDGERS. Both it and
+    `ted_state.json` are now named in `verify_bundle.OUTPUTS`. The .json is A255's own warned-of blind spot, named
+    before it could trip G1.
+  - A284 FC10: `covenant_ted.py` calls `tools/tetsu_work.ask` and was not declared. It is declared "fresh".
+  - In place it had passed only because the file was untracked: FC10's walk and A255's list read tracked files.
+  - Both are fixed in the next commit: A255 23/23, A284 17/17 in a covenant_one staged copy and in place.
+  - **Rule 10, what this repeats.** Adding a tetsu_work caller or a runtime ledger is a step A284 and A255 guard at
+    commit, and both guards fired. What was skipped was reading the stage check's FAIL lines BEFORE pushing. The
+    hook does not block, by design, so that reading is mine to do.
 
 ---
 
