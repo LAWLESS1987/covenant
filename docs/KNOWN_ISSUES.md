@@ -7645,6 +7645,24 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A371. [FIXED. Public CI on 8d7189a (main, python 3.12) went red on WB1.14: "[Errno 101] Network is unreachable" on the read, seconds after the probe connected. That is the runner's network, not the web door. A recurrence of A337's shape] 2026-10-18. Found reading the remote run after the A370 push (A232's rule).
+
+- **Measured.**
+  - Run 39141051126 (main): the 3.12 job failed with exactly one check, WB1.14, `URLError: <urlopen error [Errno 101] Network is unreachable>`. The 3.11 job passed.
+  - Run 39141054423 (the sentinel-witness push of the same commit) passed.
+  - The suite's probe, `socket.create_connection(("www.gutenberg.org", 443))`, had connected first.
+  - `covenant_web.read` opens through urllib, which connects through the same `socket.create_connection` fallback over every resolved address. So the door does not pin one address, and a whole-route "unreachable" a few seconds later is the network's.
+- **A recurrence.** A337 (10-12, his words: "make WB1.14 count a Gutenberg timeout as not run if the most logical") named a far host's 502/503/504 and timeouts. It did not name this machine's own network dropping between the probe and the read. That is the suite's existing "no network" case, arriving late.
+- **The repair (in the test, not the door).**
+  - `network_unreachable()` matches only `[Errno 101]` / "Network is unreachable".
+  - The read is asked once more after 5 s, as A337 does. Unreachable twice is NOT RUN, named, and never counted as passed.
+  - A DNS failure, a 4xx, a TLS error and a 5xx are not this case: A337's DNS choice is kept.
+  - WB1.24 drives it with no network: the cases, a retry that measures, and a retry that stays unmeasured. WB1 40/40 here, and WB1.14 was MEASURED live.
+  - Three mutations each turned WB1.24 red: no retry, a pattern widened to DNS, and the predicate removed. Restored byte-identical.
+- **What it cannot see.** Why the runner's route dropped. A door bug that surfaced as Errno 101 would now read NOT RUN on the second try, but the door has no code that produces that errno.
+
+---
+
 ### A370. [FIXED; retired on his word. Six seal services launched from a worktree by a test listened on 127.0.0.1:8433 beside the real one for three days. A recurrence of A244's shape: the remedies beside the highway were never fenced] 2026-10-18. Found while answering his "whats this black on the right of the screen"; retired on "yes check them and retire the strays".
 
 - **What ran.**

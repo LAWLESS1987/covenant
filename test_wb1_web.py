@@ -64,6 +64,17 @@ def far_host_unavailable(r):
     return bool(re.match(r"(TimeoutError|socket\.timeout|timeout|URLError)\b.*\btimed out\b", str((r or {}).get("reason", "")), re.I))
 
 
+def network_unreachable(r):
+    """A371 (2026-10-18): THIS machine's network had no route on the read itself -- [Errno 101] "Network is
+    unreachable" -- after the opening probe connected. Public CI on 8d7189a (python 3.12) failed WB1.14 on exactly
+    that. It is the suite's own "no network" case arriving a few seconds late: the network, not this door, which
+    connects through the same socket.create_connection fallback the probe used. A DNS failure stays a failure
+    (A337's choice)."""
+    if (r or {}).get("ok"):
+        return False
+    return bool(re.search(r"\[Errno 101\]|Network is unreachable", str((r or {}).get("reason", ""))))
+
+
 tmp = tempfile.mkdtemp(prefix="wb1_")
 GRANT = os.path.join(tmp, "grant.json"); NOGRANT = os.path.join(tmp, "none.json"); LEDGER = os.path.join(tmp, "reads.jsonl")
 json.dump({"granted": True, "words": ["test"]}, open(GRANT, "w"))
@@ -253,7 +264,7 @@ def read_twice_if_far(read, pause=time.sleep):
     """(r, first): one read, and once more after a pause when the first is the far host's (A337) -- a gateway
     answer is usually brief, and a read that works the second time is a measurement."""
     r = first = read()
-    if far_host_unavailable(r):
+    if far_host_unavailable(r) or network_unreachable(r):          # A371: the network gets the same one retry
         pause(5)
         r = read()
     return r, first
@@ -276,6 +287,23 @@ check("WB1.17 a far-host answer is asked once more: 504 then a page is MEASURED;
       "a 404 is not retried and stays a failure",
       _r1.get("ok") and len(_a1) == 2 and far_host_unavailable(_r2) and len(_a2) == 2
       and _r3.get("status") == 404 and not far_host_unavailable(_r3) and len(_a3) == 1, (_r1, len(_a1), len(_a2), len(_a3)))
+
+# A371: the network's own "unreachable" is its own case, asked twice like a far host; nothing else joins it
+_net = {"ok": False, "reason": "URLError: <urlopen error [Errno 101] Network is unreachable>"}
+_ncases = [(_net, True), ({"ok": False, "reason": "OSError: [Errno 101] Network is unreachable"}, True),
+           ({"ok": False, "reason": "URLError: <urlopen error [Errno 11001] getaddrinfo failed>"}, False),
+           ({"ok": False, "status": 404, "reason": "HTTP 404"}, False), ({"ok": False, "reason": "HTTP 504", "status": 504}, False),
+           ({"ok": False, "reason": "SSLError: certificate verify failed"}, False),
+           ({"ok": True, "status": 200, "title": "x", "chars": 200, "reason": "Network is unreachable"}, False)]
+_nwrong = [(c, want) for c, want in _ncases if network_unreachable(c) != want]
+_f4, _a4 = _scripted(_net, _good)
+_r4, _ = read_twice_if_far(_f4, pause=lambda s: None)
+_f5, _a5 = _scripted(_net, _net)
+_r5, _ = read_twice_if_far(_f5, pause=lambda s: None)
+check("WB1.24 (A371) only [Errno 101] 'Network is unreachable' is the network's case (DNS, 4xx, 5xx, TLS and a good "
+      "read are not); it is asked once more: unreachable then a page is MEASURED, unreachable twice stays unmeasured",
+      not _nwrong and _r4.get("ok") and len(_a4) == 2 and network_unreachable(_r5) and len(_a5) == 2,
+      (_nwrong, len(_a4), len(_a5)))
 
 # ---- A348k: api_get carries a query body under the same rules, and the feed's two ledger reads go only through it.
 # covenant_feed.ledger_facts called urllib directly for both (A213's conversion never reached it), so its requests
@@ -496,6 +524,9 @@ try:
     if far_host_unavailable(r):
         not_run("WB1.14 a real public read", "Gutenberg did not serve the page, asked twice (%s, then %s): the far host, "
                 "not this door" % (first.get("reason"), r.get("reason")))
+    elif network_unreachable(r):
+        not_run("WB1.14 a real public read", "this machine's network was unreachable on the read after the probe "
+                "connected, asked twice (%s, then %s): the network, not this door (A371)" % (first.get("reason"), r.get("reason")))
     else:
         check("WB1.14 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
 except OSError:
