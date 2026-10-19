@@ -230,7 +230,13 @@ else items.push({name:NODE+' (this node)',color:statusColor(hw.node_down==='pres
 // the phone's node was drawn a fixed dark green, a colour nothing measured; this node sees it only as a peer address
 for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\\./.test(id))items.push({name:'phone node',color:UNK,sub:'a peer; its health is not read here',detail:{peer:id,note:'the node inside his phone, as this node sees it: an address, not a health reading'},kind:'phone'});}
 const ph=d.phone&&d.phone.last_checkin_hours;
-items.push({name:'Phone',color:ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK,sub:ph!=null?'checked in '+ago(ph):'no check-in on record',detail:d.phone,kind:'phone'});
+// A375 Amendment 1: the phone's own witness of THIS PC. Normally the Phone orb is green when a check-in is recent --
+// but the phone can see a degraded link the PC cannot: it has been MISSING the PC's answers even while a check-in
+// gets through. When the phone's witness DISAGREES with the raw check-in freshness, the orb goes amber and says so.
+const pw=d.phone&&d.phone.witness;
+let pcol=ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK, psub=ph!=null?'checked in '+ago(ph):'no check-in on record';
+if(pw&&pw.disagrees){pcol=UNK;psub='the phone reports a degraded link: its witness has been missing my answers'+(pw.fixed_missed!=null?' ('+pw.fixed_missed+' recent misses)':'');}
+items.push({name:'Phone',color:pcol,sub:psub,detail:d.phone,kind:'phone'});
 // Moltbook was green whenever a row existed, sent or not (measured 2026-09-28: 6 rows, 0 sent); green now means something went out
 // A277 (2026-10-06): the same rule over a day, not over the last six attempts -- a round now tries ~200
 const fd=d.forum_day||{},fs=fd.sent||0,ft=fd.tried||0;
@@ -371,6 +377,39 @@ def highway_detail(H):
         out[k] = "unknown"
     return out, ("the watchdog's full pass is not fresh here (stale, or older than %d detector(s)); the %d core "
                  "detectors were read now and the rest are unknown" % (len(rest), len(sensed)))
+
+
+def _last_checkin_witness(path=None, now=None, max_age_h=6.0):
+    """The phone's own witness reading from its newest check-in (A375 Amendment 1), or None. {charge, theta, beats,
+    fixed_missed, spiking_silent, fixed_silent, agree, disagrees, age_h}. None when no reading, or it is stale
+    (older than max_age_h: a disagreement from a day ago is not news), so the page shows nothing invented."""
+    import io
+    import json as _json
+    import time as _time
+    p = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "phone_checkins.jsonl")
+    try:
+        with io.open(p, encoding="utf-8") as fh:
+            rows = fh.readlines()
+    except OSError:
+        return None
+    for line in reversed(rows[-50:]):                 # the newest check-in that carries a witness reading
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            r = _json.loads(line)
+        except ValueError:
+            continue
+        w = r.get("pc_witness")
+        if isinstance(w, dict) and w:
+            age_h = ((now if now is not None else _time.time()) - float(r.get("at") or 0)) / 3600.0
+            if age_h > max_age_h:
+                return None
+            out = {k: w[k] for k in ("charge", "theta", "beats", "fixed_missed", "spiking_silent", "fixed_silent", "agree") if k in w}
+            out["disagrees"] = w.get("agree") is False
+            out["age_h"] = round(age_h, 1)
+            return out
+    return None
 
 
 REPO_OWNER = "lawless1987"
@@ -643,6 +682,12 @@ def register(api, caller, refused, cov):
             import covenant_reconnect
             s = covenant_reconnect.signs_of_him()
             out["detail"]["phone"] = {"last_checkin_hours": s.get("phone", {}).get("hours"), "last_chat_hours": s.get("chat", {}).get("hours")}
+            # A375 Amendment 1: the phone's own witness of THIS PC, carried up in its last check-in. A disagreement
+            # (the phone reports it has been missing the PC's answers while check-ins still arrive) is the finding
+            # the PC cannot see on its own. A reading older than six hours is stale and not shown.
+            w = _last_checkin_witness()
+            if w is not None:
+                out["detail"]["phone"]["witness"] = w
         except Exception:                                        # noqa: BLE001
             pass
         try:

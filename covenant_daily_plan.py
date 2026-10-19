@@ -603,6 +603,22 @@ def record_checkin(body_bytes, who, path=None):
                 row[k] = int(data[k])
             except (TypeError, ValueError):
                 pass
+    # pc_witness (A375 Amendment 1, 2026-10-19): the phone's OWN spiking reading of whether the PC has been
+    # answering it, beside NodeService's fixed consecutive-count. The PC cannot see its own degraded link; the phone
+    # can. Only a bounded, type-safe scalar subset is kept, so the phone can write nothing into this ledger but
+    # these numbers. `agree=False` is the finding the /pc display surfaces.
+    w = data.get("pc_witness")
+    if isinstance(w, dict):
+        keep = {}
+        for k, caster in (("charge", float), ("theta", float), ("beats", int), ("fixed_missed", int),
+                          ("spiking_silent", bool), ("fixed_silent", bool), ("agree", bool)):
+            if k in w:
+                try:
+                    keep[k] = caster(w[k])
+                except (TypeError, ValueError):
+                    pass
+        if keep:
+            row["pc_witness"] = keep
     path = path or CHECKINS
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as fh:

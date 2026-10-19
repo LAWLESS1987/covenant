@@ -140,6 +140,23 @@ def main():
         rows = [json.loads(l) for l in open(led, encoding="utf-8")]
         check("D19 a signed check-in is recorded with the named fields only (the extra key is dropped unread)",
               code == 200 and len(rows) == 1 and rows[0]["chain_height"] == 18 and "secret" not in rows[0], rows)
+        # D19w (A375 Amendment 1, 2026-10-19): the phone's spiking witness reading rides the check-in. Only the
+        # typed scalar fields are kept; anything else inside pc_witness is dropped, so the phone can write nothing
+        # into this ledger but these numbers.
+        ledw = os.path.join(td, "checkins_w.jsonl")
+        DP.record_checkin(json.dumps({"node_id": "phone", "pc_witness": {"charge": 14.2, "theta": 12, "beats": 80,
+                          "fixed_missed": 1, "spiking_silent": True, "fixed_silent": False, "agree": False,
+                          "evil": "x" * 500}}).encode(), "phone", ledw)
+        wrow = json.loads(open(ledw, encoding="utf-8").read().strip())["pc_witness"]
+        check("D19w the phone's witness reading is kept as typed scalars only (agree=False is the finding; the extra "
+              "key is dropped)",
+              wrow == {"charge": 14.2, "theta": 12.0, "beats": 80, "fixed_missed": 1, "spiking_silent": True,
+                       "fixed_silent": False, "agree": False}, wrow)
+        import covenant_pc3d as _P
+        w_fresh = _P._last_checkin_witness(path=ledw, now=json.loads(open(ledw, encoding="utf-8").read().strip())["at"] + 60)
+        w_stale = _P._last_checkin_witness(path=ledw, now=json.loads(open(ledw, encoding="utf-8").read().strip())["at"] + 7 * 3600)
+        check("D19w2 the /pc display surfaces a fresh disagreement (disagrees True) and hides a stale one (older than 6 h)",
+              w_fresh is not None and w_fresh["disagrees"] is True and w_fresh["fixed_missed"] == 1 and w_stale is None, (w_fresh, w_stale))
         a1, i1 = DP.checkin_report(now=rows[0]["at"] + 300, path=led)
         a2, i2 = DP.checkin_report(now=rows[0]["at"] + 7200, path=led)
         a3, i3 = DP.checkin_report(now=rows[0]["at"] + 90000, path=led)
