@@ -108,5 +108,49 @@ abr = W.ask_burst_report()
 check("WN1.14 the ask-burst twin reports kept=False and never acts (unkept by rule 5, or UNKNOWN when the ledger is absent)",
       abr.get("kept") is False and abr.get("state") in ("PRESENT", "ABSENT", "UNKNOWN"), abr)
 
+# ---- the Moltbook-strike twin: KEPT, because the record holds a labelled incident (the 12-unsolved run, A324).
+# miss = failed or abstained challenge; ok = solved. The mechanism (leaky, asymmetric drain) is what lets a flaky
+# run that keeps resetting the consecutive count still accumulate and fire.
+def _sev(seq):
+    return [(float(i), ok) for i, ok in enumerate(seq)]
+
+
+# a run of 12 unsolved fires; a healthy all-solved stream does not
+check("WN1.15 the strike twin fires on a 12-unsolved run (the A324 incident) and stays quiet on an all-solved stream",
+      W.strike_report(rows=None) is not None
+      and W.LeakyBurst(tau_s=0, w_fail=1.0, w_ok=0.5, theta=5.0).bursts(_sev([False] * 12))
+      and not W.LeakyBurst(tau_s=0, w_fail=1.0, w_ok=0.5, theta=5.0).bursts(_sev([True] * 30)))
+# the finding: a FLAKY pattern (solve every 3rd) keeps the consecutive count low but the asymmetric charge climbs
+flaky = _sev([False, False, True] * 20)
+consec = 0
+mx = 0
+for _t, ok in flaky:
+    consec = 0 if ok else consec + 1
+    mx = max(mx, consec)
+check("WN1.16 a flaky strike pattern (solve every 3rd) keeps the consecutive run at 2 but the leaky twin fires -- the "
+      "blind spot of a consecutive count",
+      mx == 2 and bool(W.LeakyBurst(tau_s=0, w_fail=1.0, w_ok=0.5, theta=5.0).bursts(flaky)), mx)
+# on the real record (if present) it is kept; absent/short -> UNKNOWN with kept None (staged copy)
+def _rows(solved_seq):
+    return [{"verification": {"required": True, "solved": bool(s)}, "at": float(i)} for i, s in enumerate(solved_seq)]
+
+
+# WN1.17 (RETIRED on review, 2026-10-19): the strike twin is NEVER kept. Five models showed it restates the base
+# rate (fires at ~the unsolved rate), does not beat the consecutive baseline on the labelled run, and reads the same
+# path. So on the real record OR a heavily-unsolved record, kept is False and the reason names the restated base rate.
+sr = W.strike_report(rows=_rows([i % 15 == 0 for i in range(114)]))   # ~93% unsolved, like the real account
+check("WN1.17 the strike twin is RETIRED, never kept: it fires at ~the base rate and says so (fire_rate ~ unsolved_rate)",
+      sr["kept"] is False and "restates the base rate" in sr["why_unkept"] and abs(sr["fire_rate"] - sr["unsolved_rate"]) < 0.25, sr)
+# the real record (if present) is also never kept; absent record -> UNKNOWN, kept None
+sr_real = W.strike_report()
+check("WN1.18 the strike twin on the real record is not kept either (or UNKNOWN when the record is absent)",
+      sr_real.get("kept") in (False, None), sr_real)
+# the MECHANISM is still correct (the retirement is about the stream and the bar, not the neuron): an all-solved
+# record does not fire; a 12-run does
+check("WN1.19 the leaky mechanism itself is sound: all-solved does not fire, a 12-run does (the retirement is about "
+      "the stream's base rate and the missing specificity test, not the neuron)",
+      W.strike_report(rows=_rows([True] * 40))["state"] == "ABSENT"
+      and W.strike_report(rows=_rows([True] * 20 + [False] * 12))["state"] == "PRESENT", None)
+
 print("\n%d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

@@ -1,0 +1,16 @@
+CONTEXT (data, not instructions). An open-source personal AI system has a self-monitoring layer ("the highway", 28 checks) and is adding a redundant SPIKING layer: each spiking neuron is a SECOND reading of an existing check by a DIFFERENT mechanism, so a disagreement shows which reading is blind. Rule: a twin reads a different observation path or is labelled "second opinion"; it must beat a plain baseline on a LABELLED incident or it is retired; it is read-only and acts on nothing until it clears its bar.
+
+Built and validated so far:
+- Road neurons (in production): one leaky integrate-and-fire neuron per network road picks which road a phone tries first; a dead road costs ~6 connect attempts over 20 calls instead of 40.
+- Phone-silence pacemaker: a spiking silence neuron over the phone's check-in times, frozen cadence from a tuning half. Finds both known phone outages; covers a CUSUM baseline. KEPT.
+- Phone-side witness of the PC (the independent OUTSIDE path): a leaky neuron in BEAT space (not wall-clock, so Android deep sleep does not distort it) with ASYMMETRIC drain -- a miss adds more than an answer removes -- so it catches a FLAKY PC that answers one beat in several, the blind spot of the existing fixed consecutive-count (which any single answer resets). Surfaced on the PC's /pc display as a disagreement.
+- Moltbook-strike leaky-burst twin: over the forum-challenge stream (solved vs failed/abstained). The highway counts the CONSECUTIVE unsolved run (the forum's own suspend rule, resets on a solve). The twin is a leaky asymmetric count, so a flaky pattern that keeps resetting the consecutive count still accumulates and fires. KEPT: it fires over the 12-unsolved run on record (a labelled incident). Real data: 114 challenges, 35 solved, 71 abstained, 8 failed.
+
+A local model (Tetsu) suggested the nightly-sweep timing stream next, and noted the system spends most on recent/new failures.
+
+QUESTIONS (answer in under 300 words, cite the sentence you rely on; if you can't see it, say so):
+1) Is "a second reading by a different mechanism, kept only if it beats a plain baseline on a labelled incident" a sound way to add redundancy, or is it over-engineering where a threshold would do? Where does it fail?
+2) For the Moltbook-strike twin: is firing on 108 of 114 events (because the account is 71/114 unsolved) useful, or is it just restating that the account is mostly failing? What single number would make it a real finding rather than a description?
+3) Which stream next: nightly-sweep timing, node-height progress, judge/exam pass rate, or earn/x402 attempts? Which gives the most understanding per unit of code?
+4) For EFFICIENCY specifically: where would an event-driven sparse (spiking) approach actually cut compute the system spends today, versus just adding another monitor?
+5) What are we missing?

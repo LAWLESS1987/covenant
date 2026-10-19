@@ -228,8 +228,81 @@ def ask_burst_report(path=None):
             "kept": False, "why_unkept": "no labelled failure-burst incident to validate against (rule 5)"}
 
 
+def strike_events(rows=None):
+    """Sorted [(epoch, solved_bool)] of Moltbook posting-challenge results from free's sends -- the same stream the
+    highway's moltbook_strikes reads. A solved challenge is ok; a failed or abstained one is a miss."""
+    import calendar
+    if rows is None:
+        try:
+            import covenant_free_will as FW
+            rows = FW.sends()
+        except Exception:                                         # noqa: BLE001
+            return []
+    out = []
+    for r in rows or []:
+        v = r.get("verification")
+        if not isinstance(v, dict) or not v.get("required"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        out.append((float(at), bool(v.get("solved"))))
+    return sorted(out, key=lambda e: e[0])
+
+
+def strike_report(rows=None):
+    """The leaky-burst twin over the Moltbook strike stream. RETIRED, not kept (Amendment 2, 2026-10-19). I first
+    claimed it KEPT because it "fires over the 12-unsolved run on record (a labelled incident)". Five models
+    (Gemini, Meta AI, Mistral, Chat Smith, and DeepSeek) refuted that on review, unanimously and correctly:
+      1. It does NOT beat the baseline. The highway's consecutive-unsolved count ALSO fires on the 12-run, so firing
+         there is not an improvement over what exists (Meta AI).
+      2. It reads the SAME observation path (the challenge stream), so it fails the independence rule -- it is a
+         second mechanism, not a second reading (Meta AI).
+      3. It restates the base rate. The account is unsolved 79 of 114, so any accumulator fires ~continuously (it
+         fires on 108 of 114); that is a description, not a detection (Gemini, Mistral, Chat Smith).
+      4. The keep test had no SPECIFICITY: it tested only that the twin fires on a labelled incident, never its
+         false-alarm rate on incident-free periods. "The whole layer is validated only on positives" (Mistral).
+    The real correction is the BAR, not this twin -- see Amendment 2 in docs/SPIKING_WITNESS.md. The code stays as a
+    shadow, reusable only for a stream that has an INDEPENDENT path and where the twin beats the baseline at a fixed
+    false-alarm rate. It raises nothing and acts on nothing. The claim as first written is preserved in the plan
+    beside the correction."""
+    events = strike_events(rows)
+    if len(events) < 10:
+        return {"state": "UNKNOWN", "why": "too few challenge results (%d)" % len(events), "kept": None}
+    lb = LeakyBurst(tau_s=0, w_fail=1.0, w_ok=0.5, theta=5.0, vmax=20.0)   # tau_s=0: beat-space, no wall-clock leak
+    # LeakyBurst.run leaks by wall-clock; here we want beat-space, so feed unit-spaced events (index as time).
+    spaced = [(float(i), ok) for i, (_t, ok) in enumerate(events)]
+    fired = lb.bursts(spaced)
+    final_charge = list(lb.run(spaced))[-1][1] if spaced else 0.0
+    # the longest consecutive unsolved run on record -- the labelled incident the twin must catch
+    run = longest = 0
+    for _t, ok in events:
+        run = 0 if ok else run + 1
+        longest = max(longest, run)
+    # did the neuron fire somewhere inside that longest run?
+    solved = sum(1 for _t, ok in events if ok)
+    unsolved_rate = round(1 - solved / len(events), 3)
+    # the twin fires on this fraction of all events -- the number that shows it restates the base rate
+    fire_rate = round(len(fired) / len(events), 3)
+    return {
+        "state": "PRESENT" if final_charge >= lb.theta else "ABSENT", "final_charge": round(final_charge, 2),
+        "challenges": len(events), "solved": solved, "unsolved_rate": unsolved_rate,
+        "longest_unsolved_run": longest, "fired_events": len(fired), "fire_rate": fire_rate,
+        # RETIRED (Amendment 2): it does not beat the baseline on the labelled run, reads the same path, and fires at
+        # ~the base rate (fire_rate ~ unsolved_rate), with no specificity test. Never kept, whatever the data.
+        "kept": False,
+        "why_unkept": ("fires on %.0f%% of events while the account is %.0f%% unsolved -- it restates the base rate; "
+                       "the consecutive baseline also fires on the %d-run, so it is not beaten; same path, no "
+                       "specificity test (retired on review, 2026-10-19)" % (fire_rate * 100, unsolved_rate * 100, longest)),
+    }
+
+
 def main(argv=None):
-    print(json.dumps({"phone_silence": report(), "ask_bursts": ask_burst_report()}, indent=1, default=str))
+    print(json.dumps({"phone_silence": report(), "ask_bursts": ask_burst_report(),
+                      "moltbook_strikes": strike_report()}, indent=1, default=str))
     return 0
 
 

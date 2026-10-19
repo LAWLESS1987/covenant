@@ -218,7 +218,50 @@ run on the PC and read the PC's own ledgers. A neuron on THE PHONE over the PC's
   misses)" when the two readings disagree -- the finding the PC cannot see on its own. DP1 D19w/D19w2, three
   mutations. The PC side reads the field only when present, so it is inert until a phone build carries it.
 
-### Still to build (Amendment 1)
+### The forum-strike twin, built then RETIRED (Amendment 2, 2026-10-19)
 
-Tailscale's own view beside the check-in ledger, a writer pacemaker per ledger, and the leaky-burst over the
-forum-strike stream (which has labelled incidents). None wired to act until the replay bar is met for each.
+**What I claimed, as written:** "Moltbook-strike leaky-burst twin ... KEPT: it fires over the 12-unsolved run on
+record (a labelled incident). Real data: 114 challenges, 35 solved, 71 abstained, 8 failed." I built it
+(`covenant_witness.strike_report`) and said it passed.
+
+**Five models refuted that on review (cycle a32894190cdb: Gemini, Meta AI, Mistral, Chat Smith, DeepSeek), and they
+were right:**
+- It does **not beat the baseline.** The highway's consecutive-unsolved count also fires on the 12-run, so the twin
+  is no improvement there (Meta AI).
+- It reads the **same observation path** (the challenge stream), so it fails the independence rule -- a second
+  mechanism, not a second reading (Meta AI).
+- It **restates the base rate.** The account is unsolved 79 of 114, so any accumulator fires ~continuously; firing
+  on 108 of 114 is a description, not a detection (Gemini, Mistral, Chat Smith).
+- The deepest flaw, which is the bar's, not the twin's: the keep test had **no specificity.** "The whole layer is
+  validated only on positives" (Mistral) -- it tested that a twin fires on a labelled incident, never its
+  false-alarm rate on incident-free periods.
+
+**Retired.** `strike_report` now returns `kept: False` with the reason; the code stays as a shadow, reusable only
+for a stream with an independent path where the twin beats the baseline at a fixed false-alarm rate. WN1.17-19.
+
+## Amendment 2 (2026-10-19, after the five-model review, before any further twin)
+
+The keep test of Amendment 1 is strengthened. A twin is kept only if ALL hold:
+1. **Independence:** it reads a genuinely different observation path, or it is labelled "second opinion" and never
+   claimed as redundancy. (The phone-side witness passes -- it reads the PC from the phone. The forum-strike twin
+   failed -- same ledger.)
+2. **Beats the baseline on a labelled incident:** it must catch an incident the plain baseline (a consecutive count,
+   a CUSUM, or an EWMA) MISSES, or catch it sooner -- not merely also catch what the baseline already catches.
+3. **Specificity, measured on a held-out set of NEGATIVES:** its false-alarm rate on incident-free periods must be
+   below a fixed bound (at most one told alert per twin per week, the bar Amendment 1 already set for the phone
+   silence). A twin that fires at ~the base rate is retired, whatever it does on the positives.
+4. **Hysteresis:** every twin must define its recovery/reset and a quiet period, so an accumulator cannot sit
+   saturated (Gemini: "never defines recovery, reset, or quiet periods").
+
+**And efficiency, named honestly (all five):** adding a monitor is a COST, not a saving. Spiking cuts compute only
+where it GATES execution -- waking a dormant worker on a threshold crossing instead of polling. The only measured
+cut so far is the road neurons (6 connect attempts over 20 calls instead of 40). The next efficiency work is to
+find a dense polling loop a spike can gate, not another monitor. The pacemaker and the phone witness are
+PROVISIONALLY kept, pending their specificity measurement under rule 3.
+
+### Still to build
+
+Node-height progress (the reviewers' pick: clear monotonic velocity, a baseline-missed stall is well defined) as the
+next twin, under the Amendment 2 bar; a held-out negative set for each stream; and a dense polling loop for a real
+efficiency cut. Tailscale's own view beside the check-in ledger and a per-ledger writer pacemaker remain. None wired
+to act until each clears the Amendment 2 bar.
