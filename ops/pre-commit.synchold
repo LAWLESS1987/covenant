@@ -112,6 +112,23 @@ if git diff --cached --name-only 2>/dev/null | grep -qx "docs/RETRACTED.json"; t
   fi
 fi
 
+# ---- 2f. the lookback index follows the record and the ledger, in the same commit (2026-10-17, A363). Same
+# shape as 2e: when this commit stages docs/KNOWN_ISSUES.md or docs/RETRACTED.json, tools/lookback_index.py
+# --write regenerates docs/LOOKBACK_INDEX.md and stages it -- only when the sources and the index on disk are
+# exactly what the index holds (A255); otherwise it says why and leaves them. It never blocks the commit.
+if git diff --cached --name-only 2>/dev/null | grep -qx -e "docs/KNOWN_ISSUES.md" -e "docs/RETRACTED.json"; then
+  if [ ! -f tools/lookback_index.py ]; then
+    echo "pre-commit: tools/lookback_index.py is not in this checkout -- the lookback index was not checked" >&2
+  elif ! git diff --quiet -- docs/KNOWN_ISSUES.md docs/RETRACTED.json docs/LOOKBACK_INDEX.md 2>/dev/null; then
+    echo "pre-commit: lookback index NOT regenerated -- the record, the ledger or the index has unstaged changes; run 'python tools/lookback_index.py --write' and stage it" >&2
+  else
+    python tools/lookback_index.py --write 2>&1 | sed 's/^/pre-commit: /'
+    if ! git diff --quiet -- docs/LOOKBACK_INDEX.md 2>/dev/null || ! git ls-files --error-unmatch docs/LOOKBACK_INDEX.md >/dev/null 2>&1; then
+      git add -- docs/LOOKBACK_INDEX.md 2>/dev/null && echo "pre-commit: staged docs/LOOKBACK_INDEX.md (the lookback index follows the record)"
+    fi
+  fi
+fi
+
 # ---- 2c. every test file in this commit, run where the runner runs it (2026-10-03: E12r was checked
 # only with .git present and CI went red twice; "run it in the staged copy" had been a note since
 # 09-10). tools/stage_check.py stages the tree as covenant_one does and runs each committed suite

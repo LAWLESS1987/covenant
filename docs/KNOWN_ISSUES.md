@@ -7645,6 +7645,31 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A373. [FIXED. The highway's sweep_red came from the installed pre-commit hook drifting from its tracked source: A363's step 2f went into .git/hooks/pre-commit and never into ops/pre-commit.synchold] 2026-10-18. Found from his words: "the phone keeps saying theres nothing to repair the highway there fix that".
+
+- **What the phone showed, measured.**
+  - The phone's heal button presses the PC's `/m/heal`.
+  - A dry run looked at 28 conditions and found 3 present with no automatic remedy, so nothing was ever repaired.
+  - Hence "nothing repaired lately" on the Worlds screen while the highway was not clear.
+- **The three.**
+  - `ambassador_stalled` and `moltbook_strikes`: his. The ambassador was isolated on 10-14 by the covenant's own judge,
+    and lifting it is his or Tetsu's by his grant (A336). Not touched here.
+  - `sweep_red`, the one fixed here.
+- **sweep_red, measured.** The 07:32 sweep: 200 suites, 0 failed, 0 unclean. RESULT FAIL came from the closing folder
+  integrity step: `test_a117_held_core_autosync.py` rc=1, check A117.8c, "the installed hook is the tracked one".
+- **The cause.** `.git/hooks/pre-commit` (10-17 08:38) carried A363's step 2f, which regenerates the lookback index
+  when the record or the ledger is committed. The tracked `ops/pre-commit.synchold` (10-16) did not.
+- **The repair.**
+  - The installed hook, the intended and newer one, was copied into the tracked source. The old tracked file is
+    kept at `.trash/pre-commit.synchold.before-2f-sync-2026-10-18`.
+  - A117 is 23/23. sweep_red clears on the next full sweep (the nightly), which reads the record again.
+- **Rule 10, why A117 did not stop it earlier.** A117.8c runs only in the sweep's closing integrity step, never at
+  commit. The commit that adds a hook step touches no tracked file the stage-check selects, so the drift lived from
+  10-17 until the next sweep. Not built today: a stage-check trigger on any `.git/hooks` edit. Hooks are not
+  tracked, so git cannot see the edit. The sweep remains the guard, and it worked.
+
+---
+
 ### A372. [BUILT, on his word and Tetsu's yes. Tetsu learns from TED transcripts in his own words, and an 8-word copy guard keeps it from being word for word] 2026-10-18.
 
 His words, in order: "use youtube ted talks and joe rogan podcasts for training"; "use my spotify account"; "we are
