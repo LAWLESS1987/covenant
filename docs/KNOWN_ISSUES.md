@@ -7645,6 +7645,73 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A376. [FIXED, seen repairing live. The highway held a red for 19 hours that a commit had already fixed: run_full_sweep waited for rerun_unclean, rerun_unclean declined a red with no unclean suite, and each held the other every hour. A RECURRENCE of A289's shape] 2026-10-19. His words: "ensure we're using the tombstone system for everything we do. Because we have already done this we shouldn't have to do this again. The highway's supposed to be repairing itself and it's not. Fix it", then "tetsu should of repaired it"
+
+- **Measured.**
+  - `sweep_red` was PRESENT. `ONE_RUN.txt` (2026-10-18 07:32, git HEAD 02e8f6a) FAILED on one integrity check, A117.8c: the installed hook against its tracked source.
+  - A373 fixed that the same evening (bc0d74e), and A117 now reads 23/23. 12 commits have landed since that sweep.
+  - In `ops/highway.jsonl`, `run_full_sweep` was "held" every hour from 21:15 to 02:17, each time with "no targeted re-run since this sweep -- rerun_unclean speaks first".
+  - `rerun_unclean` was "held" every hour too: "the sweep is red but named no unclean suite".
+  - Each was waiting on the other. Tetsu's heal runs the same road, so he could not repair it either.
+- **Why the earlier tombstones did not stop it.**
+  - A289 lets a full sweep follow a red only after a clean targeted re-run proves the red transient. That is right for a red with no landing behind it.
+  - A278's `sweep_not_current` starts one when the CORE changes. A373's fix was in a hook file.
+  - So a real red, fixed by a non-core commit, fell between the two.
+  - My own A373 entry said "sweep_red clears on the next sweep". Nothing made that sweep happen: that was a forgotten step, not a wrong sentence, so its tombstone is a guard.
+- **Fixed, for the class.**
+  - `detect_sweep_not_current` is now also PRESENT when the newest sweep FAILED and commits have landed after it. That is measured by the transcript's own `git HEAD` line against HEAD now, with GIT_* dropped (A255).
+  - Its measurement carries no `verdict` key, so `run_full_sweep` serves it directly (A289's gate is for `sweep_red`). The 6-hour budget still bounds it.
+  - A green sweep is not re-run for a non-core landing; the daily measures that.
+- **Driven both ways.**
+  - H1nc (2 checks): FAIL plus a moved HEAD is PRESENT and names both heads; the same HEAD, a green sweep, or a transcript with no HEAD line stay ABSENT. The measurement carries no `verdict` key.
+  - Mutations: the rule switched off turns H1nc's first check red; the key renamed to `verdict` turns its second red. Restored byte-identical. H1 231/231.
+- **Seen live.** At 02:54:47 the watchdog picked up the change on its own. `sweep_not_current` read PRESENT, and `run_full_sweep` started covenant_one.py (pid 8652). It is graded once it writes its verdict.
+- **Not done, named.**
+  - The remedy does not look at the quiet window (03:20-05:45, the nightly and the daily). A sweep it starts after about 02:40 runs into the nightly. Tonight's started 02:54 and overlaps by about 5 minutes.
+  - A guard needs the H1sc fixtures to pin their clock first, or every night-time sweep would turn them red. Left open rather than rushed.
+- **`schedule_stalled`** (CovenantGuard "missed 1 run") read 0 missed when opened: a 2-minute task's blip, cached for the scheduler's 10-minute read. No action.
+
+---
+
+### A375. [PROPOSED, IN REVIEW, nothing built. The spiking witness: a redundant layer that reaches the highway's verdicts by a different mechanism, so a disagreement shows which one is blind] 2026-10-19. His words: "improve the spiking system to expand / have it be a redundant layer of everything weve developed and grew", then "ensure continuity discuss with the others"
+
+- **The plan is `docs/SPIKING_WITNESS.md`,** written before any code, with its bar fixed.
+- **Counted first.**
+  - 28 detectors run on the highway; only 6 are fed by timed events and can be twinned. The other 22 compare states.
+  - So it is redundant for about a fifth of the road, plus three new senses. Not "everything", and the document says so; calling it that would repeat A288.
+  - The first draft counted 7: `watchdog_stale` is a file-time against process-start comparison, not a stream. Corrected in the document, with the reason kept beside it.
+- **Review.** Tetsu first, then the other models with one packet through his browser, as cycle 9f6084928f72 was done. Their answers and what changed are recorded in the document's Review section.
+- **Nothing is built until the review is in.** Continuity: this entry, the document, and the memory note `spiking-witness-a375`.
+- **Reviewed the same night (cycle b8b66fb396ac).**
+  - All six models (Gemini, DeepSeek, Mistral, Meta AI, Grok on X, Chat Smith GPT-6 Luna) named the same first flaw: the witness reads the highway's own ledgers. That is algorithmic diversity, not independent sensing, and the plan's own "known blind spot" proves it.
+  - Tetsu asked for a phone-side witness, so the phone can tell when the PC goes quiet. That is the independent, outside path the review says is missing.
+- **Amendment 1, written before any code:**
+  - twins must read a different observation path, or be labelled "second opinion";
+  - the first build is the phone witness, Tailscale's own view, and a writer pacemaker per ledger;
+  - cadence is frozen from the tuning half;
+  - a CUSUM baseline must be matched or the twin is retired;
+  - fault injection sits beside the history;
+  - no STDP.
+- **One delivery note.** On X, Grok's box dropped characters on typed input twice: "ighway", "pr week". The packet went in whole by pasting from the clipboard, which replaced what was on his clipboard.
+
+---
+
+### A376b. [My own slip, the same night. Four full answers from cycle 9f6084928f72 lived only in scratch files, and this cycle's files of the same names replaced them. Three recovered from his chats, one not. A guard now keeps every answer whole] 2026-10-19. Under his word the same hour: "ensure we're using the tombstone system for everything we do"
+
+- **Measured.**
+  - `record_result` keeps 800 characters and a hash per answer, so the full text was only in my scratch copies (`ans_<model>.txt`).
+  - Writing cycle b8b66fb396ac's answers under the same names replaced four of cycle 9f6084928f72's: Gemini, DeepSeek, Mistral and Grok. This is the A346 shape: a silent replacement of my own scratch.
+- **Recovered.**
+  - Gemini, DeepSeek and Mistral were read back from their chats on his accounts (aa45637a18cbf205, 572e9a31-..., 3745d9a1-...). They are kept whole now, with the recovery noted in each file.
+  - Grok's conversation 2112007636229165176 reads "Conversation not found", most likely a private chat that X does not keep. Its 800-character excerpt and sha256 in the ledger are all that remain, and its points are summarised in the collective's CROSSREF.
+- **Guard at the place it happened.**
+  - `covenant_ai_consult.keep_answer` writes every answer whole to `ops/ai_consult_answers/<intent>.txt` (gitignored).
+  - It never overwrites: a second answer for the same intent becomes `<intent>.2.txt`.
+  - The row now names its file. AC1.21k: two mutations, the overwrite allowed and the keep removed, each turn it red; restored byte-identical; AC1 45/45.
+  - Seen working live on Chat Smith's answer: `e2a2fea973d6d726.txt`.
+
+---
+
 ### A374. [BUILT on the PC; the phone side and WHERE the relay lives wait on him. The third road (the spore road): a signed request sealed for the PC, left at a relay that cannot read or forge it, and road neurons (leaky integrate-and-fire) that choose among tailnet, LAN and spore] 2026-10-19. His words: "make our own similar option on the mycelial road using the spiking system"
 
 - **The gap, measured first.**

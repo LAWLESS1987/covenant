@@ -292,6 +292,8 @@ ops/sealed_mail.log
 ops/sealed_mail_seen.json
 # AI-consult ledger (2026-09-14): bounded, judged exchanges with the other AI apps
 ops/ai_consult.jsonl
+# A376b: each consult answer kept whole, beside the ledger (the ledger holds 800 characters and a hash)
+ops/ai_consult_answers/
 # the phone actuator/brain's learning, synced (2026-09-14)
 ops/actuator_learning.jsonl
 # phase 3 (2026-09-13): the PC's reduce-only guide to the phone brain, its log, the card library, the nightly digest

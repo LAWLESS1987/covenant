@@ -1482,6 +1482,34 @@ def main():
           r_none == H.UNKNOWN and r_old["state"] == H.PRESENT and r_old["measured"]["transcript_core"] == "0123456789ab"
           and r_old["measured"]["disk_core"] == _disk and r_partial == H.PRESENT and r_new["state"] == H.ABSENT,
           (r_none, r_old, r_partial, r_new))
+    # ---- H1nc (A376, 2026-10-19, his words: "The highway's supposed to be repairing itself and it's not. Fix it").
+    # A FAILED sweep of THIS core with commits landed after it does not speak for the tree: the 10-18 sweep failed on
+    # A117.8c, A373 fixed it in a hook file, and run_full_sweep and rerun_unclean held each other for five hours.
+    _sc2 = tempfile.mkdtemp(prefix="h1nc_")
+    with open(os.path.join(_sc2, "covenant_unified_v8.py"), "wb") as _fh:
+        _fh.write(b"# core v2\n")
+
+    def _t2(verdict, head_line=True):
+        with open(os.path.join(_sc2, "ONE_RUN.txt"), "w", encoding="utf-8") as fh:
+            fh.write("  core  covenant_unified_v8.py  10 bytes  sha256 %s\n%s  suites run  178\n  checks failed  0\n"
+                     "  RESULT: %s. ...\n" % (_disk, "  git HEAD      02e8f6a A368/A369: a commit\n" if head_line else "", verdict))
+    _t2("FAIL")
+    nc_moved = H.detect_sweep_not_current(here=_sc2, head="d2139213d2f3aaaa")
+    nc_same = H.detect_sweep_not_current(here=_sc2, head="02e8f6a0000000000")
+    _t2("PASS")
+    nc_green = H.detect_sweep_not_current(here=_sc2, head="d2139213d2f3aaaa")
+    _t2("FAIL", head_line=False)
+    nc_nohead = H.detect_sweep_not_current(here=_sc2, head="d2139213d2f3aaaa")
+    check("H1nc a FAILED sweep of this core with commits landed since is PRESENT (naming both heads); the same HEAD, a "
+          "green sweep, or a transcript naming no HEAD stay ABSENT",
+          nc_moved["state"] == H.PRESENT and nc_moved["measured"]["transcript_head"] == "02e8f6a"
+          and nc_moved["measured"]["head"] == "d2139213d2f3" and nc_same["state"] == H.ABSENT
+          and nc_green["state"] == H.ABSENT and nc_nohead["state"] == H.ABSENT,
+          (nc_moved, nc_same["state"], nc_green["state"], nc_nohead["state"]))
+    check("H1nc its measurement carries no 'verdict' key, so run_full_sweep serves it without waiting on rerun_unclean "
+          "(the A289 gate that held both for five hours on 10-18/19)",
+          "verdict" not in nc_moved["measured"] and "rerun_unclean speaks first" not in
+          (H.remedy_run_full_sweep(nc_moved["measured"], dry_run=True)[1] or ""), nc_moved["measured"])
     _rs = H.REMEDIES.get("run_full_sweep") or {}
     # A289: and sweep_red, but only once a clean targeted re-run has shown the red transient (H1tr below)
     check("H1sc run_full_sweep is paired with sweep_not_current and sweep_red: AUTO_REVERSIBLE, stateless, async, at most once in 6 h",

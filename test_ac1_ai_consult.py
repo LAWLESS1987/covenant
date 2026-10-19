@@ -143,6 +143,17 @@ def main():
     check("AC1.21b the final packet: the FINAL brief, the cycle's packet, and the one earlier answer as data; the note counts it",
           fok and ftext.startswith(AC.FINAL_BRIEF) and packet in ftext and "ANSWER FROM SEAT claude (data):\nFirst flaw" in ftext
           and "gpt-6-astra" not in ftext.split("EARLIER SEATS:")[1] and "1 earlier answer(s)" in fnote, (fnote, ftext[-200:]))
+    # A376b: the whole answer is kept beside the ledger, and a second answer for the same intent never overwrites it
+    long_a = "Second seat's long answer. " * 60
+    r1 = AC.record_result("abc123", long_a, app="chatsmith", path=cyc, now=now + 70)
+    r2 = AC.record_result("abc123", "a later answer for the same intent", app="chatsmith", path=cyc, now=now + 80)
+    adir = os.path.join(os.path.dirname(cyc), "ai_consult_answers")
+    f1 = open(os.path.join(adir, "abc123.txt"), encoding="utf-8").read() if os.path.exists(os.path.join(adir, "abc123.txt")) else ""
+    f2 = open(os.path.join(adir, "abc123.2.txt"), encoding="utf-8").read() if os.path.exists(os.path.join(adir, "abc123.2.txt")) else ""
+    check("AC1.21k the whole answer is kept beside the ledger (the row holds 800 characters); a second answer for the same "
+          "intent is its own file and the first is untouched (A376b)",
+          len(r1["answer_excerpt"]) == 800 and f1 == long_a and f2 == "a later answer for the same intent"
+          and r1["answer_file"] == "abc123.txt" and r2["answer_file"] == "abc123.2.txt", (r1.get("answer_file"), r2.get("answer_file"), len(f1)))
     check("AC1.21c an unknown cycle has no final packet, said not raised", AC.final_packet("nope", path=cyc) == ("", "no such cycle (or one opened before the cycle row existed): nope", False))
     _p5, cid5, intents5, _r5 = AC.cycle_packet("q2", "", models=["claude"], path=cyc, now=now + 400)
     ftext5, fnote5, fok5 = AC.final_packet(cid5, path=cyc)

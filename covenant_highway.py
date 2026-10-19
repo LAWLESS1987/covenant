@@ -806,8 +806,33 @@ def detect_sweep_red(health=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
-def detect_sweep_not_current(health=None, here=None):
-    """The newest full sweep with a verdict measured a DIFFERENT core than the one on disk.
+def _git_head(here):
+    """The full sha of HEAD in HERE, or None. GIT_* is dropped from the environment (A255: a hook's GIT_DIR)."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        r = subprocess.run(["git", "-C", here, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=20,
+                           env=env, creationflags=_NOWIN)
+        sha = (r.stdout or "").strip()
+        return sha if r.returncode == 0 and len(sha) >= 7 else None
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
+def detect_sweep_not_current(health=None, here=None, head=None):
+    """The newest full sweep with a verdict measured a DIFFERENT core than the one on disk -- or, since A376, it
+    FAILED and commits have landed since it ran.
+
+    A376 (2026-10-19, his words: "The highway's supposed to be repairing itself and it's not. Fix it", then "tetsu
+    should of repaired it"). The 2026-10-18 07:32 sweep FAILED on A117.8c (the installed pre-commit hook drifting
+    from its tracked source). A373 fixed that the same evening, in a hook file, not the core, so this detector said
+    current; sweep_red's only route to a new sweep is A289's (a clean targeted re-run first), and rerun_unclean
+    declines a red that named no unclean suite. Each held the other: run_full_sweep was recorded "held" every hour
+    from 21:15 to 02:17, and Tetsu's heal runs the same road, so he could not repair it either. A FAILED sweep is not
+    the verdict of the tree once commits have landed after it, whichever file they touched. Measured by the
+    transcript's own "git HEAD <sha>" line against HEAD now; a transcript without that line, or a tree whose HEAD
+    cannot be read, keeps the core-only answer below. A green sweep is not re-run for a non-core landing: the
+    daily's sweep measures it, and a 40-minute sweep per commit is not a repair.
 
     A278 (2026-10-06, his words: "keep expanding the highway"). sweep_red reads the newest transcript's
     verdict and never asks which core it measured. That day the core changed three times (A274, then the
@@ -851,7 +876,21 @@ def detect_sweep_not_current(health=None, here=None):
     if not m:
         measured["why"] = "the transcript names no core"
         return {"state": UNKNOWN, "measured": measured}
-    return {"state": ABSENT if m.group(1) == disk else PRESENT, "measured": measured}
+    if m.group(1) != disk:
+        return {"state": PRESENT, "measured": measured}
+    # A376: the core is the same; a FAILED sweep with commits landed after it still does not speak for the tree.
+    # ("newest_verdict", never "verdict": run_full_sweep reads a "verdict" key as sweep_red's measurement, A289.)
+    v = re.search(r"^\s*RESULT:\s*(PASS|FAIL)", txt, re.M)
+    th = re.search(r"^\s*git HEAD\s+([0-9a-f]{7,40})\b", txt, re.M)
+    if v and v.group(1) == "FAIL" and th:
+        now_head = head if head is not None else _git_head(here)
+        if now_head:
+            measured.update(newest_verdict="FAIL", transcript_head=th.group(1), head=now_head[:12])
+            if not now_head.startswith(th.group(1)) and not th.group(1).startswith(now_head):
+                measured["why"] = ("the newest sweep FAILED on %s and the tree has moved to %s since: it no longer "
+                                   "speaks for the code on disk" % (th.group(1), now_head[:12]))
+                return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
 
 
 SCHEDULE_EVERY_S = 600      # one scheduler read per 10 min: a PowerShell spawn, and the watchdog passes every minute

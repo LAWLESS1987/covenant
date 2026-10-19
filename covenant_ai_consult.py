@@ -325,10 +325,35 @@ def record_intent(app, question, verdict, by, path=None, now=None):
     return row
 
 
+def keep_answer(intent_id, answer, ledger_path=None):
+    """A376b (2026-10-19): the WHOLE answer, kept beside the ledger in ai_consult_answers/<intent>.txt (gitignored with
+    the ledger's folder rules), and never overwritten: a second answer for the same intent is <intent>.2.txt. The
+    ledger row holds only 800 characters and a hash, so the full text lived only in a scratch file -- and on
+    2026-10-19 four of cycle 9f6084928f72's were overwritten by the next cycle's files of the same names. Returns
+    the path written, or None."""
+    if not answer:
+        return None
+    d = os.path.join(os.path.dirname(ledger_path or LEDGER), "ai_consult_answers")
+    try:
+        os.makedirs(d, exist_ok=True)
+        safe = "".join(c for c in str(intent_id) if c.isalnum())[:40] or "intent"
+        p, n = os.path.join(d, safe + ".txt"), 1
+        while os.path.exists(p):
+            n += 1
+            p = os.path.join(d, "%s.%d.txt" % (safe, n))
+        with open(p, "x", encoding="utf-8") as fh:
+            fh.write(answer)
+        return p
+    except OSError:
+        return None
+
+
 def record_result(intent_id, answer, app=None, path=None, now=None):
     """Appended after the browser step returns (or fails). A second, linked
     row rather than a rewrite of the first: the ledger is append-only, the
-    same discipline every other ledger in this project keeps."""
+    same discipline every other ledger in this project keeps. The whole answer
+    is kept beside it (keep_answer, A376b)."""
+    kept = keep_answer(intent_id, answer, path)
     row = {
         "id": secrets.token_hex(8),
         "t": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now)),
@@ -339,6 +364,7 @@ def record_result(intent_id, answer, app=None, path=None, now=None):
         "answer_sha256": _sha(answer) if answer else None,
         "answer_chars": len(answer or ""),
         "answer_excerpt": (answer or "")[:800],
+        "answer_file": os.path.basename(kept) if kept else None,
     }
     path = path or LEDGER
     os.makedirs(os.path.dirname(path), exist_ok=True)
