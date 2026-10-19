@@ -109,8 +109,10 @@ def shared_phrase(notes, source):
     return " ".join(a[end - best + 1:end + 1]) if best else ""
 
 
-def prompt(title, speaker, text, retry=False, copied=""):
-    head = ("You chose to learn from TED talks. Here is the transcript of \"%s\" by %s. Read it, then write notes for "
+def prompt(title, speaker, text, retry=False, copied="", what="the TED talk"):
+    intro = ("You chose to learn from TED talks. Here is the transcript of" if what == "the TED talk" else
+             "You chose to learn about neuromorphic engineering. Here is %s" % what)
+    head = (intro + " \"%s\" by %s. Read it, then write notes for "
             "yourself IN YOUR OWN WORDS:\n- the main ideas (three to six), each in a sentence of your own;\n- the "
             "reasons or evidence the speaker gives;\n- one thing you would question or test;\n- how it connects to "
             "mutual benefit between people and machines.\nDo not quote. Do not copy any sentence or phrase from the "
@@ -155,15 +157,24 @@ def learn(slug, read=None, ask=None, cache=None, say=print):
         title, speaker, text = transcript_from_html(r.get("html"))
         if len(text.split()) < 200:
             return {"ok": False, "why": "no transcript in the page (%d words)" % len(text.split())}
+        return learn_text("ted:" + slug, slug, title, speaker, url, LICENCE, text, ask, cache, "the TED talk")
+    except Exception as e:                                         # noqa: BLE001
+        return {"ok": False, "why": "%s: %s" % (type(e).__name__, str(e)[:160])}
+
+
+def learn_text(source, slug, title, speaker, url, licence, text, ask, cache=None, what="the TED talk"):
+    """The shared core for any open text: cache it privately, ask Tetsu (private, fresh) for notes in his own words,
+    guard against copying, and return the row and the record. Never raises."""
+    try:
         d = cache or CACHE
         os.makedirs(d, exist_ok=True)
-        with open(os.path.join(d, slug + ".txt"), "w", encoding="utf-8") as fh:
-            fh.write("Title: %s\nSpeaker: %s\nSource: %s\nLicence: %s\n\n%s\n" % (title, speaker, url, LICENCE, text))
+        with open(os.path.join(d, re.sub(r"[^\w.-]", "_", slug)[:80] + ".txt"), "w", encoding="utf-8") as fh:
+            fh.write("Title: %s\nSpeaker: %s\nSource: %s\nLicence: %s\n\n%s\n" % (title, speaker, url, licence, text))
         tries, copied = [], ""
         # 2026-10-18, first real run: his notes repeated 8, then 9 words, with only "do not copy" said. A retry now
         # shows him the phrase he copied, and he has two (the limit itself does not move)
         for retry in (False, True, True):
-            st, body = ask(prompt(title, speaker, text, retry, copied))
+            st, body = ask(prompt(title, speaker, text, retry, copied, what))
             notes = (body or {}).get("answer") if isinstance(body, dict) else None
             if not notes or st != 200:
                 return {"ok": False, "why": "Tetsu did not answer (HTTP %s)" % st}
@@ -177,14 +188,77 @@ def learn(slug, read=None, ask=None, cache=None, say=print):
             copied = shared_phrase(notes, text)
         else:
             return {"ok": False, "why": "notes repeated %s consecutive words of the talk in all three tries" % tries}
-        head = ("TETSU'S NOTES, in his own words, on the TED talk \"%s\" by %s (%s; %s). Longest run of words shared "
-                "with the talk: %d (limit %d).\n\n" % (title, speaker, url, LICENCE, run, COPY_RUN))
-        record = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "by": "tetsu", "slug": slug, "title": title,
-                  "speaker": speaker, "url": url, "licence": LICENCE, "notes": notes, "longest_shared_run": run,
-                  "tries": tries}
-        return {"ok": True, "row": {"text": head + notes, "source": ("ted:" + slug)[:80]}, "record": record}
+        head = ("TETSU'S NOTES, in his own words, on %s \"%s\" by %s (%s; %s). Longest run of words shared "
+                "with the source: %d (limit %d).\n\n" % (what, title, speaker, url, licence, run, COPY_RUN))
+        record = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "by": "tetsu", "slug": slug, "source": source,
+                  "title": title, "speaker": speaker, "url": url, "licence": licence, "notes": notes,
+                  "longest_shared_run": run, "tries": tries}
+        return {"ok": True, "row": {"text": head + notes, "source": source[:80]}, "record": record}
     except Exception as e:                                         # noqa: BLE001
         return {"ok": False, "why": "%s: %s" % (type(e).__name__, str(e)[:160])}
+
+
+OA_LICENCE = "abstracts via OpenAlex (its metadata CC0; each abstract its publisher's), read for notes only"
+
+
+def openalex_bundle(author_id, who, since=0, n=6, api=None):
+    """(title, url, text): the abstracts of an author's most-cited works with an abstract, from `since` on, as one
+    text. Published science only -- never a biography (bystander-protection: no person is looked up)."""
+    if api is None:
+        import covenant_feed
+        api = covenant_feed._api
+    import covenant_feed
+    raw = api("https://api.openalex.org/works?filter=author.id:%s,has_abstract:true,from_publication_date:%d-01-01"
+              "&sort=cited_by_count:desc&per-page=%d" % (author_id, max(since, 1900), n))
+    doc = json.loads(raw) if isinstance(raw, str) else raw
+    parts = []
+    for w in (doc or {}).get("results", [])[:n]:
+        ab = covenant_feed._openalex_abstract(w.get("abstract_inverted_index"))
+        if ab:
+            parts.append("%s (%s)\n%s" % (w.get("title"), w.get("publication_year"), ab))
+    return ("%s: published work, %d abstracts" % (who, len(parts)), "https://openalex.org/%s" % author_id,
+            "\n\n".join(parts))
+
+
+def learn_open(author_id, who, since=0, n=6, api=None, ask=None, state_path=None, notes_path=None, queue_append=None,
+               cache=None, say=print):
+    """Tetsu learns one author's published work from its abstracts, by the same core as the talks."""
+    if ask is None:
+        sys.path.insert(0, os.path.join(HERE, "tools"))
+        import tetsu_work
+        ask = lambda q: tetsu_work.ask(q, private=True, fresh=True)    # noqa: E731
+    source = "openalex:%s" % author_id
+    st = load_state(state_path)
+    if source in st.get("learned", {}):
+        say("  already learned %s" % source)
+        return {"learned": [], "refused": []}
+    try:
+        title, url, text = openalex_bundle(author_id, who, since, n, api)
+    except Exception as e:                                         # noqa: BLE001
+        title, url, text = None, None, ""
+        say("  OpenAlex read failed: %s" % e)
+    if len(text.split()) < 150:
+        r = {"ok": False, "why": "too little abstract text (%d words)" % len(text.split())}
+    else:
+        r = learn_text(source, "openalex_" + author_id, title, who, url, OA_LICENCE, text, ask, cache,
+                       "the abstracts of the published research")
+    out = {"learned": [], "refused": []}
+    if r["ok"]:
+        if queue_append is None:
+            from covenant_daily_plan import teacher_queue_append as queue_append
+        queue_append([r["row"]])
+        with open(notes_path or NOTES, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(r["record"], ensure_ascii=False) + "\n")
+        st.setdefault("learned", {})[source] = {"t": r["record"]["t"], "longest_shared_run": r["record"]["longest_shared_run"]}
+        st.get("refused", {}).pop(source, None)
+        out["learned"].append(source)
+        say("  learned  %s (%s; longest shared run %d)" % (source, who, r["record"]["longest_shared_run"]))
+    else:
+        st.setdefault("refused", {})[source] = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "why": r["why"]}
+        out["refused"].append(source)
+        say("  not kept %s: %s" % (source, r["why"]))
+    save_state(st, state_path)
+    return out
 
 
 def run(n=2, talks=None, state_path=None, notes_path=None, queue_append=None, say=print, **kw):
@@ -218,5 +292,11 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="Tetsu learns from TED transcripts, in his own words")
     ap.add_argument("-n", type=int, default=1)
+    ap.add_argument("--openalex", default=None, help="an OpenAlex author id: learn that author's published abstracts")
+    ap.add_argument("--who", default=None)
+    ap.add_argument("--since", type=int, default=0)
     a = ap.parse_args()
-    print(json.dumps(run(n=a.n), indent=1))
+    if a.openalex:
+        print(json.dumps(learn_open(a.openalex, a.who or a.openalex, since=a.since), indent=1))
+    else:
+        print(json.dumps(run(n=a.n), indent=1))

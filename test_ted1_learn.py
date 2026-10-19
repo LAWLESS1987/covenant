@@ -98,6 +98,27 @@ for _answers in ([copied, copied, copied], [own]):
           read=lambda url, **k: {"ok": True, "html": page}, cache=os.path.join(_d11, "c"),
           ask=lambda q: (200, {"answer": next(_it), "teacher": "withheld: private (A263)"}))
 _st11 = json.load(open(_sp))
+# TED1.12: the OpenAlex route -- a stub API with two works' inverted-index abstracts, a stub Tetsu
+def _inv(s):                       # OpenAlex's inverted index: every position of each word (the first stub kept one)
+    out = {}
+    for i, w in enumerate(s.split()):
+        out.setdefault(w, []).append(i)
+    return out
+_abs1 = " ".join("silicon retina adaptive photoreceptor analog circuit models the outer plexiform layer".split() * 12)
+_abs2 = " ".join("address event representation carries spikes between chips on a shared digital bus".split() * 12)
+_api = lambda url: {"results": [{"title": "Silicon retina", "publication_year": 1991, "abstract_inverted_index": _inv(_abs1)},
+                                {"title": "AER", "publication_year": 1992, "abstract_inverted_index": _inv(_abs2)}]}   # noqa: E731
+_d12 = tempfile.mkdtemp(prefix="ted1_12_")
+_q12, _asked12 = [], []
+_r12 = T.learn_open("A5038154254", "Misha A. Mahowald", api=_api, state_path=os.path.join(_d12, "s.json"),
+                    notes_path=os.path.join(_d12, "n.jsonl"), queue_append=lambda rows: _q12.extend(rows),
+                    cache=os.path.join(_d12, "c"), say=lambda *a: None,
+                    ask=lambda q: (_asked12.append(q), (200, {"answer": "Her chips mimic the eye's first layers and send "
+                                   "events only when something changes.", "teacher": "withheld: private (A263)"}))[1])
+check("TED1.12 OpenAlex route: abstracts become one private text for Tetsu; his own-words notes are queued as "
+      "openalex:<id>, attributed, never the abstracts", _r12["learned"] == ["openalex:A5038154254"] and len(_q12) == 1
+      and _q12[0]["source"] == "openalex:A5038154254" and "OpenAlex" in _q12[0]["text"] and "plexiform" not in _q12[0]["text"]
+      and "plexiform" in _asked12[0], (_r12, _q12[:1]))
 check("TED1.11 a talk refused and then learned is no longer listed as refused",
       "stuart_russell_3_principles_for_creating_safer_ai" in _st11["learned"] and not _st11.get("refused"), _st11)
 

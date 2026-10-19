@@ -31,6 +31,14 @@
   "fei_fei_li_how_we_re_teaching_computers_to_understand_pictures": {
    "t": "2026-10-18T20:29:15-0400",
    "longest_shared_run": 3
+  },
+  "openalex:A5038154254": {
+   "t": "2026-10-18T20:40:41-0400",
+   "longest_shared_run": 6
+  },
+  "openalex:A5068660722": {
+   "t": "2026-10-18T20:43:06-0400",
+   "longest_shared_run": 5
   }
  },
  "refused": {}
