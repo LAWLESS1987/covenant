@@ -209,8 +209,14 @@ run on the PC and read the PC's own ledgers. A neuron on THE PHONE over the PC's
   answer resets).
 - `entry.pc_witness` returns the spiking reading beside the fixed count and whether they agree; a disagreement is
   the finding. It raises nothing and acts on nothing; NodeService keeps the authoritative reconnect notice.
-- M5.80a-e (6 checks), M5 311/311, five mutations each red. Commit db903f8 on brain/witness. Not pushed (phone main
-  reaches his phone only on his yes); not yet surfaced in the /pc display -- a later step.
+- M5.80a-f, M5 312/312, five mutations each red. Commits db903f8 + 078d055 on brain/witness. Not pushed (phone main
+  reaches his phone only on his yes).
+- **Surfaced in the /pc display (PC side on main, dd48e47).** The phone sends its witness reading in the check-in
+  (`entry.pc_witness_summary` + NodeService); `record_checkin` keeps a bounded, type-safe `pc_witness` block;
+  `covenant_pc3d._last_checkin_witness` reads the newest one and hides a reading older than 6 h; the /pc Phone orb
+  goes amber and says "the phone reports a degraded link: its witness has been missing my answers (N recent
+  misses)" when the two readings disagree -- the finding the PC cannot see on its own. DP1 D19w/D19w2, three
+  mutations. The PC side reads the field only when present, so it is inert until a phone build carries it.
 
 ### Still to build (Amendment 1)
 
