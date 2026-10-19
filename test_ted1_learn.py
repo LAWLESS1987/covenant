@@ -88,6 +88,19 @@ check("TED1.9 the real ask path sends the transcript to Tetsu with private=True 
       _r9.get("ok") and _calls and all(c.get("private") is True and c.get("fresh") is True for c in _calls), (_r9, _calls))
 check("TED1.10 Tetsu's first choice comes first", T.TALKS[0].startswith("stuart_russell"))
 
+# TED1.11: refused on one pass, learned on the next -- the state says learned only
+_d11 = tempfile.mkdtemp(prefix="ted1_11_")
+_sp = os.path.join(_d11, "s.json")
+for _answers in ([copied, copied, copied], [own]):
+    _it = iter(_answers)
+    T.run(n=1, talks=["stuart_russell_3_principles_for_creating_safer_ai"], state_path=_sp,
+          notes_path=os.path.join(_d11, "n.jsonl"), queue_append=lambda rows: None, say=lambda *a: None,
+          read=lambda url, **k: {"ok": True, "html": page}, cache=os.path.join(_d11, "c"),
+          ask=lambda q: (200, {"answer": next(_it), "teacher": "withheld: private (A263)"}))
+_st11 = json.load(open(_sp))
+check("TED1.11 a talk refused and then learned is no longer listed as refused",
+      "stuart_russell_3_principles_for_creating_safer_ai" in _st11["learned"] and not _st11.get("refused"), _st11)
+
 print()
 if FAILS:
     print("%d FAILED" % len(FAILS))

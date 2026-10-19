@@ -7,12 +7,31 @@
   "anil_seth_your_brain_hallucinates_your_conscious_reality": {
    "t": "2026-10-18T20:12:15-0400",
    "longest_shared_run": 4
+  },
+  "david_chalmers_how_do_you_explain_consciousness": {
+   "t": "2026-10-18T20:22:05-0400",
+   "longest_shared_run": 3
+  },
+  "jill_bolte_taylor_my_stroke_of_insight": {
+   "t": "2026-10-18T20:22:58-0400",
+   "longest_shared_run": 3
+  },
+  "nick_bostrom_what_happens_when_our_computers_get_smarter_than_we_are": {
+   "t": "2026-10-18T20:23:51-0400",
+   "longest_shared_run": 3
+  },
+  "max_tegmark_how_to_get_empowered_not_overpowered_by_ai": {
+   "t": "2026-10-18T20:24:57-0400",
+   "longest_shared_run": 7
+  },
+  "sam_harris_can_we_build_ai_without_losing_control_over_it": {
+   "t": "2026-10-18T20:28:43-0400",
+   "longest_shared_run": 4
+  },
+  "fei_fei_li_how_we_re_teaching_computers_to_understand_pictures": {
+   "t": "2026-10-18T20:29:15-0400",
+   "longest_shared_run": 3
   }
  },
- "refused": {
-  "stuart_russell_3_principles_for_creating_safer_ai": {
-   "t": "2026-10-18T17:24:13-0400",
-   "why": "notes repeated [8, 9] consecutive words of the talk twice"
-  }
- }
+ "refused": {}
 }

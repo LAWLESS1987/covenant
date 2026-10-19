@@ -201,6 +201,9 @@ def run(n=2, talks=None, state_path=None, notes_path=None, queue_append=None, sa
             with open(notes_path or NOTES, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(r["record"], ensure_ascii=False) + "\n")
             st.setdefault("learned", {})[slug] = {"t": r["record"]["t"], "longest_shared_run": r["record"]["longest_shared_run"]}
+            # a refusal answered by a later learning is history, not state (it stays in git); 2026-10-18 Stuart Russell
+            # read "learned" and "refused" at once
+            st.get("refused", {}).pop(slug, None)
             out["learned"].append(slug)
             say("  learned  %s (longest shared run %d)" % (slug, r["record"]["longest_shared_run"]))
         else:
