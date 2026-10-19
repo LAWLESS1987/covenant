@@ -493,6 +493,9 @@ SUITES = [
     ("test_ig1_image_guard.py",           120,  "JUDGE"),
     ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
     ("test_my1_mycelium.py",              120,  "JUDGE"),
+    # A374 (2026-10-19): the spore road (a signed request sealed for the PC through a relay that cannot read it)
+    # and the road neurons that choose among tailnet, LAN and spore.
+    ("test_sp1_spore.py",                 180,  "JUDGE"),
     ("test_ow1_own_work.py",              120,  "JUDGE"),
     ("test_wb1_web.py",                   120,  "JUDGE"),
     ("test_hl1_heal.py",                  120,  "JUDGE"),

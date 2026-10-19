@@ -397,6 +397,8 @@ ops/tetsu_immunity.jsonl
 ops/tetsu_about_him.json
 ops/refine_loop_state.json
 ops/mycelium.jsonl
+# A374: a spore relay's folder, when one runs on this PC (sealed blocks; kept, never published)
+ops/spore_relay/
 ops/security_threats.jsonl
 ops/contact_state.json
 ops/ambassador_sends.jsonl

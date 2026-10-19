@@ -69,6 +69,9 @@ BEGIN = "-----BEGIN COVENANT SEALED-----"
 END = "-----END COVENANT SEALED-----"
 VERSION = 1
 KINDS = ("plan", "decision", "identity")
+# A374: the spore road's request and answer (covenant_spore.py). A separate tuple so KINDS, which the app's mirror
+# is pinned equal to (covenant-phone M5.13), is unchanged until the app carries the road.
+ROAD_KINDS = ("spore", "spore_reply")
 ENVELOPE_KEYS = ("v", "kind", "to", "from", "ek", "iv", "ct")
 MAX_BLOCK_BYTES = 1 << 20          # a block larger than this is not one of ours
 # the marker lines as a mail client may show them: a no-break space, a double
@@ -156,8 +159,8 @@ def _check_shape(env):
             raise SealedError("envelope lacks %r" % k)
     if env["v"] != VERSION:
         raise SealedError("version %r is not %d" % (env["v"], VERSION))
-    if env["kind"] not in KINDS:
-        raise SealedError("kind %r is not one of %s" % (env["kind"], "/".join(KINDS)))
+    if env["kind"] not in KINDS + ROAD_KINDS:
+        raise SealedError("kind %r is not one of %s" % (env["kind"], "/".join(KINDS + ROAD_KINDS)))
     if fingerprint(env["spk"]) != env["from"]:
         raise SealedError("the sender key carried does not match the 'from' fingerprint")
 
@@ -167,8 +170,8 @@ def seal(kind, obj, sender_key, sender_pem, recipient_pem):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    if kind not in KINDS:
-        raise SealedError("kind %r is not one of %s" % (kind, "/".join(KINDS)))
+    if kind not in KINDS + ROAD_KINDS:
+        raise SealedError("kind %r is not one of %s" % (kind, "/".join(KINDS + ROAD_KINDS)))
     if not isinstance(obj, dict) or obj.get("kind") != kind:
         raise SealedError("the plaintext must be an object whose 'kind' is %r" % kind)
     ck, iv = secrets.token_bytes(32), secrets.token_bytes(12)

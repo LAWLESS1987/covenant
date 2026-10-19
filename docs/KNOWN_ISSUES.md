@@ -7645,6 +7645,38 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A374. [BUILT on the PC; the phone side and WHERE the relay lives wait on him. The third road (the spore road): a signed request sealed for the PC, left at a relay that cannot read or forge it, and road neurons (leaky integrate-and-fire) that choose among tailnet, LAN and spore] 2026-10-19. His words: "make our own similar option on the mycelial road using the spiking system"
+
+- **The gap, measured first.**
+  - Two roads reach the PC: the tailnet, and the LAN address with a signed request (A200).
+  - `ops/mycelium.jsonl` shows the second road working on the device: 12 admissions of the phone from its LAN address, 09-22 to 10-18. A200's "not measured on the device" is answered for those calls.
+  - Away from home with Tailscale off there is no road: no public address, no open port (A8).
+  - Six phone calls take the second road (entry.py's `_pc_route` callers, counted). The check-in, the daily plan, the app update and the approvals do not; they are tailnet only.
+- **Built: `covenant_spore.py`.**
+  - The phone leaves the SAME signed request at a relay, sealed with `covenant_sealed_mail` to the PC's key. The PC only reaches out to collect it, opens it, and runs `covenant_mycelium.admit` on the inner signature (registered key, 300 s window, single-use nonce). Only then does it hand the request to its own door on loopback. The answer goes back sealed to the phone's key.
+  - Only the doors the second road already carries ride it (`SPORE_DOORS`). His own registered keys only: an ally is refused here twice over (no ally registry is read, and only `signed:operator` passes). A stranger's block gets no answer at all.
+  - A relay that cannot read a block, forge one, replay one past the window, or drain a box it does not own: a take is signed by the key whose fingerprint names the box.
+  - It CAN drop or delay blocks, and it sees which two fingerprints talk, when and how much. A delay past the window becomes a refusal, never a late action.
+  - Relays: a folder (`FileRelay`), and `--serve-relay`, an HTTP relay on loopback port 5097 by default. 5097 is in `exposure_check.PORTS` from today (A230's shape), and `ops/spore_relay/` is gitignored.
+- **The road neurons (the spiking part).**
+  - One leaky integrate-and-fire neuron per road, event-driven: the leak between calls is solved exactly as v * exp(-dt/tau), so nothing runs between calls.
+  - A success clears negative charge and adds 1; a failed connect subtracts 1; a road at 0.5 or more is alive.
+  - Live roads go first in preference order. A dead preferred road is probed once per 300 s, the one waited longest first.
+  - Measured in SP1a: with the tailnet and the LAN dead, 20 calls cost 6 dead-road connect attempts, against 40 without the neurons. One blip after a run of successes keeps a road; old evidence leaks away after five time constants.
+  - It is a small hand-set neuron, not a trained network. Two faults were found writing the test, and both are fixed in the code, not the test: the first probe rule starved the LAN, and a road that came back stayed dead after a successful probe.
+- **Checks: SP1, 27/27,** registered in covenant_one. Mutation-tested: 10 single mutations, each red on its own check, restored byte-identical. The two ally layers are independent: either removed alone stays green, and both removed turns SP1c red.
+- **`covenant_sealed_mail`.** The two new kinds are in a separate `ROAD_KINDS`, so `KINDS` (which covenant-phone M5.13 pins equal to the app's mirror) is unchanged. `open_decision` and `open_identity` still filter by their own kind.
+- **NOT DONE, and why.**
+  - **The phone side.** entry.py needs the road kinds, the third road in `_pc_route`, and the neurons kept in a file. That goes on a covenant-phone branch; phone main reaches his phone only with his yes.
+  - **Where the relay lives.** It must be reachable from both devices away from home, and that choice is his:
+    - his website's Cloudflare Worker, in about 40 lines (it sees only ciphertext);
+    - a port he opens;
+    - a host he names.
+  - **The PC's collection loop.** `--pc-loop` exists. It is not started by the watchdog until a relay exists.
+  - **Measured on the device: nothing yet.** Every number above is from SP1 on this PC.
+
+---
+
 ### A373. [FIXED. The highway's sweep_red came from the installed pre-commit hook drifting from its tracked source: A363's step 2f went into .git/hooks/pre-commit and never into ops/pre-commit.synchold] 2026-10-18. Found from his words: "the phone keeps saying theres nothing to repair the highway there fix that".
 
 - **What the phone showed, measured.**

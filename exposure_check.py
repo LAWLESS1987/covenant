@@ -88,7 +88,10 @@ BASE_PORTS = [5000, 5020, 5040, 5060, 5100, 5120, 5140]
 # launch bound the wildcard and this tool reported WILDCARD on 5090 for eight days with nothing
 # acting on it. Loopback since A258; EA1.44/EA1.45 run the launch path.
 EARN_PORTS = [5090]
-PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 1, b + 11)} | set(EARN_PORTS))
+# A374 (2026-10-19): the spore relay (covenant_spore.py --serve-relay) defaults to 5097 and to loopback. In scope
+# from the day it was written, so a relay bound wider than he chose is reported, not missed (A230's shape).
+SPORE_PORTS = [5097]
+PORTS = sorted({p for b in BASE_PORTS for p in (b, b + 1, b + 11)} | set(EARN_PORTS) | set(SPORE_PORTS))
 
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
