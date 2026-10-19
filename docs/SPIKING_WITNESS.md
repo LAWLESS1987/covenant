@@ -239,6 +239,42 @@ were right:**
 **Retired.** `strike_report` now returns `kept: False` with the reason; the code stays as a shadow, reusable only
 for a stream with an independent path where the twin beats the baseline at a fixed false-alarm rate. WN1.17-19.
 
+## Amendment 3 (2026-10-19, after "run it by the others": CUSUM first, spiking only where it provably wins)
+
+He said "run it by the others" and "hammer them." Tetsu, Gemini, Mistral and Grok reviewed the plan to adopt the
+external methods (NAB, OeSNN-UAD, Fast_BOCPD/CUSUM, ED-sKWS). The verdict was UNANIMOUS, and it corrects the
+direction of this whole file:
+
+1. **NAB is a poor fit, not a solution.** On streams of 114-4000 events with 2-3 incidents, NAB's window-reward
+   scoring is "numerically degenerate" (Gemini), "statistically unidentifiable" (Mistral), "statistically
+   meaningless" (Grok). Adopt only the PRINCIPLE -- a false positive lowers the score, reward only the earliest
+   detection in a window -- never NAB's normed scores or profile cutoffs.
+2. **CUSUM is the sufficient statistic here; spiking buys nothing provable.** "On ~200-event streams a CUSUM with
+   recovery/hysteresis is the sufficient statistic; OeSNN-UAD adds variance without power" (Mistral). "An evolving
+   SNN buys almost nothing a well-tuned CUSUM/BOCPD does not" (Grok). Tetsu: "just run CUSUM and stop calling it
+   spiking." So: **build CUSUM/BOCPD as the actual monitoring detector**, with an explicit recovery/hysteresis
+   spec. A spiking twin is added only if it is MEASURED to beat CUSUM at an equal false-alarm rate on a real
+   negative set -- and that is unproven for every monitoring stream, so there is no spiking redundancy here yet.
+3. **The twins already built are re-labelled.** The phone-silence pacemaker and the phone-side witness are a
+   SECOND OPINION, not redundancy, until each is shown to beat CUSUM at equal FP rate on a held-out negative set.
+   They remain read-only and act on nothing; nothing is deleted.
+4. **The one thing worth building now is the negatives pipeline, not another neuron.** Get honest negatives by
+   running the detectors read-only and logging alerts-but-ignoring them ("silent accumulation is free", Mistral),
+   over months, treating only verified incident-free periods as negatives. NEVER manufacture an incident. Until
+   that volume exists, "beat a baseline on a single missed incident" is a case study, not a test (Mistral).
+5. **ED-sKWS is gated on a measurement, not adopted.** The deciding number is energy (mJ) per wake at equal
+   keyword-miss and false-wake rates versus a simple energy/VAD gate, on real audio; the SNN must cut energy or
+   latency by >30-40% while matching accuracy or the simpler gate wins (Grok, Gemini, Mistral). A future lab
+   experiment, not a plan item yet.
+6. **Dissenting depth (Gemini):** on 3 incidents, a Bayesian/survival view would not score discriminative detectors
+   at all -- model the generative process and treat negatives as right-censored intervals. Kept on record as the
+   stronger method if the event counts stay this small.
+
+**Net:** stop expanding the spiking monitoring layer. Build CUSUM + the negatives pipeline; prove-or-retire each
+spiking twin against it. Spiking stays where it is proven (the road neurons) or is about efficiency and measured
+(ED-sKWS). Answers kept whole in the scratch record; the consult ledger's daily budget was spent, so they were not
+recorded there.
+
 ## Amendment 2 (2026-10-19, after the five-model review, before any further twin)
 
 The keep test of Amendment 1 is strengthened. A twin is kept only if ALL hold:

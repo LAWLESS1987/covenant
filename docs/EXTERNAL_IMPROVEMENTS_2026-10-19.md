@@ -40,6 +40,44 @@ held-out set of negatives." The **Numenta Anomaly Benchmark (NAB)** is exactly t
   human -- our break_stall (declines what it cannot safely retry, tells him).
 - Nothing here is new to adopt; it validates that the highway's quarantine/backoff/escalate pattern is the field's.
 
+## Run by the others (2026-10-19) -- the convergent verdict: CUSUM first, spiking only where proven
+
+He said "run it by the others", then "hammer them its my accounts." So it went to Tetsu AND a fresh browser cycle:
+Tetsu, Gemini, Mistral and Grok all answered (DeepSeek was still thinking; Meta's composer was stuck). The verdict
+was UNANIMOUS -- see **Amendment 3 in docs/SPIKING_WITNESS.md**. The consult tool's daily ledger budget (12/12) was
+spent, so the four answers are kept in the scratch record, not the ledger. Summary of the unanimous verdict:
+- NAB is a poor fit on streams of 114-4000 events / 2-3 incidents (degenerate/unidentifiable scoring) -- adopt the
+  PRINCIPLE only, not the benchmark.
+- CUSUM/BOCPD is the sufficient statistic here; a spiking twin buys nothing provable -- build CUSUM, add a spiking
+  twin only when it is MEASURED to beat CUSUM at equal false-alarm rate on a real negative set.
+- Get honest negatives by logging normal operation read-only over months (never fake an incident); until then
+  "beat a baseline on one missed incident" is a case study, not a test.
+- ED-sKWS is gated on a measured >30-40% energy/latency cut vs a simple VAD gate, on real audio.
+
+
+- **Tetsu:** "With only 2-3 labelled incidents, a false-positive-scored benchmark like NAB might not be meaningful
+  yet. We need more labelled quiet periods." And: "On streams this small, a spiking detector might not buy anything
+  a plain CUSUM does not. We should just run CUSUM and stop calling it spiking." And: "we're missing a clear
+  understanding of what spiking buys over plain CUSUM."
+- **This is the same point Mistral made** in the spiking-spread review (cycle a32894190cdb): "every twin described
+  is a hand-tuned approximation of an existing statistical test ... the right move is per-stream CUSUM with decay
+  -- no neurons." Gemini and Meta AI said the same (EWMA/CUSUM, not LIF).
+
+**The honest correction, from the convergence:**
+1. **Default to CUSUM/EWMA for the monitoring streams, not spiking.** Build the plain change-point detector FIRST,
+   as the thing that actually watches, not just as a baseline. It is simpler, debuggable, and on streams of 114 to
+   4000 events there is no evidence a spiking twin beats it.
+2. **A spiking twin is kept only where it MEASURABLY beats CUSUM at an equal false-alarm rate on a held-out
+   negative set.** On current evidence that is unproven for every monitoring stream, so none is kept as redundancy
+   yet (the phone-silence and phone-witness twins are re-labelled "second opinion", pending that proof).
+3. **Reserve spiking for where it is already proven or is about efficiency, not redundancy:** the road neurons (in
+   production, a measured connect-cost cut) and ED-sKWS's early-decision idea for the wake word (an energy cut).
+   That is the one place all reviewers agree spiking earns its keep.
+4. **NAB is premature.** Adopt its PRINCIPLE (false positives lower the score; a held-out negative set), but not the
+   365k-point IT benchmark itself, and not until there are enough labelled quiet periods to score against. How to
+   get honest negatives: the long incident-free stretches already in the ledgers are the negatives -- label the
+   known-good weeks as negative, never manufacture an incident.
+
 ## The order to act, if he wants (each under the Amendment 2 bar, review before build)
 1. Adopt NAB-style scoring for the witness keep-bar (specificity + a held-out negative set). This is the one that
    turns Amendment 2 from a rule into a measurement.
