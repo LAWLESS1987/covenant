@@ -7663,6 +7663,18 @@ A280, which is the road telling the truth about it.
   - The installed hook, the intended and newer one, was copied into the tracked source. The old tracked file is
     kept at `.trash/pre-commit.synchold.before-2f-sync-2026-10-18`.
   - A117 is 23/23. sweep_red clears on the next full sweep (the nightly), which reads the record again.
+- **The ambassador, resumed on his word the same evening.** His words: "resume if its not doing shady shit theres no
+  reason to stop it". Checked first, from its own ledgers:
+  - Every message goes through covenant_moltbook's judge_outbound. No second, softer path exists; AM11 checks that.
+  - The composer cannot send without the AI disclosure and his quoted grant.
+  - Of 2,968 replies tried: 2,248 were HELD (the judge had no view), 550 refused, 62 rate-limited by Moltbook, and
+    about 107 went out.
+  - Every send past a hold or a student conviction (192) is in `ops/outbound_overrides.jsonl`, written before the
+    send, under his own grants: Tetsu's sentence read (09-28), the A322 discourse seat (10-10) and FREE_REIN (09-05).
+  - Nothing ran hidden or around the record.
+  - `python covenant_pause.py --resume ambassador`: resumed; `--list` shows every switch running.
+  - **Not changed:** moltbook_strikes (Moltbook's verification answers: run 5, suspends at 10). Resuming makes more
+    answers, so the counter is the thing to watch.
 - **Rule 10, why A117 did not stop it earlier.** A117.8c runs only in the sweep's closing integrity step, never at
   commit. The commit that adds a hook step touches no tracked file the stage-check selects, so the drift lived from
   10-17 until the next sweep. Not built today: a stage-check trigger on any `.git/hooks` edit. Hooks are not
