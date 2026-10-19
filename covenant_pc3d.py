@@ -254,12 +254,15 @@ for(const r of repos){const amber=r.dirty||r.ahead||r.ahead==null;const age=r.la
 const sig=items.map(p=>p.name+'|'+p.color+'|'+p.sub).join(';');
 if(sig===lastSig){items.forEach((p,i)=>{const o=orbs[i+1];if(o)o.userData.detail=p.detail;});return;}
 lastSig=sig;
+// 2026-10-19: carry each orb's current orbit angle across a rebuild so a data refresh does not snap every planet
+// back to its start position (that snap, every time a detector flapped, read as "not rotating smoothly").
+const prevA={};for(const o of orbs){if(o!==tetsu)prevA[o.userData.name]=o.userData.orbitA;}
 for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);dispose(o);}orbs.length=1;hovered=null;
 for(const l of links.children){if(l.geometry!==botGeo)l.geometry.dispose();l.material.dispose();}links.clear();traders.length=0;
 for(const s of labels.children){if(s.material.map)s.material.map.dispose();s.material.dispose();}labels.clear();
 const inner=items.filter(p=>!p.outer),outer=items.filter(p=>p.outer);
 const place=(list,R,size,speed)=>list.forEach((p,i)=>{const def=CW.worldFor(p.kind,p.wid,p.wi);const o=CW.planet(THREE,def,p.color,size);
- o.userData.orbitR=R;o.userData.orbitA=(i/list.length)*Math.PI*2;o.userData.orbitS=speed;o.userData.name=p.name;o.userData.detail=p.detail;o.userData.kind=p.kind;o.userData.sub=p.sub;o.userData.bad=p.color===BAD;o.userData.word=word(p.color);
+ o.userData.orbitR=R;o.userData.orbitA=(p.name in prevA)?prevA[p.name]:(i/list.length)*Math.PI*2;o.userData.orbitS=speed;o.userData.name=p.name;o.userData.detail=p.detail;o.userData.kind=p.kind;o.userData.sub=p.sub;o.userData.bad=p.color===BAD;o.userData.word=word(p.color);
  o.userData.label=label(def.repo?p.name:def.name+' · '+p.name,p.sub);if(p.outer)o.userData.label.scale.multiplyScalar(0.8);scene.add(o);orbs.push(o);
  const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const ln=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x5CE1E6,transparent:true,opacity:0.16}));ln.userData.of=o;links.add(ln);
  // two bots on every road, one each way: what goes out comes back
@@ -300,9 +303,12 @@ info.textContent='MEASURED\\n'+m+lifeText(u);});
 // me"): the canvas is sized to the window every frame it changes (a resize the browser never announced left the
 // drawing stretched off-centre), and the camera looks straight at Tetsu, so the star is the middle of the screen.
 let vw=0,vh=0;function resize(){vw=innerWidth;vh=innerHeight;renderer.setSize(vw,vh);cam.aspect=vw/vh;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
-let t=0;const sunPos=new THREE.Vector3();
-function frame(){t+=0.01;CW.tickStar(tetsu,t);CW.tickMycelium(myc,t,orbs.slice(1));
- for(const o of orbs){if(o===tetsu)continue;const u=o.userData;u.orbitA+=u.orbitS;o.position.set(Math.cos(u.orbitA)*u.orbitR,Math.sin(u.orbitA*2)*0.25,Math.sin(u.orbitA)*u.orbitR);
+let t=0,last=performance.now();const sunPos=new THREE.Vector3();
+// 2026-10-19 ("the planets don't rotate smoothly"): advance by ELAPSED time, not a fixed step per frame, so motion
+// is identical at 60fps and smooth (not juddery) when the frame rate dips or the tab is throttled. df=1 at 60fps;
+// capped at 4 so a long stall (a 15s data refresh, a GC) resumes without a jump.
+function frame(){const now=performance.now();let df=(now-last)/16.667;last=now;if(df>4)df=4;t+=0.01*df;CW.tickStar(tetsu,t);CW.tickMycelium(myc,t,orbs.slice(1));
+ for(const o of orbs){if(o===tetsu)continue;const u=o.userData;u.orbitA+=u.orbitS*df;o.position.set(Math.cos(u.orbitA)*u.orbitR,Math.sin(u.orbitA*2)*0.25,Math.sin(u.orbitA)*u.orbitR);
   CW.tick(o,t,sunPos);if(u.bad)u.atmoU.uGlow.value=0.7+0.5*(0.5+0.5*Math.sin(t*5));if(u.label)u.label.position.copy(o.position).add(new THREE.Vector3(0,(u.radius||0.45)+0.55,0));}
  for(const l of links.children){if(l.isLine){const p=l.geometry.attributes.position;p.setXYZ(1,l.userData.of.position.x,l.userData.of.position.y,l.userData.of.position.z);p.needsUpdate=true;}}
  for(const b of traders){const k=(t*0.35+b.userData.ph)%1;const a=b.userData.of.position;if(b.userData.dir)b.position.copy(a).multiplyScalar(k);else b.position.copy(a).multiplyScalar(1-k);}
