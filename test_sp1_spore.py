@@ -62,10 +62,13 @@ class Door:
 
     def __init__(self):
         self.calls = []
+        self.size = None                                          # answer with this many bytes instead of the echo
 
     def __call__(self, method, path, body, headers):
         self.calls.append((method, path, body))
-        return 200, json.dumps({"status": "ok", "echo": body.decode("utf-8", "replace")}).encode()
+        if self.size is not None:
+            return 200, os.urandom(self.size), {"Content-Type": "image/png", "X-Covenant-Model": "m", "Set-Cookie": "no"}
+        return 200, json.dumps({"status": "ok", "echo": body.decode("utf-8", "replace")}).encode(), {"Content-Type": "application/json"}
 
 
 def sp1a():
@@ -160,6 +163,25 @@ def sp1b_c_d(signers, keys, pems):
             got = (obj["code"], base64.b64decode(obj["body"]))
     check("SP1b the answer comes back sealed to the phone and opens there with the same id",
           got is not None and got[0] == 200 and b"hello from away" in got[1], got)
+    # the size budget: an answer of exactly MAX_BODY bytes fits one block and opens; one byte more is a 413
+    sizes = {}
+    for n in (SP.MAX_BODY, SP.MAX_BODY + 1):
+        door.size = n
+        rid_n, bn = request(sealer, phone, pems["phone"], pems["pc"], path="/m/image")
+        relay.put(pcbox, bn)
+        SP.pc_pass(relay, pc, pems["pc"], forward=door, sealer=sealer, signers_path=signers, ledger_path=ledger, seen=seen)
+        for _b, text in relay.take(phonebox):
+            envs = SM.blocks(text)
+            if envs:
+                _e, o, _s = SM.open_env(envs[0], phone, pems["phone"], pems["pc"])
+                if o.get("id") == rid_n:
+                    sizes[n] = (o["code"], len(base64.b64decode(o["body"])), len(text), o.get("headers"))
+    door.size = None
+    at, over = sizes.get(SP.MAX_BODY), sizes.get(SP.MAX_BODY + 1)
+    check("SP1b an answer of exactly MAX_BODY bytes rides one block under 1 MB, with only the declared headers",
+          at is not None and at[0] == 200 and at[1] == SP.MAX_BODY and at[2] < (1 << 20)
+          and at[3] == {"Content-Type": "image/png", "X-Covenant-Model": "m"}, at and at[:3] + (at[3],))
+    check("SP1b one byte more is answered 413, never cut", over is not None and over[0] == 413, over and over[:3])
 
     print("SP1c -- what the PC refuses")
     door.calls.clear()

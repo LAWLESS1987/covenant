@@ -64,7 +64,11 @@ KIND_REQ, KIND_REPLY = "spore", "spore_reply"
 # the doors the second road already carries (entry.py's _pc_route callers, counted 2026-10-19): six calls on five
 # paths plus /m/code/<id>. The check-in, the daily plan and the money doors are NOT here.
 SPORE_DOORS = ("/m/agent", "/m/heal", "/pc/3d/state", "/m/image", "/m/code")
-MAX_BODY = 600 * 1024              # a reply body above this is answered 413, never cut silently
+# A reply body above this is answered 413, never cut silently. The body is base64'd three times on its way into a
+# block (the body field, the ciphertext field, the armor): about 2.37x. 400 KB keeps a block under the 1 MB every
+# reader refuses above (SP1b sends one this size through). The first value, 600 KB, would have made blocks of ~1.4 MB.
+MAX_BODY = 400 * 1024
+REPLY_HEADERS = ("Content-Type", "X-Covenant-Model", "X-Covenant-Ms")   # what the app reads from an answer (pc_draw)
 MAX_BOX = 200                      # blocks waiting in one box at a relay
 WINDOW_S = 300                     # the window of the signature scheme and of a take
 
@@ -330,7 +334,7 @@ def _norm(pem):
 
 
 def forward_local(method, path, body, headers, base="http://127.0.0.1:5000", timeout=180):
-    """Hand an ADMITTED request to this PC's own door on loopback. (code, body bytes)."""
+    """Hand an ADMITTED request to this PC's own door on loopback. (code, body bytes, the REPLY_HEADERS present)."""
     import urllib.error
     import urllib.request
     h = dict(headers)
@@ -339,9 +343,9 @@ def forward_local(method, path, body, headers, base="http://127.0.0.1:5000", tim
     req = urllib.request.Request(base + path, data=body or None, headers=h, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.getcode(), r.read()
+            return r.getcode(), r.read(), {k: r.headers.get(k) for k in REPLY_HEADERS if r.headers.get(k)}
     except urllib.error.HTTPError as e:
-        return e.code, e.read()
+        return e.code, e.read(), {k: e.headers.get(k) for k in REPLY_HEADERS if e.headers and e.headers.get(k)}
 
 
 def pc_pass(relay, my_key, my_pem, forward=forward_local, sealer=None, signers_path=None, ledger_path=None,
@@ -365,10 +369,14 @@ def pc_pass(relay, my_key, my_pem, forward=forward_local, sealer=None, signers_p
         path, method = str(obj.get("path", "")), str(obj.get("method", "GET"))
         registered = DP.signer_name(spk, signers_path)
 
-        def answer(code, body):
+        def answer(code, body, rh=None):
             if registered:      # an answer only to his own registered keys: a stranger learns nothing
-                rep = {"kind": KIND_REPLY, "id": str(obj.get("id", ""))[:40], "code": int(code), "body": _b64(body)}
-                relay.put(sealer.fingerprint(spk), sealer.seal(KIND_REPLY, rep, my_key, my_pem, spk))
+                rep = {"kind": KIND_REPLY, "id": str(obj.get("id", ""))[:40], "code": int(code), "body": _b64(body),
+                       "headers": {k: str(v)[:200] for k, v in (rh or {}).items() if k in REPLY_HEADERS}}
+                try:
+                    relay.put(sealer.fingerprint(spk), sealer.seal(KIND_REPLY, rep, my_key, my_pem, spk))
+                except (ValueError, OSError) as e:    # a full box, a relay away: recorded, and the pass goes on
+                    rows.append(_row(ledger_path, M, "unanswered", bid, path, registered, "the answer could not be left: %s" % e))
 
         if env.get("kind") != KIND_REQ:
             rows.append(_row(ledger_path, M, "refused", bid, path, registered, "kind %s is not a request" % env.get("kind")))
@@ -396,11 +404,12 @@ def pc_pass(relay, my_key, my_pem, forward=forward_local, sealer=None, signers_p
             rows.append({"kind": "refused", "road": "spore", "block": bid, "path": path, "why": how})
             answer(403, json.dumps({"status": "error", "message": "refused on the spore road: %s" % how}).encode())
             continue
-        code, rbody = forward(method, path, body, headers)
+        got = forward(method, path, body, headers)
+        code, rbody, rh = (tuple(got) + ({},))[:3]
         if len(rbody or b"") > MAX_BODY:
-            code, rbody = 413, json.dumps({"status": "error", "message": "the answer is %d bytes; the spore road carries %d"
-                                           % (len(rbody), MAX_BODY)}).encode()
-        answer(code, rbody or b"")
+            code, rbody, rh = 413, json.dumps({"status": "error", "message": "the answer is %d bytes; the spore road carries %d"
+                                               % (len(rbody), MAX_BODY)}).encode(), {"Content-Type": "application/json"}
+        answer(code, rbody or b"", rh)
         rows.append({"kind": "answered", "road": "spore", "block": bid, "path": path, "who": who, "code": int(code)})
     return rows
 
@@ -416,7 +425,7 @@ def _row(ledger_path, M, kind, bid, path, who, why):
 def call(relay, sealer, method, path, body, headers, my_key, my_pem, pc_pem, timeout=90.0, poll_s=2.0,
          clock=time.time, sleep=time.sleep, proof_fn=None):
     """Leave the request, then collect this phone's box until the PC's answer with the same id arrives.
-    (code, body bytes), or None when TIMEOUT passes. A block not sealed by the PC's own key is ignored."""
+    (code, body bytes, headers), or None when TIMEOUT passes. A block not sealed by the PC's own key is ignored."""
     rid, block = wrap_request(sealer, method, path, body, headers, my_key, my_pem, pc_pem)
     relay.put(sealer.fingerprint(pc_pem), block)
     mine, deadline = sealer.fingerprint(my_pem), clock() + float(timeout)
@@ -429,7 +438,8 @@ def call(relay, sealer, method, path, body, headers, my_key, my_pem, pc_pem, tim
                 except sealer.error:
                     continue
                 if env.get("kind") == KIND_REPLY and obj.get("id") == rid:
-                    return int(obj.get("code", 0)), base64.b64decode(obj.get("body") or "")
+                    rh = obj.get("headers") if isinstance(obj.get("headers"), dict) else {}
+                    return int(obj.get("code", 0)), base64.b64decode(obj.get("body") or ""), rh
         if clock() >= deadline:
             return None
         sleep(poll_s)

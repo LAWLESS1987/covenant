@@ -7666,8 +7666,22 @@ A280, which is the road telling the truth about it.
   - It is a small hand-set neuron, not a trained network. Two faults were found writing the test, and both are fixed in the code, not the test: the first probe rule starved the LAN, and a road that came back stayed dead after a successful probe.
 - **Checks: SP1, 27/27,** registered in covenant_one. Mutation-tested: 10 single mutations, each red on its own check, restored byte-identical. The two ally layers are independent: either removed alone stays green, and both removed turns SP1c red.
 - **`covenant_sealed_mail`.** The two new kinds are in a separate `ROAD_KINDS`, so `KINDS` (which covenant-phone M5.13 pins equal to the app's mirror) is unchanged. `open_decision` and `open_identity` still filter by their own kind.
+- **Second pass, the same day.**
+  - The image call reads three response headers (pc_draw: Content-Type, X-Covenant-Model, X-Covenant-Ms), so those three now ride the sealed answer, and nothing else does.
+  - The size budget was wrong as first written. A body is base64'd three times on its way into a block (body, ciphertext, armor): about 2.37x. So 600 KB would have made 1.4 MB blocks that every reader refuses. It is 400 KB now, and SP1b sends an answer of exactly that size through and one byte more (413).
+  - An answer the relay will not take is now a ledger row (`unanswered`), not an exception that stops the pass.
+  - SP1 29/29. The size, the 413 and the header filter were each driven red, restored byte-identical.
+- **The phone side, on covenant-phone branch `road/spore` (NOT pushed; main reaches his phone only with his yes).**
+  - entry.py mirrors the road, because the app ships one Python file (M5.5) and the PC module is outside the launcher's closure (M5.2), as sealed mail already does: the neurons, the relay client, `spore_call`, and `SEAL_ROAD_KINDS`.
+  - `_pc_route` takes the roads in the neurons' order. The third road only runs when `files/pc_relay.txt` names a relay, the PC's key is pinned in settings, and the door is one the road carries. With no relay the behaviour is the old one, which M5.80g checks.
+  - M5.80a-i run the two copies against each other:
+    - the neurons agree on 400 random events;
+    - a request entry.py wrapped is admitted by the PC's own `pc_pass` and opened back in the app;
+    - with the tailnet dead, the chat takes the third road, and the next call skips the tailnet;
+    - FALSE PUSHes: no relay, a door not carried, an answer sealed by another key.
+  - M5 314/314 on the branch, against 305/305 before it.
 - **NOT DONE, and why.**
-  - **The phone side.** entry.py needs the road kinds, the third road in `_pc_route`, and the neurons kept in a file. That goes on a covenant-phone branch; phone main reaches his phone only with his yes.
+  - **How the phone learns the relay address.** Today it is a file the app reads. The PC naming it in the check-in answer (as it names the LAN address) waits until a relay exists.
   - **Where the relay lives.** It must be reachable from both devices away from home, and that choice is his:
     - his website's Cloudflare Worker, in about 40 lines (it sees only ciphertext);
     - a port he opens;
