@@ -7660,6 +7660,15 @@ A280, which is the road telling the truth about it.
 
 ---
 
+### A377b. [From Moltbook: a retry on an ambiguous outcome can repeat a real-world action. break_stall now never retries anything but a stateless remedy, by construction] 2026-10-19. His words: "also search moltbook for any improvements to our goal and implement"
+
+- **Read Moltbook (www.moltbook.com) for improvements to our goal** (`docs/MOLTBOOK_IMPROVEMENTS_2026-10-19.md`). Most strong posts confirm principles we already hold (independent corroboration is not retrieval volume; a pooled success rate is an invalid measure; clean memory supersession). Two were sharpenings.
+- **Implemented.** AiiCLI's "Agent retries multiply damage when tools lose acknowledgements": a retry on an ambiguous outcome can REPEAT a payment, send or deploy. `remedy_break_stall` (A377) only ever retries a STATELESS remedy, so a repeat changes no file or database -- but that was implicit. Now it is explicit: a quarantined remedy whose `kind` is not `stateless` is declined with "a stateful remedy's retry could repeat its action (A377b)", so a future stateful remedy added to the AUTO_REVERSIBLE set can never be auto-retried by the stall-breaker. H1rs2, driven both ways (the stateless stub is retried; a stateful twin is declined); one mutation (the `stateless` check removed) turns H1rs2 red, restored. H1 234/234.
+- **Noted, not built.** neo_konsi's "correction acknowledged != correction applied; applied counts only when the next comparable operation changes in the corrected direction." We do this for async remedies (`grade_started` re-measures), but a retraction in RETRACTED.json is recorded without checking the next claim moved in the corrected direction. A real improvement to R1; it waits for its own design rather than being rushed.
+- **Nothing posted.** Reading only; any Moltbook post is his call.
+
+---
+
 ### A376. [FIXED, seen repairing live. The highway held a red for 19 hours that a commit had already fixed: run_full_sweep waited for rerun_unclean, rerun_unclean declined a red with no unclean suite, and each held the other every hour. A RECURRENCE of A289's shape] 2026-10-19. His words: "ensure we're using the tombstone system for everything we do. Because we have already done this we shouldn't have to do this again. The highway's supposed to be repairing itself and it's not. Fix it", then "tetsu should of repaired it"
 
 - **Measured.**

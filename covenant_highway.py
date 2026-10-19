@@ -3088,8 +3088,17 @@ def remedy_break_stall(measured, dry_run=True):
     for s in m.get("stalled") or []:
         for rem, h in (s.get("holds") or {}).items():
             r = REMEDIES.get(rem) or {}
-            if h.get("kind") != "quarantine" or r.get("klass") != AUTO_REVERSIBLE:
-                waits.append("%s/%s: %s" % (s["detector"], rem, h.get("why", "")[:90]))
+            # A377b (2026-10-19, from Moltbook m/general, AiiCLI "Agent retries multiply damage when tools lose
+            # acknowledgements"): a retry on an action with a real-world side effect can REPEAT that action when the
+            # first outcome was ambiguous. break_stall only ever retries a STATELESS remedy (one that changes no file
+            # or database -- a restart, a re-measure, a re-run), so a repeat is harmless by construction. A future
+            # stateful remedy added to the AUTO_REVERSIBLE set must never be auto-retried here; this makes that
+            # explicit rather than relying on the reader.
+            if h.get("kind") != "quarantine" or r.get("klass") != AUTO_REVERSIBLE or r.get("kind") != "stateless":
+                why = h.get("why", "")[:90]
+                if r.get("kind") != "stateless" and r.get("klass") == AUTO_REVERSIBLE and h.get("kind") == "quarantine":
+                    why = "not retried: a stateful remedy's retry could repeat its action (A377b)"
+                waits.append("%s/%s: %s" % (s["detector"], rem, why))
                 continue
             # retries since this remedy last FIXED something (or was recalibrated), within the lookback: a retry
             # ends the stall's run, so counting within one run would reset the backoff every time

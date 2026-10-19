@@ -1979,6 +1979,21 @@ def main():
         wait_only = H.remedy_break_stall({"stalled": [{"detector": "sweep_red", "since_at": _NOW - 3 * 3600,
                                           "holds": {"run_full_sweep": {"kind": "self-wait", "why": "speaks first"}}}],
                                           "_ledger": _bl}, dry_run=False)
+        # A377b: a STATEFUL quarantined remedy is never retried by break_stall (a retry could repeat its action --
+        # Moltbook/AiiCLI). The stub above is stateless and IS retried; a stateful twin of it is declined.
+        H.REMEDIES["_stub_stateful"] = {"fn": _stub, "klass": H.AUTO_REVERSIBLE, "for": ["_stub_cond2"],
+                                        "kind": "mutating", "undo": "x", "touches": [], "benefit": {}}
+        H.DETECTORS["_stub_cond2"] = lambda health=None: {"state": H.PRESENT, "measured": {}}
+        _bs = os.path.join(tempfile.mkdtemp(prefix="h1sf_"), "l.jsonl")
+        for i in range(2):
+            H.write_ledger(_led("_stub_stateful", "_stub_cond2", "did not fix", 4.0 - i, ran=True), _bs)
+        for i in range(10):
+            H.write_ledger(_led("_stub_stateful", "_stub_cond2", "refused", 3.0 - i * 0.2,
+                                why="quarantined: measured not fixing it 2 times"), _bs)
+        sf = H.remedy_break_stall(dict(H.detect_road_stalled(now=_NOW, ledger=_bs)["measured"]), dry_run=True)
+        check("H1rs2 break_stall never retries a STATEFUL quarantined remedy -- a repeat could redo its action (A377b)",
+              sf[0] is False and "repeat its action" in sf[1], sf)
+
         check("H1rs break_stall lifts a quarantine for ONE retry (the stub runs and the condition clears -> the "
               "quarantine is cleared), backs off a retry 1 h after the last, and runs nothing for a self-wait stall",
               stuck["state"] == H.PRESENT and dry[0] is True and "_stub_cond/_stub_fix" in dry[1]
@@ -1990,6 +2005,7 @@ def main():
     finally:
         H.REMEDIES.clear(); H.REMEDIES.update(_real_rem)
         H.DETECTORS.pop("_stub_cond", None)
+        H.DETECTORS.pop("_stub_cond2", None)
 
     # ---- H1sr: the original _sweep_running is itself again (A289). A278 redefined the name; the eviction remedy's
     # `is not False` then saw [] and refused every eviction. The REAL function is called here, not a stub.
