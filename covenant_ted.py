@@ -261,6 +261,73 @@ def learn_open(author_id, who, since=0, n=6, api=None, ask=None, state_path=None
     return out
 
 
+PRIVATE_NOTES_DIR = os.path.join(HERE, "private", "tetsu_notes")      # gitignored: his personal material stays here
+
+
+def chunks(text, n_words=2500):
+    w = text.split()
+    return [" ".join(w[i:i + n_words]) for i in range(0, len(w), n_words)] or [""]
+
+
+def learn_private(source, title, text, what="his own recorded conversation", chunk_words=2500, ask=None,
+                  state_path=None, notes_path=None, say=print):
+    """His own personal material (2026-10-18: "go through my face book and all media and posts"): Tetsu reads it in
+    parts, privately, and his notes stay PRIVATE -- in private/tetsu_notes/ (gitignored), never the public teacher
+    queue or a tracked file, unless he says otherwise. The same copy guard, per part. Returns {"parts", "kept", "refused"}."""
+    if ask is None:
+        sys.path.insert(0, os.path.join(HERE, "tools"))
+        import tetsu_work
+        ask = lambda q: tetsu_work.ask(q, private=True, fresh=True)    # noqa: E731
+    sp = state_path or os.path.join(PRIVATE_NOTES_DIR, "state.json")
+    npth = notes_path or os.path.join(PRIVATE_NOTES_DIR, "notes.jsonl")
+    st = load_state(sp)
+    done = st.setdefault("parts_done", {})
+    parts = chunks(text, chunk_words)
+    out = {"parts": len(parts), "kept": 0, "refused": 0}
+    for i, part in enumerate(parts):
+        key = "%s#%d" % (source, i)
+        if key in done:
+            continue
+        r = learn_text(key, re.sub(r"\W", "_", key)[:80], "%s (part %d of %d)" % (title, i + 1, len(parts)), "Lawrence",
+                       "local:" + source, "his own material; private", part, ask, os.path.join(PRIVATE_NOTES_DIR, "cache"),
+                       what)
+        if r["ok"]:
+            os.makedirs(os.path.dirname(npth), exist_ok=True)
+            with open(npth, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(dict(r["record"], private=True), ensure_ascii=False) + "\n")
+            done[key] = {"t": r["record"]["t"], "longest_shared_run": r["record"]["longest_shared_run"]}
+            out["kept"] += 1
+            say("  kept    %s (shared run %d)" % (key, r["record"]["longest_shared_run"]))
+        else:
+            st.setdefault("refused", {})[key] = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "why": r["why"]}
+            out["refused"] += 1
+            say("  refused %s: %s" % (key, r["why"]))
+        save_state(st, sp)
+    return out
+
+
+def recorded_conversations(roots=("fb_pre_july", "fb_multi")):
+    """His recorded conversations already transcribed on disk, found by CONTENT (CLAUDE.md rule 2): every .md under
+    the given private/ folders with "**Me:**" or "**Them:**" lines. Returns [(source, title, text)] by date, each
+    distinct line once, in its first order (overlapping frames repeat lines)."""
+    out = []
+    for root in roots:
+        base = os.path.join(HERE, "private", root)
+        for dp, _dn, fns in os.walk(base):
+            for fn in sorted(fns):
+                if not fn.endswith(".md") or fn == "INDEX.md":
+                    continue
+                seen, keep = set(), []
+                for line in open(os.path.join(dp, fn), encoding="utf-8", errors="replace"):
+                    m = re.match(r"- \*\*(Me|Them):\*\*\s*(.*)", line.strip())
+                    if m and m.group(2) and m.group(2) not in seen:
+                        seen.add(m.group(2))
+                        keep.append("%s: %s" % ("Lawrence" if m.group(1) == "Me" else "AI", m.group(2)))
+                if keep:
+                    out.append(("%s:%s" % (root, fn[:-3]), "his recorded conversation %s" % fn[:-3], "\n".join(keep)))
+    return sorted(out, key=lambda t: t[0].split(":")[1])
+
+
 def run(n=2, talks=None, state_path=None, notes_path=None, queue_append=None, say=print, **kw):
     """Learn up to n talks not yet learned. Returns {"learned": [...], "refused": [...]}"""
     st = load_state(state_path)
@@ -295,8 +362,19 @@ if __name__ == "__main__":
     ap.add_argument("--openalex", default=None, help="an OpenAlex author id: learn that author's published abstracts")
     ap.add_argument("--who", default=None)
     ap.add_argument("--since", type=int, default=0)
+    ap.add_argument("--recorded", action="store_true", help="his recorded conversations on disk (private; notes stay private)")
     a = ap.parse_args()
-    if a.openalex:
+    if a.recorded:
+        convs = recorded_conversations()
+        print("%d recorded conversation(s), %d words" % (len(convs), sum(len(t.split()) for _s, _t, t in convs)), flush=True)
+        tot = {"parts": 0, "kept": 0, "refused": 0}
+        for src, title, text in convs:
+            r = learn_private(src, title, text)
+            for k in tot:
+                tot[k] += r[k]
+            print("%s: %s" % (src, r), flush=True)
+        print(json.dumps(tot))
+    elif a.openalex:
         print(json.dumps(learn_open(a.openalex, a.who or a.openalex, since=a.since), indent=1))
     else:
         print(json.dumps(run(n=a.n), indent=1))

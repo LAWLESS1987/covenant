@@ -119,6 +119,28 @@ check("TED1.12 OpenAlex route: abstracts become one private text for Tetsu; his 
       "openalex:<id>, attributed, never the abstracts", _r12["learned"] == ["openalex:A5038154254"] and len(_q12) == 1
       and _q12[0]["source"] == "openalex:A5038154254" and "OpenAlex" in _q12[0]["text"] and "plexiform" not in _q12[0]["text"]
       and "plexiform" in _asked12[0], (_r12, _q12[:1]))
+# TED1.13: his own private material -- parts, notes in a PRIVATE file only, nothing queued, resumable
+_d13 = tempfile.mkdtemp(prefix="ted1_13_")
+_saved_pnd = T.PRIVATE_NOTES_DIR
+T.PRIVATE_NOTES_DIR = os.path.join(_d13, "private", "tetsu_notes")
+_conv = " ".join(("me: i keep overthinking things i cannot control them: separate what you can influence from what "
+                  "you cannot %d" % k) for k in range(400))
+_asked13 = []
+try:
+    _o13 = T.learn_private("fb:test", "a conversation", _conv, chunk_words=2000,
+                           ask=lambda q: (_asked13.append(q), (200, {"answer": "He worries about what he can't steer; "
+                                          "the advice is to sort it.", "teacher": "withheld: private (A263)"}))[1],
+                           say=lambda *a: None)
+    _again = T.learn_private("fb:test", "a conversation", _conv, chunk_words=2000,
+                             ask=lambda q: (_asked13.append("AGAIN"), (200, {}))[1], say=lambda *a: None)
+    _np = os.path.join(T.PRIVATE_NOTES_DIR, "notes.jsonl")
+    _rows13 = [json.loads(l) for l in open(_np, encoding="utf-8")]
+finally:
+    T.PRIVATE_NOTES_DIR = _saved_pnd
+check("TED1.13 his own material is read in parts, notes go ONLY to the private notes file (marked private), a rerun "
+      "skips parts already done", _o13["parts"] == len(T.chunks(_conv, 2000)) and _o13["kept"] == _o13["parts"]
+      and all(r["private"] is True for r in _rows13) and "AGAIN" not in _asked13 and _again["kept"] == 0
+      and os.sep + "private" + os.sep in _np, (_o13, _again))
 check("TED1.11 a talk refused and then learned is no longer listed as refused",
       "stuart_russell_3_principles_for_creating_safer_ai" in _st11["learned"] and not _st11.get("refused"), _st11)
 
