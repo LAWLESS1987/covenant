@@ -3383,6 +3383,12 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
     before = (condition or {}).get("state")
     ok, detail = r["fn"]((condition or {}).get("measured"), dry_run=dry_run)
     row.update(ran=bool(ok), detail=str(detail)[:400], before=before)
+    # 2026-10-19 (attribution fix, external review): record the subset this remedy TARGETED -- the suites that were
+    # unclean when it was called -- so a remedy graded on a subset of its condition (rerun_unclean) is graded on
+    # what it actually owned, not on the whole sweep staying red for OTHER suites. See grade_started / GRADED_ON_SUBSET.
+    _uc = ((condition or {}).get("measured") or {}).get("unclean")
+    if _uc:
+        row["before_unclean"] = list(_uc)
     if dry_run:
         row.update(outcome="dry run", after=before)
         return write_ledger(row, ledger)
@@ -3547,6 +3553,25 @@ def _nodes_restarted_since(measured, started_at):
 RECURRED = {"watchdog_stale": _watchdog_restarted_since, "source_drift": _nodes_restarted_since}
 
 
+def _targeted_suites_cleared(started_row, after_measured):
+    """2026-10-19, the attribution fix (external review, DeepSeek + Gemini). A remedy that re-ran ONLY a named
+    subset of the unclean suites (rerun_unclean) did its job if THOSE suites are no longer unclean -- even when the
+    sweep stays red on OTHER suites. A290 deferred rerun_unclean's grade to 1.5h but still read sweep_red (the whole
+    sweep), so it was graded 'did not fix' for reds it never owned and quarantined although its targeted re-runs
+    came back clean. True only when the targeted set was recorded AND every suite in it has cleared; otherwise the
+    old whole-condition rule stands."""
+    targeted = started_row.get("before_unclean") or []
+    if not targeted:
+        return False
+    still = set((after_measured or {}).get("unclean") or [])
+    return all(s not in still for s in targeted)
+
+
+# Remedies graded on a SUBSET of their condition: a still-PRESENT condition is 'fixed' when the subset they owned
+# has cleared. Keyed by REMEDY (RECURRED is keyed by detector); both answer "PRESENT-again is not always failure".
+GRADED_ON_SUBSET = {"rerun_unclean": _targeted_suites_cleared}
+
+
 def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
     """Grade asynchronous `started` rows whose remedy has had time to finish.
 
@@ -3631,14 +3656,25 @@ def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
                 recurred = bool(RECURRED[detector](after_m, started_at))
             except Exception:                                     # noqa: BLE001
                 recurred = False
+        subset_cleared = False
+        if before == PRESENT and after == PRESENT and name in GRADED_ON_SUBSET:
+            try:
+                subset_cleared = bool(GRADED_ON_SUBSET[name](row, after_m))
+            except Exception:                                     # noqa: BLE001
+                subset_cleared = False
         out = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(t_now, 1),
                "remedy": name, "detector": detector, "dry_run": bool(dry_run),
                "before": before, "after": after,
-               "outcome": "fixed" if (before == PRESENT and (after == ABSENT or recurred)) else "did not fix",
+               "outcome": "fixed" if (before == PRESENT and (after == ABSENT or recurred or subset_cleared)) else "did not fix",
                "graded_late": True, "started_t": row.get("t"),
                "waited_s": round(waited, 1),
                "why": "graded %.1f h after the start it answers; the remedy's own "
                       "window is %.1f h" % (waited / 3600.0, wait / 3600.0)}
+        if subset_cleared:
+            out["targeted_cleared"] = True
+            out["why"] += ("; the suites it re-ran (%s) are no longer unclean -- graded on what it owned, not on "
+                           "the sweep staying red for others (2026-10-19 attribution fix)"
+                           % ", ".join(row.get("before_unclean") or []))
         if recurred:
             out["recurred"] = True
             out["why"] += ("; PRESENT again as a NEW instance -- the remedy measurably worked "

@@ -2166,6 +2166,49 @@ def main():
     check("H1o2 the condition UNKNOWN now -> left ungraded, never a failure",
           got == [], str(got))
 
+    # 2026-10-19 ATTRIBUTION FIX (external review, DeepSeek + Gemini). rerun_unclean re-runs ONLY named suites, so
+    # it must be graded on whether THOSE cleared -- not on the whole sweep. A290 graded it on sweep_red 1.5h later,
+    # so when the sweep stayed red on OTHER suites (ci1/li1 came clean on its own re-run) it read "did not fix" and
+    # was quarantined for a red it never owned. Driven BOTH ways here; the subset credit is earned, not assumed.
+    RU = "rerun_unclean"
+    RUWIN = float(H.REMEDIES[RU].get("grade_after_s") or H.GRADE_AFTER_S)
+
+    def ru_started(led_, at, targeted):
+        return H.write_ledger({"t": "fixture", "at": at, "remedy": RU, "detector": "sweep_red",
+                               "dry_run": False, "before": H.PRESENT, "after": H.PRESENT,
+                               "outcome": "started", "before_unclean": list(targeted)}, led_)
+
+    def sweep_now(unclean):
+        return {"sweep_red": {"state": (H.ABSENT if not unclean else H.PRESENT),
+                              "measured": {"verdict": ("PASS" if not unclean else "FAIL"),
+                                           "unclean": list(unclean)}}}
+
+    led = tmp_ledger()
+    ru_started(led, NOW - RUWIN - 60, ["test_ci1.py", "test_li1.py"])
+    got = H.grade_started(sweep_now(["test_other.py"]), ledger=led, now=NOW, dry_run=True)
+    check("H1ru rerun_unclean: its targeted suites cleared, sweep still red on OTHERS -> FIXED, graded on what it owned",
+          len(got) == 1 and got[0]["outcome"] == "fixed" and got[0].get("targeted_cleared") is True,
+          str([(g["outcome"], g.get("targeted_cleared")) for g in got]))
+
+    led = tmp_ledger()
+    ru_started(led, NOW - RUWIN - 60, ["test_ci1.py", "test_li1.py"])
+    got = H.grade_started(sweep_now(["test_ci1.py"]), ledger=led, now=NOW, dry_run=True)
+    check("H1ru ...but a targeted suite STILL unclean -> did not fix (subset credit is earned, not assumed)",
+          len(got) == 1 and got[0]["outcome"] == "did not fix", str(got))
+
+    led = tmp_ledger()
+    ru_started(led, NOW - RUWIN - 60, ["test_ci1.py"])
+    got = H.grade_started(sweep_now([]), ledger=led, now=NOW, dry_run=True)
+    check("H1ru ...and the whole sweep green -> fixed by the ordinary ABSENT rule too (regression guard)",
+          len(got) == 1 and got[0]["outcome"] == "fixed", str(got))
+
+    led = tmp_ledger()
+    H.write_ledger({"t": "fixture", "at": NOW - RUWIN - 60, "remedy": RU, "detector": "sweep_red",
+                    "dry_run": False, "before": H.PRESENT, "after": H.PRESENT, "outcome": "started"}, led)
+    got = H.grade_started(sweep_now(["test_x.py"]), ledger=led, now=NOW, dry_run=True)
+    check("H1ru with NO targeted set recorded the old whole-condition rule stands -> did not fix",
+          len(got) == 1 and got[0]["outcome"] == "did not fix", str(got))
+
     # A259-GRADE (2026-10-05). schedule_watchdog_restart restarted the watchdog twice
     # that night, a watched file was written inside each grading window, the condition
     # was PRESENT again as a new instance, both were graded "did not fix", and two of
