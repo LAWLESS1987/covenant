@@ -2194,6 +2194,8 @@ DETECTORS = {
     "held_core_drift": detect_held_core_drift,
     "manifest_stale": detect_manifest_stale,
     "watchdog_stale": detect_watchdog_stale,
+    # A377's "road_stalled" is registered after its function is defined (below), so it can read this module's own
+    # ledger helpers; sense() iterates DETECTORS in insertion order, so it still runs last.
 }
 
 
@@ -2798,6 +2800,7 @@ REMEDIES = {
                                    "cost": ["a background app pages back in when he next uses it -- a moment's lag, "
                                             "never the app in front of him"],
                                    "irreversible": []}},
+    # A377's "break_stall" is registered after its function is defined (below).
     # A278 (2026-10-06): a sweep of the core on disk, at most once in SWEEP_BUDGET_S, graded once it wrote.
     "run_full_sweep": {"fn": remedy_run_full_sweep, "klass": AUTO_REVERSIBLE,
                        "for": ["sweep_not_current", "sweep_red"], "kind": "stateless",
@@ -2952,6 +2955,184 @@ def recalibrate(name, why, ledger=None):
                          "remedy": name, "outcome": "recalibrated", "why": why}, ledger)
 
 
+# ----------------------------------------------------------------- the road watching itself (A377)
+#
+# His words, 2026-10-19: "get it right look at past issues and you and tetsu find a constantly healing fix", then
+# "that he can handle alone". The record holds the same failure ten times (A155, A259, A261, A286, A289, A290,
+# A292, A295, A376, and A293's day-long probation): a condition stayed PRESENT while every remedy for it was held --
+# quarantined by a grading mistake, waiting out a cooldown, or waiting on another remedy -- and each time a PERSON
+# found it by reading this ledger, hours or days later, and fixed that one instance. Replayed over the whole ledger
+# (2026-09-16 to 10-19) the definition below finds 52 such runs of two hours or more, among them every case above
+# and A376's own shape on 10-07, 10-08 and 10-15 that nobody had noticed. Nothing watched the road's PROGRESS.
+#
+# road_stalled reads this ledger: a condition whose newest unbroken run of live rows has no remedy that RAN, for
+# STALL_AFTER_S or more. break_stall answers the stalls held only by the road's own soft hold -- a quarantine -- with
+# one retry of the held remedy, the quarantine lifted for that attempt and the noise hour skipped; every other gate
+# stands (class, NEVER_AUTOMATIC, his choices, stateless-or-undo, a declared budget). Retries back off: 2, 4, 8,
+# 16 h, then once a day. A stall held by anything else -- a remedy that declined on its own grounds, one waiting on
+# another (A376's shape), a person's decision -- is not retried: it stays PRESENT and is told once (A367's alert
+# push), with the chain of holds, which is what Tetsu asked for: "keep the road in the stall state" and say so.
+
+STALL_AFTER_S = 2 * 3600       # Tetsu, 2026-10-19: "Two hours seems reasonable"
+STALL_GAP_S = 3 * 3600         # rows further apart than this belong to different episodes
+STALL_LOOKBACK_S = 3 * 86400
+STALL_BACKOFF_CAP_S = 86400
+_ACTED = ("fixed", "started", "did not fix")
+
+
+def _hold_kind(row):
+    """'quarantine' (the road's own soft hold, retryable), 'self-wait' (a remedy waiting on another), 'person'
+    (a proposal: a person decides), or 'declined' (the remedy's own grounds)."""
+    w = str(row.get("why") or row.get("detail") or "")
+    if row.get("outcome") == "proposed":
+        return "person"
+    if w.startswith("quarantined:"):
+        return "quarantine"
+    if "speaks first" in w:
+        return "self-wait"
+    return "declined"
+
+
+def stalls(rows, now=None, stall_after_s=STALL_AFTER_S, gap_s=STALL_GAP_S):
+    """Every detector whose NEWEST unbroken run of live ledger rows (gaps under gap_s, the newest within gap_s of
+    now) holds no remedy that ran, lasting stall_after_s or more. A run of proposals alone is a person's decision,
+    not a stall. road_stalled's own rows are never counted (the road does not stall on watching itself)."""
+    import collections
+    now = time.time() if now is None else now
+    by = collections.defaultdict(list)
+    for r in rows:
+        d = r.get("detector")
+        if (not d or d == "road_stalled" or r.get("dry_run") or r.get("repeat")
+                or r.get("outcome") in ("recalibrated", "correction") or not r.get("at")):
+            continue
+        by[d].append(r)
+    out = []
+    for d, rs in sorted(by.items()):
+        rs.sort(key=lambda r: float(r["at"]))
+        if now - float(rs[-1]["at"]) >= gap_s:
+            continue                       # no longer being worked on: it cleared, or nothing is offered
+        run = []
+        for r in reversed(rs):
+            if run and float(run[-1]["at"]) - float(r["at"]) >= gap_s:
+                break
+            if r.get("ran") is True or r.get("outcome") in _ACTED:
+                break
+            run.append(r)
+        if not run or now - float(run[-1]["at"]) < stall_after_s:
+            continue
+        if all(x.get("outcome") == "proposed" for x in run):
+            continue
+        holds = {}
+        for x in reversed(run):            # oldest first, so the newest reason per remedy is the one kept
+            holds[x.get("remedy")] = {"kind": _hold_kind(x), "why": str(x.get("why") or x.get("detail") or "")[:160]}
+        out.append({"detector": d, "since": run[-1].get("t"), "since_at": float(run[-1]["at"]),
+                    "hours": round((now - float(run[-1]["at"])) / 3600.0, 1), "rows": len(run), "holds": holds})
+    return out
+
+
+def detect_road_stalled(health=None, rows=None, now=None, ledger=None):
+    """The road itself is stuck: a condition PRESENT for STALL_AFTER_S while every repair for it was held and none
+    ran, held by the road's own holds (a quarantine, or one remedy waiting on another). Stalls held only by a
+    remedy's own grounds or a person's decision are reported in 'waiting', not PRESENT: their own detector already
+    says so. break_stall answers this one."""
+    now = time.time() if now is None else now
+    if rows is None:
+        path = ledger or LEDGER
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = fh.readlines()
+        except OSError as e:
+            # Rule 9: a ledger it cannot read is UNDETERMINED, never "nothing is stalled". The road's own progress
+            # is exactly what it cannot see here.
+            return {"state": UNKNOWN, "measured": {"why": "the highway ledger cannot be read: %s" % e}}
+        out = []
+        for line in raw:
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if float(r.get("at") or 0) >= now - STALL_LOOKBACK_S:
+                out.append(r)
+        rows = out
+    st = stalls(rows, now)
+    road = [s for s in st if any(h["kind"] in ("quarantine", "self-wait") for h in s["holds"].values())]
+    measured = {"stalled": road, "waiting": [{"detector": s["detector"], "hours": s["hours"],
+                                              "why": sorted({h["why"][:90] for h in s["holds"].values()})[:2]}
+                                             for s in st if s not in road],
+                "stall_after_h": STALL_AFTER_S / 3600.0}
+    if ledger:
+        measured["_ledger"] = ledger
+    if road:
+        measured["why"] = "; ".join("%s red %.1f h, nothing ran: %s" % (
+            s["detector"], s["hours"], ", ".join("%s %s" % (k, v["kind"]) for k, v in s["holds"].items()))
+            for s in road)
+    return {"state": PRESENT if road else ABSENT, "measured": measured}
+
+
+def _stall_backoff_s(n_before):
+    return min(STALL_AFTER_S * (2 ** max(0, n_before)), STALL_BACKOFF_CAP_S)
+
+
+def remedy_break_stall(measured, dry_run=True):
+    """STATELESS: one retry of each quarantined remedy the road is stalled on, through apply_remedy with
+    stall_break=True -- the quarantine lifted for that attempt and the noise hour skipped; every other gate stands.
+    Backs off per (remedy, condition): 2, 4, 8, 16 h, then daily. A stall held by anything but a quarantine is not
+    the road's to retry: declined, with the chain, so road_stalled stays PRESENT and is told."""
+    m = measured or {}
+    ledger = m.get("_ledger")
+    rows = read_ledger(ledger)
+    now = time.time()
+    targets, waits, later = [], [], []
+    for s in m.get("stalled") or []:
+        for rem, h in (s.get("holds") or {}).items():
+            r = REMEDIES.get(rem) or {}
+            if h.get("kind") != "quarantine" or r.get("klass") != AUTO_REVERSIBLE:
+                waits.append("%s/%s: %s" % (s["detector"], rem, h.get("why", "")[:90]))
+                continue
+            # retries since this remedy last FIXED something (or was recalibrated), within the lookback: a retry
+            # ends the stall's run, so counting within one run would reset the backoff every time
+            reset = max([float(x.get("at") or 0) for x in rows if x.get("remedy") == rem
+                         and x.get("outcome") in ("fixed", "recalibrated")] + [now - STALL_LOOKBACK_S])
+            prior = [x for x in rows if x.get("remedy") == rem and x.get("detector") == s["detector"]
+                     and x.get("stall_break") and float(x.get("at") or 0) > reset]
+            if prior and now - max(float(x["at"]) for x in prior) < _stall_backoff_s(len(prior) - 1):
+                later.append("%s/%s (retry %d waits %.0f h)" % (s["detector"], rem, len(prior) + 1,
+                                                                 _stall_backoff_s(len(prior) - 1) / 3600.0))
+                continue
+            targets.append((s["detector"], rem))
+    if not targets:
+        return False, ("nothing a retry can break%s%s" % (
+            (" -- waiting on their own grounds or a person: " + "; ".join(waits)) if waits else "",
+            (" -- backing off: " + ", ".join(later)) if later else ""))
+    if dry_run:
+        return True, "would retry once, quarantine lifted: %s" % ", ".join("%s/%s" % t for t in targets)
+    done, ran_any = [], False
+    for d, rem in targets:
+        cond = DETECTORS[d]() if d in DETECTORS else {"state": UNKNOWN, "measured": {}}
+        if cond.get("state") != PRESENT:
+            done.append("%s: no longer present" % d)
+            continue
+        row = apply_remedy(rem, cond, d, dry_run=False, ledger=ledger, stall_break=True)
+        ran_any = ran_any or bool(row.get("ran"))
+        done.append("%s/%s %s" % (d, rem, row.get("outcome")))
+    return ran_any, "; ".join(done)
+
+
+# A377: registered here, after the functions and the two dicts exist (the dicts are defined above this block).
+DETECTORS["road_stalled"] = detect_road_stalled
+REMEDIES["break_stall"] = {"fn": remedy_break_stall, "klass": AUTO_REVERSIBLE,
+                           "for": ["road_stalled"], "kind": "stateless", "noise_s": 900,
+                           "touches": ["another remedy's quarantine, lifted for one retry; the noise hour skipped "
+                                       "for it"],
+                           "benefit": {"gains": ["a remedy quarantined by a grading mistake is tried again within "
+                                                 "hours, not days, and without a person reading the ledger"],
+                                       "cost": ["one more run of a remedy that may fail again; backed off to once a "
+                                                "day"],
+                                       "irreversible": []}}
+
+
 def _recent_identical(name, detector, ledger=None, within_s=None, include_dry=True):
     """The last row for this (remedy, detector) if it is younger than the cooldown.
 
@@ -3038,15 +3219,21 @@ def propose(name, condition, detector, r=None):
 
 
 def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=None,
-                 cooldown_s=None):
+                 cooldown_s=None, stall_break=False):
     """Run one remedy against one measured condition. Returns a ledger row.
 
     Every refusal is a row too: a refusal nobody can see is indistinguishable
     from a bug that swallowed the work.
+
+    stall_break (A377): called by break_stall for a condition the road has been stuck on -- the quarantine is
+    lifted for this one attempt and the noise hour skipped. Nothing else is: a declared budget, the class,
+    NEVER_AUTOMATIC, his choices and stateless-or-undo all still refuse.
     """
     r = REMEDIES.get(name)
     row = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1),
            "remedy": name, "detector": detector, "dry_run": bool(dry_run)}
+    if stall_break and cooldown_s is None:
+        cooldown_s = 0                     # the noise hour only: max(0, declared) below keeps a declared budget
     if not r:
         row.update(outcome="refused", why="no such remedy")
         return write_ledger(row, ledger)
@@ -3174,9 +3361,12 @@ def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=N
         return write_ledger(row, ledger)
 
     qstate, qlast = quarantine_state(name, ledger)
-    if qstate == "quarantined":
+    if qstate == "quarantined" and not stall_break:
         row.update(outcome="refused", why="quarantined: measured not fixing it %d times" % QUARANTINE_AFTER)
         return write_ledger(row, ledger)
+    if stall_break:
+        row["stall_break"] = ("the road was stalled on %s with this remedy %s; one retry (A377)"
+                              % (detector, "quarantined" if qstate == "quarantined" else "held"))
     if qstate == "probation":
         row["probation"] = ("quarantined after %d failures, the last at %s; one attempt a day until it works (A293)"
                             % (QUARANTINE_AFTER, time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(qlast))))

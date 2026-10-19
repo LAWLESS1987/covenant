@@ -1892,6 +1892,105 @@ def main():
     check("H1tr rerun_unclean is graded after the full sweep it hands on has had time (A290), not at once",
           "sweep_red" in (_ru.get("async_for") or []) and _ru.get("grade_after_s", 0) >= 3600, _ru)
 
+    # ---- H1rs: the road watches its own progress (A377, 2026-10-19, his words: "you and tetsu find a constantly
+    # healing fix", "that he can handle alone"). detect_road_stalled reads a synthetic ledger; break_stall is run
+    # against a stub remedy so no real repair starts. Real wall clock, because quarantine_state reads time.time().
+    _NOW = time.time()
+
+    def _led(remedy, detector, outcome, dt_h, **kw):
+        return dict({"remedy": remedy, "detector": detector, "outcome": outcome, "dry_run": False,
+                     "at": _NOW - dt_h * 3600}, **kw)
+
+    # a condition red for 3 h, every pass a quarantine refusal: PRESENT, kind quarantine
+    q_rows = [_led("restart_nodes", "source_drift", "refused", 3.0 - i * 0.2,
+                   why="quarantined: measured not fixing it 2 times") for i in range(15)]
+    r_q = H.detect_road_stalled(rows=q_rows, now=_NOW)
+    # a condition red for 3 h, every pass a proposal (a person decides): NOT a stall, and not even in 'waiting'
+    p_rows = [_led("install_on_phone", "app_build_gap", "proposed", 3.0 - i * 0.2) for i in range(15)]
+    r_p = H.detect_road_stalled(rows=p_rows, now=_NOW)
+    # red only 1 h: too soon
+    s_rows = [_led("restart_nodes", "source_drift", "refused", 1.0 - i * 0.1,
+                   why="quarantined: measured not fixing it 2 times") for i in range(8)]
+    r_s = H.detect_road_stalled(rows=s_rows, now=_NOW)
+    # a remedy RAN 1.5 h ago, then quarantine refusals since: the run resets at the ran row, so only ~1 h of
+    # refusals stand -> not yet a stall. Without the reset the old refusals would read as a 5 h stall.
+    a_rows = ([_led("restart_nodes", "source_drift", "refused", 5.0 - i * 0.3, why="quarantined: measured not fixing it 2 times") for i in range(10)]
+              + [_led("restart_nodes", "source_drift", "did not fix", 1.5, ran=True)]
+              + [_led("restart_nodes", "source_drift", "refused", 1.0 - i * 0.1, why="quarantined: measured not fixing it 2 times") for i in range(9)])
+    r_a = H.detect_road_stalled(rows=a_rows, now=_NOW)
+    # last row older than the gap: no longer being worked -> not reported
+    old_rows = [_led("restart_nodes", "source_drift", "refused", 10.0 + i,
+                     why="quarantined: measured not fixing it 2 times") for i in range(15)]
+    r_old = H.detect_road_stalled(rows=old_rows, now=_NOW)
+    # a self-wait hold (A376 shape): PRESENT, but break_stall must not retry it
+    w_rows = [_led("run_full_sweep", "sweep_red", "held", 3.0 - i * 0.2,
+                   why="sweep_red: no targeted re-run since this sweep -- rerun_unclean speaks first") for i in range(15)]
+    r_w = H.detect_road_stalled(rows=w_rows, now=_NOW)
+    # a declined hold alone (the remedy's own grounds): reported in 'waiting', not PRESENT
+    d_rows = [_led("fetch_build", "phone_build_behind_core", "held", 3.0 - i * 0.2,
+                   detail="nothing newer to fetch -- still on build 252d3e1") for i in range(15)]
+    r_d = H.detect_road_stalled(rows=d_rows, now=_NOW)
+    check("H1rs road_stalled: a 3 h quarantine stall is PRESENT; a 3 h run of proposals is not (a person decides); "
+          "1 h is too soon; a remedy that RAN clears it; a stall older than the gap is not reported; a self-wait is "
+          "PRESENT; a declined-only hold is 'waiting', not PRESENT",
+          r_q["state"] == H.PRESENT and r_q["measured"]["stalled"][0]["detector"] == "source_drift"
+          and r_p["state"] == H.ABSENT and not r_p["measured"]["waiting"] and r_s["state"] == H.ABSENT and r_a["state"] == H.ABSENT
+          and r_old["state"] == H.ABSENT and r_w["state"] == H.PRESENT
+          and r_d["state"] == H.ABSENT and any(x["detector"] == "phone_build_behind_core" for x in r_d["measured"]["waiting"]),
+          (r_q["state"], r_p["state"], r_s["state"], r_a["state"], r_old["state"], r_w["state"], r_d["state"]))
+
+    # break_stall: a stub remedy, quarantined, that the road is stalled on. One retry with the quarantine lifted
+    # heals it (the stub's condition clears); a self-wait stall is declined; a recent retry backs the next off.
+    _real_rem = dict(H.REMEDIES)
+    _stub_state = {"ran": False}                 # the stub condition is PRESENT until its remedy runs, then ABSENT
+    _ran_live = []
+
+    def _stub(measured, dry_run=True):
+        if not dry_run:
+            _ran_live.append(True)
+            _stub_state["ran"] = True            # the quarantine was a grading mistake: the retry clears it
+        return (not dry_run), ("would run" if dry_run else "ran the stub")
+    try:
+        H.REMEDIES["_stub_fix"] = {"fn": _stub, "klass": H.AUTO_REVERSIBLE, "for": ["_stub_cond"],
+                                   "kind": "stateless", "touches": [], "benefit": {}}
+        H.DETECTORS["_stub_cond"] = lambda health=None: {"state": H.ABSENT if _stub_state["ran"] else H.PRESENT, "measured": {}}
+        _bl = os.path.join(tempfile.mkdtemp(prefix="h1rs_"), "l.jsonl")
+        # two real failures quarantine the stub (a grading mistake, say), three hours of refusals since
+        for i in range(2):
+            H.write_ledger(_led("_stub_fix", "_stub_cond", "did not fix", 5.0 - i, ran=True), _bl)
+        for i in range(15):
+            H.write_ledger(_led("_stub_fix", "_stub_cond", "refused", 3.0 - i * 0.2,
+                                why="quarantined: measured not fixing it 2 times"), _bl)
+        assert H.quarantine_state("_stub_fix", _bl)[0] == "quarantined"
+        stuck = H.detect_road_stalled(now=_NOW, ledger=_bl)
+        m = dict(stuck["measured"])
+        dry = H.remedy_break_stall(m, dry_run=True)
+        live = H.remedy_break_stall(m, dry_run=False)             # stub runs, condition clears -> fixed
+        broke_row = H.read_ledger(_bl)[-1]
+        healed = H.quarantine_state("_stub_fix", _bl)[0]          # a fix clears the quarantine
+        # backoff: a stall still standing, with a stall_break retry 1 h ago, must wait (2 h for the 2nd attempt)
+        _bb = os.path.join(tempfile.mkdtemp(prefix="h1bb_"), "l.jsonl")
+        H.write_ledger(_led("_stub_fix", "_stub_cond", "did not fix", 1.0, ran=True, stall_break="retry (A377)"), _bb)
+        back_m = {"stalled": [{"detector": "_stub_cond", "since_at": _NOW - 3 * 3600,
+                               "holds": {"_stub_fix": {"kind": "quarantine", "why": "quarantined: ..."}}}],
+                  "_ledger": _bb}
+        again = H.remedy_break_stall(back_m, dry_run=False)
+        # a self-wait stall offers break_stall nothing to run
+        wait_only = H.remedy_break_stall({"stalled": [{"detector": "sweep_red", "since_at": _NOW - 3 * 3600,
+                                          "holds": {"run_full_sweep": {"kind": "self-wait", "why": "speaks first"}}}],
+                                          "_ledger": _bl}, dry_run=False)
+        check("H1rs break_stall lifts a quarantine for ONE retry (the stub runs and the condition clears -> the "
+              "quarantine is cleared), backs off a retry 1 h after the last, and runs nothing for a self-wait stall",
+              stuck["state"] == H.PRESENT and dry[0] is True and "_stub_cond/_stub_fix" in dry[1]
+              and live[0] is True and _ran_live == [True] and broke_row.get("stall_break") and broke_row.get("outcome") == "fixed"
+              and healed == "ok"
+              and again[0] is False and "backing off" in again[1]
+              and wait_only[0] is False and "own grounds or a person" in wait_only[1],
+              (dry, live, broke_row.get("outcome"), healed, again, wait_only))
+    finally:
+        H.REMEDIES.clear(); H.REMEDIES.update(_real_rem)
+        H.DETECTORS.pop("_stub_cond", None)
+
     # ---- H1sr: the original _sweep_running is itself again (A289). A278 redefined the name; the eviction remedy's
     # `is not False` then saw [] and refused every eviction. The REAL function is called here, not a stub.
     _r = H._sweep_running()

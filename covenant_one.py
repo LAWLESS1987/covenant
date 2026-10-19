@@ -496,6 +496,9 @@ SUITES = [
     # A374 (2026-10-19): the spore road (a signed request sealed for the PC through a relay that cannot read it)
     # and the road neurons that choose among tailnet, LAN and spore.
     ("test_sp1_spore.py",                 180,  "JUDGE"),
+    # A375 Amendment 1 (2026-10-19): the spiking witness's first piece -- the phone-silence twin and its CUSUM
+    # baseline over the check-in ledger, read-only.
+    ("test_wn1_witness.py",               120,  "JUDGE"),
     ("test_ow1_own_work.py",              120,  "JUDGE"),
     ("test_wb1_web.py",                   120,  "JUDGE"),
     ("test_hl1_heal.py",                  120,  "JUDGE"),

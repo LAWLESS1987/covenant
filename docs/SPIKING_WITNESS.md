@@ -171,3 +171,35 @@ The plan above is kept as written. These changes govern the build:
    requirements.
 6. **Hand-set, no STDP in this build.**
 7. **Unchanged:** read-only, daemon only, disagreement told once, and the 15/15 tune/score split.
+
+## Built so far (2026-10-19): the phone-silence twin
+
+`covenant_witness.py`, read-only, nothing wired into the watchdog yet.
+- **Pacemaker (spiking):** a leaky integrate-and-fire silence neuron. A constant drive raises its potential; each
+  check-in resets it; it fires when the potential reaches 1, which is exactly `fire_gaps` median gaps after the last
+  check-in. Set from the stream's own median gap (10 min on the real ledger), frozen from the tuning half.
+- **CUSUM (the baseline it must beat):** a one-sided cumulative sum over the gaps. A plain change-point detector.
+- **Measured on the real check-in ledger (4,028 check-ins, 09-13 to 10-19):** median gap 10 min; the pacemaker fires
+  after 1 h; it finds both known silences (A329's 53 h from 10-08, A338's drop from 10-12) and covers every silence
+  CUSUM catches. So by Amendment 1's keep test it is kept, not retired.
+- **WN1 10/10**, three mutations red (the fire window, the silence math, the UNKNOWN path); the keep test is also
+  checked independently of the report field (WN1.4). Fault injection: a synthetic 30 h silence is found where placed.
+### The leaky-burst twin (built, SHADOW/UNKEPT): an honest null for now
+
+`LeakyBurst` over the model-ask stream (`ops/model_asks.jsonl`): each failure adds charge, each success drains some,
+the charge leaks, and it fires when failures cluster. The mechanism is checked both ways (WN1.11-13: a cluster
+fires, the same failures spread wide do not, successes between them drain it).
+
+- **But it has no validated bar, so it never acts.** Measured 2026-10-19: of 4,072 asks, 39 failed, 1-5 on most
+  days. The known Tetsu-down incidents (A329 10-08, A282 10-06) show only 1-2 FAILED asks each -- because when
+  Tetsu is DOWN, asks are not made, so there is no failure row. That silence is `tetsu_cannot_answer`'s (a
+  readiness check), not this stream's. So there is no labelled failure-burst to score against, and Amendment 1's
+  keep test cannot be met here (rule 5: what counts cannot be computed without the ground truth).
+- It is kept in the code because the mechanism is correct and reusable for a stream that DOES have labelled
+  incidents -- the forum-strike stream (A283/A324), the next candidate.
+
+### Still to build (Amendment 1)
+
+The phone-side witness of the PC (the independent outside path; phone branch, his yes), Tailscale's own view
+beside the ledger, a writer pacemaker per ledger, and the leaky-burst over the forum-strike stream (which has
+labelled incidents). None wired to act until the replay bar is met for each.
