@@ -12,6 +12,14 @@ A337 (2026-10-12, his words: "make WB1.14 count a Gutenberg timeout as not run i
 the most logical"): also NOT RUN when Gutenberg, asked twice, answers 502, 503 or
 504 or times out -- the far host not serving, which says nothing about this door.
 Anything else still FAILS. And a NOT RUN is never counted as passed.
+2026-10-19 (his words: "SUPPOSED TO RUN REGARDLESS GREEN"): also NOT RUN when the
+far host's TLS chain does not verify -- a self-signed certificate in the chain or
+"certificate verify failed" -- which is what a network that blocks or intercepts
+the host serves, and says nothing about this door. The door still refuses to read
+over an unverifiable connection (no page is read); only the far-host smoke read's
+bookkeeping moves. A337's "anything else still FAILS" is preserved as written and
+lifted ONLY for this far-host read-reachability case; the prior behaviour is held,
+runnable, on branch wb1-tls-notrun-as-written-2026-10-19.
 A348k (2026-10-14): api_get carries a query body (POST) under the same rules, and
 covenant_feed.ledger_facts reaches the network only through it -- no network used.
 A349 F1 (2026-10-14): the nightly runs the feed (covenant_nightly.feed_step), and
@@ -73,6 +81,23 @@ def network_unreachable(r):
     if (r or {}).get("ok"):
         return False
     return bool(re.search(r"\[Errno 101\]|Network is unreachable", str((r or {}).get("reason", ""))))
+
+
+def cert_unverifiable(r):
+    """2026-10-19 (his words: "SUPPOSED TO RUN REGARDLESS GREEN"). The far host's TLS chain did not verify -- a
+    self-signed certificate in the chain, or "certificate verify failed" -- which is exactly what a network that
+    blocks or intercepts the host serves (Project Gutenberg is blocked on some networks behind a page carrying its
+    own cert; measured 2026-10-19: gutenberg.org failed verify while example.com and pypi.org verified fine, so it
+    is the host/path, not this machine's CA store). It says nothing about this door, so NOT RUN, like a gateway
+    status. The honest cost, named: a genuine man-in-the-middle on THIS live smoke read would also read NOT RUN
+    rather than FAIL -- but the door still refuses to read over an unverifiable connection (it returns the error,
+    no page), so no content is ever read either way, and the door's security behaviour (WB1.13) is unchanged. Only
+    the far-host smoke read's bookkeeping moves. Narrow on purpose: a non-verify TLS error (protocol/version/
+    handshake) is NOT this and still FAILS."""
+    if (r or {}).get("ok"):
+        return False
+    return bool(re.search(r"certificate verify failed|self-signed certificate|CERTIFICATE_VERIFY_FAILED",
+                          str((r or {}).get("reason", "")), re.I))
 
 
 tmp = tempfile.mkdtemp(prefix="wb1_")
@@ -516,6 +541,17 @@ check("WB1.23 (A349 F1) the nightly's main() calls feed_step(a, say) once, uncon
       len(_feed_at) == 1 and len(_pause_at) == 1 and len(_consume_at) == 1 and _pause_at[0] < _feed_at[0] < _consume_at[0],
       (_feed_at, _pause_at, _consume_at))
 
+# ---- 2026-10-19: cert_unverifiable driven both ways, no network. A far-host cert-verify failure is NOT RUN; a
+# non-verify TLS error, a 404 and a good read are not (so the carve-out cannot swallow a real door/security fail).
+_ccases = [({"ok": False, "reason": "SSLError: certificate verify failed"}, True),
+           ({"ok": False, "reason": "URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain>"}, True),
+           ({"ok": False, "reason": "SSLError: [SSL: WRONG_VERSION_NUMBER] wrong version number"}, False),
+           ({"ok": False, "status": 404, "reason": "HTTP 404"}, False),
+           ({"ok": True, "status": 200, "title": "x", "chars": 200}, False)]
+_cwrong = [(c, want) for c, want in _ccases if cert_unverifiable(c) != want]
+check("WB1.25 (2026-10-19) a far-host cert-verify failure is NOT RUN; a non-verify TLS error, a 404 and a good read are not",
+      not _cwrong, _cwrong)
+
 # ---- one real public read
 GUTENBERG = "https://www.gutenberg.org/ebooks/1497"
 try:
@@ -527,6 +563,10 @@ try:
     elif network_unreachable(r):
         not_run("WB1.14 a real public read", "this machine's network was unreachable on the read after the probe "
                 "connected, asked twice (%s, then %s): the network, not this door (A371)" % (first.get("reason"), r.get("reason")))
+    elif cert_unverifiable(r):
+        not_run("WB1.14 a real public read", "the far host's TLS chain did not verify (%s): the far host or the "
+                "network between is not serving a verifiable certificate; the door still refused to read over it, "
+                "so nothing was read -- it says nothing about this door (2026-10-19)" % r.get("reason"))
     else:
         check("WB1.14 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
 except OSError:
