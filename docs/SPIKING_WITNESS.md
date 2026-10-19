@@ -275,6 +275,20 @@ spiking twin against it. Spiking stays where it is proven (the road neurons) or 
 (ED-sKWS). Answers kept whole in the scratch record; the consult ledger's daily budget was spent, so they were not
 recorded there.
 
+**The foundation, BUILT (his "put the foundation through ... just do it", 2026-10-19), in `covenant_witness.py`:**
+- `CusumDetector(k, h, recover)`: the one-sided CUSUM with reset and a recovery hold (hysteresis) -- the sufficient
+  statistic a twin must beat.
+- `extract_negatives(event_times, incidents)`: the honest negatives -- the incident-free spans of a real stream,
+  nothing manufactured.
+- `score_detector(fires, incidents, negatives)`: the NAB PRINCIPLE, not the benchmark -- caught incidents, and
+  false alarms on the negatives with a per-day rate.
+- `beats_baseline(twin, base, incidents, negatives)`: Amendment 3's keep test in code -- kept only if the twin
+  catches an incident the baseline MISSED at a false-alarm rate no worse than the baseline's; otherwise the reason
+  (restates the baseline / worse FP rate / misses incidents). This is prove-or-retire, mechanised.
+- Read-only; acts on nothing. WN1.20-24 (5 checks), five mutations each red, restored byte-identical. The negatives
+  pipeline (running the detectors read-only over months and logging alerts-but-ignoring) is the next build on top
+  of this; the machinery to judge it now exists.
+
 ## Amendment 2 (2026-10-19, after the five-model review, before any further twin)
 
 The keep test of Amendment 1 is strengthened. A twin is kept only if ALL hold:

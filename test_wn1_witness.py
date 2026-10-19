@@ -152,5 +152,52 @@ check("WN1.19 the leaky mechanism itself is sound: all-solved does not fire, a 1
       W.strike_report(rows=_rows([True] * 40))["state"] == "ABSENT"
       and W.strike_report(rows=_rows([True] * 20 + [False] * 12))["state"] == "PRESENT", None)
 
+# ---- the foundation (Amendment 3): CUSUM detector + the keep test (extract negatives, score FPs, beat the baseline).
+# CusumDetector: a flat stream with a sustained step fires once in the step, resets, and the recover hold blocks an
+# immediate re-fire.
+cd = W.CusumDetector(k=1.0, h=3.0, recover=0)
+flat = [0.0] * 20
+step = [0.0] * 10 + [2.0] * 10          # +2 per event over k=1 -> S climbs +1/event -> crosses h=3 after 3 steps
+check("WN1.20 CUSUM is quiet on a flat stream and fires inside a sustained step (the sufficient statistic)",
+      cd.fires(flat) == [] and cd.fires(step) and 10 <= cd.fires(step)[0] <= 14, (cd.fires(flat), cd.fires(step)))
+# recover hold: after a fire, `recover` events pass before it can fire again
+cd_hold = W.CusumDetector(k=1.0, h=3.0, recover=5)
+many = [0.0] * 5 + [3.0] * 20
+f_hold = cd_hold.fires(many)
+check("WN1.21 the recover hold spaces fires out (hysteresis): consecutive fires are at least recover+1 apart",
+      len(f_hold) >= 2 and all(b - a >= 6 for a, b in zip(f_hold, f_hold[1:])), f_hold)
+
+# extract_negatives: the incident-free spans between the first and last event
+times = [float(i) for i in range(0, 1000)]
+incidents = [(200.0, 260.0), (600.0, 630.0)]
+negs = W.extract_negatives(times, incidents)
+# no incident's interior (its midpoint) falls inside a negative span; spans only touch incidents at the boundary
+mids = [(a + b) / 2 for a, b in incidents]
+clean = not any(s < m < e for s, e in negs for m in mids)
+check("WN1.22 extract_negatives returns the incident-free spans only (no incident falls inside a span; nothing manufactured)",
+      len(negs) == 3 and negs[0][0] == 0.0 and abs(negs[-1][1] - 999.0) < 1e-9 and clean, negs)
+
+# score_detector: catches an incident, counts false alarms on the negatives
+fires_good = [230.0, 615.0]             # one inside each incident, none in a negative
+fires_noisy = [230.0, 615.0, 100.0, 400.0, 800.0]   # three extra, all in negative spans
+sg = W.score_detector(fires_good, incidents, negs)
+sn = W.score_detector(fires_noisy, incidents, negs)
+check("WN1.23 score_detector counts caught incidents and false alarms on the negatives, with a per-day FP rate",
+      sg["caught"] == 2 and sg["false_alarms"] == 0 and sn["caught"] == 2 and sn["false_alarms"] == 3
+      and sn["fa_rate_per_day"] is not None and sn["fa_rate_per_day"] > sg["fa_rate_per_day"], (sg, sn))
+
+# beats_baseline: the keep test, driven every way.
+base = [230.0]                          # baseline catches only the first incident, no false alarms
+twin_wins = [230.0, 615.0]              # catches the SECOND incident the baseline missed, no extra false alarms
+twin_restates = [230.0]                 # catches nothing the baseline misses
+twin_noisy = [230.0, 615.0, 100.0, 400.0]   # catches the miss but at a worse false-alarm rate
+k1, w1, _ = W.beats_baseline(twin_wins, base, incidents, negs)
+k2, w2, _ = W.beats_baseline(twin_restates, base, incidents, negs)
+k3, w3, _ = W.beats_baseline(twin_noisy, base, incidents, negs)
+check("WN1.24 beats_baseline KEEPS a twin that catches a baseline-missed incident at an equal-or-better false-alarm "
+      "rate; RETIRES one that restates the baseline; RETIRES one that catches the miss but at a worse FP rate",
+      k1 is True and "kept" in w1 and k2 is False and "second mechanism" in w2 and k3 is False and "WORSE false-alarm" in w3,
+      (k1, w1, k2, w2, k3, w3))
+
 print("\n%d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

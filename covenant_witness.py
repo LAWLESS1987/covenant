@@ -300,6 +300,98 @@ def strike_report(rows=None):
     }
 
 
+# ----------------------------------------------------------------- the foundation (Amendment 3): CUSUM + the keep test
+#
+# His words, 2026-10-19: "Put the foundation though its likely to be needed" / "just do it". Amendment 3 (five voices,
+# unanimous): CUSUM is the sufficient statistic on these small streams; a spiking twin is added ONLY when it is
+# measured to beat CUSUM at an EQUAL false-alarm rate on a held-out set of real negatives. This is the prove-or-retire
+# machinery every twin must pass. Pure functions; nothing acts.
+
+class CusumDetector:
+    """A one-sided cumulative-sum change detector with reset and a recovery hold (hysteresis). Over a stream of
+    values x_t: S = max(0, S + x_t - k); it fires when S >= h, then resets S to 0 and holds for `recover` events
+    before it can fire again. k is the slack (drift allowed before accumulating), h the decision threshold, both in
+    the stream's own units. The sufficient statistic the review says to beat before any neuron is kept."""
+
+    def __init__(self, k, h, recover=0):
+        self.k, self.h, self.recover = float(k), float(h), int(recover)
+
+    def fires(self, values):
+        """Indices (0-based into `values`) at which the detector fires. `values` is the per-event statistic -- e.g.
+        the gap since the last check-in, or 1.0 for a miss and 0.0 for an ok."""
+        out, s, hold = [], 0.0, 0
+        for i, x in enumerate(values):
+            if hold > 0:
+                hold -= 1
+                s = 0.0
+                continue
+            s = max(0.0, s + float(x) - self.k)
+            if s >= self.h:
+                out.append(i)
+                s, hold = 0.0, self.recover
+        return out
+
+
+def extract_negatives(event_times, incidents, pad_s=0.0):
+    """The honest negatives: the incident-free spans of a stream, as (start, end) epoch pairs. `incidents` is a list
+    of (start, end) windows; a negative is any gap between the stream's first and last event that does not overlap a
+    padded incident window. The review's rule: NEVER manufacture an incident -- normal operation IS the negative set
+    (Mistral, Grok). Returns the spans; the caller counts false alarms that land in them."""
+    if not event_times:
+        return []
+    t0, t1 = min(event_times), max(event_times)
+    bad = sorted((float(a) - pad_s, float(b) + pad_s) for a, b in incidents)
+    negs, cur = [], t0
+    for a, b in bad:
+        if a > cur:
+            negs.append((cur, min(a, t1)))
+        cur = max(cur, b)
+        if cur >= t1:
+            break
+    if cur < t1:
+        negs.append((cur, t1))
+    return [(a, b) for a, b in negs if b > a]
+
+
+def _in_any(t, windows):
+    return any(a <= t <= b for a, b in windows)
+
+
+def score_detector(fire_times, incidents, negatives):
+    """The NAB PRINCIPLE (not the benchmark): a detector is scored by whether it catches each labelled incident and
+    how many false alarms it raises on the held-out negatives. Returns {caught, missed, detections, false_alarms,
+    fa_per_negative, fa_rate_per_day}. Only the FIRST fire inside an incident window counts as the detection; every
+    fire inside a negative span is a false alarm (Mistral/Grok: FPs lower the score)."""
+    inc = [(float(a), float(b)) for a, b in incidents]
+    caught = sum(1 for a, b in inc if any(a <= t <= b for t in fire_times))
+    fa = [t for t in fire_times if _in_any(t, negatives)]
+    neg_s = sum(b - a for a, b in negatives)
+    return {"caught": caught, "missed": len(inc) - caught, "incidents": len(inc),
+            "detections": [a for a, b in inc if any(a <= t <= b for t in fire_times)],
+            "false_alarms": len(fa), "negative_days": round(neg_s / 86400.0, 2),
+            "fa_rate_per_day": round(len(fa) / (neg_s / 86400.0), 3) if neg_s > 0 else None}
+
+
+def beats_baseline(twin_fires, base_fires, incidents, negatives):
+    """Amendment 3's keep test. A twin is KEPT only if, at a false-alarm rate no worse than the baseline's on the
+    negatives, it catches at least as many incidents AND catches at least one the baseline MISSED. Returns
+    (kept_bool, why, {twin, base})."""
+    tw, bs = score_detector(twin_fires, incidents, negatives), score_detector(base_fires, incidents, negatives)
+    twin_only = [a for a, b in ((float(x), float(y)) for x, y in incidents)
+                 if any(a <= t <= b for t in twin_fires) and not any(a <= t <= b for t in base_fires)]
+    fa_ok = (tw["false_alarms"] <= bs["false_alarms"])
+    kept = bool(fa_ok and tw["caught"] >= bs["caught"] and twin_only)
+    if not twin_only:
+        why = "catches nothing the baseline misses -- a second mechanism, not a second reading (retire)"
+    elif not fa_ok:
+        why = "catches a baseline miss but at a WORSE false-alarm rate (%d vs %d) -- not kept" % (tw["false_alarms"], bs["false_alarms"])
+    elif tw["caught"] < bs["caught"]:
+        why = "misses incidents the baseline catches -- not kept"
+    else:
+        why = "catches %d incident(s) the baseline missed at an equal-or-better false-alarm rate -- kept" % len(twin_only)
+    return kept, why, {"twin": tw, "base": bs}
+
+
 def main(argv=None):
     print(json.dumps({"phone_silence": report(), "ask_bursts": ask_burst_report(),
                       "moltbook_strikes": strike_report()}, indent=1, default=str))
