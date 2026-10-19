@@ -198,8 +198,21 @@ fires, the same failures spread wide do not, successes between them drain it).
 - It is kept in the code because the mechanism is correct and reusable for a stream that DOES have labelled
   incidents -- the forum-strike stream (A283/A324), the next candidate.
 
+### The phone-side witness of the PC (built, covenant-phone branch brain/witness, NOT pushed)
+
+The independent OUTSIDE path -- the one reading neither the highway nor `covenant_witness` can make, because both
+run on the PC and read the PC's own ledgers. A neuron on THE PHONE over the PC's answers to this phone's check-ins.
+- `entry.pc_beat` keeps each beat `{t, ok}`; `entry.PcPacemaker` is a leaky integrate-and-fire neuron in BEAT space
+  (not wall-clock: Android deep sleep stretches the interval to hours and must not decay a real outage). A miss
+  adds more than an answer drains -- the asymmetry means it fires on a sustained outage AND on a flaky PC that
+  answers occasionally, the blind spot of NodeService's fixed consecutive-count (144 = 24 h, which any single
+  answer resets).
+- `entry.pc_witness` returns the spiking reading beside the fixed count and whether they agree; a disagreement is
+  the finding. It raises nothing and acts on nothing; NodeService keeps the authoritative reconnect notice.
+- M5.80a-e (6 checks), M5 311/311, five mutations each red. Commit db903f8 on brain/witness. Not pushed (phone main
+  reaches his phone only on his yes); not yet surfaced in the /pc display -- a later step.
+
 ### Still to build (Amendment 1)
 
-The phone-side witness of the PC (the independent outside path; phone branch, his yes), Tailscale's own view
-beside the ledger, a writer pacemaker per ledger, and the leaky-burst over the forum-strike stream (which has
-labelled incidents). None wired to act until the replay bar is met for each.
+Tailscale's own view beside the check-in ledger, a writer pacemaker per ledger, and the leaky-burst over the
+forum-strike stream (which has labelled incidents). None wired to act until the replay bar is met for each.
