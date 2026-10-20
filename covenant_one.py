@@ -344,6 +344,10 @@ SUITES = [
     # BOTH modes -- the untouched default, and that relaxed mode still blocks a
     # genuine dissent and still admits nothing when nothing answered.
     ("test_f1_fallback_silence.py",      120,  "JUDGE"),
+    # CV1 (2026-10-20): F1 pins the UNTRAINED judge abstaining; CV1 pins the TRAINED judge deferring on
+    # LOW-COVERAGE input (OWASP LLM09 overreliance) -- decides where it has competence, abstains where it doesn't,
+    # earned-green against the MIN_COVERAGE threshold.
+    ("test_cv1_coverage_abstain.py",     120,  "JUDGE"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with
