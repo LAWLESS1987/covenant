@@ -292,6 +292,36 @@ def _usd(atomic):
         return "?"
 
 
+# ---------------------------------------------- portable receipt signature (Agent Embassy design, credited)
+# A receipt already carries its sha256 and is hash-chained to the public-method ledger. This ADDS a portable
+# eip191 signature (covenant_receipt.py) so a buyer can verify the receipt from itself, no ledger access needed --
+# the design borrowed, with credit, from Agent Embassy (nootxlm, aemb.pro). Best-effort by design: it signs an
+# ATTESTATION, never the payment, and if the optional signer/key is unavailable the receipt is emitted unsigned
+# and earn is unaffected. It is NEVER allowed to block or alter a settled job.
+def _sign_receipt(receipt):
+    try:
+        import covenant_receipt as _R
+        receipt["proof"] = _R.sign(receipt)
+    except Exception:                                        # noqa: BLE001 -- an optional attestation must never block a settled job
+        pass
+
+
+def _signer_discovery():
+    """The public receipt signer, for buyers to verify against (the /.well-known/ convention). None if signing is
+    off on this node."""
+    try:
+        import covenant_receipt as _R
+        addr = _R.published_signer()
+        if not addr:
+            return None
+        return {"address": addr, "scheme": "eip191-personal-sign",
+                "verify": "recompute the receipt's canonical SHA-256 (JSON sorted keys, no spaces, 'proof' field "
+                          "excluded) and recover this address from the eip191 signature over that hash",
+                "design_credit": "Agent Embassy (nootxlm, aemb.pro)"}
+    except Exception:                                        # noqa: BLE001 -- discovery is best-effort
+        return None
+
+
 # ------------------------------------------------------------------ the grant
 
 def grant(path=None):
@@ -1319,6 +1349,9 @@ class App:
             p, pw = self.paused_()
             return 200, {}, {"ok": True, "granted": bool(g), "paused": bool(p), "why": pw if p else ("" if g else why),
                              "source_sha256": SOURCE_SHA256, "source_changed": source_changed()}
+        if path in ("/.well-known/covenant-signer.json", "/earn/signer"):
+            sig = _signer_discovery()
+            return (200, {}, sig) if sig else (404, {}, {"error": "receipt signing is not enabled on this node"})
         if path.startswith("/earn/result/"):
             rid = path.rsplit("/", 1)[-1]
             key = self.by_id.get(rid)
@@ -1548,6 +1581,7 @@ class App:
                    "result_sha256": result_sha, "checked": result.get("checked", ""), "terms_version": terms_version(g),
                    "maker": OFFERS[key].get("maker", ""), "mutual_benefit": mutual_benefit(key, g),
                    "terms": "a refused or held job is not charged; this receipt is hash-chained to the seller's ledger; re-deliverable 24 hours at /earn/result/" + row["id"]}
+        _sign_receipt(receipt)                                # portable eip191 proof (Agent Embassy design); best-effort, before storage so re-delivery carries it too
         kept_t = self._t()
         self.results[(payer.lower(), input_sha)] = (kept_t, result, settlement, receipt)
         self.by_id[row["id"]] = (payer.lower(), input_sha)

@@ -35,10 +35,25 @@ def check(label, ok, detail=""):
 
 def main():
     print("RCT1 -- a portable signed receipt verifies from itself; every tamper fails\n")
+
+    # MONEY-SAFETY (runs regardless of the optional dep): covenant_earn._sign_receipt must NEVER block or raise on
+    # a settled job. If signing is down, the receipt is emitted unsigned and the sale is unaffected.
+    import covenant_earn as E
+    orig_sign = R.sign
+    try:
+        R.sign = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("signing down"))
+        rc = {"id": "safety", "amount_usdc": "0.020000"}
+        E._sign_receipt(rc)                                          # must not raise
+        check("RCT1.G signing failure NEVER blocks a settled job -- receipt emitted unsigned, no exception",
+              "proof" not in rc)
+    finally:
+        R.sign = orig_sign
+
     if not _HAVE_ETH:
-        print("RCT1: NOT RUN -- eth-account is not installed (optional dependency for receipt signing). The "
-              "portable-receipt feature is off on this machine; nothing to verify here.")
-        return 0
+        print("\nRCT1: mechanism checks NOT RUN -- eth-account absent; the money-safety check above still ran.")
+        ok_n = sum(1 for r in results if r)
+        print("RCT1: %d/%d passed" % (ok_n, len(results)))
+        return 0 if ok_n == len(results) else 1
     from eth_account import Account
     acct = Account.create()                                           # ephemeral signer, not the deployed one
     registry = [acct.address]
@@ -81,6 +96,20 @@ def main():
     check("RCT1.5 the canonical hash is order-independent (same content, different key order -> same hash)",
           R.receipt_hash(receipt) == R.receipt_hash(reordered) == proof["hash"],
           (R.receipt_hash(receipt), R.receipt_hash(reordered)))
+
+    # RCT1.6 -- LIVE INTEGRATION: covenant_earn attaches a proof that verifies from the receipt alone, against the
+    # node's own published signer. This is the end-to-end path a buyer sees.
+    live = {"id": "live", "offer": "receipt", "amount_usdc": "0.020000", "network": "eip155:8453",
+            "input_sha256": "a" * 64, "result_sha256": "b" * 64, "checked": "1 citation"}
+    E._sign_receipt(live)
+    ok, why = R.verify({k: v for k, v in live.items() if k != "proof"}, live.get("proof", {}),
+                       allowed_signers=[R.published_signer()])
+    check("RCT1.6 live integration: covenant_earn signs a receipt that verifies against the node's published signer",
+          "proof" in live and ok, why)
+    disc = E._signer_discovery()
+    check("RCT1.7 the signer-discovery endpoint exposes the signer a buyer verifies against",
+          bool(disc) and disc.get("address") == R.published_signer() and disc.get("scheme") == "eip191-personal-sign",
+          disc)
 
     ok_n = sum(1 for r in results if r)
     print("\nRCT1: %d/%d passed" % (ok_n, len(results)))
