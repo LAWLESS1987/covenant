@@ -553,6 +553,9 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple has fourteen.
+    # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
+    ("test_na1_never_automatic.py", 120, "DAILY + GUARDS"),
     # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.
