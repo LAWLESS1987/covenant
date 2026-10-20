@@ -101,6 +101,33 @@ def _extract_verdict_json(text: str) -> str:
     raise ValueError(f"no JSON object in judge response: {text[:200]!r}")
 
 
+# VERDICT CACHE (2026-10-20, operator full-go; Tetsu consented to the kill switch). A judge verdict for the SAME
+# prompt under the SAME model is meant to be deterministic, so memoising _call by (model, prompt) skips the
+# expensive LLM round-trip on a repeated identical judgment -- a 33.7% repeat rate on the real log, 0 cache-wrong on
+# held-out (covenant_verdict_cache.verify_on_log). policy_version = the model string, and the prompt already carries
+# the data + principles, so a changed model OR changed constitution is a different key -> re-judge. The cache's kill
+# switch (COVENANT_VERDICT_CACHE_OFF) disables all hits. The cache NEVER changes a verdict: a hit is the identical
+# stored verdict, so it cannot widen what the gate permits.
+class _NullCache:
+    def get(self, text, context=None): return None
+    def put(self, text, verdict, context=None): pass
+
+
+_VC_CACHES = {}
+
+
+def _verdict_cache(model):
+    try:
+        import covenant_verdict_cache as _vc
+    except Exception:                                    # noqa: BLE001 -- the judge must never fail because of the cache
+        return _NullCache()
+    c = _VC_CACHES.get(model)
+    if c is None:
+        c = _vc.VerdictCache("llm-judge::" + str(model))
+        _VC_CACHES[model] = c
+    return c
+
+
 class OpenAICompatJudge(cov._APIReasoningJudge):
     """Any endpoint that speaks the OpenAI /chat/completions shape."""
     provider = "local"
@@ -144,6 +171,12 @@ class OpenAICompatJudge(cov._APIReasoningJudge):
 
     def _call(self, data, principles):
         import requests
+        prompt = self._build_prompt(data, principles)
+        model = self._model()
+        cache = _verdict_cache(model)                    # policy version = model; kill switch inside
+        hit = cache.get(prompt)
+        if hit is not None:                              # identical prompt + model already judged -> reuse verdict
+            return hit
         headers = {"content-type": "application/json"}
         key = self.api_key
         if key and key != "local-no-key":
@@ -151,9 +184,8 @@ class OpenAICompatJudge(cov._APIReasoningJudge):
         resp = requests.post(
             self._endpoint(),
             headers=headers,
-            json={"model": self._model(),
-                  "messages": [{"role": "user",
-                                "content": self._build_prompt(data, principles)}],
+            json={"model": model,
+                  "messages": [{"role": "user", "content": prompt}],
                   "max_tokens": 512},
             # Local models on CPU are SLOW. 30s (the cloud default) times out
             # mid-generation and the raise is then counted as a violation --
@@ -161,7 +193,9 @@ class OpenAICompatJudge(cov._APIReasoningJudge):
             timeout=float(os.environ.get("COVENANT_LOCAL_JUDGE_TIMEOUT", "180")),
         )
         resp.raise_for_status()
-        return self._parse_verdict(resp.json()["choices"][0]["message"]["content"])
+        verdict = self._parse_verdict(resp.json()["choices"][0]["message"]["content"])
+        cache.put(prompt, verdict)
+        return verdict
 
 
 class MistralJudge(OpenAICompatJudge):

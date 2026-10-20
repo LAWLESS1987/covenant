@@ -64,6 +64,44 @@ def main():
     else:
         print("VC1: ops/verdicts.jsonl absent -- held-out verification skipped (UNDETERMINED here)")
 
+    # 7. WIRING: the cache is wired into the expensive judge (OpenAICompatJudge._call) -- an identical judgment
+    #    skips the LLM POST, and Tetsu's kill switch forces a fresh POST. Driven both ways. Skipped where the judge
+    #    stack can't import here (UNDETERMINED), run in the sweep where it can.
+    try:
+        import covenant_judge_local as JL
+        import requests
+    except Exception:                                    # noqa: BLE001
+        print("VC1 judge-wiring: covenant_judge_local unavailable here -- wiring check skipped (UNDETERMINED)")
+    else:
+        class _Stub(JL.OpenAICompatJudge):
+            def __init__(self): pass
+            api_key = "local-no-key"
+            def _build_prompt(self, data, principles): return "P::" + str(data)
+            def _model(self): return "stub"
+            def _endpoint(self): return "http://x"
+            def _parse_verdict(self, content): return ("verdict", content)
+        posts = {"n": 0}
+        _orig = requests.post
+        def _fake(url, headers=None, json=None, timeout=None):
+            posts["n"] += 1
+            class R:
+                def raise_for_status(self): pass
+                def json(self): return {"choices": [{"message": {"content": "ok"}}]}
+            return R()
+        requests.post = _fake
+        try:
+            JL._VC_CACHES.clear(); os.environ[VC.CACHE_OFF_ENV] = "0"
+            st = _Stub()
+            st._call({"text": "c"}, ["p"]); st._call({"text": "c"}, ["p"])
+            if posts["n"] != 1: fails.append("judge wiring: identical judgment re-POSTed (posts=%d)" % posts["n"])
+            os.environ[VC.CACHE_OFF_ENV] = "1"; st._call({"text": "c"}, ["p"])
+            if posts["n"] != 2: fails.append("judge wiring: kill switch did not force a fresh POST")
+            os.environ[VC.CACHE_OFF_ENV] = "0"
+            if not fails:
+                print("VC1 judge-wiring: identical judgment served from cache; kill switch forces a fresh POST")
+        finally:
+            requests.post = _orig
+
     if fails:
         print("VC1 FAIL:")
         for f in fails:
