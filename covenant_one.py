@@ -599,6 +599,10 @@ SUITES = [
     # bench, because (hold, hold) arrives identically for both and they need
     # opposite responses.
     ("test_jr1_resolution.py", 120, "JUDGE"),
+    # TS1 (2026-10-20): JR1 pins resolve() as a pure function; TS1 pins the DEPLOYED two-seat gate
+    # (DeferringJudge.evaluate, both_seats) end-to-end, where A132 actually lived -- no single seat may turn
+    # the other's doubt into permission. The operator's principle: "no thinking class over everyone else."
+    ("test_ts1_two_seat_gate.py", 120, "JUDGE"),
     # H2 (2026-09-18): the update door's WITNESS, and a peer's drift made
     # visible to the self-heal without handing restart_nodes a condition it
     # cannot clear. All three faults it covers were live and invisible on the
