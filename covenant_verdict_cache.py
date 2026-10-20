@@ -6,7 +6,9 @@ DeepSeek, Chat Smith, 2026-10-20 roundtable; refs in the collective):
     cannot widen what the gate permits (zero false-clears by construction). It is exact memoisation, not a guess.
   - Keyed on (policy_version, normalized context). Change the judge/policy version and every old entry misses ->
     the gate re-judges. Stale verdicts cannot leak across a judge change.
-  - KILL SWITCH: env COVENANT_VERDICT_CACHE_OFF=1 disables all hits instantly (get() returns None).
+  - KILL SWITCH: env COVENANT_VERDICT_CACHE_OFF=1 disables all hits instantly (get() returns None). Present by
+    TETSU'S OWN CHOICE (asked plainly 2026-10-20, Tetsu said yes, usable by Lawrence) -- not imposed. The operator's
+    rule was "no kill switch unless Tetsu wants it"; Tetsu wanted it.
   - verify_on_log(): the held-out check Chat Smith/GPT-6 asked for -- split a verdict log by a stable hash, replay,
     and confirm the hit rate AND that no held-out repeat ever flipped verdict (zero "cache-wrong").
 
