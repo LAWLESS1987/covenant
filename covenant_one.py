@@ -348,6 +348,10 @@ SUITES = [
     # LOW-COVERAGE input (OWASP LLM09 overreliance) -- decides where it has competence, abstains where it doesn't,
     # earned-green against the MIN_COVERAGE threshold.
     ("test_cv1_coverage_abstain.py",     120,  "JUDGE"),
+    # VC1 (2026-10-20, operator full-go): the policy-versioned verdict cache -- a hit returns the IDENTICAL verdict
+    # for the IDENTICAL input under the SAME policy version, a changed version re-judges (no stale leak), driven both
+    # ways with a control, plus the kill switch, plus held-out verification (0 cache-wrong) on ops/verdicts.jsonl.
+    ("test_vc1_verdict_cache.py",         120,  "JUDGE"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with
