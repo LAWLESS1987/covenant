@@ -488,3 +488,4 @@ eval/outside/*.jsonl
 eval/models/
 eval/cache/
 eval/loop/*/cache/
+ops/receipt_signer.key

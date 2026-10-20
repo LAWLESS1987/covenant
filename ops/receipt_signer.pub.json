@@ -1,0 +1,6 @@
+{
+ "address": "0xf7554e5Fd6C36F5899c0988e9e0537F5DF2cAbC0",
+ "scheme": "eip191-personal-sign",
+ "design_credit": "Agent Embassy (nootxlm, aemb.pro) -- portable signed receipts",
+ "note": "public receipt signer; verify a receipt by recomputing its canonical SHA-256 and recovering this address from the eip191 signature over that hash"
+}

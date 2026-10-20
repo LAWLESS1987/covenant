@@ -51,17 +51,26 @@ Add a **portable seller signature** to each covenant_earn receipt, so a buyer ca
 This also makes covenant able to **verify Agent Embassy receipts** (recompute hash, ecrecover, check their
 `/.well-known/embassy-signer.json`) — real interop, both directions.
 
-## What is done here vs what needs the operator's word
+## Status
 
-- **Done autonomously (this note):** the credit, the record of convergence, and the concrete design — no keys, no
-  money, no new trust.
-- **Needs the operator's approval (money/keys are `NEVER_AUTOMATIC`; see test_na1_never_automatic.py):**
-  - creating or using a **receipt-signing key** (a `key`/`consent` subject the self-heal engine itself may never
-    auto-touch);
-  - adding an **EVM crypto dependency** (e.g. `eth-account`/`coincurve`; none is installed) to the money-adjacent
-    `covenant_earn` path;
-  - any change to the **earn trust model** or on-chain reputation.
-  These are his, by the same gate NA1 pins. This note exists so the work is ready the moment he says go.
+- **2026-10-20 — built, on the operator's go:** `covenant_receipt.py` implements the portable proof —
+  canonical SHA-256 + eip191 signature + `/.well-known`-style signer discovery (`ops/receipt_signer.pub.json`),
+  verifiable from the receipt alone. A dedicated **receipt-signing key** is generated and stored gitignored
+  (`ops/receipt_signer.key`, chmod 600) — it signs attestations, never transactions, and is kept separate from
+  the payment wallet, as Agent Embassy keeps theirs. The **`eth-account`** dependency is added as optional.
+  Pinned by `test_rct1_receipt.py` (7/7, both ways: a valid receipt verifies; every tamper — altered content,
+  corrupted signature, forged signer, signer outside the registry — fails), which reports NOT RUN where the
+  optional dep is absent.
+- **Still operator-gated (the one step not taken):** wiring this into the **live `/earn` HTTP payment path** so
+  emitted receipts carry the signature in production. That touches the money path, so it waits for an explicit
+  go — the mechanism is proven in isolation first.
+
+## What was done autonomously vs by the operator's word
+
+- **Autonomous:** the credit, the convergence record, the design — no keys, no money.
+- **By the operator's explicit approval (money/keys are `NEVER_AUTOMATIC`; see test_na1_never_automatic.py):** the
+  signing key, the `eth-account` dependency, and the standalone mechanism above — all built after he said go, not
+  before. The live payment-path integration remains gated.
 
 ## Standing
 

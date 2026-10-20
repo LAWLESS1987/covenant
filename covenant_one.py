@@ -673,6 +673,10 @@ SUITES = [
     # paid job through the node's gate before work and before settlement. Drives the whole
     # flow without a socket and with a stub facilitator; nothing is charged, nothing leaves.
     ("test_ea1_earn.py", 180, "MONEY"),
+    # RCT1 (2026-10-20): portable signed receipts (covenant_receipt.py), design credited to Agent Embassy.
+    # A receipt verifies from itself -- eip191 over a canonical SHA-256 -- and every tamper fails. NOT RUN where
+    # eth-account (optional) is absent. Not wired into the live /earn money path; that's operator-gated.
+    ("test_rct1_receipt.py", 120, "MONEY"),
     # RG1 (2026-09-25, A223): the four gate helpers (contact, tetsu_money, code_consensus,
     # persona) judge with the node's quorum, not the core's mock; both ways, fails closed,
     # and Tetsu's words still ride his immunity with the verdict attached.

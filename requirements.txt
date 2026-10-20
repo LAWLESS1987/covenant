@@ -22,3 +22,10 @@ xrpl-py>=4.0
 # OPTIONAL -- neural telemetry bridge only. Absent by default; the node
 # attaches the bridge with brainflow_available=False and runs unaffected.
 # brainflow>=5.10
+
+# OPTIONAL -- portable signed receipts (covenant_receipt.py), design credited to
+# Agent Embassy. Only needed to SIGN/VERIFY receipts with a portable eip191
+# signature; covenant_receipt imports it lazily and test_rct1 reports NOT RUN when
+# it is absent, so the rest of the node runs unaffected. It signs attestations,
+# never transactions -- not a payment key.
+eth-account>=0.11
