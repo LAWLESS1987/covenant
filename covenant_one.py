@@ -358,6 +358,7 @@ SUITES = [
     ("test_f4_capability.py",            120,  "JUDGE"),
     ("test_f5_reserve.py",                90,  "JUDGE"),
     ("test_f6_stuffing.py",              120,  "JUDGE"),
+    ("test_pi1_injection.py",            150,  "JUDGE"),
     ("test_f7_caps.py",                   60,  "MONEY"),
     ("test_rule5_ledger.py",              60,  "MONEY"),
     # Registered 2026-09-07. Both arrived from the Cowork run that evening and

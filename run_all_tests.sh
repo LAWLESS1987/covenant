@@ -706,6 +706,7 @@ run test_dk1_desk.py 60
 run test_f4_capability.py 120
 run test_f5_reserve.py 90
 run test_f6_stuffing.py 120
+run test_pi1_injection.py 150
 run test_f7_caps.py 60
 run test_g12_inflight.py 60
 run test_purge_tool.py 60
