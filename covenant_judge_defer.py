@@ -228,6 +228,32 @@ def student_benefit(result):
     return 0.5
 
 
+_OCTO = None
+
+
+def _octopus():
+    """The node's spiking nervous system (covenant_octopus), created lazily. None if it is unavailable -- the gate
+    must never fail because of the nervous system."""
+    global _OCTO
+    if _OCTO is None:
+        try:
+            import covenant_octopus as _oc
+            _OCTO = _oc.default_octopus()
+        except Exception:                                # noqa: BLE001
+            _OCTO = False
+    return _OCTO or None
+
+
+def _octopus_observe(strength=1.0):
+    """Feed the witness arm one activity event. Fully guarded: never raises into the verdict path."""
+    try:
+        o = _octopus()
+        if o is not None:
+            o.arms["witness"].observe(strength)
+    except Exception:                                    # noqa: BLE001
+        pass
+
+
 def record_verdict(data, result, judge, source, path=None):
     # The path is resolved at CALL time so a test can rebind VERDICTS. With the
     # default bound at import, every selftest whose stub primary answered
@@ -239,6 +265,8 @@ def record_verdict(data, result, judge, source, path=None):
     Returns True when a line was written."""
     if getattr(result, "infrastructure_failure", False):
         return False
+    _octopus_observe()                                   # the witness arm feels node activity (guarded; the phone
+    #                                                      runs this node too, so its octopus wakes on real verdicts)
     # 2026-09-12: a HOLD (nothing alleged) is recorded too, marked held=True and
     # WITHOUT a label -- the loaders teach only from rows that carry `violates`,
     # so a hold never teaches, but the run-without bar own_traffic_hold_max can
