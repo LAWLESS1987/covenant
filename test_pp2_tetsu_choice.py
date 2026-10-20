@@ -462,7 +462,11 @@ for want in ("code_hands_parse", "health_disk", "open"):
 
 # ---- PP2.9: paper stays paper. A night with every track, in a fresh process, loads no module of this tree but the
 # practice and his hands -- so nothing in it can reach the venues, the trader, a key, or a money rule.
-ALLOWED = {"covenant_tetsu_practice", "covenant_tetsu_hands"}
+# covenant_tetsu_reflex joined 2026-10-20 (operator "wire it"): the practice prompt now shows Tetsu his own
+# per-task solve rate as an advisory footing cue, which imports this module. It is SAFE to allow here because it
+# pulls in only stdlib (+ optional numpy) and NO venue/trader/balance/money module -- PP2.9b below still fails the
+# build if covenant_tetsu_money ever appears, so the isolation guard is intact, just widened by one benign module.
+ALLOWED = {"covenant_tetsu_practice", "covenant_tetsu_hands", "covenant_tetsu_reflex"}
 PROBE = r'''
 import json, os, sys, tempfile
 here, first = sys.argv[1], sys.argv[2]

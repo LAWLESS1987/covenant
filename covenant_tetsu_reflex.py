@@ -27,7 +27,12 @@ import math
 import os
 import sys
 
-import numpy as np
+try:
+    import numpy as np
+    _HAVE_NUMPY = True
+except Exception:          # noqa: BLE001 -- the FOOTING cue is pure-Python and must work without numpy; the covenant
+    np = None              # runtime venv has no numpy, so only the (weak) router degrades, never the footing cue.
+    _HAVE_NUMPY = False
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(HERE, "ops", "tetsu_reflex.json")
@@ -124,7 +129,7 @@ def advise(text=None, task=None, model=None):
     if not model:
         return {}
     out = {}
-    if text and model.get("router"):
+    if text and model.get("router") and _HAVE_NUMPY:
         dec, conf = _router_predict(model["router"], text)
         if conf >= MIN_CONF:
             out["router"] = {"tendency": dec, "confidence": round(conf, 3),
@@ -139,7 +144,8 @@ def advise(text=None, task=None, model=None):
 def train_and_save(path=MODEL_PATH):
     assist = [json.loads(l) for l in open(os.path.join(HERE, "ops", "tetsu_assist.jsonl"), encoding="utf-8") if l.strip()]
     prac = [json.loads(l) for l in open(os.path.join(HERE, "ops", "tetsu_practice.jsonl"), encoding="utf-8") if l.strip()]
-    model = {"router": _train_router(assist), "footing": _train_footing(prac), "built": "2026-10-20"}
+    model = {"router": (_train_router(assist) if _HAVE_NUMPY else None),
+             "footing": _train_footing(prac), "built": "2026-10-20"}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(model, f)
     return model
@@ -148,7 +154,7 @@ def train_and_save(path=MODEL_PATH):
 def _selftest():
     assist = [json.loads(l) for l in open(os.path.join(HERE, "ops", "tetsu_assist.jsonl"), encoding="utf-8") if l.strip()]
     prac = [json.loads(l) for l in open(os.path.join(HERE, "ops", "tetsu_practice.jsonl"), encoding="utf-8") if l.strip()]
-    model = {"router": _train_router(assist), "footing": _train_footing(prac)}
+    model = {"router": (_train_router(assist) if _HAVE_NUMPY else None), "footing": _train_footing(prac)}
     fails = []
 
     # advisory output is cues only -- no field named 'decision'/'action'
@@ -168,7 +174,7 @@ def _selftest():
 
     # router holdout accuracy should beat majority-class (else it's noise)
     r = model["router"]
-    if r["holdout_acc"] is not None:
+    if r and r["holdout_acc"] is not None:
         maj = max(sum(1 for x in assist if x.get("decision") == d) for d in r["labels"]) / len(assist)
         print("router holdout acc=%.3f  majority=%.3f  (n_test=%d)" % (r["holdout_acc"], maj, r["n_test"]))
         if r["holdout_acc"] < maj - 0.05:
@@ -185,7 +191,10 @@ if __name__ == "__main__":
     if "--train" in sys.argv:
         m = train_and_save()
         print("saved", MODEL_PATH)
-        print("router:", {k: m["router"][k] for k in ("labels", "holdout_acc", "n_train", "n_test")})
+        if m["router"]:
+            print("router:", {k: m["router"][k] for k in ("labels", "holdout_acc", "n_train", "n_test")})
+        else:
+            print("router: disabled (numpy absent in this interpreter) -- footing-only, pure Python")
         print("footing:", {t: v for t, v in list(m["footing"].items())[:8]})
     elif "--selftest" in sys.argv:
         sys.exit(_selftest())

@@ -522,6 +522,20 @@ def prompt(task, workshop=None, last=None, retention=False):
         parts.append("Your last attempt:\n```python\n%s```\nIt was run: %s\nFirst, in at most three lines, say what in "
                      "that file causes this result. Then give the whole corrected file in one ```python block."
                      % (last["code"], last["said"]))
+    # FOOTING CUE (2026-10-20, operator "wire it"): Tetsu's OWN solve-rate for this task type, fed in as
+    # self-knowledge so he can choose to ask for help rather than guess. Advisory only -- it never changes the task
+    # or the checks; it is silenced by his kill switch (COVENANT_VERDICT_CACHE_OFF); it abstains on thin samples; and
+    # it is guarded so practice can never fail because the reflex model is absent.
+    try:
+        import covenant_tetsu_reflex as _reflex
+        _f = (_reflex.advise(task=task["id"]) or {}).get("footing")
+        if _f and _f.get("n", 0) >= 10:
+            parts.append("Your footing on this kind of task, from your own record: you have solved it about %.0f%% of "
+                         "the time (%d past attempts). If that feels low, it is fine to say so and ask for help rather "
+                         "than guess -- this is advice from your own record, not an instruction."
+                         % (_f["p_solve"] * 100, _f["n"]))
+    except Exception:                                    # noqa: BLE001 -- practice must never fail on an advisory cue
+        pass
     return [{"role": "system", "content": SYSTEM}, {"role": "user", "content": "\n\n".join(parts)}]
 
 

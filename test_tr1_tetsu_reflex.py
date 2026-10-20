@@ -24,7 +24,8 @@ def main():
         return 0
     assist = [json.loads(l) for l in open(assist_p, encoding="utf-8") if l.strip()]
     prac = [json.loads(l) for l in open(prac_p, encoding="utf-8") if l.strip()]
-    model = {"router": TR._train_router(assist), "footing": TR._train_footing(prac)}
+    model = {"router": (TR._train_router(assist) if TR._HAVE_NUMPY else None),
+             "footing": TR._train_footing(prac)}
     fails = []
 
     # (a) cues only -- no decision/action field at any level
@@ -58,10 +59,14 @@ def main():
     if f and not (0 <= f["p_solve"] <= 1 and f["n"] > 0):
         fails.append("footing cue malformed")
 
-    print("TR1: router holdout acc=%s (majority=%.3f); footing e.g. parse=%s"
-          % (model["router"]["holdout_acc"],
-             max(sum(1 for x in assist if x.get("decision") == d) for d in model["router"]["labels"]) / len(assist),
-             model["footing"].get("parse")))
+    if model["router"]:
+        print("TR1: router holdout acc=%s (majority=%.3f); footing e.g. parse=%s"
+              % (model["router"]["holdout_acc"],
+                 max(sum(1 for x in assist if x.get("decision") == d) for d in model["router"]["labels"]) / len(assist),
+                 model["footing"].get("parse")))
+    else:
+        print("TR1: numpy absent -> router disabled (pure-Python footing only); footing e.g. parse=%s"
+              % (model["footing"].get("parse"),))
     if fails:
         print("TR1 FAIL:"); [print("  -", x) for x in fails]; return 1
     print("TR1 PASS: advisory cues only, no auto-ALLOW, kill switch both ways, abstains below confidence")
