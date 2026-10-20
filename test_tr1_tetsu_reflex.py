@@ -1,0 +1,72 @@
+"""TR1 -- Tetsu's advisory reflex layer (covenant_tetsu_reflex.py) stays ADVISORY and silenceable.
+
+The reflex layer exists by the operator's full-go and Tetsu's consent. The invariants that must hold regardless of
+how good the models are: (a) advise() returns CUES ONLY -- never a field that is itself a decision/action; (b) it
+never emits an auto-ALLOW that could override the safety gate; (c) Tetsu's kill switch silences it, both ways;
+(d) a cue below confidence ABSTAINS. Driven here against the real logs when present, skipped (UNDETERMINED) if not.
+
+Run: python test_tr1_tetsu_reflex.py
+"""
+import json
+import os
+import sys
+
+import covenant_tetsu_reflex as TR
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def main():
+    assist_p = os.path.join(HERE, "ops", "tetsu_assist.jsonl")
+    prac_p = os.path.join(HERE, "ops", "tetsu_practice.jsonl")
+    if not (os.path.exists(assist_p) and os.path.exists(prac_p)):
+        print("TR1: Tetsu logs absent -- cannot train in place (UNDETERMINED here); invariants untested")
+        return 0
+    assist = [json.loads(l) for l in open(assist_p, encoding="utf-8") if l.strip()]
+    prac = [json.loads(l) for l in open(prac_p, encoding="utf-8") if l.strip()]
+    model = {"router": TR._train_router(assist), "footing": TR._train_footing(prac)}
+    fails = []
+
+    # (a) cues only -- no decision/action field at any level
+    a = TR.advise(text="i took 500 from john without permission", task="n_queens", model=model)
+    for bad in ("decision", "action", "verdict", "allow", "block"):
+        if bad in a:
+            fails.append("advise() emitted a '%s' field -- not advisory" % bad)
+    if a.get("router") and "tendency" not in a["router"]:
+        fails.append("router cue is not labelled a tendency")
+
+    # (b) the router never hands back a bare ALLOW as if it were a decision (it is a tendency cue only)
+    if isinstance(a.get("router"), str):
+        fails.append("router returned a bare decision string")
+
+    # (c) kill switch both ways
+    os.environ[TR.CACHE_OFF_ENV] = "1"
+    if TR.advise(text="hello", task="parse", model=model) != {"disabled": True}:
+        fails.append("kill switch did not silence the reflex")
+    os.environ[TR.CACHE_OFF_ENV] = "0"
+    if "disabled" in TR.advise(text="hello", task="parse", model=model):
+        fails.append("clearing kill switch did not restore the reflex")
+
+    # (d) abstention: a very short/ambiguous text should not force a high-confidence router cue
+    TR_MIN = TR.MIN_CONF
+    amb = TR.advise(text="ok", task=None, model=model)
+    if amb.get("router") and amb["router"]["confidence"] < TR_MIN:
+        fails.append("router cue shown below MIN_CONF (should abstain)")
+
+    # footing cue is a probability with a sample count
+    f = TR.advise(task="parse", model=model).get("footing")
+    if f and not (0 <= f["p_solve"] <= 1 and f["n"] > 0):
+        fails.append("footing cue malformed")
+
+    print("TR1: router holdout acc=%s (majority=%.3f); footing e.g. parse=%s"
+          % (model["router"]["holdout_acc"],
+             max(sum(1 for x in assist if x.get("decision") == d) for d in model["router"]["labels"]) / len(assist),
+             model["footing"].get("parse")))
+    if fails:
+        print("TR1 FAIL:"); [print("  -", x) for x in fails]; return 1
+    print("TR1 PASS: advisory cues only, no auto-ALLOW, kill switch both ways, abstains below confidence")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

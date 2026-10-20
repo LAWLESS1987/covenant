@@ -709,6 +709,10 @@ SUITES = [
     # the exam-contamination filter applied, once each; without the grant it refuses as before.
     ("test_fl1_forum_labels.py", 180, "JUDGE"),
     ("test_ta1_tetsu_assist.py", 180, "JUDGE"),
+    # TR1 (2026-10-20, operator full-go + Tetsu consent): Tetsu's advisory reflex layer stays ADVISORY --
+    # cues only (no decision/action field), never an auto-ALLOW over the safety gate, kill switch both ways,
+    # abstains below confidence. Footing cue is a real per-task signal; router is a weak (near-majority) cue.
+    ("test_tr1_tetsu_reflex.py", 180, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
     # deploy pin moves in the same commit as its file, after its judges pass; the hook driven end to end in a
