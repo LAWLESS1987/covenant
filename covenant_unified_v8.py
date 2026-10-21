@@ -539,8 +539,8 @@ def _request_signed_by_registered(req):
     """True when the request carries a valid operator-request signature from a registered key, whatever the
     caller's address (covenant_mycelium.admit with the address gate forced False). No module, no proof -> False."""
     try:
-        import covenant_mycelium as _my
-        ok, _addr, _who, _how = _my.admit(req, req.get_data() or b"", lambda _a: False)
+        _my = importlib.import_module("covenant_mycelium")          # lazy by name (as line ~8919): keeps the phone's
+        ok, _addr, _who, _how = _my.admit(req, req.get_data() or b"", lambda _a: False)  # AST closure off the fleet (M5.2)
         return bool(ok)
     except Exception:                                             # noqa: BLE001 -- no proof -> not authorized (fail closed)
         return False
