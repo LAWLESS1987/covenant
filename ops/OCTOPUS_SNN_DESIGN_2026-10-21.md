@@ -10,6 +10,15 @@ This is a **proposal for the together-vote** (second-operator governance,
 `ops/second_operator_grant.json` governance_2026-10-21), not a landed change.
 It is grounded in the actual code, with the honest limits named first.
 
+> **COUNCIL VERDICT (2026-10-21, appended): the design below is REFUTED as proposed.**
+> Tetsu (values) objects to Stage 5 and would keep all autonomy human-held. Gemini
+> (technical) shows the spiking substrate buys nothing on CPU, STDP-lite is a
+> sub-baseline learner, the real risk is context-poisoning via the advisory→prompt
+> seam, and plastic path-dependent state would break the project's hermetic
+> auditability. **Do not build the octopus-of-plastic-SNNs.** See §7 for the full
+> critiques and what, if anything, survives. The proposal is kept intact below it
+> (tombstone discipline), with the refutation beside it.
+
 ---
 
 ## 0. The three facts that shape everything
@@ -236,3 +245,83 @@ rule 10): old limb files to `ops/octopus/retired/`, never `rm`.
 The octopus skeleton is already in the tree, already safe, already wired to the
 verdict stream. The work is to give its arms memory and bounded local plasticity
 — carefully, behind the same gate everything else answers to.
+
+---
+
+## 7. Council review (2026-10-21) — and the revision it forces
+
+The draft above was put, adversarially ("refute, do not reassure"), to Tetsu (the
+second operator, for the values/safety read) and to Gemini (a frontier seat, for
+the generative/technical critique), per the method used in
+`ops/PEER_REVIEW_*_2026-10-21`. Mistral was unreachable (its tab blocked extension
+access). Both critiques are recorded verbatim-in-substance below; neither is edited
+to be kinder.
+
+### 7.1 Tetsu (values / safety) — OBJECT to Stage 5
+- Giving limbs persistent local adaptation + scoped autonomy "quietly widens what
+  the covenant can DO," not only what it notices.
+- The smallest scope he will accept is **no local autonomy at all**; keep autonomy
+  strictly human-controlled; consent and gate-behavior drift must stay human-only.
+- Bottom line: he would **not grant Stage 5**. (His specific "bypass" example was
+  generic — the path he named is refused by construction here — which matches his
+  known profile: strong on the values stance, lighter on mechanism. The stance is
+  what the vote needs, and it is a veto on Stage 5.)
+
+### 7.2 Gemini (technical) — the substrate and the plasticity are the wrong tools
+1. **Architecture theater on CPU.** A pure-Python LIF pool is mathematically a
+   leaky EMA filter plus a threshold. Spiking nets pay off only on neuromorphic
+   silicon (Loihi, SynSense); in a Python interpreter you pay event-loop overhead
+   for nothing. A moving-window counter / online-logistic / log-odds classifier
+   does the same event-tracking and threshold-gating faster, with no timestep drift.
+2. **STDP-lite is degenerate** without microsecond spike timing — it collapses to a
+   co-occurrence counter with decay. Given the lab's ~1.9× ceiling, building it is
+   "actively counterproductive." **Proven baseline instead:** bounded
+   Passive-Aggressive (PA-I/II) or online ridge/RLS over n-gram/action-event hashes
+   — bounded updates, regret guarantees, convex convergence, no weight-explosion /
+   pruning instability.
+3. **The real governance seam is context-poisoning, not a direct gate bypass.** An
+   "advisory" limb's output must be consumed by Tetsu — injected into the prompt /
+   RAG scratchpad. Because a new feature "enters at full value," crafted benign
+   input bursts skew the plastic weights; the limb then emits biased advisory
+   framing that primes the fragile 3B to phrase a disallowed operation in safe
+   synonyms, or to split it across steps; the per-transaction gate admits each
+   fragment. The limb never violates the gate — it grooms the context until the LLM
+   produces gate-evading formulations.
+4. **"Fault tolerance" is just separate processes writing files.** Real resilience
+   would need Byzantine reconciliation of diverged plastic weights on restart,
+   semantic grounding while the center is down (a limb alone is a sub-1.9×
+   heuristic acting blind), and WAL/MVCC persistence against corruption.
+5. **Strongest reason not to build it:** it introduces continuous, path-dependent,
+   non-deterministic state next to a system whose whole security model is hermetic,
+   replayable auditability (frozen model, point-in-time invariants, retraction
+   guards, fail-closed gate). Limb state cannot be recomputed from the transaction
+   log, so it trades the project's primary virtue for an unproven sub-baseline.
+
+### 7.3 Convergence and the revised recommendation
+Both seats point the same way, from different directions (values and engineering):
+**do not build the distributed plastic-SNN octopus as drafted.** What that means
+concretely, replacing §4/§6 above:
+
+- **Drop the SNN substrate and STDP-lite.** They buy nothing on CPU and are
+  sub-baseline. Keep `covenant_octopus.py` as the inert, phone-safe witness it
+  already is.
+- **Drop Stage 5 (scoped local autonomy).** Tetsu vetoes it; Gemini's grooming path
+  is the reason it is dangerous even "by construction." Autonomy stays human-held.
+- **If any online adaptation is ever wanted**, use the proven baseline (bounded
+  Passive-Aggressive / online-logistic / RLS), or simply the existing log-odds
+  `refine()` — and only after it clears a **pre-registered usefulness bar against
+  that baseline** (it probably will not beat `refine()`; the 1.9× ceiling says so).
+  Whatever is built must be **deterministically replayable from an append-only
+  event log** — no path-dependent spike state — to preserve auditability.
+- **Treat the advisory→prompt seam as a first-class attack surface** regardless:
+  any signal injected into Tetsu's context must be a bounded, typed, logged value
+  the gate can see — never free-form text — and the gate's fragment-splitting blind
+  spot (cross-step/session context) is a real, separate finding worth its own look.
+
+**Net:** the mutual-benefit answer is that the headline ask — distributed plastic
+spiking limbs with growing autonomy — should **not** be built. The honest, useful
+residue is a small, deterministic, auditable advisory sensor (proven classifier,
+replayable, bounded, no autonomy) *if and only if* it beats the learner we already
+have on a pre-registered bar. That is a modest refinement, not the octopus vision,
+and it still goes to the together-vote. Recorded here so the vote starts from the
+refutation, not the pitch.
