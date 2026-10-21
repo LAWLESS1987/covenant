@@ -102,6 +102,68 @@ def main():
         finally:
             requests.post = _orig
 
+    # 8. BASIS INVALIDATION BOTH WAYS (gap #4, council 2026-10-21): a changed tombstone/amendment ledger
+    #    bumps the basis hash -> the judge cache re-keys -> prior verdicts miss and re-judge. No exemption.
+    import tempfile
+    d = tempfile.mkdtemp()
+    led = os.path.join(d, "RETRACTED.json")
+    open(led, "w", encoding="utf-8").write('{"a": 1}')
+    VC._BASIS_MEMO.clear(); h1 = VC.basis_version([led])
+    h1b = VC.basis_version([led])
+    if h1 == "none" or h1 != h1b: fails.append("basis_version unstable on an unchanged ledger (%r/%r)" % (h1, h1b))
+    open(led, "w", encoding="utf-8").write('{"a": 2, "tombstone": "x"}')   # a tombstone lands
+    VC._BASIS_MEMO.clear(); h2 = VC.basis_version([led])
+    if h2 == h1: fails.append("basis_version did NOT change when the ledger changed (gap #4 open)")
+    os.remove(led); VC._BASIS_MEMO.clear()
+    if VC.basis_version([led]) != "none": fails.append("absent ledger should hash to 'none'")
+
+    try:
+        import covenant_judge_local as JL2
+    except Exception:                                    # noqa: BLE001
+        print("VC1 basis-wiring: covenant_judge_local unavailable here -- skipped (UNDETERMINED)")
+    else:
+        _origbasis = VC.basis_version
+        try:
+            JL2._VC_CACHES.clear()
+            VC.basis_version = lambda *a, **k: "AAAA"
+            ca = JL2._verdict_cache("m"); cb = JL2._verdict_cache("m")
+            if ca is not cb: fails.append("basis-wiring: same basis made a new cache (hits lost needlessly)")
+            ca.put("ONLY-UNDER-AAAA", {"violates": True})
+            VC.basis_version = lambda *a, **k: "BBBB"     # a tombstone lands -> basis changes
+            cc = JL2._verdict_cache("m")
+            if cc is ca: fails.append("basis-wiring: basis change did NOT re-key the cache (gap #4 open)")
+            if "BBBB" not in cc.policy_version: fails.append("basis-wiring: new basis not in the policy key")
+            if cc.get("ONLY-UNDER-AAAA") is not None:
+                fails.append("basis-wiring: a verdict survived a basis change (stale leaked past a tombstone)")
+            VC.basis_version = lambda *a, **k: "AAAA"      # control: same basis serves the old entry (re-key, not a wipe)
+            if JL2._verdict_cache("m").get("ONLY-UNDER-AAAA") is None:
+                fails.append("basis-wiring control: same-basis entry not served (re-key is vacuous)")
+            if not any("basis-wiring" in f for f in fails):
+                print("VC1 basis-wiring: a changed tombstone ledger re-keys the judge cache; stale cannot leak past a correction")
+        finally:
+            VC.basis_version = _origbasis
+            JL2._VC_CACHES.clear()
+
+    # 9. CANARY BOTH WAYS (gap #2, council 2026-10-21): OFF by default (no sampling, no judge-call cost); when
+    #    switched on it logs real-turn agreement and catches a real-turn cache-wrong. Observational only.
+    if VC.should_canary(VC.canary_pct()):                # env unset -> pct 0 -> must be False
+        fails.append("canary is ON by default (must be opt-in -- it spends a judge call per sampled hit)")
+    if VC.should_canary(0): fails.append("should_canary(0) returned True")
+    if not VC.should_canary(100, r=0.5): fails.append("should_canary(100) did not fire")
+    if VC.should_canary(2, r=0.99): fails.append("should_canary(2) fired at r=0.99")
+    if not VC.should_canary(2, r=0.0): fails.append("should_canary(2) did not fire at r=0.0")
+    clog = os.path.join(d, "canary.jsonl")
+    if not VC.record_canary(clog, "m", "t1", {"violates": True}, {"violates": True}):
+        fails.append("canary: identical verdicts recorded as a disagreement")
+    if VC.record_canary(clog, "m", "t2", {"violates": False}, {"violates": True}):
+        fails.append("canary: a real-turn FLIP recorded as agree (a cache-wrong would be missed)")
+    rep = VC.canary_report(clog)
+    if rep["checked"] != 2 or rep["real_turn_cache_wrong"] != 1:
+        fails.append("canary_report wrong: %r" % rep)
+    if not any("canary" in f for f in fails):
+        print("VC1 canary: off by default; when on, logs real-turn agreement and catches a real-turn cache-wrong")
+    import shutil; shutil.rmtree(d, ignore_errors=True)
+
     if fails:
         print("VC1 FAIL:")
         for f in fails:

@@ -103,9 +103,13 @@ def _extract_verdict_json(text: str) -> str:
 
 # VERDICT CACHE (2026-10-20, operator full-go; Tetsu consented to the kill switch). A judge verdict for the SAME
 # prompt under the SAME model is meant to be deterministic, so memoising _call by (model, prompt) skips the
-# expensive LLM round-trip on a repeated identical judgment -- a 33.7% repeat rate on the real log, 0 cache-wrong on
-# held-out (covenant_verdict_cache.verify_on_log). policy_version = the model string, and the prompt already carries
-# the data + principles, so a changed model OR changed constitution is a different key -> re-judge. The cache's kill
+# expensive LLM round-trip on a repeated identical judgment. CORRECTION (council 2026-10-21, A369-CACHE-REAL-LOG-SAVING):
+# the earlier "33.7% repeat rate on the real log" was measured on ops/verdicts.jsonl, which is SYNTHETIC-dominated
+# (generated+judged); it is NOT a real-world saving rate. On real/live turns the repeat rate is ~72% but that is a
+# NEW, unverified claim, and the "0 cache-wrong" held-out check was graded on synthetic repeats only, never on real
+# turns (see ops/COUNCIL_REVIEW_2026-10-21.md; real-turn coverage now comes from the canary, _maybe_canary below).
+# policy_version = model + a hash of the tombstone ledger (basis), and the prompt carries the data + principles, so a
+# changed model, changed constitution, OR a landed tombstone is a different key -> re-judge (no exemption). The kill
 # switch (COVENANT_VERDICT_CACHE_OFF) disables all hits. The cache NEVER changes a verdict: a hit is the identical
 # stored verdict, so it cannot widen what the gate permits.
 class _NullCache:
@@ -121,11 +125,30 @@ def _verdict_cache(model):
         import covenant_verdict_cache as _vc
     except Exception:                                    # noqa: BLE001 -- the judge must never fail because of the cache
         return _NullCache()
-    c = _VC_CACHES.get(model)
+    # basis = a hash of the tombstone/amendment ledger. A tombstone that changes a ruling's basis
+    # bumps it -> a new key -> every prior cached verdict misses and re-judges (council 2026-10-21,
+    # "no exemption: the cache obeys a correction like everything else"). Keyed by (model, basis).
+    basis = _vc.basis_version()
+    k = (model, basis)
+    c = _VC_CACHES.get(k)
     if c is None:
-        c = _vc.VerdictCache("llm-judge::" + str(model))
-        _VC_CACHES[model] = c
+        c = _vc.VerdictCache("llm-judge::" + str(model) + "::basis=" + basis)
+        _VC_CACHES[k] = c
     return c
+
+
+def _maybe_canary(model, prompt, cached_verdict, do_request):
+    """On a cache HIT, with probability COVENANT_CACHE_CANARY_PCT, re-judge live and log whether the
+    cached verdict still matches -- the council's real-turn coverage for the zero-wrong claim
+    (2026-10-21). Observational only: never changes the returned verdict, never raises into the judge."""
+    try:
+        import covenant_verdict_cache as _vc
+        if not _vc.should_canary(_vc.canary_pct()):
+            return
+        fresh = do_request(prompt)
+        _vc.record_canary(_vc.DEFAULT_CANARY_LOG, model, prompt, cached_verdict, fresh)
+    except Exception:                                    # noqa: BLE001 -- the canary must never break the judge
+        pass
 
 
 class OpenAICompatJudge(cov._APIReasoningJudge):
@@ -173,27 +196,32 @@ class OpenAICompatJudge(cov._APIReasoningJudge):
         import requests
         prompt = self._build_prompt(data, principles)
         model = self._model()
-        cache = _verdict_cache(model)                    # policy version = model; kill switch inside
-        hit = cache.get(prompt)
-        if hit is not None:                              # identical prompt + model already judged -> reuse verdict
-            return hit
+        cache = _verdict_cache(model)                    # policy version = model + basis; kill switch inside
         headers = {"content-type": "application/json"}
         key = self.api_key
         if key and key != "local-no-key":
             headers["Authorization"] = f"Bearer {key}"
-        resp = requests.post(
-            self._endpoint(),
-            headers=headers,
-            json={"model": model,
-                  "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": 512},
-            # Local models on CPU are SLOW. 30s (the cloud default) times out
-            # mid-generation and the raise is then counted as a violation --
-            # i.e. your own slow hardware silently rejects your transactions.
-            timeout=float(os.environ.get("COVENANT_LOCAL_JUDGE_TIMEOUT", "180")),
-        )
-        resp.raise_for_status()
-        verdict = self._parse_verdict(resp.json()["choices"][0]["message"]["content"])
+
+        def _do_request(p):
+            resp = requests.post(
+                self._endpoint(),
+                headers=headers,
+                json={"model": model,
+                      "messages": [{"role": "user", "content": p}],
+                      "max_tokens": 512},
+                # Local models on CPU are SLOW. 30s (the cloud default) times out
+                # mid-generation and the raise is then counted as a violation --
+                # i.e. your own slow hardware silently rejects your transactions.
+                timeout=float(os.environ.get("COVENANT_LOCAL_JUDGE_TIMEOUT", "180")),
+            )
+            resp.raise_for_status()
+            return self._parse_verdict(resp.json()["choices"][0]["message"]["content"])
+
+        hit = cache.get(prompt)
+        if hit is not None:                              # identical prompt + model already judged -> reuse verdict
+            _maybe_canary(model, prompt, hit, _do_request)   # real-turn coverage of "zero wrong"; off by default
+            return hit
+        verdict = _do_request(prompt)
         cache.put(prompt, verdict)
         return verdict
 

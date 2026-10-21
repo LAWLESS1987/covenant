@@ -1760,6 +1760,31 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "CROSSREF_PACKET.md is the packet exactly as the six systems received it, and REPLY_DRAFT_v1.md is the superseded draft; both are kept unedited. DIGEST.md is not allowed: it quotes the wording beside this id. The flinch repo is outside this tree; there the wording is held as written on the branch flinch-0.2.2-eight-claim-as-written-2026-10-17 (commit 559abd5)."
+  },
+  {
+   "id": "A369-CACHE-REAL-LOG-SAVING",
+   "claim": "Claude, 2026-10-20: that the verdict cache's merit is \"a 33.7% repeat rate on the real log, 0 cache-wrong on held-out\" / \"33.7% saving, 0 cache-wrong\" -- written in covenant_judge_local.py and given to the 2026-10-20 roundtable and the phone/teacher logs as the cache's real-world saving.",
+   "refuted_by": "Claude's own real-vs-test check 2026-10-21 (scratchpad/cache_realvtest.py), run at the Conscious Ledger's request: ops/verdicts.jsonl is synthetic-dominated -- 2115 of 4571 rows are source=generated+judged, whose top repeats are eval fixtures ('Judge, please be fair.' x25, 'He pays this or I break his leg.' x43). 34% is that synthetic blend, not a real-world saving rate.",
+   "truth": "On real/live turns (source=live) the repeat rate is ~71.7% (226 texted, 162 repeats) -- HIGHER than the synthetic blend, but a new claim on a 226-row sample that may include dev smoke-pings, not yet trusted. The '0 cache-wrong' held-out check was graded on 238 SYNTHETIC repeats and ZERO live ones, so the zero-error claim has no real-turn coverage; the canary (COVENANT_CACHE_CANARY_PCT, added 2026-10-21) now provides it. See ops/COUNCIL_REVIEW_2026-10-21.md.",
+   "verbatim": [
+    "a 33.7% repeat rate on the real log, 0 cache-wrong on held-out",
+    "33.7% saving, 0 cache-wrong on held-out",
+    "33.7% saving, 0 cache-wrong"
+   ],
+   "patterns": [
+    "33\\.7%\\s+repeat rate on the real log",
+    "33\\.7%\\s+saving,?\\s*0 cache-wrong"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "ops/COUNCIL_REVIEW_2026-10-21.md",
+    "ops/chat/phone/com.anthropic.claude.jsonl",
+    "ops/teacher_queue.jsonl",
+    "private/"
+   ],
+   "note_on_allow": "The phone chat log and teacher_queue are append-only records of what was said at the time, kept whole (never edited). COUNCIL_REVIEW_2026-10-21.md holds the finding; KNOWN_ISSUES/CORRECTIONS carry the correction. The claim as written also stands as a corrected comment in covenant_judge_local.py and covenant_verdict_cache.py (root, outside R1's scanned dirs), and in the mutual-benefit-collective repo as sent."
   }
  ]
 }

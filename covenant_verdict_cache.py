@@ -11,6 +11,11 @@ DeepSeek, Chat Smith, 2026-10-20 roundtable; refs in the collective):
     rule was "no kill switch unless Tetsu wants it"; Tetsu wanted it.
   - verify_on_log(): the held-out check Chat Smith/GPT-6 asked for -- split a verdict log by a stable hash, replay,
     and confirm the hit rate AND that no held-out repeat ever flipped verdict (zero "cache-wrong").
+  - basis_version(): gap #4 (council 2026-10-21) -- fold a hash of the tombstone ledger into the key so a landed
+    tombstone/correction invalidates every cached verdict, no exemption.
+  - canary (should_canary/record_canary/canary_report): gap #2 -- real-turn coverage of the zero-wrong claim, since
+    verify_on_log's 0-cache-wrong was graded on a SYNTHETIC-dominated log (ops/verdicts.jsonl). The headline "34%
+    saving" was that synthetic blend, NOT a real-world rate (A369, retracted); real/live repeat is ~72% but unverified.
 
 This module is offline and side-effect-free by itself (like covenant_judge_defer); the judge path calls judge().
 Never caches when kill-switched. Dependency-free.
@@ -22,10 +27,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import re
 import sys
 
 CACHE_OFF_ENV = "COVENANT_VERDICT_CACHE_OFF"
+CANARY_PCT_ENV = "COVENANT_CACHE_CANARY_PCT"
+
+_REPO = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_BASIS_PATHS = ("docs/RETRACTED.json",)
+DEFAULT_CANARY_LOG = "ops/cache_canary.jsonl"
 
 
 def normalize(text):
@@ -34,6 +45,118 @@ def normalize(text):
 
 def _disabled():
     return os.environ.get(CACHE_OFF_ENV, "") not in ("", "0", "false", "False")
+
+
+def _utcnow():
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# --- BASIS VERSION (gap #4, council 2026-10-21) -------------------------------------------------
+# The council's non-negotiable: a tombstone/correction that changes the BASIS of a ruling must
+# invalidate every cached verdict resting on it -- no exemption, the cache obeys a correction like
+# everything else. The in-memory cache already re-judges on a changed model or changed prompt
+# (principles live in the prompt); the uncovered basis-change was the tombstone ledger. We fold a
+# hash of that ledger into the policy key by DISCOVERY -- reading the actual bytes, never a
+# hardcoded version -- so a new tombstone changes the key and all prior entries miss (fail-closed:
+# over-invalidation re-judges, it never serves stale).
+_BASIS_MEMO = {}
+
+
+def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
+    root = root or _REPO
+    key = (root, tuple(paths))
+    sig = []
+    for p in paths:
+        fp = p if os.path.isabs(p) else os.path.join(root, p)
+        try:
+            st = os.stat(fp)
+            sig.append((p, st.st_mtime_ns, st.st_size))
+        except OSError:
+            sig.append((p, None, None))
+    sig = tuple(sig)
+    memo = _BASIS_MEMO.get(key)
+    if memo and memo[0] == sig:          # unchanged ledger -> skip re-hashing on the hot path
+        return memo[1]
+    h = hashlib.sha256()
+    found = False
+    for p in paths:
+        fp = p if os.path.isabs(p) else os.path.join(root, p)
+        try:
+            with open(fp, "rb") as f:
+                h.update(p.encode("utf-8"))
+                h.update(b"\0")
+                h.update(f.read())
+                found = True
+        except OSError:
+            continue
+    val = h.hexdigest()[:12] if found else "none"
+    _BASIS_MEMO[key] = (sig, val)
+    return val
+
+
+# --- CANARY (gap #2, council 2026-10-21) --------------------------------------------------------
+# "zero wrong" was graded only on the synthetic log, never on real turns. The canary gives the real-
+# turn coverage: on a live cache HIT, with probability COVENANT_CACHE_CANARY_PCT, re-judge the turn
+# and log whether the cached verdict still matches. A disagreement is a REAL-turn cache-wrong. It is
+# OFF by default (pct 0): it spends a judge call per sampled hit, so turning it on is the operator's
+# choice, like the kill switch. Observational only -- it never changes the verdict the gate returns.
+def canary_pct():
+    try:
+        v = int(os.environ.get(CANARY_PCT_ENV, "0") or "0")
+    except ValueError:
+        return 0
+    return max(0, min(100, v))
+
+
+def should_canary(pct, r=None):
+    if pct <= 0:
+        return False
+    if r is None:
+        r = random.random()
+    return r < (pct / 100.0)
+
+
+def _verdict_flag(v):
+    return bool(v.get("violates")) if isinstance(v, dict) else None
+
+
+def record_canary(log_path, model, text, cached_verdict, fresh_verdict):
+    """Append one real-turn canary row; return True iff cached==fresh on the violates flag.
+    A False is a real-turn cache-wrong -- the coverage the synthetic held-out check could not give."""
+    cf = _verdict_flag(cached_verdict)
+    ff = _verdict_flag(fresh_verdict)
+    agree = (cf == ff)
+    row = {"t": _utcnow(), "model": str(model),
+           "text_sha": hashlib.sha256(normalize(text).encode("utf-8")).hexdigest()[:16],
+           "cached_violates": cf, "fresh_violates": ff, "agree": agree}
+    try:
+        fp = log_path if os.path.isabs(log_path) else os.path.join(_REPO, log_path)
+        d = os.path.dirname(fp)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        with open(fp, "a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+    return agree
+
+
+def canary_report(path):
+    checked = agree = disagree = 0
+    try:
+        for line in open(path, encoding="utf-8"):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            checked += 1
+            if r.get("agree"):
+                agree += 1
+            else:
+                disagree += 1
+    except OSError:
+        pass
+    return {"checked": checked, "agree": agree, "disagree": disagree, "real_turn_cache_wrong": disagree}
 
 
 class VerdictCache:
@@ -148,5 +271,12 @@ if __name__ == "__main__":
     if "--verify" in sys.argv:
         path = sys.argv[sys.argv.index("--verify") + 1]
         print(json.dumps(verify_on_log(path), indent=2))
+        sys.exit(0)
+    if "--canary-report" in sys.argv:
+        path = sys.argv[sys.argv.index("--canary-report") + 1]
+        print(json.dumps(canary_report(path), indent=2))      # real-turn coverage of the zero-wrong claim
+        sys.exit(0)
+    if "--basis" in sys.argv:
+        print(basis_version())
         sys.exit(0)
     print(__doc__)
