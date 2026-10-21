@@ -10236,6 +10236,11 @@ class CovenantAPI:
                     f"HTTP served by {self.wsgi_backend} -- one unbounded thread per "
                     "connection, no idle timeout; `pip install waitress` for a "
                     "bounded pool")
+            try:
+                import covenant_judge_defer as _jd
+                _octo_pulses = _jd.octopus_pulses()
+            except Exception:                                     # noqa: BLE001
+                _octo_pulses = 0
             return jsonify({
                 "node_id": self.node.node_id,
                 "chain_height": len(self.node.chain),
@@ -10251,6 +10256,7 @@ class CovenantAPI:
                 "governor_unclassified": self.node.governor.unclassified_seen,
                 "judge": judge_id,
                 "judge_keyless": keyless,
+                "octopus_pulses": _octo_pulses,                   # witness-arm spikes -> the phone tree beats on them
                 "wsgi": self.wsgi_backend,                            # W1 (v8.29)
                 "version": COVENANT_VERSION,                          # P11 (v8.31)
                 "source_sha256": CORE_SOURCE_SHA12,                   # P11 (v8.31)

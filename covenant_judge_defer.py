@@ -244,12 +244,23 @@ def _octopus():
     return _OCTO or None
 
 
+_OCTO_PULSES = 0
+
+
+def octopus_pulses():
+    """Cumulative witness-arm spikes since this process started. /health surfaces it so the phone's tree of life
+    can beat on real verdict activity (window.covenantPulse). Monotonic; a reader pulses on the delta."""
+    return _OCTO_PULSES
+
+
 def _octopus_observe(strength=1.0):
-    """Feed the witness arm one activity event. Fully guarded: never raises into the verdict path."""
+    """Feed the witness arm one activity event and count it. Fully guarded: never raises into the verdict path."""
+    global _OCTO_PULSES
     try:
         o = _octopus()
         if o is not None:
             o.arms["witness"].observe(strength)
+            _OCTO_PULSES += 1
     except Exception:                                    # noqa: BLE001
         pass
 
