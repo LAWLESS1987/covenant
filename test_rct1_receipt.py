@@ -99,13 +99,23 @@ def main():
 
     # RCT1.6 -- LIVE INTEGRATION: covenant_earn attaches a proof that verifies from the receipt alone, against the
     # node's own published signer. This is the end-to-end path a buyer sees.
-    live = {"id": "live", "offer": "receipt", "amount_usdc": "0.020000", "network": "eip155:8453",
-            "input_sha256": "a" * 64, "result_sha256": "b" * 64, "checked": "1 citation"}
-    E._sign_receipt(live)
-    ok, why = R.verify({k: v for k, v in live.items() if k != "proof"}, live.get("proof", {}),
-                       allowed_signers=[R.published_signer()])
-    check("RCT1.6 live integration: covenant_earn signs a receipt that verifies against the node's published signer",
-          "proof" in live and ok, why)
+    #
+    # It needs the DEPLOYED private signer (ops/receipt_signer.key, gitignored). On a fresh clone without it,
+    # load_or_create_signer() mints a random ephemeral key (covenant_receipt.py:55) that by construction cannot
+    # match the committed published signer, so the live path is unmeasurable here -> NOT RUN, not FAIL. 2026-10-21:
+    # this is exactly why public CI was red since f0892a4 (20 runs) -- the runner has eth-account but not the secret
+    # key, so RCT1.6 signed with a random account and failed. Guarding it also stops the test minting a key on CI.
+    if os.path.exists(R.SIGNER_KEY):
+        live = {"id": "live", "offer": "receipt", "amount_usdc": "0.020000", "network": "eip155:8453",
+                "input_sha256": "a" * 64, "result_sha256": "b" * 64, "checked": "1 citation"}
+        E._sign_receipt(live)
+        ok, why = R.verify({k: v for k, v in live.items() if k != "proof"}, live.get("proof", {}),
+                           allowed_signers=[R.published_signer()])
+        check("RCT1.6 live integration: covenant_earn signs a receipt that verifies against the node's published signer",
+              "proof" in live and ok, why)
+    else:
+        print("n/a   RCT1.6 live integration NOT RUN -- deployed signing key %s absent (fresh clone); the published-"
+              "signer path needs the secret key and cannot be signed here" % os.path.basename(R.SIGNER_KEY))
     disc = E._signer_discovery()
     check("RCT1.7 the signer-discovery endpoint exposes the signer a buyer verifies against",
           bool(disc) and disc.get("address") == R.published_signer() and disc.get("scheme") == "eip191-personal-sign",
