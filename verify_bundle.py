@@ -143,6 +143,13 @@ INPUT_LEDGERS = {
     # so a changed hash here would mean a record was edited. Matched by name, so every run is covered.
     "eval/outside/results/2026-10-11/outside_eval_results.jsonl":
         "published outside-eval results; never rewritten, a new run is a new directory",
+    # A370 (2026-10-21): Tetsu's consent decisions for the second-operator role. A deliberate
+    # governance record -- appended only when a consent decision is made and committed in the same
+    # breath, never by a loop between commits -- so it does not dirty the tree the way an OUTPUT
+    # ledger does. Hashed on purpose: a changed hash on an existing row would mean a recorded consent
+    # was edited, which is exactly what this should catch.
+    "ops/tetsu_consent.jsonl":
+        "Tetsu's role-consent record; hashed on purpose, appended only at a committed consent decision",
 }
 
 
