@@ -121,6 +121,30 @@ written. When it proposes a command, you run it and paste the output back.
 Free-tier limits are real: a long pack uses a good part of a day's allowance.
 `--max-kb 40` trims it; the gates and the tally come first and survive the trim.
 
+## 4b. A single plug an AI that CAN run Python uses to operate it
+
+Section 4 is for a chat with no tools: paste the pack, it reasons, you act. When
+the AI at the other end *can* run a Python process -- another model, a fresh
+Claude seat, you at a shell -- it does not have to be carried. It runs one file:
+
+```bash
+python covenant_plug.py             # sense the highway + the spiking readout; acts on nothing
+python covenant_plug.py --spine     # the spiking network alone (stdlib-only; runs on a phone)
+python covenant_plug.py --preview   # preview a self-heal (dry run)
+python covenant_plug.py --heal      # press self-heal FOR REAL -- refuses outside the production tree or while paused
+python covenant_plug.py --contract  # the one-screen charter
+```
+
+It composes surfaces that already refuse to act on their own (`covenant_highway.sense`,
+`covenant_heal.heal`, the stdlib-only `covenant_octopus` and `covenant_witness`) and
+adds no new authority -- its proper job is SENSE -> REPORT -> PROPOSE. The one
+safety check it adds is re-enforcing the production-tree gate (A244) in the driver,
+so an external operator cannot repair a staged copy or a clone. It never touches a
+`NEVER_AUTOMATIC` subject, never a verdict, never an outward action; letting a plug
+*act* autonomously is new capability and waits for the together-vote. This is a
+refinement -- the sibling of section 4, not section 5. Full contract:
+**`docs/PLUG_IN_AI.md`**. Both-ways guard test: `test_pg1_plug.py`.
+
 ## 5. What "a fully functional app" would have to carry, and does not yet
 
 The phone app and the PC's agent door (the 3B model, judged and leashed; A147
