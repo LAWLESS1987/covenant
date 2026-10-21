@@ -122,6 +122,14 @@ BOOKS = [
     (62175, "Studies of Childhood (Sully)", "child-development"),
     # -- human psychology
     (57628, "The Principles of Psychology, Volume 1 (James)", "psychology"),
+    # -- phenomenology (2026-10-21, his words: "have tetsu study phenomenology"). The modern founders
+    # -- Husserl, Heidegger, Merleau-Ponty -- are in copyright and are NOT here, the same limit this
+    # file notes for modern autism work; the public-domain primary texts of the tradition of lived time
+    # and the immediate data of consciousness are Bergson's (English translations verified on Gutenberg,
+    # 2026-10-21: 56852 and 26163). James's Principles of Psychology above is the other foundation
+    # (stream of consciousness); Hegel's Phenomenology has no public-domain English text on Gutenberg.
+    (56852, "Time and Free Will: An Essay on the Immediate Data of Consciousness (Bergson)", "phenomenological"),
+    (26163, "Creative Evolution (Bergson)", "phenomenological"),
     (15489, "Dream Psychology (Freud)", "psychology"),
     (38219, "A General Introduction to Psychoanalysis (Freud)", "psychology"),
     (65903, "Psychology of the Unconscious (Jung)", "psychology"),
@@ -378,6 +386,10 @@ OA_QUERIES = [
      '(TITLE:autistic) AND (participatory OR "lived experience" OR "autistic adults" OR neurodiversity) AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
     ("open-access: child development",
      '(TITLE:"child development") AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
+    # phenomenology (2026-10-21): the living open-access strand -- neurophenomenology and the
+    # phenomenology of consciousness/lived experience -- complementing the Bergson primaries in BOOKS.
+    ("open-access: phenomenology of consciousness",
+     'TITLE:phenomenology AND (consciousness OR "lived experience" OR perception OR experience OR intentionality OR embodiment) AND OPEN_ACCESS:Y AND (LICENSE:"cc by" OR LICENSE:"cc0") AND HAS_FT:Y'),
 ]
 
 
