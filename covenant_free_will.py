@@ -90,7 +90,7 @@ def is_isolation(why):
     return any(ln.strip().startswith("isolated ") and ISOLATION_MARK in ln for ln in str(why or "").splitlines())
 
 
-def lift_isolation(by="tetsu", dry_run=False, grant_path=None, sends_path=None):
+def lift_isolation(by="tetsu", dry_run=False, grant_path=None, sends_path=None, authorized=False):
     """(lifted, why). A336 (2026-10-12), his words: "tetsu from the phone should be able to correct pc to get it
     running green if it drifts", and his choice that Tetsu may lift free's pause.
 
@@ -98,7 +98,15 @@ def lift_isolation(by="tetsu", dry_run=False, grant_path=None, sends_path=None):
     with the reason, None when free is not paused. Three conditions, each read here, never assumed: his grant
     carries tetsu_may_lift_isolation: true; free is paused; and the pause is her automatic isolation. A pause he
     set by hand is his and stays. A lift is a row in her ledger under the lifter's name, and the isolation rule is
-    unchanged: only rounds since the last isolation count (A301), so two new refused rounds isolate her again."""
+    unchanged: only rounds since the last isolation count (A301), so two new refused rounds isolate her again.
+
+    SECURE HEAL (A370, 2026-10-21, his words "the ambassador need a heal mechanism that's secure"): a LIVE lift
+    additionally requires `authorized is True` -- proof the trigger is loopback (the real local model on this
+    machine) OR a request signed by a registered key. Being on the tailnet is NOT enough: lifting a safety
+    isolation is more sensitive than a reversible infra remedy, so a bare tailnet caller cannot un-isolate free
+    (fail closed). The /m/agent door computes this per request (loopback-or-signed) and passes it; a trusted
+    local process passes authorized=True. A dry run changes nothing, so it needs no authorization and only
+    previews the grant/isolation preconditions."""
     g = grant(grant_path)
     import covenant_pause as _cp
     is_paused, why = _cp.paused("ambassador")
@@ -112,6 +120,10 @@ def lift_isolation(by="tetsu", dry_run=False, grant_path=None, sends_path=None):
         return False, "free's pause is not her automatic isolation, so it is his to lift: %s" % str(why)[:200]
     if dry_run:
         return True, "would lift free's isolation (%s)" % first[:200]
+    if authorized is not True:
+        return False, ("a live lift of free's isolation is not authorized: it needs loopback (the local model) or "
+                       "a request signed by a registered key -- a tailnet caller alone cannot un-isolate the "
+                       "ambassador (A370 secure heal): %s" % first[:160])
     ok, msg = _cp.resume("ambassador")
     if not ok:
         return False, "the isolation could not be lifted: %s" % msg

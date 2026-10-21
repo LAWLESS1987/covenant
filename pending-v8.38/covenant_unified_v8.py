@@ -523,6 +523,37 @@ def tailnet_ok(addr: str) -> bool:
     return ip.version == 4 and ip in TAILNET_CGNAT
 
 
+def _addr_is_loopback(addr):
+    """True only for a loopback caller -- the real local model on this machine. Narrower than tailnet_ok,
+    which also admits the whole CGNAT tailnet."""
+    try:
+        ip = ipaddress.ip_address((addr or "").strip().split("%")[0])
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_loopback
+
+
+def _request_signed_by_registered(req):
+    """True when the request carries a valid operator-request signature from a registered key, whatever the
+    caller's address (covenant_mycelium.admit with the address gate forced False). No module, no proof -> False."""
+    try:
+        import covenant_mycelium as _my
+        ok, _addr, _who, _how = _my.admit(req, req.get_data() or b"", lambda _a: False)
+        return bool(ok)
+    except Exception:                                             # noqa: BLE001 -- no proof -> not authorized (fail closed)
+        return False
+
+
+def heal_lift_authorized(addr, req):
+    """A370 secure heal (2026-10-21, "the ambassador need a heal mechanism that's secure"): un-isolating the
+    ambassador is more sensitive than a reversible infra remedy, so it needs loopback (the real local model) OR a
+    request signed by a registered key -- NOT mere tailnet membership. A bare tailnet HEAL still presses the infra
+    button; it just cannot lift free's isolation (covenant_free_will.lift_isolation fails closed without this)."""
+    return _addr_is_loopback(addr) or _request_signed_by_registered(req)
+
+
 # THE AGENT'S BROWSER, ON A LEASH (2026-09-19, docs/AGENT.md). One GET per
 # answer, to a host on this list, text only, 8 KB kept. Module level so a
 # test can drive the predicate and the fetch without a node.
@@ -9095,7 +9126,10 @@ class CovenantAPI:
                     # the PC and phone pages -- covenant_heal, the highway's own remedies,
                     # recorded who="tetsu" -- and the outcome handed back as data. His choice;
                     # nothing schedules it.
-                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_heal").act(answer)
+                    # A370 (2026-10-21): the infra button presses on any admitted caller, but un-isolating the
+                    # ambassador needs stronger proof than tailnet membership -- loopback or a registered signature.
+                    _auth_lift = heal_lift_authorized(addr, request)
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_heal").act(answer, authorized=_auth_lift)
                     if _handled:
                         forum.append(_rec)
                         msgs.append({"role": "assistant", "content": answer})

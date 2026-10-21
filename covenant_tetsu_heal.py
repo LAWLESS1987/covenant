@@ -44,7 +44,7 @@ def _his_line(text, why):
     return C.say(text, why, actor="tetsu")
 
 
-def act(answer, heal=None, tell=None, lift=None):
+def act(answer, heal=None, tell=None, lift=None, authorized=False):
     """(handled, data, record) for an answer whose first line is HEAL or HEAL DRY.
     Anything else: (False, "", None) -- not ours, the conversation goes on.
 
@@ -52,7 +52,11 @@ def act(answer, heal=None, tell=None, lift=None):
     first lifts free's AUTOMATIC isolation when his grant says so (covenant_free_will.lift_isolation: never a pause
     he set by hand), then presses the button, then puts what is still left for him on his line, once per change
     (covenant_heal.tell_left). A lift is told to him too. HEAL DRY lifts nothing and tells nothing; it says what a
-    live press would lift. heal, tell and lift are injectable; their defaults are the real ones."""
+    live press would lift. heal, tell and lift are injectable; their defaults are the real ones.
+
+    A370 (2026-10-21, "the ambassador need a heal mechanism that's secure"): `authorized` is passed through to the
+    live lift -- the caller (the /m/agent door) sets it True only when the trigger is loopback or a signed request.
+    A bare tailnet HEAL still presses the infra button, but cannot un-isolate free (lift_isolation fails closed)."""
     first = (answer or "").strip().splitlines()[0].strip().upper() if (answer or "").strip() else ""
     if first not in ("HEAL", "HEAL DRY", "SELF-HEAL"):
         return False, "", None
@@ -62,7 +66,7 @@ def act(answer, heal=None, tell=None, lift=None):
         if lift is None:
             import covenant_free_will as FW
             lift = FW.lift_isolation
-        lifted, lift_why = lift(by="tetsu", dry_run=dry)
+        lifted, lift_why = lift(by="tetsu", dry_run=dry, authorized=authorized)
     except Exception as e:                                        # noqa: BLE001
         lifted, lift_why = False, "the lift could not be read: %s: %s" % (type(e).__name__, str(e)[:120])
     if lifted and not dry:

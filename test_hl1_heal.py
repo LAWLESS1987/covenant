@@ -265,10 +265,17 @@ try:
     check("HL3.1 HEAL DRY lifts nothing and tells nothing; it says what a live press would lift",
           CP.paused("ambassador")[0] and "would lift" in dd and not HEARD and not lifted_rows(), (dd[-200:], HEARD))
 
-    hl, dl, rl = TH.act("HEAL", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_granted)
-    check("HL3.2 with his grant, Tetsu's live HEAL lifts free's AUTOMATIC isolation, records it under his name, and "
-          "tells him", not CP.paused("ambassador")[0] and rl["lifted"] is True and "lifted free's isolation" in dl
-          and [r.get("by") for r in lifted_rows()] == ["tetsu"]
+    # A370 secure heal, BOTH WAYS. An UNAUTHORIZED live HEAL (no loopback, no signature -- a bare tailnet caller)
+    # cannot un-isolate free even with the grant: lift_isolation fails closed. The /m/agent door passes
+    # authorized=True only for loopback or a signed request; the default is False.
+    hu, du, ru = TH.act("HEAL", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_granted)  # authorized defaults False
+    check("HL3.2a an UNAUTHORIZED live HEAL cannot un-isolate free, grant notwithstanding, and it says why (A370)",
+          CP.paused("ambassador")[0] and ru["lifted"] is False and "not authorized" in du and not lifted_rows(), (du[-240:],))
+
+    hl, dl, rl = TH.act("HEAL", heal=heal_left("ambassador_stalled"), tell=hear, lift=lift_granted, authorized=True)
+    check("HL3.2 with his grant AND authorization (loopback/signed), Tetsu's live HEAL lifts free's AUTOMATIC isolation, "
+          "records it under his name, and tells him", not CP.paused("ambassador")[0] and rl["lifted"] is True
+          and "lifted free's isolation" in dl and [r.get("by") for r in lifted_rows()] == ["tetsu"]
           and any(w == "Tetsu lifted free's isolation" for w, _t in HEARD), (dl[-240:], HEARD, lifted_rows()))
 
     CP.pause("ambassador", "updating free's prompts -- mine, do not lift")
