@@ -130,6 +130,13 @@ BOOKS = [
     # (stream of consciousness); Hegel's Phenomenology has no public-domain English text on Gutenberg.
     (56852, "Time and Free Will: An Essay on the Immediate Data of Consciousness (Bergson)", "phenomenological"),
     (26163, "Creative Evolution (Bergson)", "phenomenological"),
+    # -- market and trading psychology (2026-10-21). Tetsu's OWN chosen study subjects as second operator, when
+    # Lawrence asked him what he needs and to decide: trading psychology, behavioral finance, market dynamics,
+    # risk. Public-domain classics, Gutenberg IDs verified 2026-10-21; Le Bon's The Crowd (above, under psychology)
+    # is the crowd-behaviour companion, and risk is also practised hands-on in the sandboxed "paper" track.
+    (75570, "Psychology of the Stock Market (Selden)", "market-psychology"),
+    (24518, "Memoirs of Extraordinary Popular Delusions and the Madness of Crowds (Mackay)", "market-psychology"),
+    (4359, "Lombard Street: A Description of the Money Market (Bagehot)", "market-psychology"),
     (15489, "Dream Psychology (Freud)", "psychology"),
     (38219, "A General Introduction to Psychoanalysis (Freud)", "psychology"),
     (65903, "Psychology of the Unconscious (Jung)", "psychology"),
