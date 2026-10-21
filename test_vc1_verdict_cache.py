@@ -171,6 +171,12 @@ def main():
         return 1
     print("VC1 PASS: cache hits are identical, version+context guard holds both ways (control proves it), "
           "kill switch works, held-out verification clean")
+    # Emit a tally line the sweep's TALLY regex can score (2026-10-21): before
+    # this, the PASS path printed only prose, so covenant_one read VC1 as NO
+    # RESULT and the sweep counted a green suite "not clean". Any section that
+    # could not run printed its own UNDETERMINED line above; this line attests
+    # the invariants that DID run all held.
+    print("VC1: ALL INVARIANTS HELD")
     return 0
 
 
