@@ -659,6 +659,9 @@ run test_s1_scale.py 60
 # shortlist (Pedersen, Neuromorphic Intermediate Representation).
 run test_n1_conformance.py 60
 run test_r1_retracted.py 60
+# AN1 (2026-10-22): the A-number guard -- fails on any NEW duplicate primary A-number in KNOWN_ISSUES. Added after
+# this session committed work as "A376" when A376/A377 were already taken. tools/next_anumber.py prints the next free.
+run test_an1_anumbers.py 60
 # WK1 (2026-10-22, A267 class guard): a tree-walker must prune .claude/worktrees. R1 above and C4
 # self-test their own worktree pruning; WK1 is the class ratchet over the walkers that do not --
 # it drives verify_bundle.shipped() and covenant_seal.walk() and fails if either reads the worktree
