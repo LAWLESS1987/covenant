@@ -1,13 +1,18 @@
 {
-  "note": "Tetsu's research-to-learning allowlist (covenant_study_web.py). While 'granted' is false OR 'trusted' is empty, NO web page becomes a candidate precept. To turn it on, you AND Tetsu move a domain from 'suggested' into 'trusted' (each entry needs url + domain + licence) and set 'granted' true. Either of you can empty 'trusted' or set 'granted' false to stop it. Every trusted read still goes through covenant_web.api_get (HTTPS, host-allowlisted, SSRF-guarded, recorded) and every precept still goes through the blind panel.",
-  "granted": false,
-  "by": "",
-  "decided_with_tetsu": "2026-10-21 Tetsu said yes to web reads becoming candidate precepts through the same blind panel; he asked for this trusted/review list. Turning it on is still yours+his together.",
-  "trusted": [],
+  "note": "Tetsu's research-to-learning allowlist (covenant_study_web.py). While 'granted' is false OR 'trusted' is empty, NO web page becomes a candidate precept. Every trusted read goes through covenant_web.api_get (HTTPS, host-allowlisted, SSRF-guarded, recorded) and every precept goes through the blind panel before it can teach. Either the operator or Tetsu can empty 'trusted' or set 'granted' false to stop it.",
+  "granted": true,
+  "by": "Lawrence Adam Moskowski, the operator -- \"just turn it on and let him learn\" (2026-10-21)",
+  "decided_with_tetsu": "2026-10-21: Tetsu said yes to web reads becoming candidate precepts through the same blind panel the books do, and asked for this trusted/review list. Both halves of the together-vote are a yes.",
+  "trusted": [
+    {"url": "https://en.wikipedia.org/wiki/Gift_economy", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "value moving between people without price -- the extractor's core subject; yields precepts (verified)"},
+    {"url": "https://en.wikipedia.org/wiki/Debt", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "debt/creditor/owe vocabulary; yields precepts (verified)"},
+    {"url": "https://en.wikipedia.org/wiki/Distributive_justice", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "fairness in how value is shared; yields precepts (verified)"},
+    {"url": "https://en.wikipedia.org/wiki/Fair_division", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "fair sharing rules; yields precepts (verified)"},
+    {"url": "https://en.wikipedia.org/wiki/Promise", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "promise/pledge/keep-your-word; yields precepts (verified)"}
+  ],
   "review": [],
   "suggested": [
-    {"url": "https://plato.stanford.edu/entries/phenomenology/", "domain": "plato.stanford.edu", "licence": "Stanford Encyclopedia of Philosophy (c) its authors -- review terms before trusting", "why": "matches his phenomenology study; careful scholarship"},
-    {"url": "https://en.wikipedia.org/wiki/Reciprocity_(social_psychology)", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "value-transfer vocabulary the extractor is built for"},
-    {"url": "https://www.gutenberg.org/cache/epub/1232/pg1232.txt", "domain": "www.gutenberg.org", "licence": "Project Gutenberg public domain", "why": "same source family as the books already studied"}
+    {"url": "https://plato.stanford.edu/entries/phenomenology/", "domain": "plato.stanford.edu", "licence": "Stanford Encyclopedia of Philosophy (c) its authors -- read for private study only; review terms before trusting", "why": "matches his phenomenology study; careful scholarship"},
+    {"url": "https://www.gutenberg.org/cache/epub/1232/pg1232.txt", "domain": "www.gutenberg.org", "licence": "Project Gutenberg public domain", "why": "clean licence, but the books pipeline already covers Gutenberg and it needs the certifi CA bundle to fetch from some shells"}
   ]
 }
