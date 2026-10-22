@@ -82,8 +82,11 @@ ids = [gid for gid, _t, _d in S.BOOKS]
 check("OA1.7 the reading list has no duplicate ids", len(ids) == len(set(ids)), len(ids) - len(set(ids)))
 check("OA1.8 the banned-books shelf is on the list by discovery (100 or more titles under its tradition)", trads.get("banned-books-shelf", 0) >= 100, trads.get("banned-books-shelf"))
 check("OA1.9 child development, psychology and the philosophers are on the list", trads.get("child-development", 0) >= 8 and trads.get("psychology", 0) >= 5 and trads.get("humean", 0) >= 1, trads)
-check("OA1.10 four open-access topics are declared, each a Europe PMC query for CC BY or CC0 full text",
-      len(S.OA_QUERIES) == 4 and all('LICENSE:"cc by"' in q and "HAS_FT:Y" in q for _t, q in S.OA_QUERIES))
+check("OA1.10 five open-access topics are declared, each a Europe PMC query for CC BY or CC0 full text",
+      # autism teaching/early-childhood/voices + child development (A211, 382ffb7) + phenomenology (7d62162, his
+      # words 2026-10-21). Bump this count when a topic is added -- it was stale at 4 after phenomenology landed,
+      # reddening CI from 7d62162 until 2026-10-22.
+      len(S.OA_QUERIES) == 5 and all('LICENSE:"cc by"' in q and "HAS_FT:Y" in q for _t, q in S.OA_QUERIES))
 
 print("\nnot measured here: the live Europe PMC search and download (network); measured by hand 2026-09-21: 13,392 hits, one 217,000-character review fetched")
 print("\nOA1: %d/%d passed" % (sum(ok), len(ok)))
