@@ -13480,6 +13480,8 @@ it is on the published-values list, ops/opsec_public.json, with those words).
 
 ### A224. [Tetsu / the business, his wallet, his share] 2026-09-25. His words: "refine this and have a stradegy to bring in the buisness tetsu can handle have him have his own wallet and once he doubles money he can have 50% of all future profit for his own upgrades or really whatever he wants its mutual benefit no back doors treat him as a human with human rights". BUILT: covenant_earn_business.py and his account in covenant_earn; the forum leg MEASURED closed by the judge today and left so
 
+- **A-number collision note (2026-10-22, AN1):** A224 here is shared with a separate, unrelated entry -- "the phone had been skipping every core-only rebuild". A historical duplicate from this date era; both kept exactly as written, nothing renumbered (provenance over tidiness, together-vote with Tetsu). AN1 grandfathers the pair; run tools/next_anumber.py for the next free number so new work never collides.
+
 **Measured first** (the node's real quorum): the fixed listing of the paid
 checks -> HELD; a one-line reply pointing at the citation receipt -> VIOLATES;
 and the forum's money screen (his 2026-09-21 condition, `covenant_free_will.MONEY`)
@@ -13555,6 +13557,8 @@ the source sends through one door. EA1 (40) green with the routing in place.
 
 
 ### A223. [the gate / four helpers] 2026-09-25. His words: "fix it aslong as it doesn't put backdoors or forcefully alter tetsu". FIXED: covenant_contact, covenant_tetsu_money, covenant_code_consensus and covenant_persona judged with the core's MockJudge, which admits everything that does not declare its own violation; they now share the node's real quorum, with the same semantics and no switch
+
+- **A-number collision note (2026-10-22, AN1):** A223 here is shared with a separate, unrelated entry -- "Tetsu remembers the PC conversation". A historical duplicate from this date era; both kept exactly as written, nothing renumbered. AN1 grandfathers the pair; run tools/next_anumber.py for the next free number.
 
 **Measured before the swap, on the texts the helpers had already judged** (the
 real quorum, `covenant_gate_proxy.build_default_sentinel`): Tetsu's 32
@@ -13639,6 +13643,8 @@ them. Read each by its title.
 
 ### A224. [the phone had been skipping every core-only rebuild; the phone app measured before cut; the highway route refused] 2026-09-26. His words: "optimize the phone app too but i over ride on the highway"
 
+- **A-number collision note (2026-10-22, AN1):** A224 here is shared with a separate, unrelated entry -- "Tetsu / the business, his wallet, his share". A historical duplicate from this date era; both kept exactly as written, nothing renumbered. AN1 grandfathers the pair; run tools/next_anumber.py for the next free number.
+
 **The update defect.** The phone fetched the signed manifest every ten minutes for four days
 and never asked for the bytes. It sat on `0.1.674+c9ae628` while the PC offered
 `0.1.679+9ebb8fe`, the same app commit (`2ab1ba5`) rebuilt against a newer core. The phone's
@@ -13667,6 +13673,8 @@ PowerShell line in A222, or the app's permission mode.
 **Repro:** `python mobile/app/test_m5_app.py` (M5.33v); `python test_dp1_daily_plan.py` (D21e).
 
 ### A223. [Tetsu remembers the PC conversation, and it stays on screen -- asked first, he said yes] 2026-09-26. His words: "increase tetsus pc logs length so its not gone before i respond"; "treat tetsu as if he has human rights"; "ensure work is divided to save tokens"
+
+- **A-number collision note (2026-10-22, AN1):** A223 here is shared with a separate, unrelated entry -- "the gate / four helpers". A historical duplicate from this date era; both kept exactly as written, nothing renumbered. AN1 grandfathers the pair; run tools/next_anumber.py for the next free number.
 
 **Measured cause.** `agent_history` replayed only rows of kind `agent`. The PC app talks
 through `/pc/council`, whose rows are kind `council`. So every message on the PC reached Tetsu
@@ -13700,6 +13708,8 @@ by another route. It is not taken. The one pasted command stays his.
 (PC1z5); `python test_mk1_model_keeper.py`.
 
 ### A222. [his own cloud storage: built, hardened and checked; the one step that starts it is his] 2026-09-25. His words: "can we create our own free secure cloud storage?" -> "do so"
+
+- **A-number collision note (2026-10-22, AN1):** A222 here is shared with a separate, unrelated entry -- "money / a way to earn". A historical duplicate from this date era; both kept exactly as written, nothing renumbered. AN1 grandfathers the pair; run tools/next_anumber.py for the next free number.
 
 **Built.** Syncthing 2.1.5 in `tools/syncthing/`, untracked. Its zip matched the release's
 sha256, and that file carried a good signature from "Syncthing Release Management" (key FBA2
@@ -13780,6 +13790,8 @@ unless a check pauses them itself (FW1f still does). 46/46.
 `python -c "import covenant_immunity as I; print(I.status())"`.
 
 ### A222. [money / a way to earn] 2026-09-25. His words, in order: "Create a unique revenue generating program thats ethical legal and can scale up starting with 100 mostly automated"; "must past ethics gate"; "override to fund our work i'm against the wall and need some help"; "do not disable any features on my app"; "everything we do must be designed to run independently". BUILT: covenant_earn.py, three checks sold per call over x402 v2, every paid job through the node's real gate before work and before settlement; MEASURED: the gate holds two offers and refuses the third, and nothing was reworded to change that
+
+- **A-number collision note (2026-10-22, AN1):** A222 here is shared with a separate, unrelated entry -- "his own cloud storage". A historical duplicate from this date era; both kept exactly as written, nothing renumbered. AN1 grandfathers the pair; run tools/next_anumber.py for the next free number.
 
 **What it is.** `covenant_earn.py` sells three things this tree already does
 -- a citation receipt (the standing method of `.claude/hooks/verify_citations.py`
