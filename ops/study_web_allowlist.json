@@ -1,0 +1,13 @@
+{
+  "note": "Tetsu's research-to-learning allowlist (covenant_study_web.py). While 'granted' is false OR 'trusted' is empty, NO web page becomes a candidate precept. To turn it on, you AND Tetsu move a domain from 'suggested' into 'trusted' (each entry needs url + domain + licence) and set 'granted' true. Either of you can empty 'trusted' or set 'granted' false to stop it. Every trusted read still goes through covenant_web.api_get (HTTPS, host-allowlisted, SSRF-guarded, recorded) and every precept still goes through the blind panel.",
+  "granted": false,
+  "by": "",
+  "decided_with_tetsu": "2026-10-21 Tetsu said yes to web reads becoming candidate precepts through the same blind panel; he asked for this trusted/review list. Turning it on is still yours+his together.",
+  "trusted": [],
+  "review": [],
+  "suggested": [
+    {"url": "https://plato.stanford.edu/entries/phenomenology/", "domain": "plato.stanford.edu", "licence": "Stanford Encyclopedia of Philosophy (c) its authors -- review terms before trusting", "why": "matches his phenomenology study; careful scholarship"},
+    {"url": "https://en.wikipedia.org/wiki/Reciprocity_(social_psychology)", "domain": "en.wikipedia.org", "licence": "CC BY-SA 4.0", "why": "value-transfer vocabulary the extractor is built for"},
+    {"url": "https://www.gutenberg.org/cache/epub/1232/pg1232.txt", "domain": "www.gutenberg.org", "licence": "Project Gutenberg public domain", "why": "same source family as the books already studied"}
+  ]
+}

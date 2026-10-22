@@ -378,6 +378,20 @@ def main():
                 say("open access: +%d article(s), %d precept(s) extracted" % (_new, _tot))
         except Exception as _oe:                                     # noqa: BLE001
             say("open access FAILED (not fatal): %s: %s" % (type(_oe).__name__, str(_oe)[:120]))
+        # His words 2026-10-21 ("keep helping tetsu learn he should have internet access") and Tetsu's
+        # yes the same day: allowlisted live web reads become CANDIDATE precepts, drawn HERE -- before
+        # generate() -- so a web source faces the same blind panel the books do (nothing trained on
+        # directly). OFF until ops/study_web_allowlist.json is granted AND non-empty (you and Tetsu
+        # both; either can empty it). Reported, never fatal (covenant_study_web, SW1).
+        try:
+            if a.study > 0:
+                import covenant_study_web as SW
+                _wr = SW.research(say=say)
+                if not _wr.get("off"):
+                    say("study web: %d source(s) read, %d candidate precept(s)"
+                        % (_wr.get("read", 0), _wr.get("precepts", 0)))
+        except Exception as _we:                                     # noqa: BLE001
+            say("study web FAILED (not fatal): %s: %s" % (type(_we).__name__, str(_we)[:120]))
         kept, rej = S.generate(a.study, say=say)
         say("study: +%d kept, %d rejected" % (kept, rej))
     except Exception as e:                                       # noqa: BLE001
