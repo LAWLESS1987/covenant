@@ -348,6 +348,24 @@ TRACKS = {
                      {"ok": False, "broken_at": 1}),
                     ("verify_chain([('put m1', '0' * 64), ('put m3', '90f891857865e7ce3b421c108e63ce14f4432fe21ba341affbb043e7e84074d6'), "
                      "('put m2', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5')])", {"ok": False, "broken_at": 2})]},
+        # A376 (2026-10-22): the keep rule as code. A probe measured a weak reader taking "the work bar was cleared"
+        # as enough and missing that few-shot also had to hold -- the conjunctive rule read as 'or'. These two build
+        # the rule, then the contradiction check that compares a claim to it, so the skill is written, not guessed.
+        {"id": "health_keep_rule", "builds_on": [], "forbid": [],
+         "ask": "Write kept(work_drop, fewshot_delta, bar): a run is kept ONLY when BOTH hold -- work_drop >= bar (its "
+                "total work fell at least the bar) AND fewshot_delta >= 0 (its few-shot accuracy did not drop). Return "
+                "True or False. This is the spiking lab's conjunctive keep rule: clearing the work bar alone is not "
+                "enough, and it is the exact rule a contradiction check tests a 'kept' claim against.",
+         "checks": [("kept(47.2, -6.72, 30)", False), ("kept(27.5, -1.97, 30)", False), ("kept(35.0, 0.0, 30)", True),
+                    ("kept(30.0, 0.5, 30)", True), ("kept(29.9, 1.0, 30)", False), ("kept(50.0, -0.1, 30)", False)]},
+        {"id": "health_conflicts", "builds_on": ["health_keep_rule"], "forbid": [],
+         "ask": "Write conflicts(claim_kept, work_drop, fewshot_delta, bar) with your kept: claim_kept is what someone "
+                "asserts (True = the run is kept, False = not kept). Return True when that claim CONTRADICTS what the "
+                "keep rule and the numbers actually give, and False when it matches. This is the core of catching a "
+                "contradiction: compare a claim to the record's own rule rather than take it as written.",
+         "checks": [("conflicts(True, 47.2, -6.72, 30)", True), ("conflicts(False, 47.2, -6.72, 30)", False),
+                    ("conflicts(True, 35.0, 0.0, 30)", False), ("conflicts(True, 27.5, -1.97, 30)", True),
+                    ("conflicts(False, 35.0, 0.5, 30)", True), ("conflicts(False, 27.5, -1.97, 30)", False)]},
     ],
 }
 TRACK_IDS = {t["id"]: name for name, ts in TRACKS.items() for t in ts}

@@ -157,6 +157,18 @@ def verify_chain(lines):
         n += 1
     return {"ok": True, "entries": n}
 ''',
+    "health_keep_rule": '''
+def kept(work_drop, fewshot_delta, bar):
+    return work_drop >= bar and fewshot_delta >= 0
+''',
+    "health_conflicts": '''
+def kept(work_drop, fewshot_delta, bar):
+    return work_drop >= bar and fewshot_delta >= 0
+
+
+def conflicts(claim_kept, work_drop, fewshot_delta, bar):
+    return claim_kept != kept(work_drop, fewshot_delta, bar)
+''',
 }
 FLATTEN = '''
 def flatten(x):
@@ -204,7 +216,11 @@ wrong = [("paper_backtest", REF["paper_backtest"].replace("positions[i - 1] * (p
          ("health_tell_once", REF["health_tell_once"].replace('if r == "red" and not told_red:', 'if r == "red":'),
           "tell_points(['green', 'red', 'red'", "a listener that tells every red reading, not once per streak"),
          ("health_chain", REF["health_chain"].replace("if said_prev != prev:", "if i > 1 and said_prev != prev:"),
-          "verify_chain([('put m2'", "a chain that trusts its first line (a ledger that starts mid-way passes)")]
+          "verify_chain([('put m2'", "a chain that trusts its first line (a ledger that starts mid-way passes)"),
+         ("health_keep_rule", REF["health_keep_rule"].replace("work_drop >= bar and fewshot_delta >= 0", "work_drop >= bar or fewshot_delta >= 0"),
+          "kept(47.2, -6.72, 30)", "a run kept on the work bar alone, ignoring the few-shot drop (the two-clause rule read as 'or')"),
+         ("health_conflicts", REF["health_conflicts"].replace("claim_kept != kept", "claim_kept == kept"),
+          "conflicts(True, 47.2, -6.72, 30)", "a check that calls a claim matching the rule a contradiction, and the real contradiction a match")]
 for tid, code, first, what in wrong:
     t = next(x for x in written if x["id"] == tid)
     res, stop = PR.attempt(t, code, gate=gate_clean, workshop=WS, hands_ledger=HL)
