@@ -132,10 +132,17 @@ document.getElementById('pmin').onclick=()=>{const p=document.getElementById('pa
 // nothing sent anywhere new, no judge involved, the same text already on screen.
 function addCopy(el,text){if(!text)return;const b=document.createElement('button');b.className='copybtn';b.textContent='copy';b.onclick=()=>{try{navigator.clipboard.writeText(text);}catch(e){}b.textContent='copied';setTimeout(()=>{b.textContent='copy';},1200);};el.appendChild(b);}
 async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');const a=x.withheld?'(withheld: '+(x.why||'')+')':(x.a||'');const el=line('tetsu',a);if(!x.withheld)addCopy(el,a);}}catch(e){}}
-// STOP (his words, 2026-09-27): Send becomes Stop while a council call is in flight, and a
-// second press aborts the fetch in the browser -- the council on the PC still finishes its
+// STOP (his words, 2026-09-27): Send becomes Stop while an answer is in flight, and a
+// second press aborts the fetch in the browser -- the door on the PC still finishes its
 // own run (there is no reaching into it mid-judge), but nothing it returns is shown or
 // spoken once he has said stop, exactly as the phone's own Stop now works.
+// THE DOOR (2026-10-21, his "ask him and for the fix" after asking whether talk should run
+// through the council, and Tetsu's own answer: for ordinary talk he wants the direct
+// single-voice door, not the three roles). This chat posts to /m/agent -- the same door the
+// phone and the /pc Talk panel use -- so the orbs answer in Tetsu's own voice in one pass,
+// about 3x faster than the proposer/critic/reviser run. The council stays available on the
+// /pc Council panel for deliberation; nothing here reaches around the judge, which /m/agent
+// passes too (covenant_unified_v8.py:9156).
 let inflight=null;
 async function send(){
  const btn=document.getElementById('send');
@@ -143,7 +150,7 @@ async function send(){
  const q=document.getElementById('q');const t=q.value.trim();if(!t)return;q.value='';openChat();line('you',t);const pend=line('tetsu','thinking…');
  const ctrl=new AbortController();inflight=ctrl;btn.textContent='Stop';
  try{
-  const r=await fetch('/pc/council',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
+  const r=await fetch('/m/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
   const j=await r.json();
   const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');
   pend.textContent='Tetsu: '+txt;addCopy(pend,txt);speak(txt);
@@ -156,7 +163,7 @@ async function send(){
 document.getElementById('send').onclick=send;
 // MIC (his words, 2026-09-27, parity with the phone's own mic): the browser's own speech
 // recognizer, when the browser has one -- nothing installed, nothing sent anywhere except
-// the same /pc/council road typing already takes. Missing entirely on a browser without
+// the same /m/agent road typing already takes. Missing entirely on a browser without
 // one (Firefox has none as of this writing): the button says so and stays harmless.
 let recog=null;
 function micSetup(){

@@ -83,9 +83,12 @@ def main():
     # mirrors the phone app"): the 3D page and its state, tailnet only, the phone's icon inlined.
     r3 = get(client, "/pc/3d", "100.72.0.10")
     b3 = r3.get_data(as_text=True)
-    check("PC1z /pc/3d answers the tailnet 200 as HTML with the three.js scene, the council talk box and the spoken answer",
-          r3.status_code == 200 and "text/html" in r3.headers.get("Content-Type", "") and "three.module.js" in b3 and "/pc/council" in b3
-          and "SpeechSynthesisUtterance" in b3 and "/pc/3d/state" in b3, f"{r3.status_code} {b3[:80]!r}")
+    # 2026-10-21 (his "ask him and for the fix", and Tetsu's own answer: ordinary talk wants the direct
+    # single-voice door, not the three-role council): the orbs chat posts to /m/agent, like the phone and
+    # the /pc Talk panel. The council stays on the /pc Council panel (PC1a below still pins it there).
+    check("PC1z /pc/3d answers the tailnet 200 as HTML with the three.js scene, the direct talk box (/m/agent) and the spoken answer",
+          r3.status_code == 200 and "text/html" in r3.headers.get("Content-Type", "") and "three.module.js" in b3 and "/m/agent" in b3
+          and "/pc/council" not in b3 and "SpeechSynthesisUtterance" in b3 and "/pc/3d/state" in b3, f"{r3.status_code} {b3[:80]!r}")
     check("PC1z the page carries the phone app's symbol path for path (the Tree of Life's canopy colours) and names this node",
           "#4FB08E" in b3 and "#175A48" in b3 and "M54,20 C68,20 78,28 80,38" in b3 and "__NODE__" not in b3 and "__SYMBOL__" not in b3)
     check("PC1z /pc/3d refuses a LAN address 403", get(client, "/pc/3d", "192.168.1.50").status_code == 403)
