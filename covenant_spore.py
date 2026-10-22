@@ -71,6 +71,9 @@ MAX_BODY = 400 * 1024
 REPLY_HEADERS = ("Content-Type", "X-Covenant-Model", "X-Covenant-Ms")   # what the app reads from an answer (pc_draw)
 MAX_BOX = 200                      # blocks waiting in one box at a relay
 WINDOW_S = 300                     # the window of the signature scheme and of a take
+# A376: a take may ask the relay to HOLD the connection up to this long for a block, so a reply reaches the phone the
+# instant the PC seals it instead of at the next poll tick. Capped here; the client's own HTTP timeout must exceed it.
+LONGPOLL_MAX_S = 25
 
 
 # ---------------------------------------------------------------- the road neurons
@@ -264,23 +267,29 @@ class FileRelay:
 
 
 class HttpRelay:
-    """The client side of serve_relay(): POST /box/<box> leaves a block; POST /box/<box>/take with a take proof."""
+    """The client side of serve_relay(): POST /box/<box> leaves a block; POST /box/<box>/take with a take proof.
+    take(wait_s=N) asks the relay to long-poll: hold until a block arrives or N seconds pass (A376)."""
 
     def __init__(self, base, key=None, pem=None, timeout=15):
         self.base, self.key, self.pem, self.timeout = base.rstrip("/"), key, pem, timeout
 
-    def _post(self, url, data):
+    def _post(self, url, data, timeout=None):
         import urllib.request
         req = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/octet-stream"})
-        with urllib.request.urlopen(req, timeout=self.timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout or self.timeout) as r:
             return json.loads(r.read().decode("utf-8"))
 
     def put(self, box, blob):
         return self._post("%s/box/%s" % (self.base, box), str(blob).encode("utf-8")).get("id")
 
-    def take(self, box, proof=None, seen=None, now=None):
+    def take(self, box, proof=None, seen=None, now=None, wait_s=0.0):
         proof = proof or take_proof(self.key, self.pem, box, now)
-        rows = self._post("%s/box/%s/take" % (self.base, box), _canon(proof).encode("utf-8")).get("blocks") or []
+        url, timeout = "%s/box/%s/take" % (self.base, box), None
+        if wait_s and wait_s > 0:
+            w = min(float(wait_s), LONGPOLL_MAX_S)
+            url += "?wait=%g" % w
+            timeout = w + float(self.timeout)              # outlast the relay's hold, or urlopen aborts it
+        rows = self._post(url, _canon(proof).encode("utf-8"), timeout=timeout).get("blocks") or []
         return [(r.get("id"), r.get("blob")) for r in rows]
 
 
@@ -302,7 +311,8 @@ def make_relay_server(root, host="127.0.0.1", port=0):
             self.wfile.write(b)
 
         def do_POST(self):
-            parts = self.path.strip("/").split("/")
+            raw, _, query = self.path.partition("?")
+            parts = raw.strip("/").split("/")
             n = int(self.headers.get("Content-Length") or 0)
             if n > (1 << 20) + 4096:
                 return self._send(413, {"error": "too large"})
@@ -311,7 +321,23 @@ def make_relay_server(root, host="127.0.0.1", port=0):
                 if len(parts) == 2 and parts[0] == "box":
                     return self._send(200, {"id": relay.put(parts[1], data.decode("utf-8"))})
                 if len(parts) == 3 and parts[0] == "box" and parts[2] == "take":
-                    rows = relay.take(parts[1], json.loads(data.decode("utf-8")), seen)
+                    rows = relay.take(parts[1], json.loads(data.decode("utf-8")), seen)   # verify + collect once; nonce spent here
+                    # A376 long-poll: box empty and the caller asked to wait -> HOLD, re-collecting WITHOUT re-verifying
+                    # (proof=None), so the reply is handed over the instant the PC seals it, not at the next client poll.
+                    wait = 0.0
+                    for kv in query.split("&"):
+                        if kv.startswith("wait="):
+                            try:
+                                wait = min(float(kv[5:]), LONGPOLL_MAX_S)
+                            except ValueError:
+                                wait = 0.0
+                    if not rows and wait > 0:
+                        deadline = time.time() + wait
+                        while time.time() < deadline:
+                            time.sleep(0.2)
+                            rows = relay.take(parts[1], None)
+                            if rows:
+                                break
                     return self._send(200, {"blocks": [{"id": i, "blob": b} for i, b in rows]})
             except PermissionError as e:
                 return self._send(403, {"error": str(e)})

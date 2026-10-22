@@ -296,11 +296,44 @@ def sp1e(pems, keys):
         srv.server_close()
 
 
+def sp1f(pems, keys):
+    print("SP1f -- the relay long-poll (A376): a held take returns the instant a block lands, not at the next poll")
+    pc = keys[0]
+    srv = SP.make_relay_server(os.path.join(TMP, "relay_lp"), "127.0.0.1", 0)
+    t = threading.Thread(target=srv.serve_forever, daemon=True)
+    t.start()
+    try:
+        url = "http://127.0.0.1:%d" % srv.server_address[1]
+        box = SM.fingerprint(pems["pc"])
+        owner = SP.HttpRelay(url, pc, pems["pc"])
+        # it HOLDS: a waited take on an empty box returns empty only after about the wait
+        t0 = time.time()
+        empty = owner.take(box, wait_s=0.6)
+        held = time.time() - t0
+        check("SP1f a held take on an empty box waits, then returns empty", empty == [] and 0.4 <= held < 3.0, (empty, held))
+        # the other way: with NO wait the same empty box returns at once -- the wait is what does the work
+        t0 = time.time()
+        now_empty = owner.take(box, wait_s=0)
+        fast = time.time() - t0
+        check("SP1f without wait an empty box returns immediately (no hold)", now_empty == [] and fast < 0.4, (now_empty, fast))
+        # it RETURNS PROMPTLY: a block put 0.4 s into a 5 s held take comes back well before the cap
+        threading.Thread(target=lambda: (time.sleep(0.4), SP.HttpRelay(url).put(box, "a late block")), daemon=True).start()
+        t0 = time.time()
+        got = owner.take(box, wait_s=5)
+        waited = time.time() - t0
+        check("SP1f a block landing mid-wait is returned promptly (long-poll), well before the cap",
+              len(got) == 1 and got[0][1] == "a late block" and 0.3 <= waited < 4.0, (got, waited))
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
 def main():
     sp1a()
     signers, keys, pems = make_world()
     sp1b_c_d(signers, keys, pems)
     sp1e(pems, keys)
+    sp1f(pems, keys)
     print()
     print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
     if FAILURES:
