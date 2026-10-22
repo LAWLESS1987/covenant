@@ -708,6 +708,13 @@ AGENT_HISTORY_TURNS = 20
 AGENT_HISTORY_CHARS = 2000
 AGENT_HISTORY_BUDGET = 12000
 AGENT_ANSWER_TOKENS = 700
+# THE PC APP NO LONGER TALKS THROUGH THE COUNCIL (2026-10-21, his words: "his conversation with me
+# doesn't need to go to the council ... we only need the council for select things at this point").
+# The /pc/3d orbs now post to /m/agent (kind "agent"), like the phone and the /pc Talk panel -- so the
+# note above ("The PC app talks through /pc/council") describes the OLD routing, kept as written. His
+# conversation reaches no council on any surface now. "council" stays in the tuple below only so the
+# /pc Council panel -- a deliberate, select convene, not ordinary chat -- is still replayed into his
+# history when he chooses to use it.
 AGENT_HISTORY_KINDS = ("agent", "council")
 # THE WORK CALLER KEEPS ITS CEILING (A273, the same day). Fitting to the window let the batch caller --
 # tools/tetsu_work.py's SOURCE, covenant_persona.WORK_CALLERS, never his own conversation -- replay 16
