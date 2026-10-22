@@ -14,10 +14,12 @@ sys.path.insert(0, HERE)
 from tools import next_anumber as AN  # noqa: E402
 
 n_fail = 0
+n_total = 0
 
 
 def check(name, ok, detail=""):
-    global n_fail
+    global n_fail, n_total
+    n_total += 1
     print(("ok   " if ok else "FAIL ") + name + (("  -- %s" % (detail,)) if detail else ""))
     if not ok:
         n_fail += 1
@@ -54,5 +56,5 @@ sub = "### A500.\n- parent\n\n### A500b.\n- a sub-entry, not a duplicate\n"
 check("AN1.5 a lettered sub-entry is not a duplicate of its parent", AN.duplicates(AN.primaries(sub)) == set(),
       AN.primaries(sub))
 
-print("\nAN1: %d checks, %d failed" % (5 + (1 if True else 0), n_fail))
+print("\nAN1: %d/%d passed" % (n_total - n_fail, n_total))
 sys.exit(1 if n_fail else 0)
