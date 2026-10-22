@@ -659,6 +659,11 @@ run test_s1_scale.py 60
 # shortlist (Pedersen, Neuromorphic Intermediate Representation).
 run test_n1_conformance.py 60
 run test_r1_retracted.py 60
+# WK1 (2026-10-22, A267 class guard): a tree-walker must prune .claude/worktrees. R1 above and C4
+# self-test their own worktree pruning; WK1 is the class ratchet over the walkers that do not --
+# it drives verify_bundle.shipped() and covenant_seal.walk() and fails if either reads the worktree
+# copies (proven: removing the prune makes verify_bundle yield 51,785 files, 49,814 under .claude).
+run test_wk1_walkers_prune_worktrees.py 120
 run test_r2_semantics.py 120
 run test_a124_chain_syncable.py 90
 run test_a125_trunk_judges_history.py 90
