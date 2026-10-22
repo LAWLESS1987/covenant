@@ -297,7 +297,7 @@ def sp1e(pems, keys):
 
 
 def sp1f(pems, keys):
-    print("SP1f -- the relay long-poll (A376): a held take returns the instant a block lands, not at the next poll")
+    print("SP1f -- the relay long-poll (A378): a held take returns the instant a block lands, not at the next poll")
     pc = keys[0]
     srv = SP.make_relay_server(os.path.join(TMP, "relay_lp"), "127.0.0.1", 0)
     t = threading.Thread(target=srv.serve_forever, daemon=True)

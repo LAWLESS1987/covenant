@@ -71,7 +71,7 @@ MAX_BODY = 400 * 1024
 REPLY_HEADERS = ("Content-Type", "X-Covenant-Model", "X-Covenant-Ms")   # what the app reads from an answer (pc_draw)
 MAX_BOX = 200                      # blocks waiting in one box at a relay
 WINDOW_S = 300                     # the window of the signature scheme and of a take
-# A376: a take may ask the relay to HOLD the connection up to this long for a block, so a reply reaches the phone the
+# A378: a take may ask the relay to HOLD the connection up to this long for a block, so a reply reaches the phone the
 # instant the PC seals it instead of at the next poll tick. Capped here; the client's own HTTP timeout must exceed it.
 LONGPOLL_MAX_S = 25
 
@@ -268,7 +268,7 @@ class FileRelay:
 
 class HttpRelay:
     """The client side of serve_relay(): POST /box/<box> leaves a block; POST /box/<box>/take with a take proof.
-    take(wait_s=N) asks the relay to long-poll: hold until a block arrives or N seconds pass (A376)."""
+    take(wait_s=N) asks the relay to long-poll: hold until a block arrives or N seconds pass (A378)."""
 
     def __init__(self, base, key=None, pem=None, timeout=15):
         self.base, self.key, self.pem, self.timeout = base.rstrip("/"), key, pem, timeout
@@ -322,7 +322,7 @@ def make_relay_server(root, host="127.0.0.1", port=0):
                     return self._send(200, {"id": relay.put(parts[1], data.decode("utf-8"))})
                 if len(parts) == 3 and parts[0] == "box" and parts[2] == "take":
                     rows = relay.take(parts[1], json.loads(data.decode("utf-8")), seen)   # verify + collect once; nonce spent here
-                    # A376 long-poll: box empty and the caller asked to wait -> HOLD, re-collecting WITHOUT re-verifying
+                    # A378 long-poll: box empty and the caller asked to wait -> HOLD, re-collecting WITHOUT re-verifying
                     # (proof=None), so the reply is handed over the instant the PC seals it, not at the next client poll.
                     wait = 0.0
                     for kv in query.split("&"):

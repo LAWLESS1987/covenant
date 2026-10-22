@@ -348,7 +348,7 @@ TRACKS = {
                      {"ok": False, "broken_at": 1}),
                     ("verify_chain([('put m1', '0' * 64), ('put m3', '90f891857865e7ce3b421c108e63ce14f4432fe21ba341affbb043e7e84074d6'), "
                      "('put m2', 'a9cdbc2ab8e5c84810fd3a02f4f0095ba96c0d034e14e9eb8836f57aa427aac5')])", {"ok": False, "broken_at": 2})]},
-        # A376 (2026-10-22): the keep rule as code. A probe measured a weak reader taking "the work bar was cleared"
+        # A379 (2026-10-22): the keep rule as code. A probe measured a weak reader taking "the work bar was cleared"
         # as enough and missing that few-shot also had to hold -- the conjunctive rule read as 'or'. These two build
         # the rule, then the contradiction check that compares a claim to it, so the skill is written, not guessed.
         {"id": "health_keep_rule", "builds_on": [], "forbid": [],
