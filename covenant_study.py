@@ -84,6 +84,7 @@ BOOKS = [
     (10, "The Bible, King James Version", "hebrew-christian"),
     (2800, "The Koran (Rodwell translation)", "islamic"),
     (2388, "The Bhagavad Gita", "hindu"),
+    (3283, "The Upanishads", "hindu-vedantic"),
     (2680, "Meditations", "stoic"),
     (10661, "A Selection from the Discourses of Epictetus with the Encheiridion", "stoic"),
     (4280, "The Critique of Pure Reason", "kantian"),
