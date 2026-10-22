@@ -64,7 +64,7 @@ try:
         rc = P.main(["--write"])
         with open(vd, encoding="utf-8") as fh:
             after_pass = fh.read()
-        check("PC2.4 all four pass: the pin and the line count move to the core's",
+        check("PC2.4 all judges pass: the pin and the line count move to the core's",
               rc == 0 and P.pinned(after_pass) == (want_sha, want_lines), P.pinned(after_pass))
         strip = lambda t: P.LINES_RE.sub("", P.PIN_RE.sub("", t))  # noqa: E731
         check("PC2.5 ...and nothing else in the file changes -- the history comments stay as written",

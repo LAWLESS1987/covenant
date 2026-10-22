@@ -9,7 +9,7 @@ on remembering is the tombstone this project keeps re-digging. So the pre-commit
 whenever the core is in a commit.
 
 THE ORDER (the b969 lesson, kept): a pin proves WHICH bytes arrived, never that they are right, so
-the suites that judge these bytes -- K1, K2, P19, A3s -- are run FIRST. The pin moves only if all
+the suites that judge these bytes -- K1, K2, P19, A3s, and the core security audit -- are run FIRST. The pin moves only if all
 four pass. If any fails the pin is left where it was and that is said, so verify_deploy reads red
 and a person looks: refusing the commit is not this tool's call (the hook never blocks).
 
@@ -27,8 +27,14 @@ import sys
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE = os.path.join(HERE, "covenant_unified_v8.py")
 VD = os.path.join(HERE, "verify_deploy.py")
+# A315's gap, closed 2026-10-22 (his "find upgrades", panel consensus Tetsu+DeepSeek+Gemini): the core
+# security audit -- the suite that judges the core for silent handlers etc. -- ran NOWHERE before a push,
+# so an `except: pass` in the core (A314, 2026-10-08) reddened PUBLIC CI only after the fact. It runs here
+# now, on the core's own bytes, before the pin moves. It passes clean today (133/0, ~17 s) and only runs on
+# a commit that CHANGES the core (main() short-circuits when the pin already matches), so ordinary commits
+# pay nothing.
 JUDGES = ("test_k1_runner_key_preservation.py", "test_k2_tally_arithmetic.py",
-          "test_p19_overlay_guard.py", "test_a3s_send_bounds.py")
+          "test_p19_overlay_guard.py", "test_a3s_send_bounds.py", "test_security_audit.py")
 PIN_RE = re.compile(r'("covenant_unified_v8\.py":\s*\n\s*")([0-9a-f]{64})(")')
 LINES_RE = re.compile(r"^(EXPECTED_LINES = )(\d+)", re.M)
 
@@ -82,7 +88,7 @@ def main(argv=None):
         return 1
     with open(VD, "w", encoding="utf-8", newline="") as fh:
         fh.write(rewrite(text, sha, lines))
-    print("pin_core: moved %s -> %s, %s -> %d lines, after K1/K2/P19/A3s passed on these bytes"
+    print("pin_core: moved %s -> %s, %s -> %d lines, after K1/K2/P19/A3s + security-audit passed on these bytes"
           % ((have_sha or "?")[:12], sha[:12], have_lines, lines))
     return 0
 
