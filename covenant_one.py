@@ -714,6 +714,7 @@ SUITES = [
     # cues only (no decision/action field), never an auto-ALLOW over the safety gate, kill switch both ways,
     # abstains below confidence. Footing cue is a real per-task signal; router is a weak (near-majority) cue.
     ("test_tr1_tetsu_reflex.py", 180, "JUDGE"),
+    ("test_cr1_conv_reflex.py", 120, "JUDGE"),
     # OC1 (2026-10-20, operator "think octopus" / "all 3"): the pure-Python spiking nervous system -- three
     # semi-autonomous LIF arms (witness/encoder/reflex), central integrate, kill switch both ways, and NO heavy
     # dependency so it runs on the phone (Termux has no numpy/torch). Arms extensible toward eight.

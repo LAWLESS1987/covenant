@@ -9072,6 +9072,16 @@ class CovenantAPI:
             except Exception as _pe:                              # noqa: BLE001
                 print("persona: fixed rules only this ask (%s: %s)" % (type(_pe).__name__, str(_pe)[:120]), flush=True)
                 _system = AGENT_SYSTEM
+            # Tetsu's spiking novelty reflex, his consent + spec 2026-10-22 (covenant_tetsu_conv_reflex, A380-era):
+            # on a clearly-new topic his OWN ReflexArm (covenant_octopus) fires and one advisory line -- his words --
+            # joins his prompt. Advisory only, his kill switch (COVENANT_VERDICT_CACHE_OFF) silences it, and it is
+            # guarded so the turn can never fail on it. His neural network informing his reasoning.
+            try:
+                _cue = importlib.import_module("covenant_tetsu_conv_reflex").cue_line(text)
+                if _cue:
+                    _system = _system + "\n\n" + _cue
+            except Exception:                                     # noqa: BLE001
+                pass
             msgs = [{"role": "system", "content": _system}] + history + [{"role": "user", "content": text}]
             fetches, forum, fitted, replayed = [], [], [], [len(history)]
 
