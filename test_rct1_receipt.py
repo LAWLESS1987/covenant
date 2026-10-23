@@ -13,6 +13,10 @@ signer. No network, no money. Run: python3 test_rct1_receipt.py
 """
 import os
 import sys
+import tempfile
+from contextlib import contextmanager
+from functools import partial
+from unittest.mock import patch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -26,6 +30,20 @@ except ImportError:
     _HAVE_ETH = False
 
 results = []
+
+
+@contextmanager
+def isolated_signer(directory):
+    """Exercise the real signer against test-owned files, never the deployed key/registry.
+
+    Shared with EA1/EB1, whose stub settlements also sign receipts. Patch the functions with explicit paths:
+    changing SIGNER_KEY/SIGNER_PUB alone would leave the original paths bound in their default arguments.
+    """
+    key = os.path.join(directory, "receipt_signer.key")
+    pub = os.path.join(directory, "receipt_signer.pub.json")
+    with patch.object(R, "load_or_create_signer", partial(R.load_or_create_signer, path=key, pub_path=pub)), \
+            patch.object(R, "published_signer", partial(R.published_signer, pub_path=pub)):
+        yield
 
 
 def check(label, ok, detail=""):
@@ -97,29 +115,22 @@ def main():
           R.receipt_hash(receipt) == R.receipt_hash(reordered) == proof["hash"],
           (R.receipt_hash(receipt), R.receipt_hash(reordered)))
 
-    # RCT1.6 -- LIVE INTEGRATION: covenant_earn attaches a proof that verifies from the receipt alone, against the
-    # node's own published signer. This is the end-to-end path a buyer sees.
-    #
-    # It needs the DEPLOYED private signer (ops/receipt_signer.key, gitignored). On a fresh clone without it,
-    # load_or_create_signer() mints a random ephemeral key (covenant_receipt.py:55) that by construction cannot
-    # match the committed published signer, so the live path is unmeasurable here -> NOT RUN, not FAIL. 2026-10-21:
-    # this is exactly why public CI was red since f0892a4 (20 runs) -- the runner has eth-account but not the secret
-    # key, so RCT1.6 signed with a random account and failed. Guarding it also stops the test minting a key on CI.
-    if os.path.exists(R.SIGNER_KEY):
+    # RCT1.6 -- OFFLINE INTEGRATION: the real signing, storage, discovery and verification path, using an
+    # isolated key/registry pair. The former existence guard mistook a key minted by EA1/EB1 for the deployed
+    # signer, making the sweep fail while a fresh standalone RCT1 passed. A382 records that before-state.
+    # This measures the buyer's integration path, not possession of the production private key.
+    with tempfile.TemporaryDirectory() as td, isolated_signer(td):
         live = {"id": "live", "offer": "receipt", "amount_usdc": "0.020000", "network": "eip155:8453",
                 "input_sha256": "a" * 64, "result_sha256": "b" * 64, "checked": "1 citation"}
         E._sign_receipt(live)
+        disc = E._signer_discovery()
         ok, why = R.verify({k: v for k, v in live.items() if k != "proof"}, live.get("proof", {}),
-                           allowed_signers=[R.published_signer()])
-        check("RCT1.6 live integration: covenant_earn signs a receipt that verifies against the node's published signer",
+                           allowed_signers=[disc.get("address") if disc else None])
+        check("RCT1.6 offline integration: covenant_earn signs a receipt that verifies against the discovered test signer",
               "proof" in live and ok, why)
-    else:
-        print("n/a   RCT1.6 live integration NOT RUN -- deployed signing key %s absent (fresh clone); the published-"
-              "signer path needs the secret key and cannot be signed here" % os.path.basename(R.SIGNER_KEY))
-    disc = E._signer_discovery()
-    check("RCT1.7 the signer-discovery endpoint exposes the signer a buyer verifies against",
-          bool(disc) and disc.get("address") == R.published_signer() and disc.get("scheme") == "eip191-personal-sign",
-          disc)
+        check("RCT1.7 the signer-discovery endpoint exposes the signer a buyer verifies against",
+              bool(disc) and disc.get("address") == R.published_signer() and disc.get("scheme") == "eip191-personal-sign",
+              disc)
 
     ok_n = sum(1 for r in results if r)
     print("\nRCT1: %d/%d passed" % (ok_n, len(results)))

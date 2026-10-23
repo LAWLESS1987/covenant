@@ -1785,6 +1785,26 @@
     "private/"
    ],
    "note_on_allow": "The phone chat log and teacher_queue are append-only records of what was said at the time, kept whole (never edited). COUNCIL_REVIEW_2026-10-21.md holds the finding; KNOWN_ISSUES/CORRECTIONS carry the correction. The claim as written also stands as a corrected comment in covenant_judge_local.py and covenant_verdict_cache.py (root, outside R1's scanned dirs), and in the mutual-benefit-collective repo as sent."
+  },
+  {
+   "id": "A382-SW1-SHIPPED-OFF",
+   "claim": "SW1 asserted that the shipped study-web allowlist is off, even after the operator explicitly granted it in 232f5f4.",
+   "refuted_by": "Running the previously orphaned SW1 at b13fc71 on a fresh Linux archive: 11/12 passed; shipped_allowlist_is_off failed because off_reason() returned None for the granted allowlist.",
+   "truth": "The shipped grant records the operator's current decision. The default-path reader must refuse an ungranted fixture and accept a granted fixture with a licensed trusted entry. SW1 now measures both without changing the shipped grant.",
+   "verbatim": [
+    "the live allowlist shipped in the repo is OFF by default",
+    "shipped_allowlist_is_off"
+   ],
+   "patterns": [
+    "the live allowlist shipped in the repo is OFF by default",
+    "\\bshipped_allowlist_is_off\\b"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json"
+   ],
+   "note_on_allow": "The original test remains unedited and runnable on archive/ci-tests-before-20261022 at b13fc71. A382 records the reproduction and corrected measurement."
   }
  ]
 }

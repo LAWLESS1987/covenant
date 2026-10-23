@@ -28,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import covenant_earn as E                                    # noqa: E402
+from test_rct1_receipt import isolated_signer                 # noqa: E402
 
 results = []
 
@@ -111,7 +112,7 @@ def write_sanctions(path, addrs, age_days=0.0):
 
 
 def main():
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory() as td, isolated_signer(td):
         gpath, ledger, trials = os.path.join(td, "grant.json"), os.path.join(td, "ledger.jsonl"), os.path.join(td, "trials")
         sanctions, funnel = os.path.join(td, "sanctions.json"), os.path.join(td, "funnel.json")
         said = []

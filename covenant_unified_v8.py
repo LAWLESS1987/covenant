@@ -9081,8 +9081,8 @@ class CovenantAPI:
                 for _line in (_cr.cue_line(text), _cr.recall_line(text)):   # A380 novelty + A381 recall
                     if _line:
                         _system = _system + "\n\n" + _line
-            except Exception:                                     # noqa: BLE001
-                pass
+            except Exception as _cre:                             # noqa: BLE001
+                print("conversation reflex: advisory unavailable this ask (%s)" % type(_cre).__name__, flush=True)
             msgs = [{"role": "system", "content": _system}] + history + [{"role": "user", "content": text}]
             fetches, forum, fitted, replayed = [], [], [], [len(history)]
 

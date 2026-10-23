@@ -120,8 +120,19 @@ sf4 = StubFetch()
 r4 = SW.research(say=lambda *_a, **_k: None, allowlist_path=p_http, precepts_path=fresh_precepts(), fetch=sf4)
 ok("non_https_entry_is_off", bool(r4.get("off")) and sf4.calls == [], "r4=%r calls=%r" % (r4, sf4.calls))
 
-# --- the live allowlist shipped in the repo is OFF by default ---------------------------------------
-ok("shipped_allowlist_is_off", bool(SW.off_reason()), "off_reason=%r" % SW.off_reason())
+# --- the default-path reader obeys the current grant, both ways (A382) ------------------------------
+# The operator granted the shipped allowlist in 232f5f4. Check the mechanism on fixtures, not his current
+# decision: an ungranted default must be off, and a granted licensed default must be on.
+saved_allowlist = SW.ALLOWLIST
+try:
+    SW.ALLOWLIST = p_off
+    why_off = SW.off_reason()
+    ok("default_allowlist_off_when_not_granted", bool(why_off), "off_reason=%r" % why_off)
+    SW.ALLOWLIST = p_on
+    why_on = SW.off_reason()
+    ok("default_allowlist_on_when_granted", why_on is None, "off_reason=%r" % why_on)
+finally:
+    SW.ALLOWLIST = saved_allowlist
 
 # ------------------------------------------------------------------------------------- tally
 passed = sum(1 for _n, c, _d in checks if c)

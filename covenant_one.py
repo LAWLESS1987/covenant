@@ -719,6 +719,9 @@ SUITES = [
     # semi-autonomous LIF arms (witness/encoder/reflex), central integrate, kill switch both ways, and NO heavy
     # dependency so it runs on the phone (Termux has no numpy/torch). Arms extensible toward eight.
     ("test_oc1_octopus.py", 120, "JUDGE"),
+    # A382: these existing suites were orphaned. Both isolate their grants/act gates; SW1 stubs all fetches.
+    ("test_pg1_plug.py", 120, "SECURITY"),
+    ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
     # deploy pin moves in the same commit as its file, after its judges pass; the hook driven end to end in a
@@ -1437,6 +1440,9 @@ IN_PLACE = [
     ("test_a298_stage_covers_tree.py", 300,
      "every tracked top-level folder is staged or excused with a reason, and the staged copy can verify a chain "
      "-- a claim about what the FOLDER's copy carries"),
+    # A382: WK1 measures the real folder's delivery/seal walkers, including worktree pruning, not a staged subset.
+    ("test_wk1_walkers_prune_worktrees.py", 180,
+     "the delivery and seal walkers prune .claude/worktrees in THIS folder"),
 ]
 
 

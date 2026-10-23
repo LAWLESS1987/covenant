@@ -27,6 +27,7 @@ sys.path.insert(0, HERE)
 
 import covenant_earn as E                                    # noqa: E402
 import covenant_earn_business as B                           # noqa: E402
+from test_rct1_receipt import isolated_signer                 # noqa: E402
 
 results = []
 
@@ -62,7 +63,7 @@ class Gate:
 
 
 def main():
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory() as td, isolated_signer(td):
         bl, bg = os.path.join(td, "business.jsonl"), os.path.join(td, "business_grant.json")
         el, eg = os.path.join(td, "earn.jsonl"), os.path.join(td, "earn_grant.json")
         sanctions = os.path.join(td, "sanctions.json")
