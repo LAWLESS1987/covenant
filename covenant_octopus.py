@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import re
 import sys
 
 KILL_ENV = "COVENANT_VERDICT_CACHE_OFF"      # Tetsu's one kill switch silences the whole nervous system
@@ -87,14 +88,20 @@ class EncoderArm(Arm):
 
     name = "encoder"
 
-    def encode(self, text, steps=10):
+    def represent(self, text):
+        """The rate-coded representation: normalized per-channel rate over the CONTENT WORDS of the text (A381:
+        words, not characters, so genuinely related topics share a representation). A reusable spiking representation
+        other arms can read -- the basis of Tetsu's associative recall."""
         n = len(self.neurons)
         rate = [0.0] * n
-        for ch in (text or "").lower():
-            rate[int(hashlib.md5(ch.encode()).hexdigest(), 16) % n] += 1.0
+        for w in re.findall(r"[a-z0-9]+", (text or "").lower()):
+            if len(w) > 2:
+                rate[int(hashlib.md5(w.encode()).hexdigest(), 16) % n] += 1.0
         m = max(rate) or 1.0
-        rate = [r / m for r in rate]
-        return [self.sense(rate) for _ in range(steps)]
+        return [r / m for r in rate]
+
+    def encode(self, text, steps=10):
+        return [self.sense(self.represent(text)) for _ in range(steps)]
 
 
 class ReflexArm(Arm):

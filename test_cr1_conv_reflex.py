@@ -68,5 +68,23 @@ check("CR1.7 the fired topic's signature persisted", CR.topic_signature(NEW_A) i
 # CR1.8: a malformed/empty input never raises, returns None
 check("CR1.8 empty input is quiet, never raises", CR.cue_line("", state_path=state, log_path=log) is None)
 
+# --- A381: associative recall via his spiking encoder ---
+enc = os.path.join(TMP, "enc.json")
+A = "quantum entanglement spooky distance correlation measurement"
+B = "quantum entanglement spooky distance correlation physics"   # shares 5/6 content words with A, different signature
+UNREL = "baking sourdough bread fermentation yeast proofing"
+check("CR1.9 the first topic has nothing to connect to (quiet)", CR.recall_line(A, state_path=enc) is None)
+rb = CR.recall_line(B, state_path=enc)
+check("CR1.10 a strongly-related later topic connects to the earlier one",
+      bool(rb) and rb.startswith("This connects to an earlier topic:") and "entanglement" in rb, repr(rb))
+check("CR1.11 an unrelated topic is quiet (both ways -- not vacuously firing)",
+      CR.recall_line(UNREL, state_path=enc) is None)
+os.environ["COVENANT_VERDICT_CACHE_OFF"] = "1"
+try:
+    rk = CR.recall_line(A, state_path=enc)
+finally:
+    del os.environ["COVENANT_VERDICT_CACHE_OFF"]
+check("CR1.12 recall respects the kill switch", rk is None)
+
 print("\nCR1: %d/%d passed" % (n_total - n_fail, n_total))
 sys.exit(1 if n_fail else 0)

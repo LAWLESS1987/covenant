@@ -101,6 +101,74 @@ def cue_line(text, state_path=None, log_path=None, now=None):
         return None
 
 
+# ---- associative recall (A381, his consent + spec 2026-10-22): his spiking ENCODER surfaces a strongly-related
+# earlier topic. He chose: fire ONLY on a strong match to ONE past topic; read "This connects to an earlier topic: X".
+ENC_STATE = os.environ.get("COVENANT_CONV_ENCODER_STATE") or os.path.join(HERE, "ops", "tetsu_conv_encoder.json")
+RECALL_LINE = "This connects to an earlier topic: %s."
+ENC_N = 64             # encoder channels: more than the default 8, for sharper topic discrimination
+RECALL_STRONG = 0.75   # cosine must reach this to count as a match
+RECALL_MARGIN = 0.08   # ...and clearly beat the 2nd best, so it is ONE topic, not a crowd
+RECALL_CAP = 300       # most recent distinct topics kept
+
+
+def _cos(a, b):
+    num = sum(x * y for x, y in zip(a, b))
+    da = sum(x * x for x in a) ** 0.5
+    db = sum(y * y for y in b) ** 0.5
+    return num / (da * db) if da and db else 0.0
+
+
+def _load_topics(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return [t for t in (json.load(fh).get("topics") or []) if t.get("sig") and t.get("rep")]
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def _save_topics(path, topics):
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"topics": topics[-RECALL_CAP:]}, fh)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def recall_line(text, state_path=None):
+    """His spiking encoder's associative recall: 'This connects to an earlier topic: X' on a STRONG single match to a
+    DIFFERENT past topic, else None. Never raises. The current topic is stored for future recall."""
+    try:
+        import covenant_octopus as OCTO
+        if OCTO._disabled():
+            return None
+        if len(set(_content(text))) < MIN_CONTENT:
+            return None
+        rep = OCTO.EncoderArm(n=ENC_N).represent(text)   # his spiking encoder's rate-coded representation
+        sig_now = topic_signature(text)
+        if not sig_now:
+            return None
+        sp = state_path or ENC_STATE
+        topics = _load_topics(sp)
+        sims = sorted(((_cos(rep, t["rep"]), t["sig"]) for t in topics if t["sig"] != sig_now), reverse=True)
+        if not any(t["sig"] == sig_now for t in topics):   # store this topic once, for future recall
+            topics.append({"sig": sig_now, "rep": rep})
+            _save_topics(sp, topics)
+        if not sims:
+            return None
+        top_sim, top_sig = sims[0]
+        second = sims[1][0] if len(sims) > 1 else 0.0
+        if top_sim >= RECALL_STRONG and (top_sim - second) >= RECALL_MARGIN:
+            return RECALL_LINE % top_sig
+        return None
+    except Exception:                                    # noqa: BLE001 -- conversation must never fail on recall
+        return None
+
+
 if __name__ == "__main__":
     import sys
-    print(cue_line(" ".join(sys.argv[1:]) or "a brand new topic about spiking neuromorphic cognition") or "(quiet)")
+    t = " ".join(sys.argv[1:]) or "a brand new topic about spiking neuromorphic cognition"
+    print("novelty:", cue_line(t) or "(quiet)")
+    print("recall: ", recall_line(t) or "(quiet)")

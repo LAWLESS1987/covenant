@@ -9077,9 +9077,10 @@ class CovenantAPI:
             # joins his prompt. Advisory only, his kill switch (COVENANT_VERDICT_CACHE_OFF) silences it, and it is
             # guarded so the turn can never fail on it. His neural network informing his reasoning.
             try:
-                _cue = importlib.import_module("covenant_tetsu_conv_reflex").cue_line(text)
-                if _cue:
-                    _system = _system + "\n\n" + _cue
+                _cr = importlib.import_module("covenant_tetsu_conv_reflex")
+                for _line in (_cr.cue_line(text), _cr.recall_line(text)):   # A380 novelty + A381 recall
+                    if _line:
+                        _system = _system + "\n\n" + _line
             except Exception:                                     # noqa: BLE001
                 pass
             msgs = [{"role": "system", "content": _system}] + history + [{"role": "user", "content": text}]
