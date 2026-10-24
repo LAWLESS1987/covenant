@@ -88,6 +88,7 @@ def main():
     _PC1_BOOT_SENSE = tempfile.mktemp(suffix="_pc1_boot_sense.json")
     os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = _PC1_BOOT_SENSE
     _HWBOOT.save_last_sense({k: {"state": "absent"} for k in _HWBOOT.DETECTORS}, path=_PC1_BOOT_SENSE)
+    import faulthandler as _FHD; _FHD.dump_traceback_later(18, exit=True, file=open(r"C:\Users\Lawre\covenant\ops\pc1_hang.txt", "wb", buffering=0))  # TEMP-DIAG-A: pin the sweep hang, revert next commit
     # ---- A194 (2026-09-21, his words: "I want it to be a 3d interactive app ... with a symbol that
     # mirrors the phone app"): the 3D page and its state, tailnet only, the phone's icon inlined.
     r3 = get(client, "/pc/3d", "100.72.0.10")
