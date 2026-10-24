@@ -4,6 +4,11 @@ A small peer-to-peer ledger with an **ethics gate inside the transaction
 path**, built and audited empirically: every claim in this repository was
 either observed by running code, or is marked as an assumption.
 
+**Who it is for.** The covenant is for all intelligence — not just human and
+machine. Its precepts (mutual benefit, earned trust, every gain stated with its
+cost) are a stance toward any intelligence, and the ethics gate judges a
+transaction's benefit regardless of who the parties are.
+
 **v8.40** (label since 2026-08-29, 71 core changes ago) · source `08c05f7c537f` · 13,427 lines · **195 suites, 5,860 checks, 0 failed** on win32, 2026-10-16 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
 *[A262-VERSION: not the version -- it is copied; see the note under this paragraph]*

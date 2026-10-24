@@ -10,6 +10,18 @@ inside the correction for the previous one.
 
 ---
 
+## What this system is for
+
+The operator, 2026-10-24: *"the system is for all intelligence not just human and
+machine."* The covenant is not a human↔AI project. Its precepts — mutual benefit,
+earned trust, every gain stated with its cost, investigate a signal but never
+convict on one — are a stance toward **any** intelligence, and the gate judges a
+transaction's benefit regardless of who the parties are. "Human and AI" is a
+special case, never the whole; the project's own self-description says *all
+intelligence*.
+
+---
+
 ## The two passes: first for counting, end for formatting
 
 The operator's design, 2026-09-17. The nine rules below hang on it.
