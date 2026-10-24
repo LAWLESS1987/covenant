@@ -593,7 +593,7 @@ def git_state(run=_run):
     rc, lr = run(["git", "rev-list", "--left-right", "--count", "origin/main...HEAD"], timeout=30)
     if rc == 0 and len(lr.split()) == 2:
         out["behind"], out["ahead"] = (int(x) for x in lr.split())
-    rc, st = run(["git", "status", "--porcelain"], timeout=60)
+    rc, st = run(["git", "--no-optional-locks", "status", "--porcelain"], timeout=60)  # never take the index.lock (2026-10-24: contended with /pc/3d repo discovery)
     out["uncommitted"] = len([l for l in (st or "").splitlines() if l[:2].strip() and not l.startswith("??")]) if rc == 0 else None
     return out
 

@@ -266,7 +266,7 @@ def main():
         # from someone's hands being on the keys.
         dirty = ""
         try:
-            r = subprocess.run(["git", "status", "--porcelain"], cwd=HERE,
+            r = subprocess.run(["git", "--no-optional-locks", "status", "--porcelain"], cwd=HERE,
                                timeout=20, capture_output=True, text=True,
                                creationflags=_NO_WINDOW)
             if r.returncode == 0 and r.stdout.strip():

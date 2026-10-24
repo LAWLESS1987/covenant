@@ -462,8 +462,16 @@ def repos_detail(home=None, now=None, run=None):
             continue
 
         def g(*a, p=p):
+            # Root cause of sweep_red (2026-10-24, pinned by faulthandler): repo discovery's read-only git
+            # calls contended for the index.lock with the watchdog's own `git fetch` during the sweep, so a
+            # read blocked ~20 s and /pc/3d/state hung past its cap. GIT_OPTIONAL_LOCKS=0 makes these reads
+            # NEVER take the index.lock (git's canonical answer for `git status` vs a concurrent git op), so
+            # they cannot contend -- the actual cause, not the symptom. The 8 s timeout is only a safety net;
+            # a read that still cannot complete fails fast and that repo reads amber (PC1z9), never holding
+            # the page.
             try:
-                r = run(["git", "-C", p] + list(a), capture_output=True, text=True, timeout=20)
+                _env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+                r = run(["git", "-C", p] + list(a), capture_output=True, text=True, timeout=8, env=_env)
             except Exception:                                    # noqa: BLE001
                 return None
             return r.stdout.strip() if r.returncode == 0 else None
