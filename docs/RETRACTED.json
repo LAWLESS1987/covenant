@@ -1805,6 +1805,23 @@
     "docs/RETRACTED.json"
    ],
    "note_on_allow": "The original test remains unedited and runnable on archive/ci-tests-before-20261022 at b13fc71. A382 records the reproduction and corrected measurement."
+  },
+  {
+   "id": "A383-CONTENT-IDENTITY",
+   "claim": "The A383 artifact comment said: any real change -- even same-name -- misses and re-judges (fail-closed).",
+   "refuted_by": "Same-size replacement followed by restoring st_mtime_ns returns the original metadata fingerprint. VC1 now exercises that replacement for both a model and the correction ledger.",
+   "truth": "Metadata is not content identity. Local artifact bytes are SHA-256 hashed and the correction ledger is reread. This costs a full local model read per lookup; it does not prove which weights a remote server has loaded. No live deployment or change to Tetsu consent occurred.",
+   "verbatim": [
+    "any real change -- even same-name -- misses and re-judges (fail-closed)"
+   ],
+   "patterns": [
+    "any real change -- even\\s+(?:#\\s*)?same-name -- misses and re-judges"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/research/CONVERSATION_CACHE_REVIEW_2026-10-24.md"
+   ],
+   "note_on_allow": "The pre-fix module is retained on archive/cache-identity-before-content-20261024 at d668a771dd5f772ed6db5fd30531e1ce7dd0beac. The review record quotes the old claim beside its correction."
   }
  ]
 }

@@ -111,6 +111,11 @@ def main():
     VC._BASIS_MEMO.clear(); h1 = VC.basis_version([led])
     h1b = VC.basis_version([led])
     if h1 == "none" or h1 != h1b: fails.append("basis_version unstable on an unchanged ledger (%r/%r)" % (h1, h1b))
+    preserved = os.stat(led)
+    open(led, "w", encoding="utf-8").write('{"a": 9}')
+    os.utime(led, ns=(preserved.st_atime_ns, preserved.st_mtime_ns))
+    if VC.basis_version([led]) == h1:
+        fails.append("basis_version reused stale bytes after a same-size preserved-mtime replacement")
     open(led, "w", encoding="utf-8").write('{"a": 2, "tombstone": "x"}')   # a tombstone lands
     VC._BASIS_MEMO.clear(); h2 = VC.basis_version([led])
     if h2 == h1: fails.append("basis_version did NOT change when the ledger changed (gap #4 open)")
@@ -172,6 +177,13 @@ def main():
     md = _tf.mkdtemp()
     mp = os.path.join(md, "m.gguf"); open(mp, "wb").write(b"x" * 100)
     a1 = VC.artifact_version("m", endpoint="http://a/v1", models_dir=md)
+    preserved_model = os.stat(mp)
+    open(mp, "wb").write(b"y" * 100)
+    os.utime(mp, ns=(preserved_model.st_atime_ns, preserved_model.st_mtime_ns))
+    if VC.artifact_version("m", endpoint="http://a/v1", models_dir=md) == a1:
+        fails.append("artifact_version reused stale bytes after a same-size preserved-mtime replacement")
+    open(mp, "wb").write(b"x" * 100)
+    os.utime(mp, ns=(preserved_model.st_atime_ns, preserved_model.st_mtime_ns))
     if a1 != VC.artifact_version("m", endpoint="http://a/v1", models_dir=md):
         fails.append("artifact_version unstable on an unchanged artifact")
     if VC.artifact_version("m", endpoint="http://b/v1", models_dir=md) == a1:
@@ -206,6 +218,21 @@ def main():
             VC.artifact_version = lambda *a, **k: "ART1"   # control: same artifact serves the old entry (re-key, not a wipe)
             if JL3._verdict_cache("m").get("ONLY-UNDER-ART1") is None:
                 fails.append("artifact-wiring control: same-artifact entry not served (re-key is vacuous)")
+            for marker in ("unstable", "unreadable"):
+                VC.artifact_version = lambda *a, _marker=marker, **k: "endpoint=x::artifact=" + _marker
+                bypass = JL3._verdict_cache("m")
+                bypass.put("probe", {"violates": False})
+                if bypass.get("probe") is not None:
+                    fails.append("artifact-wiring: uncertain local artifact served a cached verdict")
+            def forbidden_read(*a, **k):
+                raise AssertionError("artifact read while cache disabled")
+            VC.artifact_version = forbidden_read
+            os.environ[VC.CACHE_OFF_ENV] = "1"
+            try:
+                if JL3._verdict_cache("m").get("probe") is not None:
+                    fails.append("disabled cache returned a hit")
+            finally:
+                os.environ[VC.CACHE_OFF_ENV] = "0"
             if not any("artifact-wiring" in f for f in fails):
                 print("VC1 artifact-wiring: a same-name endpoint/bytes change re-keys the judge cache; stale cannot leak")
         finally:
