@@ -9078,7 +9078,10 @@ class CovenantAPI:
             # guarded so the turn can never fail on it. His neural network informing his reasoning.
             try:
                 _cr = importlib.import_module("covenant_tetsu_conv_reflex")
-                for _line in (_cr.cue_line(text), _cr.recall_line(text)):   # A380 novelty + A381 recall
+                # Match history's caller boundary and keep private/public topic
+                # state separate. Existing shared state is retained, not migrated.
+                _cr_scope = _cr.conversation_scope(addr, private)
+                for _line in (_cr.cue_line(text, scope=_cr_scope), _cr.recall_line(text, scope=_cr_scope)):
                     if _line:
                         _system = _system + "\n\n" + _line
             except Exception as _cre:                             # noqa: BLE001

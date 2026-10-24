@@ -75,6 +75,11 @@ def main():
     os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="a263_pause_")
     os.environ.pop("COVENANT_HOLD_PRIVATE", None)
     d = fresh_env()
+    import covenant_tetsu_conv_reflex as CR
+    # The real handler's advisory persistence is synthetic too, never ops/.
+    CR.STATE = os.path.join(d, "cue.json")
+    CR.LOG = os.path.join(d, "cue.jsonl")
+    CR.ENC_STATE = os.path.join(d, "recall.json")
     import covenant_daily_plan as DP
     import covenant_teacher_queue as TQ
     import covenant_unified_v8 as cov
@@ -155,6 +160,9 @@ def main():
         lrow = [x for x in rows_of(log) if CANARY in x.get("text", "")]
         check("D1 ...and its memory row is marked private", len(lrow) == 1 and lrow[0].get("private") is True, lrow)
         private_answered = bool(lrow and lrow[0].get("answer"))
+        check("D1 scoped private advisory state uses the authenticated caller and privacy mode",
+              os.path.isfile(CR._scoped_path(CR.STATE, CR.conversation_scope(A, True)))
+              and not os.path.exists(CR.STATE))
 
         r = post("/m/agent", A, {"text": "an ordinary question afterwards"})
         j = r.get_json() or {}
@@ -164,6 +172,9 @@ def main():
         check("D2 ...and the private exchange was not replayed into it (cold: 2 messages; private answered=%s)" % private_answered,
               "(2 messages)" in str(j.get("answer", "")) and CANARY not in json.dumps(rows_of(q)), j.get("answer"))
         ordinary_answered = bool(j.get("answer"))
+        check("D2 ordinary advisory state uses a separate public partition",
+              os.path.isfile(CR._scoped_path(CR.STATE, CR.conversation_scope(A, False)))
+              and not os.path.exists(CR.LOG))
         r = post("/m/agent", A, {"text": "a second private question", "private": True})
         j = r.get_json() or {}
         want = 2 + 2 * (int(private_answered) + int(ordinary_answered))

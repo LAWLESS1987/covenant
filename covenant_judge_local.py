@@ -125,13 +125,17 @@ def _verdict_cache(model):
         import covenant_verdict_cache as _vc
     except Exception:                                    # noqa: BLE001 -- the judge must never fail because of the cache
         return _NullCache()
+    if _vc._disabled():
+        return _NullCache()  # honor his existing choice before any artifact I/O
     # basis = a hash of the tombstone/amendment ledger. A tombstone that changes a ruling's basis
     # bumps it -> a new key -> every prior cached verdict misses and re-judges (council 2026-10-21,
     # "no exemption: the cache obeys a correction like everything else"). Keyed by (model, basis).
     basis = _vc.basis_version()
-    # A383: fold a fingerprint of the ACTUAL artifact (endpoint + local model file by size/mtime) into the key, so a
+    # A383 follow-up: endpoint + local file content digest, including preserved-metadata replacements.
     # SAME-NAME change -- a swapped endpoint or new bytes under the same name -- misses and re-judges (fail-closed).
     artifact = _vc.artifact_version(model)
+    if artifact.endswith(("::artifact=unstable", "::artifact=unreadable")):
+        return _NullCache()
     k = (model, basis, artifact)
     c = _VC_CACHES.get(k)
     if c is None:

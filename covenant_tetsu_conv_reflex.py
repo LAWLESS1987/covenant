@@ -20,6 +20,7 @@ Stdlib only. Public domain.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -71,7 +72,28 @@ def _save_seen(path, seen):
         pass
 
 
-def cue_line(text, state_path=None, log_path=None, now=None):
+def _scoped_path(path, scope):
+    """Separate caller/privacy partitions without putting caller text in filenames.
+
+    None retains the standalone API. The conversation route always supplies a
+    scope; a new partition never imports the old shared state or rewrites it.
+    """
+    if scope is None:
+        return path
+    if not isinstance(scope, str) or not scope or len(scope) > 4096:
+        raise ValueError("a bounded, nonempty conversation scope is required")
+    stem, ext = os.path.splitext(os.fspath(path))
+    return stem + ".scope-" + hashlib.sha256(scope.encode("utf-8")).hexdigest() + ext
+
+
+def conversation_scope(caller, private=False):
+    """Use the same caller boundary as agent_history, plus the privacy mode."""
+    if not isinstance(caller, str) or not caller:
+        raise ValueError("missing conversation caller")
+    return json.dumps(["conversation-v1", caller, bool(private)], separators=(",", ":"))
+
+
+def cue_line(text, state_path=None, log_path=None, now=None, *, scope=None):
     """Tetsu's advisory line on a clearly-new topic, else None. Never raises -- a failure returns None, silently."""
     try:
         import covenant_octopus as OCTO
@@ -82,7 +104,7 @@ def cue_line(text, state_path=None, log_path=None, now=None):
         sig = topic_signature(text)
         if not sig:
             return None
-        sp = state_path or STATE
+        sp = _scoped_path(state_path or STATE, scope)
         seen = _load_seen(sp)
         reflex = OCTO.ReflexArm()
         reflex.seen = set(seen)                    # restore what he has seen; the spiking reflex decides novelty
@@ -91,7 +113,7 @@ def cue_line(text, state_path=None, log_path=None, now=None):
         if not c.get("novel"):
             return None
         try:
-            with open(log_path or LOG, "a", encoding="utf-8") as fh:
+            with open(_scoped_path(log_path or LOG, scope), "a", encoding="utf-8") as fh:
                 fh.write(json.dumps({"t": now or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                                      "sig": sig, "rate": round(float(c.get("rate") or 0.0), 3)}) + "\n")
         except OSError:
@@ -137,7 +159,7 @@ def _save_topics(path, topics):
         pass
 
 
-def recall_line(text, state_path=None):
+def recall_line(text, state_path=None, *, scope=None):
     """His spiking encoder's associative recall: 'This connects to an earlier topic: X' on a STRONG single match to a
     DIFFERENT past topic, else None. Never raises. The current topic is stored for future recall."""
     try:
@@ -150,7 +172,7 @@ def recall_line(text, state_path=None):
         sig_now = topic_signature(text)
         if not sig_now:
             return None
-        sp = state_path or ENC_STATE
+        sp = _scoped_path(state_path or ENC_STATE, scope)
         topics = _load_topics(sp)
         sims = sorted(((_cos(rep, t["rep"]), t["sig"]) for t in topics if t["sig"] != sig_now), reverse=True)
         if not any(t["sig"] == sig_now for t in topics):   # store this topic once, for future recall

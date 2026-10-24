@@ -86,5 +86,33 @@ finally:
     del os.environ["COVENANT_VERDICT_CACHE_OFF"]
 check("CR1.12 recall respects the kill switch", rk is None)
 
+# Caller and privacy partitions: no live/default paths are used in these probes.
+sa = CR.conversation_scope("caller-a", True)
+sb = CR.conversation_scope("caller-b", True)
+sap = CR.conversation_scope("caller-a", False)
+scoped_state = os.path.join(TMP, "scoped.json")
+scoped_enc = os.path.join(TMP, "scoped-enc.json")
+scoped_log = os.path.join(TMP, "scoped.jsonl")
+check("CR1.13 private first topic cues", CR.cue_line(A, scoped_state, scoped_log, scope=sa) == CR.LINE)
+check("CR1.14 own repeat stays quiet", CR.cue_line(A, scoped_state, scoped_log, scope=sa) is None)
+check("CR1.15 another caller has an independent seen set", CR.cue_line(A, scoped_state, scoped_log, scope=sb) == CR.LINE)
+check("CR1.16 public mode has an independent seen set", CR.cue_line(A, scoped_state, scoped_log, scope=sap) == CR.LINE)
+CR.recall_line(A, scoped_enc, scope=sa)
+check("CR1.17 another caller cannot recall a private topic", CR.recall_line(B, scoped_enc, scope=sb) is None)
+check("CR1.18 public mode cannot recall a private topic", CR.recall_line(B, scoped_enc, scope=sap) is None)
+check("CR1.19 own private recall still works", CR.recall_line(B, scoped_enc, scope=sa) is not None)
+check("CR1.20 scoped logging leaves shared log absent", not os.path.exists(scoped_log))
+legacy_bytes = open(enc, "rb").read()
+check("CR1.21 legacy shared topics are not imported", CR.recall_line(B, enc, scope=sa) is None)
+check("CR1.22 legacy shared topics are not rewritten", open(enc, "rb").read() == legacy_bytes)
+check("CR1.23 invalid scope produces no advisory", CR.cue_line(A, scoped_state, scoped_log, scope="") is None)
+check("CR1.24 scope cannot traverse directories", os.path.dirname(CR._scoped_path(scoped_state, "../../outside")) == TMP)
+
+# Keep the experiment's own regression guard on the existing CR1 sweep path.
+import unittest
+from test_cue_eval import OfflineEvaluationTest
+evaluation_checks = unittest.defaultTestLoader.loadTestsFromTestCase(OfflineEvaluationTest)
+check("CR1.25 offline counterfactual evidence guard", unittest.TextTestRunner().run(evaluation_checks).wasSuccessful())
+
 print("\nCR1: %d/%d passed" % (n_total - n_fail, n_total))
 sys.exit(1 if n_fail else 0)

@@ -65,19 +65,6 @@ _BASIS_MEMO = {}
 
 def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
     root = root or _REPO
-    key = (root, tuple(paths))
-    sig = []
-    for p in paths:
-        fp = p if os.path.isabs(p) else os.path.join(root, p)
-        try:
-            st = os.stat(fp)
-            sig.append((p, st.st_mtime_ns, st.st_size))
-        except OSError:
-            sig.append((p, None, None))
-    sig = tuple(sig)
-    memo = _BASIS_MEMO.get(key)
-    if memo and memo[0] == sig:          # unchanged ledger -> skip re-hashing on the hot path
-        return memo[1]
     h = hashlib.sha256()
     found = False
     for p in paths:
@@ -91,30 +78,38 @@ def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
         except OSError:
             continue
     val = h.hexdigest()[:12] if found else "none"
-    _BASIS_MEMO[key] = (sig, val)
     return val
 
 
 # --- ARTIFACT (A383, 2026-10-23: Claude's review of Codex's model-replacement study, Tetsu concurring) ----------
-# The key held the model NAME + basis. A controlled study (research/model-replacement-2026-10-23 in Mutual,
-# reproduced) showed a SAME-NAME gap: a swapped endpoint, or new bytes under the same local model file, left the key
-# unchanged and could serve a stale verdict -- a fail-OPEN corner, since a stale CLEAN admits what the current judge
-# might block. This folds a cheap fingerprint of the ACTUAL artifact into the key so any real change -- even
-# same-name -- misses and re-judges (fail-closed). Knowable from the judge's side: the ENDPOINT by value, and the
-# local model file by (size, mtime) when the name resolves to one in models/. An external server we do not own folds
-# a stable 'artifact=unknown' -- no regression, and the endpoint still catches an endpoint change. The residual
-# (same endpoint + same name + changed bytes on a server we cannot inspect) is NOT closed, by construction, exactly
-# as the study said: discovering a remote artifact's identity is a separate, unsolved problem.
+# Content identity must survive same-size replacements with preserved timestamps.
+# Read the bytes on each lookup: metadata alone cannot prove content identity on
+# every supported filesystem. This is deliberately conservative. Large local GGUF
+# files incur a full read per lookup; an activation-time, verified digest protocol
+# is a future optimization, not something a mutable sidecar can safely assert.
+# Remote same-name replacements remain unknown; this does not attest a server's
+# loaded weights or close that separate protocol gap.
 def artifact_version(model, endpoint=None, models_dir=None):
     ep = os.environ.get("COVENANT_LOCAL_JUDGE_URL", "") if endpoint is None else str(endpoint)
     sig = "endpoint=" + ep
     d = models_dir or os.path.join(_REPO, "models")
     for p in (os.path.join(d, str(model)), os.path.join(d, str(model) + ".gguf")):
         try:
-            st = os.stat(p)
-            return sig + "::file=%s,%d,%d" % (os.path.basename(p), st.st_size, int(st.st_mtime))
-        except OSError:
+            h = hashlib.sha256()
+            with open(p, "rb") as f:
+                before = os.fstat(f.fileno())
+                for block in iter(lambda: f.read(1024 * 1024), b""):
+                    h.update(block)
+                after = os.fstat(f.fileno())
+            # Do not cache against a file observed changing during the read.
+            fields = ("st_size", "st_mtime_ns", "st_ctime_ns")
+            if any(getattr(before, k) != getattr(after, k) for k in fields):
+                return sig + "::artifact=unstable"
+            return sig + "::file=" + os.path.basename(p) + ",sha256=" + h.hexdigest()
+        except FileNotFoundError:
             continue
+        except OSError:
+            return sig + "::artifact=unreadable"
     return sig + "::artifact=unknown"
 
 
