@@ -79,6 +79,15 @@ def main():
     os.environ["COVENANT_MODEL_STUB"] = "1"
     m = fresh_master()
     client = m.api.app.test_client()
+    # Remedy (2026-10-24, sweep_red): in production the watchdog always leaves a fresh highway pass,
+    # so /pc/3d/state reads it and never live-senses. The sweep runs no watchdog, so a COLD /pc/3d/state
+    # live-sensed the whole highway under load and hung past the 180 s cap (standalone 8 s, staged 90 s+).
+    # Seed a fresh pass here, mirroring the running system -- the same "cached state, never a live probe"
+    # design the phone uses (its health is a signed check-in). PC1z4 below still tests sense-vs-pass.
+    import covenant_highway as _HWBOOT
+    _PC1_BOOT_SENSE = tempfile.mktemp(suffix="_pc1_boot_sense.json")
+    os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = _PC1_BOOT_SENSE
+    _HWBOOT.save_last_sense({k: {"state": "absent"} for k in _HWBOOT.DETECTORS}, path=_PC1_BOOT_SENSE)
     # ---- A194 (2026-09-21, his words: "I want it to be a 3d interactive app ... with a symbol that
     # mirrors the phone app"): the 3D page and its state, tailnet only, the phone's icon inlined.
     r3 = get(client, "/pc/3d", "100.72.0.10")
@@ -198,7 +207,7 @@ def main():
               (hw, hw2))
     finally:
         HW.sense, P3.STATE_TTL = real_sense, real_ttl
-        os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)
+        os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = _PC1_BOOT_SENSE  # restore the boot pass so later state calls stay cached, never cold-sense
 
     # ---- PC1z7 (2026-09-27, his words: "continue to update and refine both the pc and
     # phone apps to catch up to other ai apps and platforms"): three chat-parity features on
