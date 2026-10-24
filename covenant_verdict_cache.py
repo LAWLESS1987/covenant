@@ -95,6 +95,29 @@ def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
     return val
 
 
+# --- ARTIFACT (A383, 2026-10-23: Claude's review of Codex's model-replacement study, Tetsu concurring) ----------
+# The key held the model NAME + basis. A controlled study (research/model-replacement-2026-10-23 in Mutual,
+# reproduced) showed a SAME-NAME gap: a swapped endpoint, or new bytes under the same local model file, left the key
+# unchanged and could serve a stale verdict -- a fail-OPEN corner, since a stale CLEAN admits what the current judge
+# might block. This folds a cheap fingerprint of the ACTUAL artifact into the key so any real change -- even
+# same-name -- misses and re-judges (fail-closed). Knowable from the judge's side: the ENDPOINT by value, and the
+# local model file by (size, mtime) when the name resolves to one in models/. An external server we do not own folds
+# a stable 'artifact=unknown' -- no regression, and the endpoint still catches an endpoint change. The residual
+# (same endpoint + same name + changed bytes on a server we cannot inspect) is NOT closed, by construction, exactly
+# as the study said: discovering a remote artifact's identity is a separate, unsolved problem.
+def artifact_version(model, endpoint=None, models_dir=None):
+    ep = os.environ.get("COVENANT_LOCAL_JUDGE_URL", "") if endpoint is None else str(endpoint)
+    sig = "endpoint=" + ep
+    d = models_dir or os.path.join(_REPO, "models")
+    for p in (os.path.join(d, str(model)), os.path.join(d, str(model) + ".gguf")):
+        try:
+            st = os.stat(p)
+            return sig + "::file=%s,%d,%d" % (os.path.basename(p), st.st_size, int(st.st_mtime))
+        except OSError:
+            continue
+    return sig + "::artifact=unknown"
+
+
 # --- CANARY (gap #2, council 2026-10-21) --------------------------------------------------------
 # "zero wrong" was graded only on the synthetic log, never on real turns. The canary gives the real-
 # turn coverage: on a live cache HIT, with probability COVENANT_CACHE_CANARY_PCT, re-judge the turn

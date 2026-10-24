@@ -129,10 +129,13 @@ def _verdict_cache(model):
     # bumps it -> a new key -> every prior cached verdict misses and re-judges (council 2026-10-21,
     # "no exemption: the cache obeys a correction like everything else"). Keyed by (model, basis).
     basis = _vc.basis_version()
-    k = (model, basis)
+    # A383: fold a fingerprint of the ACTUAL artifact (endpoint + local model file by size/mtime) into the key, so a
+    # SAME-NAME change -- a swapped endpoint or new bytes under the same name -- misses and re-judges (fail-closed).
+    artifact = _vc.artifact_version(model)
+    k = (model, basis, artifact)
     c = _VC_CACHES.get(k)
     if c is None:
-        c = _vc.VerdictCache("llm-judge::" + str(model) + "::basis=" + basis)
+        c = _vc.VerdictCache("llm-judge::" + str(model) + "::basis=" + basis + "::" + artifact)
         _VC_CACHES[k] = c
     return c
 

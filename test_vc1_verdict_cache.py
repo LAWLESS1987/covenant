@@ -164,6 +164,55 @@ def main():
         print("VC1 canary: off by default; when on, logs real-turn agreement and catches a real-turn cache-wrong")
     import shutil; shutil.rmtree(d, ignore_errors=True)
 
+    # 10. ARTIFACT INVALIDATION BOTH WAYS (A383): a SAME-NAME change -- a swapped endpoint, or new bytes under the
+    #     same local model file -- re-keys the judge cache so a stale verdict cannot leak; an unchanged artifact
+    #     serves; a name with no local file folds a stable 'artifact=unknown' (no regression). Closes the fail-open
+    #     corner Codex's model-replacement study found and Claude reproduced.
+    import tempfile as _tf
+    md = _tf.mkdtemp()
+    mp = os.path.join(md, "m.gguf"); open(mp, "wb").write(b"x" * 100)
+    a1 = VC.artifact_version("m", endpoint="http://a/v1", models_dir=md)
+    if a1 != VC.artifact_version("m", endpoint="http://a/v1", models_dir=md):
+        fails.append("artifact_version unstable on an unchanged artifact")
+    if VC.artifact_version("m", endpoint="http://b/v1", models_dir=md) == a1:
+        fails.append("artifact_version did NOT change on a changed endpoint (same name) -- fail-open gap open")
+    open(mp, "wb").write(b"x" * 200)                      # new bytes under the same name
+    if VC.artifact_version("m", endpoint="http://a/v1", models_dir=md) == a1:
+        fails.append("artifact_version did NOT change when the local model file changed (same name)")
+    an = VC.artifact_version("nosuch", endpoint="http://a/v1", models_dir=md)
+    if "artifact=unknown" not in an:
+        fails.append("unresolvable artifact did not fold a stable marker")
+    if VC.artifact_version("nosuch", endpoint="http://a/v1", models_dir=md) != an:
+        fails.append("unresolvable artifact not stable across calls (would needlessly miss)")
+    try:
+        import covenant_judge_local as JL3
+    except Exception:                                    # noqa: BLE001
+        print("VC1 artifact-wiring: covenant_judge_local unavailable here -- skipped (UNDETERMINED)")
+    else:
+        _origart = VC.artifact_version
+        try:
+            JL3._VC_CACHES.clear()
+            VC.artifact_version = lambda *a, **k: "ART1"
+            ca = JL3._verdict_cache("m")
+            ca.put("ONLY-UNDER-ART1", {"violates": True})
+            if "ART1" not in ca.policy_version:
+                fails.append("artifact-wiring: artifact fingerprint not in the policy key")
+            VC.artifact_version = lambda *a, **k: "ART2"   # same name, changed endpoint/bytes
+            cc = JL3._verdict_cache("m")
+            if cc is ca:
+                fails.append("artifact-wiring: an artifact change did NOT re-key the cache")
+            if cc.get("ONLY-UNDER-ART1") is not None:
+                fails.append("artifact-wiring: a verdict survived an artifact change (stale leaked past a same-name swap)")
+            VC.artifact_version = lambda *a, **k: "ART1"   # control: same artifact serves the old entry (re-key, not a wipe)
+            if JL3._verdict_cache("m").get("ONLY-UNDER-ART1") is None:
+                fails.append("artifact-wiring control: same-artifact entry not served (re-key is vacuous)")
+            if not any("artifact-wiring" in f for f in fails):
+                print("VC1 artifact-wiring: a same-name endpoint/bytes change re-keys the judge cache; stale cannot leak")
+        finally:
+            VC.artifact_version = _origart
+            JL3._VC_CACHES.clear()
+    shutil.rmtree(md, ignore_errors=True)
+
     if fails:
         print("VC1 FAIL:")
         for f in fails:
