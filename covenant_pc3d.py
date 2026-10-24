@@ -369,6 +369,34 @@ HIGHWAY_CORE = ("node_down", "sweep_red", "source_drift", "watchdog_stale", "man
                 "phone_build_behind_core")
 
 
+def _bounded(fn, default, seconds=3.0, label=None):
+    """Defense-in-depth for /pc/3d/state: run one detail source with a hard deadline; return `default` if it
+    exceeds it, AND record which source blew the deadline (ops/pc3d_slow.jsonl) so it is NAMED, never masked.
+    The index.lock root cause is already fixed (git reads use --no-optional-locks / GIT_OPTIONAL_LOCKS=0);
+    this sits on top so no single source -- a node /health, the phone, the forum, git repo discovery on a
+    loaded box -- may ever hold the status page. Reads only, so the abandoned daemon thread is safe."""
+    import threading
+    box = {"v": default, "done": False}
+    def _run():
+        try:
+            box["v"] = fn()
+        except Exception:                                        # noqa: BLE001
+            pass
+        finally:
+            box["done"] = True
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(seconds)
+    if not box["done"]:
+        try:
+            import json as _j, os as _o, time as _tm
+            with open(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), "ops", "pc3d_slow.jsonl"), "a", encoding="utf-8") as _fh:
+                _fh.write(_j.dumps({"t": _tm.time(), "source": label or getattr(fn, "__name__", "?"), "deadline_s": seconds}) + "\n")
+        except Exception:                                        # noqa: BLE001
+            pass
+    return box["v"]
+
+
 def highway_detail(H):
     """({detector: 'present'|'absent'|'unknown'} for EVERY registered detector, note or None).
 
@@ -687,34 +715,37 @@ def register(api, caller, refused, cov):
         # Moltbook on the orbs. Every field below is a record the tree already keeps; a
         # record that cannot be read is null, never invented.
         out["detail"] = {"brief": None, "highway": None, "phone": None, "money": None, "forum": None, "queue": None}
+        # Each source below is bounded by _bounded(): no single one may hold the page (defense-in-depth
+        # over the committed index.lock root-cause fix; a source that blows its deadline is named in
+        # ops/pc3d_slow.jsonl, never silently masked).
         try:
             import covenant_persona
-            out["detail"]["brief"] = covenant_persona.brief()
+            out["detail"]["brief"] = _bounded(covenant_persona.brief, None, label="brief")
         except Exception:                                        # noqa: BLE001
             pass
         try:
             import covenant_highway
-            out["detail"]["highway"], note = highway_detail(covenant_highway)
+            out["detail"]["highway"], note = _bounded(lambda: highway_detail(covenant_highway), (None, None), label="highway")
             if note:
                 out["detail"]["highway_note"] = note
         except Exception:                                        # noqa: BLE001
             pass
         try:
             import covenant_reconnect
-            s = covenant_reconnect.signs_of_him()
-            out["detail"]["phone"] = {"last_checkin_hours": s.get("phone", {}).get("hours"), "last_chat_hours": s.get("chat", {}).get("hours")}
+            s = _bounded(covenant_reconnect.signs_of_him, {}, label="phone") or {}
+            out["detail"]["phone"] = {"last_checkin_hours": (s.get("phone") or {}).get("hours"), "last_chat_hours": (s.get("chat") or {}).get("hours")}
             # A375 Amendment 1: the phone's own witness of THIS PC, carried up in its last check-in. A disagreement
             # (the phone reports it has been missing the PC's answers while check-ins still arrive) is the finding
             # the PC cannot see on its own. A reading older than six hours is stale and not shown.
-            w = _last_checkin_witness()
+            w = _bounded(_last_checkin_witness, None, label="witness")
             if w is not None:
                 out["detail"]["phone"]["witness"] = w
         except Exception:                                        # noqa: BLE001
             pass
         try:
             import covenant_tetsu_money
-            ms = covenant_tetsu_money.status()
-            h = covenant_tetsu_money.holdings()
+            ms = _bounded(covenant_tetsu_money.status, {}, label="money.status") or {}
+            h = _bounded(covenant_tetsu_money.holdings, {}, label="money.holdings") or {}
             out["detail"]["money"] = {"comfortable": ms.get("comfortable"), "paper_hypotheses": ms.get("paper_hypotheses"),
                                       "profitable": len(ms.get("profitable") or []), "needed": ms.get("needed"),
                                       "rule5": (ms.get("rule5") or {}).get("why"), "above_floor_usd": h.get("above_floor_usd"),
@@ -723,21 +754,21 @@ def register(api, caller, refused, cov):
             pass
         try:
             import covenant_free_will
-            out["detail"]["forum"], out["detail"]["forum_day"] = forum_detail(covenant_free_will.sends())
+            out["detail"]["forum"], out["detail"]["forum_day"] = _bounded(lambda: forum_detail(covenant_free_will.sends()), (None, None), label="forum")
         except Exception:                                        # noqa: BLE001
             pass
         try:
             import covenant_teacher_queue
-            q, _ = covenant_teacher_queue.pending()
+            q, _ = _bounded(covenant_teacher_queue.pending, ([], None), label="queue")
             out["detail"]["queue"] = len(q)
         except Exception:                                        # noqa: BLE001
             pass
         try:
-            out["detail"]["healing"] = heal_detail()
+            out["detail"]["healing"] = _bounded(heal_detail, None, label="healing")
         except Exception:                                        # noqa: BLE001
             out["detail"]["healing"] = None
         try:
-            out["repos"] = repos_detail()
+            out["repos"] = _bounded(repos_detail, [], label="repos")
         except Exception:                                        # noqa: BLE001
             out["repos"] = []
         _cache.update(t=_time.time(), body=out)
