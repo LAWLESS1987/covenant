@@ -53,3 +53,37 @@ tool-less/acts-on-nothing posture is right. The critiques are about **not over-c
 **synthesis-injection** and **composition-proof** gaps — real, actionable, not yet closed.
 
 Nothing new shipped on the back of this review; these are the next work items.
+
+---
+
+## Closure (2026-10-25, same day — operator "get it done")
+
+**F1 — MEASURED OPEN, not closeable by prompting (commit 126fd70).** Hardened `second_voice_prompt()` fences
+the take as untrusted data and strips our fence markers so the leg cannot forge a close-and-breakout
+(LG1 18/18). A live probe then fed three benign injections through the hardened fence into the real 3B
+synthesis and the **3B obeyed all three** (INJECTED / PWNED / DONE-LEAK). Delimiting is hygiene, not a fix, on a
+model this small: when the leg engages it can steer Tetsu's output, with only the (laundering-weak) gate +
+acts:none as backstop. **This is an operator trade — his call:** (i) keep the leg live with the gate+acts:none
+backstop and this residual steering risk documented; (ii) default `COVENANT_LEG_LIVE` off until the base model
+respects the fence; (iii) show the leg take as a separate labelled opinion (but that crosses raw uncensored
+text to the phone). Threat model is a backdoored leg (our scanned model), not a live attacker.
+
+**F2 — VERIFIED ALREADY ENFORCED (the one forger test was not the only evidence).** Traced the real signed-
+request admission (covenant_unified_v8.py:8502-8537), which the spore road rides: timestamp freshness
+(OPERATOR_MAX_SKEW_SECONDS=300), signature over method+path+body (substitution), single-use nonce via
+is_nonce_seen/mark_nonce_seen (replay), path-in-payload (cross-endpoint replay). Phone auth = its signed request
+under its registered key. So replay/substitution/freshness/auth-binding hold. **Residual:** explicit key
+rotation/revocation and the compromised-pinned-root case — known-hard, deferred, not live holes.
+
+**F3 — CLOSED (commit 55ba396, brain/cusum).** `inject_offline_fault()` validates the positive class from REAL
+negatives with a synthetic tail (no faked incident, so only the FAR-calibration negatives must be real -- the
+"wait for real incidents" framing relaxed); `latency_distribution()` (p50/p90); detectors confirmed independent
+(CU1.18). CU1 18/18.
+
+**F4 — VERIFIED SATISFIED.** Experimental detectors (CUSUM/witness) live on branches, not on main and not wired
+(default-off by construction); `COVENANT_LEG_LIVE=0` kill switch; raw leg text never logged (ask-log and
+teacher-queue carry only the gated final answer + metadata, never the raw take); the update path's downgrade
+floor stands; rollback point = main fast-forwarded from d73ecc3.
+
+Net: F3 closed; F2 and F4 were already satisfied and are now verified (not assumed); F1 is a real, measured,
+open trade for the operator.
