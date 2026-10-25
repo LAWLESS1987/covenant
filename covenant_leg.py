@@ -208,6 +208,83 @@ def senses_need(text, state_path=None, uncertainty=None):
     return False, "3B confident: mean_entropy %.3f < %.2f%s -- 3B answers alone; novelty=%s" % (ent, ENTROPY_ENGAGE, conf, nov)
 
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+# Append-only tombstone of every leg-INFLUENCED learning write. "learned doesn't mean used" (operator 2026-10-25):
+# Tetsu MAY learn from the leg -- but any write to his growth that the leg influenced is TAGGED and REVERSIBLE,
+# so drift is undoable (the project's own rule: move aside with a record, never forbid). This ledger is where a
+# wired learning-writer records that a precept/practice/register row was shaped with a leg take, and reverse_
+# learning_write() undoes it by that tag. Env-overridable like the other ledgers.
+LEG_INFLUENCE_LEDGER = os.environ.get("COVENANT_LEG_INFLUENCE_LEDGER") or os.path.join(HERE, "ops", "leg_influence.jsonl")
+
+
+def tag_learning_write(target_path, record, attribution, ledger_path=None):
+    """Make a leg-influenced learning write REVERSIBLE. Stamp `record` with leg provenance, append it to
+    target_path (JSONL, the project's append idiom), and log a tombstone to the influence ledger so it can be
+    undone by tag. Returns the tombstone dict (carries the tag). -> this is the write-site call the operator's
+    "learned doesn't mean used" asks for: learning flows, but tagged and reversible, never walled off.
+
+    Unlike route(), this does NOT swallow IO errors: a learning write whose tombstone failed to record is NOT
+    silently reversible, so it must fail loud rather than leave an untracked write behind."""
+    ledger_path = ledger_path or LEG_INFLUENCE_LEDGER
+    at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    rec_json = json.dumps(record, ensure_ascii=False, sort_keys=True)
+    payload_sha = (attribution or {}).get("payload_sha256", "")
+    tag = hashlib.sha256(("%s|%s|%s|%s" % (payload_sha, target_path, rec_json, time.time())).encode("utf-8")).hexdigest()[:16]
+    stamped = dict(record)
+    stamped["_leg"] = {"tag": tag, "payload_sha256": payload_sha, "model": (attribution or {}).get("model"),
+                       "reversible": True, "at": at}
+    stamped_json = json.dumps(stamped, ensure_ascii=False, sort_keys=True)
+    with open(target_path, "a", encoding="utf-8") as fh:               # the learning write itself, now tagged
+        fh.write(stamped_json + "\n")
+    tomb = {"tag": tag, "target": target_path, "at": at, "reversed": False,
+            "record_sha256": hashlib.sha256(stamped_json.encode("utf-8")).hexdigest(),
+            "attribution": attribution}
+    with open(ledger_path, "a", encoding="utf-8") as fh:               # the tombstone that makes it undoable
+        fh.write(json.dumps(tomb, ensure_ascii=False, sort_keys=True) + "\n")
+    return tomb
+
+
+def reverse_learning_write(tag, target_path=None, ledger_path=None):
+    """Undo a leg-influenced learning write by its tag: remove the stamped row from its target (found by _leg.tag),
+    PRESERVE the removed row in <target>.leg-reversed (never deleted -- tombstone rule), and append a 'reversed'
+    row to the ledger. Returns the number of rows removed. target_path is read from the ledger if not given."""
+    ledger_path = ledger_path or LEG_INFLUENCE_LEDGER
+    if target_path is None:
+        with open(ledger_path, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    t = json.loads(line)
+                except Exception:                          # noqa: BLE001
+                    continue
+                if t.get("tag") == tag and t.get("target"):
+                    target_path = t["target"]
+                    break
+    if not target_path or not os.path.exists(target_path):
+        return 0
+    kept, removed = [], []
+    with open(target_path, encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                if json.loads(line).get("_leg", {}).get("tag") == tag:
+                    removed.append(line)
+                    continue
+            except Exception:                              # noqa: BLE001
+                pass
+            kept.append(line)
+    if not removed:
+        return 0
+    with open(target_path + ".leg-reversed", "a", encoding="utf-8") as fh:   # moved aside, kept whole
+        for line in removed:
+            fh.write(line if line.endswith("\n") else line + "\n")
+    with open(target_path, "w", encoding="utf-8") as fh:
+        fh.writelines(kept)
+    with open(ledger_path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"tag": tag, "target": target_path, "reversed": True, "n": len(removed),
+                             "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+                            ensure_ascii=False, sort_keys=True) + "\n")
+    return len(removed)
+
+
 def leg_available(timeout=3):
     """Is the leg's server up? Read-only; never raises."""
     try:

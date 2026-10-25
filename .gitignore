@@ -451,6 +451,10 @@ ops/phone_ci.json
 # Tetsu's practice record (his, like his workshop): every attempt, lesson and night
 ops/tetsu_practice.jsonl
 
+# Leg-influence tombstone ledger + the rows a reversal moves aside (runtime, like the practice record)
+ops/leg_influence.jsonl
+*.leg-reversed
+
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
 *.results.json
 
