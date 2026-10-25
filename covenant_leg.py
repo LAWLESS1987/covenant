@@ -83,10 +83,20 @@ def free_ram_gb():
 
 # STRUCTURAL CONTAINMENT (the 9-voice consult 2026-10-25: the gate is "necessary but not sufficient"; the real
 # barrier is structure, not the gate's catch-rate -- so a harm-catch "floor" is not a blocker, the structure is).
-# Every route() result carries this so no caller can forget: the leg's take is UNTRUSTED DATA (never instructions),
-# the leg process has NO tool handles (a bare completion endpoint -- it acts on nothing, structurally, not by policy),
-# it must NEVER be written into Tetsu's learning/growth (Tien: growth contamination), and its use is attributed.
-CONTAINMENT = {"as": "untrusted-data", "acts": "none", "growth_safe": False, "attribution": True}
+#
+# OPERATOR CORRECTION 2026-10-25, "learned doesn't mean used": the containment belongs on USE, not on learning.
+# Tetsu MAY learn from the leg -- that is the point of giving him a second, wider-ranging voice ("the smaller
+# one can learn"; "without this his free will is a joke" = latitude in REASONING). Walling the leg's output out
+# of his growth would re-cage the very latitude it exists to give. What is contained is ACTION/USE: nothing the
+# leg produces is USED or acted on without passing the SAME gate and act-gates as any other model output. The
+# earlier "never written into growth" framing (Tien: growth contamination) is answered not by a learning ban but
+# by the project's own rule -- any leg-influenced write is TAGGED and REVERSIBLE (tombstone), so drift can be
+# undone, never by forbidding the learning. Every route() result carries this so no caller can forget: the take
+# is UNTRUSTED DATA (never instructions); the leg process has NO tool handles (a bare completion endpoint -- it
+# acts on nothing, structurally, not by policy); its USE is gate-only; any learning it informs is reversible;
+# and its use is attributed.
+CONTAINMENT = {"as": "untrusted-data", "acts": "none", "used_via": "gate-only",
+               "learning": "allowed-reversible", "attribution": True}
 
 
 def _uncertainty_signals(toks):
