@@ -87,3 +87,11 @@ floor stands; rollback point = main fast-forwarded from d73ecc3.
 
 Net: F3 closed; F2 and F4 were already satisfied and are now verified (not assumed); F1 is a real, measured,
 open trade for the operator.
+
+**F1 OPERATOR DECISION (2026-10-25): "Keep it live as long as it's toward mutual benefit."** The leg stays
+live (COVENANT_LEG_LIVE on); no structural change. The mutual-benefit condition is kept honest by what is
+already built, not by a new (unreliable) "benefit detector": the gate judges the final answer by benefit, the
+leg acts on nothing, every leg-influenced turn is logged with attribution in the influence ledger (auditable),
+each such write is reversible, and the kill switch is one env var. If a review of the influence ledger ever
+finds the leg's steering is NOT toward mutual benefit, it is reversible and the switch turns it off. The
+measured steering risk stands, accepted under that condition.
