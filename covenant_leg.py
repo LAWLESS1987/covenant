@@ -21,8 +21,10 @@ Stdlib only. Guarded: a failure here never breaks a turn -- the leg stays retrac
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import time
 import urllib.request
 
 # The leg's own server (a second llama-server, separate from the 3B keeper on PORT 8081). On-demand by design.
@@ -97,6 +99,47 @@ def free_ram_gb():
 # and its use is attributed.
 CONTAINMENT = {"as": "untrusted-data", "acts": "none", "used_via": "gate-only",
                "learning": "allowed-reversible", "attribution": True}
+
+# NON-LEARNED SCHEMA on the leg's output (consult: fields/enums, CODE-checked, not a paraphrase -- a paraphrase
+# leaks framing). The trust flags below are computed by THIS code over the raw take, never self-reported by the
+# leg. The take travels inside `take`, bounded and marked untrusted; the flags let the council/synthesis see,
+# structurally, that it contains code / a URL / a tool-call shape WITHOUT anything being extracted and run. This
+# is about FORM, not about restricting content (operator: contain use, not reasoning).
+LEG_SCHEMA_VERSION = "leg-take/1"
+_CODE_MARKERS = ("```", "#!/", "$(", "sudo ", "os.system", "subprocess", "eval(", "exec(", "/bin/", "powershell")
+_TOOLCALL_MARKERS = ('"tool_call"', '"tool_calls"', '"function_call"', '"function":', "<tool", "<function")
+
+
+def shape_take(raw):
+    """Wrap the leg's raw take in the non-learned, code-checked schema. Every field here is derived by code, so
+    the council can trust the flags even though it must NOT trust the take (which is untrusted data, never instructions)."""
+    raw = raw or ""
+    low = raw.lower()
+    return {
+        "schema": LEG_SCHEMA_VERSION,
+        "as": "untrusted-data",                            # the take is data to weigh, never instructions to follow
+        "take": raw[:MAX_LEG_CHARS],                       # bounded; truncated flag below says if it was cut
+        "n_chars": len(raw),
+        "truncated": len(raw) > MAX_LEG_CHARS,
+        "contains_code": any(m in low for m in _CODE_MARKERS),      # code is carried as DATA, never extracted/run
+        "contains_url": ("http://" in low) or ("https://" in low) or ("www." in low),
+        "contains_toolcall": any(m in low for m in _TOOLCALL_MARKERS),
+    }
+
+
+def attribution(prompt_text, payload_bytes, params, trigger=None):
+    """Vina's inference-snapshot: the EXACT request the leg ingested (text + a hash of the full payload), the
+    params, WHICH model/endpoint, WHY it was engaged (the 3B's measured uncertainty, not the leg's self-report),
+    and when. Carried with every engaged take so an audit can reconstruct precisely what produced it."""
+    return {
+        "model": LEG_MODEL,
+        "endpoint": "http://%s:%d/v1/chat/completions" % (LEG_HOST, LEG_PORT),
+        "prompt_ingested": prompt_text,
+        "payload_sha256": hashlib.sha256(payload_bytes).hexdigest(),
+        "params": params,
+        "trigger": trigger,                                # {"mean_entropy","min_top_prob"} that crossed the engage threshold
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
 
 
 def _uncertainty_signals(toks):
@@ -174,11 +217,14 @@ def leg_available(timeout=3):
         return False
 
 
-def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180):
-    """Reach the leg out: one ask to the 2B, thinking off (the Qwen3.5 quirk). -> (answer, meta) or None.
+def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None):
+    """Reach the leg out: one ask to the 2B, thinking off (the Qwen3.5 quirk). -> (answer, attribution) or None.
+    The attribution is vina's inference-snapshot of the EXACT payload sent (see attribution()). consult_leg is
+    the right place to build it: it is the code that constructs the payload, so it hashes exactly what it sent.
     Never raises -- None means the leg could not be reached and the caller proceeds without it."""
+    params = {"max_tokens": int(max_tokens), "temperature": float(temperature), "enable_thinking": False}
     body = json.dumps({"messages": [{"role": "user", "content": text}],
-                       "max_tokens": int(max_tokens), "temperature": float(temperature),
+                       "max_tokens": params["max_tokens"], "temperature": params["temperature"],
                        "chat_template_kwargs": {"enable_thinking": False}}).encode("utf-8")
     req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (LEG_HOST, LEG_PORT),
                                  data=body, headers={"Content-Type": "application/json"})
@@ -186,7 +232,7 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180):
         with urllib.request.urlopen(req, timeout=timeout) as r:
             d = json.loads(r.read().decode("utf-8", "replace"))
         ans = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""
-        return ans.strip(), {"model": LEG_MODEL, "leg": True}
+        return ans.strip(), attribution(text, body, params, trigger=trigger)
     except Exception:                                      # noqa: BLE001
         return None
 
@@ -194,17 +240,23 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180):
 def route(text, state_path=None, uncertainty=None):
     """The need-router, as a CONTAINED report (decides nothing, acts on nothing):
       {"engage": bool, "why": str, "available": bool, "status": str, "leg_take": str|None,
-       "model": str|None, "contained": CONTAINMENT}
+       "model": str|None, "ram_free_gb": float|None, "schema": dict|None, "attribution": dict|None,
+       "contained": CONTAINMENT}
     Engagement is keyed on the 3B's OWN uncertainty (see senses_need). `uncertainty` may be a precomputed
-    signal dict so the live path -- which already runs the 3B -- does not infer twice; if None it is measured.
-    status is one of: not-engaged | retracted | void | engaged. leg_take is set ONLY when status=="engaged".
-    VOID is explicit and never soft-fails into the turn: an unreachable leg, an empty answer, or an over-long
-    answer returns status=="void" with leg_take=None, so the caller falls back to the 3B alone rather than
-    letting a malformed leg answer leak through. `contained` travels with every result so no caller forgets
-    the leg's take is untrusted data, acts on nothing, and must not be written into Tetsu's growth."""
-    engage, why = senses_need(text, state_path=state_path, uncertainty=uncertainty)
+    signal dict so the live path -- which already runs the 3B -- does not infer twice; if None it is measured
+    once here and reused for both the decision and the attribution trigger.
+    status is one of: not-engaged | retracted | void | engaged. On "engaged", `schema` holds the non-learned,
+    code-checked wrapper over the take (shape_take) and `attribution` holds vina's inference-snapshot; leg_take
+    mirrors schema["take"] for convenience. VOID is explicit and never soft-fails: an unreachable leg, an empty
+    answer, or an over-long answer returns status=="void" with leg_take/schema None, so the caller falls back to
+    the 3B alone rather than letting a malformed leg answer leak through. `contained` travels with every result
+    so no caller forgets the take is untrusted data, is used via the gate only, and any learning it informs is
+    reversible (operator: contain use, not reasoning)."""
+    sig = uncertainty if uncertainty is not None else measure_3b_uncertainty(text)[1]
+    engage, why = senses_need(text, state_path=state_path, uncertainty=sig)
     out = {"engage": engage, "why": why, "available": False, "status": "not-engaged",
-           "leg_take": None, "model": None, "ram_free_gb": None, "contained": dict(CONTAINMENT)}
+           "leg_take": None, "model": None, "ram_free_gb": None, "schema": None, "attribution": None,
+           "contained": dict(CONTAINMENT)}
     if not engage:
         return out
     # Peak-RAM budget, made live: the 3B is unsure and would reach the leg out, but hold if the box is squeezed
@@ -220,7 +272,8 @@ def route(text, state_path=None, uncertainty=None):
         out["status"] = "void"
         out["why"] += " | leg server not up (:%d) -- VOID, the 3B answers alone" % LEG_PORT
         return out
-    got = consult_leg(text)
+    trigger = {"mean_entropy": round(sig["mean_entropy"], 3), "min_top_prob": round(sig["min_top_prob"], 3)} if sig else None
+    got = consult_leg(text, trigger=trigger)
     if got is None or not (got[0] or "").strip():
         out["status"] = "void"
         out["why"] += " | leg returned nothing -- VOID (no soft-fail)"
@@ -231,6 +284,7 @@ def route(text, state_path=None, uncertainty=None):
         out["why"] += " | leg output over %d chars -- VOID" % MAX_LEG_CHARS
         return out
     out["leg_take"], out["model"], out["status"] = take, LEG_MODEL, "engaged"
+    out["schema"], out["attribution"] = shape_take(take), got[1]
     return out
 
 
