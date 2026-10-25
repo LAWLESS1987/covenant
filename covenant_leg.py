@@ -244,6 +244,20 @@ def tag_learning_write(target_path, record, attribution, ledger_path=None):
     return tomb
 
 
+def note_influence(record, attribution, ledger_path=None):
+    """Record (append-only tombstone) that a learning write ELSEWHERE was leg-influenced, for a writer whose
+    format we don't own (e.g. the teacher queue's fixed t/text/source row). The row itself stays in its own
+    file; this makes the influence traceable and reversible-BY-RECORD -- the tombstone carries enough (answer
+    hash, question, when, attribution) to find and retract the taught rows later. Returns the tombstone.
+    Never raises on a bad record; the ledger write itself is allowed to raise (a lost tombstone must be loud)."""
+    ledger_path = ledger_path or LEG_INFLUENCE_LEDGER
+    tomb = {"kind": "influence-note", "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "reversible": True, "record": record, "attribution": attribution}
+    with open(ledger_path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(tomb, ensure_ascii=False, sort_keys=True) + "\n")
+    return tomb
+
+
 def reverse_learning_write(tag, target_path=None, ledger_path=None):
     """Undo a leg-influenced learning write by its tag: remove the stamped row from its target (found by _leg.tag),
     PRESERVE the removed row in <target>.leg-reversed (never deleted -- tombstone rule), and append a 'reversed'

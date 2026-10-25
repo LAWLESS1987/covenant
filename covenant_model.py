@@ -632,8 +632,12 @@ def _rates(d):
     return out
 
 
-def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
-    """One chat completion. messages: [{"role","content"}...]. Returns (text, meta) or raises."""
+def ask(messages, max_tokens=700, temperature=0.3, timeout=180, logprobs=False):
+    """One chat completion. messages: [{"role","content"}...]. Returns (text, meta) or raises.
+    logprobs=True (opt-in; default off so no other caller changes) also asks the server for per-token
+    logprobs and returns them in meta["logprobs"] (the choices[0].logprobs.content list, or None). The
+    agent door uses this to read the 3B's OWN uncertainty from the answer it already produces -- no extra
+    inference -- to decide whether to reach the octopus leg out (covenant_leg)."""
     if os.environ.get("COVENANT_MODEL_STUB"):
         last = messages[-1]["content"] if messages else ""
         # A scripted answer (2026-09-21, A175): a user line beginning "STUB>> " is
@@ -660,8 +664,12 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     # reasoning and returned an empty answer (finish=length); with it, it answered in 2.8 s. The 3B
     # answered normally with the same field in both of its exam runs (A252); a template that does not
     # use the variable ignores it.
-    body = json.dumps({"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature),
-                       "chat_template_kwargs": {"enable_thinking": False}}).encode("utf-8")
+    _payload = {"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature),
+                "chat_template_kwargs": {"enable_thinking": False}}
+    if logprobs:
+        _payload["logprobs"] = True
+        _payload["top_logprobs"] = 5
+    body = json.dumps(_payload).encode("utf-8")
     req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (HOST, PORT), data=body,
                                  headers={"Content-Type": "application/json"})
     t0 = time.time()
@@ -675,8 +683,11 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180):
     _mark_used()
     text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
     usage = d.get("usage", {}) or {}
-    return text, {"model": _read_state().get("model", "?"), "tokens": int(usage.get("completion_tokens", 0) or 0),
-                  "ms": int((time.time() - t0) * 1000)}
+    meta = {"model": _read_state().get("model", "?"), "tokens": int(usage.get("completion_tokens", 0) or 0),
+            "ms": int((time.time() - t0) * 1000)}
+    if logprobs:
+        meta["logprobs"] = ((d.get("choices", [{}])[0].get("logprobs") or {}).get("content")) or None
+    return text, meta
 
 
 class ContextTooLong(RuntimeError):
