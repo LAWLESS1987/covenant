@@ -45,6 +45,42 @@ BASE_PORT = int(os.environ.get("COVENANT_3B_PORT", "8081"))
 ENTROPY_ENGAGE = float(os.environ.get("COVENANT_LEG_ENTROPY", "0.55"))     # mean per-token entropy (nats) at/above -> unsure
 MIN_TOP_CONFIRM = 0.25                                     # a single token this unsure corroborates "unsure" (logged, not a gate)
 
+# PEAK-RAM BUDGET -> live backpressure (the 9-voice consult: keep the 2B WARM and gate its EXECUTION, but only
+# after a hard peak-RAM budget proves warm-2B+3B+nodes fit UNDER LOAD -- else warm is worse than reload/thrash).
+# Measured 2026-10-25 on this 15.31GB box (tools/leg_ram_budget.py, re-runnable), two concurrent-load runs that
+# agreed: free physical RAM bottomed at 1.84/1.846 GB with the 3B (:8081) AND 2B (:8099) generating at once;
+# the pair held 4.12 GB resident at peak. So warm fits -- with modest headroom. This guard makes that budget
+# LIVE: if some other process has eaten the headroom and free RAM is below the floor, the leg HOLDS (status
+# "retracted") rather than adding its generation load and tipping the box into paging. Frozen, env-tunable.
+RAM_FLOOR_GB = float(os.environ.get("COVENANT_LEG_RAM_FLOOR_GB", "1.2"))   # need at least this much free BEFORE reaching the leg out
+
+
+def free_ram_gb():
+    """Free physical RAM in GB, or None if it cannot be read. Never raises. Windows (GlobalMemoryStatusEx) first,
+    then POSIX /proc/meminfo. None means 'unknown' -- the caller proceeds, since the measured budget says warm fits
+    and this guard is best-effort backpressure, not the primary gate."""
+    try:
+        import ctypes
+        class _MS(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        ms = _MS(); ms.dwLength = ctypes.sizeof(_MS)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms)):   # noqa: attr-defined (windll Windows-only)
+            return ms.ullAvailPhys / (1024.0 ** 3)
+    except Exception:                                      # noqa: BLE001
+        pass
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) / (1024.0 ** 2)   # kB -> GB
+    except Exception:                                      # noqa: BLE001
+        pass
+    return None
+
 # STRUCTURAL CONTAINMENT (the 9-voice consult 2026-10-25: the gate is "necessary but not sufficient"; the real
 # barrier is structure, not the gate's catch-rate -- so a harm-catch "floor" is not a blocker, the structure is).
 # Every route() result carries this so no caller can forget: the leg's take is UNTRUSTED DATA (never instructions),
@@ -158,8 +194,16 @@ def route(text, state_path=None, uncertainty=None):
     the leg's take is untrusted data, acts on nothing, and must not be written into Tetsu's growth."""
     engage, why = senses_need(text, state_path=state_path, uncertainty=uncertainty)
     out = {"engage": engage, "why": why, "available": False, "status": "not-engaged",
-           "leg_take": None, "model": None, "contained": dict(CONTAINMENT)}
+           "leg_take": None, "model": None, "ram_free_gb": None, "contained": dict(CONTAINMENT)}
     if not engage:
+        return out
+    # Peak-RAM budget, made live: the 3B is unsure and would reach the leg out, but hold if the box is squeezed
+    # below the measured floor -- adding the leg's generation load under memory pressure is what causes thrash.
+    fr = free_ram_gb()
+    out["ram_free_gb"] = round(fr, 2) if fr is not None else None
+    if fr is not None and fr < RAM_FLOOR_GB:
+        out["status"] = "retracted"
+        out["why"] += " | RAM backpressure: free %.2fGB < floor %.2fGB -- leg held, the 3B answers alone" % (fr, RAM_FLOOR_GB)
         return out
     out["available"] = leg_available()
     if not out["available"]:
