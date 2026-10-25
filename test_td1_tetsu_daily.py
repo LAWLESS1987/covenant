@@ -370,7 +370,7 @@ def main():
         realm = (M.alive, M._read_state, M.pick_model, M.MODELS)
         mdir = os.path.join(tmp, "models")
         os.makedirs(mdir)
-        two_b, three_b = "Qwen3.5-2B-Q4_K_M.gguf", "qwen2.5-3b-instruct-q4_k_m.gguf"
+        two_b, three_b = "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf", "qwen2.5-3b-instruct-q4_k_m.gguf"
         for n in (two_b, three_b):
             with open(os.path.join(mdir, n), "wb") as fh:
                 fh.write(b"weights")
@@ -601,7 +601,7 @@ def main():
                                              "tip": "aa" * 32, "genesis": "00" * 32,
                                              "app": "0.1.901+616ee22", "pc_version": "0.1.942+5ae0735"},
                       git_state=lambda: {"head": "7d4d59c", "ahead": 0, "behind": 0},
-                      model_state=lambda: {"file": "Qwen3.5-2B-Q4_K_M.gguf", "running": True},
+                      model_state=lambda: {"file": "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf", "running": True},
                       node_interpreter=lambda: sys.executable,      # == the stubbed VENV_PY: "same as venv"
                       _run=lambda cmd, **k: (0, "".join("%07x commit %d\n" % (i, i) for i in range(30))))
         real4 = {k: getattr(D, k) for k in stubs4}
@@ -626,7 +626,7 @@ def main():
               and any("0.1.942+5ae0735" in w and "0.1.901+616ee22" in w for w in con4),
               (st4.get("phone_node"), q4.get("what_changed"), con4))
         check("TD1t in the cycle: the model line names the weights that RUN as running",
-              "Tetsu's model: Qwen3.5-2B-Q4_K_M.gguf (running)" in con4, con4)
+              "Tetsu's model: Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf (running)" in con4, con4)
         check("TD1u 30 commits since the last record read 30, in the 9 questions and the updates applied (10-07's 44 read 20)",
               "code: 30 commit(s)" in (q4.get("what_changed") or [])
               and any(u["what"] == "code: 30 commit(s)" for u in st4.get("updates_applied") or []), q4.get("what_changed"))

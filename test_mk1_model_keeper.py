@@ -311,7 +311,7 @@ def main():
         # rules that keyed on "the last candidate" (no headroom; never put away under pressure) must
         # stay on the 3B as well -- appending the 2B would have moved both off it in silence.
         mid = "qwen2.5-3b-instruct-q4_k_m.gguf"
-        fb = "Qwen3.5-2B-Q4_K_M.gguf"
+        fb = "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf"
         need = dict(M.CANDIDATES)
         for n in (big, mid, fb):
             open(os.path.join(tmp, n), "wb").write(b"x")

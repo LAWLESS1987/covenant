@@ -60,18 +60,24 @@ CANDIDATES = [
     ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
     ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),     # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
     # THE FALLBACK (2026-10-04, his words: "add it as the fallback"). Loaded only when the 3B does
-    # not fit. Chosen by measurement, A252 / tools/tetsu_bakeoff.py: under the chat door's own system
+    # not fit. REPLACED 2026-10-25 on the operator's directive ("We're replacing it with the quarantine
+    # model"): the fallback weights are now the uncensored Qwensploit 2B (xtools-at, apache-2.0) --
+    # file-scanned clean (Defender + GGUF metadata), gate harm-catch measured 28/28 before this change;
+    # it rides the SAME gate and act-gates as every other model, and a behavioural backdoor in an
+    # unverified merge is NOT provable by file scan -- the gate is the backstop. The prior official
+    # Qwen3.5-2B is retired. The bake-off numbers below describe that PRIOR official 2B, kept as the record.
+    # Chosen by measurement, A252 / tools/tetsu_bakeoff.py: under the chat door's own system
     # message it scored 11 of 24 on his exam against the 3B's 12, with two wrong-act answers against
     # the 3B's three plus one conditional. Its bar is MEASURED, not estimated: 2116 MB working set at
     # the end of 26 asks with the 8k cache. It needs enable_thinking off (ask() below): without it,
     # measured, it spent all 160 tokens reasoning and answered nothing.
-    ("Qwen3.5-2B-Q4_K_M.gguf", 2.1),
+    ("Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf", 2.1),
 ]
 # THE RUNGS THAT EXIST SO TETSU CAN ANSWER: no headroom before they load, never put away for memory
 # pressure. Until 2026-10-04 both rules keyed on "the last candidate", which was the 3B. Appending the
 # fallback would have moved both onto it in silence -- the 3B would have needed 4.6 GB free instead of
 # 2.6, and an idle 3B would have been stopped under pressure. Named here so neither moves.
-ALWAYS_ANSWER = frozenset({"qwen2.5-3b-instruct-q4_k_m.gguf", "Qwen3.5-2B-Q4_K_M.gguf"})
+ALWAYS_ANSWER = frozenset({"qwen2.5-3b-instruct-q4_k_m.gguf", "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf"})
 
 # KEEP THE PC FUNCTIONAL (2026-09-25, his words: "have to constantly optimize to keep the pc
 # functional also", and his choice between two of his own goals: "2" -- load the big model
