@@ -302,14 +302,25 @@ def _note_read(parsed, state):
 
 
 def _atomic_write_jsonl(path, rows):
-    """Write rows to `path` atomically: a temp file in the same directory, then os.replace (atomic on
-    one filesystem). A crash mid-write leaves the original quarantine intact -- never a half-written or
-    truncated file (Codex: an open('w') rewrite that is interrupted loses rows)."""
-    tmp = "%s.tmp.%d" % (path, os.getpid())
-    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-        for r in rows:
-            fh.write(json.dumps(r, sort_keys=True) + "\n")
-    os.replace(tmp, path)
+    """Write rows to `path` atomically: a uniquely-named temp file in the same directory (mkstemp, so two
+    threads cannot collide -- Codex), fsync'd for durability, then os.replace (atomic on one filesystem).
+    A crash mid-write leaves the original intact -- never a half-written or truncated file."""
+    import tempfile
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(prefix=".lvtmp-", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, sort_keys=True) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=None, _locked=False):
@@ -345,58 +356,56 @@ def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=
             release_lock(tok)
 
 
-STALE_LOCK_SECONDS = 7200     # 2h: far beyond any real harvest (seconds) or release (minutes), so a live
-#                               holder is never evicted; a crashed one self-heals before the next nightly.
-
-
-def _lock_token():
-    return "%d:%d:%s" % (os.getpid(), int(time.time()), os.urandom(5).hex())
-
-
 def acquire_lock(path=None):
-    """Exclusive advisory lock, by atomic file creation (O_CREAT|O_EXCL). Returns an ownership TOKEN
-    (str) or None if the lock is held. The fd is closed immediately -- the file's existence is the lock,
-    so there is no descriptor to leak. A lock older than STALE_LOCK_SECONDS is reclaimed so a crashed
-    holder cannot wedge the nightly; the window is far beyond any real holder, so a live one is safe."""
+    """Exclusive lock held by the OS for the life of the returned handle (Codex round 3: an age-reclaimed
+    lock file can evict a live holder and let two reclaimers both acquire). msvcrt on Windows, fcntl.flock
+    elsewhere -- a non-blocking exclusive lock. Returns the open handle (keep it until release_lock) or
+    None if another process holds it. The OS drops the lock automatically when this process exits, so a
+    crash cannot wedge the nightly and there is no stale-file protocol to get wrong."""
     path = path or LOCK
-    token = _lock_token()
     try:
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
+        fh = open(path, "a+")
+    except OSError:
+        return None
+    try:
+        if os.name == "nt":
+            import msvcrt
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fh
+    except OSError:                                             # held by another process
         try:
-            if time.time() - os.path.getmtime(path) > STALE_LOCK_SECONDS:
-                os.unlink(path)
-                return acquire_lock(path)
+            fh.close()
         except OSError:
             pass
         return None
-    try:
-        os.write(fd, token.encode("ascii"))
-    except OSError:
-        try:
-            os.close(fd); os.unlink(path)
-        except OSError:
-            pass
-        return None
-    try:
-        os.close(fd)
-    except OSError:
-        pass
-    return token
 
 
-def release_lock(token, path=None):
-    """Release the lock ONLY if we own it (the file still carries our token): never delete another
-    holder's or a reclaimer's fresh lock (Codex: an unconditional unlink can remove a successor's lock)."""
-    path = path or LOCK
-    try:
-        with open(path, encoding="ascii") as fh:
-            cur = fh.read()
-    except OSError:
+def release_lock(handle, path=None):
+    """Drop the OS lock and close the handle. (The OS would drop it on process exit anyway; this returns
+    it promptly.) `path` is accepted for call-site symmetry and ignored -- the handle identifies the lock."""
+    if handle is None:
         return
-    if token is not None and cur == token:
+    try:
+        if os.name == "nt":
+            import msvcrt
+            try:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+        else:
+            import fcntl
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+    finally:
         try:
-            os.unlink(path)
+            handle.close()
         except OSError:
             pass
 

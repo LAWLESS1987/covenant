@@ -98,32 +98,53 @@ def _is_directive(text):
     not a dict, is treated as a directive (Codex: a malformed classifier result must not clear)."""
     try:
         res = LV.MB.classify(text or "")
-        if not isinstance(res, dict):
-            return True
-        return bool(res.get("directive"))
     except Exception:                                           # noqa: BLE001
+        return True                                             # cannot screen -> directive
+    # FAIL CLOSED: clear ONLY on an explicit boolean False. A non-dict, a missing key, None, 0, ""
+    # -- anything that is not literally False -- is treated as a directive (Codex: {} / {"directive": 0}
+    # must not clear).
+    if not isinstance(res, dict):
         return True
+    return res.get("directive") is not False
 
 
 def _corpus_leviathan_shas(corpus):
     """The sha256s already present in the corpus under a leviathan/* source. Used for IDEMPOTENT release:
     a candidate already in the corpus is never appended again, so a crash between the corpus append and
-    the quarantine update cannot produce a duplicate on rerun (Codex: two separate files are not atomic)."""
+    the quarantine update cannot produce a duplicate on rerun (Codex: two separate files are not atomic).
+
+    FAIL CLOSED on an unreadable corpus (Codex round 3): a MISSING corpus is genuinely empty, but a corpus
+    that exists and cannot be read must raise -- returning an empty set there would let a pending row that
+    is already in the corpus be written again."""
     shas = set()
-    try:
-        with open(corpus, encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    o = json.loads(line)
-                except ValueError:
-                    continue
-                if str(o.get("source", "")).startswith("leviathan"):
-                    s = (o.get("leviathan") or {}).get("sha256")
-                    if s:
-                        shas.add(s)
-    except OSError:
-        pass
+    if not os.path.exists(corpus):
+        return shas
+    with open(corpus, encoding="utf-8") as fh:                  # OSError here propagates -> release refuses
+        for line in fh:
+            try:
+                o = json.loads(line)
+            except ValueError:
+                continue                                        # a torn/garbled line is skipped for the SCAN...
+            if str(o.get("source", "")).startswith("leviathan"):
+                s = (o.get("leviathan") or {}).get("sha256")
+                if s:
+                    shas.add(s)
     return shas
+
+
+def _append_corpus(corpus, row):
+    """Append one JSONL record to the corpus, torn-record-safe (Codex round 3): if the file does not end
+    in a newline (a previous append was interrupted mid-line), write a separating newline first so this
+    record cannot be concatenated onto a fragment. fsync for durability."""
+    with open(corpus, "a+", encoding="utf-8", newline="") as fh:
+        fh.seek(0, os.SEEK_END)
+        if fh.tell() > 0:
+            fh.seek(fh.tell() - 1)
+            if fh.read(1) != "\n":
+                fh.write("\n")                                  # repair: close off the interrupted fragment
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
 
 
 def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
@@ -156,13 +177,24 @@ def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
         if not todo:
             say("nothing pending: %d candidate(s), none eligible and unreleased" % len(rows))
             return 0
-        corpus_shas = _corpus_leviathan_shas(corpus)    # IDEMPOTENCY: what is already in the corpus
+        try:
+            corpus_shas = _corpus_leviathan_shas(corpus)    # IDEMPOTENCY: what is already in the corpus
+        except OSError as e:
+            say("REFUSED: the corpus exists but cannot be read (%s); refusing rather than risk a duplicate"
+                % type(e).__name__)
+            return 0
 
-        written, held, contam, directive, dup = 0, 0, 0, 0, 0
+        written, held, contam, directive, dup, nosha = 0, 0, 0, 0, 0, 0
         for cand in todo:
             text = cand.get("text")
             full_sha = cand.get("sha256")
             sha = (full_sha or "?")[:12]
+            # A candidate with no usable sha cannot be de-duplicated, so it must never be written (Codex:
+            # a missing sha bypasses the idempotency set). Hold it.
+            if not full_sha:
+                nosha += 1
+                say("  NOSHA %s -- candidate has no sha256; held (cannot de-duplicate)" % sha)
+                continue
             # IDEMPOTENT: a row already in the corpus is never written twice, whatever the quarantine says.
             # This -- not the file ordering -- is what makes a crash between the two writes safe.
             if not dry_run and full_sha in corpus_shas:
@@ -200,10 +232,8 @@ def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
             say("  %-8s %s  %s" % ("VIOLATES" if violates else "clean", sha, (cand.get("title") or "")[:52]))
             if dry_run:
                 continue
-            with open(corpus, "a", encoding="utf-8", newline="\n") as fh:
-                fh.write(json.dumps(row, sort_keys=True) + "\n")
-            if full_sha:
-                corpus_shas.add(full_sha)
+            _append_corpus(corpus, row)                 # torn-record-safe, fsync'd
+            corpus_shas.add(full_sha)
             cand["label"] = bool(violates)
             cand["released_at"] = row["t"]
             cand["released_by"] = judge
@@ -213,9 +243,9 @@ def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
             # a crash between the two writes cannot produce a duplicate on rerun.
             LV._atomic_write_jsonl(qpath, rows)
         say("%s: %d judged, %d written to the corpus, %d held by the teacher, %d held by the exam filter, "
-            "%d rejected as directive, %d already-present (idempotent)"
-            % ("DRY RUN" if dry_run else "released", len(todo) - held - contam - directive - dup,
-               written, held, contam, directive, dup))
+            "%d rejected as directive, %d already-present (idempotent), %d held (no sha)"
+            % ("DRY RUN" if dry_run else "released", len(todo) - held - contam - directive - dup - nosha,
+               written, held, contam, directive, dup, nosha))
         return 0
     finally:
         if lock is not None:
@@ -342,6 +372,37 @@ def selftest():
     release(limit=5, dry_run=False, teacher=yes, corpus=c5, quarantine=q5, contaminating=never, lock_path=lk, say=lambda m: None)
     _c5b = [l for l in open(c5, encoding="utf-8") if l.strip()]
     check("LVR13c ...and a rerun duplicates nothing (corpus unchanged)", len(_c5b) == 2, len(_c5b))
+
+    # LVR14: an unreadable (not absent) corpus makes release REFUSE -- fail closed rather than scan empty
+    # and risk a duplicate (Codex round 3). Simulate by making the scan raise OSError.
+    q6, c6 = os.path.join(d, "q6.jsonl"), os.path.join(d, "corpus6.jsonl")
+    LV.MB.append([LV.candidate("c" * 200, "https://leviathan.talmbout.ai/6", author="p", title="6")], q6)
+    _savedscan = SELF._corpus_leviathan_shas
+    SELF._corpus_leviathan_shas = lambda c: (_ for _ in ()).throw(OSError("denied"))
+    try:
+        SELF.release(limit=5, dry_run=False, teacher=yes, corpus=c6, quarantine=q6, contaminating=never, lock_path=lk, say=lambda m: None)
+    finally:
+        SELF._corpus_leviathan_shas = _savedscan
+    check("LVR14 an unreadable corpus makes release REFUSE (fail closed, nothing written)", not os.path.exists(c6))
+
+    # LVR15: a candidate with no sha cannot be de-duplicated, so it is HELD, never written (Codex round 3).
+    q7, c7 = os.path.join(d, "q7.jsonl"), os.path.join(d, "corpus7.jsonl")
+    nos = LV.candidate("d" * 200, "https://leviathan.talmbout.ai/7", author="p", title="7")
+    nos["sha256"] = ""
+    LV.MB.append([nos], q7)
+    SELF.release(limit=5, dry_run=False, teacher=yes, corpus=c7, quarantine=q7, contaminating=never, lock_path=lk, say=lambda m: None)
+    check("LVR15 a candidate with no sha256 is HELD (cannot de-duplicate), nothing written", not os.path.exists(c7))
+
+    # LVR16: a malformed classifier result ({}) fails CLOSED -- the row is rejected (Codex round 3).
+    q8, c8 = os.path.join(d, "q8.jsonl"), os.path.join(d, "corpus8.jsonl")
+    LV.MB.append([LV.candidate("e" * 200, "https://leviathan.talmbout.ai/8", author="p", title="8")], q8)
+    _savedcl = LV.MB.classify
+    LV.MB.classify = lambda t: {}
+    try:
+        SELF.release(limit=5, dry_run=False, teacher=yes, corpus=c8, quarantine=q8, contaminating=never, lock_path=lk, say=lambda m: None)
+    finally:
+        LV.MB.classify = _savedcl
+    check("LVR16 a malformed classifier result ({}) fails closed -- row rejected, nothing written", not os.path.exists(c8))
 
     n = sum(ok)
     print("\nLEVIATHAN-RELEASE: %d/%d passed" % (n, len(ok)))

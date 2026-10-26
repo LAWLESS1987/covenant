@@ -14,9 +14,11 @@ import covenant_leviathan as L
 import covenant_second_student as S
 
 fails = []
+_total = [0]
 
 
 def ok(name, cond):
+    _total[0] += 1
     print(("ok   " if cond else "FAIL ") + name)
     if not cond:
         fails.append(name)
@@ -169,35 +171,26 @@ except Exception:
     _xscheme = False
 ok("LV1.35 a non-http redirect scheme is blocked", _xscheme)
 
+# --- OS lock (Codex round 3): process-held, exclusive, auto-released; a mutation refuses while held.
 _lp = os.path.join(tempfile.mkdtemp(), "lk")
-_fd = L.acquire_lock(_lp)
-_fd2 = L.acquire_lock(_lp)
-ok("LV1.36 lock is exclusive: a second acquire returns None while held", _fd is not None and _fd2 is None)
-L.release_lock(_fd, _lp)
-_fd3 = L.acquire_lock(_lp)
-ok("LV1.37 ...and the lock is re-acquirable after release", _fd3 is not None)
+_h1 = L.acquire_lock(_lp)
+_h2 = L.acquire_lock(_lp)
+ok("LV1.36 OS lock is exclusive: a second acquire returns None while held", _h1 is not None and _h2 is None)
+L.release_lock(_h1, _lp)
+_h3 = L.acquire_lock(_lp)
+ok("LV1.37 ...and it is re-acquirable after release (OS drops it)", _h3 is not None)
+L.release_lock(_h3, _lp)
 
-# --- round 2 (Codex re-review): token-owned release, mutation respects the lock, atomic write.
-_tokA = _fd3                                  # we hold the lock under token _fd3
-L.release_lock("not-the-right-token", _lp)
-ok("LV1.38 release with a wrong token does NOT free the lock (no cross-delete)",
-   L.acquire_lock(_lp) is None)
-L.release_lock(_tokA, _lp)
-_tokB = L.acquire_lock(_lp)
-ok("LV1.39 ...and the owner's token frees it (re-acquirable)", _tokB is not None)
-L.release_lock(_tokB, _lp)
-
-# a quarantine mutation refuses while the real lock is held (harvest cannot race a release)
 _held = L.acquire_lock()
-ok("LV1.40 a mutation refuses while the lock is held (harvest respects the lock)",
+ok("LV1.38 a quarantine mutation refuses while the lock is held (harvest respects the lock)",
    _held is not None and L._append_quarantine([], _locked=False) is None)
 L.release_lock(_held)
 
-# atomic jsonl write round-trips
+# atomic jsonl write round-trips (mkstemp + fsync + os.replace)
 _aw = os.path.join(tempfile.mkdtemp(), "a.jsonl")
 L._atomic_write_jsonl(_aw, [{"sha256": "x", "text": "hi"}])
-ok("LV1.41 _atomic_write_jsonl writes the rows (temp + os.replace)",
+ok("LV1.39 _atomic_write_jsonl writes the rows atomically",
    len([l for l in open(_aw, encoding="utf-8") if l.strip()]) == 1)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 41 - len(fails), 41))
+print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", _total[0] - len(fails), _total[0]))
 sys.exit(1 if fails else 0)
