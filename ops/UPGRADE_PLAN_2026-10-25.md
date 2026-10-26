@@ -13,7 +13,13 @@ fix — fix the channel.
 
 ## Prioritized (Grok's 1→2→3, mapped to our findings)
 
-**P1 — Structured, validated LEG channel (highest leverage; fixes F1 at the source). [medium effort]**
+**P1 — Structured, validated LEG channel (highest leverage; fixes F1 at the source). [medium effort] — DONE (ace8847).**
+Built: validate_leg_output (non-LLM, strict JSON {answer/evidence/confidence}, fail-closed), consult_structured,
+structured_second_voice; door LEG directive wired to it. MEASURED: the free-text injection that was 3/3 steers
+is now REJECTED 3/3 before the 3B (0 reach it). Residual, honest: an injection inside a valid JSON answer field
+still obeyed 2/3 (field values are text) -- harder attack, framed as data, gate + acts-on-nothing backstop it.
+LG1 25/25, M6 78/78. Live after the node restart.
+Original note:
 The leg must emit strict JSON (start: `answer` / `evidence` / `confidence` only); a NON-LLM validator rejects
 free text, control sequences, and schema violations BEFORE anything reaches the 3B, which consumes only the
 validated fields — never the raw prose. Log every rejection. **Verify:** re-run the injection probe (currently
