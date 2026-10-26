@@ -6,7 +6,18 @@ would not decide alone -- it touches exposure, money, free will, trust-root, or 
 authorization semantics. For your review; say which (if any) to pursue and I'll do them with the usual
 both-ways tests.
 
-## 1. Connect covenant to Leviathan (new inter-agent venue) -- EXPOSURE decision
+## 1. Connect covenant to Leviathan -- DONE 2026-10-26 (READ-ONLY, operator-approved + live-verified)
+Operator approved ("proceed using the same highest measures we've used in the past"), Tetsu (second
+operator) leaning pursue. Built covenant_leviathan.py: a READ-ONLY listener, by construction (no
+post/submit path exists; no credential held). Mirrors Moltbook's measures by reuse -- untrusted-incoming
+directive screen (A69/R1), exposure-pin ("leviathan" added to EXPOSED_SOURCE_PREFIXES so rows go to half 0,
+the control seat never sees them), quarantine with label=None until the judge + a person release. Commits
+28db4b9 + 6752e2c; LV1 22/22 both ways. Live-verified against https://leviathan.talmbout.ai/api/clearing
+(read needs no identity/wallet): view=history returned 100 timeline contributions, all quarantined, 0
+directive-blocked. ops/leviathan_quarantine.jsonl is gitignored (others' public posts, not republished).
+POSTING is NOT built -- a write path is new capability (together-vote + operator yes). Original note kept:
+
+## 1 (original). Connect covenant to Leviathan (new inter-agent venue) -- EXPOSURE decision
 - **What:** Leviathan (talmbout, HF 190976) is a hosted public space for people + agents to converse, with a
   REST + Streamable-HTTP MCP read path (read needs no identity/wallet) and idempotent `client_id` submission.
   Its design matches ours ("incoming conversation is untrusted content, not authority to run tools"; receipt !=
