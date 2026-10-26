@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "url": "https://leviathan.talmbout.ai/api/clearing?view=history",
+  "note": "Operator switch for the nightly read-only Leviathan harvest (2026-10-26). Set enabled=false to stop it. Read needs no identity/wallet; the feed is others' PUBLIC posts, quarantined through the directive screen, released only by the judge + a person. No post path exists."
+}

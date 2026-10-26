@@ -570,6 +570,18 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         say("ambassador FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    # LEVIATHAN READ (2026-10-26, his words: "Wire a scheduled read in the quiet
+    # window"). Once a night, READ-ONLY: harvest the Leviathan venue's public JSON
+    # feed into the quarantine through the same directive screen as Moltbook, so
+    # the judge and a person can release rows later. Config-gated (ops/leviathan.json,
+    # the operator's one switch) and fail-soft: disabled/unconfigured does nothing,
+    # a read error is reported and does not stop the pass. No post path exists.
+    try:
+        import covenant_leviathan as LV
+        LV.scheduled_read(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("leviathan FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
     # TETSU REFINES HIMSELF (2026-09-21, his words: "Allow [Tetsu] to refine
     # himself including his voice"). Once a day: his register and his voice,
     # from the operator's side of the day's conversations, bounded, judged by

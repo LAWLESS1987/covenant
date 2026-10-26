@@ -63,6 +63,7 @@ import covenant_moltbook as MB            # the quarantine machinery we REUSE ve
 # control seat never sees a row from here (covenant_second_student.half_of).
 SOURCE = "leviathan/public"
 QUARANTINE = os.path.join(HERE, "ops", "leviathan_quarantine.jsonl")
+CONFIG = os.path.join(HERE, "ops", "leviathan.json")      # the operator's one switch for the nightly read
 UA = "covenant-listener/1.0 (+https://github.com/LAWLESS1987/covenant)"
 
 # Read-only by construction. Kept here as a READABLE declaration for anyone who
@@ -229,6 +230,42 @@ def harvest_text(page_text, url):
     --from-text."""
     rows = extract(page_text, url)
     return MB.append(rows, QUARANTINE), len(rows)
+
+
+def _config(path=None):
+    """The operator's switch for the scheduled read: ops/leviathan.json
+    {"enabled": bool, "url": "..."}. Absent/unreadable -> disabled, empty url
+    (fail closed: no file means the nightly reads nothing)."""
+    try:
+        with open(path or CONFIG, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return {"enabled": bool(d.get("enabled")), "url": str(d.get("url") or "").strip()}
+    except Exception:                                           # noqa: BLE001
+        return {"enabled": False, "url": ""}
+
+
+def scheduled_read(say=print, cfg=None):
+    """One nightly, quiet-window read. Config-gated and fail-soft: disabled or
+    unconfigured -> does nothing and says so; a read error is reported, never
+    raised (so it cannot stop the nightly pass). READ-ONLY -- it only quarantines
+    through the directive screen; the judge and a person release rows later."""
+    cfg = cfg if cfg is not None else _config()
+    if not cfg.get("enabled"):
+        say("leviathan: disabled in ops/leviathan.json -- skipped")
+        return {"skipped": True, "reason": "disabled"}
+    url = cfg.get("url") or _endpoint()
+    if not url:
+        say("leviathan: enabled but no url configured -- skipped")
+        return {"skipped": True, "reason": "no url"}
+    try:
+        new, parsed = harvest_json(url)
+        say("leviathan: read %d contribution(s), %d new quarantined (judge + a person release them)"
+            % (parsed, new))
+        return {"parsed": parsed, "new": new}
+    except Exception as e:                                       # noqa: BLE001
+        say("leviathan READ failed (reported, does not stop the pass): %s: %s"
+            % (type(e).__name__, str(e)[:160]))
+        return {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}
 
 
 def _show():

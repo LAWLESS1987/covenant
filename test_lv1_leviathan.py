@@ -102,5 +102,18 @@ except Exception:
     json_refused = False
 ok("LV1.21 fetch_json with no endpoint refuses", json_refused)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 22 - len(fails), 22))
+# --- scheduled_read is config-gated and fail-soft, driven BOTH ways with NO network:
+#     disabled -> skipped; enabled-but-no-url -> skipped; enabled+bad-scheme -> error (refused), never raises.
+_said = []
+d = L.scheduled_read(say=_said.append, cfg={"enabled": False, "url": "https://x"})
+ok("LV1.22b disabled config -> skipped, no read", d.get("skipped") and d.get("reason") == "disabled")
+d = L.scheduled_read(say=_said.append, cfg={"enabled": True, "url": ""})
+ok("LV1.23 enabled but no url -> skipped", d.get("skipped") and d.get("reason") == "no url")
+d = L.scheduled_read(say=_said.append, cfg={"enabled": True, "url": "ftp://not-http"})
+ok("LV1.24 enabled + non-http url -> error, not raised (fail-soft)", "error" in d)
+ok("LV1.25 default config loads and is disabled-safe when the file is absent",
+   isinstance(L._config("/no/such/leviathan.json"), dict)
+   and L._config("/no/such/leviathan.json")["enabled"] is False)
+
+print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 26 - len(fails), 26))
 sys.exit(1 if fails else 0)
