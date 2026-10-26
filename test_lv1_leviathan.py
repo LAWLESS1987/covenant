@@ -84,5 +84,23 @@ except Exception:
     bad_scheme_refused = False
 ok("LV1.17 a non-http(s) endpoint is refused", bad_scheme_refused)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 17 - len(fails), 17))
+# --- JSON feed path: _items_of finds the list, skips unrecognised shapes (both ways); fetch_json refuses
+#     with no endpoint. The parse is json.loads (DATA), never executed.
+ok("LV1.18 _items_of(list) returns the list", L._items_of([{"text": "a"}]) == [{"text": "a"}])
+ok("LV1.19 _items_of finds a known key", L._items_of({"posts": [{"text": "a"}]}) == [{"text": "a"}])
+ok("LV1.19b _items_of finds Leviathan's 'timeline'",
+   L._items_of({"timeline": [{"content": "hi"}]}) == [{"content": "hi"}])
+ok("LV1.20 _items_of unrecognised shape -> [] (not coerced)",
+   L._items_of({"unknown": [1]}) == [] and L._items_of({"posts": "notalist"}) == [] and L._items_of(None) == [])
+try:
+    os.environ.pop("COVENANT_LEVIATHAN_URL", None)
+    L.fetch_json("")
+    json_refused = False
+except RuntimeError:
+    json_refused = True
+except Exception:
+    json_refused = False
+ok("LV1.21 fetch_json with no endpoint refuses", json_refused)
+
+print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 22 - len(fails), 22))
 sys.exit(1 if fails else 0)

@@ -161,6 +161,59 @@ def fetch_text(url=None, timeout=20):
     return re.sub(r"\n{3,}", "\n\n", text), url
 
 
+MAX_READ_BYTES = 4_000_000     # bound the read: a public feed is ~50 posts, not a firehose
+
+
+def _items_of(obj):
+    """The list of items inside a Leviathan feed response, trying the shapes the
+    REST feed is documented to use, and returning [] for anything unrecognised
+    rather than coercing. Untrusted shape is skipped, never forced into a row."""
+    if isinstance(obj, list):
+        return obj
+    if isinstance(obj, dict):
+        # "timeline" is Leviathan's view=history contribution stream (the real feed,
+        # confirmed live 2026-10-26); the rest are the shapes other feeds may use.
+        for k in ("timeline", "recent_conversation_roots", "posts", "items",
+                  "contributions", "feed", "data", "results", "records"):
+            v = obj.get(k)
+            if isinstance(v, list):
+                return v
+    return []
+
+
+def fetch_json(url=None, timeout=20):
+    """GET the configured read endpoint and json.loads it: (obj, url). READ ONLY,
+    no credential, no auth header; the body is parsed as DATA (json.loads never
+    executes), read is capped at MAX_READ_BYTES, 429 retried once. Refuses with a
+    clear error when no endpoint is configured or the scheme is not http(s)."""
+    url = url or _endpoint()
+    if not url:
+        raise RuntimeError("COVENANT_LEVIATHAN_URL is not set -- no endpoint to read, by design.")
+    if not url.startswith(("http://", "https://")):
+        raise RuntimeError("Leviathan endpoint must be an http(s) URL.")
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    for attempt in (0, 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read(MAX_READ_BYTES).decode("utf-8", "replace")
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == 0:
+                time.sleep(1.5)
+                continue
+            raise
+    return json.loads(raw or "null"), url
+
+
+def harvest_json(url=None):
+    """fetch_json -> rows_from_items -> quarantine (de-duplicated). The right path
+    for Leviathan's JSON feed. Returns (new_rows, parsed_rows). Nothing is judged
+    or used here; a person and the covenant judge release rows later."""
+    obj, u = fetch_json(url)
+    rows = rows_from_items(_items_of(obj), u)
+    return MB.append(rows, QUARANTINE), len(rows)
+
+
 def harvest(url=None):
     """fetch_text -> extract -> append to the quarantine (de-duplicated). Returns
     how many new rows landed. Nothing is judged or used here; a person and the
