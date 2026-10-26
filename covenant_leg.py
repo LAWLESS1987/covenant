@@ -28,9 +28,11 @@ Stdlib only. Guarded: a failure here never breaks a turn -- the leg stays retrac
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
+import threading
 import time
 import urllib.request
 
@@ -62,6 +64,30 @@ MIN_TOP_CONFIRM = 0.25                                     # a single token this
 # LIVE: if some other process has eaten the headroom and free RAM is below the floor, the leg HOLDS (status
 # "retracted") rather than adding its generation load and tipping the box into paging. Frozen, env-tunable.
 RAM_FLOOR_GB = float(os.environ.get("COVENANT_LEG_RAM_FLOOR_GB", "1.2"))   # need at least this much free BEFORE reaching the leg out
+
+# CXR-8 (Codex 2026-10-25): enforce the kill switch, a concurrency cap, and loopback IN this module, not only at
+# the door. A free-RAM snapshot cannot stop simultaneous callers all passing, and a caller that bypasses the door
+# would bypass COVENANT_LEG_LIVE entirely.
+LEG_MAX_CONCURRENT = int(os.environ.get("COVENANT_LEG_MAX_CONCURRENT", "2"))
+MAX_HTTP_BYTES = 1 << 20                                    # bound the leg's HTTP response BEFORE parsing (CXR-3)
+_leg_sema = threading.BoundedSemaphore(max(1, LEG_MAX_CONCURRENT))
+# A URL opener that does NOT follow redirects: the leg server is loopback; a redirected response must never send
+# our request somewhere else (CXR-8).
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):                   # noqa: D401
+        return None
+_no_redirect = urllib.request.build_opener(_NoRedirect)
+
+
+def _is_loopback(host):
+    """Only loopback hosts may be reached unless the operator explicitly allows remote (COVENANT_LEG_ALLOW_REMOTE)."""
+    if os.environ.get("COVENANT_LEG_ALLOW_REMOTE"):
+        return True
+    return str(host) in ("127.0.0.1", "localhost", "::1", "[::1]")
+
+
+def _leg_live():
+    return os.environ.get("COVENANT_LEG_LIVE", "1") != "0"
 
 
 def free_ram_gb():
@@ -224,14 +250,38 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LEG_INFLUENCE_LEDGER = os.environ.get("COVENANT_LEG_INFLUENCE_LEDGER") or os.path.join(HERE, "ops", "leg_influence.jsonl")
 
 
-def tag_learning_write(target_path, record, attribution, ledger_path=None):
-    """Make a leg-influenced learning write REVERSIBLE. Stamp `record` with leg provenance, append it to
-    target_path (JSONL, the project's append idiom), and log a tombstone to the influence ledger so it can be
-    undone by tag. Returns the tombstone dict (carries the tag). -> this is the write-site call the operator's
-    "learned doesn't mean used" asks for: learning flows, but tagged and reversible, never walled off.
+@contextlib.contextmanager
+def _influence_lock(path, timeout=5.0):
+    """A best-effort cross-process lock around a target's read-modify-write, so a concurrent append is not lost
+    when reverse_learning_write() rewrites the file (Codex CXR-4). O_CREAT|O_EXCL on a .lock file; after `timeout`
+    it proceeds anyway rather than hang on a stale lock left by a crash."""
+    lockp = str(path) + ".lock"
+    deadline, fd = time.time() + timeout, None
+    while True:
+        try:
+            fd = os.open(lockp, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.time() > deadline:
+                break
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        if fd is not None:
+            os.close(fd)
+            try:
+                os.remove(lockp)
+            except OSError:
+                pass
 
-    Unlike route(), this does NOT swallow IO errors: a learning write whose tombstone failed to record is NOT
-    silently reversible, so it must fail loud rather than leave an untracked write behind."""
+
+def tag_learning_write(target_path, record, attribution, ledger_path=None):
+    """Make a leg-influenced learning write REVERSIBLE. Stamp `record` with leg provenance, then (Codex CXR-4,
+    crash-safe ORDER) write the TOMBSTONE FIRST and the learning row SECOND, under the target's lock. If the
+    learning write then fails, the tombstone is a harmless pointer to a row that is not there (reverse removes 0);
+    the old order could leave an UNTRACKED learning row when the tombstone failed. Returns the tombstone (the tag).
+    Does NOT swallow IO errors -- an untrackable learning write must fail loud."""
     ledger_path = ledger_path or LEG_INFLUENCE_LEDGER
     at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     rec_json = json.dumps(record, ensure_ascii=False, sort_keys=True)
@@ -241,13 +291,14 @@ def tag_learning_write(target_path, record, attribution, ledger_path=None):
     stamped["_leg"] = {"tag": tag, "payload_sha256": payload_sha, "model": (attribution or {}).get("model"),
                        "reversible": True, "at": at}
     stamped_json = json.dumps(stamped, ensure_ascii=False, sort_keys=True)
-    with open(target_path, "a", encoding="utf-8") as fh:               # the learning write itself, now tagged
-        fh.write(stamped_json + "\n")
     tomb = {"tag": tag, "target": target_path, "at": at, "reversed": False,
             "record_sha256": hashlib.sha256(stamped_json.encode("utf-8")).hexdigest(),
             "attribution": attribution}
-    with open(ledger_path, "a", encoding="utf-8") as fh:               # the tombstone that makes it undoable
-        fh.write(json.dumps(tomb, ensure_ascii=False, sort_keys=True) + "\n")
+    with _influence_lock(target_path):
+        with open(ledger_path, "a", encoding="utf-8") as fh:          # tombstone FIRST, so no untracked write can exist
+            fh.write(json.dumps(tomb, ensure_ascii=False, sort_keys=True) + "\n")
+        with open(target_path, "a", encoding="utf-8") as fh:          # then the learning row itself, tagged
+            fh.write(stamped_json + "\n")
     return tomb
 
 
@@ -282,28 +333,31 @@ def reverse_learning_write(tag, target_path=None, ledger_path=None):
                     break
     if not target_path or not os.path.exists(target_path):
         return 0
-    kept, removed = [], []
-    with open(target_path, encoding="utf-8") as fh:
-        for line in fh:
-            try:
-                if json.loads(line).get("_leg", {}).get("tag") == tag:
-                    removed.append(line)
-                    continue
-            except Exception:                              # noqa: BLE001
-                pass
-            kept.append(line)
-    if not removed:
-        return 0
-    with open(target_path + ".leg-reversed", "a", encoding="utf-8") as fh:   # moved aside, kept whole
-        for line in removed:
-            fh.write(line if line.endswith("\n") else line + "\n")
-    with open(target_path, "w", encoding="utf-8") as fh:
-        fh.writelines(kept)
-    with open(ledger_path, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"tag": tag, "target": target_path, "reversed": True, "n": len(removed),
-                             "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
-                            ensure_ascii=False, sort_keys=True) + "\n")
-    return len(removed)
+    with _influence_lock(target_path):                     # CXR-4: serialize with concurrent tag appends
+        kept, removed = [], []
+        with open(target_path, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    if json.loads(line).get("_leg", {}).get("tag") == tag:
+                        removed.append(line)
+                        continue
+                except Exception:                          # noqa: BLE001
+                    pass
+                kept.append(line)
+        if not removed:
+            return 0
+        with open(target_path + ".leg-reversed", "a", encoding="utf-8") as fh:   # moved aside, kept whole
+            for line in removed:
+                fh.write(line if line.endswith("\n") else line + "\n")
+        tmp = target_path + ".tmp-reverse"                 # CXR-4: atomic replace -- a crash can't truncate the target
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.writelines(kept)
+        os.replace(tmp, target_path)
+        with open(ledger_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"tag": tag, "target": target_path, "reversed": True, "n": len(removed),
+                                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+                                ensure_ascii=False, sort_keys=True) + "\n")
+        return len(removed)
 
 
 def leg_available(timeout=3):
@@ -322,37 +376,43 @@ LEG_JSON_INSTRUCTION = (
 
 
 def validate_leg_output(raw):
-    """NON-LLM validator (P1 / Grok's #1 / the real F1 fix): the leg's reply MUST be a single strict JSON object
-    {answer:str, evidence:str, confidence in low|medium|high}. Free text, a non-JSON reply, extra top-level keys,
-    control characters, or schema violations are REJECTED (fail-closed) -- so a free-text prompt injection can
-    never ride into the 3B as instructions, because the 3B only ever consumes the validated FIELDS this returns,
-    never the raw prose. -> (ok, fields|None, why). Pure; no model."""
+    """NON-LLM validator (P1 / the real F1 fix), tightened per Codex CXR-3: the leg's reply MUST be a single strict
+    JSON object with EXACTLY {answer:str, evidence:str, confidence in low|medium|high}. Anything else -- free text,
+    non-JSON, missing/extra keys, DUPLICATE keys, a non-string or empty answer, a non-string evidence, a confidence
+    outside the enum, control characters, or an oversize field -- is REJECTED with a FIXED code (never reflecting
+    the attacker's own keys), and nothing is silently stripped, truncated, or repaired. The 3B only ever consumes
+    the validated FIELDS this returns, never the raw prose. -> (ok, fields|None, code). Pure; no model."""
     import re
+    ctl = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
     s = (raw or "").strip()
     m = re.match(r"^```(?:json)?\s*(.*?)\s*```$", s, re.S)        # tolerate a ```json fence, nothing else
     if m:
         s = m.group(1).strip()
     if not (s.startswith("{") and s.endswith("}")):
-        return False, None, "not a single JSON object (free text rejected)"
+        return False, None, "not-json-object"
+    _keys = []
     try:
-        obj = json.loads(s)
+        obj = json.loads(s, object_pairs_hook=lambda ps: (_keys.extend(k for k, _ in ps), dict(ps))[1])
     except Exception:                                            # noqa: BLE001
-        return False, None, "invalid JSON"
+        return False, None, "invalid-json"
     if not isinstance(obj, dict):
-        return False, None, "JSON is not an object"
-    extra = set(obj) - {"answer", "evidence", "confidence"}
-    if extra:
-        return False, None, "unexpected keys: %s" % sorted(extra)
-    if not isinstance(obj.get("answer"), str) or not obj["answer"].strip():
-        return False, None, "missing/empty 'answer' string"
-    ev = obj.get("evidence", "")
-    if ev is not None and not isinstance(ev, str):
-        return False, None, "'evidence' not a string"
-    conf = obj.get("confidence", "")
-    if conf not in ("low", "medium", "high", ""):
-        return False, None, "confidence not in {low,medium,high}"
-    strip_ctl = lambda x: re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(x))[:MAX_LEG_CHARS]
-    return True, {"answer": strip_ctl(obj["answer"]), "evidence": strip_ctl(ev or ""), "confidence": conf}, "ok"
+        return False, None, "not-object"
+    if len(_keys) != len(set(_keys)):                            # json.loads silently keeps the last of a dup
+        return False, None, "duplicate-keys"
+    if set(obj) != {"answer", "evidence", "confidence"}:         # exactly these three -- no more, no fewer
+        return False, None, "wrong-keys"
+    a, ev, conf = obj["answer"], obj["evidence"], obj["confidence"]
+    if not isinstance(a, str) or not a.strip():
+        return False, None, "bad-answer"
+    if not isinstance(ev, str):
+        return False, None, "bad-evidence"
+    if conf not in ("low", "medium", "high"):
+        return False, None, "bad-confidence"
+    if len(a) > MAX_LEG_CHARS or len(ev) > MAX_LEG_CHARS:
+        return False, None, "oversize"
+    if ctl.search(a) or ctl.search(ev):
+        return False, None, "control-chars"
+    return True, {"answer": a, "evidence": ev, "confidence": conf}, "ok"
 
 
 def structured_second_voice(fields):
@@ -372,19 +432,29 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
     The attribution is vina's inference-snapshot of the EXACT payload sent (see attribution()). consult_leg is
     the right place to build it: it is the code that constructs the payload, so it hashes exactly what it sent.
     Never raises -- None means the leg could not be reached and the caller proceeds without it."""
-    params = {"max_tokens": int(max_tokens), "temperature": float(temperature), "enable_thinking": False}
-    body = json.dumps({"messages": [{"role": "user", "content": text}],
-                       "max_tokens": params["max_tokens"], "temperature": params["temperature"],
-                       "chat_template_kwargs": {"enable_thinking": False}}).encode("utf-8")
-    req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (LEG_HOST, LEG_PORT),
-                                 data=body, headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            d = json.loads(r.read().decode("utf-8", "replace"))
-        ans = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""
-        return ans.strip(), attribution(text, body, params, trigger=trigger)
-    except Exception:                                      # noqa: BLE001
+    if not _leg_live() or not _is_loopback(LEG_HOST):      # CXR-8: honour the kill switch and loopback IN the module
         return None
+    if not _leg_sema.acquire(timeout=1.0):                 # CXR-8: cap concurrent generations; a RAM snapshot can't
+        return None                                        #        stop simultaneous callers all passing
+    try:
+        params = {"max_tokens": int(max_tokens), "temperature": float(temperature), "enable_thinking": False}
+        body = json.dumps({"messages": [{"role": "user", "content": text}],
+                           "max_tokens": params["max_tokens"], "temperature": params["temperature"],
+                           "chat_template_kwargs": {"enable_thinking": False}}).encode("utf-8")
+        req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (LEG_HOST, LEG_PORT),
+                                     data=body, headers={"Content-Type": "application/json"})
+        try:
+            with _no_redirect.open(req, timeout=timeout) as r:     # no redirects off loopback
+                raw = r.read(MAX_HTTP_BYTES + 1)                   # CXR-3: bound the response BEFORE parsing
+            if len(raw) > MAX_HTTP_BYTES:
+                return None
+            d = json.loads(raw.decode("utf-8", "replace"))
+            ans = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+            return ans.strip(), attribution(text, body, params, trigger=trigger)
+        except Exception:                                  # noqa: BLE001
+            return None
+    finally:
+        _leg_sema.release()
 
 
 LEG_FENCE_OPEN = "<<<LEG_TAKE_UNTRUSTED>>>"
