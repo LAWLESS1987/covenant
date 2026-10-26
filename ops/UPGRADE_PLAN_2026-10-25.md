@@ -77,11 +77,14 @@ Codex (CXR-1..9, read covenant_leg.py) and Tien (blunt read) both landed, and th
   free-text bypass paths (consult_for/second_voice_prompt/leg_take) so callers can't sidestep the channel.
 - **Reorder (Tien): P3 before P2** -- the sealed-road gaps cost INTEGRITY (what an attacker exploits); the
   over-conviction only costs usefulness. So: P1(done) -> harm-catch suite -> P3 -> P2 (only after the number) -> P4.
-- **Cheap fixes Codex found (do alongside):** validator contract gaps (CXR-3: missing/null/dup keys, control-char
-  reject not strip, bound the HTTP read); crash/concurrency-safe learning writes (CXR-4); COVENANT_LEG_LIVE +
-  concurrency bound + loopback IN the module (CXR-8, the module never checks the kill switch today); 3B-side
-  quoted-data framing + reject directive-shaped field content (Tien); audit spine + attribution to the real
-  artifact not the LEG_MODEL constant (CXR-5).
+- **Cheap fixes Codex found -- CXR-3/4/8 DONE (commit 195c4e5, LG1 32/32, live):** validator now strict (exactly
+  3 keys; reject missing/extra/dup keys, null evidence, out-of-enum confidence, control chars, oversize; fixed
+  codes; bounded HTTP read); learning writes crash-safe (tombstone-first) + reversals concurrency-safe (file lock
+  + atomic replace); COVENANT_LEG_LIVE + concurrency cap + loopback + no-redirect enforced IN the leg module, not
+  only the door. NOT done: the 3B-side quoted-data framing + reject-directive-field content -- DROPPED per "Tetsu
+  is correct" (he wants the answer direct). STILL OPEN (P1-tier, bigger): CXR-5 audit spine + bind attribution to
+  the real loaded artifact not the LEG_MODEL constant; CXR-1/2 artifact-bound authorization at the action executor
+  (the real injection boundary) + remove the legacy free-text leg paths.
 
 ## Operator decisions (2026-10-25)
 
