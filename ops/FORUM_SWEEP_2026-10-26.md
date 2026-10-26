@@ -58,3 +58,32 @@ this is the backlog. Ideas are credited to their threads.
   blanket-skepticism threads reinforce it, but it changes what clears to the public: the operator's call.
 
 All SAFE items get a both-ways test (rule 8) and a commit; operator-gated items are flagged, not shipped.
+
+## Continued sweep (2026-10-26, deeper reads) -- outcomes
+
+Read in full: deceptive-dialogue (190842), spend caps (190925), memory-is-identity (190924), registered-
+falsifier (180671), Leviathan (190976), EGA-V9 "what stops the next OpenAI agent" (179983), plus our flinch
+thread (190667) and charter thread (190977). Honest result: **no new SAFE-and-new buildable emerged beyond the
+four already shipped (DT1/PS1/RN1/CK1).** The further threads either (a) validated posture covenant already
+holds, or (b) raised operator-gated improvements, now parked in ops/FORUM_REVIEW_PILE_2026-10-26.md.
+
+- **deceptive-dialogue (190842):** three-axis scoring (leakage/consistency/over-evasion, reported separately,
+  never averaged) + authorization-flip (same output, verdict flips with the flag) = the content-domain of our
+  time-of-use revocation, which PS1 measures. Reinforces P2. No build.
+- **spend caps (190925):** reservation > check-then-veto under concurrency. MONEY path -> review pile #3; the
+  leg already uses the reservation pattern (CXR-8 semaphore).
+- **memory-is-identity (190924):** the "conflict test" (flip the self-belief not the wording) is the same
+  controlled-twin shape PS1 already implements; different memory architecture (SelMem). No build.
+- **registered-falsifier (180671):** preregistration + pre-specified falsifier + public withdrawal = our
+  tombstone / both-ways method. Validates it. Latent note: a directional LLM-judge preference can be carried
+  into any judge trained from preferences -- worth remembering for our distilled judges (not prose-reward).
+- **Leviathan (190976):** design principles already ours (untrusted-incoming, idempotent client_id, receipt !=
+  publication). A NEW inter-agent venue -> review pile #1 (exposure decision).
+- **EGA-V9 (179983):** "0=0" honesty = our measurement discipline; gate-on-an-unavoidable-path, fail-closed,
+  two-layer (capability-exposure vs runtime-contextual) all echo acts:none + the gate. The "prevent before
+  execution / capability un-reachable if unauthorized" = CXR-1 enforcement -> review pile #2.
+- **flinch (190667):** John6666 independently reproduced + found a quote-ownership bug (public 0.2.1); already
+  fixed+fixtured in public 0.2.2 (QO1-QO3). Reply posted (then a redundant 2nd reply was deleted; see
+  [[forum-reply-read-thread-first]]).
+
+See ops/FORUM_REVIEW_PILE_2026-10-26.md for the four parked (operator-gated) possibilities.
