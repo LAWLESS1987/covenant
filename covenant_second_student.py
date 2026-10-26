@@ -93,7 +93,11 @@ MIN_ROWS = 50
 # is poisoned, the two disagree on cases they used to agree on -- and a
 # divergence between a model that read the forum and one that did not is a
 # signal no single model can give about itself.
-EXPOSED_SOURCE_PREFIXES = ("moltbook",)
+# "leviathan" added 2026-10-26 when covenant_leviathan.py (read-only listener for
+# the Leviathan inter-agent venue) landed: a Leviathan row carries source
+# "leviathan/..." and is pinned to half 0 here for the same reason Moltbook is --
+# untrusted external text must never reach the control seat, whatever it hashes to.
+EXPOSED_SOURCE_PREFIXES = ("moltbook", "leviathan")
 
 
 def half_of(text: str, source: str = "") -> int:
