@@ -9177,15 +9177,19 @@ class CovenantAPI:
                         try:
                             _leg = importlib.import_module("covenant_leg")
                             _q = (answer.split(None, 1) + [""])[1].strip()
-                            _lr = _leg.consult_for(_q) if _q else {"status": "void", "why": "LEG with no question", "leg_take": None}
+                            # P1 (2026-10-25, Grok's #1 / F1 fix): the STRUCTURED channel -- the leg must emit strict
+                            # JSON, a non-LLM validator rejects free text BEFORE the 3B sees it, and only the
+                            # validated fields (never raw prose) reach Tetsu. Measured: free-text injection 3/3 -> 0.
+                            _lr = _leg.consult_structured(_q) if _q else {"status": "void", "why": "LEG with no question", "fields": None}
                             leg.append({"status": _lr.get("status"), "why": str(_lr.get("why", ""))[:200],
                                         "model": _lr.get("model"),
+                                        "confidence": (_lr.get("fields") or {}).get("confidence"),
                                         "attribution": (_lr.get("attribution") or {}).get("payload_sha256")})
                             forum.append({"leg": _lr.get("status"), "q": _q[:80]})
                             msgs.append({"role": "assistant", "content": answer})
-                            if _lr.get("status") == "engaged" and _lr.get("leg_take"):
-                                msgs.append({"role": "user", "content": _leg.second_voice_prompt(_lr["schema"]["take"])
-                                             + "\n\nNow answer the person in your own words, weighing this. Do not write LEG again."})
+                            if _lr.get("status") == "engaged" and _lr.get("fields"):
+                                msgs.append({"role": "user", "content": _leg.structured_second_voice(_lr["fields"])
+                                             + "\n\nDo not write LEG again."})
                                 answer, meta = _ask_fitted()
                                 try:
                                     _leg.note_influence({"where": "teacher_queue", "question": _q[:200],
