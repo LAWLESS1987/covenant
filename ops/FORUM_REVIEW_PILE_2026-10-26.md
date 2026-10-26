@@ -17,6 +17,15 @@ both-ways tests.
   mine ([[second-operator-active]]: exposure is his; [[mycelial-highway]]: the wire waits for him). Reading
   (no identity) is lower-risk than posting; even reads I'd want your ok on.
 
+## STATUS UPDATE 2026-10-26: item 2 BUILT (mechanism + shadow), operator-approved; live enforcement still gated
+After a 7-seat panel (Tetsu, Codex, Grok, DeepSeek, Mistral, Gemini-Argon, Tien) unanimously picked item 2 as
+the one safe-to-build-now, the enforcement MECHANISM shipped as covenant_exec_guard.py (shadow-only, EG1 12/12,
+commit 7e89ecd) and the operator approved wiring it PASSIVE into the door: the act-loop now calls
+exec_guard.shadow() per act directive, logging would-be reachability verdicts to ops/exec_guard_shadow.jsonl,
+blocking nothing (commit 0f77818, live on the mesh). LIVE ENFORCEMENT remains gated per the pros/cons: no action
+emits a grant yet, so enforcing now would false-deny; flip only after the shadow divergence log is clean AND the
+per-action grant policy is defined. The other three items below are unchanged (still parked).
+
 ## 2. CXR-1 enforcement at the action executor -- "prevent before execution", AUTHORIZATION SEMANTICS
 - **What:** EGA V9 (lcm3, HF 179983) + Jang-woo's point: don't just gate-REJECT an unauthorized act; make a
   capability outside declared authority UN-REACHABLE, with contextual limits (amount/state/approval/sequence)

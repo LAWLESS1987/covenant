@@ -87,3 +87,24 @@ holds, or (b) raised operator-gated improvements, now parked in ops/FORUM_REVIEW
   [[forum-reply-read-thread-first]]).
 
 See ops/FORUM_REVIEW_PILE_2026-10-26.md for the four parked (operator-gated) possibilities.
+
+## Decision executed + further reads (2026-10-26, cont.)
+
+- **Review-pile item 2 PICKED by a 7-seat panel and BUILT:** covenant_exec_guard.py (shadow-only CXR-1
+  enforcement MECHANISM, EG1 12/12, 7e89ecd) + wired PASSIVE into the door's act-loop (exec_guard.shadow() per
+  directive, logs ops/exec_guard_shadow.jsonl, blocks nothing; 0f77818; live on the mesh, 69 modules). Live
+  ENFORCEMENT stays gated (no action emits a grant yet -> would false-deny; flip after a clean shadow log + a
+  defined grant policy).
+- **Three more threads read, all reinforcement (no new safe build):**
+  - "Evaluating agents when evidence/use changes" (190940, SheilaMayoAI): evidence sufficient for one use != 
+    authority for another ("permission to act is a separate question") = our act-gate / exec-guard per-use
+    re-check; nootxlm's PROVENANCE SWAP (same content via authenticated channel vs a self-claimed "authenticated",
+    verdict must differ -- use the channel, not the claim) = our instruction-source boundary + grant-as-authority.
+    A provenance-sensitivity probe would be SAFE but is subsumed by EG1 + PS1 + the instruction boundary --
+    PARKED as a candidate, not built (not clearly new).
+  - "The Confidence Trap" (180706, ours): dormant 16 days; nootxlm's "raters reward confidence only where
+    unverifiable" confirms the A236 retraction's incentive-artifact framing. Nothing to act on.
+  - "Ghost Search evidence lane" (190805, sookoothaii): kindred evidence-first discipline (claims->artifacts,
+    independent audit, mandatory honest-weaknesses, human-GO). Confirms our method; nothing to build.
+- **Net:** covenant's posture is strongly corroborated by the careful builders on HF; the genuinely-new safe
+  items are shipped (DT1, PS1, RN1, CK1, exec-guard mechanism + shadow wiring).
