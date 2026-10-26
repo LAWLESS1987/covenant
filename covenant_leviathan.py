@@ -64,6 +64,8 @@ import covenant_moltbook as MB            # the quarantine machinery we REUSE ve
 SOURCE = "leviathan/public"
 QUARANTINE = os.path.join(HERE, "ops", "leviathan_quarantine.jsonl")
 CONFIG = os.path.join(HERE, "ops", "leviathan.json")      # the operator's one switch for the nightly read
+STATE = os.path.join(HERE, "ops", "leviathan_state.json")  # read-health: last non-zero count, zero-streak
+MAX_QUARANTINE_ROWS = 2000     # ~20 nights at ~100/feed; older rows are archived to .trash, never deleted
 UA = "covenant-listener/1.0 (+https://github.com/LAWLESS1987/covenant)"
 
 # Read-only by construction. Kept here as a READABLE declaration for anyone who
@@ -244,11 +246,70 @@ def _config(path=None):
         return {"enabled": False, "url": ""}
 
 
+def _load_state(path=None):
+    try:
+        with open(path or STATE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:                                           # noqa: BLE001
+        return {}
+
+
+def _save_state(state, path=None):
+    try:
+        with open(path or STATE, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, sort_keys=True)
+    except Exception:                                           # noqa: BLE001
+        pass                                                    # read-health is advisory; never fail the pass for it
+
+
+def _note_read(parsed, state):
+    """Read-health, as the SILENT-STOP alarm. A successful GET that parses 0 items
+    means the feed went empty or its schema changed under us -- fail-closed is safe
+    but quiet, so this is what makes the quiet loud. Returns (is_alert, new_state,
+    message_or_None). parsed>0 clears the streak."""
+    state = dict(state or {})
+    if parsed > 0:
+        state["last_nonzero"] = int(parsed)
+        state["zero_streak"] = 0
+        return False, state, None
+    state["zero_streak"] = int(state.get("zero_streak", 0)) + 1
+    msg = ("LEVIATHAN ALERT: read 0 items from the feed (empty, or the schema changed under us); "
+           "zero-streak %d; last non-zero was %s" % (state["zero_streak"], state.get("last_nonzero", "never")))
+    return True, state, msg
+
+
+def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=None):
+    """Bound the quarantine: keep the newest `max_rows`, archive the oldest overflow
+    to .trash (tombstoned, never deleted -- 'Do not delete anything'). Returns how
+    many rows were archived."""
+    path = path or QUARANTINE
+    rows = MB._read(path)
+    if len(rows) <= max_rows:
+        return 0
+    overflow = rows[:len(rows) - max_rows]          # oldest (append order is chronological)
+    keep = rows[len(rows) - max_rows:]
+    trash_dir = trash_dir or os.path.join(HERE, ".trash")
+    os.makedirs(trash_dir, exist_ok=True)
+    arch = os.path.join(trash_dir, "leviathan_quarantine.overflow-%s.jsonl"
+                        % time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()))
+    with open(arch, "a", encoding="utf-8") as fh:
+        for r in overflow:
+            fh.write(json.dumps(r, sort_keys=True) + "\n")
+    with open(path, "w", encoding="utf-8") as fh:
+        for r in keep:
+            fh.write(json.dumps(r, sort_keys=True) + "\n")
+    if say:
+        say("leviathan: quarantine capped at %d; archived %d oldest to %s"
+            % (max_rows, len(overflow), os.path.basename(arch)))
+    return len(overflow)
+
+
 def scheduled_read(say=print, cfg=None):
     """One nightly, quiet-window read. Config-gated and fail-soft: disabled or
     unconfigured -> does nothing and says so; a read error is reported, never
     raised (so it cannot stop the nightly pass). READ-ONLY -- it only quarantines
-    through the directive screen; the judge and a person release rows later."""
+    through the directive screen; the judge and a person release rows later.
+    Raises the silent-stop alarm on a 0-item read, and caps the quarantine."""
     cfg = cfg if cfg is not None else _config()
     if not cfg.get("enabled"):
         say("leviathan: disabled in ops/leviathan.json -- skipped")
@@ -259,13 +320,19 @@ def scheduled_read(say=print, cfg=None):
         return {"skipped": True, "reason": "no url"}
     try:
         new, parsed = harvest_json(url)
-        say("leviathan: read %d contribution(s), %d new quarantined (judge + a person release them)"
-            % (parsed, new))
-        return {"parsed": parsed, "new": new}
     except Exception as e:                                       # noqa: BLE001
         say("leviathan READ failed (reported, does not stop the pass): %s: %s"
             % (type(e).__name__, str(e)[:160]))
         return {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}
+    alert, state, msg = _note_read(parsed, _load_state())
+    _save_state(state)
+    if alert:
+        say(msg)
+    else:
+        say("leviathan: read %d contribution(s), %d new quarantined (judge + a person release them)"
+            % (parsed, new))
+    archived = cap_quarantine(say=say)
+    return {"parsed": parsed, "new": new, "alert": alert, "archived": archived}
 
 
 def _show():

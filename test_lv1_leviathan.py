@@ -115,5 +115,33 @@ ok("LV1.25 default config loads and is disabled-safe when the file is absent",
    isinstance(L._config("/no/such/leviathan.json"), dict)
    and L._config("/no/such/leviathan.json")["enabled"] is False)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 26 - len(fails), 26))
+# --- read-health alarm (_note_read): parsed>0 clears the streak; parsed==0 after a good GET is the alert.
+noalert, st, msg = L._note_read(100, {"zero_streak": 3})
+ok("LV1.26 parsed>0 clears streak, no alert", (noalert is False) and st["zero_streak"] == 0
+   and st["last_nonzero"] == 100 and msg is None)
+alert, st2, msg2 = L._note_read(0, st)
+ok("LV1.27 parsed==0 raises the silent-stop alert", alert is True and st2["zero_streak"] == 1
+   and "ALERT" in (msg2 or "") and "0 items" in (msg2 or ""))
+alert3, st3, _ = L._note_read(0, st2)
+ok("LV1.28 consecutive zeros escalate the streak", alert3 is True and st3["zero_streak"] == 2)
+
+# --- quarantine cap: archive oldest overflow to a temp trash, keep newest; both ways (overflow / none).
+import json as _json, tempfile, glob as _glob
+_tmp = tempfile.mkdtemp()
+_q = os.path.join(_tmp, "q.jsonl")
+_tr = os.path.join(_tmp, "trash")
+with open(_q, "w", encoding="utf-8") as fh:
+    for i in range(5):
+        fh.write(_json.dumps({"sha256": "s%d" % i, "text": "row %d" % i, "t": "2026-10-26T00:0%dZ" % i}) + "\n")
+n = L.cap_quarantine(max_rows=3, path=_q, trash_dir=_tr)
+_kept = [l for l in open(_q, encoding="utf-8").read().splitlines() if l.strip()]
+_arch = _glob.glob(os.path.join(_tr, "leviathan_quarantine.overflow-*.jsonl"))
+ok("LV1.29 cap archives the oldest overflow (2 of 5)", n == 2 and len(_kept) == 3)
+ok("LV1.30 overflow is tombstoned to .trash, not deleted",
+   len(_arch) == 1 and len([l for l in open(_arch[0], encoding='utf-8').read().splitlines() if l.strip()]) == 2)
+ok("LV1.31 newest rows are the ones kept", '"text": "row 4"' in open(_q, encoding="utf-8").read()
+   and '"text": "row 0"' not in open(_q, encoding="utf-8").read())
+ok("LV1.32 cap is a no-op when under the limit", L.cap_quarantine(max_rows=10, path=_q, trash_dir=_tr) == 0)
+
+print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 32 - len(fails), 32))
 sys.exit(1 if fails else 0)

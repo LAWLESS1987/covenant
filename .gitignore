@@ -459,6 +459,7 @@ ops/exec_guard_shadow.jsonl
 # Leviathan read-only quarantine (2026-10-26): others' public posts harvested from the venue, held
 # locally for the judge + a person; never republished into this public repo (exposure hygiene).
 ops/leviathan_quarantine.jsonl
+ops/leviathan_state.json
 *.leg-reversed
 
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
