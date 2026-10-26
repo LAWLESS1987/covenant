@@ -9100,6 +9100,24 @@ class CovenantAPI:
                 answer, meta = _ask_fitted()
                 first = answer.strip().splitlines()[0].strip() if answer.strip() else ""
                 url = _agent_fetch_url(answer)
+                # CXR-1 exec-guard, SHADOW-ONLY (2026-10-26; 7-seat panel + operator "wire passive/shadow"):
+                # observe what a capability guard WOULD decide for this act and log it -- it changes NOTHING and
+                # blocks NOTHING (no handle is used, no branch reads it). Off with COVENANT_EXEC_GUARD_SHADOW=0.
+                # Double-guarded: a failure here never touches the turn. Wiring it to ENFORCE is a separate,
+                # human-gated step this does not take.
+                if os.environ.get("COVENANT_EXEC_GUARD_SHADOW", "1") != "0":
+                    try:
+                        _eg = importlib.import_module("covenant_exec_guard")
+                        _akw = first.split(None, 1)[0].upper() if first else ""
+                        _eact = {"FETCH": "FETCH", "WEB": "WEB", "HANDS": "HANDS", "MOLTBOOK": "MOLTBOOK",
+                                 "HEAL": "HEAL", "LEG": "LEG"}.get(_akw) or ("FETCH" if url else None)
+                        if _eact:
+                            _etgt = (url or (first.split(None, 1) + [""])[1].strip())[:300]
+                            _eg.shadow(_eact, {"action": _eact, "target": _etgt, "expiry": time.time() + 600},
+                                       {"now": time.time()}, target=_etgt,
+                                       log_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "exec_guard_shadow.jsonl"))
+                    except Exception:                         # noqa: BLE001 -- a shadow observation never breaks a turn
+                        pass
                 if private and (url or first.upper().startswith(("MOLTBOOK", "WEB "))):
                     # A263: an act that reaches outside this machine is not made for a private ask.
                     # Handed back as data, the same way a refused act is, so what he says is what happened.

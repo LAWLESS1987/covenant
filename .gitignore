@@ -453,6 +453,9 @@ ops/tetsu_practice.jsonl
 
 # Leg-influence tombstone ledger + the rows a reversal moves aside (runtime, like the practice record)
 ops/leg_influence.jsonl
+# Exec-guard SHADOW observation log (2026-10-26): what a capability guard WOULD decide per act; runtime,
+# observe-only, never pushed (it mentions targets/urls from live acts).
+ops/exec_guard_shadow.jsonl
 *.leg-reversed
 
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
