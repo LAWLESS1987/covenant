@@ -9100,11 +9100,11 @@ class CovenantAPI:
                 answer, meta = _ask_fitted()
                 first = answer.strip().splitlines()[0].strip() if answer.strip() else ""
                 url = _agent_fetch_url(answer)
-                # CXR-1 exec-guard, SHADOW-ONLY (2026-10-26; 7-seat panel + operator "wire passive/shadow"):
-                # observe what a capability guard WOULD decide for this act and log it -- it changes NOTHING and
-                # blocks NOTHING (no handle is used, no branch reads it). Off with COVENANT_EXEC_GUARD_SHADOW=0.
-                # Double-guarded: a failure here never touches the turn. Wiring it to ENFORCE is a separate,
-                # human-gated step this does not take.
+                # CXR-1 exec-guard, SHADOW-ONLY (2026-10-26; 7-seat panel + operator). Capture the guard's would-be
+                # verdict for this act NOW; it is PAIRED with the door's ACTUAL outcome after the branches run and
+                # logged there (observe-only, blocks nothing, reads no branch result). Off with
+                # COVENANT_EXEC_GUARD_SHADOW=0. Double-guarded: it never touches the turn. ENFORCE stays human-gated.
+                _eg_obs = None
                 if os.environ.get("COVENANT_EXEC_GUARD_SHADOW", "1") != "0":
                     try:
                         _eg = importlib.import_module("covenant_exec_guard")
@@ -9113,11 +9113,12 @@ class CovenantAPI:
                                  "HEAL": "HEAL", "LEG": "LEG"}.get(_akw) or ("FETCH" if url else None)
                         if _eact:
                             _etgt = (url or (first.split(None, 1) + [""])[1].strip())[:300]
-                            _eg.shadow(_eact, {"action": _eact, "target": _etgt, "expiry": time.time() + 600},
-                                       {"now": time.time()}, target=_etgt,
-                                       log_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "exec_guard_shadow.jsonl"))
-                    except Exception:                         # noqa: BLE001 -- a shadow observation never breaks a turn
-                        pass
+                            _wld, _wwhy = _eg.evaluate(_eact, {"action": _eact, "target": _etgt, "expiry": time.time() + 600},
+                                                       {"now": time.time()}, target=_etgt)
+                            _eg_obs = {"action": _eact, "target": _etgt,
+                                       "guard_would": "reachable" if _wld else "unreachable", "guard_reason": _wwhy}
+                    except Exception:                         # noqa: BLE001 -- shadow observation never breaks a turn
+                        _eg_obs = None
                 if private and (url or first.upper().startswith(("MOLTBOOK", "WEB "))):
                     # A263: an act that reaches outside this machine is not made for a private ask.
                     # Handed back as data, the same way a refused act is, so what he says is what happened.
@@ -9223,6 +9224,23 @@ class CovenantAPI:
                             print("octopus leg: not reached this ask (%s)" % type(_le).__name__, flush=True)
             except Exception as e:                                # noqa: BLE001
                 return (jsonify({"status": "error", "message": "the model did not answer: %s: %s" % (type(e).__name__, str(e)[:300])}), 503)
+            if _eg_obs is not None:                               # CXR-1 exec-guard SHADOW: pair the guard's would-be
+                try:                                              # verdict with the door's ACTUAL outcome; log only.
+                    _drec = (fetches[-1] if fetches else None) if _eg_obs["action"] == "FETCH" else (forum[-1] if forum else None)
+                    _dtxt = json.dumps(_drec, default=str).lower() if _drec else ""
+                    if _drec is None:
+                        _dout = "no-record"
+                    elif ("held" in _dtxt) or ('"sent": false' in _dtxt) or ("refus" in _dtxt) or ("not public" in _dtxt) or ("void" in _dtxt):
+                        _dout = "refused-or-held"
+                    else:
+                        _dout = "ran"
+                    _div = (_eg_obs["guard_would"] == "reachable") != (_dout == "ran") if _dout in ("ran", "refused-or-held") else None
+                    _erow = dict(_eg_obs, door_outcome=_dout, door_record=_drec, divergent=_div,
+                                 at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+                    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "exec_guard_shadow.jsonl"), "a", encoding="utf-8") as _ef:
+                        _ef.write(json.dumps(_erow, ensure_ascii=False, default=str) + "\n")
+                except Exception:                                 # noqa: BLE001 -- shadow logging never breaks a turn
+                    pass
             tx = Transaction(sender_pubkey="model", receiver="collective",
                              data={"origin": "model", "kind": "answer", "message": answer[:4000], "question": text[:1000]},
                              amount=0.0, benefit_score=0.5)
