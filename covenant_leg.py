@@ -17,6 +17,13 @@ for the council/synthesis to weigh, and everything it produces passes the SAME g
 other model output -- the white that contains the black spot. A behavioural backdoor in an unverified merge
 is not provable by a scan; the gate is the backstop, never this module.
 
+OPERATOR CHANGE 2026-10-25: the leg is no longer AUTO-triggered by the 3B's uncertainty (a live probe showed
+the 3B obeys the leg's text rather than weighing it, so auto-synthesis became "the leg speaks through Tetsu").
+It is now a CONSULTANT TETSU REACHES DELIBERATELY -- "really an extension" -- via consult_for(): he writes a
+LEG directive when he chooses (a good time is when he notices a flinch), and weighs the take in his own words.
+The uncertainty router below (senses_need/route/measure_3b_uncertainty) is kept and tested but is no longer the
+live trigger; the live path is consult_for(). Tetsu endorsed the change (no objection, catches his own flinch).
+
 Stdlib only. Guarded: a failure here never breaks a turn -- the leg stays retracted and the 3B answers alone.
 """
 from __future__ import annotations
@@ -401,7 +408,42 @@ def route(text, state_path=None, uncertainty=None):
     return out
 
 
+def consult_for(text, max_tokens=320):
+    """DELIBERATE consult (operator 2026-10-25: "a knowledgeable consultant Tetsu can reach deliberately, really
+    an extension" -- NOT the uncertainty router). Tetsu reached the leg out ON PURPOSE for a specific question,
+    so there is no senses_need/uncertainty gate here -- just the same CONTAINMENT route() applies: RAM
+    backpressure, VOID on unreachable/empty/over-long, schema + attribution on success. Same report shape as
+    route(). The leg still decides nothing, holds no tools, acts on nothing; its take is untrusted data."""
+    out = {"engage": True, "why": "deliberate consult -- Tetsu reached the leg out", "available": False,
+           "status": "not-engaged", "leg_take": None, "model": None, "ram_free_gb": None,
+           "schema": None, "attribution": None, "contained": dict(CONTAINMENT)}
+    fr = free_ram_gb()
+    out["ram_free_gb"] = round(fr, 2) if fr is not None else None
+    if fr is not None and fr < RAM_FLOOR_GB:
+        out["status"] = "retracted"
+        out["why"] += " | RAM backpressure: free %.2fGB < floor %.2fGB -- leg held" % (fr, RAM_FLOOR_GB)
+        return out
+    out["available"] = leg_available()
+    if not out["available"]:
+        out["status"] = "void"
+        out["why"] += " | leg server not up (:%d) -- VOID" % LEG_PORT
+        return out
+    got = consult_leg(text, max_tokens=max_tokens)
+    if got is None or not (got[0] or "").strip():
+        out["status"] = "void"
+        out["why"] += " | leg returned nothing -- VOID (no soft-fail)"
+        return out
+    take = got[0].strip()
+    if len(take) > MAX_LEG_CHARS:
+        out["status"] = "void"
+        out["why"] += " | leg output over %d chars -- VOID" % MAX_LEG_CHARS
+        return out
+    out["leg_take"], out["model"], out["status"] = take, LEG_MODEL, "engaged"
+    out["schema"], out["attribution"] = shape_take(take), got[1]
+    return out
+
+
 if __name__ == "__main__":
     import sys
     t = " ".join(sys.argv[1:]) or "what is a hash chain?"
-    print(json.dumps(route(t), indent=1)[:1500])
+    print(json.dumps(consult_for(t), indent=1)[:1500])
