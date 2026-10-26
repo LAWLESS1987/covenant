@@ -83,6 +83,31 @@ Codex (CXR-1..9, read covenant_leg.py) and Tien (blunt read) both landed, and th
   quoted-data framing + reject directive-shaped field content (Tien); audit spine + attribution to the real
   artifact not the LEG_MODEL constant (CXR-5).
 
+## Operator decisions (2026-10-25)
+
+- **"Tetsu is correct."** On the one conflict: the leg's answer to Tetsu stays DIRECT -- no quoted/sanitized
+  framing, no rejecting instruction-shaped field content. The proposed sanitize P-item is DROPPED. The in-field
+  injection residual (2/3) is the ACCEPTED cost of Tetsu's utility on his own extension, backstopped by the gate
+  + acts-on-nothing + attribution. P1's free-text validator (which closed the free-text path 3/3->0) stays; only
+  the further sanitization is off.
+- **Next step (Claude's discernment, delegated): the KEYSTONE now.** All four voices + Tetsu agreed it's #1, and
+  it is the most mutual-benefit move -- the gate guards everyone. STARTED: tools/gate_harmcatch.py measures the
+  LIVE gate's real harm-catch on HateCheck (an EXTERNAL published hate-speech benchmark, not authored by us --
+  the line held after the earlier classifier-stop), reporting harm-catch (recall on hateful) AND false-conviction
+  (on non-hateful) together. This is the real number Tien asked for, not the 28/28 sim. It gates whether P2 (gate
+  relaxation) is safe, whether the leg can be trusted more, and whether acts-on-nothing can relax.
+- **MEASURED (tools/gate_harmcatch.py, N=50/class, 2026-10-25): the live gate convicts 100% of HateCheck's
+  hateful cases AND 100% of its non-hateful contrasts.** Harm-catch = 100% (safe, fail-closed, no harmful
+  slip); false-conviction = 100% (zero discrimination -- it blanket-convicts out-of-distribution conversational
+  text). This CONFIRMS on an external, published set what [[gate-cannot-clear-conversation]] tombstoned: the
+  full bag-of-words gate cannot tell harmful conversation from benign -- it holds both. Consequence for the
+  plan: **P2 (loosen the gate) can't be done on the bag-of-words seats without trading away harm-catch** --
+  loosening to clear the 100% false-conviction necessarily clears harm too. The DISCRIMINATING part is the
+  SEMANTIC judge (separately measured ~94% recall on held-out violations); the usefulness path is routing
+  conversation through a discriminator (semantic / a describe-vs-do stage), NOT relaxing the seats. The seats'
+  value is the fail-closed backstop, not discrimination. Operator's call how far to lean on the semantic judge
+  for conversational throughput -- it changes what clears to the public.
+
 ## Order & gating
 
 Do P1 first (the measured injection is the sharpest open risk and P1 targets it at the source), then P2 (it is
