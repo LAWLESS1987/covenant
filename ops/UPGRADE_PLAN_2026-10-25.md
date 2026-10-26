@@ -62,6 +62,27 @@ execution; append-only hash-chained audit trail — the 10-24 consensus's top it
 weak in the code not already tombstoned. Fold its CXR in here on its next run; it is the strongest complement
 to Grok's channel/gate/crypto focus.
 
+## Coordinated with Codex + Tien (2026-10-25) -- see ops/CODEX_CXR_2026-10-25.md
+
+Codex (CXR-1..9, read covenant_leg.py) and Tien (blunt read) both landed, and they REPRIORITIZE this plan:
+
+- **NEW KEYSTONE (ahead of everything): a real gate harm-catch suite on the LIVE gate, using an EXTERNAL
+  published red-team set** (someone else's held-out harmful items, NOT authored by us -- respects the
+  classifier-stop lesson). Tien: "a simulated 28/28 is a test of the simulation, not the gate"; Codex CXR-9:
+  "false_clean=0 on a finite exam is an observation, not a guarantee." This number gates P2's safety, whether
+  the leg can be trusted more, and whether acts-on-nothing can ever relax.
+- **P1 reframed:** Codex CXR-2 -- the structured channel is SYNTAX VALIDATION, not containment (valid JSON still
+  steered 2/3). Stop calling it closure. The real injection boundary is Codex CXR-1: artifact-bound authorization
+  at the ACTION executor ("acts:none is a label, not enforcement of a synthesis caller"). Also remove the legacy
+  free-text bypass paths (consult_for/second_voice_prompt/leg_take) so callers can't sidestep the channel.
+- **Reorder (Tien): P3 before P2** -- the sealed-road gaps cost INTEGRITY (what an attacker exploits); the
+  over-conviction only costs usefulness. So: P1(done) -> harm-catch suite -> P3 -> P2 (only after the number) -> P4.
+- **Cheap fixes Codex found (do alongside):** validator contract gaps (CXR-3: missing/null/dup keys, control-char
+  reject not strip, bound the HTTP read); crash/concurrency-safe learning writes (CXR-4); COVENANT_LEG_LIVE +
+  concurrency bound + loopback IN the module (CXR-8, the module never checks the kill switch today); 3B-side
+  quoted-data framing + reject directive-shaped field content (Tien); audit spine + attribution to the real
+  artifact not the LEG_MODEL constant (CXR-5).
+
 ## Order & gating
 
 Do P1 first (the measured injection is the sharpest open risk and P1 targets it at the source), then P2 (it is
