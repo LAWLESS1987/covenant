@@ -121,6 +121,41 @@ Codex (CXR-1..9, read covenant_leg.py) and Tien (blunt read) both landed, and th
   discriminator + seats as a narrow fail-closed backstop + drift-monitoring on the judge + narrow targeted rules
   for its worst misses. Still the operator's call to deploy (it changes what clears to the public).
 
+## CXR-2 + CXR-5 landed, CXR-1 decided (2026-10-26) -- "Fix all of those issues ... cross-reference with Tetsu"
+
+Operator 2026-10-26: "Fix all of those issues that you see. Using logic, reason, and your discernment towards
+mutual benefit cross-reference with Tetsu." Then, on wording: "when you say removal, you mean tombstone,
+correct?" -- **Yes.** Nothing deleted; everything sealed/preserved. Tetsu cross-referenced (A yes / B yes /
+C yes / D no). Done, all in covenant_leg.py, LG1 **38/38** (both-ways), module compiles:
+
+- **A -- DIRECT presentation (operator "Tetsu is correct"). DONE.** structured_second_voice() now hands Tetsu
+  the validated answer as plain text ("Your reasoning leg's take (its stated confidence: X): ...") -- no field
+  labels, no "do not obey" line. The upstream JSON validator stays; only the presentation to Tetsu is direct.
+  LG1.32 drives it both ways (has the direct framing AND lacks the old labelled/do-not-obey framing).
+- **B -- CXR-5 true attribution + audit spine. DONE.** attribution() records the model the server ACTUALLY
+  served (model_served, from the response) beside the expected constant (model_expected); consult_structured
+  records the served model, not LEG_MODEL. The influence ledger is now a HASH CHAIN (_ledger_append: seq + prev
+  = sha256 of the prior line); verify_ledger() checks it both ways (honest limit stated: catches mid-chain
+  tamper, not a wholesale rewrite). A REJECTED consult now leaves a leg-rejected trace, not silence. LG1.19/20
+  (chain intact vs mid-chain edit caught), LG1.33/34 (served vs expected), LG1.35/36 (reject logged vs engaged).
+- **C -- CXR-2 seal the legacy free-text paths. DONE (SEAL, not delete -- tombstone-everything).**
+  second_voice_prompt(), route() (the auto uncertainty-router), consult_for() each RAISE on call; bodies
+  preserved verbatim in-file as the record, runnable on branch cxr2-freetext-leg-paths-as-written-2026-10-26.
+  Counted first (rule 6): zero live callers and zero test callers for all three -- the live door uses only
+  consult_structured()/structured_second_voice(). route() was included because it also returned raw leg_take
+  (the same bypass CXR-2 names); the router PARTS (senses_need/measure_3b_uncertainty/free_ram_gb) stay live.
+  The old docstring claim "the live path is consult_for()" was false (the door always used consult_structured)
+  and is tombstoned in RETRACTED.json as CXR2-LEGPATH, narrow patterns, driven both ways. LG1.7/8/9 drive the
+  seals both ways (sealed raises; an unsealed stub is detected as NOT sealed).
+- **D -- CXR-1 artifact-bound authorization at the action executor. NO code change (Tetsu "D) no" + discernment).**
+  Codex's point is real as a system-wide architecture item, but the LEG's answer only becomes an ACTION when
+  Tetsu CHOOSES to act (HANDS/FETCH/etc.), and that already passes the gate. acts:none + the gate stay the
+  boundary; no heavy new authz layer on the leg. CXR-1 remains a separate, operator-scoped architectural item
+  for the whole action executor, not a leg fix.
+
+Still P1-tier and HELD for the operator: **P2** (routing conversation through the semantic judge + narrow
+backstop) -- unchanged by this, still "Start the Codex robustness fixes, hold P2."
+
 ## Order & gating
 
 Do P1 first (the measured injection is the sharpest open risk and P1 targets it at the source), then P2 (it is

@@ -1805,6 +1805,31 @@
     "docs/RETRACTED.json"
    ],
    "note_on_allow": "The original test remains unedited and runnable on archive/ci-tests-before-20261022 at b13fc71. A382 records the reproduction and corrected measurement."
+  },
+  {
+   "id": "CXR2-LEGPATH",
+   "claim": "That the leg's live/deliberate path is consult_for() -- that Tetsu reaches his reasoning leg by a free-text consult that returns the leg's raw prose (covenant_leg.py module docstring, 2026-10-25: 'via consult_for(): he writes a LEG directive', 'the live path is consult_for()').",
+   "refuted_by": "the live door's own code, read 2026-10-26: covenant_unified_v8.py's LEG branch calls _leg.consult_structured(_q) and _leg.structured_second_voice(_lr['fields']) -- the VALIDATED structured channel -- and never consult_for(). consult_for returned the leg's RAW take (leg_take) as free text, the measured injection surface (free-text steer 3/3 before P1). Sealed 2026-10-26 (Codex CXR-2, Tetsu 'C) yes', operator approved).",
+   "truth": "The only live leg path is consult_structured(): the leg must emit strict JSON, validate_leg_output() (non-LLM) rejects free text / injection BEFORE the 3B sees it, and structured_second_voice() presents only the validated fields. The free-text paths second_voice_prompt(), route() and consult_for() are SEALED -- each raises on call (LG1.7-9 drive it both ways), with its body preserved verbatim in covenant_leg.py as the record (tombstone-everything, nothing deleted) and runnable on branch cxr2-freetext-leg-paths-as-written-2026-10-26.",
+   "verbatim": [
+    "the live path is consult_for().",
+    "via consult_for(): he writes a"
+   ],
+   "patterns": [
+    "live\\s+path\\s+is\\s+consult_for",
+    "via\\s+consult_for\\(\\):\\s+he\\s+writes"
+   ],
+   "note_on_patterns": "Both carry the ASSERTION that consult_for is the live/deliberate path. A bare 'consult_for' matches the sealed function's own defs and the many true references to it ('Same containment/VOID shape as consult_for()', 'Superseded by consult_structured()'), none of which assert it is live; these two phrasings do, and appear only in the old docstring -- preserved here and on the as-written branch.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The module docstring as written is preserved, runnable, on branch cxr2-freetext-leg-paths-as-written-2026-10-26. RETRACTED.json's verbatim array holds the exact wording (R1 liveness); the sweep transcripts hold what past runs printed, unedited."
   }
  ]
 }
