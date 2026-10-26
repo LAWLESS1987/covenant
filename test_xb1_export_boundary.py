@@ -70,16 +70,20 @@ if git_ok:
        check_ignored(CONTROL) is False, "the control file reads as ignored -- the matcher is broken")
     ok("XB1 control %s IS tracked" % CONTROL, is_tracked(CONTROL) is True, "control not tracked")
 else:
-    # NO RESULT for the git checks (no .git where the runner runs it). Fall back to .gitignore membership so
-    # there is still a measurement; name the blind spot rather than pass on absence (A129/NO RESULT).
-    print("XB1 NOTE: no git repo here (the runner's staged tree) -- git check-ignore NOT RUN; "
-          "falling back to .gitignore text membership. Blind spot: a rule that matches by pattern "
-          "rather than exact path is not verified here.")
     gi = os.path.join(HERE, ".gitignore")
-    rules = set()
-    if os.path.isfile(gi):
-        rules = {ln.strip() for ln in open(gi, encoding="utf-8", errors="ignore") if ln.strip() and not ln.startswith("#")}
-    ok("XB1 .gitignore present to check", bool(rules), gi)
+    if not os.path.isfile(gi):
+        # NO RESULT (A129 / rule 9): this suite measures a REPOSITORY property, and here there is neither .git
+        # NOR .gitignore -- the runner stages to a temp tree without them ([[run-it-where-the-runner-runs-it]]).
+        # Nothing to measure, so nothing is claimed; fabricating failures here would be the inverse of a fake
+        # green. The authoritative measurement runs in the working tree and in CI's fresh clone (git check-ignore).
+        print("XB1 NO RESULT: no .git and no .gitignore in this tree (the runner's staged copy) -- "
+              "a repo-property suite is run where the repo exists (working tree / CI clone), not here.")
+        print("\nXB1: 0/0 passed -- nothing measured, nothing claimed")
+        raise SystemExit(0)
+    # No git, but .gitignore IS present -> exact-path membership fallback (a real, weaker measurement).
+    print("XB1 NOTE: no git here -- git check-ignore NOT RUN; using .gitignore exact-path membership. "
+          "Blind spot: a pattern-matched ignore rule (not an exact path) is not verified here.")
+    rules = {ln.strip() for ln in open(gi, encoding="utf-8", errors="ignore") if ln.strip() and not ln.startswith("#")}
     for p in SENSITIVE:
         ok("XB1 .gitignore names %s as an ignore rule" % p, p in rules, "no exact ignore rule for it")
     ok("XB1 control %s is NOT a .gitignore rule" % CONTROL, CONTROL not in rules, "control is ignored")
