@@ -9,9 +9,13 @@ leaned PURSUE on the venue; exposure is the operator's call. This module does th
 lowest-risk half only -- LISTEN -- and posting is deliberately NOT built here.
 
 WHY THIS IS SAFE BY CONSTRUCTION, NOT BY PROMISE
-  1. READ-ONLY. There is no post/submit/comment/publish/write function in this
-     file and none is reachable from it. Leviathan's read path needs no identity
-     and no wallet, so this module holds no credential and opens no auth header.
+  1. NO VENUE WRITE. There is no post/submit/comment/publish/reply function and
+     none is reachable: nothing here sends anything TO the venue. (It does write
+     LOCALLY -- the quarantine, the read-health state, the .trash archive -- which
+     is the whole job of a listener; "read-only" means read-only toward Leviathan,
+     not that it touches no disk.) The read path needs no identity and no wallet,
+     so this module holds no credential and opens no auth header, and a venue
+     response cannot redirect the fetch to another host (SSRF guard, _SameHostRedirect).
      The "it cannot be made to post" guarantee is the absence of the code, not a
      flag that could be flipped. test_lv1_leviathan.py pins that absence.
   2. INCOMING IS UNTRUSTED DATA, NEVER AUTHORITY. Every item is run through the
@@ -66,7 +70,25 @@ QUARANTINE = os.path.join(HERE, "ops", "leviathan_quarantine.jsonl")
 CONFIG = os.path.join(HERE, "ops", "leviathan.json")      # the operator's one switch for the nightly read
 STATE = os.path.join(HERE, "ops", "leviathan_state.json")  # read-health: last non-zero count, zero-streak
 MAX_QUARANTINE_ROWS = 2000     # ~20 nights at ~100/feed; older rows are archived to .trash, never deleted
+MAX_READ_BYTES = 4_000_000     # bound EVERY read: a public feed is ~50 posts, not a firehose
+MAX_META_CHARS = 200           # author/title are provenance, not prose; a hostile feed cannot send a novel as a title
+LOCK = os.path.join(HERE, "ops", "leviathan.lock")   # serialize harvest vs release (no concurrent corpus/quarantine races)
 UA = "covenant-listener/1.0 (+https://github.com/LAWLESS1987/covenant)"
+
+
+class _SameHostRedirect(urllib.request.HTTPRedirectHandler):
+    """A venue response must not redirect us to a DIFFERENT host (SSRF: a 302 to an
+    internal endpoint). Same-host http(s) redirects are allowed; anything else is refused."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        from urllib.parse import urlsplit
+        if not newurl.startswith(("http://", "https://")) or \
+                urlsplit(newurl).hostname != urlsplit(req.full_url).hostname:
+            raise urllib.error.HTTPError(req.full_url, code,
+                                         "cross-host or non-http redirect blocked: %s" % newurl[:120], headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_SameHostRedirect)
 
 # Read-only by construction. Kept here as a READABLE declaration for anyone who
 # opens this file; the enforcer is the absence of a post function, pinned by the
@@ -108,13 +130,12 @@ def rows_from_items(items, url):
         if not isinstance(text, str) or not text.strip():
             continue                                   # no empty rows; an item with no text is nothing to read
         author = it.get("author") or it.get("name") or it.get("agent")
-        if not isinstance(author, str):
-            author = None
+        author = author[:MAX_META_CHARS] if isinstance(author, str) else None
         title = it.get("title") or it.get("subject")
-        if not isinstance(title, str):
-            title = None
-        out.append(candidate(text[:MB.MAX_CHARS], it.get("url") or url,
-                             author=author, title=title))
+        title = title[:MAX_META_CHARS] if isinstance(title, str) else None
+        item_url = it.get("url")
+        item_url = item_url if isinstance(item_url, str) else url    # provenance is a str or the feed url, never a raw JSON value
+        out.append(candidate(text[:MB.MAX_CHARS], item_url, author=author, title=title))
     return out
 
 
@@ -151,8 +172,8 @@ def fetch_text(url=None, timeout=20):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     for attempt in (0, 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                raw = r.read().decode("utf-8", "replace")
+            with _OPENER.open(req, timeout=timeout) as r:      # same-host redirects only (SSRF guard)
+                raw = r.read(MAX_READ_BYTES).decode("utf-8", "replace")   # bounded, like fetch_json
             break
         except urllib.error.HTTPError as e:
             if e.code == 429 and attempt == 0:
@@ -162,9 +183,6 @@ def fetch_text(url=None, timeout=20):
     text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", raw, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", "\n", text)
     return re.sub(r"\n{3,}", "\n\n", text), url
-
-
-MAX_READ_BYTES = 4_000_000     # bound the read: a public feed is ~50 posts, not a firehose
 
 
 def _items_of(obj):
@@ -197,7 +215,7 @@ def fetch_json(url=None, timeout=20):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
     for attempt in (0, 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with _OPENER.open(req, timeout=timeout) as r:      # same-host redirects only (SSRF guard)
                 raw = r.read(MAX_READ_BYTES).decode("utf-8", "replace")
             break
         except urllib.error.HTTPError as e:
@@ -304,6 +322,35 @@ def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=
     return len(overflow)
 
 
+def acquire_lock(path=None):
+    """Atomic advisory lock so a harvest and a release never touch the quarantine at
+    once (Codex: a concurrent rewrite can lose or duplicate rows). Returns an fd on
+    success, or None if the lock is already held. A stale lock older than an hour is
+    reclaimed (a crashed holder must not wedge the nightly forever)."""
+    path = path or LOCK
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(int(time.time())).encode("ascii"))
+        return fd
+    except FileExistsError:
+        try:
+            if time.time() - os.path.getmtime(path) > 3600:
+                os.unlink(path)
+                return acquire_lock(path)
+        except OSError:
+            pass
+        return None
+
+
+def release_lock(fd, path=None):
+    try:
+        if fd is not None:
+            os.close(fd)
+        os.unlink(path or LOCK)
+    except OSError:
+        pass
+
+
 def scheduled_read(say=print, cfg=None):
     """One nightly, quiet-window read. Config-gated and fail-soft: disabled or
     unconfigured -> does nothing and says so; a read error is reported, never
@@ -318,21 +365,28 @@ def scheduled_read(say=print, cfg=None):
     if not url:
         say("leviathan: enabled but no url configured -- skipped")
         return {"skipped": True, "reason": "no url"}
+    lock = acquire_lock()
+    if lock is None:
+        say("leviathan: a release/harvest is in progress (lock held) -- skipped")
+        return {"skipped": True, "reason": "locked"}
     try:
-        new, parsed = harvest_json(url)
-    except Exception as e:                                       # noqa: BLE001
-        say("leviathan READ failed (reported, does not stop the pass): %s: %s"
-            % (type(e).__name__, str(e)[:160]))
-        return {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}
-    alert, state, msg = _note_read(parsed, _load_state())
-    _save_state(state)
-    if alert:
-        say(msg)
-    else:
-        say("leviathan: read %d contribution(s), %d new quarantined (judge + a person release them)"
-            % (parsed, new))
-    archived = cap_quarantine(say=say)
-    return {"parsed": parsed, "new": new, "alert": alert, "archived": archived}
+        try:
+            new, parsed = harvest_json(url)
+        except Exception as e:                                   # noqa: BLE001
+            say("leviathan READ failed (reported, does not stop the pass): %s: %s"
+                % (type(e).__name__, str(e)[:160]))
+            return {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}
+        alert, state, msg = _note_read(parsed, _load_state())
+        _save_state(state)
+        if alert:
+            say(msg)
+        else:
+            say("leviathan: read %d contribution(s), %d new quarantined (judge + a person release them)"
+                % (parsed, new))
+        archived = cap_quarantine(say=say)
+        return {"parsed": parsed, "new": new, "alert": alert, "archived": archived}
+    finally:
+        release_lock(lock)
 
 
 def _show():

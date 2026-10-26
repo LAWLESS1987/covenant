@@ -24,7 +24,7 @@ def ok(name, cond):
 
 # --- (1) READ-ONLY BY CONSTRUCTION: no write path exists, no credential is held.
 _WRITE_NAMES = ("post", "submit", "comment", "publish", "write", "send", "create", "reply", "upvote")
-ok("LV1.1 no write/post function exists on the module",
+ok("LV1.1 no venue-write function (post/submit/...) exists on the module",
    not any(hasattr(L, n) for n in _WRITE_NAMES))
 ok("LV1.2 holds no credential (read needs no identity/wallet)", L.CRED_PATH is None)
 ok("LV1.3 declares READ_ONLY", L.READ_ONLY is True)
@@ -143,5 +143,40 @@ ok("LV1.31 newest rows are the ones kept", '"text": "row 4"' in open(_q, encodin
    and '"text": "row 0"' not in open(_q, encoding="utf-8").read())
 ok("LV1.32 cap is a no-op when under the limit", L.cap_quarantine(max_rows=10, path=_q, trash_dir=_tr) == 0)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 32 - len(fails), 32))
+# --- listener hardening (Codex review 2026-10-26): metadata caps, redirect-SSRF guard, concurrency lock.
+mrow = L.rows_from_items([{"text": "x" * 200, "author": "z" * 500, "title": "t" * 500, "url": 123}], "leviathan:u")
+ok("LV1.33 author/title are capped and a non-str url falls back to the feed url",
+   len(mrow) == 1 and len(mrow[0]["author"]) == L.MAX_META_CHARS and len(mrow[0]["title"]) == L.MAX_META_CHARS
+   and mrow[0]["url"] == "leviathan:u")
+
+import urllib.error as _ue, urllib.request as _ureq
+_h = L._SameHostRedirect()
+_req = _ureq.Request("https://leviathan.talmbout.ai/api/x")
+try:
+    _h.redirect_request(_req, None, 302, "", {}, "https://evil.example/internal")
+    _xhost = False
+except _ue.HTTPError:
+    _xhost = True
+except Exception:
+    _xhost = False
+ok("LV1.34 a cross-host redirect is blocked (SSRF guard)", _xhost)
+try:
+    _h.redirect_request(_req, None, 302, "", {}, "file:///etc/passwd")
+    _xscheme = False
+except _ue.HTTPError:
+    _xscheme = True
+except Exception:
+    _xscheme = False
+ok("LV1.35 a non-http redirect scheme is blocked", _xscheme)
+
+_lp = os.path.join(tempfile.mkdtemp(), "lk")
+_fd = L.acquire_lock(_lp)
+_fd2 = L.acquire_lock(_lp)
+ok("LV1.36 lock is exclusive: a second acquire returns None while held", _fd is not None and _fd2 is None)
+L.release_lock(_fd, _lp)
+_fd3 = L.acquire_lock(_lp)
+ok("LV1.37 ...and the lock is re-acquirable after release", _fd3 is not None)
+L.release_lock(_fd3, _lp)
+
+print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 37 - len(fails), 37))
 sys.exit(1 if fails else 0)
