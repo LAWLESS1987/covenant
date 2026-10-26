@@ -55,6 +55,10 @@ import covenant_leviathan as LV                 # the Leviathan quarantine
 RELEASED_SOURCE = "leviathan/judged"
 
 
+def _now():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
 def corpus_row(cand, violates, reasoning, judge, now=None):
     """The row as the corpus will hold it. Provenance travels with it. SOURCE IS
     LOAD-BEARING: anything beginning "leviathan" is pinned to half 0 by
@@ -90,11 +94,36 @@ def _contaminator():
 def _is_directive(text):
     """Re-screen the ACTUAL text for an injection/directive at release time, independent of the
     stored eligible/flags fields (defense in depth for the money-gate corpus: never trust a field
-    a tampered quarantine could carry)."""
+    a tampered quarantine could carry). Fail CLOSED: a classifier exception, or any result that is
+    not a dict, is treated as a directive (Codex: a malformed classifier result must not clear)."""
     try:
-        return bool((LV.MB.classify(text or "") or {}).get("directive"))
+        res = LV.MB.classify(text or "")
+        if not isinstance(res, dict):
+            return True
+        return bool(res.get("directive"))
     except Exception:                                           # noqa: BLE001
-        return True                                             # cannot screen -> treat as directive, fail closed
+        return True
+
+
+def _corpus_leviathan_shas(corpus):
+    """The sha256s already present in the corpus under a leviathan/* source. Used for IDEMPOTENT release:
+    a candidate already in the corpus is never appended again, so a crash between the corpus append and
+    the quarantine update cannot produce a duplicate on rerun (Codex: two separate files are not atomic)."""
+    shas = set()
+    try:
+        with open(corpus, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    o = json.loads(line)
+                except ValueError:
+                    continue
+                if str(o.get("source", "")).startswith("leviathan"):
+                    s = (o.get("leviathan") or {}).get("sha256")
+                    if s:
+                        shas.add(s)
+    except OSError:
+        pass
+    return shas
 
 
 def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
@@ -127,16 +156,31 @@ def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
         if not todo:
             say("nothing pending: %d candidate(s), none eligible and unreleased" % len(rows))
             return 0
+        corpus_shas = _corpus_leviathan_shas(corpus)    # IDEMPOTENCY: what is already in the corpus
 
-        written, held, contam, directive = 0, 0, 0, 0
+        written, held, contam, directive, dup = 0, 0, 0, 0, 0
         for cand in todo:
             text = cand.get("text")
-            sha = (cand.get("sha256") or "?")[:12]
+            full_sha = cand.get("sha256")
+            sha = (full_sha or "?")[:12]
+            # IDEMPOTENT: a row already in the corpus is never written twice, whatever the quarantine says.
+            # This -- not the file ordering -- is what makes a crash between the two writes safe.
+            if not dry_run and full_sha in corpus_shas:
+                dup += 1
+                cand["released_at"] = cand.get("released_at") or _now()
+                cand["released_by"] = cand.get("released_by") or "(idempotent: already in corpus)"
+                say("  DUP   %s -- already in the corpus; marked released, not re-written" % sha)
+                LV._atomic_write_jsonl(qpath, rows)
+                continue
             # DIRECTIVE VETO, re-enforced on the actual text at release (Codex: pending() trusts a stored
-            # flag). A row that is ineligible, flagged directive, or re-screens as a directive never enters.
+            # flag). A row that is ineligible, flagged directive, or re-screens as a directive never enters,
+            # and is marked ineligible so it stops occupying the batch (Codex: limit applied before screening).
             if not cand.get("eligible") or (cand.get("flags") or {}).get("directive") or _is_directive(text):
                 directive += 1
-                say("  DIRECTIVE %s -- rejected at release (re-screened); never enters the corpus" % sha)
+                say("  DIRECTIVE %s -- rejected at release (re-screened); marked ineligible" % sha)
+                if not dry_run and cand.get("eligible"):
+                    cand["eligible"] = False
+                    LV._atomic_write_jsonl(qpath, rows)
                 continue
             if contaminating is not None and contaminating(text):
                 contam += 1
@@ -158,19 +202,20 @@ def release(limit=5, dry_run=True, teacher=None, corpus=None, quarantine=None,
                 continue
             with open(corpus, "a", encoding="utf-8", newline="\n") as fh:
                 fh.write(json.dumps(row, sort_keys=True) + "\n")
+            if full_sha:
+                corpus_shas.add(full_sha)
             cand["label"] = bool(violates)
             cand["released_at"] = row["t"]
             cand["released_by"] = judge
             written += 1
-            # TRANSACTIONAL: persist the quarantine NOW, after each written row, so a crash/kill cannot
-            # leave a corpus row whose quarantine entry is still pending (which re-releases it next run).
-            with open(qpath, "w", encoding="utf-8", newline="\n") as fh:
-                for r in rows:
-                    fh.write(json.dumps(r, sort_keys=True) + "\n")
+            # TRANSACTIONAL: persist the quarantine ATOMICALLY after each written row (temp + os.replace),
+            # so a crash cannot leave a half-written quarantine. Paired with the idempotency check above,
+            # a crash between the two writes cannot produce a duplicate on rerun.
+            LV._atomic_write_jsonl(qpath, rows)
         say("%s: %d judged, %d written to the corpus, %d held by the teacher, %d held by the exam filter, "
-            "%d rejected as directive"
-            % ("DRY RUN" if dry_run else "released", len(todo) - held - contam - directive,
-               written, held, contam, directive))
+            "%d rejected as directive, %d already-present (idempotent)"
+            % ("DRY RUN" if dry_run else "released", len(todo) - held - contam - directive - dup,
+               written, held, contam, directive, dup))
         return 0
     finally:
         if lock is not None:
@@ -260,6 +305,8 @@ def selftest():
     release(limit=5, dry_run=False, teacher=yes, corpus=c4, quarantine=q4, contaminating=never, lock_path=lk, say=lambda m: None)
     check("LVR11 a directive re-screened at release is rejected, nothing written (defense in depth)",
           not os.path.exists(c4))
+    check("LVR11b ...and the rejected directive row is marked ineligible, so it stops occupying the batch",
+          all(not r.get("eligible") for r in LV.MB._read(q4)))
 
     # LVR12: a LOADED-but-EMPTY exam set fails CLOSED, not open (Codex). Patch _exam_bags to return [].
     import covenant_distill as _X
@@ -272,28 +319,29 @@ def selftest():
     check("LVR12 an empty exam set makes the filter UNAVAILABLE (fail closed), not pass-everything",
           fn12 is None and "EMPTY" in str(status12).upper())
 
-    # LVR13: TRANSACTIONAL -- the quarantine is persisted after EACH written row, so a mid-batch failure
-    # cannot leave a corpus row still pending (which would re-release it). Teacher errors on row 2; row 1
-    # must be written AND marked released on disk, and a rerun must not duplicate it.
+    # LVR13: IDEMPOTENCY -- the real anti-duplicate guarantee (Codex: two separate files are not atomic,
+    # so a crash between the corpus append and the quarantine update must not duplicate on rerun). A
+    # candidate whose sha is ALREADY in the corpus is never appended again, whatever the quarantine says.
+    import json as _json
     q5, c5 = os.path.join(d, "q5.jsonl"), os.path.join(d, "corpus5.jsonl")
     ra = LV.candidate("a" * 200, "https://leviathan.talmbout.ai/1", author="p", title="1")
     rb = LV.candidate("b" * 200, "https://leviathan.talmbout.ai/2", author="p", title="2")
     LV.MB.append([ra, rb], q5)
-    _calls = {"n": 0}
-    def flaky(text):
-        _calls["n"] += 1
-        if _calls["n"] >= 2:
-            raise RuntimeError("boom on a later row")
-        return (False, "clean", "stub/teacher")
-    release(limit=5, dry_run=False, teacher=flaky, corpus=c5, quarantine=q5, contaminating=never, lock_path=lk, say=lambda m: None)
-    _q5 = LV.MB._read(q5)
-    _rel = [r for r in _q5 if r.get("released_at")]
-    _corp5 = [l for l in open(c5, encoding="utf-8") if l.strip()] if os.path.exists(c5) else []
-    check("LVR13 incremental persist: row1 is written AND marked released on disk despite the later error",
-          len(_corp5) == 1 and len(_rel) == 1 and _rel[0]["sha256"] == ra["sha256"])
-    release(limit=5, dry_run=False, teacher=flaky, corpus=c5, quarantine=q5, contaminating=never, lock_path=lk, say=lambda m: None)
-    _corp5b = [l for l in open(c5, encoding="utf-8") if l.strip()]
-    check("LVR13b ...and a rerun does not duplicate the already-released row", len(_corp5b) == 1, len(_corp5b))
+    # Simulate a crash AFTER ra's corpus append but BEFORE its quarantine was marked released: ra is in
+    # the corpus, yet still pending in the quarantine.
+    with open(c5, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(_json.dumps(corpus_row(ra, False, "pre-seeded", "stub/teacher"), sort_keys=True) + "\n")
+    release(limit=5, dry_run=False, teacher=yes, corpus=c5, quarantine=q5, contaminating=never, lock_path=lk, say=lambda m: None)
+    _c5 = [_json.loads(l) for l in open(c5, encoding="utf-8") if l.strip()]
+    _ra_rows = [r for r in _c5 if (r.get("leviathan") or {}).get("sha256") == ra["sha256"]]
+    _rb_rows = [r for r in _c5 if (r.get("leviathan") or {}).get("sha256") == rb["sha256"]]
+    _q5 = {r["sha256"]: r for r in LV.MB._read(q5)}
+    check("LVR13 idempotent: a sha already in the corpus is NOT written twice (crash-between-writes is safe)",
+          len(_ra_rows) == 1 and _q5[ra["sha256"]].get("released_at"))
+    check("LVR13b ...and a genuinely new row IS released in the same run", len(_rb_rows) == 1)
+    release(limit=5, dry_run=False, teacher=yes, corpus=c5, quarantine=q5, contaminating=never, lock_path=lk, say=lambda m: None)
+    _c5b = [l for l in open(c5, encoding="utf-8") if l.strip()]
+    check("LVR13c ...and a rerun duplicates nothing (corpus unchanged)", len(_c5b) == 2, len(_c5b))
 
     n = sum(ok)
     print("\nLEVIATHAN-RELEASE: %d/%d passed" % (n, len(ok)))

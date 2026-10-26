@@ -134,7 +134,7 @@ def rows_from_items(items, url):
         title = it.get("title") or it.get("subject")
         title = title[:MAX_META_CHARS] if isinstance(title, str) else None
         item_url = it.get("url")
-        item_url = item_url if isinstance(item_url, str) else url    # provenance is a str or the feed url, never a raw JSON value
+        item_url = item_url[:1000] if isinstance(item_url, str) else url   # a str (bounded) or the feed url, never a raw JSON value
         out.append(candidate(text[:MB.MAX_CHARS], item_url, author=author, title=title))
     return out
 
@@ -154,7 +154,7 @@ def extract(page_text, url):
         if len(body) < MB.MIN_CHARS:
             continue
         lines = [l for l in body.splitlines() if l.strip()]
-        title = lines[0].strip() if lines else None
+        title = lines[0].strip()[:MAX_META_CHARS] if lines else None
         out.append(candidate(body[:MB.MAX_CHARS], url, title=title))
     return out
 
@@ -226,30 +226,35 @@ def fetch_json(url=None, timeout=20):
     return json.loads(raw or "null"), url
 
 
-def harvest_json(url=None):
-    """fetch_json -> rows_from_items -> quarantine (de-duplicated). The right path
-    for Leviathan's JSON feed. Returns (new_rows, parsed_rows). Nothing is judged
-    or used here; a person and the covenant judge release rows later."""
+def _harvested(new, rows):
+    if new is None:
+        raise RuntimeError("leviathan quarantine is locked by another writer (harvest/release in progress)")
+    return new, len(rows)
+
+
+def harvest_json(url=None, _locked=False):
+    """fetch_json -> rows_from_items -> quarantine (de-duplicated, under the lock). The right path for
+    Leviathan's JSON feed. Returns (new_rows, parsed_rows). Nothing is judged or used here; a person and
+    the covenant judge release rows later. Raises if another writer holds the lock."""
     obj, u = fetch_json(url)
     rows = rows_from_items(_items_of(obj), u)
-    return MB.append(rows, QUARANTINE), len(rows)
+    return _harvested(_append_quarantine(rows, _locked), rows)
 
 
-def harvest(url=None):
-    """fetch_text -> extract -> append to the quarantine (de-duplicated). Returns
-    how many new rows landed. Nothing is judged or used here; a person and the
-    covenant judge release rows later, exactly as for Moltbook."""
+def harvest(url=None, _locked=False):
+    """fetch_text -> extract -> append to the quarantine (de-duplicated, under the lock). Returns
+    (new_rows, parsed_rows). Nothing is judged or used here; a person and the covenant judge release
+    rows later, exactly as for Moltbook."""
     text, u = fetch_text(url)
     rows = extract(text, u)
-    return MB.append(rows, QUARANTINE), len(rows)
+    return _harvested(_append_quarantine(rows, _locked), rows)
 
 
-def harvest_text(page_text, url):
-    """The honest, no-network path: parse visible text a browser or an agent's
-    own client already saved, and quarantine it. Same small surface as Moltbook's
-    --from-text."""
+def harvest_text(page_text, url, _locked=False):
+    """The honest, no-network path: parse visible text a browser or an agent's own client already
+    saved, and quarantine it (under the lock). Same small surface as Moltbook's --from-text."""
     rows = extract(page_text, url)
-    return MB.append(rows, QUARANTINE), len(rows)
+    return _harvested(_append_quarantine(rows, _locked), rows)
 
 
 def _config(path=None):
@@ -296,59 +301,119 @@ def _note_read(parsed, state):
     return True, state, msg
 
 
-def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=None):
-    """Bound the quarantine: keep the newest `max_rows`, archive the oldest overflow
-    to .trash (tombstoned, never deleted -- 'Do not delete anything'). Returns how
-    many rows were archived."""
+def _atomic_write_jsonl(path, rows):
+    """Write rows to `path` atomically: a temp file in the same directory, then os.replace (atomic on
+    one filesystem). A crash mid-write leaves the original quarantine intact -- never a half-written or
+    truncated file (Codex: an open('w') rewrite that is interrupted loses rows)."""
+    tmp = "%s.tmp.%d" % (path, os.getpid())
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, sort_keys=True) + "\n")
+    os.replace(tmp, path)
+
+
+def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=None, _locked=False):
+    """Bound the quarantine: keep the newest `max_rows`, archive the oldest overflow to .trash
+    (tombstoned, never deleted). Takes the lock (unless the caller holds it) so it cannot race a
+    harvest or release, and rewrites atomically. Returns how many rows were archived."""
     path = path or QUARANTINE
-    rows = MB._read(path)
-    if len(rows) <= max_rows:
-        return 0
-    overflow = rows[:len(rows) - max_rows]          # oldest (append order is chronological)
-    keep = rows[len(rows) - max_rows:]
-    trash_dir = trash_dir or os.path.join(HERE, ".trash")
-    os.makedirs(trash_dir, exist_ok=True)
-    arch = os.path.join(trash_dir, "leviathan_quarantine.overflow-%s.jsonl"
-                        % time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()))
-    with open(arch, "a", encoding="utf-8") as fh:
-        for r in overflow:
-            fh.write(json.dumps(r, sort_keys=True) + "\n")
-    with open(path, "w", encoding="utf-8") as fh:
-        for r in keep:
-            fh.write(json.dumps(r, sort_keys=True) + "\n")
-    if say:
-        say("leviathan: quarantine capped at %d; archived %d oldest to %s"
-            % (max_rows, len(overflow), os.path.basename(arch)))
-    return len(overflow)
+    tok = None
+    if not _locked:
+        tok = acquire_lock()
+        if tok is None:
+            return 0                          # busy: the cap is advisory, skip this round
+    try:
+        rows = MB._read(path)
+        if len(rows) <= max_rows:
+            return 0
+        overflow = rows[:len(rows) - max_rows]          # oldest (append order is chronological)
+        keep = rows[len(rows) - max_rows:]
+        trash_dir = trash_dir or os.path.join(HERE, ".trash")
+        os.makedirs(trash_dir, exist_ok=True)
+        arch = os.path.join(trash_dir, "leviathan_quarantine.overflow-%s.jsonl"
+                            % time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()))
+        with open(arch, "a", encoding="utf-8", newline="\n") as fh:
+            for r in overflow:
+                fh.write(json.dumps(r, sort_keys=True) + "\n")
+        _atomic_write_jsonl(path, keep)
+        if say:
+            say("leviathan: quarantine capped at %d; archived %d oldest to %s"
+                % (max_rows, len(overflow), os.path.basename(arch)))
+        return len(overflow)
+    finally:
+        if tok is not None:
+            release_lock(tok)
+
+
+STALE_LOCK_SECONDS = 7200     # 2h: far beyond any real harvest (seconds) or release (minutes), so a live
+#                               holder is never evicted; a crashed one self-heals before the next nightly.
+
+
+def _lock_token():
+    return "%d:%d:%s" % (os.getpid(), int(time.time()), os.urandom(5).hex())
 
 
 def acquire_lock(path=None):
-    """Atomic advisory lock so a harvest and a release never touch the quarantine at
-    once (Codex: a concurrent rewrite can lose or duplicate rows). Returns an fd on
-    success, or None if the lock is already held. A stale lock older than an hour is
-    reclaimed (a crashed holder must not wedge the nightly forever)."""
+    """Exclusive advisory lock, by atomic file creation (O_CREAT|O_EXCL). Returns an ownership TOKEN
+    (str) or None if the lock is held. The fd is closed immediately -- the file's existence is the lock,
+    so there is no descriptor to leak. A lock older than STALE_LOCK_SECONDS is reclaimed so a crashed
+    holder cannot wedge the nightly; the window is far beyond any real holder, so a live one is safe."""
     path = path or LOCK
+    token = _lock_token()
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, str(int(time.time())).encode("ascii"))
-        return fd
     except FileExistsError:
         try:
-            if time.time() - os.path.getmtime(path) > 3600:
+            if time.time() - os.path.getmtime(path) > STALE_LOCK_SECONDS:
                 os.unlink(path)
                 return acquire_lock(path)
         except OSError:
             pass
         return None
-
-
-def release_lock(fd, path=None):
     try:
-        if fd is not None:
-            os.close(fd)
-        os.unlink(path or LOCK)
+        os.write(fd, token.encode("ascii"))
+    except OSError:
+        try:
+            os.close(fd); os.unlink(path)
+        except OSError:
+            pass
+        return None
+    try:
+        os.close(fd)
     except OSError:
         pass
+    return token
+
+
+def release_lock(token, path=None):
+    """Release the lock ONLY if we own it (the file still carries our token): never delete another
+    holder's or a reclaimer's fresh lock (Codex: an unconditional unlink can remove a successor's lock)."""
+    path = path or LOCK
+    try:
+        with open(path, encoding="ascii") as fh:
+            cur = fh.read()
+    except OSError:
+        return
+    if token is not None and cur == token:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def _append_quarantine(rows, _locked=False):
+    """Append rows to the quarantine, under the lock unless the caller already holds it. Returns the
+    count of new rows, or None if another writer holds the lock (the caller reports 'busy' rather than
+    racing the file)."""
+    if _locked:
+        return MB.append(rows, QUARANTINE)
+    tok = acquire_lock()
+    if tok is None:
+        return None
+    try:
+        return MB.append(rows, QUARANTINE)
+    finally:
+        release_lock(tok)
 
 
 def scheduled_read(say=print, cfg=None):
@@ -371,7 +436,7 @@ def scheduled_read(say=print, cfg=None):
         return {"skipped": True, "reason": "locked"}
     try:
         try:
-            new, parsed = harvest_json(url)
+            new, parsed = harvest_json(url, _locked=True)        # we already hold the lock
         except Exception as e:                                   # noqa: BLE001
             say("leviathan READ failed (reported, does not stop the pass): %s: %s"
                 % (type(e).__name__, str(e)[:160]))
@@ -383,7 +448,7 @@ def scheduled_read(say=print, cfg=None):
         else:
             say("leviathan: read %d contribution(s), %d new quarantined (judge + a person release them)"
                 % (parsed, new))
-        archived = cap_quarantine(say=say)
+        archived = cap_quarantine(say=say, _locked=True)
         return {"parsed": parsed, "new": new, "alert": alert, "archived": archived}
     finally:
         release_lock(lock)

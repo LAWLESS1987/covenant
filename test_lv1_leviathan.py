@@ -133,7 +133,7 @@ _tr = os.path.join(_tmp, "trash")
 with open(_q, "w", encoding="utf-8") as fh:
     for i in range(5):
         fh.write(_json.dumps({"sha256": "s%d" % i, "text": "row %d" % i, "t": "2026-10-26T00:0%dZ" % i}) + "\n")
-n = L.cap_quarantine(max_rows=3, path=_q, trash_dir=_tr)
+n = L.cap_quarantine(max_rows=3, path=_q, trash_dir=_tr, _locked=True)
 _kept = [l for l in open(_q, encoding="utf-8").read().splitlines() if l.strip()]
 _arch = _glob.glob(os.path.join(_tr, "leviathan_quarantine.overflow-*.jsonl"))
 ok("LV1.29 cap archives the oldest overflow (2 of 5)", n == 2 and len(_kept) == 3)
@@ -141,7 +141,7 @@ ok("LV1.30 overflow is tombstoned to .trash, not deleted",
    len(_arch) == 1 and len([l for l in open(_arch[0], encoding='utf-8').read().splitlines() if l.strip()]) == 2)
 ok("LV1.31 newest rows are the ones kept", '"text": "row 4"' in open(_q, encoding="utf-8").read()
    and '"text": "row 0"' not in open(_q, encoding="utf-8").read())
-ok("LV1.32 cap is a no-op when under the limit", L.cap_quarantine(max_rows=10, path=_q, trash_dir=_tr) == 0)
+ok("LV1.32 cap is a no-op when under the limit", L.cap_quarantine(max_rows=10, path=_q, trash_dir=_tr, _locked=True) == 0)
 
 # --- listener hardening (Codex review 2026-10-26): metadata caps, redirect-SSRF guard, concurrency lock.
 mrow = L.rows_from_items([{"text": "x" * 200, "author": "z" * 500, "title": "t" * 500, "url": 123}], "leviathan:u")
@@ -176,7 +176,28 @@ ok("LV1.36 lock is exclusive: a second acquire returns None while held", _fd is 
 L.release_lock(_fd, _lp)
 _fd3 = L.acquire_lock(_lp)
 ok("LV1.37 ...and the lock is re-acquirable after release", _fd3 is not None)
-L.release_lock(_fd3, _lp)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 37 - len(fails), 37))
+# --- round 2 (Codex re-review): token-owned release, mutation respects the lock, atomic write.
+_tokA = _fd3                                  # we hold the lock under token _fd3
+L.release_lock("not-the-right-token", _lp)
+ok("LV1.38 release with a wrong token does NOT free the lock (no cross-delete)",
+   L.acquire_lock(_lp) is None)
+L.release_lock(_tokA, _lp)
+_tokB = L.acquire_lock(_lp)
+ok("LV1.39 ...and the owner's token frees it (re-acquirable)", _tokB is not None)
+L.release_lock(_tokB, _lp)
+
+# a quarantine mutation refuses while the real lock is held (harvest cannot race a release)
+_held = L.acquire_lock()
+ok("LV1.40 a mutation refuses while the lock is held (harvest respects the lock)",
+   _held is not None and L._append_quarantine([], _locked=False) is None)
+L.release_lock(_held)
+
+# atomic jsonl write round-trips
+_aw = os.path.join(tempfile.mkdtemp(), "a.jsonl")
+L._atomic_write_jsonl(_aw, [{"sha256": "x", "text": "hi"}])
+ok("LV1.41 _atomic_write_jsonl writes the rows (temp + os.replace)",
+   len([l for l in open(_aw, encoding="utf-8") if l.strip()]) == 1)
+
+print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", 41 - len(fails), 41))
 sys.exit(1 if fails else 0)
