@@ -315,6 +315,14 @@ def _atomic_write_jsonl(path, rows):
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp, path)
+        try:                                           # durably commit the rename itself (power-loss);
+            dfd = os.open(d, os.O_RDONLY)              # best-effort: unsupported on some platforms (Windows)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except OSError:
+            pass
     except BaseException:
         try:
             os.unlink(tmp)
@@ -346,6 +354,9 @@ def cap_quarantine(max_rows=MAX_QUARANTINE_ROWS, path=None, trash_dir=None, say=
         with open(arch, "a", encoding="utf-8", newline="\n") as fh:
             for r in overflow:
                 fh.write(json.dumps(r, sort_keys=True) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())        # Codex r4: durably commit the archive BEFORE truncating the
+            #                              quarantine, so a power loss during capping cannot lose the overflow
         _atomic_write_jsonl(path, keep)
         if say:
             say("leviathan: quarantine capped at %d; archived %d oldest to %s"
