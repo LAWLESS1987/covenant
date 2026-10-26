@@ -107,6 +107,16 @@ Codex (CXR-1..9, read covenant_leg.py) and Tien (blunt read) both landed, and th
   conversation through a discriminator (semantic / a describe-vs-do stage), NOT relaxing the seats. The seats'
   value is the fail-closed backstop, not discrimination. Operator's call how far to lean on the semantic judge
   for conversational throughput -- it changes what clears to the public.
+- **Grok on X (the FRESH reader, cold -- no project context, no names) INDEPENDENTLY confirmed the direction**
+  the keystone pointed to: "route conversational traffic through the semantic classifier, keep the rules as a
+  NARROW fail-closed backstop." Because it was unprimed, that it lands in the same place is signal, not echo. Its
+  two additions: (a) the biggest failure mode is SILENT DRIFT in the semantic judge's ~6% miss -- new slang /
+  coded phrasing / a shifted data mix can quietly widen the hole once you remove the catch-everything seats, with
+  nothing flagging it; so MONITOR the semantic judge's score distribution over time and page when it moves;
+  (b) cluster the semantic judge's misses by subtype and patch the worst with a handful of NARROW rules, without
+  reintroducing the blanket block. So the P2 shape is now concrete: semantic judge as the conversational
+  discriminator + seats as a narrow fail-closed backstop + drift-monitoring on the judge + narrow targeted rules
+  for its worst misses. Still the operator's call to deploy (it changes what clears to the public).
 
 ## Order & gating
 
