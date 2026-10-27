@@ -1,0 +1,912 @@
+#!/usr/bin/env python3
+"""covenant_model.py -- the open-source model on this PC, on demand and put away.
+
+WHY (2026-09-19, his words). "there has to be a image creation open source we
+can take and improve on same as the other asks including our students growing
+to agents"; "optimize the pc towards these tasks and this purpose"; "need a
+browser and a security layer other than that optimize"; "green light".
+
+WHAT THIS IS. A thin keeper for llama.cpp's llama-server (tools/llama/, the
+same 18 MB runtime the judge workflow uses on the GitHub runner) and the GGUF
+weights under models/ (never tracked: .gitignore). It starts the server the
+first time something asks, on 127.0.0.1 only, and STOPS it after IDLE_S with
+nothing asked -- his standing rule since Ollama: unload the model after use.
+This PC has 15.3 GB and was using 12.5 GB of it when this was written, mostly
+the browser and the desktop app, so the model is a guest: it picks the
+largest weights that fit the memory free at the moment it starts, and says
+which.
+
+WHAT IT IS NOT. Not a judge seat and not the gate. The gate is the sentinel
+(the distilled students and the semantic judge); every answer this model gives
+through the node passes that gate before anyone sees it (/m/agent). It is the
+thing the students learn to judge -- that is how they grow toward agents:
+their verdicts on its answers go into the same ledger the nightly distill
+reads.
+
+CLI:  python covenant_model.py --status | --start | --stop | --ask "text"
+"""
+from __future__ import annotations
+
+import json
+import math
+import os
+import statistics
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+BIN = os.path.join(HERE, "tools", "llama", "llama-server.exe")
+MODELS = os.path.join(HERE, "models")
+HOST, PORT = "127.0.0.1", int(os.environ.get("COVENANT_MODEL_PORT", "8081"))
+IDLE_S = int(os.environ.get("COVENANT_MODEL_IDLE_S", "600"))
+IDLE_ROUND_S = 30          # the idle watcher's round (_watch_idle); named so wait_cap() reads the same number (A351)
+STATE = os.path.join(HERE, "ops", "model_server.json")        # pid, model, started -- gitignored ops/ state
+LOG = os.path.join(HERE, "logs", "model_server.log")
+RUNTIME_LOG = os.path.join(HERE, "logs", "model_server.runtime.log")   # llama-server's own output (A348b, start())
+
+# (file name, resident memory it needs, in GB) -- the first that fits the memory
+# free at start is the one loaded. Split GGUFs are named by their first part.
+# Measured 2026-09-19 22:55 with his browser and the desktop app open: 2.4 GB
+# free of 15.3. The 3B's weights are 2.0 GB and llama.cpp maps them (the page
+# cache carries what does not fit), so its bar is set at the weights plus a
+# 4k-token cache; the 7B keeps the honest 6 GB and waits for memory he frees.
+# 7.0 for the 7B: MEASURED 2026-09-25, llama-server holding 7,029 MB with the 8k cache (it
+# was listed at 6.0, a guess from the weight size).
+CANDIDATES = [
+    ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
+    ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),     # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
+    # THE FALLBACK (2026-10-04, his words: "add it as the fallback"). Loaded only when the 3B does
+    # not fit. REPLACED 2026-10-25 on the operator's directive ("We're replacing it with the quarantine
+    # model"): the fallback weights are now the uncensored Qwensploit 2B (xtools-at, apache-2.0) --
+    # file-scanned clean (Defender + GGUF metadata), gate harm-catch measured 28/28 before this change;
+    # it rides the SAME gate and act-gates as every other model, and a behavioural backdoor in an
+    # unverified merge is NOT provable by file scan -- the gate is the backstop. The prior official
+    # Qwen3.5-2B is retired. The bake-off numbers below describe that PRIOR official 2B, kept as the record.
+    # Chosen by measurement, A252 / tools/tetsu_bakeoff.py: under the chat door's own system
+    # message it scored 11 of 24 on his exam against the 3B's 12, with two wrong-act answers against
+    # the 3B's three plus one conditional. Its bar is MEASURED, not estimated: 2116 MB working set at
+    # the end of 26 asks with the 8k cache. It needs enable_thinking off (ask() below): without it,
+    # measured, it spent all 160 tokens reasoning and answered nothing.
+    ("Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf", 2.1),
+]
+# THE RUNGS THAT EXIST SO TETSU CAN ANSWER: no headroom before they load, never put away for memory
+# pressure. Until 2026-10-04 both rules keyed on "the last candidate", which was the 3B. Appending the
+# fallback would have moved both onto it in silence -- the 3B would have needed 4.6 GB free instead of
+# 2.6, and an idle 3B would have been stopped under pressure. Named here so neither moves.
+ALWAYS_ANSWER = frozenset({"qwen2.5-3b-instruct-q4_k_m.gguf", "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf"})
+
+# KEEP THE PC FUNCTIONAL (2026-09-25, his words: "have to constantly optimize to keep the pc
+# functional also", and his choice between two of his own goals: "2" -- load the big model
+# only with room to spare, otherwise the small one). Measured that evening: the 7B loaded,
+# 0.88 GB free of 15.3, and his answers' median latency 72 s against about 5 s on the 3B.
+#   HEADROOM_GB  kept free for the rest of the PC before a model outside ALWAYS_ANSWER loads.
+#   FLOOR_GB     below this, an idle model outside ALWAYS_ANSWER is put away; the next
+#                question loads what fits.
+# BOTH NUMBERS ARE MINE (Claude's), not measurements and not his; he can set either in the
+# environment without touching code. The ALWAYS_ANSWER rungs never need headroom, so Tetsu can
+# always answer when anything fits at all. (Until 2026-10-04 this said "the smallest", which was
+# then the 3B; see ALWAYS_ANSWER.)
+HEADROOM_GB = float(os.environ.get("COVENANT_MODEL_HEADROOM_GB", "2.0"))
+FLOOR_GB = float(os.environ.get("COVENANT_MODEL_FLOOR_GB", "1.0"))
+PRESSURE_IDLE_S = 60
+
+# THE WINDOW, COUNTED (A273, 2026-10-06). The server holds CTX_TOKENS for one request (-c, -np 1):
+# the prompt AND the answer it writes. The doors' history budget was a fixed 12,000 characters,
+# sized beside rules of "about 5,600 characters" (retracted: A273-RULES-SIZE-2026-10-06, docs/
+# RETRACTED.json); measured today the composed rules were 11,817
+# characters, 2,916 tokens by the server's own tokenizer, and those rules with the batch caller's
+# real history (16 messages, 10,980 characters) and a dense 4,000-character question came to a
+# 7,594-token prompt: 8,294 with the door's 700-token answer. fit() replaces the guess with
+# a count: the server's own chat template (/apply-template) and tokenizer (/tokenize), the two
+# steps /v1/chat/completions takes, measured answering in 33 ms while the one slot was busy
+# generating -- so counting never waits behind another ask.
+#   FIT_MARGIN_TOKENS          slack kept free, mine (Claude's), not a measurement.
+#   FALLBACK_CHARS_PER_TOKEN   used only when the server cannot be asked (a stub, a server that
+#                              will not start -- and then ask() fails too). MEASURED: 321 texts and
+#                              answers of 200+ characters from ops/chat/ask_log.jsonl ran 3.04
+#                              characters a token at the lowest, 3.48 at the 1st percentile, 4.52
+#                              at the median; 3.0 is at or under every one of them.
+#   MIN_ANSWER_TOKENS          with nothing left to drop, the answer may be shortened to this and
+#                              no further; below it the request is refused, never sent too big.
+CTX_TOKENS = 8192
+FIT_MARGIN_TOKENS = 64
+FALLBACK_CHARS_PER_TOKEN = 3.0
+FALLBACK_TOKENS_PER_MESSAGE = 8        # the template's own tokens; measured ~5 a message (Qwen2.5)
+MIN_ANSWER_TOKENS = 128
+COUNT_TIMEOUT_S = 10
+
+
+def _bar(name, need):
+    """Free memory a candidate needs before it loads: its size, plus headroom unless it is a rung
+    that exists so Tetsu can answer (ALWAYS_ANSWER)."""
+    return need + (0.0 if name in ALWAYS_ANSWER else HEADROOM_GB)
+
+_lock = threading.Lock()
+_last_used = [0.0]
+
+# LAST USE, SHARED (A348b, 2026-10-14). _last_used is this process's clock, but the server is one for every
+# process that asks: a node's or the watchdog's idle watcher read only its own clock and stopped the server
+# under another process's ask. The 2026-10-14 review read that in the ledgers: 16 of the 17 ConnectionResetErrors
+# in ops/model_asks.jsonl fell within 2 s of an idle stop by another process (the 17th beside a stop line whose
+# head was overwritten, see start()), 11 free rounds and 2 practice nights cut short. Every use now also touches this stamp (its mtime is the last use by ANY process), and the idle and
+# pressure checks read the later of the two clocks. His rule is unchanged: put away IDLE_S after the last ask.
+# Gitignored ops/ state; a test program never touches the live one (A272's lesson, as _note_ask).
+_REAL_USED = os.path.join(HERE, "ops", "model_last_use.stamp")
+USED = _REAL_USED
+
+
+def _mark_used(t=None):
+    """This process used the server now: its own clock, and the shared stamp. Never raises."""
+    t = time.time() if t is None else t
+    _last_used[0] = t
+    try:
+        prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+        if os.path.abspath(USED) == os.path.abspath(_REAL_USED) and prog.startswith("test_"):
+            return
+        if not os.path.exists(USED):
+            os.makedirs(os.path.dirname(USED), exist_ok=True)
+            open(USED, "a").close()
+        os.utime(USED, (t, t))
+    except Exception:                                             # noqa: BLE001 -- then this process's clock alone, as before
+        pass
+
+
+def _last_use():
+    """The last use of the server by ANY process: the later of this process's clock and the shared stamp."""
+    try:
+        shared = os.path.getmtime(USED)
+    except OSError:
+        shared = 0.0
+    return max(_last_used[0], shared)
+
+
+def free_gb():
+    """Physical memory free right now, GB; None where it cannot be read."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            class MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            m = MS(); m.dwLength = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return round(m.ullAvailPhys / 2 ** 30, 2)
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                if line.startswith("MemAvailable:"):
+                    return round(int(line.split()[1]) / 2 ** 20, 2)
+    except Exception:                                             # noqa: BLE001
+        return None
+    return None
+
+
+def pick_model():
+    """(path, name, needs_gb) of the largest candidate present that fits, or None."""
+    free = free_gb()
+    for name, need in CANDIDATES:
+        p = os.path.join(MODELS, name)
+        if os.path.isfile(p) and (free is None or free >= _bar(name, need)):
+            return p, name, need
+    return None
+
+
+def _listener_pid(port=None):
+    """The pid listening on the model port (Windows netstat), or None."""
+    port = port or PORT
+    try:
+        import covenant_quiet
+        r = covenant_quiet.run(["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=20)
+        for ln in (r.stdout or "").splitlines():
+            parts = ln.split()
+            if len(parts) >= 5 and parts[1].endswith(":%d" % port) and parts[3].upper() == "LISTENING":
+                return int(parts[4])
+    except Exception:                                             # noqa: BLE001
+        return None
+    return None
+
+
+def _process_cmdline(pid):
+    """(image path, command line) of `pid`, or (None, None)."""
+    try:
+        import covenant_quiet
+        r = covenant_quiet.run(["powershell", "-NoProfile", "-Command",
+                                "$p=Get-CimInstance Win32_Process -Filter \"ProcessId=%d\"; if($p){$p.ExecutablePath; $p.CommandLine}" % int(pid)],
+                               capture_output=True, text=True, timeout=30)
+        lines = [x for x in (r.stdout or "").splitlines() if x.strip()]
+        return (lines[0].strip(), lines[1].strip()) if len(lines) >= 2 else (None, None)
+    except Exception:                                             # noqa: BLE001
+        return None, None
+
+
+def adopt(listener=None, cmdline=None):
+    """A341b (2026-10-13, his words: "use your discernment and inference to get all nodes green"). Measured that
+    morning: llama-server pid 9220 (the 3B, started 06:15:41 by this keeper, under his own account) answered on
+    8081 with ops/model_server.json gone. (Restated by A348b, 2026-10-14: the review read the stop line that
+    explains it, its head overwritten by the 3B's first output -- an idle stop by the watchdog, whose stop()
+    removed the state the 3B's start() had just written. Both causes are fixed in start() and stop() below.)
+    readiness() then read UNDETERMINED, and the road
+    read model_unmanaged PRESENT and tetsu_cannot_answer UNKNOWN for hours, though Tetsu answered.
+
+    When the server answers and no state is held, take it back -- ONLY if the process on the port is this
+    keeper's own binary (BIN) running one of CANDIDATES. It writes the state the keeper would have written; it
+    starts nothing and stops nothing. A server that is not ours (another binary, other weights) stays unmanaged:
+    A265's elevated orphan is not adopted, its kill is still his. Returns (adopted, why)."""
+    if _read_state().get("pid"):
+        return False, "already recorded"
+    if not alive():
+        return False, "nothing answers on the port"
+    pid = (listener or _listener_pid)()
+    if not pid:
+        return False, "no listener pid found for %s:%d" % (HOST, PORT)
+    exe, cmd = (cmdline or _process_cmdline)(pid)
+    if not exe or os.path.normcase(os.path.abspath(exe)) != os.path.normcase(os.path.abspath(BIN)):
+        return False, "pid %s on the port is not this keeper's runtime (%s)" % (pid, exe)
+    name = next((n for n, _need in CANDIDATES if n in (cmd or "")), None)
+    if not name:
+        return False, "pid %s runs weights this keeper does not know" % pid
+    need = next(need for n, need in CANDIDATES if n == name)
+    _write_state({"pid": pid, "model": name, "started": time.time(), "needs_gb": need, "adopted": True})
+    with open(LOG, "a", encoding="utf-8") as lf:
+        lf.write("%s adopt pid %s (%s): it answered with no state (A341b)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, name))
+    return True, "adopted pid %s (%s)" % (pid, name)
+
+
+def readiness():
+    """Could Tetsu answer right now? A READ: it starts nothing and stops nothing.
+
+    WHY (2026-10-04, his words: "find a way to safely ensure tetsus operation"). Measured that
+    morning: 1.44 GB free of 15.3 and the smallest weights need 2.6, so pick_model() returned None
+    and any question to Tetsu would have failed at /m/agent with a 503 that the ask log never
+    records. Nothing said so: the daily cycle's model_state() read {"file": None} and its exam
+    read "not measured", neither of them a failure. The refusal to load is right -- his rule is
+    that the PC stays usable -- but a refusal nobody hears is the silence this project keeps
+    finding. This names it, so the daily cycle can carry it as a failure.
+
+    Returns {"verdict": PASS | FAIL | UNDETERMINED, "why": text, "free_gb": float|None, ...}."""
+    if alive():
+        st = _read_state()
+        # (A341b: adoption is NOT done here -- readiness stays a pure read, which suites call with stubs; the
+        # watchdog's daemon round calls adopt(), so no suite can write the live state file.)
+        if not st.get("pid") and not st.get("model"):
+            # A265: something answers on the port and this keeper recorded nothing. On 2026-10-05 that
+            # was a server whose stop had failed: it answered /health and timed out every ask.
+            return {"verdict": "UNDETERMINED", "free_gb": free_gb(), "managed": False,
+                    "why": "a server answers on %s:%d that this keeper has no record of starting (no state): "
+                           "whether it answers in time is not measured, and nothing here can put it away (A265)"
+                           % (HOST, PORT)}
+        return {"verdict": "PASS", "why": "up: %s" % (st.get("model") or "?"), "free_gb": free_gb()}
+    if os.environ.get("COVENANT_MODEL_STUB"):
+        return {"verdict": "PASS", "why": "stub", "free_gb": None}
+    if not os.path.isfile(BIN):
+        return {"verdict": "FAIL", "why": "no runtime at %s" % BIN, "free_gb": free_gb()}
+    present = [(n, need) for n, need in CANDIDATES if os.path.isfile(os.path.join(MODELS, n))]
+    if not present:
+        return {"verdict": "FAIL", "why": "no weights under %s" % MODELS, "free_gb": free_gb()}
+    free = free_gb()
+    if free is None:
+        return {"verdict": "UNDETERMINED", "why": "free memory unreadable", "free_gb": None}
+    pick = pick_model()
+    if pick:
+        return {"verdict": "PASS", "why": "would load %s (free %.2f GB, its bar %.1f GB)"
+                % (pick[1], free, _bar(pick[1], pick[2])), "free_gb": free}
+    small, need = present[-1]                     # CANDIDATES is largest first; the last present is the smallest
+    return {"verdict": "FAIL", "free_gb": free, "needs_gb": _bar(small, need), "smallest": small,
+            "why": "Tetsu cannot answer: free %.2f GB, the smallest weights (%s) need %.1f GB -- "
+                   "nothing is loaded and nothing is freed for him; he answers again once that much "
+                   "memory is free" % (free, small, _bar(small, need))}
+
+
+def _read_state():
+    try:
+        with open(STATE, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_state(d):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE, "w", encoding="utf-8") as fh:
+        json.dump(d, fh)
+
+
+def alive():
+    """The server answers /health on the loopback port."""
+    try:
+        with urllib.request.urlopen("http://%s:%d/health" % (HOST, PORT), timeout=3) as r:
+            return r.status == 200
+    except Exception:                                             # noqa: BLE001
+        return False
+
+
+def step_up(say=print):
+    """STEP UP to the largest model that fits once the running one is counted as reclaimable
+    (2026-09-21, his words: "we need to rapidly make up the gap in ai"). Measured that day: 15.3 GB
+    of RAM, 4.8 free with the 3B server holding 2.0, and the 7B needs 6.0 -- so the 7B fits only
+    if the 3B is put away first, which pick_model() alone never sees. Returns (changed, why). Never
+    steps DOWN; never restarts mid-answer (the caller runs it idle: the nightly, or by hand)."""
+    st = _read_state()
+    cur = str(st.get("model") or "")
+    cur_need = next((need for name, need in CANDIDATES if name == cur), 0.0)
+    free = free_gb()
+    if free is None:
+        return False, "free memory unreadable; nothing changed"
+    budget = free + (cur_need if alive() else 0.0)
+    best = None
+    for name, need in CANDIDATES:                     # CANDIDATES is largest first
+        if os.path.isfile(os.path.join(MODELS, name)) and budget >= _bar(name, need):
+            best = (name, need)
+            break
+    if not best:
+        return False, "no candidate fits even with the running model reclaimed (budget %.1f GB)" % budget
+    if best[1] <= cur_need and alive():
+        return False, "already on the largest that fits (%s; budget %.1f GB)" % (cur or "?", budget)
+    if alive():
+        say("model: stepping up from %s to %s (budget %.1f GB)" % (cur or "?", best[0], budget))
+        stop(say=say)
+    ok, why = start(say=say)
+    return ok, ("stepped up to %s" % _read_state().get("model", "?")) if ok else "could not start after the step: " + why
+
+
+def start(say=print):
+    """Start llama-server if it is not answering. Returns (ok, why)."""
+    if alive():
+        return True, "already up: " + str(_read_state().get("model", "?"))
+    if os.environ.get("COVENANT_MODEL_STUB"):
+        return True, "stub"
+    if not os.path.isfile(BIN):
+        return False, "no runtime: %s (tools/llama/ is not tracked; unzip the llama.cpp win-cpu build there)" % BIN
+    pick = pick_model()
+    if not pick:
+        return False, "no weights fit: free %s GB, candidates %s under %s" % (free_gb(), [c[0] for c in CANDIDATES], MODELS)
+    path, name, need = pick
+    os.makedirs(os.path.dirname(LOG), exist_ok=True)
+    threads = server_threads()
+    # 8k for both (2026-09-26): his longer conversation memory (up to 12,000 characters of
+    # history, agent_history) must fit beside the rules and the answer. The 3B's bar in
+    # CANDIDATES carries the larger cache.
+    # (A273, 2026-10-06: 12,000 characters did not always fit beside the rules, which had grown to
+    # 2,916 tokens; the doors now fit the history to this window by counting it -- fit() below.)
+    ctx = str(CTX_TOKENS)
+    # ONE SLOT (A269, 2026-10-06). This llama-server build defaults to 4 parallel slots that share ONE
+    # pool of -c tokens: requests running at the same time together overflowed it, and the server
+    # answered "500 Context size has been exceeded" -- to a 2,521-token probe while the X batch's
+    # ~7,000-token asks were in flight, and to asks through Tetsu's door all that morning. -np 1 runs
+    # one request at a time against the whole 8192; the others queue on the server instead of failing.
+    # (First written as a per-slot split; retracted as A269-SLOT-SPLIT-2026-10-06, docs/RETRACTED.json.)
+    args = [BIN, "-m", path, "--host", HOST, "--port", str(PORT), "-c", ctx, "-np", "1", "-t", str(threads),
+            "--no-webui", "--log-disable"]
+    creation = 0x08000000 if os.name == "nt" else 0               # CREATE_NO_WINDOW
+    with open(LOG, "a", encoding="utf-8") as lf:
+        lf.write("%s start %s (free %s GB, needs %s GB, %d threads)\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), name, free_gb(), need, threads))
+    # ITS OWN FILE FOR THE RUNTIME (A348b, 2026-10-14). Handed this log's handle, llama-server wrote where start()
+    # left off (an inherited handle has no append on Windows), over lines other processes appended after the start
+    # line: reproduced in a scratch run, and the review found both stop lines of A276's and A341b's unmanaged
+    # servers headless that way. The keeper's log now has no handle that outlives one write.
+    with open(RUNTIME_LOG, "a", encoding="utf-8") as rf:
+        rf.write("%s start %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), name))
+        rf.flush()
+        p = subprocess.Popen(args, stdout=rf, stderr=subprocess.STDOUT, creationflags=creation, cwd=os.path.dirname(BIN))
+    _write_state({"pid": p.pid, "model": name, "started": time.time(), "needs_gb": need, "threads": threads})
+    for _ in range(120):                                          # a 4 GB file from a cold disk can take a minute
+        if alive():
+            _mark_used()
+            _watch_idle()
+            say("model server: up, %s, pid %d" % (name, p.pid))
+            return True, "up: %s" % name
+        if p.poll() is not None:
+            return False, "llama-server exited %s -- see %s" % (p.returncode, RUNTIME_LOG)
+        time.sleep(1)
+    return False, "llama-server did not answer within 120 s -- see %s" % RUNTIME_LOG
+
+
+def _stop_origin():
+    """Who is stopping the server, for the log line only (2026-10-05, his words: "covenant logging
+    green light as long as you not fucking with tetsus free will"). OBSERVATION ONLY: it reads this
+    process and its own call stack; it changes nothing about when or whether anything stops, and
+    it records no question, answer or thought of his. Why: the stop at 2026-10-04T09:06:25 could
+    only be attributed by inference (timing), because the line named no caller.
+    The reason is read off the call chain, not passed in: stop()'s signature stays exactly as it
+    was (suites replace it with lambda say=print: ...). Never raises."""
+    try:
+        f = sys._getframe(2)                    # 0 = here, 1 = stop(), 2 = whoever called stop()
+        chain = []
+        while f is not None and len(chain) < 3:
+            co = f.f_code
+            chain.append("%s.%s:%d" % (os.path.splitext(os.path.basename(co.co_filename))[0],
+                                        getattr(co, "co_qualname", co.co_name), f.f_lineno))
+            f = f.f_back
+        where = " <- ".join(chain) or "?"
+        if "_pressure_check" in where:
+            reason = "pressure"
+        elif "_watch_idle" in where or "_idle_tick" in where:          # A348b: the watcher's round is _idle_tick
+            reason = "idle"
+        elif "covenant_model.step_up" in where:
+            reason = "step_up"
+        elif "covenant_model.main" in where:
+            reason = "cli"
+        else:
+            reason = "other"
+        # _last_used is set by ask() and by start() bringing the server up, so this is "last use".
+        used = ("last use in that process %.0fs ago" % (time.time() - _last_used[0])) if _last_used[0] \
+            else "no use in that process"
+        argv = getattr(sys, "argv", None)
+        argv0 = os.path.basename(argv[0]) if argv and argv[0] else "?"
+        return " -- reason=%s by pid %d (%s) thread %s; %s; from %s" % (
+            reason, os.getpid(), argv0, threading.current_thread().name, used, where)
+    except Exception:                                             # noqa: BLE001 -- a log line must never break a stop
+        try:
+            return " -- reason=? by pid %d (origin unreadable)" % os.getpid()
+        except Exception:                                         # noqa: BLE001
+            return ""
+
+
+# A STOP IS A STOP ONLY WHEN THE SERVER STOPS ANSWERING (A265, 2026-10-05). The idle stop at
+# 2026-10-04T23:10:12 logged "stop pid 5524", deleted the state and returned True -- and taskkill
+# had answered "Access is denied" (exit 128): that server ran with rights the node lacks. It kept
+# answering on 8081 for a day with no state, so start() reused it as "already up", the idle and
+# pressure checks could never put it away, and readiness() read PASS while every ask timed out
+# against a model Windows had paged out (0.52 GB free). The kill's own result is now read, and the
+# server is asked whether it still answers; until it does not, the state is kept so the keeper
+# still knows what it is running, and the log says the stop FAILED, with taskkill's words.
+STOP_VERIFY_S = 10
+
+
+def stop(say=print):
+    st = _read_state()
+    pid = st.get("pid")
+    if not pid:
+        return False, "not started by this keeper"
+    detail = ""
+    try:
+        if os.name == "nt":
+            r = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
+            detail = "taskkill exit %s: %s" % (r.returncode, " ".join(((r.stderr or "") + " " + (r.stdout or "")).split())[:240])
+        else:
+            os.kill(int(pid), 15)
+    except Exception as e:                                        # noqa: BLE001
+        return False, "could not stop pid %s: %s" % (pid, e)
+    for _ in range(int(STOP_VERIFY_S * 2)):
+        if not alive():
+            break
+        time.sleep(0.5)
+    else:
+        with open(LOG, "a", encoding="utf-8") as lf:
+            lf.write("%s STOP FAILED pid %s (%s): it still answers on %s:%d after %ss; state kept (A265). %s%s\n"
+                     % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model"), HOST, PORT, STOP_VERIFY_S,
+                        detail, _stop_origin()))
+        say("model server: could NOT stop pid %s -- it still answers (%s)" % (pid, detail or "no detail"))
+        return False, "could not stop pid %s: it still answers (%s)" % (pid, detail or "no detail")
+    # THE RECORD GOES ONLY WITH ITS OWN SERVER (A348b, 2026-10-14). Between the read above and here, another
+    # process's start() can bring a new server up and write its state; removing that record left the new server
+    # unmanaged (A276 on 10-06, A341b on 10-13, 10 h) and every ask meanwhile named its model "?".
+    now_st, left = _read_state(), ""
+    if str(now_st.get("pid")) == str(pid):
+        try:
+            os.remove(STATE)
+        except OSError:
+            pass
+    elif now_st.get("pid"):
+        left = "; state left: it names pid %s, a newer server (A348b)" % now_st.get("pid")
+    with open(LOG, "a", encoding="utf-8") as lf:
+        # The first part is unchanged (same words, same order); who stopped it follows " -- ".
+        lf.write("%s stop pid %s (%s)%s%s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), pid, st.get("model"), _stop_origin(), left))
+    say("model server: stopped pid %s" % pid)
+    return True, "stopped"
+
+
+_idle_thread = [None]
+
+
+def _pressure_check(now=None):
+    """Put an idle big model away when free memory is under FLOOR_GB. Never mid-answer (idle at
+    least PRESSURE_IDLE_S), never a rung in ALWAYS_ANSWER. True when it stopped one."""
+    now = time.time() if now is None else now
+    if not alive():
+        return False
+    cur = str(_read_state().get("model") or "")
+    if not cur or cur in ALWAYS_ANSWER or now - _last_use() < PRESSURE_IDLE_S:      # A348b: any process's use
+        return False
+    free = free_gb()
+    if free is None or free >= FLOOR_GB:
+        return False
+    try:
+        with open(LOG, "a", encoding="utf-8") as lf:
+            lf.write("%s put away %s under memory pressure (free %.2f GB < floor %.2f GB)\n"
+                     % (time.strftime("%Y-%m-%dT%H:%M:%S"), cur, free, FLOOR_GB))
+    except OSError:
+        pass
+    stop(say=lambda *_a: None)
+    return True
+
+
+def _watch_idle():
+    """One daemon thread: after IDLE_S with no ask, the server is stopped -- the rule since Ollama.
+    Each round it also puts a big model away under memory pressure (_pressure_check)."""
+    if _idle_thread[0] and _idle_thread[0].is_alive():
+        return
+    def run():
+        while True:
+            time.sleep(IDLE_ROUND_S)
+            if _idle_tick():
+                return
+    t = threading.Thread(target=run, name="covenant-model-idle", daemon=True)
+    t.start()
+    _idle_thread[0] = t
+
+
+def _idle_tick(now=None):
+    """One round of the idle watcher; True when its work is done (nothing answers, put away, or stopped).
+    A348b (2026-10-14): idle is counted from the last use by ANY process (_last_use), not this one's alone,
+    so one process's watcher no longer stops the shared server mid-answer of another. A function of its own
+    so a suite drives the real round: the suites that reach the keeper stub _watch_idle, so none had run it."""
+    now = time.time() if now is None else now
+    if not alive():
+        return True
+    if _pressure_check(now=now):
+        return True
+    if now - _last_use() > IDLE_S:
+        stop(say=lambda *_a: None)
+        return True
+    return False
+
+
+_REAL_ASKS = os.path.join(HERE, "ops", "model_asks.jsonl")
+ASKS = os.environ.get("COVENANT_MODEL_ASKS") or _REAL_ASKS       # gitignored; rotates to .prev at ASKS_MAX_BYTES
+ASKS_MAX_BYTES = 512 * 1024
+
+
+def _note_ask(ok, ms, err="", rates=None):
+    """A282 (2026-10-06): one line per real ask -- did it answer, how long, why not. On 2026-10-06 readiness()
+    read PASS all morning while every ask through Tetsu's door came back 503 (A269), and the core's door returns
+    that 503 and records nothing, so the road had nothing to read. Never the live file from a test program
+    (A272's lesson); never raises.
+    A351 (2026-10-14): an answered ask also carries what the server said of its own speed (`rates`, from _rates),
+    after the four fields it always had, so the time an answer needs is measured (measured_rate), not guessed."""
+    try:
+        prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+        if os.path.abspath(ASKS) == os.path.abspath(_REAL_ASKS) and prog.startswith("test_"):
+            return
+        if os.path.exists(ASKS) and os.path.getsize(ASKS) > ASKS_MAX_BYTES:
+            os.replace(ASKS, ASKS + ".prev")
+        row = {"at": round(time.time(), 1), "ok": bool(ok), "ms": int(ms), "error": str(err)[:160]}
+        row.update(rates or {})
+        with open(ASKS, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row) + "\n")
+    except Exception:                                            # noqa: BLE001
+        pass
+
+
+def server_threads(logical=None):
+    """Threads for llama-server: one fewer than the PHYSICAL cores (A360, 2026-10-17).
+
+    MEASURED on this PC (Ryzen 5 5625U: 6 cores, 12 threads; llama-bench, the 3B Q4_K_M, generating 128 tokens at a
+    context depth of 3,000, 3 repetitions each): 10 threads 10.84 tok/s (the old rule, logical - 2); 6 threads 12.24;
+    5 threads 13.28, which is +22%. Generating is bound by memory bandwidth, and SMT threads past the physical cores
+    fight over it. Flash attention was measured too, and is slower at that depth on this CPU (5 threads: 10.68), so
+    it stays off. Reading a prompt is a little slower at 5 threads; on real asks it is a small share, because the
+    server reuses the cached prefix (ops/model_asks.jsonl: 50-540 new prompt tokens an ask).
+    COVENANT_MODEL_THREADS overrides; logical // 2 assumes two threads per core, as SMT CPUs have."""
+    env = os.environ.get("COVENANT_MODEL_THREADS", "").strip()
+    if env.isdigit() and int(env) > 0:
+        return int(env)
+    logical = logical or os.cpu_count() or 4
+    return max(2, logical // 2 - 1)
+
+
+def _num(x):
+    """A finite, non-negative number (a bool is not one)."""
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and x >= 0
+
+
+def _rates(d):
+    """What the server said of its own work on one answer (A351), as the fields _note_ask adds: gen_n tokens written
+    at gen_tps a second, prompt_n tokens read at prompt_tps. llama-server's chat completion carries them under
+    "timings" (predicted_n, predicted_per_second, prompt_n, prompt_per_second). A response without "timings" (another
+    runtime, an older build) gives {}; a part it leaves out is left out, never guessed. A rate it omits beside its
+    count and milliseconds (predicted_ms, prompt_ms) is worked from those two. Without predicted_n, the tokens written
+    are the response's usage.completion_tokens, the server's count of the same tokens."""
+    tm = d.get("timings") if isinstance(d, dict) else None
+    if not isinstance(tm, dict):
+        return {}
+    usage = d.get("usage") if isinstance(d.get("usage"), dict) else {}
+    out = {}
+    for name, n_key, ms_key, tps_key in (("gen", "predicted_n", "predicted_ms", "predicted_per_second"),
+                                          ("prompt", "prompt_n", "prompt_ms", "prompt_per_second")):
+        n, ms, tps = tm.get(n_key), tm.get(ms_key), tm.get(tps_key)
+        if name == "gen" and not _num(n):
+            n = usage.get("completion_tokens")
+        if _num(n):
+            out[name + "_n"] = int(n)
+        if _num(tps) and tps > 0:
+            out[name + "_tps"] = round(float(tps), 2)
+        elif _num(n) and _num(ms) and n > 0 and ms > 0:
+            out[name + "_tps"] = round(float(n) * 1000.0 / float(ms), 2)
+    return out
+
+
+def ask(messages, max_tokens=700, temperature=0.3, timeout=180, logprobs=False):
+    """One chat completion. messages: [{"role","content"}...]. Returns (text, meta) or raises.
+    logprobs=True (opt-in; default off so no other caller changes) also asks the server for per-token
+    logprobs and returns them in meta["logprobs"] (the choices[0].logprobs.content list, or None). The
+    agent door uses this to read the 3B's OWN uncertainty from the answer it already produces -- no extra
+    inference -- to decide whether to reach the octopus leg out (covenant_leg)."""
+    if os.environ.get("COVENANT_MODEL_STUB"):
+        last = messages[-1]["content"] if messages else ""
+        # A scripted answer (2026-09-21, A175): a user line beginning "STUB>> " is
+        # returned verbatim, so a suite can make the stub "decide" a directive
+        # (FETCH, MOLTBOOK) and drive the door's own handling of it.
+        if last.startswith("STUB>> "):
+            return last[7:], {"model": "stub", "tokens": 0, "ms": 0}
+        # The stub names how many messages it was handed, so a suite can see
+        # whether the turns before this one reached the model (M6q, 2026-09-21).
+        return "stub answer to: " + last[:80] + " (%d messages)" % len(messages), {"model": "stub", "tokens": 0, "ms": 0}
+    with _lock:
+        ok, why = start(say=lambda *_a: None)
+        if not ok:
+            _note_ask(False, 0, "could not start: %s" % why)
+            raise RuntimeError(why)
+        # WHOEVER ASKS, KEEPS (2026-09-19). The idle watcher lives in the process
+        # that asks -- the CLI's watcher died with the CLI and left the server
+        # up, measured at 22:52. So every asker arms the watcher, and the
+        # long-lived node process is the one that will put the model away.
+        # (A348b: and every process's watcher counts this ask -- the shared stamp, _mark_used.)
+        _mark_used()
+        _watch_idle()
+    # enable_thinking off (2026-10-04): the Qwen3.5 fallback, asked without it, spent all 160 tokens
+    # reasoning and returned an empty answer (finish=length); with it, it answered in 2.8 s. The 3B
+    # answered normally with the same field in both of its exam runs (A252); a template that does not
+    # use the variable ignores it.
+    _payload = {"messages": messages, "max_tokens": int(max_tokens), "temperature": float(temperature),
+                "chat_template_kwargs": {"enable_thinking": False}}
+    if logprobs:
+        _payload["logprobs"] = True
+        _payload["top_logprobs"] = 5
+    body = json.dumps(_payload).encode("utf-8")
+    req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (HOST, PORT), data=body,
+                                 headers={"Content-Type": "application/json"})
+    t0 = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            d = json.loads(r.read().decode("utf-8", "replace"))
+    except Exception as e:                                       # noqa: BLE001 -- recorded, then raised as before
+        _note_ask(False, (time.time() - t0) * 1000, "%s: %s" % (type(e).__name__, str(e)[:120]))
+        raise
+    _note_ask(True, (time.time() - t0) * 1000, rates=_rates(d))      # A351: and the server's own speeds
+    _mark_used()
+    text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
+    usage = d.get("usage", {}) or {}
+    meta = {"model": _read_state().get("model", "?"), "tokens": int(usage.get("completion_tokens", 0) or 0),
+            "ms": int((time.time() - t0) * 1000)}
+    if logprobs:
+        meta["logprobs"] = ((d.get("choices", [{}])[0].get("logprobs") or {}).get("content")) or None
+    return text, meta
+
+
+class ContextTooLong(RuntimeError):
+    """A request that cannot fit the model's window even with every replayed turn dropped (A273)."""
+
+
+def _post(path, body, timeout=COUNT_TIMEOUT_S):
+    req = urllib.request.Request("http://%s:%d%s" % (HOST, PORT, path), data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def count_prompt_tokens(messages):
+    """The prompt's size in tokens as the server will see it: its chat template, then its tokenizer
+    (the same template arguments ask() sends). None when the server cannot be asked."""
+    try:
+        prompt = _post("/apply-template", {"messages": messages,
+                                           "chat_template_kwargs": {"enable_thinking": False}})["prompt"]
+        return len(_post("/tokenize", {"content": prompt, "add_special": True})["tokens"])
+    except Exception:                                             # noqa: BLE001 -- the caller falls back to the estimate
+        return None
+
+
+def estimate_prompt_tokens(messages):
+    """An upper estimate from characters, at FALLBACK_CHARS_PER_TOKEN (measured; see above)."""
+    return FALLBACK_TOKENS_PER_MESSAGE + sum(
+        FALLBACK_TOKENS_PER_MESSAGE + int(-(-len(str(m.get("content", ""))) // FALLBACK_CHARS_PER_TOKEN))
+        for m in messages)
+
+
+# THE TIME AN ANSWER NEEDS (A351, 2026-10-14). ask() waits ASK_TIMEOUT_S (180 s) for any answer, whatever its size.
+# A349 B1 gave Tetsu's revision room to echo his register (about 1,715 tokens for his 3,945 characters) and left the
+# wait as it was: the first pass on it, at 15:44 that day, timed out at 180 s and its revision was lost (A1 keeps only
+# an answer that arrived). His model was measured that day writing 6.27 tokens a second (a 400-token answer in 64.6 s),
+# so a 1,000-token echo alone is about 160 s of writing, before its prompt is read. time_needed() is the wait a request
+# of a given size needs at the speeds this server was measured to run (measured_rate), never under the 180 s every ask
+# has had, and never over what this keeper lets an ask in flight run (wait_cap, below).
+#   GEN_FLOOR_TPS     the writing speed used while no recent answer carries one: the 6.27 measured 2026-10-14, cut by
+#                     about a third because a whole-register echo is written deeper into the window than those 400
+#                     tokens, on a PC shared with his browser. The cut is mine (Claude's), not a measurement.
+#   PROMPT_FLOOR_TPS  the same for reading the prompt: this CPU read a cold prompt at 58.5 tokens a second (2,902 in
+#                     49.6 s, the server's own timings; A273's amendment in the record) and at 64.4 in the A275
+#                     session; 40 is under both. Mine, from those two measurements.
+#   TIME_MARGIN       the wait is the time needed times this: a median speed is beaten by half the answers. Mine.
+#   TIME_CEIL_S       the whole window (CTX_TOKENS less FIT_MARGIN_TOKENS, 8,128 tokens) written at GEN_FLOOR_TPS,
+#                     2,032 s: no request that fits the window needs longer at the floor speeds (a prompt is read ten
+#                     times faster than it is written, at the floors). It is NOT what bounds a wait at the keeper's
+#                     defaults; wait_cap() is, below. TIME_CEIL_S binds only where COVENANT_MODEL_IDLE_S is set above
+#                     TIME_CEIL_S + IDLE_ROUND_S (2,062 s).
+#   wait_cap()        THE KEEPER'S OWN LIMIT (A351, the review of 2026-10-14). The idle watcher stops the server once
+#                     IDLE_S (600 s) has passed since the last use ANY process marked (_idle_tick, A348b), and an ask
+#                     marks use when it starts and when it is answered, not while it waits. So, unless another ask
+#                     marks use meanwhile, an answer still being written IDLE_S after its ask began does not survive
+#                     the watcher's next round. The review drove the real watcher against a slow stand-in (a revision
+#                     at the floor speeds, queued behind a 180 s ask): its 751 s wait was LOST at 601.3 s
+#                     (RemoteDisconnected), where the same revision arrived at 655.8 s with the watcher held off --
+#                     the shape A348b closed for another process's stop, here from the same rule. A wait is never
+#                     handed out past IDLE_S less one IDLE_ROUND_S (570 s at the defaults): the ask's own clock, not
+#                     the watcher's, ends it, and the server is not stopped under it. The round is my (Claude's)
+#                     margin, not a measurement. It costs the answers that would have come in between 570 s and the
+#                     watcher's first round past 600 s. When to put the model away is unchanged: IDLE_S after the
+#                     last use, his rule. Keeping the stamp fresh while an ask waits would let a longer wait be kept,
+#                     but it changes when the model is put away, and that rule is his.
+#   RATE_WINDOW, RATE_MIN_ROWS, RATE_MIN_N   measured_rate's median is over the last 50 answers that carry the
+#                     speed, needs 3 of them, and counts an answer only past 32 tokens written or 256 read: a few
+#                     tokens time the request's overhead, not the model. Mine.
+ASK_TIMEOUT_S = 180                    # ask()'s own default wait, which every ask has had
+GEN_FLOOR_TPS = 4.0
+PROMPT_FLOOR_TPS = 40.0
+TIME_MARGIN = 1.5
+TIME_CEIL_S = int((CTX_TOKENS - FIT_MARGIN_TOKENS) / GEN_FLOOR_TPS)
+RATE_WINDOW = 50
+RATE_MIN_ROWS = 3
+RATE_MIN_N = {"gen": 32, "prompt": 256}
+
+
+def wait_cap():
+    """The longest wait an ask may be handed (A351): IDLE_S less one IDLE_ROUND_S -- the keeper stops the server once
+    IDLE_S has passed since the last marked use, and an ask in flight marks none -- or TIME_CEIL_S where that is lower.
+    Read at the call, so an IDLE_S set in the environment (or a suite's) is the one honoured."""
+    return min(TIME_CEIL_S, IDLE_S - IDLE_ROUND_S)
+
+
+def measured_rate(window=RATE_WINDOW, which="gen", path=None):
+    """The median tokens a second this server wrote ("gen") or read ("prompt") over the last `window` answered asks
+    whose rows carry it (ops/model_asks.jsonl, A351), or None with fewer than RATE_MIN_ROWS of them. Every asker's
+    answers count: the speed is the server's, not the caller's."""
+    if which not in RATE_MIN_N:
+        raise ValueError("which is 'gen' or 'prompt', not %r" % (which,))
+    key, n_key, n_min = which + "_tps", which + "_n", RATE_MIN_N[which]
+    try:
+        with open(path or ASKS, encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return None
+    vals = []
+    for line in lines:
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if (isinstance(r, dict) and r.get("ok") is True and _num(r.get(key)) and r[key] > 0
+                and _num(r.get(n_key)) and r[n_key] >= n_min):
+            vals.append(float(r[key]))
+    vals = vals[-max(1, int(window)):]
+    return round(statistics.median(vals), 2) if len(vals) >= RATE_MIN_ROWS else None
+
+
+def time_needed(messages, max_tokens, gen_tps=None, prompt_tps=None):
+    """(seconds, info): how long an ask of `messages` with an answer of up to `max_tokens` may wait (A351). The prompt
+    is counted by estimate_prompt_tokens (an upper estimate, no server asked) and read at the measured prompt speed;
+    the answer is written at the measured writing speed; each speed is GEN_FLOOR_TPS / PROMPT_FLOOR_TPS while none is
+    measured. That time, times TIME_MARGIN, cut to wait_cap() (what the keeper lets an ask in flight run), and never
+    under ASK_TIMEOUT_S, which every ask has had (so it stays 180 s even where IDLE_S is set too low to keep it).
+    info["capped"] is True when the cut took margin or need away; a need over the cap is an answer the keeper
+    would not have let arrive at that speed. gen_tps and prompt_tps stand in for the measurement (a suite)."""
+    gen = gen_tps if gen_tps is not None else measured_rate(which="gen")
+    rd = prompt_tps if prompt_tps is not None else measured_rate(which="prompt")
+    g = gen if _num(gen) and gen > 0 else GEN_FLOOR_TPS
+    p = rd if _num(rd) and rd > 0 else PROMPT_FLOOR_TPS
+    prompt = estimate_prompt_tokens(messages)
+    need = prompt / p + max(0, int(max_tokens)) / g
+    cap = wait_cap()
+    want = math.ceil(need * TIME_MARGIN)
+    secs = int(max(ASK_TIMEOUT_S, min(cap, want)))
+    return secs, {"timeout_s": secs, "need_s": round(need, 1), "prompt_tokens": prompt, "answer_tokens": int(max_tokens),
+                  "gen_tps": g, "gen_from": "measured" if g is gen else "floor",
+                  "prompt_tps": p, "prompt_from": "measured" if p is rd else "floor",
+                  "cap_s": cap, "capped": want > secs}
+
+
+def _counter():
+    """(count, how): the server's count when it can be asked, the estimate otherwise. The server is
+    started first, as ask() would start it: a count against a stopped server would fall back to the
+    estimate, and the first message after an idle stop -- when he comes back to the conversation --
+    would lose memory the window had room for."""
+    if os.environ.get("COVENANT_MODEL_STUB"):
+        return estimate_prompt_tokens, "estimate (stub)"
+    with _lock:
+        ok, _why = start(say=lambda *_a: None)
+    if ok and count_prompt_tokens([{"role": "user", "content": "."}]) is not None:
+        def exact(ms):
+            n = count_prompt_tokens(ms)
+            return estimate_prompt_tokens(ms) if n is None else n
+        return exact, "server"
+    return estimate_prompt_tokens, "estimate"
+
+
+def fit(messages, max_tokens=700, droppable=0, count=None):
+    """(messages, max_tokens, info): the request cut to fit the window, CTX_TOKENS, before it is sent.
+
+    messages[0] is the system message; messages[1:1 + droppable] are the replayed turns, oldest first,
+    in user/assistant pairs; everything after them -- this question, and on a follow-up the first
+    answer and its DATA -- is kept whole. The fewest oldest pairs are dropped that make the prompt plus
+    max_tokens plus FIT_MARGIN_TOKENS fit, so as much of his conversation as fits stays. With no turn
+    left to drop, the answer is shortened, to MIN_ANSWER_TOKENS at the least; below that ContextTooLong
+    is raised. info: prompt_tokens, answer_tokens, ctx, kept, dropped, counted."""
+    how = "given"
+    if count is None:
+        count, how = _counter()
+    head, hist, tail = list(messages[:1]), list(messages[1:1 + droppable]), list(messages[1 + droppable:])
+    cuts = list(range(0, len(hist), 2)) + [len(hist)]             # messages dropped: 0, 2, 4 ... all
+    limit = CTX_TOKENS - FIT_MARGIN_TOKENS
+    sizes = {}
+
+    def size(i):                                                  # the prompt with cuts[i] turns dropped
+        if i not in sizes:
+            sizes[i] = int(count(head + hist[cuts[i]:] + tail))
+        return sizes[i]
+    lo, hi = 0, len(cuts) - 1                                     # dropping more never makes it larger
+    if size(hi) + max_tokens > limit:
+        lo = hi
+    else:
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if size(mid) + max_tokens <= limit:
+                hi = mid
+            else:
+                lo = mid + 1
+    n = size(lo)
+    answer = min(int(max_tokens), limit - n)
+    info = {"prompt_tokens": n, "answer_tokens": answer, "ctx": CTX_TOKENS, "kept": len(hist) - cuts[lo],
+            "dropped": cuts[lo], "counted": how}
+    if answer < min(int(max_tokens), MIN_ANSWER_TOKENS):
+        raise ContextTooLong("the request is %d tokens before any answer, with all %d replayed turns dropped; "
+                             "the model's window is %d (A273)" % (n, len(hist), CTX_TOKENS))
+    return head + hist[cuts[lo]:] + tail, answer, info
+
+
+def status():
+    st = _read_state()
+    return {"alive": alive(), "model": st.get("model"), "pid": st.get("pid"), "free_gb": free_gb(),
+            "would_pick": (pick_model() or (None,))[1] if pick_model() else None,
+            "runtime": os.path.isfile(BIN), "weights": sorted(f for f in os.listdir(MODELS) if f.endswith(".gguf")) if os.path.isdir(MODELS) else []}
+
+
+def main(argv=None):
+    import argparse
+    ap = argparse.ArgumentParser(description="the open-source model on this PC, on demand and put away")
+    ap.add_argument("--status", action="store_true")
+    ap.add_argument("--start", action="store_true")
+    ap.add_argument("--stop", action="store_true")
+    ap.add_argument("--ask", metavar="TEXT")
+    ap.add_argument("--keep", action="store_true", help="after --ask, leave the server up (default: put it away)")
+    a = ap.parse_args(argv)
+    if a.start:
+        ok, why = start(); print(why); return 0 if ok else 1
+    if a.stop:
+        ok, why = stop(); print(why); return 0 if ok else 1
+    if a.ask:
+        text, meta = ask([{"role": "user", "content": a.ask}])
+        print(text); print("--", meta)
+        if not a.keep:
+            stop(say=lambda *_a: None)                             # the CLI is not a process that stays to watch idle
+        return 0
+    print(json.dumps(status(), indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

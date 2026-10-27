@@ -1,0 +1,503 @@
+# --- Secrets and key material: never commit ------------------------------
+# Node database encryption keys. Committing any of these compromises every
+# ledger they unlock, including retroactively via the git history.
+*.key
+_keybackup/
+_unsealtest/
+
+# --- Ledger state ---------------------------------------------------------
+# Node databases are per-operator runtime state, not source. genesis.json is
+# deliberately NOT ignored: it is the canonical genesis, exported once and
+# shared (see README).
+*.db
+*.db-shm
+*.db-wal
+covenant_sealed.bin
+
+# --- Balances and account screenshots -------------------------------------
+balance.png
+balance_small.jpg
+
+# --- Python ---------------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+
+# --- Versioned backups ----------------------------------------------------
+# Superseded snapshots kept alongside the live file. Git is the version
+# history once this is a repository.
+*.PRE-*
+
+# --- Runtime output -------------------------------------------------------
+logs/
+judge_queue/
+
+# --- Vendored installers --------------------------------------------------
+KrakenDesktopInstaller.msi
+
+# --- Personal financial position: never publish -----------------------------
+# holdings.txt is L's ACTUAL portfolio -- exact quantities and average buy
+# prices. TRADING_POLICY.json carries the locked book value and the sleeve
+# funding. Both were TRACKED until 2026-08-27, so they are still present in
+# the existing git history: untracking them protects every FUTURE commit and
+# does nothing about the past. Until that history is rewritten, any remote
+# the history that carried it was rewritten on 2026-09-05 (tools/purge_history.py).
+holdings.txt
+TRADING_POLICY.json
+launch/*/holdings.txt
+launch/*/TRADING_POLICY.json
+
+# --- Launcher reports: outputs, not inputs ----------------------------------
+# These are WRITTEN by the launchers into this folder. Tracking an output as
+# an input means every launch dirties the worktree -- the same deadlock as
+# hashing LAUNCH_CHECK.json in MANIFEST.sha256 (M48), one layer up. They are
+# already on verify_bundle.py's OUTPUTS list; this is the git half of it.
+# NB MANIFEST.sha256 stays TRACKED on purpose: it is a release reference, like
+# a lockfile, written deliberately at release time rather than on every run.
+DEPLOY_VERIFY.txt
+LAUNCH_CHECK.json
+NODE_RESTART.txt
+launch/*/NODE_RESTART.txt
+ONE_RUN.txt
+ONE_RUN_ONLY.txt
+ONE_RUN_cloud.txt
+ONE_RUN_pc.txt
+ONE_RETEST.txt
+ONE_RETEST_gates.txt
+ONE_UP.txt
+PROBE_WIN_CONNECT.txt
+GIT_SETUP.txt
+ONE_RUN_ci.txt
+GITHUB_PUSH.txt
+GH_LOGIN.txt
+GH_CODE.txt
+
+# --- Transfer scratch -------------------------------------------------------
+_stage/
+_to_delete/
+.fuse_hidden*
+
+# --- ADDED 2026-08-29 by preflight_publish.py's G4 -------------------------
+# G4 probes the ignore RULES with paths that do not exist (`git check-ignore`),
+# so it tests what the file would actually refuse rather than what it looks
+# like it refuses. On its first run it found these three uncovered, next to
+# rules that already covered *.key and *.db. An ignore file nobody has watched
+# refuse anything has not been tested (M31).
+*.pem
+*.p12
+*.pfx
+*.env
+.env.*
+.covenant-keys/
+**/.covenant-keys/
+secrets.*
+*_secret*
+*.seed
+*.mnemonic
+id_rsa*
+id_ed25519*
+
+# ...but a TEST ABOUT secrets contains none, and must be committed.
+#
+# THIS COST A RED CI FOR A DAY, 2026-08-29 to 2026-08-30. `*_secret*` above
+# silently swallowed test_e1_secret_egress.py -- the regression suite for the
+# credential-in-a-URL disclosure, whose every "secret" is a labelled fixture
+# like "AIzaSyD-EXAMPLE-not-a-real-key" and which makes no network call at
+# all. The file existed on the production PC, so the PC ran it and passed. It
+# was never committed, so CI checked out a tree without it, the runner
+# correctly reported it ABSENT, and every run went red from the commit that
+# added it to the suite table onward. Green before, red after, and no defect
+# anywhere in the code being tested.
+#
+# The rule matched on the NAME and not on the NATURE. A file called *_secret*
+# is as likely to be the check that no secret escapes as it is to be a secret
+# -- and the check is precisely the thing you most want in the repository.
+# The same error turned up the same day in a guard that flagged twelve
+# innocent files under ai_memory_system/ for containing "ai_memory": a
+# pattern that cannot tell a thing from a thing ABOUT it.
+#
+# Tests and probes are never credentials. If one ever does hold a real
+# secret, that is a defect in the test, to be fixed there -- not hidden by an
+# ignore rule that also hides the test's absence.
+!test_*secret*
+!probe_*secret*
+!test_*key*
+!test_*env*
+
+# --- corpus cache: reproducible, not committable --------------------------
+# fetch46.py rebuilds these 46 public-domain Gutenberg texts (~17 MB) from
+# claude_phil_CORPUS_MANIFEST.json. Keeping them locally is what makes the
+# semantic model's vocabulary reproducible -- the model file's own
+# `supersedes` block records an earlier model whose source is simply GONE, and
+# weights nobody can rebuild are weights nobody can check. Committing them is a
+# different question: they are re-fetchable from the manifest, so the manifest
+# is the artifact and these are the cache.
+docs/semantic/books/
+**/books/
+*.pkl
+tokens.pkl
+space_mc*.pkl
+
+# --- exchange credentials and the balances they read ----------------------
+# kraken_balance.py and coinbase_balance.py both REFUSE to read a credential
+# from inside this folder -- that is the real control and it is in the code.
+# These rules are the second layer: if one ever lands here by accident, git
+# must not be the thing that publishes it. Defence in depth, not a substitute.
+#
+# The *_balance.txt files are not credentials. They are HOLDINGS -- what you
+# own and how much -- which is nobody's business in a public repository, and
+# the reason those scripts write them here at all is so Claude can read them
+# WITHOUT the key. That argument stops working the moment they are pushed.
+.kraken/
+.coinbase/
+cdp_api_key.json
+*_api_key.json
+kraken_balance.txt
+coinbase_balance.txt
+*_balance.txt
+# Same data, machine-readable, written by the same two scripts for
+# sync_holdings.py. It is HOLDINGS -- it must not be published either.
+*_balance.json
+
+# --- trader runtime config ------------------------------------------------
+# trader_config.json carries `armed`. It is per-operator runtime state, and
+# committing it could publish an armed configuration or, worse, arm a fresh
+# clone by accident. covenant_trader.py rewrites a DISARMED default whenever
+# the file is absent, so ignoring it fails in the safe direction.
+trader_config.json
+TRADER_HALT
+# The scheduled run's log: portfolio totals, position sizes, orders placed.
+# That is holdings by another name, and holdings are not published.
+trader_log.txt
+
+# restore-point snapshots of unlanded candidates -- never source
+PRE-LAND-*/
+pending-*.BACKUP-*/
+
+# --- The private record: never publishable, by rule not by habit ----------
+# CONSTITUTION.md II.4 says the private corpus is never published, in whole or
+# in part, for any reason -- including a reason that seems excellent at the
+# time. It names people who did not consent to being recorded and it carries
+# one person's medical detail. Only its FINGERPRINT is published, in
+# docs/SUCCESSION_ANCHORS.md.
+#
+# Until 2026-08-30 that rule was kept by remembering it. redundancy.py's
+# principle check pointed out that nothing enforced it: the corpus lives
+# outside the repository, so it had never been tracked, and "has not happened"
+# had been standing in for "cannot happen". One stray copy into the tree is
+# the whole rule gone, and it would be gone irreversibly -- a published git
+# history cannot be unpublished.
+#
+# NOTE what is NOT ignored: ai_memory_system/ is the SOFTWARE and is public on
+# purpose. The store is ai_memory/. One is code about the record; the other is
+# the record. A pattern that cannot tell them apart is worse than none.
+ai_memory/
+ai_memory_backups/
+covenant-memory-backup/
+.covenant-keys/
+audit.jsonl
+guard_state.json
+
+# --- trade history read from the venue's own site (2026-09-02) -------------
+# coinbase_history*.csv is L's ACTUAL transaction history, transcribed from
+# coinbase.com/transactions in his own logged-in browser. It is holdings by
+# another name -- every buy, sell and receipt with dates -- and is not published.
+coinbase_history*.csv
+*_history.csv
+
+# --- private working folder (2026-09-02) ------------------------------------
+# Strategy notes that name L's actual positions, and anything else that is
+# holdings by another name. Nothing under private/ is published.
+private/
+
+# covenant_route.py's local-judge ledger: state, appended per call
+ops/judge_route.log
+
+# covenant_chat.py transcripts and the covenant's own memory: private conversations
+ops/chat/
+ops/gemini.log
+
+# 2026-09-03: covenant_distill.py keeps a REFUSED candidate here for inspection; the model in use is fallback_model.json
+fallback_model.candidate.json
+fallback_model_2.candidate.json
+
+# 2026-09-03: holdings.txt is ignored, but its dated backups were not, and a
+# `git add -A` committed two of them. The portfolio is the one thing this file
+# exists to keep out (CONSTITUTION II.4), so the pattern is ignored too.
+holdings.txt.bak-*
+*.bak-2*
+# session residue that is regenerated by a run, never a record
+C2_RESULT.txt
+ONE_RUN_stdout.txt
+
+# 2026-09-04: covenant_study.py caches ~14 MB of public-domain text here
+private/study/
+
+# 2026-09-04: ONE_RUN.txt was ignored and ONE_SWEEP.txt was not, so the sweep
+# transcript sat as permanent untracked noise in every `git status`. Both are
+# generated by covenant_one.py and read back by launch_check's G12 and
+# readme_totals.py; both are outputs.
+ONE_SWEEP.txt
+
+# The student audit trail (covenant_judge_defer.AUDIT_PATH). It records what
+# the gate cleared or refused, and it holds whatever any submitter sent to
+# the node -- which is not this operator's content to publish. The public
+# half of the record is the XRPL commitment, not this.
+judged_by_student.jsonl
+
+# The local half of the verdict corpus (covenant_judge_defer.LIVE_VERDICTS,
+# 2026-09-11). ops/verdicts.jsonl is TRACKED and this repository is public, so
+# the split is by source: only a source known to be shareable reaches the
+# tracked ledger, and a verdict on a LIVE transaction -- which carries the
+# transaction text -- lands here instead. The student loses nothing;
+# covenant_distill.corpus_paths() reads both, so this machine learns from all
+# of it while the repository carries only what is not the submitter's to
+# publish. Same reasoning as the entry above. Pinned by test_a91.
+ops/verdicts_live.jsonl
+# Its twin for rejected rows (2026-09-26, "protect operation security in all we
+# do by default"): the teacher queue's rows are his conversations and his phone's
+# AI screens, never a shareable source. Pinned by TQ1f.
+ops/distill_rejected_live.jsonl
+# Runtime state that was untracked but NOT ignored, so one `git add -A` would have
+# published it (the 2026-09-26 OPSEC sweep): heal.jsonl carries the phone's and the
+# PC's tailnet addresses; the rest are this machine's own state.
+ops/heal.jsonl
+ops/immune.jsonl
+ops/own_work_state.json
+ops/pause/
+# Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
+# and covenant_prod.bat alike, so neither public file carries the address.
+ops/local_peers.txt
+# The pre-push guard's record of pushes let through on his say (masked values only).
+ops/opsec_overrides.jsonl
+
+# The operator's standing decision about the ethics quorum (2026-09-11). This
+# repository is public and is meant to be read as GUIDANCE, and a policy file
+# is one operator's ANSWER -- it also carried his own words in decided_by.
+# ops/quorum_policy.example.json is shipped in its place: same keys, the same
+# reasoning about what each one costs, and no answer filled in. The code
+# already treats absence as valid (covenant_judge_defer.apply_policy:101,
+# "if not p: return ''"), which is exactly what a fresh clone gets.
+ops/quorum_policy.json
+# the day's plan carries the money posture; the approvals and signers are the operator's
+ops/daily_plan/
+ops/daily_approvals.jsonl
+ops/daily_plan_signers.json
+ops/phone_checkins.jsonl
+# the newest phone-app build, fetched from the operator's private repository
+ops/app/
+# sealed mail (2026-09-13): the blocks, the plaintext ledger, the opened-nonce ledger
+ops/sealed_mail/
+ops/sealed_mail.log
+ops/sealed_mail_seen.json
+# AI-consult ledger (2026-09-14): bounded, judged exchanges with the other AI apps
+ops/ai_consult.jsonl
+# A376b: each consult answer kept whole, beside the ledger (the ledger holds 800 characters and a hash)
+ops/ai_consult_answers/
+# the phone actuator/brain's learning, synced (2026-09-14)
+ops/actuator_learning.jsonl
+# phase 3 (2026-09-13): the PC's reduce-only guide to the phone brain, its log, the card library, the nightly digest
+ops/actuator_guide.json
+ops/actuator_guide.log
+ops/actuator_library/
+ops/ACTUATOR_DIGEST.md
+
+# THE PRIVATE PHONE APP, checked out here as its own repository (A107, 2026-09-12).
+# Found untracked-but-not-ignored on 2026-09-14: `git status` listed `?? mobile/app/`,
+# so one `git add -A` in this PUBLIC repository would have committed the app the
+# operator deliberately made private -- and a second copy of the core with it, which
+# test_p18 and M5.4 both forbid. The workflow checks this path out itself, so ignoring
+# it here costs nothing and closes the accident.
+mobile/app/
+
+# Delivery folder holding duplicate copies of suites that already live at the
+# repo root (breakout_ledger.py, test_breakout_ledger.py, test_paper_run.py are
+# the registered ones -- covenant_one.py:297-298). Committing the copies would
+# manufacture the "superseded copies" ambiguity covenant_selfaudit already tracks.
+Claude outputs/
+ops/rule5_backfill_ledger.jsonl
+
+# --- diagnostic captures: outputs, not deliverables (2026-09-11) -----------
+# Sixteen one-machine captures were tracked on a public main that is meant to
+# be read as guidance. They are not a judgement call: verify_bundle.py:73-79
+# ALREADY lists every one of them as a generated output to exclude from
+# hashing, for the reason stated there -- a launcher that writes a report into
+# this folder would otherwise guarantee the next run reports "changed". So the
+# repository was publishing files its own verifier classifies as noise.
+# Checked before removal: none is named in MANIFEST.sha256, and the only one
+# named by code is judge_bench_out.txt, by judge_bench.py -- which WRITES it.
+# The generators (pc_check.bat, AG_LEAN_MEASURE.bat, AD_DIAG_PORTS.bat ...)
+# all stay; a second operator runs them and gets their own machine's answers.
+# pc_report.txt mattered most: exact CPU SKU, RAM, disk size and free space,
+# GPU driver build and the power-scheme GUID of this one PC.
+CLEANUP.txt
+FIT_CHECK.txt
+FREE_RAM.txt
+INTEGRATE_RESULTS.txt
+INTEGRATE_RESULTS2.txt
+LEAN_MEASURE.txt
+PORT_DIAG.txt
+PORT_PICK.txt
+RETEST_RESULTS.txt
+STRAY_FIX.txt
+TOPMEM.txt
+diag_out.txt
+go_out.txt
+judge_bench_out.txt
+preflight_out.txt
+pc_report.txt
+
+# 2026-09-12: Google platform-tools (adb) fetched by mobile/usb_link.py; a binary, not the delivery
+tools/platform-tools/
+
+# Transient working files written by scripts and sweeps into ops/ during a
+# session -- rolling-restart transcripts, sweep captures, one-off probes.
+# Added 2026-09-14 after a rolling restart and two sweeps left six of them
+# sitting untracked next to the real records, which is how something that
+# should never have been committed eventually is (the A85 lesson).
+ops/_*
+
+# local open-source model runtime and weights (2026-09-19): never tracked, never shipped
+tools/llama/
+models/
+*.gguf
+ops/model_server.json
+logs/model_server.log
+# A348b (2026-10-14): the last use of the model by any process (its mtime), read by every idle watcher
+ops/model_last_use.stamp
+tools/sd/
+*.safetensors
+ops/images/
+
+# context_pack.py output: a paste for a Claude with no tools; a record, never shipped
+ops/CONTEXT_PACK.txt
+
+# 2026-09-21 (A166/A168/A169): his conversations, the AI-app chat lines the phone carries, what the PC says to him, and what free sent -- records of a person, never shipped
+ops/teacher_queue.jsonl
+ops/teacher_queue.state.json
+# the queue's twin for rows marked private: answered on this PC, withheld from the public panel (A263)
+ops/teacher_queue.withheld.jsonl
+ops/contact_outbox.jsonl
+ops/tetsu_persona.json
+# his whole revision history, append-only, and any persona file set aside unreadable (A233, 2026-09-26)
+ops/tetsu_persona_history.jsonl
+ops/tetsu_persona.json.unreadable-*
+# A348g: the questions A341 moved out of his register, written beside it -- his words and the operator's; was neither tracked nor ignored
+ops/tetsu_register_retired.jsonl
+ops/tetsu_blocks.json
+ops/security_probe_ledger.jsonl
+ops/security_probes_observed.json
+ops/security_probe_reviews.json
+ops/reconnect_state.json
+ops/succession.private.json
+ops/succession_state.json
+ops/SUCCESSION_LETTER.txt
+ops/code_consensus.jsonl
+ops/tetsu_strategy.jsonl
+ops/tetsu_live.jsonl
+ops/tetsu_immunity.jsonl
+ops/tetsu_about_him.json
+ops/refine_loop_state.json
+ops/mycelium.jsonl
+# A374: a spore relay's folder, when one runs on this PC (sealed blocks; kept, never published)
+ops/spore_relay/
+ops/security_threats.jsonl
+ops/contact_state.json
+ops/ambassador_sends.jsonl
+# A270 (2026-10-06): free's round lock and Tetsu's per-round decisions, runtime records beside the sends ledger
+ops/ambassador_round.lock
+ops/tetsu_moltbook_updates.jsonl
+# A282 (2026-10-06): one line per real ask of the model, and its rotation
+ops/model_asks.jsonl
+ops/model_asks.jsonl.prev
+# A294 (2026-10-07): the threefold witness's readings and its first-seen gaps
+ops/threefold_witness.json
+ops/public_identity.json
+coinbase_balance.prev.json
+
+# A211b (2026-09-21): the assistant's `git add -A` swept its own scratch
+# transcripts into this PUBLIC repo in 382ffb7. They carry tailnet addresses and
+# local paths and were never deliverables -- the same class as ONE_RUN.txt above,
+# simply not on the list. No key or balance was in them (scanned); they are out
+# of the tree at HEAD and the pattern stops the next one.
+SWEEP_RUN*.txt
+SWEEP_END.txt
+SWEEP_HYST.txt
+SWEEP_RESULTS.txt
+C4_RUN.txt
+CLAIMS_RECHECK.txt
+H2_RUN.txt
+ONE_CHECK.txt
+ROLLING_RESTART_*.txt
+ops/sweep_heal_last.txt
+# operational ledgers: what the mesh did and what Tetsu read are his, not public
+ops/highway.jsonl
+ops/web_reads.jsonl
+# covenant_daily (his directive, 2026-09-28): Tetsu's daily maintenance records -- operational, his
+ops/tetsu_daily.jsonl
+ops/TETSU_DAILY.md
+ops/tetsu_daily_latest.json
+ops/tetsu_last_verified.json
+ops/tetsu_directive_exam.jsonl
+# covenant_tetsu_crawl (A237, 2026-09-27): what he searched and crawled, per day, for the cap and the record.
+ops/tetsu_crawl.jsonl
+ops/ambassador_rate.json
+
+# the watchdog pass's last sensed states (2026-09-25), read by the PC 3D page
+ops/highway_last_sense.json
+# this PC's last reading of the public CI (A232): the detector's throttle and cache
+ops/public_ci.json
+ops/phone_ci.json
+# Tetsu's practice record (his, like his workshop): every attempt, lesson and night
+ops/tetsu_practice.jsonl
+
+# Leg-influence tombstone ledger + the rows a reversal moves aside (runtime, like the practice record)
+ops/leg_influence.jsonl
+# Exec-guard SHADOW observation log (2026-10-26): what a capability guard WOULD decide per act; runtime,
+# observe-only, never pushed (it mentions targets/urls from live acts).
+ops/exec_guard_shadow.jsonl
+# Leviathan read-only quarantine (2026-10-26): others' public posts harvested from the venue, held
+# locally for the judge + a person; never republished into this public repo (exposure hygiene).
+ops/leviathan_quarantine.jsonl
+ops/leviathan_state.json
+*.leg-reversed
+
+# covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
+*.results.json
+
+# covenant_earn (A222, 2026-09-25): his grant, the money ledger and the per-payer
+# trial files are private; the example grant is shipped in their place.
+ops/earn_grant.json
+ops/earn_ledger.jsonl
+ops/earn_trials/
+ops/earn_sanctions.json
+ops/earn_funnel.json
+# A349 M4 (2026-10-14): the 24-hour re-delivery copies (buyers' results), kept on disk so a restart never charges twice
+ops/earn_results.jsonl
+ops/earn_results.jsonl.tmp
+ops/earn_results.jsonl.retired.jsonl
+
+# Syncthing (2026-09-25): the binary and its config/keys never tracked
+tools/syncthing/
+ops/syncthing/
+ops/cloud_check.json
+ops/cloud_manifest.json
+ops/cloud_pc_qr.png
+ops/earn_business_grant.json
+ops/earn_business.jsonl
+
+# covenant_tetsu_hands (A226, 2026-09-26): his workshop and his proposals are his, not the delivery's.
+ops/tetsu_workshop/
+ops/tetsu_workshop_history/
+ops/tetsu_hands.jsonl
+ops/tetsu_proposals/
+
+# Outside-labelled sets (A327): the raw downloads and the converted sets are third-party data, fetched by URL
+# and checked by sha256 (eval/outside/SOURCES.md); only the per-item results (ids, not texts) are committed.
+eval/outside/raw/
+eval/outside/*.jsonl
+eval/models/
+eval/cache/
+eval/loop/*/cache/
+ops/receipt_signer.key
+ops/tetsu_reflex.json

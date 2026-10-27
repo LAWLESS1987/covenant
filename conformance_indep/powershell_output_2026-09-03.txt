@@ -1,0 +1,35 @@
+SELFTEST serializer/sha256/ordinal-sort: ok
+spec: covenant-conformance-v1
+spec file: C:\Users\Lawre\AppData\Local\Temp\claude\C--Users-Lawre-covenant\5b00e25a-e3a7-45ea-86ab-aa4900b484f6\scratchpad\conformance_indep\CONFORMANCE_SPEC.json
+vectors: 23
+
+[MATCH]    S.clean.distinct-root
+[MATCH]    S.clean.is-reachable
+[MATCH]    S.compose.agree
+[MATCH]    S.compose.height-invariant
+[MATCH]    S.divergence.survives-climb
+[MATCH]    S.divergences.split-counts-every-party
+[MATCH]    S.divergences.two-levels
+[MATCH]    S.divergences.two-outliers-one-level
+[MATCH]    S.quorum.default-scales-at-a-level
+[MATCH]    S.silence.two-kinds
+[MATCH]    S.silence.upward
+[MATCH]    S.unproven.speaks-silence
+[MATCH]    T.agree.all
+[MATCH]    T.agree.one-silent
+[MATCH]    T.diverged.one-outlier
+[MATCH]    T.diverged.plurality-without-majority
+[MATCH]    T.diverged.reference-is-tallied
+[MATCH]    T.diverged.three-way
+[MATCH]    T.diverged.tie-for-top
+[MATCH]    T.quorum.default-met-at-five
+[MATCH]    T.quorum.default-scales-with-witnesses
+[MATCH]    T.quorum.raised
+[MATCH]    T.unproven.too-few
+
+vectors_matching: 23 / 23
+mismatches: 0
+root_computed  (sha256 over MY outputs):            0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef
+root_published (from the spec file):                0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef
+roots_match: true
+diag: root over the SPEC's own expected values:     0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef  (equals root_published iff my hashing rule + serializer reproduce the published root; independent of op semantics)

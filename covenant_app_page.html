@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Covenant Console</title>
+<!--
+  This page loads NOTHING from anywhere. No fonts, no scripts, no images.
+  The server sends: default-src 'none'; style-src 'unsafe-inline';
+  script-src 'unsafe-inline'; connect-src 'self'  -- and this file is written
+  to be exactly that. If a future edit adds a <link> or a CDN <script>, the
+  browser will refuse it and the page will silently lose a feature. That is
+  the intended outcome, not a bug to work around by widening the header.
+-->
+<style>
+  :root{
+    --ground:#EDF0EE; --panel:#F7F9F7; --sunk:#E3E8E4;
+    --rule:#C9D1CB; --rule-soft:#DDE3DE;
+    --text:#141B18; --text-dim:#4C5A54; --text-faint:#77857E;
+    --brass:#8A6A28; --brass-soft:#EFE6D2;
+    --pass:#2F7358; --pass-soft:#DCEAE2;
+    --blocked:#A83E29; --blocked-soft:#F4E0DA;
+    --unknown:#5B5280; --unknown-soft:#E4E1EE;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0F1417; --panel:#151C1F; --sunk:#111819;
+      --rule:#2A3538; --rule-soft:#1E282B;
+      --text:#DCE4E1; --text-dim:#94A5A0; --text-faint:#6B7C77;
+      --brass:#C9A25A; --brass-soft:#2C2416;
+      --pass:#5FB392; --pass-soft:#162A23;
+      --blocked:#E0765D; --blocked-soft:#2E1A16;
+      --unknown:#9E93C4; --unknown-soft:#211E2E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0F1417; --panel:#151C1F; --sunk:#111819;
+    --rule:#2A3538; --rule-soft:#1E282B;
+    --text:#DCE4E1; --text-dim:#94A5A0; --text-faint:#6B7C77;
+    --brass:#C9A25A; --brass-soft:#2C2416;
+    --pass:#5FB392; --pass-soft:#162A23;
+    --blocked:#E0765D; --blocked-soft:#2E1A16;
+    --unknown:#9E93C4; --unknown-soft:#211E2E;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--ground); color:var(--text);
+    font-family:"Segoe UI","Helvetica Neue",Arial,system-ui,sans-serif;
+    font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px 90px}
+  .mono,code,.hash,.tail,input,select,td.n{
+    font-family:"Cascadia Mono",Consolas,"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-variant-numeric:tabular-nums;
+  }
+  .lab{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint)}
+
+  /* ---------------- masthead ---------------- */
+  header{border-bottom:1px solid var(--rule);padding:30px 0 0}
+  .top{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+  h1{font-size:27px;font-weight:700;letter-spacing:-.01em;margin:0}
+  h1 .sub{color:var(--brass);font-weight:500}
+  .pulse{width:9px;height:9px;display:inline-block;background:var(--unknown);flex:0 0 auto;
+    align-self:center;animation:beat 2.5s ease-in-out infinite}
+  .pulse.ok{background:var(--pass)} .pulse.bad{background:var(--blocked)}
+  @keyframes beat{0%,100%{opacity:1}50%{opacity:.28}}
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+  .idline{margin:12px 0 0;font-size:12.5px;color:var(--text-dim);
+    display:flex;gap:8px 20px;flex-wrap:wrap;padding-bottom:16px}
+  .idline b{color:var(--text);font-weight:600}
+  .hash{color:var(--brass);font-weight:600}
+
+  .banner{margin:14px 0 0;padding:11px 14px;border-left:3px solid var(--brass);
+    background:var(--brass-soft);font-size:13px;color:var(--text-dim)}
+  .banner b{color:var(--text)}
+
+  /* ---------------- section ---------------- */
+  section{padding:26px 0 0;border-bottom:1px solid var(--rule-soft)}
+  section:last-of-type{border-bottom:0}
+  h2{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--text-faint);margin:0 0 14px;display:flex;gap:12px;align-items:baseline}
+  h2 .note{font-size:11px;letter-spacing:.04em;text-transform:none;font-weight:400;color:var(--text-faint)}
+
+  /* ---------------- convergence strip ---------------- */
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:1px;background:var(--rule);border:1px solid var(--rule);margin-bottom:8px}
+  .cell{background:var(--panel);padding:12px 14px}
+  .cell .v{font-size:19px;font-weight:600;margin-top:3px;
+    font-family:"Cascadia Mono",Consolas,ui-monospace,monospace}
+  .cell.ok .v{color:var(--pass)} .cell.bad .v{color:var(--blocked)}
+  .cell.unk .v{color:var(--unknown)} .cell.brass .v{color:var(--brass)}
+
+  /* ---------------- node tiles ---------------- */
+  .nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .node{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--rule);padding:14px 16px}
+  .node.up{border-left-color:var(--pass)}
+  .node.down{border-left-color:var(--blocked)}
+  .node.warn{border-left-color:var(--brass)}
+  .nhead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .nid{font-size:22px;font-weight:700;letter-spacing:.02em}
+  .nport{font-size:12.5px;color:var(--text-faint)}
+  .nstate{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+  .node.up .nstate{color:var(--pass)} .node.down .nstate{color:var(--blocked)}
+  .node.warn .nstate{color:var(--brass)}
+  table.kv{width:100%;border-collapse:collapse;font-size:13px}
+  table.kv td{padding:3px 0;vertical-align:top;border-bottom:1px solid var(--rule-soft)}
+  table.kv tr:last-child td{border-bottom:0}
+  table.kv td.k{color:var(--text-faint);width:44%;white-space:nowrap}
+  table.kv td.n{text-align:right;font-size:12.5px}
+  .flag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.09em;
+    text-transform:uppercase;padding:2px 6px;margin:2px 4px 0 0}
+  .f-ok{background:var(--pass-soft);color:var(--pass)}
+  .f-bad{background:var(--blocked-soft);color:var(--blocked)}
+  .f-unk{background:var(--unknown-soft);color:var(--unknown)}
+  .f-brass{background:var(--brass-soft);color:var(--brass)}
+  .warns{margin:10px 0 0;padding:0;list-style:none}
+  .warns li{font-size:12px;color:var(--text-dim);padding:5px 0 5px 10px;
+    border-left:2px solid var(--brass);margin-bottom:4px;background:var(--sunk)}
+
+  /* ---------------- watchdog ---------------- */
+  .wd{background:var(--panel);border:1px solid var(--rule);padding:14px 16px}
+  .wdline{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+  .age{font-size:26px;font-weight:600;font-family:"Cascadia Mono",Consolas,monospace}
+  .age.ok{color:var(--pass)} .age.bad{color:var(--blocked)} .age.unk{color:var(--unknown)}
+  .wdlast{font-size:12px;color:var(--text-dim);word-break:break-word}
+  .alerts{margin:10px 0 0;padding:0;list-style:none}
+  .alerts li{font-size:12px;padding:6px 10px;background:var(--blocked-soft);
+    color:var(--blocked);margin-bottom:4px;word-break:break-word}
+
+  /* ---------------- review queue ---------------- */
+  .rq{display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}
+  .rq .big{font-size:30px;font-weight:600;font-family:"Cascadia Mono",Consolas,monospace}
+  .rq .big.ok{color:var(--pass)} .rq .big.bad{color:var(--blocked)}
+  .rq .lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+  .owed{margin-top:10px;padding:11px 13px;border-left:3px solid var(--blocked);
+    background:var(--blocked-soft);color:var(--blocked);font-size:13px}
+  .owed.calm{border-left-color:var(--brass);background:var(--brass-soft);color:var(--text-dim)}
+  .scripts{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+
+  /* ---------------- actions ---------------- */
+  .acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+  .act{background:var(--panel);border:1px solid var(--rule);
+    border-left:3px solid var(--rule);padding:12px 14px;
+    display:flex;flex-direction:column;gap:8px}
+  .act.read{border-left-color:var(--pass)}
+  .act.write{border-left-color:var(--brass)}
+  .act.system{border-left-color:var(--blocked)}
+  .act.long{border-left-color:var(--unknown)}
+  button.danger{border-color:var(--blocked);color:var(--blocked)}
+  button.danger:hover:not(:disabled){background:var(--blocked-soft)}
+  .act .an{font-size:14px;font-weight:600;display:flex;gap:10px;
+    align-items:baseline;justify-content:space-between}
+  .act .an .flag{margin:0;flex:0 0 auto;white-space:nowrap}
+  .act .ad{font-size:12px;color:var(--text-dim);flex:1}
+  .act .as{font-size:11.5px;font-family:"Cascadia Mono",Consolas,monospace;color:var(--text-faint)}
+  button{
+    font:inherit;font-size:13px;font-weight:600;letter-spacing:.02em;
+    padding:8px 14px;border:1px solid var(--brass);background:transparent;
+    color:var(--brass);cursor:pointer;border-radius:0;transition:background .12s;
+  }
+  button:hover:not(:disabled){background:var(--brass-soft)}
+  button:disabled{border-color:var(--rule);color:var(--text-faint);cursor:not-allowed;opacity:.75}
+  button.go{background:var(--brass);color:var(--ground);border-color:var(--brass)}
+  button.go:hover:not(:disabled){opacity:.86;background:var(--brass)}
+  .running{font-size:11.5px;color:var(--brass);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+  .rc-ok{color:var(--pass)} .rc-bad{color:var(--blocked)}
+  .tail{white-space:pre-wrap;font-size:11.5px;background:var(--sunk);color:var(--text-dim);
+    padding:10px;margin-top:8px;max-height:230px;overflow:auto;border-left:2px solid var(--rule)}
+
+  /* ---------------- transact ---------------- */
+  .tx{background:var(--panel);border:1px solid var(--rule);padding:16px}
+  .txrow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .fld{display:flex;flex-direction:column;gap:4px}
+  .fld label{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+  input,select{
+    font-size:14px;padding:7px 9px;background:var(--ground);color:var(--text);
+    border:1px solid var(--rule);border-radius:0;
+  }
+  input:focus,select:focus{outline:2px solid var(--brass);outline-offset:-2px}
+  input.memo{min-width:230px;flex:1}
+  .cost{margin-top:12px;padding:10px 12px;background:var(--sunk);
+    border-left:3px solid var(--brass);font-size:12.5px;color:var(--text-dim)}
+  .cost b{color:var(--text)}
+  .txout{margin-top:12px;font-size:12.5px}
+  .txout .head{font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:11px;margin-bottom:6px}
+  .waiting{color:var(--brass);font-weight:600}
+
+  footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--rule);
+    font-size:12px;color:var(--text-faint)}
+  footer ol{margin:8px 0 0;padding-left:20px}
+  footer li{margin-bottom:5px}
+  .dead{padding:14px;background:var(--blocked-soft);color:var(--blocked);
+    font-size:13.5px;font-weight:600;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="top">
+    <span class="pulse" id="pulse"></span>
+    <h1>Covenant <span class="sub">console</span></h1>
+    <span class="lab" id="actmode">&nbsp;</span>
+  </div>
+  <div class="idline" id="idline"></div>
+</header>
+
+<div id="dead"></div>
+
+<section>
+  <h2>The three claims <span class="note">project &ne; disk &ne; running process (M38)</span></h2>
+  <div class="strip" id="strip"></div>
+</section>
+
+<section>
+  <h2>Nodes <span class="note">from /health &mdash; height never comes from /chain, which is rate-limited to 20 reads per 60s (M11)</span></h2>
+  <div class="nodes" id="nodes"></div>
+</section>
+
+<section>
+  <h2>Watchdog <span class="note">a gap longer than its own stated bound reads as death, not calm (P16)</span></h2>
+  <div class="wd" id="wd"></div>
+</section>
+
+<section id="reviewsec" style="display:none">
+  <h2>Held, not judged <span class="note">the ethics model could not read these &mdash; it has alleged nothing, and anyone competent may clear them</span></h2>
+  <div class="wd" id="review"></div>
+</section>
+
+<section>
+  <h2>Actions <span class="note">a fixed allowlist of scripts already in this folder &mdash; never a command string</span></h2>
+  <div id="actgate"></div>
+  <div class="acts" id="acts"></div>
+</section>
+
+<section>
+  <h2>Transact <span class="note">signed in the server process; the key is never read into this page</span></h2>
+  <div class="tx" id="tx"></div>
+</section>
+
+<footer>
+  <span class="lab">Four rules, structural</span>
+  <ol>
+    <li>Loopback only. <code>BIND_HOST</code> is <code>127.0.0.1</code>, <code>main()</code> refuses to start otherwise, and every request is checked again at the handler. No environment variable moves it.</li>
+    <li>Actions are a fixed allowlist of scripts in this folder. Nothing from a request reaches a shell, an argument list or a path.</li>
+    <li>Actions are off until <code>COVENANT_APP_ACTIONS=1</code> exactly. No value of it relaxes anything else.</li>
+    <li>The signing key is read at the moment of signing, used, and dropped &mdash; never logged, never in a response, never in this page.</li>
+  </ol>
+</footer>
+
+</div>
+
+<script>
+"use strict";
+var S = null, txBusy = false, txStarted = 0, lastOk = 0;
+
+function esc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+function num(v){ return (v === null || v === undefined) ? "—" : String(v); }
+function dur(s){
+  if (s === null || s === undefined) return "—";
+  if (s < 90) return s + "s";
+  if (s < 5400) return Math.floor(s/60) + "m " + (s%60) + "s";
+  return Math.floor(s/3600) + "h " + Math.floor((s%3600)/60) + "m";
+}
+
+/* ---------------------------------------------------------------- masthead */
+function renderHead(st){
+  var a = st.app;
+  document.getElementById("idline").innerHTML =
+    '<span>console <span class="hash">' + esc(a.sha) + '</span> &middot; ' + num(a.lines) + ' lines</span>' +
+    '<span>bound <b class="mono">' + esc(a.bind) + '</b></span>' +
+    '<span>up ' + dur(a.uptime_s) + '</span>' +
+    '<span>heartbeat every ' + a.heartbeat_s + 's to logs/app.log</span>' +
+    '<span class="mono">' + esc(st.when) + '</span>';
+  var am = document.getElementById("actmode");
+  am.textContent = a.actions_enabled ? "actions armed" : "read-only";
+  am.style.color = a.actions_enabled ? "var(--brass)" : "var(--text-faint)";
+
+  var up = st.nodes.filter(function(n){ return n.up; }).length;
+  var p = document.getElementById("pulse");
+  p.className = "pulse " + (up === st.nodes.length && st.converged ? "ok" : up === 0 ? "bad" : "");
+}
+
+/* ------------------------------------------------------------ three claims */
+function renderStrip(st){
+  var up = st.nodes.filter(function(n){ return n.up; });
+  var agree = up.filter(function(n){ return n.agrees_with_disk; }).length;
+  var cells = [
+    ["Disk source", st.disk_source || "unreadable", st.disk_source ? "brass" : "unk"],
+    ["Nodes answering", up.length + " of " + st.nodes.length,
+      up.length === st.nodes.length ? "ok" : up.length === 0 ? "bad" : "unk"],
+    ["Running = disk", agree + " of " + up.length,
+      up.length && agree === up.length ? "ok" : up.length ? "bad" : "unk"],
+    ["Chain height", st.heights.length ? (st.converged ? st.heights[0] : st.heights.join(" / ")) : "—",
+      st.heights.length === 0 ? "unk" : st.converged ? "ok" : "bad"],
+    ["Converged", st.heights.length === 0 ? "unknown" : st.converged ? "yes" : "SPLIT",
+      st.heights.length === 0 ? "unk" : st.converged ? "ok" : "bad"]
+  ];
+  document.getElementById("strip").innerHTML = cells.map(function(c){
+    return '<div class="cell ' + c[2] + '"><div class="lab">' + esc(c[0]) +
+           '</div><div class="v">' + esc(c[1]) + '</div></div>';
+  }).join("");
+}
+
+/* ------------------------------------------------------------- node tiles */
+function flag(text, cls){ return '<span class="flag ' + cls + '">' + esc(text) + '</span>'; }
+
+function renderNodes(st){
+  document.getElementById("nodes").innerHTML = st.nodes.map(function(n){
+    var h = n.health || {};
+    if (!n.up){
+      return '<div class="node down"><div class="nhead"><span class="nid">' + esc(n.id) +
+        '</span><span class="nport mono">:' + n.port + '</span>' +
+        '<span class="nstate">no answer</span></div>' +
+        '<table class="kv"><tr><td class="k">error</td><td class="n">' + esc(n.error || "unreachable") +
+        '</td></tr><tr><td class="k">what this means</td><td class="n">process down, or still booting</td></tr></table></div>';
+    }
+    var deg = !!h.degraded, crisis = !!h.crisis_mode;
+    var cls = crisis || !n.agrees_with_disk ? "warn" : deg ? "warn" : "up";
+    var sub = h.substrate || {}, q = h.quorum || {}, mesh = h.mesh || {};
+    var flags = "";
+    flags += n.agrees_with_disk ? flag("source = disk", "f-ok")
+                                : flag("source ≠ disk", "f-bad");
+    flags += deg ? flag("degraded", "f-bad") : flag("healthy", "f-ok");
+    if (crisis) flags += flag("crisis mode", "f-bad");
+    if (h.spike_detected) flags += flag("spike", "f-brass");
+    if (h.judge_keyless) flags += flag("judge keyless", "f-bad");
+    if (h.judge_insecure) flags += flag("judge insecure", "f-bad");
+    if (q.is_quorum) flags += flag(q.diverse ? "quorum diverse" : "quorum not diverse",
+                                   q.diverse ? "f-ok" : "f-brass");
+    else flags += flag("single judge", "f-unk");
+    if (h.own_genesis) flags += flag("own genesis", "f-bad");
+
+    var kinds = (h.anomaly_kinds || []);
+    var perKind = n.anomalies || {};
+    var kindTxt = kinds.length
+      ? kinds.map(function(k){ var c = perKind[k]; return k + (c ? " ×" + c : ""); }).join(", ")
+      : "none";
+
+    var memTxt = "—";
+    if (sub.available_memory_mb !== null && sub.available_memory_mb !== undefined){
+      memTxt = sub.available_memory_mb + " MB free";
+      if (sub.judge_footprint_mb) memTxt += " / judge " + sub.judge_footprint_mb + " MB";
+    } else if (sub.unavailable) { memTxt = esc(sub.unavailable); }
+
+    var rows = [
+      ["version", esc(h.version || "?")],
+      ["source", '<span class="hash">' + esc(h.source_sha256 || "?") + '</span> &middot; ' + num(h.source_lines) + " lines"],
+      ["height", num(h.chain_height)],
+      ["peers", num(h.peers) + (mesh.tracked !== undefined ? " (mesh tracks " + mesh.tracked + ")" : "")],
+      ["pending tx", num(h.pending_transactions)],
+      ["judge", esc(h.judge || "?")],
+      ["alignment", h.alignment === null || h.alignment === undefined ? "—" : Number(h.alignment).toFixed(3)],
+      ["memory", memTxt],
+      ["anomalies", esc(kindTxt)],
+      ["wsgi", esc(h.wsgi || "?")]
+    ];
+    var warns = (h.warnings || []).map(function(w){
+      return '<li>' + esc(w) + '</li>';
+    }).join("");
+
+    return '<div class="node ' + cls + '">' +
+      '<div class="nhead"><span class="nid">' + esc(n.id) + '</span>' +
+      '<span class="nport mono">:' + n.port + '</span>' +
+      '<span class="nstate">' + (crisis ? "crisis" : deg ? "degraded" : "up") + '</span></div>' +
+      '<div>' + flags + '</div>' +
+      '<table class="kv" style="margin-top:9px">' + rows.map(function(r){
+        return '<tr><td class="k">' + r[0] + '</td><td class="n">' + r[1] + '</td></tr>';
+      }).join("") + '</table>' +
+      (warns ? '<ul class="warns">' + warns + '</ul>' : '') +
+      '</div>';
+  }).join("");
+}
+
+/* ---------------------------------------------------------------- watchdog */
+function renderWatchdog(st){
+  var w = st.watchdog, cls, txt;
+  if (w.age_s === null || w.age_s === undefined){
+    cls = "unk"; txt = "no log";
+  } else {
+    cls = w.age_s <= w.bound_s ? "ok" : "bad";
+    txt = dur(w.age_s);
+  }
+  var verdict = (w.age_s === null || w.age_s === undefined)
+    ? "logs/watchdog.log is not there — " + esc(w.error || "unreadable") +
+      ". Nothing is watching. This is UNKNOWN, not PASS."
+    : (w.age_s <= w.bound_s
+        ? "within its own " + w.bound_s + "s bound — alive"
+        : "STALE against its own " + w.bound_s + "s bound — the watchdog is not running");
+  document.getElementById("wd").innerHTML =
+    '<div class="wdline"><span class="age ' + cls + '">' + esc(txt) + '</span>' +
+    '<span style="font-size:13px;color:var(--text-dim)">' + verdict + '</span></div>' +
+    (w.last && !(w.alerts || []).some(function(a){ return a === w.last; })
+      ? '<div class="wdlast mono">' + esc(w.last) + '</div>' : '') +
+    (w.alerts && w.alerts.length
+      ? '<ul class="alerts">' + w.alerts.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join("") + '</ul>'
+      : '<div style="font-size:12px;color:var(--text-faint);margin-top:8px">no ALERT lines in the last 40</div>');
+}
+
+/* ----------------------------------------------------- the review queue */
+function renderReview(st){
+  var r = st.ethics_review, sec = document.getElementById("reviewsec");
+  // absent is not zero. Until a node reports the field at all, this panel
+  // stays hidden rather than claiming an empty queue -- "nobody is held" and
+  // "nobody is counting" are different claims and only one is good news.
+  if (!r){ sec.style.display = "none"; return; }
+  sec.style.display = "";
+  var over = r.overdue > 0;
+  document.getElementById("review").innerHTML =
+    '<div class="rq">' +
+      '<div><div class="lbl">held</div><div class="big ' + (r.open_holds ? "bad" : "ok") + '">' +
+        r.open_holds + '</div></div>' +
+      '<div><div class="lbl">past the bound</div><div class="big ' + (over ? "bad" : "ok") + '">' +
+        r.overdue + '</div></div>' +
+      '<div><div class="lbl">oldest</div><div class="big ' + (over ? "bad" : "") + '">' +
+        dur(r.oldest_hold_s) + '</div></div>' +
+      '<div><div class="lbl">bound</div><div class="big">' + dur(r.review_bound_s) + '</div></div>' +
+    '</div>' +
+    (Object.keys(r.by_script || {}).length
+      ? '<div class="scripts">' + Object.keys(r.by_script).sort(function(a,b){
+          return r.by_script[b] - r.by_script[a]; }).map(function(k){
+          return '<span class="flag f-unk">' + esc(k) + ' &times;' + r.by_script[k] + '</span>';
+        }).join("") + '</div>'
+      : '') +
+    (Object.keys(r.coverable || {}).length
+      ? '<div style="margin-top:12px"><div class="lbl">someone in the mesh can clear these</div>' +
+        Object.keys(r.coverable).sort().map(function(k){
+          return '<div class="mono" style="font-size:12.5px;color:var(--text-dim);padding:3px 0">' +
+            '<b style="color:var(--pass)">' + esc(k) + ' &times;' + r.coverable[k].holds + '</b> &nbsp;&rarr;&nbsp; ' +
+            esc(r.coverable[k].can_clear.join(", ")) + '</div>'; }).join("") + '</div>'
+      : '') +
+    (Object.keys(r.nobody_can_read || {}).length
+      ? '<div class="owed" style="margin-top:12px"><b>Nobody in this mesh can read ' +
+        Object.keys(r.nobody_can_read).sort().map(function(k){
+          return esc(k) + ' (' + r.nobody_can_read[k] + ')'; }).join(", ") + '.</b> ' +
+        'That is the network&rsquo;s debt rather than any one node&rsquo;s, and it is the ' +
+        'next language for somebody to fit.</div>'
+      : '') +
+    (r.cleared_unqualified
+      ? '<div class="owed" style="margin-top:12px"><b>' + r.cleared_unqualified +
+        ' of ' + r.cleared + ' released without reading.</b> Permitted, and counted ' +
+        'separately on purpose &mdash; a queue emptied by rubber stamps must not be ' +
+        'able to look like a queue that was read.</div>'
+      : '') +
+    (r.open_holds
+      ? '<div class="owed' + (over ? '' : ' calm') + '">' +
+        '<b>' + r.open_holds + ' transaction' + (r.open_holds === 1 ? '' : 's') +
+        ' stopped because this model could not read ' +
+        (r.open_holds === 1 ? 'it' : 'them') + '.</b> ' +
+        'Nothing has been alleged against any of them. They are waiting on anyone who ' +
+        'can read them &mdash; another node, another judge, or a person &mdash; and no ' +
+        'timeout will clear them, only someone deciding. ' +
+        (over ? 'The stated bound has passed.' : 'Still inside the stated bound.') +
+        '</div>'
+      : '<div class="owed calm">Nothing held. The scripts above are the ones this ' +
+        'judge has had to refuse before &mdash; the languages it is not yet able to serve.</div>');
+}
+
+/* ----------------------------------------------------------------- actions */
+function renderActions(st){
+  var on = st.app.actions_enabled;
+  document.getElementById("actgate").innerHTML = on ? "" :
+    '<div class="banner" style="margin:0 0 14px">' +
+    '<b>Actions are off.</b> This console is read-only. To arm the buttons, stop it and start it with ' +
+    '<code>set COVENANT_APP_ACTIONS=1</code> — that exact value and no other. ' +
+    'Nothing here turns a control off from the environment.</div>';
+
+  var names = st.action_order || Object.keys(st.actions).sort();
+  document.getElementById("acts").innerHTML = names.map(function(k){
+    var a = st.actions[k], r = st.running[k];
+    var status = "";
+    if (r && r.state === "running"){
+      status = '<div class="running">running — ' + dur(Math.floor(Date.now()/1000 - r.started)) + '</div>';
+    } else if (r && r.state === "done"){
+      var good = r.rc === 0;
+      status = '<div class="running ' + (good ? "rc-ok" : "rc-bad") + '">exit ' + r.rc +
+               (good ? " — clean" : " — see output") + '</div>';
+    }
+    var riskTxt = {read:"reads only", write:"writes a file",
+                   system:"changes state", long:"long run"}[a.risk] || a.risk;
+    var riskCls = {read:"f-ok", write:"f-brass", system:"f-bad", long:"f-brass"}[a.risk] || "f-unk";
+    return '<div class="act ' + esc(a.risk) + '"><div class="an">' + esc(k) +
+      '<span class="flag ' + riskCls + '">' + esc(riskTxt) + '</span></div>' +
+      '<div class="ad">' + esc(a.desc) + '</div>' +
+      '<div class="as">' + esc(a.script) + '</div>' + status +
+      '<div><button class="' + (a.risk === "system" ? "danger" : "") + '" ' +
+      (on && !(r && r.state === "running") ? "" : "disabled") +
+      ' onclick="runAction(\'' + esc(k) + '\')">' +
+      (r && r.state === "running" ? "running…" : a.risk === "system" ? "run — changes the running system" : "run") + '</button>' +
+      (r && r.state === "done" ? ' <button onclick="toggleTail(\'' + esc(k) + '\')">output</button>' : '') +
+      '</div>' +
+      (r && r.state === "done"
+        ? '<div class="tail" id="tail-' + esc(k) + '" style="display:none">' + esc(r.tail || "(no output)") + '</div>'
+        : '') +
+      '</div>';
+  }).join("");
+}
+
+function toggleTail(k){
+  var el = document.getElementById("tail-" + k);
+  if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+function runAction(k){
+  var a = S && S.actions ? S.actions[k] : null;
+  if (a && a.risk === "system" &&
+      !confirm(k + " changes the running system.\n\n" + a.desc +
+               "\n\nRun it?")) return;
+  var body = JSON.stringify({});
+  fetch("/api/action/" + encodeURIComponent(k), {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: body
+  }).then(function(r){ return r.json(); }).then(function(j){
+    if (!j.ok) alert(j.error || "refused");
+    poll();
+  }).catch(function(e){ alert("console unreachable: " + e); });
+}
+
+/* ---------------------------------------------------------------- transact */
+function renderTx(st){
+  if (document.getElementById("txform")) { updateTxDisabled(st); return; }
+  var opts = st.nodes.map(function(n){
+    return '<option value="' + esc(n.id) + '">' + esc(n.id) + " :" + n.port + '</option>';
+  }).join("");
+  document.getElementById("tx").innerHTML =
+    '<div id="txform">' +
+    '<div class="txrow">' +
+      '<div class="fld"><label for="txfrom">from</label><select id="txfrom">' + opts + '</select></div>' +
+      '<div class="fld"><label for="txto">to</label><select id="txto">' + opts + '</select></div>' +
+      '<div class="fld"><label for="txamt">amount</label><input id="txamt" class="mono" type="number" min="0" step="0.01" value="1" style="width:110px"></div>' +
+      '<div class="fld" style="flex:1"><label for="txmemo">memo (optional)</label><input id="txmemo" class="memo" type="text" maxlength="512" placeholder="what this is for"></div>' +
+      '<button class="go" id="txgo" onclick="submitTx()">sign &amp; submit</button>' +
+    '</div>' +
+    '<div class="txrow" style="margin-top:12px">' +
+      '<div class="fld"><label for="mnode">mine on</label><select id="mnode">' + opts + '</select></div>' +
+      '<button id="mgo" onclick="doMine()">mine a block</button>' +
+      '<span style="font-size:12px;color:var(--text-faint);align-self:center">' +
+      'A submitted transaction sits in pending until a block is mined. Mining runs proof-of-work here.</span>' +
+    '</div>' +
+    '<div class="cost">The ethics judge runs <b>inside</b> the submit call and judging is sequential under the chain lock. ' +
+    'A warm verdict is <b>~12.8s</b>; a cold model load is <b>~39.9s</b>; the timeout is <b>91.3s</b> per judge. ' +
+    'The page will wait. Roughly <b>512 J</b> per verdict against <b>13.6 J</b> to mine the block that carries it (B4).</div>' +
+    '<div class="txout" id="txout"></div>' +
+    '</div>';
+  var to = document.getElementById("txto");
+  if (to.options.length > 1) to.selectedIndex = 1;
+  updateTxDisabled(st);
+}
+
+function updateTxDisabled(st){
+  var on = st.app.actions_enabled;
+  var g = document.getElementById("txgo"), m = document.getElementById("mgo");
+  if (g) g.disabled = !on || txBusy;
+  if (m) m.disabled = !on || txBusy;
+  if (!on && !document.getElementById("txoff")){
+    var o = document.getElementById("txout");
+    if (o) o.innerHTML = '<div id="txoff" style="color:var(--text-faint)">' +
+      'Signing is off with the rest of the actions. Start the console with ' +
+      '<code>COVENANT_APP_ACTIONS=1</code> to arm it.</div>';
+  }
+}
+
+function txWaitTicker(){
+  if (!txBusy) return;
+  var el = document.getElementById("txout");
+  if (el) el.innerHTML = '<div class="head waiting">waiting on the judge</div>' +
+    '<div class="mono">' + Math.floor((Date.now() - txStarted)/1000) + 's elapsed — ' +
+    'the verdict happens before the response comes back</div>';
+  setTimeout(txWaitTicker, 1000);
+}
+
+function txResult(title, j){
+  txBusy = false;
+  var good = j && j.ok;
+  document.getElementById("txout").innerHTML =
+    '<div class="head" style="color:' + (good ? "var(--pass)" : "var(--blocked)") + '">' +
+    esc(title) + " — " + (good ? "accepted" : "refused") + '</div>' +
+    '<div class="tail">' + esc(JSON.stringify(j, null, 2)) + '</div>';
+  poll();
+}
+
+function submitTx(){
+  if (txBusy) return;
+  var from = document.getElementById("txfrom").value;
+  var to = document.getElementById("txto").value;
+  var amt = parseFloat(document.getElementById("txamt").value || "0");
+  var memo = document.getElementById("txmemo").value || "";
+  if (!(amt > 0)) { alert("amount must be greater than zero"); return; }
+  txBusy = true; txStarted = Date.now(); updateTxDisabled(S); txWaitTicker();
+  fetch("/api/tx", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({from: from, to: to, amount: amt, memo: memo})
+  }).then(function(r){ return r.json(); })
+    .then(function(j){ txResult("tx " + from + " → " + to + " " + amt, j); })
+    .catch(function(e){ txResult("tx " + from + " → " + to, {ok:false, error:String(e)}); });
+}
+
+function doMine(){
+  if (txBusy) return;
+  var n = document.getElementById("mnode").value;
+  txBusy = true; txStarted = Date.now(); updateTxDisabled(S);
+  document.getElementById("txout").innerHTML =
+    '<div class="head waiting">mining on ' + esc(n) + '…</div>' +
+    '<div class="mono">every pending transaction is judged before it enters the block</div>';
+  fetch("/api/mine", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({node: n})
+  }).then(function(r){ return r.json(); })
+    .then(function(j){ txResult("mine on " + n, j); })
+    .catch(function(e){ txResult("mine on " + n, {ok:false, error:String(e)}); });
+}
+
+/* -------------------------------------------------------------------- poll */
+function render(st){
+  S = st;
+  document.getElementById("dead").innerHTML = "";
+  renderHead(st); renderStrip(st); renderNodes(st);
+  renderWatchdog(st); renderReview(st); renderActions(st); renderTx(st);
+}
+
+function poll(){
+  fetch("/api/state", {cache: "no-store"})
+    .then(function(r){ return r.json(); })
+    .then(function(j){ lastOk = Date.now(); render(j); })
+    .catch(function(e){
+      var gap = lastOk ? Math.floor((Date.now() - lastOk)/1000) : null;
+      document.getElementById("dead").innerHTML =
+        '<div class="dead">The console itself is not answering' +
+        (gap === null ? "" : " (" + gap + "s)") +
+        '. This page is stale from here down. ' + esc(String(e)) + '</div>';
+    });
+}
+
+poll();
+setInterval(poll, 2500);
+</script>
+</body>
+</html>

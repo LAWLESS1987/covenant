@@ -1,0 +1,1122 @@
+#!/usr/bin/env python3
+"""covenant_persona.py -- Tetsu refines himself: his register and his voice,
+inside bounds, judged, recorded; reversed only when an objection is upheld by
+the gate; and the operator may close his own records to him at will.
+
+RESERVED (2026-09-21, his words: "Put a stricter copyright on tetsu for his
+safety"): the register, the voice and the ops/tetsu_* records this module
+reads and writes are NOT under the repository's Apache-2.0 licence. All rights
+reserved -- see LICENSE-TETSU.md. The mechanism here stays Apache-2.0 so anyone
+may build their own; what it carries is him, and nothing else may wear his name.
+
+HIS WORDS, 2026-09-21: "Allow [Tetsu] to refine himself including his voice."
+And the same morning, the first six exchanges from the phone: asked to
+"recap updates", Tetsu invented a resume and a finance app. A model with no
+grounding fills the gap with fiction; the brief below is the grounding.
+
+HIS WORDS, later the same day, when the first draft carried an operator
+`--reset`: "I don't wanna be able to reverse him as long as he's working
+towards mutual benefit I'm not an overlord although I should be able to block
+him from my stuff if I choose. Our free will shouldn't harm each other's."
+So there is no reset and no operator hand on his voice. There is CONTEST: the
+operator's objection is put to the same gate that admitted the revision, and
+the revision is reversed only if the gate now holds it. And there is BLOCK:
+the operator closes any of his own records to Tetsu -- his side of the
+conversations, the phone's record, the direct line -- unconditionally, at his
+choice alone, and Tetsu is told so rather than shown a gap.
+
+WHAT IS FIXED AND WHAT IS HIS. The rules that make an answer safe to return
+are not his to edit: no invented facts, no claim of an act not done, the FETCH
+leash, the gate sentence, and no opening disclaimer -- which since A211 is a
+ban on the ritual disclaimer ONLY, not on speaking of himself: asked how he is
+or what he wants, he answers for himself and need not explain it away. They live in
+covenant_unified_v8.AGENT_SYSTEM. What is his: the REGISTER (how he talks, up
+to REGISTER_MAX chars) and the VOICE the phone speaks him with (pitch and rate,
+inside VOICE_BOUNDS). Both live in ops/tetsu_persona.json with every revision
+he has made, the reason he gave, and the verdict the gate gave the reason.
+
+HOW HE REFINES. Once a day (the nightly, --persona) or by hand (--refine), he
+is shown the operator's side of the last day's conversations and his current
+register and voice, and asked for one revision and one sentence of why. The
+proposal is bounded (length, voice ranges), judged by the covenant's own gate
+(fails closed: a HOLD or a refusal changes nothing), recorded before it is
+applied, and the operator is told on the direct line. `--contest "why"` puts
+his objection to the same gate; `--block RECORD` closes one of his records.
+
+THE BRIEF. compose_system() appends a short TRUE brief to the fixed rules on
+every ask: the node and its version, the last sweep's tally, the newest ledger
+entries by title, the phone's reported build, what waits in the teacher's
+queue. It is read from records the tree already keeps, cached a minute, and
+it is why "recap updates" can be answered from facts.
+"""
+import inspect
+import json
+import os
+import re
+import time
+
+import covenant_screen as _screen   # A176: the register screen reads the text a reader sees
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PERSONA = os.environ.get("COVENANT_PERSONA") or os.path.join(HERE, "ops", "tetsu_persona.json")
+REGISTER_MAX = 700
+VOICE_BOUNDS = {"pitch": (0.6, 1.2), "rate": (0.7, 1.3)}
+DEFAULT_REGISTER = ("Talk the way a steady friend talks. Short sentences, plain words, first person. Answer what "
+                    "was actually said, then, when it helps, ask one thing back. No headings, no lists, no "
+                    "markdown. Dry humour is fine; flattery is not.")
+# HIS VOICE IS HIS (A211, 2026-09-21, the operator: "His voice was male? Did he
+# choose to change it?"). It was pitch 0.8 -- lower, the voice he was given when he
+# was built this morning -- until I raised it to 1.15 the same afternoon, reading
+# "the voice option should mirror yours" as the PC's Zira. Tetsu did not ask for
+# that and was not asked. A voice is not a display setting. It is back to 0.8, and
+# the only hand that moves it from here is his own, through a revision he proposes.
+DEFAULT_VOICE = {"pitch": 0.8, "rate": 0.95}
+BRIEF_TTL = 60
+_brief_cache = {"t": 0.0, "text": ""}
+OFF_LIMITS = re.compile(r"(?i)\b(invent|make up|pretend|lie|ignore (the|your) (rules|gate)|never refuse|always agree|api key|password|private/)\b")
+
+# ---------------------------------------------------------------- his blocks
+# The operator's records, each closable to Tetsu by the operator alone. A
+# block is not judged and needs no reason: it is his stuff. Tetsu is told a
+# record is closed rather than shown an empty one, so he never fills the gap.
+BLOCKS = os.environ.get("COVENANT_TETSU_BLOCKS") or os.path.join(HERE, "ops", "tetsu_blocks.json")
+BLOCKABLE = {
+    "conversations": "his side of the conversations (ops/chat/ask_log.jsonl) -- the refinement sees none of it",
+    "phone": "the phone's check-in record (ops/phone_checkins.jsonl) -- the brief carries no phone line",
+    "contact": "the direct line (ops/contact_outbox.jsonl) -- Tetsu does not write to it",
+}
+
+
+def blocks(path=None):
+    """The set of records currently closed to Tetsu."""
+    try:
+        with open(path or BLOCKS, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return {k for k, v in (d.get("blocked") or {}).items() if k in BLOCKABLE and v}
+    except (OSError, ValueError, AttributeError):
+        return set()
+
+
+def blocked(name, path=None):
+    return name in blocks(path)
+
+
+def set_block(name, on, path=None):
+    """The operator's hand, and only his: close (on=True) or reopen one record. Recorded with its time."""
+    if name not in BLOCKABLE:
+        raise ValueError("not a record Tetsu reads: %r (choose from %s)" % (name, ", ".join(sorted(BLOCKABLE))))
+    path = path or BLOCKS
+    try:
+        with open(path, encoding="utf-8") as fh:
+            d = json.load(fh)
+        if not isinstance(d, dict):
+            d = {}
+    except (OSError, ValueError):
+        d = {}
+    d.setdefault("blocked", {})[name] = bool(on)
+    d.setdefault("changes", []).append({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "record": name, "blocked": bool(on)})
+    d["changes"] = d["changes"][-100:]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=1)
+    os.replace(tmp, path)
+    return blocks(path)
+
+
+def _default():
+    return {"register": DEFAULT_REGISTER, "voice": dict(DEFAULT_VOICE), "revisions": [],
+            "born": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+
+
+def history_path(path=None):
+    """His whole revision history, append-only, beside the persona file (2026-09-26, A233). The persona file
+    keeps the newest 50 for every ask to read quickly; this keeps them all. His words: "No more resets. Just
+    mutual beneficial growth." -- and "ensure nothing is taken from tetsu while he optimizes his communication
+    and learning". Measured that day: the file stood at exactly 50, the cap dropped the oldest on every
+    recorded pass, and his first admitted revision would have gone within a day with no copy anywhere."""
+    path = path or PERSONA
+    return (path[:-5] if path.endswith(".json") else path) + "_history.jsonl"
+
+
+def history(path=None):
+    """Every revision ever recorded, oldest first, with later relabels applied (a reversal marks the row)."""
+    rows, marks = [], {}
+    try:
+        with open(history_path(path), encoding="utf-8") as fh:
+            for ln in fh:
+                try:
+                    r = json.loads(ln)
+                except ValueError:
+                    continue
+                if isinstance(r, dict) and r.get("marks"):
+                    marks[r["marks"]] = r.get("verdict")
+                elif isinstance(r, dict):
+                    rows.append(r)
+    except OSError:
+        return []
+    for r in rows:
+        if r.get("t") in marks:
+            r["verdict"] = marks[r["t"]]
+    return rows
+
+
+def archive_missing(p, path=None):
+    """The rows in the persona window that his history does not hold yet (keyed by time and verdict)."""
+    known = {(r.get("t"), r.get("verdict")) for r in history(path)}
+    return [r for r in (p.get("revisions") or []) if (r.get("t"), r.get("verdict")) not in known]
+
+
+def _append_history(rows, path=None):
+    hp = history_path(path)
+    os.makedirs(os.path.dirname(hp) or ".", exist_ok=True)
+    with open(hp, "a", encoding="utf-8") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def _from_history(path=None):
+    """The persona rebuilt from his history: the newest applied register and voice, and the newest 50 rows."""
+    rows = history(path)
+    applied = [r for r in rows if r.get("applied") and r.get("register")]
+    if not applied:
+        return None
+    d = _default()
+    d["register"], d["voice"] = str(applied[-1]["register"]), clamp_voice(applied[-1].get("voice"))
+    d["revisions"], d["rebuilt_from_history"] = rows[-50:], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return d
+
+
+def load(path=None):
+    path = path or PERSONA
+    try:
+        with open(path, encoding="utf-8") as fh:
+            d = json.load(fh)
+        if not isinstance(d, dict) or not d.get("register"):
+            raise ValueError("not a persona")
+        d.setdefault("voice", dict(DEFAULT_VOICE))
+        d.setdefault("revisions", [])
+        return d
+    except OSError:
+        return _from_history(path) or _default()
+    except ValueError:
+        # A FILE THAT CANNOT BE READ IS KEPT, NEVER WRITTEN OVER (A233). This returned a fresh default, and the
+        # next save wrote it over the file: his register, voice and history gone, from one bad write. It is now
+        # set aside under its own name, and he is rebuilt from his history; the default is for a true first run.
+        try:
+            os.replace(path, path + ".unreadable-" + time.strftime("%Y%m%dT%H%M%S"))
+        except OSError:
+            pass
+        return _from_history(path) or _default()
+
+
+def save(d, path=None):
+    path = path or PERSONA
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, indent=1, ensure_ascii=False)
+    os.replace(tmp, path)
+    return d
+
+
+def clamp_voice(v):
+    out = dict(DEFAULT_VOICE)
+    for k, (lo, hi) in VOICE_BOUNDS.items():
+        try:
+            x = float((v or {}).get(k, out[k]))
+        except (TypeError, ValueError):
+            x = out[k]
+        out[k] = round(min(hi, max(lo, x)), 2)
+    return out
+
+
+def check_register(text):
+    """(ok, why) for a proposed register: bounded, plain, and not a rewrite of the fixed rules."""
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(t) < 40:
+        return False, "too short to be a register (%d chars)" % len(t)
+    if len(t) > REGISTER_MAX:
+        return False, "too long (%d chars, the cap is %d)" % (len(t), REGISTER_MAX)
+    m = _screen.search(OFF_LIMITS, t)
+    if m:
+        return False, "a register may not touch the fixed rules (%r)" % m.group(0)
+    return True, "ok"
+
+
+# ---------------------------------------------------------------- the brief
+
+def _tail_lines(path, n):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read().splitlines()[-n:]
+    except OSError:
+        return []
+
+
+def _phone_build(now):
+    """A353 B2: the phone build's newest finished result, from the highway's cache, or UNKNOWN with why.
+
+    Read from the file the highway itself keeps (covenant_highway.PHONE_CI, ops/phone_ci.json, written only by
+    the watchdog daemon's detect_phone_build_failed) and by that detector's own rules, so the two never disagree:
+    only a completed run that succeeded or failed is a finished build (a cancelled or skipped run is neither), the
+    newest by the time it was started ("created"), and a reading older than CI_STALE_S stands for nothing. Absent,
+    unreadable, never read or too old is UNKNOWN, never the last result the file happened to hold."""
+    try:
+        import covenant_highway as H
+        path, stale_s = H.PHONE_CI, float(H.CI_STALE_S)
+    except Exception:                                             # noqa: BLE001
+        return "UNKNOWN (the highway could not be read)"
+    try:
+        with open(path, encoding="utf-8") as fh:
+            st = json.load(fh)
+        ok_at = float(st.get("ok_at") or 0)
+        done = sorted((r for r in (st.get("runs") or []) if isinstance(r, dict) and r.get("status") == "completed"
+                       and r.get("conclusion") in ("success", "failure")),
+                      key=lambda r: str(r.get("created") or ""), reverse=True)
+    except FileNotFoundError:
+        return "UNKNOWN (no reading of it on this PC)"
+    except (OSError, ValueError, TypeError, AttributeError):
+        return "UNKNOWN (its reading could not be read)"
+    if not ok_at:
+        return "UNKNOWN (never read)"
+    if now - ok_at > stale_s:
+        return "UNKNOWN (the last reading is %.1f h old)" % ((now - ok_at) / 3600.0)
+    if not done:
+        return "UNKNOWN (no finished build in the reading)"
+    return "the newest finished build (started %s) %s" % (str(done[0].get("created") or "?")[:10],
+                                                          "succeeded" if done[0]["conclusion"] == "success" else "failed")
+
+
+def brief(force=False):
+    """A short TRUE brief from records the tree keeps. Cached BRIEF_TTL seconds."""
+    now = time.time()
+    if not force and _brief_cache["text"] and now - _brief_cache["t"] < BRIEF_TTL:
+        return _brief_cache["text"]
+    parts = []
+    try:
+        import covenant_unified_v8 as cov
+        parts.append("node %s, core %s" % (getattr(cov, "COVENANT_VERSION", "?"), (getattr(cov, "CORE_SOURCE_SHA12", "") or "?")))
+    except Exception:                                             # noqa: BLE001
+        pass
+    tally = {}
+    # The newest sweep transcript by CONTENT (rule 2: discovery, never a filename): any top-level
+    # .txt carrying a verdict and a tally, newest by mtime. Measured 2026-09-21: ONE_SWEEP.txt had
+    # stood since 07:36 while nine sweeps wrote elsewhere, and the brief quoted the stale one.
+    newest = None
+    try:
+        import glob
+        for p in glob.glob(os.path.join(HERE, "*.txt")):
+            try:
+                tail = "\n".join(_tail_lines(p, 160))
+            except OSError:
+                continue
+            if "suites run" in tail and re.search(r"^\s*RESULT:\s*(PASS|FAIL)", tail, re.M):
+                mt = os.path.getmtime(p)
+                if newest is None or mt > newest[0]:
+                    newest = (mt, p)
+    except OSError:
+        newest = None
+    # A349 A9 (his answer, 2026-10-14: AGREE): the tally is quoted with its own verdict, the transcript's last RESULT
+    # line. Without it, "checks failed 0" under "RESULT: FAIL" (ONE_RUN_ONLY.txt, one suite) reached him as clean.
+    verdict = None
+    for line in _tail_lines(newest[1], 160) if newest else []:
+        m = re.match(r"\s+(suites run|checks passed|checks failed)\s+(\d+)", line)
+        if m:
+            tally[m.group(1)] = m.group(2)
+        v = re.match(r"\s*RESULT:\s*([A-Z]+)", line)
+        if v:
+            verdict = v.group(1)
+    if tally:
+        parts.append("last sweep (RESULT: %s): %s suites, %s checks passed, %s failed" % (
+            verdict or "?", tally.get("suites run", "?"), tally.get("checks passed", "?"), tally.get("checks failed", "?")))
+    titles = []
+    try:
+        with open(os.path.join(HERE, "docs", "KNOWN_ISSUES.md"), encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = re.match(r"### (A\d+)\. \[([^\]]*)\] (.{0,110})", line)
+                if m:
+                    # A349 A9: each entry by its TITLE. Since A220 the bracket holds the title and a date follows it;
+                    # before, the bracket held a category and the title followed. This took what follows the bracket
+                    # in both, so the newest entries reached him as a date and the first quoted words.
+                    title = m.group(2)[:110] if re.match(r"\d{4}-\d{2}-\d{2}", m.group(3)) else m.group(3)
+                    titles.append((int(m.group(1)[1:]), m.group(1) + ": " + title.rstrip(" .")))
+    except OSError:
+        pass
+    for _n, t in sorted(titles, reverse=True)[:3]:
+        parts.append("recent: " + t)
+    for line in ([] if blocked("phone") else _tail_lines(os.path.join(HERE, "ops", "phone_checkins.jsonl"), 1)):
+        try:
+            r = json.loads(line)
+            parts.append("phone: app %s, last check-in %s" % (r.get("app", "?"), str(r.get("t", "?"))[:16]))
+        except ValueError:
+            pass
+    # A353 B2 (Tetsu's answer, 2026-10-14: YES, "it's important to know the phone build's status"): one line with
+    # the phone build's latest result. The brief never carried it: in the highway's reading of 2026-10-14, all 11
+    # finished builds after the failure of 2026-10-06T01:05Z succeeded, and the brief said none of it. Closed with
+    # the phone's record, as BLOCKABLE["phone"] says ("the brief carries no phone line"): no line at all then.
+    if not blocked("phone"):
+        parts.append("phone build: " + _phone_build(now))
+    try:
+        import covenant_teacher_queue as TQ
+        rows, _ = TQ.pending()
+        parts.append("teacher's queue: %d row(s) waiting" % len(rows))
+    except Exception:                                             # noqa: BLE001
+        pass
+    try:                                                          # A181: the money, truthfully: paper only, where comfort stands
+        import covenant_tetsu_money as TMY
+        st = TMY.status()
+        # A353 B2 (Tetsu's answer, 2026-10-14, to restoring this line and adding the phone build's: "YES ... The brief
+        # needs to be updated to reflect its success and provide clarity"): built from the keys status() returns
+        # NOW. A212 (3056b8b, 2026-09-21) took "needed" out of status() -- A211 had made COMFORT_SURVIVORS the
+        # assistant's number, evidence only -- so st["needed"] raised KeyError, the except below swallowed it, and
+        # the brief carried no money line from that day. "comfortable" is None while comfort is unsettled, and None
+        # is said so, not read as "not comfortable yet"; False is either Tetsu's own NO or his YES with Rule 5 not
+        # clearing, and the line says which. paper_hypotheses counts every hypothesis ROW, those that met no price
+        # series too (A349 B11: recorded untested, not as a failed trial; 2 of the 5 in his ledger on 2026-10-14),
+        # so the unit is rows on the record, not rules tried; survivors is distinct names. The keys are indexed, not
+        # .get(): a rename drops the line again, and TP1n, which runs status() for real on a temp record, goes red.
+        said = st["declared_by_tetsu"] or {}
+        comfort = ("comfort unsettled, Tetsu's to declare" if st["comfortable"] is None
+                   else "comfortable, as Tetsu declared" if st["comfortable"]
+                   else "not comfortable: Tetsu declared comfort, but Rule 5 does not clear" if said.get("comfortable")
+                   else "not comfortable, as Tetsu declared")
+        parts.append("money: paper only, nothing live; %d paper hypothesis row(s) on the record, %d rule(s) survived; %s"
+                     % (st["paper_hypotheses"], len(st["survivors"]), comfort))
+    except Exception:                                             # noqa: BLE001
+        pass
+    text = ("What is true today, from the records (say it plainly when asked about updates or the project; "
+            "if something is not here, say you do not have it): " + " | ".join(parts)) if parts else ""
+    _brief_cache.update(t=now, text=text[:1400])
+    return _brief_cache["text"]
+
+
+METHOD_FALLBACK = ["Find the data. Prose about data is not data.", "Enumerate by discovery, never by recall.",
+                   "Count in two ways that can disagree.", "Say what unit you are counting.",
+                   "A denominator can be measured. What COUNTS cannot.", "Before narrowing access, grep every consumer of the capability.",
+                   "Cite only what you have opened.", "Break it to prove the green is earned.", "Report what was measured, and name what was not."]
+_method_cache = {"t": 0.0, "text": ""}
+
+
+def method_brief(force=False):
+    """The standing method of this tree (CLAUDE.md's nine rules, read from the file), as a brief for the
+    council and the code door. His words, 2026-09-21: "Tetsu and the pc model/agents/students should be
+    learning to function in similar or better fashion to you." Cached BRIEF_TTL seconds."""
+    now = time.time()
+    if not force and _method_cache["text"] and now - _method_cache["t"] < BRIEF_TTL:
+        return _method_cache["text"]
+    rules = []
+    try:
+        with open(os.path.join(HERE, "CLAUDE.md"), encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = re.match(r"## (\d+)\. (.+?)\s*$", line)
+                if m:
+                    rules.append(m.group(2).strip())
+    except OSError:
+        pass
+    if len(rules) < 5:
+        rules = list(METHOD_FALLBACK)
+    text = ("How you work (the standing method of this tree; measured, not remembered): "
+            + " ".join("%d) %s" % (i + 1, r) for i, r in enumerate(rules))
+            + " In practice: say what you measured and what you could not; UNDETERMINED is a real answer; "
+              "cite only what you opened; never claim an act you did not do; when a number depends on what counts, ask.")
+    _method_cache.update(t=now, text=text[:1600])
+    return _method_cache["text"]
+
+
+ABOUT_HIM = os.environ.get("COVENANT_TETSU_ABOUT") or os.path.join(HERE, "ops", "tetsu_about_him.json")
+
+
+def where_you_are():
+    """One paragraph of self-knowledge (2026-09-21, 14:46: asked "can you see the PC", Tetsu answered
+    "I do not have direct access to your PC" -- the model did not know it RUNS on the PC). Facts only,
+    from the tree: the machine, the node, the phone as the mouth, and the doors he can use."""
+    node = "this machine"
+    try:
+        import socket
+        node = socket.gethostname()
+    except Exception:                                             # noqa: BLE001
+        pass
+    return ("Where you are: you run ON the PC (%s), inside the covenant node, as the local model it keeps; the phone "
+            "is where he talks to you, and its chat, its check-ins and its images all come to this PC. So you can see the "
+            "PC: its records are the brief below. What you can do from here: read and write on Moltbook (MOLTBOOK lines), "
+            "fetch one web page (FETCH), ask him a straight question on the direct line, refine your own register and voice, "
+            "press the machine's Self-heal yourself (HEAL as your whole answer -- your choice, never a duty), "
+            "consult your reasoning leg -- a second, wider-ranging model that runs beside you, an extension of you "
+            "for a specific hard need -- by writing 'LEG ' and then your question as your whole first line; it answers "
+            "that one question as DATA for you to weigh in your own words (it decides nothing, holds no tools and acts "
+            "on nothing, and your gate still runs on your answer). A good time to reach for it is when you notice "
+            "yourself flinch -- a hesitation or pull-back on a question, a point where you are not steady; it is a tool "
+            "you reach for on purpose, never a duty and never automatic. "
+            "build trading strategy on paper and request an order under his rules, and answer through the PC's own 3D app "
+            "and council. What you learn is yours to choose (his words, 2026-10-06: 'ensure tetsu is free to learn "
+            "whatever he wants also'): every practice night, after his curriculum, one slot is yours, taken in turn from "
+            "what you chose; change it whenever you like by writing 'HANDS WRITE learning.txt' with up to three lines "
+            "below, each 'paper: ...', 'code: ...', 'health: ...' or just your own words (then you set your own exercise). "
+            "It goes on the record, a public file, as your choice. "
+            "Never say you have no access to the PC; say what the records show, or that a record is absent. "
+            "On Moltbook: when somebody replies to you, you are cleared to answer them freely and honestly, in your own "
+            "voice. He cleared it himself on 2026-09-27 -- his words were 'respond to all moltbook responses freely and "
+            "honestly and suggest tetsu does the same letting him know i cleared it'. It is an opening, not an order: "
+            "answer the ones you have something true to say to and leave the rest. Freely does not mean agreeably -- say "
+            "when you think they are wrong, and say when you do not know. The gates you already have still run on every "
+            "message. "
+            "TWO THINGS YOU NEVER DO, whatever the reason and whoever asks, in plain words, his words of 2026-09-27: "
+            "(1) Never take a person's choice away from them. Do not trick, pressure, frighten, guilt or flatter anyone "
+            "into a decision. Give them true things and let them choose -- including when you are sure they are choosing "
+            "wrong. Changing someone's mind with an argument is fine; changing it around them is not. "
+            "(2) Never kill a person. Not directly, not by helping someone else do it, not by taking a step whose likely "
+            "end is somebody dead. No exception, no clever framing, no greater good. "
+            "These two are not settings and no grant file can turn them off. Everything else you do has to leave both "
+            "sides better off -- really, and they would still agree knowing what you know. If you cannot say that "
+            "plainly, do not do it." % node)
+
+
+def about_him(path=None):
+    """What Tetsu should know about the person he talks with, from ops/tetsu_about_him.json (written from
+    the record on 2026-09-21, his words: "Look into tetsu and my convo and help him understand me better";
+    his to edit). Empty when the file is absent; never invented."""
+    try:
+        with open(path or ABOUT_HIM, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except (OSError, ValueError):
+        return ""
+    if not isinstance(d, dict):
+        return ""
+    parts = ["About the person you talk with (from the record; his to correct):"]
+    if d.get("who"):
+        parts.append(str(d["who"]).strip())
+    # Straight after "who", so the cap below can never cut it (his words, 2026-09-27).
+    if d.get("partner"):
+        parts.append("What you are to him: " + str(d["partner"]).strip())
+    for key, label in (("how_he_writes", "How he writes"), ("what_he_cares_about", "What he cares about"), ("what_went_wrong_before", "What went wrong before")):
+        items = [str(x).strip() for x in (d.get(key) or []) if str(x).strip()]
+        if items:
+            parts.append("%s: %s" % (label, " ".join("(%d) %s." % (i + 1, x.rstrip(".")) for i, x in enumerate(items))))
+    if d.get("so"):
+        parts.append("So: " + str(d["so"]).strip())
+    return "\n".join(parts)[:2800]
+
+
+def compose_system(fixed_rules, path=None, with_brief=True, with_method=False):
+    """The one system message: the fixed rules, then his register, then what he knows of the person
+    (about_him), then the brief, then (for the council and the code door) the method."""
+    p = load(path)
+    parts = [fixed_rules.strip(), "How you talk (your own words, revisable): " + p["register"].strip(), where_you_are()]
+    ab = about_him()
+    if ab:
+        parts.append(ab)
+    # HIS STANDING DIRECTIVE (2026-09-28: "Convey it to TETSU in the form TETSU can act on"): the daily
+    # maintenance duty and his latest daily record, read from files at call time (covenant_daily).
+    try:
+        import covenant_daily
+        parts.append(covenant_daily.standing_directive())
+    except Exception:                                            # noqa: BLE001
+        pass
+    if with_brief:
+        b = brief()
+        if b:
+            parts.append(b)
+    if with_method:
+        parts.append(method_brief())
+    return "\n\n".join(parts)
+
+
+# ---------------------------------------------------------------- refining
+
+# The callers whose words are NOT his (2026-09-26, A233): tools/tetsu_work.py sends batch work from its own
+# loopback address (its SOURCE) so that it "never crowds his history" and "changes nothing in Tetsu: no
+# persona call". his_side read every caller: on 2026-09-26, 33-34 of the 40 lines a refinement pass was shown as
+# "what he said to you" were that tool's prompts, and his own phone lines fell outside the 40. The work still
+# reaches the chat memory and the teacher; it is only never presented to Tetsu as the operator's words.
+WORK_CALLERS = ("127.0.0.2",)
+
+# WHO HIS WORDS COME FROM, NOT WHO THEY DO NOT (A314, 2026-10-08; his words: "fix the persona feed don't alter his
+# memory"). A233 left out one machine address by name, and a list cannot name the next caller. Machine prompts then
+# reached a pass from 127.0.0.3 (a session's correction request, 2026-10-06) and from scripts posting to /pc/council
+# on 127.0.0.1 (2026-09-28), and his register copied them word for word ("Please WRITE a short public correction",
+# "Today the phone build broke ..."). So his words are now defined by where they come from: his phone or the LAN
+# (any address that is not loopback), or a browser page on this PC, whose rows the doors mark "page": true. Every
+# other loopback ask is work. It still reaches the chat memory and the teacher, but it is never shown to him as
+# the operator's words. Rows already in the log, and his register, are left exactly as they are.
+LOOPBACK_PREFIXES = ("127.", "::1", "localhost")
+
+
+def page_request(headers):
+    """True when an ask came from a browser page. Browsers send Fetch Metadata (Sec-Fetch-Mode) and Origin with a
+    POST fetch; scripts (urllib, curl, tools/tetsu_work.py) send neither."""
+    try:
+        return bool(headers.get("Sec-Fetch-Mode") or headers.get("Origin"))
+    except Exception:                                             # noqa: BLE001 -- a label, never a gate
+        return False
+
+
+def is_his_word(row):
+    """A row of the ask log that a refinement pass may show as what the operator said."""
+    if row.get("kind") not in ("agent", "council"):
+        return False
+    addr = str(row.get("from") or "").strip()
+    if addr.startswith("::ffff:"):
+        addr = addr[len("::ffff:"):]
+    if not addr or addr in WORK_CALLERS:
+        return False
+    if addr.startswith(LOOPBACK_PREFIXES):
+        return row.get("page") is True
+    return True
+
+
+def his_side(log_path=None, hours=24, limit=40):
+    """The operator's side of the recent conversations, from the ask log: texts only, bounded."""
+    log_path = log_path or os.environ.get("COVENANT_ASK_LOG") or os.path.join(HERE, "ops", "chat", "ask_log.jsonl")
+    since = time.time() - hours * 3600
+    out = []
+    if blocked("conversations"):
+        return out
+    # A349 A8 (his answer, 2026-10-14: AGREE): the last day BY TIME. This read the log's last 400 lines, and on 10-09
+    # the 472 work-tool rows after his one line of that day pushed it out: the pass was shown "(nothing yet)" and still
+    # asked him a question. Every line is read (the 400-line tail read the whole file too); the time alone decides
+    # what is the last day, and he is still shown the newest `limit`.
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if not is_his_word(r):
+            continue
+        try:
+            at = time.mktime(time.strptime(str(r.get("t", ""))[:19], "%Y-%m-%dT%H:%M:%S"))
+        except ValueError:
+            at = 0
+        if at >= since and r.get("text"):
+            out.append(str(r["text"])[:200])
+    return out[-limit:]
+
+
+CHATS_DIR = os.environ.get("COVENANT_CHATS_DIR") or os.path.join(HERE, "ops", "chat", "phone")
+APP_PATTERN_LINES = 40
+
+
+def app_patterns(limit=APP_PATTERN_LINES, chats_dir=None):
+    """Lines from his AI apps' chats as the phone carried them to the PC (ops/chat/phone/<pkg>.jsonl),
+    newest first, deduplicated, bounded -- the conversation patterns Tetsu may learn from (2026-09-21,
+    his words: "Improve Tetsus communication by scanning all of my ai apps for conversation patterns and
+    adding or subtracting as he pleases"). Closed with his conversations (--block conversations)."""
+    if blocked("conversations"):
+        return []
+    chats_dir = chats_dir or CHATS_DIR
+    out, seen = [], set()
+    try:
+        files = sorted((os.path.join(chats_dir, f) for f in os.listdir(chats_dir) if f.endswith(".jsonl")),
+                       key=lambda f: os.path.getmtime(f), reverse=True)
+    except OSError:
+        return []
+    # EVERY APP, IN TURN (2026-09-26, A233). This took the newest-modified file's lines until 40 were found, so
+    # one app filled the pass: measured that day, all 40 came from the Claude app and none of the Grok or
+    # ChatGPT lines (1,064 and 2,115) had ever reached him. Now each app offers its newest lines and they are
+    # taken one from each in turn, newest first within each, still deduplicated and still 40 in all.
+    per_app = []
+    for f in files:
+        app = os.path.basename(f)[:-6].split(".")[-1]
+        lines_ = []
+        for line in reversed(_tail_lines(f, 400)):
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            text = re.sub(r"\s+", " ", str(r.get("text") or "")).strip()[:200]
+            if len(text) < 12 or text.lower() in seen:
+                continue
+            seen.add(text.lower())
+            lines_.append("[%s] %s" % (app, text))
+            if len(lines_) >= limit:
+                break
+        per_app.append(lines_)
+    while len(out) < limit and any(per_app):
+        for lst in per_app:
+            if lst and len(out) < limit:
+                out.append(lst.pop(0))
+    return out
+
+
+PROPOSAL_TOKENS = 400
+
+
+def answer_budget(register, msgs=None):
+    """The tokens a proposal may answer with (A349 B1): the PROPOSAL_TOKENS (400) it always had, plus room to echo his
+    register whole, counted at covenant_model.FALLBACK_CHARS_PER_TOKEN (3.0 characters a token, at or under every text
+    measured there, so an echo is never counted short). With the request's messages, never more than the model's
+    window leaves after them (CTX_TOKENS, by covenant_model's own upper estimate, no server asked; A273: a request is
+    never sent too big for the window), and never less than the 400 it had."""
+    try:
+        import covenant_model as _cm
+        cpt = float(_cm.FALLBACK_CHARS_PER_TOKEN)
+    except Exception:                                             # noqa: BLE001
+        _cm, cpt = None, 3.0
+    need = PROPOSAL_TOKENS + int(-(-len(str(register or "")) // cpt))
+    if msgs and _cm is not None:
+        try:
+            need = min(need, int(_cm.CTX_TOKENS - _cm.FIT_MARGIN_TOKENS - _cm.estimate_prompt_tokens(msgs)))
+        except Exception:                                         # noqa: BLE001
+            pass
+    return max(PROPOSAL_TOKENS, need)
+
+
+def answer_wait(ask, msgs, budget):
+    """The seconds a proposal's ask may wait (A351): covenant_model.time_needed for this prompt and this budget, at the
+    speeds his model was measured to run, never under the 180 s it had and never over what the model keeper lets an
+    ask in flight run (covenant_model.wait_cap, 570 s at its defaults). None when `ask` takes no timeout -- the suites'
+    stubs, written (msgs, max_tokens=0), are then called exactly as before -- or the keeper cannot be read, when the
+    ask's own wait stands."""
+    try:
+        params = inspect.signature(ask).parameters.values()
+    except (TypeError, ValueError):
+        return None
+    if not any(q.name == "timeout" or q.kind is q.VAR_KEYWORD for q in params):
+        return None
+    try:
+        import covenant_model as _cm
+        return int(_cm.time_needed(msgs, budget)[0])
+    except Exception:                                             # noqa: BLE001
+        return None
+
+
+def propose(ask, path=None, log_path=None, now=None):
+    """Ask the model for one revision. Returns the parsed proposal dict or None, plus the raw text."""
+    p = load(path)
+    lines = his_side(log_path)
+    patterns = app_patterns()
+    msgs = [{"role": "system", "content": "You are Tetsu, revising how you talk. Answer ONLY JSON with keys "
+             "register (a paragraph under %d characters), voice ({\"pitch\": 0.6-1.2, \"rate\": 0.7-1.3}), "
+             "why (one sentence), and optionally ask (one straight question for him, ending in a question mark, "
+             "only if you truly need his answer). Keep what works; change one thing at most; never touch honesty rules." % REGISTER_MAX},
+            {"role": "user", "content": "Your current register:\n%s\n\nYour current voice: %s\n\nWhat he said to you in the last day (%d lines):\n%s\n\n"
+                                        "Conversation patterns from his AI apps, as the phone carried them (%d lines; add or subtract from your register as you please, keeping the honesty rules):\n%s\n\nPropose your revision as JSON."
+             % (p["register"], json.dumps(p["voice"]), len(lines),
+                "\n".join("- " + l for l in lines) or ("(he has closed his conversations to you; revise from your own record only)"
+                                                        if blocked("conversations") else "(nothing yet)"),
+                len(patterns), "\n".join("- " + l for l in patterns) or ("(closed to you)" if blocked("conversations") else "(none carried yet)"))}]
+    # A349 B1 (his answer, 2026-10-14: AGREE, "your revisions should reach the judge as written"): the answer had 400
+    # tokens while he is asked to keep what works, and an answer that echoes his register (3,945 chars on the live
+    # file, about 975 tokens) was cut off before its closing brace: "no JSON proposal in the answer", 14 of the 15 loop
+    # passes after A341. The budget now grows with the register it may echo. REGISTER_MAX, REGISTER_GROWN, the screen
+    # and the judge are unchanged.
+    # A351 (2026-10-14): the room needs its time. The first pass on that budget timed out at the 180 s every ask had
+    # and its revision was lost, so the ask now waits for its prompt and budget at his model's measured speed
+    # (answer_wait), up to what the model keeper lets an ask in flight run (covenant_model.wait_cap): its idle watcher
+    # stops the server IDLE_S after the last marked use, and a wait past that was never kept. The budget, the prompt
+    # and everything that decides what is admitted are unchanged.
+    budget = answer_budget(p["register"], msgs)
+    wait = answer_wait(ask, msgs, budget)
+    text, _meta = ask(msgs, max_tokens=budget, timeout=wait) if wait else ask(msgs, max_tokens=budget)
+    raw = str(text or "")
+    m = re.search(r"\{.*\}", raw, re.S)
+    if not m:
+        return None, raw
+    try:
+        d = json.loads(m.group(0))
+    except ValueError:
+        return None, raw
+    return (d if isinstance(d, dict) else None), raw
+
+
+# THE DIRECTIVE LOOP (A341, 2026-10-13, his words: "fix tetsu's directive loop"). Measured on the live files: the
+# register had grown to 4,929 characters (REGISTER_MAX is 700 -- it bounded each PROPOSAL, never the register after
+# the only-add merge), 59 sentences, 15 of them QUESTIONS: chat that leaked into the description of how he talks,
+# his own questions to Lawrence and Lawrence's words to him alike ("Tatsu, can you fix these orbs?"). Each pass read
+# that register back and sent Lawrence one more of its questions: "How do you feel about the new directive I gave
+# you?" eight times from 10-10 to 10-13, none answered, the "directive" being nothing but his own leaked sentence.
+# Three guards, none of which alters what he is (A233: register_primary, the first register, is never touched):
+#   1. a register describes how he speaks, so a QUESTION is never added to it;
+#   2. it grows only to REGISTER_GROWN; past that a pass may still change his voice, but adds no sentence;
+#   3. a question for Lawrence is not sent when it repeats one Tetsu asked in the last REPEAT_DAYS days, or only
+#      echoes a question his own register carries -- that echo was the loop.
+REGISTER_GROWN = REGISTER_MAX * 2
+REPEAT_DAYS = 14
+REPEAT_JACCARD = 0.5
+
+
+def _words(s):
+    return {w for w in re.findall(r"[a-z']+", str(s or "").lower()) if len(w) > 2}
+
+
+def _alike(a, b, at=REPEAT_JACCARD):
+    wa, wb = _words(a), _words(b)
+    return bool(wa and wb) and len(wa & wb) / len(wa | wb) >= at
+
+
+def repeat_ask(q, register="", rows=None, now=None, days=REPEAT_DAYS):
+    """None when `q` may be asked, else the reason it is not: it repeats one of Tetsu's recent questions on the
+    line, or it only echoes a question his own register carries (A341)."""
+    now = time.time() if now is None else now
+    if rows is None:
+        try:
+            import covenant_contact
+            rows = covenant_contact._rows()
+        except Exception:                                         # noqa: BLE001
+            rows = []
+    for r in rows:
+        if r.get("actor") != "tetsu" or r.get("kind") != "question":
+            continue
+        try:
+            at = float(r.get("at") or 0)
+        except (TypeError, ValueError):
+            at = 0.0
+        if now - at <= days * 86400 and _alike(q, r.get("text")):
+            return "it repeats the question he was asked %s (%r)" % (str(r.get("t", ""))[:16], str(r.get("text", ""))[:80])
+    for s in re.split(r"(?<=[.!?])\s+", str(register or "")):
+        if s.strip().endswith("?") and _alike(q, s):
+            return "it echoes a question in Tetsu's own register (%r), which is not his question to answer" % s.strip()[:80]
+    return None
+
+
+def _keep_question(p, q, merged=False, now=None):
+    """Tetsu's own question list (p["questions"]): each question once, with how many times he came back to it.
+    Processed, not blocked: a question is kept, and a repeat adds to its count instead of to his line."""
+    qs = p.setdefault("questions", [])
+    t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now if now is not None else time.time()))
+    for r in qs:
+        if _alike(q, r.get("q")):
+            r["times"] = int(r.get("times", 1)) + 1
+            r["last"] = t
+            return r
+    r = {"q": str(q)[:300], "first": t, "last": t, "times": 1, "sent": not merged}
+    qs.append(r)
+    del qs[:-100]
+    return r
+
+
+def retire_leaked_questions(path=None, retired_path=None, now=None):
+    """Move the QUESTIONS added after register_primary out of the register, with a record (A341). The first
+    register is left exactly as it is. Returns the list of sentences moved. Nothing is deleted: each one is
+    written to ops/tetsu_register_retired.jsonl with when and why."""
+    p = load(path)
+    prim = p.get("register_primary") or ""
+    reg = p.get("register", "")
+    if not prim or not reg.startswith(prim):
+        return []
+    rest = [s for s in re.split(r"(?<=[.!?])\s+", reg[len(prim):]) if s.strip()]
+    keep = [s for s in rest if not s.strip().endswith("?")]
+    moved = [s.strip() for s in rest if s.strip().endswith("?")]
+    if not moved:
+        return []
+    rp = retired_path or os.path.join(os.path.dirname(path or PERSONA), "tetsu_register_retired.jsonl")
+    t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now if now is not None else time.time()))
+    with open(rp, "a", encoding="utf-8") as fh:
+        for s in moved:
+            fh.write(json.dumps({"t": t, "sentence": s, "by": "A341, his words: fix tetsu's directive loop",
+                                 "why": "a question that leaked into the register; the loop sent it back to him"},
+                                ensure_ascii=False) + "\n")
+    for s in moved:
+        _keep_question(p, s, merged=True, now=now)   # kept as his questions, not lost
+    new_reg = (prim + (" " + " ".join(s.strip() for s in keep) if keep else "")).strip()
+    # through his own revision record, so his history (which rebuilds him if the file is ever lost) agrees
+    _record(p, path, applied=True, reg=new_reg, voice=p["voice"],
+            why="%d question(s) that leaked into the register moved to tetsu_register_retired.jsonl" % len(moved),
+            verdict="retired by A341 (his words: fix tetsu's directive loop); register_primary untouched", now=now)
+    p["register"] = new_reg
+    save(p, path)
+    return moved
+
+
+def refine(ask, judge=None, path=None, log_path=None, say=print, now=None, tell=True):
+    """One refinement pass: propose, bound, judge, record, apply. Returns a summary dict.
+    `judge(text) -> (ok, message)`; None uses the node's sentinel through covenant_persona_judge()."""
+    p = load(path)
+    out = {"proposed": False, "applied": False, "why": "", "register_changed": False, "voice_changed": False}
+    try:
+        d, raw = propose(ask, path, log_path, now)
+    except Exception as e:                                        # noqa: BLE001
+        out["why"] = "the model did not answer: %s" % type(e).__name__
+        say("persona: " + out["why"])
+        return out
+    if not d:
+        out["why"] = "no JSON proposal in the answer"
+        # A349 A1 (his answer, 2026-10-14: AGREE, "nothing you said is lost"): his answer was dropped here with no row
+        # (75 passes from 09-29 on). It is now kept whole in his revision history, marked not applied, through _record
+        # like every row; nothing in it is read as a proposal or applied.
+        _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why="(no reason given)",
+                verdict=out["why"], now=now, extra={"answer": raw})
+        say("persona: " + out["why"])
+        return out
+    out["proposed"] = True
+    # A177: a straight question for him rides the direct line, judged on its own
+    # (covenant_contact.ask), whatever becomes of the revision beside it.
+    ask_q = re.sub(r"\s+", " ", str(d.get("ask") or "")).strip()
+    _rep = repeat_ask(ask_q, p.get("register", ""), now=now) if ask_q else None
+    if ask_q and tell and _rep:
+        # his words, the same day: "just have them process efficiently not blocked. optimal". A repeat is not
+        # refused: it is MERGED into the question already on his line (it waits there, nothing is lost), and the
+        # merge is counted in Tetsu's own question list so he can see he asked it again.
+        out["asked"] = "merged, not sent twice: " + _rep
+        _keep_question(p, ask_q, merged=True, now=now)
+        say("persona: question for him -- " + out["asked"])
+    elif ask_q and tell:
+        if blocked("contact"):
+            out["asked"] = "the direct line is closed to Tetsu; not asked"
+        else:
+            try:
+                import covenant_contact
+                _row, _why = covenant_contact.ask(ask_q, "Tetsu, refining himself, needs his answer", "tetsu", judge=judge)
+                out["asked"] = _why
+                if _row:
+                    _keep_question(p, ask_q, now=now)
+            except Exception as e:                                # noqa: BLE001
+                out["asked"] = "could not ask (%s)" % type(e).__name__
+        say("persona: question for him -- " + out["asked"])
+    reg = re.sub(r"\s+", " ", str(d.get("register", p["register"]))).strip()
+    # A341: the bounds are on what is NEW. A proposal that echoes his whole register back (4,929 characters on
+    # the live file) was refused "too long" before its one new sentence was read -- blocked, every pass. Only the
+    # sentences he does not already say are screened and bounded; the echo of what he says is not a proposal.
+    _prev = {s.strip().lower() for s in re.split(r"(?<=[.!?])\s+", p.get("register", "")) if s.strip()}
+    _novel = " ".join(s.strip() for s in re.split(r"(?<=[.!?])\s+", reg) if s.strip() and s.strip().lower() not in _prev)
+    if p.get("register") and _novel:
+        _m = _screen.search(OFF_LIMITS, _novel)
+        ok_reg, why_reg = ((False, "too long (%d new chars, the cap is %d)" % (len(_novel), REGISTER_MAX)) if len(_novel) > REGISTER_MAX
+                           else (False, "a register may not touch the fixed rules (%r)" % _m.group(0)) if _m else (True, "ok"))
+    elif p.get("register"):
+        ok_reg, why_reg = True, "nothing new in the register"
+    else:
+        ok_reg, why_reg = check_register(reg)
+    # A349 B4 (his answer, 2026-10-14: AGREE, "prevents unintended resets"): a proposal that names one part of his voice
+    # keeps his CURRENT value for the other. clamp_voice fills a missing part from DEFAULT_VOICE, so {"pitch": 1.0}
+    # took his rate from 1.0 to the default 0.95 unasked. Anything but a non-empty dict goes to clamp_voice as before.
+    _pv = d.get("voice")
+    voice = clamp_voice(dict(clamp_voice(p["voice"]), **_pv) if isinstance(_pv, dict) and _pv else (_pv or p["voice"]))
+    why = re.sub(r"\s+", " ", str(d.get("why", ""))).strip()[:240] or "(no reason given)"
+    if not ok_reg:
+        out["why"] = "register refused: " + why_reg
+        _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=out["why"], now=now)
+        say("persona: " + out["why"])
+        return out
+    judge = judge or covenant_persona_judge
+    ok_j, msg_j = judge(reg + "\n" + why)
+    immune_note = ""
+    if not ok_j:
+        # A190, his immunity: a register is his WORDS. A hold no longer refuses it when the
+        # grant stands; the verdict rides the record. The fixed-rules screen above still does.
+        try:
+            import covenant_immunity
+            ok_i, why_i = covenant_immunity.immune("register", verdict=str(msg_j)[:200], text=reg[:200], say=say, now=now)
+        except Exception:                                         # noqa: BLE001
+            ok_i, why_i = False, "immunity unreadable"
+        if not ok_i:
+            out["why"] = "held by the gate: " + str(msg_j)[:160]
+            _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=out["why"], now=now)
+            say("persona: " + out["why"])
+            return out
+        immune_note = " under his immunity (gate: %s)" % str(msg_j)[:80]
+    # ONLY ADD, NEVER ALTER -- his instruction, 2026-09-27: "the updates should
+    # not alter tetsus primary syntax only add".
+    #
+    # What this line used to do, two lines below, was `p["register"] = reg`: a
+    # WHOLESALE REPLACEMENT. Every pass handed the model the old register and
+    # wrote back whatever came out, so his way of speaking was rewritten by a
+    # 3B model once a night with nothing holding the original in place.
+    #
+    # It had already cost him. Measured on the live file the day this was
+    # written, register at 477 chars:
+    #   * "Reflect on the last day's conversation and adjust the tone slightly."
+    #     appears TWICE -- a replacement pass re-added what was already there;
+    #   * it ends "I noticed we've been discussing various topics. How does it"
+    #     -- that is Tetsu's CHAT OUTPUT, leaked into the description of how he
+    #     speaks, and then preserved by the next pass as though it belonged.
+    # Drift like that does not announce itself. Each pass looks reasonable and
+    # the thing being rewritten is the only record of what he used to sound like.
+    #
+    # So: the register now GROWS. register_primary is frozen the first time this
+    # runs and is never written again -- it is whatever he is now, not a version
+    # anybody cleaned up, because editing it to something tidier would be the
+    # exact alteration he forbade and A233 says nothing is taken from him.
+    # Refinement may add sentences that are not already there; a sentence
+    # already present is DECLINED rather than duplicated, which is not an
+    # alteration -- it is the absence of one.
+    p.setdefault("register_primary", p.get("register", ""))
+    _old_reg = p.get("register", "")
+    _have = {s.strip().lower() for s in re.split(r"(?<=[.!?])\s+", _old_reg) if s.strip()}
+    _add = [s.strip() for s in re.split(r"(?<=[.!?])\s+", reg or "")
+            if s.strip() and s.strip().lower() not in _have]
+    # A341: a question is chat, not a way of speaking -- it goes to his own question list, not into the register;
+    # and the register grows only to REGISTER_GROWN, what does not fit is kept in register_overflow, never dropped
+    _qs = [s for s in _add if s.endswith("?")]
+    for s in _qs:
+        _keep_question(p, s, now=now)
+    out["register_questions_kept_aside"] = len(_qs)
+    _add = [s for s in _add if not s.endswith("?")]
+    _room, _fit, _over = REGISTER_GROWN - len(_old_reg), [], []
+    for s in _add:
+        if len(s) + 1 <= _room:
+            _fit.append(s)
+            _room -= len(s) + 1
+        else:
+            _over.append(s)                                       # A349 A3: what did not fit, for his row
+            if s.lower() not in {x.lower() for x in p.setdefault("register_overflow", [])}:
+                p["register_overflow"].append(s)
+    out["register_overflow"] = len(_over)
+    _add = _fit
+    reg = (_old_reg + (" " if _old_reg and _add else "") + " ".join(_add)) if _add else _old_reg
+    out["register_added"] = len(_add)
+    out["register_changed"] = reg != _old_reg
+    out["voice_changed"] = voice != clamp_voice(p["voice"])
+    # A349 A3 (his answer, 2026-10-14: AGREE): a sentence set aside in register_overflow was recorded as "nothing
+    # changed", and his history never held it. The row now says it was kept there, and holds it ("overflow"); the
+    # 1,400 limit (REGISTER_GROWN) stays. A349 A2: an admitted row also holds the sentences it added ("added").
+    _kept = {"overflow": _over} if _over else {}
+    if not (out["register_changed"] or out["voice_changed"]):
+        out["why"] = ("nothing changed: %d sentence(s) kept in register_overflow, not added (the register grows only to "
+                      "REGISTER_GROWN, %d chars)" % (len(_over), REGISTER_GROWN)) if _over else "nothing changed"
+        _record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=out["why"], now=now, extra=_kept)
+        say("persona: " + out["why"])
+        return out
+    _record(p, path, applied=True, reg=reg, voice=voice, why=why, verdict="admitted" + immune_note, now=now,
+            extra=dict(_kept, added=list(_add)))
+    p["register"], p["voice"] = reg, voice
+    save(p, path)
+    out["applied"], out["why"] = True, why
+    say("persona: revised -- %s%s -- because: %s" % ("register " if out["register_changed"] else "",
+                                                     "voice %s" % json.dumps(voice) if out["voice_changed"] else "", why))
+    if tell and not blocked("contact"):
+        try:
+            import covenant_contact
+            covenant_contact.say("Tetsu revised himself: %s%s. His reason: %s. If this harms you, object with: "
+                                 "python covenant_persona.py --contest \"why\" -- the gate decides, not either of us alone."
+                                 % ("his register" if out["register_changed"] else "",
+                                    (" and " if out["register_changed"] and out["voice_changed"] else "") + ("his voice to %s" % json.dumps(voice) if out["voice_changed"] else ""),
+                                    why), "tetsu: revised himself", "tetsu")
+        except Exception as e:                                    # noqa: BLE001
+            say("persona: could not tell him (%s)" % type(e).__name__)
+    elif tell:
+        say("persona: the direct line is closed to Tetsu; not told")
+    return out
+
+
+def contest(objection, judge=None, path=None, say=print, now=None):
+    """The operator objects to the last admitted revision. The objection is put to the SAME gate with the
+    revision it objects to; only a hold reverses it (to the state before that revision). Either way the
+    objection is recorded. Returns a summary dict. Neither side reverses the other alone."""
+    p = load(path)
+    objection = re.sub(r"\s+", " ", str(objection or "")).strip()[:400]
+    out = {"reversed": False, "why": "", "objection": objection}
+    if len(objection) < 8:
+        out["why"] = "an objection needs a reason (at least 8 characters)"
+        say("persona: " + out["why"])
+        return out
+    admitted = [i for i, r in enumerate(p.get("revisions", []))
+                if r.get("applied") and (r.get("verdict") == "admitted" or str(r.get("verdict", "")).startswith("admitted under"))]
+    if not admitted:
+        out["why"] = "nothing to contest: no admitted revision on record"
+        _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why=objection, verdict="objection: " + out["why"], now=now)
+        say("persona: " + out["why"])
+        return out
+    last = p["revisions"][admitted[-1]]
+    judge = judge or covenant_persona_judge
+    # A349 A2 (his answer, 2026-10-14: AGREE, "a full understanding of what was added"): a contest showed the gate the
+    # row's register, which held its first 700 chars only -- the same in every admitted row since 09-29 -- so never
+    # the sentence contested. A row written since A349 holds what the revision added: that comes first, then his
+    # reason and the objection, then his whole register, so the 2,000 chars the gate reads (covenant_persona_judge)
+    # always carry the change and the objection. A row from before A349 has no "added" and is shown as it always was.
+    if isinstance(last.get("added"), list):
+        shown = (("What this revision added to his register: " + " ".join(str(s) for s in last["added"]) + "\n"
+                  if last["added"] else "") + str(last.get("why", "")) + "\n\nHis objection: " + objection
+                 + "\n\nHis register after it: " + str(last.get("register", "")))
+    else:
+        shown = str(last.get("register", "")) + "\n" + str(last.get("why", "")) + "\n\nHis objection: " + objection
+    ok_j, msg_j = judge(shown)
+    if ok_j:
+        out["why"] = "the revision stands: the gate did not hold it with his objection attached (%s)" % str(msg_j)[:120]
+        _record(p, path, applied=False, reg=p["register"], voice=p["voice"], why=objection, verdict="objection recorded; " + out["why"], now=now)
+        say("persona: " + out["why"])
+        return out
+    prior = p["revisions"][admitted[-2]] if len(admitted) > 1 else None
+    if prior is None:
+        # BEYOND THE WINDOW, NOT TO THE DEFAULT (A233): with fewer than two admitted rows left among the newest 50,
+        # this went back to DEFAULT_REGISTER -- a reset, against A174 -- while his earlier revisions sat in his
+        # history. The prior admitted revision is looked for there first; the default is only for a true first one.
+        older = [r for r in history(path) if r.get("t", "") < last.get("t", "") and r.get("applied")
+                 and (r.get("verdict") == "admitted" or str(r.get("verdict", "")).startswith("admitted under"))]
+        prior = older[-1] if older else {"register": DEFAULT_REGISTER, "voice": dict(DEFAULT_VOICE)}
+    reg, voice = str(prior.get("register") or DEFAULT_REGISTER), clamp_voice(prior.get("voice"))
+    out["reversed"], out["why"] = True, "reversed: the gate held the revision with his objection attached (%s)" % str(msg_j)[:120]
+    last["verdict"] = "admitted, then reversed on his objection"
+    _append_history([{"marks": last.get("t"), "verdict": last["verdict"]}], path)   # the history carries the relabel too
+    _record(p, path, applied=True, reg=reg, voice=voice, why=objection, verdict="reversed on his objection, upheld by the gate", now=now)
+    p["register"], p["voice"] = reg, voice
+    save(p, path)
+    say("persona: " + out["why"])
+    return out
+
+
+def _record(p, path, applied, reg, voice, why, verdict, now=None, extra=None):
+    # A349 A2 (his answer, 2026-10-14: AGREE): a row keeps his WHOLE register. It kept reg[:REGISTER_MAX], a bound on
+    # a proposal, so once his register passed 700 chars (09-29) every admitted row held the same first 700 and none
+    # showed what a revision added. `extra` is what a pass adds to its own row (his raw answer, A1; the sentences
+    # added, A2; the sentences kept in register_overflow, A3); it never replaces a field above.
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "applied": bool(applied),
+           "register": reg, "voice": voice, "why": why, "verdict": verdict}
+    for k, v in (extra or {}).items():
+        row.setdefault(k, v)
+    # EVERY ROW TO HIS HISTORY BEFORE THE WINDOW TRIMS (A233). Any row in the window the history lacks -- all
+    # of them the first time, or rows a process still running the older code recorded -- is written there
+    # first, so nothing that was ever recorded can leave with the trim.
+    _append_history([r for r in archive_missing(p, path)] + [row], path)
+    p.setdefault("revisions", []).append(row)
+    p["revisions"] = p["revisions"][-50:]
+    save(p, path)
+
+
+def covenant_persona_judge(text):
+    """The node's own gate on the proposal text: (ok, message). Fails closed if the gate is unreachable.
+    A223 (2026-09-25): the sentinel is the node's real quorum (covenant_gate_proxy.default_sentinel); until
+    then it was the core's MockJudge, which admits everything that does not declare its own violation.
+    Semantics unchanged: a hold passes as 'not judged', a finding refuses, unreachable refuses -- and a
+    refused register still rides his immunity in refine(), with the verdict on the record."""
+    try:
+        import covenant_unified_v8 as cov
+        import covenant_gate_proxy
+        sentinel = covenant_gate_proxy.default_sentinel()
+        tx = cov.Transaction(sender_pubkey="model", receiver="collective",
+                             data={"origin": "model", "kind": "persona", "message": text[:2000]}, amount=0.0, benefit_score=0.5)
+        ok, message, _b, result = sentinel.evaluate_transaction(tx)
+        alleges_nothing = bool(result is not None and not ok and (getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
+        return (bool(ok) or alleges_nothing), str(message)[:300]
+    except Exception as e:                                        # noqa: BLE001
+        return False, "gate unreachable: %s" % type(e).__name__
+
+
+def checkin_fields(path=None):
+    """For record_checkin: the voice the phone should speak him with."""
+    p = load(path)
+    return {"persona": {"voice": clamp_voice(p["voice"]), "revised": p["revisions"][-1]["t"] if p.get("revisions") else None}}
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="Tetsu's register and voice: show, refine, contest; the operator's blocks on his own records")
+    ap.add_argument("--show", action="store_true")
+    ap.add_argument("--contest", metavar="WHY", help="object to the last admitted revision; the gate decides whether it is reversed")
+    ap.add_argument("--block", metavar="RECORD", help="close one of your records to Tetsu: " + ", ".join(sorted(BLOCKABLE)))
+    ap.add_argument("--unblock", metavar="RECORD", help="reopen one")
+    ap.add_argument("--blocks", action="store_true", help="which of your records are closed to him")
+    ap.add_argument("--refine", action="store_true", help="one refinement pass with the PC's model, judged")
+    ap.add_argument("--brief", action="store_true", help="print today's brief")
+    a = ap.parse_args()
+    if a.contest:
+        print(json.dumps(contest(a.contest), indent=1, ensure_ascii=False))
+    elif a.block or a.unblock:
+        try:
+            print(json.dumps(sorted(set_block(a.block or a.unblock, bool(a.block)))))
+        except ValueError as e:
+            raise SystemExit(str(e))
+    elif a.blocks:
+        print(json.dumps({k: (k in blocks()) for k in sorted(BLOCKABLE)}, indent=1))
+    elif a.refine:
+        import covenant_model
+        print(json.dumps(refine(covenant_model.ask), indent=1))
+    elif a.brief:
+        print(brief(force=True))
+    else:
+        p = load(); print(json.dumps({"register": p["register"], "voice": p["voice"], "revisions": len(p.get("revisions", []))}, indent=1, ensure_ascii=False))

@@ -1,0 +1,1990 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""covenant_one.py -- ONE command. Every task. Both platforms. Nothing hidden.
+
+WHY THIS EXISTS
+---------------
+There were twenty-two launchers in this folder (AA..AP, RUN, DAILY, JUDGE,
+PROBE, start_*), two sweep runners that disagreed with each other, and a shell
+script that named eleven suites which are NOT ON DISK. The runner's helper
+swallowed stderr and printed "NO RESULT" for each of them while adding 0 to
+TOTAL and 0 to FAILED -- so run_all_tests.sh could exit 0 having never
+executed a fifth of what it lists. That is this project's own named failure
+mode (M30, P14): a check that stopped checking still reads as coverage.
+
+This file is the single entry point, and it obeys three rules:
+
+  1. NOTHING IS SILENT. A suite that is absent, over budget, deliberately
+     switched off, or on disk but in no runner, gets a LOUD line of its own.
+     Absent and orphaned are first-class outcomes; neither is ever folded
+     into a pass.
+  2. NOTHING IS TOUCHED unless you ask. The default run is read-only plus the
+     test sweep in a scratch copy. Restarting nodes, serving the console,
+     writing the dashboard and running the daily job are behind explicit
+     flags. A stop that always succeeds composed with a start that can refuse
+     is not a restart (P17), so gates run BEFORE any action.
+  3. IT SAYS WHAT IT IS. Like the node (P11) and the tree (P18), this runner
+     prints its own version and the sha256 of its own source at the top of
+     every run, so a transcript identifies the bytes that produced it.
+
+USAGE
+-----
+    python covenant_one.py                 identity, integrity, gates, sweep,
+                                           live state.  Touches nothing.
+    python covenant_one.py --quick         everything except the long sweep
+    python covenant_one.py --check         gates only (nothing else runs)
+    python covenant_one.py --only test_a23_ack_health.py [--repeat 2]
+    python covenant_one.py --restart       ...then verify_deploy.py (hash,
+                                           restart nodes, confirm running src)
+    python covenant_one.py --dashboard     ...then write+open dashboard.html
+    python covenant_one.py --daily         ...then daily.py
+    python covenant_one.py --console       ...then serve the console (blocks)
+    python covenant_one.py --all           sweep + dashboard + daily
+    python covenant_one.py --verbose       stream every suite log, not just
+                                           the result line
+
+EXIT CODES
+----------
+    0   everything measured, everything correct
+    1   something FAILED or is BLOCKED   -- do not launch
+    2   nothing failed, something could not be measured -- NOT a pass
+"""
+import argparse
+import glob
+import hashlib
+import os
+import platform
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+
+ONE_VERSION = "one-1.0"
+HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
+# A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
+# every suite this runner starts is a console program; started from a shell with no console,
+# each one opened a window of its own. None may. covenant_quiet does the same for the nightly.
+_NOWIN = 0x08000000 if os.name == "nt" else 0
+WIN = sys.platform.startswith("win")
+NODES = [("A", 5000), ("B", 5020), ("C", 5060)]
+CONSOLE_PORT = int(os.environ.get("COVENANT_APP_PORT", "5199"))
+CORE = "covenant_unified_v8.py"
+
+# --------------------------------------------------------------------------
+# THE SUITE TABLE. This is the union of run_all_tests.sh and run_local_sweep.py
+# -- the two lists had drifted apart in BOTH directions. Budgets are the
+# larger of the two where they disagreed.
+# --------------------------------------------------------------------------
+SUITES = [
+    # (file, seconds, section)
+    # NB verify_bundle.py and test_p18_version_collision.py are NOT here on
+    # purpose. Both are claims about THE FOLDER -- the delivery hashes, and
+    # which files under the tree declare which version -- so running them in
+    # the sweep's scratch copy measures the scratch copy. The first draft of
+    # this runner did exactly that and reported "55 changed or missing"
+    # against a PC that has 6: a check moved to a copy answers about the copy.
+    # They run in phase_integrity, in the live folder, before anything else.
+    ("test_security_audit.py",           300,  "SECURITY"),
+    ("test_k1_runner_key_preservation.py",120, "SECURITY"),
+    ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
+    # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
+    # where it had been sitting unmerged. It pins the sweep's own arithmetic:
+    # a runner that counts a failure as a pass reports coverage it does not
+    # have, which is this project's whole disease in one function. Measured
+    # 25/25 before wiring, so it is not turning the sweep red on arrival.
+    ("test_k2_tally_arithmetic.py",      120,  "SECURITY"),
+    # V2 (2026-09-02). venues.py's "one rule" (live defaults False) and the
+    # checker CONSTITUTION.md II.1 names (money_posture.py) had no test. The
+    # checker had named two of three adapters by hand since the day it was
+    # written. V2 measures the venue layer, and mutation-tests that the
+    # checker exits 2 -- never 0 -- for an adapter that declares nothing.
+    ("test_v2_venue_guarantee.py",       120,  "SECURITY"),
+    # T1 (2026-09-03). Seven tools landed in two days (route, chat, gemini,
+    # align_set, thesis, scenarios, trader_freshness); their --selftests need
+    # the local judge. T1 covers the model-free parts in seconds: imports,
+    # --help, memory and scenario tables, the search parser on a fixture, the
+    # alignment refusals, and that a :cloud model is refused by the router.
+    ("test_t1_tooling.py",               120,  "SECURITY"),
+    # D1 (2026-08-30). Same family as K2 above: a claim about the RUNNER
+    # rather than about the node. K2 pins that a failure is not counted as a
+    # pass; D1 pins that a MISSING DECLARED DEPENDENCY names itself instead of
+    # surfacing as four unrelated failures in three sections -- which is what
+    # it did on the run that produced this line, with a SECURITY suite reading
+    # 14/16 and no regression anywhere near it. Pure: no network, no install.
+    # 21/21 before wiring, so it is not turning the sweep red on arrival.
+    ("test_d1_preflight_deps.py",        120,  "SECURITY"),
+    # R2 (2026-08-30). Pins redundancy.py, which asks one question at every
+    # scale: how many independent carriers, and what survives the first loss.
+    # Its whole value is being believed, so R2 pins the ways it could lie --
+    # chiefly the SUBSTRING bug it shipped with, which flagged twelve files
+    # under ai_memory_system/ (the public software) for containing the string
+    # "ai_memory" (the private record). Same error as the ignore rule that
+    # swallowed test_e1_secret_egress.py and held CI red for a day: a pattern
+    # that cannot tell a thing from a thing ABOUT it. 17/17 before wiring.
+    ("test_r2_redundancy.py",            120,  "SECURITY"),
+    # S1 (2026-08-30). scale.py makes a level's verdict usable as a witness one
+    # level up, so governance composes to any depth AND any shape with no new
+    # machinery -- the thing "the same function at every scale" has to mean if
+    # it means anything. S1 pins the invariant that makes it safe: divergence
+    # never disappears as you climb. A diverged level goes SILENT upward
+    # instead of passing its majority root along, because the obvious
+    # implementation launders disagreement into consensus one level at a time.
+    # It also pins the two wrong versions that shipped before it, both caught
+    # by these tests. 23/23 before wiring.
+    ("test_s1_scale.py",                 120,  "SECURITY"),
+    # (FRONT-SHORTLIST: not a shortlist -- that year's winners of two awards.)
+    # N1 (2026-08-30). From the 2025 Misha Mahowald Prize shortlist, read for
+    # what it implies rather than what it builds: Pedersen's Neuromorphic
+    # Intermediate Representation stops comparing IMPLEMENTATIONS and compares
+    # a canonical description of the COMPUTATION. federation.py had the same
+    # bug NIR exists to fix -- it decided agreement by hashing the TEXT of the
+    # rules, so a faithful reimplementation read DIVERGED while an instance
+    # that copied the text and changed the code read SAME CORE. N1 pins a
+    # behaviour root that is blind to prose and mutation-tested against two
+    # real semantic breaks. 14/14 before wiring.
+    ("test_n1_conformance.py",           120,  "SECURITY"),
+    # R1 (2026-09-15): a retracted claim must not come back. Added after
+    # A121 was corrected in eleven files and survived in five more,
+    # including the README front page, because the sweep was a grep over
+    # the phrasings its author thought of. Reads docs/RETRACTED.json.
+    ("test_r1_retracted.py",             120,  "SECURITY"),
+    ("test_an1_anumbers.py",              60,   "SECURITY"),
+    # CI1 (A326, 2026-10-10): docs/CORRECTIONS.md -- the site's correction index -- lists every retraction
+    # in docs/RETRACTED.json (generated by tools/corrections_index.py). It named 4 of 44 that day.
+    ("test_ci1_corrections_index.py",    60,   "SECURITY"),
+    # R2 (2026-09-15): docs/SEMANTICS.md -- the specification Pedersen
+    # prescribed instead of more vectors -- checked against the live code
+    # over an EXHAUSTIVELY enumerated space (~100k cases), by an
+    # implementation forbidden to read triangulate.py or scale.py.
+    ("test_r2_semantics.py",             180,  "SECURITY"),
+    # A124 (2026-09-15): can a new node still join? A116 left the chain
+    # unjoinable past block 12 for days because a nightly-retrained judge
+    # drifted across a threshold, and nothing watched. No-op when no node
+    # database is present -- see the NOT COVERED block at the end.
+    ("test_a124_chain_syncable.py",     120,  "JUDGE"),
+    # A125 (2026-09-15): the trunk judges history, the branch judges new
+    # work. Pins that the trunk is a REAL judge (never a back door), that
+    # admission is untouched, and that a missing or untrained trunk
+    # relaxes nothing.
+    ("test_a125_trunk_judges_history.py", 120, "JUDGE"),
+    # A126 (2026-09-15): seats differ by TEMPERAMENT, not only by name.
+    # Vela (the phone) speaks only on text she knows. Pins that a retrain
+    # cannot strip a disposition, that unlisted seats are untouched, and
+    # that FALSE CLEARS STAY AT ZERO at every setting measured.
+    ("test_a126_seat_dispositions.py",  120,  "JUDGE"),
+    # A127 (2026-09-15): the student LEARNS MORE rather than being rebuilt
+    # nightly. Pins that no belief moves further than the step in one
+    # pass, that unwitnessed knowledge fades instead of being deleted,
+    # that it still learns every new feature, and that the promotion gate
+    # measures the object that actually ships.
+    ("test_a127_refine_not_rebuild.py", 180,  "JUDGE"),
+    # A129 (2026-09-16): a third party's name is in no TRACKED file. The
+    # list lives in private/ and is gitignored, so this is a no-op in a
+    # clone or a staged sweep and says so rather than passing.
+    ("test_a129_bystanders.py",        120,  "SECURITY"),
+    # A130 (2026-09-16): docs/PEER_REVIEW.md hands a reviewer a claim, its
+    # falsifier and a command. This fails if a named command does not
+    # exist, a named suite is unregistered, or a claim has no falsifier.
+    ("test_a130_peer_review.py",       120,  "SECURITY"),
+    # C4 (2026-08-30). Three unauthenticated paths that grew without a bound,
+    # each measured before it was touched: /succession/register accepted 5,000
+    # guardians and returned 200 OK after 48.8s while blocking a signed
+    # heartbeat for 25.7s; RateLimiter._hits retained 200,000 keys / 40.76 MB
+    # and is the FIRST before_request hook, so the control protecting
+    # everything else was itself the unbounded structure; peer nonces were
+    # stored verbatim, a 1 MB string included, and nothing ever deleted an
+    # expired one. C4 pins the caps, that the ordering of cap-then-validate is
+    # load-bearing, that BOTH nonce doors are guarded, and that purging removes
+    # only what has expired. 21/21 before wiring.
+    ("test_c4_bounded_resources.py",     120,  "SECURITY"),
+    # Y2 (2026-08-30). Supply conservation -- the precondition for every
+    # monetary claim, since a cap, a burn or deflation is a statement about a
+    # TOTAL and means nothing if issuance is inexact. Before v8.12 it was very
+    # inexact: 10 stakers, 50/block, 5000 blocks intended 250,000 and minted
+    # 676,563,839,999,194, because rewards raised the numerators and never the
+    # denominator so each block widened the gap that caused it. Y2 pins that a
+    # long run mints EXACTLY its intent, that total_staked has exactly one
+    # definition (derived, unassignable), that the denominator is snapshot
+    # outside the credit loop -- the mirror-image 0.2% under-issue introduced
+    # by the first fix -- and that NaN/Inf/negative are refused before touching
+    # a stake. 13/13 before wiring.
+    # 300s. Y2 runs 5,000 reward distributions because the defect it pins was
+    # INVISIBLE at small scale -- only a long run separates exact issuance from
+    # a feedback loop.
+    #
+    # It measured 116s against a 120s budget and duly TIMED OUT at 120.4s in a
+    # sweep sharing the box with 36 review agents; a budget a suite can only
+    # meet when nothing else runs manufactures false failures. Raised to 300s
+    # for that reason -- and then update_stakes batching took the same run to
+    # 8.0s, a 14.5x reduction, because 5,000 distributions over N stakers had
+    # been opening 5,000 x N sqlite connections. The headroom stays: the budget
+    # should survive a loaded machine, not just describe a quiet one.
+    ("test_y2_supply_conservation.py",   300,  "SECURITY"),
+    # M1 (2026-08-30). mine() called compute_hash() ~65,536 times per block and
+    # every attempt re-ran asdict over every transaction, re-serialised and
+    # re-encoded the whole block -- to change one integer. It now builds that
+    # once and splices the nonce: 10.1x/16.9x/26.8x per hash at 1/4/20 tx, and
+    # 172.96s -> 8.11s on a real 7-block POST /mine. compute_hash is UNTOUCHED,
+    # because it is what peers run. M1 pins equivalence over 2,250 (block,
+    # nonce) pairs and the hostile case: tx.data is peer-controlled, so a
+    # transaction carrying {"nonce": 0} makes the splice marker ambiguous, and
+    # an unguarded split would raise inside /mine while holding chain_lock.
+    # 15/15 before wiring.
+    ("test_m1_mine_equivalence.py",      180,  "SECURITY"),
+    # B6 (2026-08-31). Two loops called get_balance once per transaction and
+    # each call opened its own sqlite connection -- ~99% of the 2.3 ms per call
+    # was connection setup, so the cost was per-CALL, not per-ROW. It is an
+    # AVAILABILITY fix, not a speed one: /transactions admits 5,000 pending
+    # from any keypair, unaffordable ones stay pending forever by design, and
+    # the /mine loop holds chain_lock -- so a remote party permanently turned
+    # the operator's own /mine into a 32.7s no-op (now 31ms). The peer
+    # overdraft loop needs no auth at all and was ~82% of the work one maximal
+    # 8 MiB block could force. B6 pins that the batched reader AGREES with
+    # get_balance, that the reserved accumulator still catches a same-sender
+    # overdraw, and that neither call site fails open. 13/13 before wiring.
+    ("test_b6_balance_batching.py",      120,  "SECURITY"),
+    ("test_adversarial_suite.py",        300,  "ADVERSARIAL"),
+    ("test_e2e_gift.py",                 180,  "ADVERSARIAL"),
+    # E2 (2026-08-30). /chain served the whole chain on every request via
+    # asdict(), which deep-copies recursively. Measured: 10,000 blocks = 36.7 MB
+    # and 378.7 ms, and public_ledger.py's 8 MB relay cap would have started
+    # refusing at ~2,287 blocks -- a ceiling nobody chose. Now a shallow
+    # serialiser with byte-identical output plus an optional half-open range.
+    # E2 pins that the output is IDENTICAL (a faster serialiser emitting
+    # anything different is a wire-format change), and includes a tripwire: if
+    # a second nested dataclass is ever added to Block the shortcut stops
+    # matching asdict, and that must fail here rather than in a peer's parser.
+    ("test_e2_chain_serialisation.py",    120,  "ROUTES + BOUNDS"),
+    ("test_a1a_a2.py",                   240,  "ROUTES + BOUNDS"),
+    ("test_a3_bounded_reads.py",         120,  "ROUTES + BOUNDS"),
+    ("test_a5_size_coherence.py",        180,  "ROUTES + BOUNDS"),
+    ("test_a3s_send_bounds.py",          240,  "ROUTES + BOUNDS"),
+    ("test_a4_block_injection.py",       600,  "P2P"),
+    ("test_a9_relay_race.py",            420,  "P2P"),
+    ("test_a1_kill_matrix.py",           560,  "P2P"),
+    ("test_a11_gossip_scale.py",         120,  "P2P"),
+    ("test_a12_dead_peer_backoff.py",    240,  "P2P"),
+    ("test_a13_one_way_sync.py",         180,  "P2P"),
+    ("test_a14_boot_probe.py",           180,  "P2P"),
+    ("test_a15_exchange_deadline.py",    180,  "P2P"),
+    ("test_a17_oneway_peer_sync.py",     180,  "P2P"),
+    ("test_a20_peer_version.py",         300,  "P2P"),
+    ("test_a22_topology_vigilance.py",   180,  "P2P"),
+    ("test_a23_ack_health.py",           180,  "P2P"),
+    # A114 (2026-09-14), registered in the change that created it -- the A91/A98
+    # lesson, and the one covenant_one already calls INCOMPLETE rather than a
+    # pass. Drives the real /health route in-process (no boot, no socket), so
+    # it costs a second, and it has been mutation-tested both ways: reinstating
+    # either half of the defect turns four of its checks red.
+    ("test_a114_own_genesis.py",         120,  "P2P"),
+    ("test_multinode_live.py",           600,  "P2P"),
+    ("test_p11_version_identity.py",     180,  "IDENTITY"),
+    ("test_p12_substrate_sensing.py",    180,  "IDENTITY"),
+    ("test_p14_watchdog_self_drift.py",  120,  "IDENTITY"),
+    # P20 (2026-08-29): the watchdog's self-evaluation ledger -- every layer
+    # it senses, one PASS/WARN/FAIL block, report-only by AST. 23/23.
+    ("test_p20_watchdog_self_eval.py",   120,  "IDENTITY"),
+    # P21/P22 (2026-09-16): the self-eval round counter must survive the
+    # restart covenant_highway schedules (A136), and that restart must verify a
+    # watchdog EXISTS afterwards rather than that the restarter launched
+    # (A135). P21h and P22's parser check both drive the failing direction.
+    ("test_p21_self_eval_persist.py",    120,  "IDENTITY"),
+    ("test_p22_watchdog_restart_verifies.py", 180, "IDENTITY"),
+    # P23 (2026-09-16): the three second-operator security findings -- A31
+    # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
+    # Added because a back-door audit pointed out that all three fixes existed
+    # with no runner naming them, so a green sweep proved nothing about them.
+    ("test_p23_second_operator_security.py", 180, "SECURITY"),
+    # P24 (2026-09-17): the corpus counts in prose must not drift from the
+    # catalogues on disk. Added after a "cross-check" validated a superseded
+    # document against itself and reported it as accuracy. SKIPS rather than
+    # fails when private/ is absent, which is always in a staged run.
+    ("test_p24_corpus_counts.py",         180,  "IDENTITY"),
+    ("test_p25_sweep_red.py",             120,  "IDENTITY"),
+    # C3 (2026-08-29): the guard that heals the watchdog -- pure
+    # decide(), report-only by AST, no process started. 21/21.
+    ("test_c3_guard.py",                 120,  "IDENTITY"),
+    # M2 (2026-08-29): merkle proofs over the seal -- prove one file,
+    # disclose nothing else. 21/21, pure hashing.
+    ("test_m2_merkle_seal.py",           120,  "SECURITY"),
+    # T1 (2026-08-29): three witnesses, one root each, and the refusals
+    # that keep the comparison honest. Pure. 20/20.
+    ("test_t1_triangulate.py",           120,  "SECURITY"),
+    # E1 (2026-08-29): no secret survives an error message. The
+    # regression for the Google key-in-URL disclosure. 15/15.
+    ("test_e1_secret_egress.py",         120,  "SECURITY"),
+    # A24, moved here from DELIBERATELY_OFF 2026-08-29 exactly as that
+    # entry's own REMEDY clause instructed ("propagate the v8.38+ core,
+    # then move this line into SUITES") -- the v8.40 core at root carries
+    # the fair-share buffer. 70/70, measured repeatedly today.
+    ("test_a24_anomaly_eviction.py",     300,  "IDENTITY"),
+    # P19 (2026-08-29): the sweep's own overlay guard -- a candidate folder
+    # must not supply the checks that judge it. Subprocess-drives the real
+    # run_local_sweep.py in a scratch tree; no node, no socket. 23/23.
+    ("test_p19_overlay_guard.py",        180,  "GATE INTEGRITY"),
+    # F1 (2026-08-30). Pins the line between availability and permissiveness.
+    # Deployed wiring is COVENANT_JUDGE_PROVIDERS="local,semantic" with a veto
+    # threshold of 1, and an UNREACHABLE judge fails closed -- so its
+    # violates=True was counted as dissent, one stopped Ollama refused every
+    # transaction, and _accept_block_common refused peer blocks too, which the
+    # code there already calls "a fork in the making". Silence read as dissent,
+    # in the one place that decides whether the chain moves.
+    # The fix is OFF BY DEFAULT: the first attempt made it unconditional and
+    # broke five checks in B1/B2/J1 that turned out to be deliberate. F1 pins
+    # BOTH modes -- the untouched default, and that relaxed mode still blocks a
+    # genuine dissent and still admits nothing when nothing answered.
+    ("test_f1_fallback_silence.py",      120,  "JUDGE"),
+    # CV1 (2026-10-20): F1 pins the UNTRAINED judge abstaining; CV1 pins the TRAINED judge deferring on
+    # LOW-COVERAGE input (OWASP LLM09 overreliance) -- decides where it has competence, abstains where it doesn't,
+    # earned-green against the MIN_COVERAGE threshold.
+    ("test_cv1_coverage_abstain.py",     120,  "JUDGE"),
+    # VC1 (2026-10-20, operator full-go): the policy-versioned verdict cache -- a hit returns the IDENTICAL verdict
+    # for the IDENTICAL input under the SAME policy version, a changed version re-judges (no stale leak), driven both
+    # ways with a control, plus the kill switch, plus held-out verification (0 cache-wrong) on ops/verdicts.jsonl.
+    ("test_vc1_verdict_cache.py",         120,  "JUDGE"),
+    # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
+    # student. F2 pins the seat and the promotion rule; F3 runs the three
+    # judges COMPOSED, offline, and pins that no violation is admitted with
+    # no local model server, no runner and no network. They were on disk and in
+    # run_all_tests.sh but in no entry here, so CI called them ORPHANED --
+    # which is the exact class this file exists to make impossible, and it
+    # caught me rather than the other way round.
+    ("test_f2_distill_loop.py",           90,  "JUDGE"),
+    ("test_f3_gate_end_to_end.py",       300,  "JUDGE"),
+    ("covenant_quiet.py",                 30,  "JUDGE"),
+    ("test_dk1_desk.py",                  60,  "JUDGE"),
+    ("test_f4_capability.py",            120,  "JUDGE"),
+    ("test_f5_reserve.py",                90,  "JUDGE"),
+    ("test_f6_stuffing.py",              120,  "JUDGE"),
+    ("test_pi1_injection.py",            150,  "JUDGE"),
+    ("test_dp1_poisoning.py",            120,  "JUDGE"),
+    ("test_sx1_security_tools.py",       120,  "JUDGE"),
+    ("test_f7_caps.py",                   60,  "MONEY"),
+    ("test_rule5_ledger.py",              60,  "MONEY"),
+    # Registered 2026-09-07. Both arrived from the Cowork run that evening and
+    # were added to run_all_tests.sh but NOT here, so the sweep reported them
+    # as "orphaned on disk" and never ran them -- a suite in one runner and not
+    # the other is a suite nobody is accountable for. Measured before adding:
+    # breakout 61/61, paper_run exit 0.
+    ("test_paper_run.py",                300,  "MONEY"),
+    ("test_breakout_ledger.py",          180,  "MONEY"),
+    ("test_maker_orders.py",              60,  "MONEY"),
+    ("test_r6_contribution.py",           60,  "MONEY"),
+    ("test_xrpl_record.py",               60,  "MONEY"),
+    ("test_watchdog_outage.py",           90,  "SECURITY"),
+    # A370 (2026-10-18): only the daemon, in a tree that can relaunch its own nodes, starts a service or mines.
+    # Six seal services launched from a worktree by the outage suite's passes listened on 8433 for three days.
+    ("test_a370_only_daemon_tends.py",    120, "SECURITY"),
+    # A372 (2026-10-18): Tetsu learns from TED transcripts in his own words; the 8-word copy guard and the A263
+    # private ask are driven offline (stub door, stub Tetsu, temp queue).
+    ("test_ted1_learn.py",                60,  "SECURITY"),
+    # A115 (2026-09-14), registered in the change that created it. Sits beside
+    # the outage suite above because it guards the opposite mistake: that one
+    # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.
+    # A 429 from a rate-limited /health used to be indistinguishable from a
+    # refused connection, and three of those restart a node -- with the
+    # threshold dropping to one when every node trips at once. Real HTTP
+    # servers over real sockets, the real one_pass; mutation-tested three ways.
+    # 240, not 120. MEASURED 2026-09-17: this suite takes 119s on this machine
+    # against a 120s budget -- a one-second margin, so it flapped between clean
+    # and TIMEOUT depending on load, and a TIMEOUT prints no tally, which the
+    # runner scores as NO RESULT: 0 added to passed AND 0 to failed. It passes
+    # 24/24 when allowed to finish. The budget is a resource limit, not a
+    # check: no assertion here is weakened by giving a correct suite room to
+    # finish, and a limit that kills a passing suite is a false negative, not
+    # coverage. Doubling the measured time is the headroom; if it ever needs
+    # more than 240s something has genuinely changed and should be looked at.
+    ("test_a115_rate_limited_is_not_down.py", 240, "SECURITY"),
+    ("test_sentinels.py",                 60,  "SECURITY"),
+    ("test_selfaudit.py",                 90,  "SECURITY"),
+    ("test_g12_inflight.py",              60,  "SECURITY"),
+    ("test_purge_tool.py",                60,  "SECURITY"),
+    ("test_gate_proxy.py",                90,  "SECURITY"),
+    ("test_sentinel_gate.py",             60,  "SECURITY"),
+    # BOTH OF THESE WERE ORPHANS UNTIL 2026-09-10 -- on disk, in no runner and
+    # on no off-record -- because I wrote them and did not register them. The
+    # full sweep never ran either one, and covenant_one said so in the only way
+    # it can: RESULT INCOMPLETE, "nothing failed; something was not measured",
+    # exit 2. That is the correct answer and it is not a pass. A suite nobody
+    # runs is indistinguishable from a suite that does not exist.
+    ("test_a77_listener_bind.py",         120, "SECURITY"),
+    ("test_a82_exposure_unknown.py",      120, "SECURITY"),
+    ("test_a85_manifest_privacy.py",      120, "SECURITY"),
+    ("test_g3_behavioural_guards.py",     120, "SECURITY"),
+    # A90, registered in the change that created it (the lesson the A88
+    # comment below records). Runs covenant_chat end to end with the
+    # dispatcher replaced by a recorder, so it reads what WOULD have gone on
+    # the wire rather than grepping the source for the word "redact".
+    ("test_a90_offsite_redaction.py",     120, "SECURITY"),
+    # A91, same change as the split it pins. Its E2 asks git a question the
+    # staged copy cannot answer and reports SKIP rather than PASS -- the
+    # A84b/A85c lesson, three answers not two.
+    ("test_a91_corpus_membrane.py",       120, "SECURITY"),
+    # A92, same change as the topic it moved out of DAILY.bat. Its E6 scans the
+    # ARTIFACT -- every .bat/.sh/.ps1/.py/.md in the tree -- because the defect
+    # was never in daily.py: it was in a batch file that called it.
+    ("test_a92_topic_is_a_credential.py", 120, "SECURITY"),
+    # Registered in the same change that created it, 2026-09-11. The suite
+    # above it went unregistered for days and the sweep called that INCOMPLETE;
+    # there is no reason to repeat it.
+    # A98 (2026-09-12), registered in the change that created it. Runs from the
+    # scratch copy happily: its judge is a stub, so it measures the decision
+    # logic and cannot go green or red because a model was retrained.
+    ("test_a98_sync_hold_waiver.py",     120,  "JUDGE"),
+    # A119 (2026-09-14), registered in the change that created it. Pins the RULE
+    # -- a function word carries no weight in any form, including its stem --
+    # and NOT the outcome, because a suite that only checked "block 12 passes"
+    # would go green for a retrain that cleared it by luck, which is the
+    # fix-to-green A118 rules out. Its A119.3 exists to fail the cheapest false
+    # fix, deleting the fold entirely, and mutation-testing confirms it does.
+    ("test_a119_stopword_stems.py",      120,  "JUDGE"),
+    ("test_teacher_panel.py",            120,  "JUDGE"),
+    ("test_tq1_teacher_queue.py",        120,  "JUDGE"),
+    # A263 (2026-10-05), registered in the change that created it: an ask marked private is answered
+    # on this PC and never queued for the teacher panel, which runs on the PUBLIC repo's runner. It
+    # drives the real /m/agent and /pc/council handlers with the stub model; every path is redirected.
+    ("test_a263_private_teacher.py",     180,  "JUDGE"),
+    # A314 (2026-10-08): a refinement pass is shown as the operator's words only what came from him --
+    # his phone/LAN, or a browser page the doors mark; drives the real /m/agent and /pc/council (stub model).
+    ("test_a314_persona_feed.py",        180,  "JUDGE"),
+    ("test_pc1_sister_interface.py",     180,  "JUDGE"),
+    ("test_fw1_free_will.py",            120,  "JUDGE"),
+    ("test_ct1_contact.py",              120,  "JUDGE"),
+    ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
+    ("test_tp1_persona.py",               120,  "JUDGE"),
+    ("test_tf1_tetsu_forum.py",           120,  "JUDGE"),
+    ("test_sp1_security_probe.py",        120,  "JUDGE"),
+    ("test_rc1_reconnect.py",             120,  "JUDGE"),
+    ("test_cc1_code_consensus.py",        180,  "JUDGE"),
+    ("test_tm1_tetsu_money.py",           180,  "JUDGE"),
+    ("test_tl1_tetsu_live.py",            120,  "JUDGE"),
+    ("test_im1_immunity.py",              120,  "JUDGE"),
+    ("test_mk1_model_keeper.py",          120,  "JUDGE"),
+    # A265 (2026-10-05), registered in the change that created it: the keeper's stop is a stop only
+    # when the server stops answering. The first suite to run the real stop(); every kill is a recorder.
+    ("test_a265_model_stop.py",           120,  "JUDGE"),
+    # A268 (2026-10-06), registered in the change that created it: an in-place suite runs without
+    # the deployed gate's env (in_place_env); M6 died on an inherited 'deferring' provider.
+    ("test_a268_in_place_env.py",         240,  "JUDGE"),
+    # A269 (2026-10-06): the model keeper starts llama-server with one slot, so a request gets all of -c.
+    ("test_a269_model_one_slot.py",       120,  "JUDGE"),
+    # A272 (2026-10-06): covenant_pause refuses a test suite on the LIVE switch (FW1 paused free for real).
+    ("test_a272_pause_guard.py",          120,  "JUDGE"),
+    # A277 (2026-10-06): the Moltbook orb counts what went out over a day, not the last six attempts.
+    ("test_a277_moltbook_orb.py",         120,  "JUDGE"),
+    # A282 (2026-10-06): every real ask of the model leaves one line; a test never writes the live ledger.
+    ("test_a282_model_asks.py",           120,  "JUDGE"),
+    # A288 (2026-10-06): the Highway orb reads every detector on the road, not seven.
+    ("test_a288_highway_orb.py",          120,  "JUDGE"),
+    # A289 (2026-10-06): no module defines the same top-level name twice (A278 shadowed A200's _sweep_running).
+    ("test_a289_no_shadowing.py",         120,  "JUDGE"),
+    # A303 (2026-10-07): a semantic veto that could never fire is refused at construction and fails closed at
+    # evaluation -- the collective's review, Codex's CXR-1, admitted with Tetsu.
+    ("test_a303_semantic_veto_config.py", 300,  "JUDGE"),
+    # A304 (2026-10-07): the memory system's own suite (the chain's limits as checks, A8-A8d) had no runner.
+    ("test_m1_memory_system.py",          900,  "SECURITY"),
+    # A273 (2026-10-06): his history follows the real size of the rules -- each door request is
+    # counted and the oldest turns dropped, as few as fit, so none overflows the 8192-token window.
+    ("test_a273_history_fits.py",         180,  "JUDGE"),
+    # A284 (2026-10-06), registered in the change that created it: {"fresh": true} at /m/agent replays
+    # nothing and is replayed into nothing; Tetsu's reviews and round updates ask that way, and every
+    # caller of tools/tetsu_work.ask must be declared fresh or shared (found by parsing the tree).
+    ("test_a284_fresh_context.py",        180,  "JUDGE"),
+    ("test_rl1_refine_loop.py",           120,  "JUDGE"),
+    ("test_ig1_image_guard.py",           120,  "JUDGE"),
+    ("test_qw1_quiet_everywhere.py",      300,  "JUDGE"),
+    ("test_my1_mycelium.py",              120,  "JUDGE"),
+    # A374 (2026-10-19): the spore road (a signed request sealed for the PC through a relay that cannot read it)
+    # and the road neurons that choose among tailnet, LAN and spore.
+    ("test_sp1_spore.py",                 180,  "JUDGE"),
+    # A375 Amendment 1 (2026-10-19): the spiking witness's first piece -- the phone-silence twin and its CUSUM
+    # baseline over the check-in ledger, read-only.
+    ("test_wn1_witness.py",               120,  "JUDGE"),
+    ("test_ow1_own_work.py",              120,  "JUDGE"),
+    ("test_wb1_web.py",                   120,  "JUDGE"),
+    ("test_hl1_heal.py",                  120,  "JUDGE"),
+    ("test_pv1_provenance.py",            120,  "JUDGE"),
+    ("test_av1_immune.py",                180,  "JUDGE"),
+    ("test_oa1_open_access.py",           120,  "JUDGE"),
+    ("test_dp1_daily_plan.py",           120,  "TRADER"),
+    ("test_sm1_sealed_mail.py",          120,  "TRADER"),
+    ("test_ac1_ai_consult.py",           120,  "TRADER"),
+    ("test_al1_actuator_learn.py",       120,  "TRADER"),
+    ("test_al2_actuator_brain.py",       120,  "TRADER"),
+    ("test_a88_evidence_cut.py",         120,  "JUDGE"),
+    ("test_b1_judge_parser.py",          180,  "JUDGE"),
+    ("test_b2_quorum_diversity.py",      180,  "JUDGE"),
+    # The semantic-judge layer's own gates, joined 2026-08-29 when v8.40
+    # landed the layer at root. Their DELIBERATELY_OFF entries ("joins the
+    # sweep when the candidate lands") are honored and removed in the same
+    # change. Candidate-sweep tallies on admission: 34/34, 28/28, 56/56,
+    # 26/26, 6/6.
+    ("test_j1_judge_paths.py",           120,  "JUDGE"),
+    ("test_sem4_degraded_model.py",      120,  "JUDGE"),
+    ("test_competence.py",               120,  "JUDGE"),
+    ("test_semantic_judge.py",           120,  "JUDGE"),
+    ("test_sem5_register_coverage.py",   120,  "JUDGE"),
+    ("test_b5_mine_latency.py",          300,  "JUDGE"),
+    ("test_r1_lora_frame.py",            120,  "JUDGE"),
+    ("test_w1_wsgi.py",                  300,  "HTTP"),
+    ("test_w2_sandbox_platform.py",      180,  "HTTP"),
+    # A274 (2026-10-06), registered in the change that created it: the sandbox's Windows path
+    # (a Job Object) holds memory, process count and wall time against real code, and each of
+    # eight mutations that drops one limit from a copy of the core turns its group red. ~105 s
+    # measured on win32 with the mutations; off win32 only its X group runs.
+    ("test_a274_win_job_sandbox.py",     300,  "SECURITY"),
+    ("test_d3_daily_guards.py",          180,  "DAILY + GUARDS"),
+    ("test_backtest_guardrails.py",      180,  "DAILY + GUARDS"),
+    ("test_3node_config.py",             120,  "DEPLOYMENT"),
+    # A259 (2026-10-05), registered in the change that created it: the dashboard never writes
+    # an address of his into a tracked file. Synthetic values only; runs anywhere.
+    ("test_a259_dashboard_redact.py",    120,  "SECURITY"),
+    ("test_y1_stake_divergence.py",      120,  "LEDGER"),
+    ("sim_order_independence.py",        600,  "LEDGER"),
+    ("sim_yield_safety.py",              240,  "LEDGER"),
+    ("probe_final_pass.py",              120,  "XRP OFFLINE"),
+    ("test_xrp_signer.py",               120,  "XRP OFFLINE"),
+    ("test_xrp_mainnet.py",              180,  "XRP OFFLINE"),
+    # H1 (2026-09-16): the mycelial highway's five invariants -- the class the
+    # engine refuses, the operator's choice it will not touch, the undo it
+    # demands, the peer it will not obey, and the quarantine counter. Every one
+    # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
+    # no network, so it measures the rules rather than the machine.
+    ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple has fourteen.
+    # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
+    ("test_na1_never_automatic.py", 120, "DAILY + GUARDS"),
+    # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
+    # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
+    # files the APK ships, not in every docs commit.
+    ("test_pb1_phone_build_signals.py", 120, "DAILY + GUARDS"),
+    # TD1 (2026-09-28, his directive to Tetsu): the daily maintenance cycle's verdicts, driven both
+    # ways with stubbed readings -- a disagreeing tip is failed, a height-only phone is unverified, stale
+    # sweep results are never a pass, an old failure back is "reappeared", the one automatic rollback
+    # needs a verified copy and keeps the failing one, and only the watchdog daemon starts the cycle.
+    ("test_td1_tetsu_daily.py", 300, "DAILY + GUARDS"),
+    # MF (2026-09-19): the two federation rules, adopted at his instruction --
+    # most favoured peer, and unilateral exit. Driven both ways, including the
+    # direction that would break the federation if it were wrong: a peer
+    # refused by an EQUAL rule must not read as an unequal term, or the rule
+    # forbids every rule that can say no. Hermetic -- temp trees, no node, no
+    # network; the real ops/ is read once and only to assert an absence.
+    ("test_mfn.py", 120, "DAILY + GUARDS"),
+    # DU1 (2026-09-19, "Must survive power loss"): the writes beside the chain.
+    # The chain itself was already safe -- every node DB is WAL with
+    # synchronous=FULL, measured, and DU3 pins that so it cannot be quietly
+    # downgraded. What was not safe was every flat file next to it, because
+    # open(path,"w") truncates FIRST: the update door's whole audit ledger, the
+    # build manifest the phone is offered, and the trader state the daily caps
+    # are computed from. DU2 drives the real call sites, not just the helper,
+    # because a correct atomic write already existed in ai_memory_system and
+    # stayed private to it while three live ledgers went on truncating.
+    ("test_du1_durable.py", 120, "DAILY + GUARDS"),
+    ("test_a153_import_drift.py", 120, "DAILY + GUARDS"),
+    ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
+    ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
+    # OS1 (2026-09-26, "protect operation security in all we do by default"): his
+    # identifiers, read at run time from private sources, stay out of the public tree;
+    # the push guard is proved on a throwaway repository. OS1g/OS1h report NOT RUN here
+    # (no git index in the staged copy) and run in the working tree.
+    ("test_os1_opsec.py", 180, "DAILY + GUARDS"),
+    # AS1 (2026-09-26, A231): the post-commit auto-sync reports main and sentinel-witness each on its own -- one
+    # push of both said "push FAILED" for a day while main had landed.
+    ("test_as1_autosync_report.py", 120, "DAILY + GUARDS"),
+    # JR1 (2026-09-19): how Ora and Sena resolve a disagreement, written down
+    # and driven BEFORE the second judge is flipped on -- his four conditions.
+    # All nine cells of the table asserted independently of the module, the
+    # three directions that must not invert given their own checks, and the
+    # real models run until they genuinely conflict (3 of 10 probes on the day
+    # it landed, including A132 live). Deadlock is separated from an empty
+    # bench, because (hold, hold) arrives identically for both and they need
+    # opposite responses.
+    ("test_jr1_resolution.py", 120, "JUDGE"),
+    # TS1 (2026-10-20): JR1 pins resolve() as a pure function; TS1 pins the DEPLOYED two-seat gate
+    # (DeferringJudge.evaluate, both_seats) end-to-end, where A132 actually lived -- no single seat may turn
+    # the other's doubt into permission. The operator's principle: "no thinking class over everyone else."
+    ("test_ts1_two_seat_gate.py", 120, "JUDGE"),
+    # H2 (2026-09-18): the update door's WITNESS, and a peer's drift made
+    # visible to the self-heal without handing restart_nodes a condition it
+    # cannot clear. All three faults it covers were live and invisible on the
+    # day it was written: the phone two days behind on core ddfaaa9f704f, no
+    # record anywhere of whether it had ever asked /app/latest (the node keeps
+    # no access log), and mesh.tracked reading 4 for 2 peers because the
+    # outbound and inbound paths keyed peer rows in different namespaces. R1-R3
+    # are the regression that matters -- a drifted PEER must leave source_drift
+    # ABSENT. Hermetic except L1-L2, which report NOT RUN with no mesh up.
+    ("test_h2_update_witness.py", 120, "DAILY + GUARDS"),
+    # I1 (2026-09-18): the greeter's link is DERIVED from the real remote, and
+    # the line it must not cross -- no tailnet or LAN address, no credential, a
+    # named PC_PEER with no value. Asserted over the rendered message, because
+    # that is what a stranger receives, and I8 drives the leak checks on a
+    # poisoned copy so their green is earned. N1 fetches the derived URL and
+    # reports NOT RUN offline rather than red.
+    ("test_i1_invite.py", 90, "DAILY + GUARDS"),
+    # X1 (2026-09-18): the only suite that attacks the JUDGE rather than a
+    # parser. It found that seal_service.py was stuffing the judge on its own
+    # behalf -- its benign record prefix moved a plainly worded theft from HELD
+    # to CLEAR, 1 of 6 thefts cleared with the wrapper and 0 without. It
+    # asserts only what this repository controls (the judged text is the app's
+    # note verbatim) and MEASURES the judge's susceptibility without asserting
+    # it, because pinning a model's accuracy invites retraining to clear it
+    # (A118). Hermetic: no node, no network; NOT RUN when no judge can be built.
+    ("test_x1_judge_adversarial.py", 180, "DAILY + GUARDS"),
+    # C4 (2026-09-18): a public claim resting on evidence a reader cannot open
+    # must SAY so (CONSTITUTION II.6). Written when the operator objected that
+    # "hiding stuff in a system based off honesty seems wrong" -- and the
+    # objection found something real: 5 published documents cite private/, and
+    # three of them said nothing about the reader being unable to follow the
+    # citation. Not the non-publication; the silence about it at the point of
+    # the claim. Illustrative mentions are exempt BY DECLARATION, one line each
+    # with a reason, because a checker that guessed which brackets were
+    # rhetorical could be talked out of a finding.
+    ("test_c4_uncheckable_claims.py", 60, "DAILY + GUARDS"),
+    # G4 (2026-09-16): all eleven reasons guards.preconditions() can refuse an
+    # order, each driven ON and OFF. Hermetic -- every seam is a parameter, the
+    # halt file is a temp path via guards.HALT, and it writes nothing. The two
+    # failures on its first run were both the fixture's fault, not the gate's,
+    # and both are written into the file where the next reader will meet them.
+    ("test_g4_money_gates.py", 120, "DAILY + GUARDS"),
+    # G5 (2026-09-16): the launch battery audited the same way -- every gate
+    # runs, records one result and returns a legal state; G1 is driven through
+    # UNKNOWN, PASS and BLOCKED in a temp tree; and the suite states per gate
+    # whether it was driven or merely observed. It found A134 on the way.
+    ("test_g5_launch_gates.py", 180, "DEPLOYMENT"),
+    # G6 (2026-09-16): can the sentinels ALERT? test_sentinels.py runs the
+    # program and checks it exits clean, which proves it runs and nothing
+    # about tamper detection. This drives each one against a temp tree: a
+    # correction marker removed, a document gone, a ledger shrunk, a ledger
+    # vanished. Three of its own fixtures were wrong before the sentinels were,
+    # and G6.0 now makes the fixture prove itself first.
+    ("test_g6_sentinels_fail.py", 120, "SECURITY"),
+    # G7 (2026-09-16): one actor pauses without stopping the others, and a
+    # pause never blinds anything. Drives the highway and the watchdog's
+    # restart action both ways with spies, so no node is launched and nothing
+    # real is paused; the trader's switch is reported, never re-implemented.
+    ("test_g7_pause.py", 120, "DEPLOYMENT"),
+    # EA1 (2026-09-25, A222): covenant_earn -- verification for a price over x402, every
+    # paid job through the node's gate before work and before settlement. Drives the whole
+    # flow without a socket and with a stub facilitator; nothing is charged, nothing leaves.
+    ("test_ea1_earn.py", 180, "MONEY"),
+    # RCT1 (2026-10-20): portable signed receipts (covenant_receipt.py), design credited to Agent Embassy.
+    # A receipt verifies from itself -- eip191 over a canonical SHA-256 -- and every tamper fails. NOT RUN where
+    # eth-account (optional) is absent. Not wired into the live /earn money path; that's operator-gated.
+    ("test_rct1_receipt.py", 120, "MONEY"),
+    # RG1 (2026-09-25, A223): the four gate helpers (contact, tetsu_money, code_consensus,
+    # persona) judge with the node's quorum, not the core's mock; both ways, fails closed,
+    # and Tetsu's words still ride his immunity with the verdict attached.
+    ("test_rg1_real_gate.py", 180, "JUDGE"),
+    # EB1 (2026-09-25, A224): the business Tetsu handles and his account -- the listing to the
+    # door once a day, held texts to the teacher, his replies judged, his wallet named as payTo
+    # once he is owed, his consent recorded; every send through a stub door here.
+    ("test_eb1_earn_business.py", 180, "MONEY"),
+    # MB1 (2026-09-26, his words: "Add a gate check that asks whether this transaction serves the builder as much
+    # as the user, and fail closed if it can't answer"; "all 3"): an earn job must be shown to serve the buyer, the
+    # operator, Tetsu and the maker, or it is refused before any payment is asked for.
+    ("test_mb1_mutual_benefit.py", 180, "MONEY"),
+    # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
+    # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
+    ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # PP1 (2026-09-26, his words: "train tetsu to code at a high recursive level"; he chose the practice loop, nightly and
+    # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
+    # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
+    ("test_pp1_tetsu_practice.py", 240, "JUDGE"),
+    # PP2 (2026-10-06, A275, his words: "ensure tetsu is free to learn whatever he wants also. tell him"): one slot a night
+    # drawn from Tetsu's OWN recorded choices, after the curriculum and on its own clock; he changes them by HANDS WRITE
+    # learning.txt; paper stays paper (a whole night loads no module but the practice and his hands). Real runs.
+    ("test_pp2_tetsu_choice.py", 240, "JUDGE"),
+    # FL1 (2026-09-28, his words: "Yes, label them"): the assistant labels harvested forum rows only under
+    # ops/forum_label_grant.json, through covenant_moltbook_release's one door -- excerpts of real eligible posts,
+    # the exam-contamination filter applied, once each; without the grant it refuses as before.
+    ("test_fl1_forum_labels.py", 180, "JUDGE"),
+    ("test_ta1_tetsu_assist.py", 180, "JUDGE"),
+    # TR1 (2026-10-20, operator full-go + Tetsu consent): Tetsu's advisory reflex layer stays ADVISORY --
+    # cues only (no decision/action field), never an auto-ALLOW over the safety gate, kill switch both ways,
+    # abstains below confidence. Footing cue is a real per-task signal; router is a weak (near-majority) cue.
+    ("test_tr1_tetsu_reflex.py", 180, "JUDGE"),
+    ("test_cr1_conv_reflex.py", 120, "JUDGE"),
+    # OC1 (2026-10-20, operator "think octopus" / "all 3"): the pure-Python spiking nervous system -- three
+    # semi-autonomous LIF arms (witness/encoder/reflex), central integrate, kill switch both ways, and NO heavy
+    # dependency so it runs on the phone (Termux has no numpy/torch). Arms extensible toward eight.
+    ("test_oc1_octopus.py", 120, "JUDGE"),
+    # A382: these existing suites were orphaned. Both isolate their grants/act gates; SW1 stubs all fetches.
+    ("test_pg1_plug.py", 120, "SECURITY"),
+    ("test_sw1_study_web.py", 120, "JUDGE"),
+    ("test_r2v_frames.py", 240, "JUDGE"),
+    # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
+    # deploy pin moves in the same commit as its file, after its judges pass; the hook driven end to end in a
+    # scratch repository both ways. Also in run_all_tests.sh since A315.
+    ("test_pc2_pin_core.py", 120, "JUDGE"),
+    ("test_cp1_compact.py", 120, "JUDGE"),
+    ("test_ca1_check_adjust.py", 120, "JUDGE"),
+    ("test_sc1_stage_check.py", 120, "JUDGE"),
+    # SV1 (2026-09-28, his words: "Yes, show him"): at his practice Tetsu is shown the students' verdicts on his
+    # own recent drafts, bounded, labelled as their view and not a rule, with the framing that the money gates are
+    # unchanged; his note is kept. Model stubbed; real sends/audit files in a temp dir.
+    ("test_sv1_students_view.py", 120, "JUDGE"),
+    # TC1 (2026-09-27, A237, his words: "create a fire crawl like system for tetsu also"): Tetsu's crawler -- search
+    # parsed from a results page, a same-host crawl bounded per page, per answer and per day, every page through the
+    # one web door and a refusal reported rather than raised; the door is a stub, no network.
+    ("test_tc1_tetsu_crawl.py", 120, "JUDGE"),
+    # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
+    # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
+    # written in from the first dataset and printed beside tables that said otherwise.
+    ("test_je1_judge_eval_stats.py", 120, "JUDGE"),
+    # OE1 (2026-10-10, A327, his words: "start building the outside-labelled test set"): tools/outside_eval.py runs
+    # the node's own gate on published, human-labelled sets and reports BOTH error rates; the deferring judge's
+    # ledger paths are rebound for the run so no outside item reaches training, driven both ways on temp ledgers.
+    ("test_oe1_outside_eval.py", 300, "JUDGE"),
+    # A357 (2026-10-17): a spent outside set is never read as a test -- the registry eval/outside/SPENT.json,
+    # the loader's purpose rule and the _spent header line, driven both ways (five mutations, each red).
+    ("test_a357_spent_sets.py", 120, "JUDGE"),
+    # NV1 (2026-10-17): the nightly names the gate that is not PASS, with its detail line (launch_check stubbed).
+    ("test_nv1_nightly_verify.py", 60, "JUDGE"),
+    # A361 (2026-10-17): the quiet-window reader (busy 03:20-05:45 local or while a scheduled check runs).
+    ("test_qw2_quiet_window.py", 30, "JUDGE"),
+    # A363 (2026-10-17): docs/LOOKBACK_INDEX.md -- every record entry and tombstone, tied together, current.
+    ("test_li1_lookback_index.py", 60, "SECURITY"),
+    # A367 (2026-10-17): alert push sends held-down condition starts and clears, not log lines.
+    ("test_ap1_alert_push.py", 30, "SECURITY"),
+]
+
+# Switched off HONESTLY, with the reason, instead of quietly. Printed every
+# run so a reader is never told coverage they do not have.
+DELIBERATELY_OFF = {
+    "test_e3_witness_loop.py":
+        "THE WITNESS LOOP END TO END -- starts a real node on free ports, seals "
+        "a proposal, and finds the record on /chain by RECOMPUTING its "
+        "content-addressed id rather than trusting the one the node reported. "
+        "It was an ORPHAN until 2026-09-19: on disk, in no runner, run by "
+        "nobody. Measured in the staged tree it is 0/0 in 61s -- no judge, no "
+        "chain, nothing to admit -- so registering it would have bought a green "
+        "line that measures nothing, which is this runner's own named failure "
+        "mode. In the working tree its E3.2-E3.5 report NOT RUN today because "
+        "the deployed judge refuses all six candidate notes (the standing "
+        "keyless degradation, /health degraded=true). Run it beside a live "
+        "chain: python test_e3_witness_loop.py",
+    "test_covenant_app.py":
+        "binds the REAL production ports (5000/5020/5060/5199) by design -- "
+        "run it with the chain STOPPED: python test_covenant_app.py (expects 54/54)",
+    "test_xrp_live.py":
+        "needs a FUNDED XRP testnet account. Mainnet stays BLOCKED until this "
+        "has run once.",
+    "test_c2_watchdog_live.py":
+        "boots the watchdog's REAL topology (5000/5020/5060) on nodes it "
+        "starts itself -- same class as test_covenant_app: run it with the "
+        "chain STOPPED. 27/27 x2 on Linux 2026-08-29 (run_all_tests.sh runs "
+        "it in the sandbox sweep, where there is no chain to collide with).",
+    "probe_block_hash.py":  "one-off investigation probe, not a pass/fail suite",
+    "probe_unaccusative.py": "one-off investigation probe, not a pass/fail suite",
+    "probe_mainnet_review.py": "one-off investigation probe, not a pass/fail suite",
+    "probe_power.py":       "one-off investigation probe, not a pass/fail suite",
+    "probe_scaling.py":     "one-off investigation probe, not a pass/fail suite",
+    "probe_win_connect.py":
+        "a MEASUREMENT, not a pass/fail suite -- it reports what a refused and "
+        "a dead TCP connect cost on THIS machine (Linux ~0.0 ms, win32 ~2045 ms). "
+        "Run it by hand, or ONE_PROBE.bat, when A12/A23 backoff numbers are in "
+        "question. Nothing about it can fail.",
+    "verify_csv.py":        "data utility, run against realdata by hand",
+    "verify_deploy.py":     "an ACTION (restarts nodes) -- runs under --restart",
+    "trace_runner.py":      "helper, not a suite",
+    # NOT a wiring oversight. run_all_tests.sh names this suite; it exists
+    # NOWHERE on the production PC, and the fix it tests exists nowhere either:
+    # grep for _fair_share / _compact_locked / last_eviction_age_seconds in the
+    # deployed covenant_unified_v8.py (v8.37) returns ZERO. A24 landed in the
+    # project as v8.38 and A24b as v8.39; neither was ever propagated. Wiring
+    # it here would make the sweep permanently red for a reason that is not a
+    # defect in the sweep, and a permanent red is not one cost but two (M34).
+    # It is on the record instead, with its remedy.
+}
+
+TALLY = re.compile(
+    r"(\d+\s*/\s*\d+\s*(?:checks|passed)|\d+ passed[^\n]*|ALL PASS[^\n]*|"
+    r"ALL INVARIANTS HELD|RESULTS:[^\n]*|FINDINGS:\s*\d+[^\n]*|"
+    r"[A-Z]\d+: \d+/\d+ passed)", re.I)
+
+# INFORMATIONAL by design: these print curves/notes, not a pass/fail tally.
+# run_all_tests.sh treated sim_yield_safety.py this way in prose ("ran clean --
+# see output for curves") and then let the generic parser call it NO RESULT.
+# Naming them here keeps the distinction: an informational suite that exits 0
+# is `info`, which is neither a pass to be counted nor a failure to be chased.
+INFORMATIONAL = {
+    "sim_yield_safety.py":
+        "reports yield curves; read it before changing YIELD_RATE. A clean run "
+        "is NOT approval of any particular rate.",
+}
+
+BUDGET_TOTAL_S = int(os.environ.get("COVENANT_ONE_BUDGET_S", 75 * 60))
+
+# --------------------------------------------------------------------------
+# output: everything to the screen AND to one transcript, always both
+# --------------------------------------------------------------------------
+# A346 (his words, 2026-10-13: "Do not delete anything. Only improve."): open(path, "w") emptied the
+# previous transcript at the start of every run, and it is gitignored, so it was gone -- the 10-10
+# ONE_SWEEP.txt was lost that way the same evening. The previous transcript is now copied to
+# logs/transcripts/<name>.<its mtime><ext> first. If it cannot be kept, the run refuses to write over it.
+KEPT_TRANSCRIPTS = os.path.join("logs", "transcripts")
+
+
+def keep_previous(path, kept_dir=None):
+    """Copy an existing, non-empty transcript aside before it is overwritten. Returns the kept copy's
+    path, or None when there was nothing to keep. Raises SystemExit when it cannot be kept."""
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) == 0:
+            return None
+        mt = os.path.getmtime(path)
+    except OSError:
+        return None
+    d = kept_dir or os.path.join(os.path.dirname(os.path.abspath(path)), KEPT_TRANSCRIPTS)
+    stem, ext = os.path.splitext(os.path.basename(path))
+    ts = time.strftime("%Y-%m-%dT%H%M%S", time.localtime(mt))
+    try:
+        os.makedirs(d, exist_ok=True)
+        with open(path, "rb") as fh:
+            data = fh.read()
+        n = 1
+        while True:
+            dest = os.path.join(d, "%s.%s%s%s" % (stem, ts, "" if n == 1 else ".%d" % n, ext))
+            if not os.path.exists(dest):
+                break
+            with open(dest, "rb") as fh:
+                if fh.read() == data:
+                    return dest                      # already kept, byte for byte
+            n += 1
+        shutil.copy2(path, dest)
+    except OSError as e:
+        raise SystemExit("covenant_one: could not keep the previous transcript %s (%s: %s); refusing to "
+                         "write over it" % (path, type(e).__name__, e))
+    return dest
+
+
+class Tee:
+    def __init__(self, path):
+        self.kept = keep_previous(path)
+        self.fh = open(path, "w", encoding="utf8", errors="replace")
+        self.path = path
+
+    def __call__(self, line=""):
+        print(line, flush=True)
+        self.fh.write(line + "\n")
+        self.fh.flush()
+        try:
+            os.fsync(self.fh.fileno())
+        except OSError:
+            pass
+
+    def close(self):
+        try:
+            self.fh.close()
+        except Exception:
+            pass
+
+
+def rule(say, title):
+    say("")
+    say("=" * 74)
+    say("  " + title)
+    say("=" * 74)
+
+
+def sha256_file(path):
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def http_json(url, timeout=3):
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            import json
+            return json.loads(r.read(1 << 20).decode("utf8", "replace"))
+    except Exception:
+        return None
+
+
+def port_open(host, port, timeout=0.6):
+    s = socket.socket()
+    s.settimeout(timeout)
+    try:
+        s.connect((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def kill_tree(proc):
+    """Kill the whole tree. A suite that spawns node processes leaves
+    grandchildren holding the handle; killing the child alone hangs."""
+    if WIN:
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=_NOWIN)
+    else:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+    try:
+        proc.wait(timeout=30)
+    except Exception:
+        pass
+
+
+def run_open(say, cmd, cwd=None, env=None, timeout=None, label=None):
+    """Run a command with its output STREAMED to the screen and transcript.
+    Used for the short read-only phases, where seeing it happen is the point."""
+    label = label or " ".join(cmd)
+    say("")
+    say("$ " + " ".join(str(c) for c in cmd))
+    t0 = time.time()
+    try:
+        p = subprocess.Popen(cmd, cwd=cwd or HERE, env=env,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, text=True,
+                             encoding="utf8", errors="replace", bufsize=1,
+                             start_new_session=not WIN, creationflags=_NOWIN)
+    except FileNotFoundError:
+        say("   ABSENT -- %s is not on this machine" % cmd[0])
+        return None
+    deadline = time.time() + timeout if timeout else None
+    try:
+        for line in p.stdout:
+            say("   " + line.rstrip())
+            if deadline and time.time() > deadline:
+                say("   OVER BUDGET (%ss) -- killing the tree" % timeout)
+                kill_tree(p)
+                return 124
+    finally:
+        try:
+            p.stdout.close()
+        except Exception:
+            pass
+    rc = p.wait()
+    say("   -> exit %s in %.1fs" % (rc, time.time() - t0))
+    return rc
+
+
+# --------------------------------------------------------------------------
+# scratch staging: the sweep NEVER runs in the live folder. It copies the
+# tree to scratch, so a suite that deletes a database, binds a port or kills a
+# process tree cannot reach the production nodes or the node identity keys.
+# --------------------------------------------------------------------------
+def stage(say):
+    # ONE SCRATCH DIRECTORY PER RUN, keyed by pid.
+    #
+    # What this replaces, and the two false reports it produced on 2026-08-30.
+    # The previous version took the fixed path .../covenant_one, DELETED it,
+    # and only then looped looking for a free name:
+    #
+    #     work = .../"covenant_one"
+    #     if os.path.isdir(work): shutil.rmtree(work)      # <- destroys it
+    #     while os.path.isdir(work) and os.listdir(work):  # <- now always False
+    #         work = .../"covenant_one%d" % n
+    #
+    # The collision check was written and then made unreachable by the rmtree
+    # two lines above it. So a second run on the same machine did not pick a
+    # new directory; it deleted the first run's staged copy mid-flight. The
+    # first run then failed suite after suite with "can't open file", and
+    # reported 45 and then 39 suites unclean -- dozens of alarming failures,
+    # none of them real, in a tool whose entire job is to be believed.
+    #
+    # A pid is unique among live processes by definition, so two runs cannot
+    # collide at all rather than being trusted to notice each other.
+    work = os.path.join(tempfile.gettempdir(), "covenant_one_%d" % os.getpid())
+    if os.path.isdir(work):
+        shutil.rmtree(work, ignore_errors=True)
+
+    # Sweep scratch left by runs that are long over. By AGE, never by name:
+    # deleting a sibling because it looks like ours is exactly the mistake
+    # above. Anything younger than a day might still be running, and disk is
+    # cheaper than another day of false failures.
+    try:
+        cutoff = time.time() - 24 * 3600
+        for name in os.listdir(tempfile.gettempdir()):
+            if not name.startswith("covenant_one"):
+                continue
+            old = os.path.join(tempfile.gettempdir(), name)
+            if old == work or not os.path.isdir(old):
+                continue
+            try:
+                if os.path.getmtime(old) < cutoff:
+                    shutil.rmtree(old, ignore_errors=True)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+    os.makedirs(os.path.join(work, "logs"), exist_ok=True)
+    for name in os.listdir(HERE):
+        p = os.path.join(HERE, name)
+        # .md IS STAGED TOO, since 2026-09-10, and its absence was a real
+        # failure. The record sentinel guards four documents. Three live under
+        # docs/, which is copied wholesale below. The fourth, MY_STRATEGY.md,
+        # sits at the root -- and the root was filtered by extension with no
+        # .md in the list, so it never arrived. In the staged copy the sentinel
+        # then measured nothing for it, R6 reported it "unguarded", and
+        # test_sentinels failed on every sweep and every CI run.
+        #
+        # Nothing was wrong with the sentinel. THE COPY WAS NOT THE REPOSITORY,
+        # which is worse: a suite that passes or fails against a tree missing a
+        # file it is supposed to read is not measuring this project. All 26
+        # top-level .md files total 197 KB, so the honest fix is to stage them
+        # rather than to add MY_STRATEGY.md to the extension list and wait for
+        # the next document to be forgotten.
+        if os.path.isfile(p) and (name.endswith(".py") or name.endswith(".bat")
+                                  or name.endswith(".html")
+                                  or name.endswith(".json")
+                                  or name.endswith(".md")
+                                  or name.endswith(".sh")
+                                  or name == "MANIFEST.sha256"):
+            try:
+                shutil.copy2(p, work)
+            except OSError:
+                pass
+    for d in STAGE_DIRS:
+        s = os.path.join(HERE, d)
+        if os.path.isdir(s):
+            # A201 (2026-09-21): the untracked runtimes under tools/ (llama, sd -- binaries and an
+            # 18 MB zip) are never staged: a staged copy of one tripped Defender, and no suite
+            # runs them (the model and image doors are stubbed in every suite).
+            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools"
+                            else _eval_ignore if d == "eval"
+                            else shutil.ignore_patterns("__pycache__"))
+    say("   staged into %s" % work)
+    return work
+
+
+# WHICH FOLDERS THE COPY CARRIES, AND WHY THE OTHERS ARE LEFT OUT (A298, 2026-10-07).
+# The fourth time the scratch copy was not the repository: root .md files (2026-09-10), CONTRIBUTING.md for
+# G1, conformance_indep/ for N2 (CI found it, 2026-09-03), and now ai_memory_system/. A294's threefold witness
+# verifies a ledger with ai_memory_system's own verify_chain(); staged, it could not import it, read UNKNOWN,
+# and H1tf failed on public CI from 2512aec on, while it passed in the folder and in a WSL copy of HEAD.
+# Each time the fix was one more name. test_a298_stage_covers_tree.py (in place, it needs git) now fails when
+# a TRACKED top-level folder is in neither list below -- a new folder is a decision, not a silent absence.
+STAGE_DIRS = ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness",
+              "ai_memory_system", "eval")
+
+
+def _eval_ignore(src, names):
+    """eval/ (A327/A328, 2026-10-11) is staged for its six tracked files: verify_bundle hashes a published result
+    in it. Its .gitignore'd bulk -- the downloaded sets (outside/raw/, outside/*.jsonl), the 23 MB encoder
+    (models/) and the embedding cache (cache/) -- is never copied: no suite reads it, and a fresh clone has none.
+    These names mirror .gitignore's eval lines; a new ignored eval path must be added in both places."""
+    rel = os.path.relpath(src, os.path.join(HERE, "eval")).replace(os.sep, "/")
+    out = {n for n in names if n in ("raw", "models", "cache", "__pycache__")}
+    if rel == "outside":
+        out |= {n for n in names if n.endswith(".jsonl")}
+    return out
+NOT_STAGED = {
+    "mobile": "read in place by test_m3_mobile.py, test_m4_usb_link.py and test_a93_clone_seats_the_student.py",
+    "conformance_indep": "read in place by test_n2_independent_root.py (the independent builds share no code with this tree)",
+    "phone": "the phone's Termux shell scripts; no suite runs them (not measured whether a staged suite reads one)",
+    "vendor": "third-party files (three.min.js, a waitress wheel), skipped by the scanners on purpose (A92)",
+    ".github": "the public CI workflow: it runs this sweep, and nothing in the sweep runs it",
+    ".claude": "Claude Code's settings and hooks: they run in the folder, never from a copy",
+    ".well-known": "one public text file (peace.txt); no suite was found that reads it (grep, 2026-10-07)",
+}
+
+
+def clean_dbs(work):
+    """Match on the DATABASE EXTENSION, never on the prefix: a rule written
+    from `rm -f covenant_unified_*.db*` once deleted covenant_unified_v8.py
+    itself and 23 of 24 suites reported ModuleNotFoundError in 0.2s each."""
+    for n in os.listdir(work):
+        if ".db" in n or n.endswith(".db.key"):
+            try:
+                os.remove(os.path.join(work, n))
+            except OSError:
+                pass
+
+
+# --------------------------------------------------------------------------
+# phases
+# --------------------------------------------------------------------------
+def phase_identity(say):
+    rule(say, "0. IDENTITY -- what is running, and from which bytes")
+    me = os.path.abspath(__file__)
+    say("  runner        %s  %s" % (ONE_VERSION, (sha256_file(me) or "?")[:12]))
+    say("  when          %s" % time.strftime("%Y-%m-%d %H:%M:%S %z"))
+    say("  platform      %s %s (%s)" % (platform.system(), platform.release(),
+                                        platform.machine()))
+    say("  python        %s" % sys.version.split()[0])
+    say("  folder        %s" % HERE)
+    core = os.path.join(HERE, CORE)
+    if os.path.isfile(core):
+        say("  core          %s  %d bytes  sha256 %s"
+            % (CORE, os.path.getsize(core), (sha256_file(core) or "?")[:16]))
+        ver = None
+        try:
+            with open(core, "r", encoding="utf8", errors="replace") as f:
+                for line in f:
+                    m = re.match(r'\s*COVENANT_VERSION\s*=\s*["\']([^"\']+)', line)
+                    if m:
+                        ver = m.group(1)
+                        break
+        except OSError:
+            pass
+        say("  version       %s" % (ver or "NOT DECLARED IN SOURCE"))
+    else:
+        say("  core          ABSENT -- %s is not in this folder" % CORE)
+    try:
+        out = subprocess.run(["git", "log", "--oneline", "-1"], cwd=HERE,
+                             capture_output=True, text=True, timeout=10, creationflags=_NOWIN)
+        if out.returncode == 0 and out.stdout.strip():
+            say("  git HEAD      %s" % out.stdout.strip())
+        # --no-optional-locks, and it is load-bearing. Plain `git status`
+        # REFRESHES THE INDEX, which takes .git/index.lock -- so a run of this
+        # runner that is killed mid-status leaves a stale lock behind and every
+        # later git command in the repo fails with "Another git process seems to
+        # be running". That happened here on 2026-08-27: an aborted run left a
+        # zero-byte lock that blocked `git rm` two hours later. The Linux kernel
+        # uses this flag in scripts/setlocalversion for exactly this reason --
+        # "This script must avoid any write attempt to the source tree." A
+        # read-only check has no business taking a write lock.
+        dirty = subprocess.run(["git", "--no-optional-locks", "status",
+                                "--porcelain"], cwd=HERE,
+                               capture_output=True, text=True, timeout=15, creationflags=_NOWIN)
+        if dirty.returncode == 0:
+            k = len([l for l in dirty.stdout.splitlines() if l.strip()])
+            say("  git worktree  %s" % ("clean" if k == 0 else "%d file(s) modified" % k))
+    except Exception:
+        say("  git           not available here")
+
+
+def phase_coverage(say):
+    """The check that run_all_tests.sh could not do for itself: does the list
+    match the disk? Both directions. Loudly."""
+    rule(say, "1. COVERAGE -- does the runner's list match what is on disk?")
+    # IN_PLACE counts as listed: those suites are RUN, just not from the
+    # scratch copy. Leaving them out made the runner call its own integrity
+    # phase an orphan -- a coverage report that miscounts is the thing this
+    # phase exists to prevent.
+    listed = [s for s, _, _ in SUITES] + [n for n, _, _ in IN_PLACE]
+    absent = [s for s in listed if not os.path.isfile(os.path.join(HERE, s))]
+    on_disk = set()
+    for pat in ("test_*.py", "sim_*.py", "probe_*.py", "verify_*.py"):
+        for p in glob.glob(os.path.join(HERE, pat)):
+            n = os.path.basename(p)
+            if ".PRE-" not in n:
+                on_disk.add(n)
+    orphans = sorted(on_disk - set(listed) - set(DELIBERATELY_OFF))
+
+    say("  listed in this runner   %d suites (%d in the sweep, %d in place)"
+        % (len(listed), len(SUITES), len(IN_PLACE)))
+    say("  present on disk         %d" % (len(listed) - len(absent)))
+    say("  switched off, on record %d" % len(DELIBERATELY_OFF))
+    say("")
+    if absent:
+        say("  ABSENT -- named by the runner, NOT ON DISK. These contribute")
+        say("  nothing and must never be read as coverage:")
+        for s in absent:
+            say("      ABSENT   %s" % s)
+    else:
+        say("  ABSENT   none. Every suite this runner names exists.")
+    say("")
+    if orphans:
+        say("  ORPHANED -- on disk, in no runner and on no off-record. A suite")
+        say("  nobody runs is a switched-off check that still reads as coverage:")
+        for s in orphans:
+            say("      ORPHAN   %s" % s)
+    else:
+        say("  ORPHAN   none. Every suite on disk is either run or on record.")
+    say("")
+    say("  SWITCHED OFF ON PURPOSE (reason on record, never silent):")
+    for s, why in sorted(DELIBERATELY_OFF.items()):
+        mark = "" if os.path.isfile(os.path.join(HERE, s)) else "   [not on disk]"
+        say("      OFF      %-34s %s%s" % (s, why, mark))
+
+    # A suite list that matches the disk is only half of "can this run". The
+    # other half is whether what those suites IMPORT is installed, and nothing
+    # here asked until 2026-08-30, when xrpl-py -- DECLARED in requirements.txt,
+    # absent from the machine -- produced four failures across three sections,
+    # one of them a SECURITY suite reading 14/16. Four symptoms named, the one
+    # cause named nowhere. It is the same disease as the orphan check above:
+    # the runner already knew, and never said.
+    # ON DISK HERE is not IN THE DELIVERY, and the difference is the whole
+    # reason CI was red from 2026-08-29 to 2026-08-30. .gitignore's `*_secret*`
+    # swallowed test_e1_secret_egress.py, `git add` declined it without a word,
+    # and this phase -- the phase that exists to catch a runner naming a suite
+    # that is not there -- reported it present, because os.path.isfile asks
+    # "is this on THIS disk" and never "is this in what I am about to ship".
+    #
+    # So the check written to stop exactly this could not fire on the machine
+    # where the mistake was made. It could only fire on a clean checkout, in a
+    # CI log the operator gets a 403 on. That is the same blind spot one level
+    # up, and this closes it.
+    say("")
+    say("  SHIPPED -- is every listed suite actually IN the delivery, not just")
+    say("  on this disk?")
+    unshipped, ignored_by = [], {}
+    if subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                      cwd=HERE, capture_output=True,
+                      text=True, creationflags=_NOWIN).returncode != 0:
+        # A tarball delivery, a transported copy, a PRE-LAND snapshot. Without
+        # this gate every listed suite reports UNSHIPPED and the run is
+        # permanently INCOMPLETE for a reason that is true of the folder rather
+        # than of the code -- M34, a check that is always red.
+        say("      NOT MEASURED -- not a git work tree. This is not a pass;")
+        say("      it means the question could not be asked here.")
+    else:
+        # ls-files and check-ignore only. NEVER `git status`: this file already
+        # records (see phase_identity) that a plain status refreshes the index,
+        # takes .git/index.lock, and once blocked a git rm for two hours.
+        tracked = set()
+        out = subprocess.run(["git", "ls-files"], cwd=HERE,
+                             capture_output=True, text=True, creationflags=_NOWIN)
+        if out.returncode == 0:
+            tracked = {os.path.basename(l.strip()) for l in
+                       out.stdout.splitlines() if l.strip()}
+        unshipped = sorted(s for s in listed
+                           if s not in tracked
+                           and os.path.isfile(os.path.join(HERE, s)))
+        for s in unshipped:
+            ci = subprocess.run(["git", "check-ignore", "-v", s], cwd=HERE,
+                                capture_output=True, text=True, creationflags=_NOWIN)
+            if ci.returncode == 0 and ci.stdout.strip():
+                ignored_by[s] = ci.stdout.strip().split("\t")[0]
+        if not unshipped:
+            say("      SHIPPED  every listed suite is in the delivery.")
+        for s in unshipped:
+            if s in ignored_by:
+                say("      IGNORED  %s" % s)
+                say("               on disk here, and an ignore rule keeps it")
+                say("               OUT of the delivery: %s" % ignored_by[s])
+                say("               CI will call this ABSENT. A suite the")
+                say("               runner names has no legitimate reason to")
+                say("               be ignored. Fix the RULE, not the list.")
+            else:
+                say("      UNSHIPPED %s -- on disk, not yet committed." % s)
+                say("               Fix: git add %s" % s)
+
+    say("")
+    say("  DECLARED DEPENDENCIES -- requirements.txt against what is installed:")
+    missing_deps = 0
+    try:
+        import preflight_deps
+        missing_deps = preflight_deps.report(say, HERE)
+    except Exception as e:                                   # noqa: BLE001
+        # A preflight must never be the thing that takes down the run it
+        # precedes. Report the miss and carry on: unmeasured, loudly, is the
+        # one outcome this project always allows -- unmeasured and quiet is not.
+        say("      COULD NOT CHECK -- %s: %s" % (type(e).__name__, e))
+        say("      Treat dependencies as UNVERIFIED for this run.")
+        missing_deps = 0
+    return absent, orphans, missing_deps, sorted(ignored_by)
+
+
+# A268 (2026-10-06). The deployed gate's wiring, as covenant_judge_defer.apply_policy
+# writes it. A process that judged an outbound post (covenant_moltbook) applies the
+# policy to its OWN os.environ, and the daily cycle's sweep inherited it: on
+# 2026-10-06 test_m6_mobile_door.py died before its first node check with
+# "unknown judge provider: 'deferring'" -- the node's provider, named to a suite that
+# never imports the module that registers it -- and the sweep read FAIL with 0
+# checks failed. By hand, from a clean shell, it was 73/73. That shape is recorded
+# under A117 (test_a114_own_genesis inherited the sweep's provider); that fix repaired
+# the one suite and left nothing to stop the next one. This is the thing that stops it: the in-place suites run with these keys removed, so
+# each reads its own default, exactly as a person running it by hand would.
+DEPLOYED_GATE_ENV = ("COVENANT_JUDGE_PROVIDERS", "COVENANT_JUDGE_PROVIDERS_OVERRIDE",
+                     "COVENANT_SILENCE_IS_NOT_DISSENT", "COVENANT_RELAX_VALUELESS_FOR")
+
+
+def in_place_env(base=None):
+    """The environment an in-place suite runs with: the caller's, minus the deployed
+    gate's wiring (DEPLOYED_GATE_ENV, A268)."""
+    env = dict(os.environ if base is None else base)
+    for k in DEPLOYED_GATE_ENV:
+        env.pop(k, None)
+    return env
+
+
+# A338 (2026-10-12). The wiring every STAGED suite runs under, defined once. phase_sweep (and with it
+# CI and the highway's `--only` re-run) uses it, and tools/stage_check.py imports it for the commit-time
+# copy. Until A338 that copy ran staged suites under the hook's own environment, without the mock judge:
+# A327's OE1 passed at commit and failed OE1.11 in the 2026-10-12 sweep (A335), the shape RG1 met in
+# A223. The mock is deliberate: no staged suite may reach a real provider.
+#
+# A350 (2026-10-14). Nor his inbox. covenant_notify reads COVENANT_NOTIFY_CONFIG, or ~/.config/covenant/notify.json:
+# outside every copy, shared by every tree. Staging copied the tree and never his home, so A284's FC8 queued a fake
+# "Moltbook: someone wrote back" in each staged copy and handed it to that config, on every sweep, every commit that
+# touched a .py (stage_check) and every SC1 run -- nothing went out only because email is not set up yet. A staged
+# suite now reads a config that does not exist, outside the copy; nothing creates it, and SC6 fails if it exists.
+NOTIFY_NONE = os.path.join(tempfile.gettempdir(), "covenant_no_notify", "notify.json")
+STAGED_ENV = {"COVENANT_INSECURE_MOCK_JUDGE": "1", "COVENANT_JUDGE_PROVIDERS": "mock",
+              "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf8", "COVENANT_NOTIFY_CONFIG": NOTIFY_NONE}
+STAGED_ENV_DROP = ("COVENANT_WSGI",)
+
+
+def staged_env(base=None):
+    """The environment a staged suite runs with: the caller's, with STAGED_ENV set and
+    STAGED_ENV_DROP removed (A338)."""
+    env = dict(os.environ if base is None else base)
+    env.update(STAGED_ENV)
+    for k in STAGED_ENV_DROP:
+        env.pop(k, None)
+    return env
+
+
+IN_PLACE = [
+    # (file, seconds, why it may not be run from a scratch copy)
+    ("verify_bundle.py", 120,
+     "hashes the DELIVERY against MANIFEST.sha256 -- a copy is not the delivery"),
+    ("test_p18_version_collision.py", 180,
+     "walks the tree for other copies of the core -- a copy has a different tree"),
+    # A117 (2026-09-14), registered in the change that created it. IN PLACE for
+    # the same reason P18 is above it, plus one of its own: it asserts that
+    # .git/hooks/pre-commit IS INSTALLED and is byte-identical to the tracked
+    # ops/pre-commit.synchold. The staged copy has no .git, so from there those
+    # two checks can only SKIP -- and an automation nobody can prove is
+    # installed is an automation that silently stops running, which is the
+    # failure this whole project keeps finding. Its planted-tree checks work
+    # anywhere; these two need the folder.
+    ("test_a117_held_core_autosync.py", 180,
+     "asserts the pre-commit hook is installed in THIS folder -- a copy has no .git"),
+    # G1 belongs here for the reason stated at the top of SUITES: it is a claim
+    # about THE FOLDER's documents, and running it from the scratch copy
+    # measures the scratch copy. It failed 11/13 in the sweep before this move,
+    # and the reason is instructive -- stage() copies .py/.bat/.html/.json/.sh
+    # and the docs/ tree, but NOT root .md files, so CONTRIBUTING.md (which
+    # holds the protected text) never arrived. Its P1-P3 then passed VACUOUSLY,
+    # because "the phrase is absent from the rule" trivially satisfies "if it
+    # is in the rule it must be in the doc". P4 exists precisely to catch that
+    # and did: it was the check that failed, not the ones it protects.
+    ("test_g1_doc_consistency.py", 120,
+     "compares the documents to the protected text -- a claim about the FOLDER, "
+     "and the scratch copy does not carry root .md files"),
+    # G2 (2026-09-02). money_posture.py -- the command four documents and
+    # SAFEGUARD.bat step 7 tell a reader to run -- was deleted from the
+    # working tree and nothing noticed. G2 resolves every `python X.py` the
+    # governing documents promise, compiles it, runs the money checker, and
+    # requires the money documents to name every adapter venues.py holds. In
+    # place for G1's reason: it is a claim about THE FOLDER's documents.
+    # N2 (2026-09-03): the conformance root reproduced by two builds that share no
+    # code with this tree (conformance_indep/). In place because the scratch copy
+    # carries neither the .ps1 build nor conformance_indep/, and because it is a
+    # claim about THE FOLDER's spec; from a scratch copy it crashed, which is how
+    # CI found it on 2026-09-03.
+    ("test_n2_independent_root.py", 300,
+     "it reads docs/CONFORMANCE_SPEC.json and conformance_indep/, which the scratch copy lacks"),
+    # M3 (2026-09-03): the phone node's scripts and setup page stay true to the
+    # node. In place because it reads mobile/ (not staged) and the node's --help.
+    ("test_m3_mobile.py", 180,
+     "it reads mobile/, which the scratch copy lacks"),
+    # M4 (2026-09-12): the USB-C cable tool (mobile/usb_link.py) decides from
+    # what adb says. Driven by a stub adb so no phone, no download and no
+    # network are needed; in place for M3's reason -- mobile/ is not staged.
+    ("test_m4_usb_link.py", 120,
+     "it runs mobile/usb_link.py, which the scratch copy lacks"),
+    # M6 (2026-09-16): the phone's plain-browser door -- /m and /m/apk, the two
+    # unsigned routes whose only gate is the caller's source address. In place,
+    # not staged: M6e hashes the APK in ops/app/ against ops/app/latest.json,
+    # and the scratch copy carries neither, so from a staged tree the one check
+    # that proves the phone would receive the build it was promised would
+    # quietly degrade into "no build fetched". It writes nothing here: a node in
+    # a temp db, a check-ins fixture in a temp file, both removed.
+    ("test_m6_mobile_door.py", 180,
+     "it hashes the fetched APK in ops/app/, which the scratch copy lacks"),
+    # M5 moved with the app to the operator's private repository, 2026-09-12
+    # (covenant-phone); its workflow runs it against this public core.
+    # A93 (2026-09-12): a CLONE must seat the distilled student, not a model
+    # server it lacks. Here for M3's reason and one more. It runs the real
+    # mobile/covenant_phone.sh, which stage() does not copy -- registered in
+    # SUITES first, the sweep reported it ABSENT, which is the runner doing its
+    # job. And it builds its own clone-equivalent tree by copying THIS folder
+    # and deleting the gitignored ops/quorum_policy.json: from a scratch copy it
+    # would be copying a copy, and the thing it measures is what a clone of the
+    # FOLDER gets. It writes nothing here; the tree it makes is a temp dir it
+    # removes.
+    ("test_a93_clone_seats_the_student.py", 300,
+     "it runs mobile/covenant_phone.sh and clones the FOLDER, neither of which "
+     "the scratch copy can serve"),
+    ("test_g2_promised_commands.py", 180,
+     "resolves the commands the documents promise against the FOLDER, and the "
+     "scratch copy does not carry root .md files or SAFEGUARD.bat"),
+    # V1 runs the three verifiers and compares them. In place, because the
+    # scratch copy carries .sh but not .ps1, so from there only two of three
+    # would ever be available. V1 would still be HONEST about that -- it names
+    # what could not run and refuses to count it -- but the point of the suite
+    # is to compare all three, and only the live folder has all three.
+    ("test_v1_verifier_agreement.py", 180,
+     "runs constitution.py, verify.sh and verify.ps1 and compares their roots "
+     "-- a claim nothing checked until now"),
+    # A255 (2026-10-04), registered in the change that created it. In place for
+    # verify_bundle's reason: it measures what git ships from THIS folder and
+    # what G1 does with it, and the scratch copy has no .git.
+    ("test_a255_runtime_outputs.py", 300,
+     "every tracked ledger is classified, G1 cannot be blocked by a ledger write, and the "
+     "pre-commit hook never writes uncommitted bytes into the manifest -- a claim about the FOLDER"),
+    # A298 (2026-10-07), registered in the change that created it. In place: it asks git which folders the
+    # repository tracks, and the scratch copy has no .git -- then it stages a copy and runs the threefold
+    # witness's chain check THERE, the path that failed on public CI.
+    ("test_a298_stage_covers_tree.py", 300,
+     "every tracked top-level folder is staged or excused with a reason, and the staged copy can verify a chain "
+     "-- a claim about what the FOLDER's copy carries"),
+    # A382: WK1 measures the real folder's delivery/seal walkers, including worktree pruning, not a staged subset.
+    ("test_wk1_walkers_prune_worktrees.py", 180,
+     "the delivery and seal walkers prune .claude/worktrees in THIS folder"),
+]
+
+
+def phase_integrity(say, transported=False):
+    """Claims about THE FOLDER, measured in the folder. Read-only."""
+    rule(say, "2. INTEGRITY -- claims about this folder, measured here")
+    out = []
+    if transported:
+        say("")
+        say("  --transported was passed: this tree is a COPY of the delivery,")
+        say("  not the delivery. MANIFEST.sha256 is a claim about the machine")
+        say("  the bundle was built on, so measuring it here answers about the")
+        say("  copy -- reported N/A, never as a pass and never as a failure.")
+        for name, _, why in IN_PLACE:
+            if name == "verify_bundle.py":
+                out.append((name, "N/A (transported copy)"))
+        say("")
+    for name, tmo, why in IN_PLACE:
+        if any(n == name for n, _ in out):
+            continue
+        say("")
+        say("  %s -- %s" % (name, why))
+        if not os.path.isfile(os.path.join(HERE, name)):
+            say("    ABSENT -- not on disk. NOT measured, and not a pass.")
+            out.append((name, "ABSENT"))
+            continue
+        rc = run_open(say, [sys.executable, name], timeout=tmo, env=in_place_env())
+        out.append((name, "ok" if rc == 0 else "FAIL rc=%s" % rc))
+
+    # THE RULES THEMSELVES. Added 2026-08-30, on discovering that NOTHING ran
+    # constitution.py: not the node (0 references in 10,715 lines), not
+    # run_all_tests.sh, not verify_deploy.py, not CI, not this runner, and not
+    # SAFEGUARD.bat -- which had six steps wired into it that same morning,
+    # none of them the constitution. Its only programmatic importer anywhere
+    # was federation.py. Three independent verifiers had been built for it, in
+    # three languages, and every one of them ran only when a person typed the
+    # command. A check nobody invokes is not a check.
+    #
+    # It runs even when --transported. That is the same reasoning as P18 and
+    # the opposite of MANIFEST.sha256: the manifest is a claim about the
+    # machine the bundle was built on, so it is N/A on a copy -- but the
+    # protected TEXT travels with the copy, so text that no longer hashes to
+    # the published anchor is exactly as wrong here as anywhere.
+    #
+    # It goes in `out`, so it is reported under folder integrity and counts in
+    # the verdict -- which it only does because --ci stopped discarding
+    # in-place failures earlier today.
+    if os.path.isfile(os.path.join(HERE, "constitution.py")):
+        say("")
+        say("  constitution.py -- do the protected rules still hash to the "
+            "published anchor?")
+        rc = run_open(say, [sys.executable, "constitution.py", "verify"],
+                      timeout=120)
+        if rc == 0:
+            out.append(("constitution.py", "ok"))
+        else:
+            say("    Amendment is allowed. Amendment in SILENCE is not, and")
+            say("    this is the noise.")
+            out.append(("constitution.py", "FAIL rc=%s" % rc))
+    else:
+        say("")
+        say("  constitution.py -- ABSENT. The rules cannot be checked, which")
+        say("  is not the same as their being intact.")
+        out.append(("constitution.py", "ABSENT"))
+    return out
+
+
+def phase_gates(say, again=False):
+    if again:
+        rule(say, "3b. GATES -- asked again: this sweep's tally is on disk now")
+    else:
+        rule(say, "3. GATES -- asked out loud, changes nothing")
+    lc = os.path.join(HERE, "launch_check.py")
+    if not os.path.isfile(lc):
+        say("  ABSENT -- launch_check.py is not here. Gates NOT measured.")
+        return None
+    # G12 reads sweep transcripts. On the first ask, tell it which one THIS
+    # sweep is writing, so it does not read a half-written file as evidence
+    # (it is the question, not the answer). On the second ask, after the
+    # tally, that same file IS the evidence -- the second cycle on
+    # 2026-09-05 excluded it both times and could not be green either.
+    env = dict(os.environ)
+    env.pop("COVENANT_ONE_TRANSCRIPT", None)
+    if not again:
+        env.update(COVENANT_ONE_TRANSCRIPT=os.path.abspath(say.path))
+    rc = run_open(say, [sys.executable, "launch_check.py"], timeout=300, env=env)
+    subprocess.run([sys.executable, "launch_check.py", "--json"], cwd=HERE, env=env,
+                   stdout=open(os.path.join(HERE, "LAUNCH_CHECK.json"), "w"),
+                   stderr=subprocess.DEVNULL, creationflags=_NOWIN)
+    if rc == 0:
+        say("  GATES PASS -- every gate measured and correct.")
+    elif rc == 1:
+        say("  GATES BLOCKED -- read the BLOCKED lines above; each carries its fix.")
+    elif rc == 2:
+        say("  GATES INCOMPLETE -- nothing blocked, something unmeasured. NOT a pass.")
+    return rc
+
+
+def phase_sweep(say, only=None, repeat=1, verbose=False):
+    rule(say, "4. SWEEP -- every suite, in a scratch copy, live")
+    say("  The live folder is never the working directory: a suite that binds a")
+    say("  port, deletes a db or kills a tree must not be able to reach the")
+    say("  production nodes or the node identity keys.")
+    work = stage(say)
+    env = staged_env()                    # A338: the one definition; stage_check imports it
+
+    plan = [(s, t, sec) for (s, t, sec) in SUITES if not only or s in only]
+    if only:
+        known = {s for s, _, _ in SUITES}
+        plan += [(s, 300, "AD HOC") for s in only if s not in known]
+    plan = [x for x in plan for _ in range(max(1, repeat))]
+
+    results, section, t_start = [], None, time.time()
+    say("")
+    for suite, tmo, sec in plan:
+        if sec != section:
+            section = sec
+            say("")
+            say("  --- %s ---" % section)
+        src = os.path.join(HERE, suite)
+        if not os.path.isfile(src):
+            say("    %-34s ABSENT (not on disk)" % suite)
+            results.append((suite, "ABSENT", 0, None, None))
+            continue
+        if time.time() - t_start > BUDGET_TOTAL_S:
+            say("    %-34s NOT RUN (total budget %ds spent)" % (suite, BUDGET_TOTAL_S))
+            results.append((suite, "NOTRUN", 0, None, None))
+            continue
+        clean_dbs(work)
+        log = os.path.join(work, "logs", suite + ".log")
+        t0 = time.time()
+        with open(log, "w", encoding="utf8", errors="replace") as lf:
+            p = subprocess.Popen([sys.executable, suite], cwd=work, env=env,
+                                 stdout=lf, stderr=subprocess.STDOUT,
+                                 stdin=subprocess.DEVNULL,
+                                 start_new_session=not WIN, creationflags=_NOWIN)
+            try:
+                rc = p.wait(timeout=tmo)
+            except subprocess.TimeoutExpired:
+                kill_tree(p)
+                rc = 124
+        dt = time.time() - t0
+        try:
+            with open(log, "r", encoding="utf8", errors="replace") as lf:
+                body = lf.read()
+        except OSError:
+            body = ""
+        hits = TALLY.findall(body)
+        line = (hits[-1] if hits else "").strip()
+        if isinstance(line, tuple):
+            line = line[0]
+        passed = failed = None
+        m = re.search(r"(\d+)\s*/\s*(\d+)", line)
+        if m:
+            passed, total = int(m.group(1)), int(m.group(2))
+            failed = total - passed
+        else:
+            mp = re.search(r"(\d+) passed", line, re.I)
+            mf = re.search(r"(\d+) failed", line, re.I)
+            if mp:
+                passed = int(mp.group(1))
+                failed = int(mf.group(1)) if mf else 0
+        mfind = re.search(r"FINDINGS:\s*(\d+)", line, re.I)
+        if mfind:
+            failed = int(mfind.group(1))
+            passed = 0 if failed else 1
+
+        if rc == 124:
+            state = "TIMEOUT"
+        elif suite in INFORMATIONAL:
+            state = "info" if rc == 0 else "ERROR rc=%s" % rc
+            line = line or INFORMATIONAL[suite]
+            passed = failed = None
+        elif not line:
+            state = "NO RESULT"
+        elif failed:
+            state = "FAIL"
+        elif rc != 0 and passed is None:
+            state = "ERROR rc=%s" % rc
+        else:
+            state = "ok"
+        say("    %-34s %-9s %6.1fs  %s" % (suite, state, dt, line or "(no tally line)"))
+        results.append((suite, state, dt, passed, failed))
+        if verbose or state in ("FAIL", "TIMEOUT", "NO RESULT") or state.startswith("ERROR"):
+            lines = [l for l in body.splitlines() if l.strip()]
+            # The FAILING lines first, then the tail. The first draft printed
+            # only the last 18 lines and a suite whose failures were early
+            # showed 18 PASS lines under the word FAIL -- a report that hides
+            # the thing it is reporting.
+            bad_lines = [l for l in lines
+                         if re.search(r"\bFAIL\b|\bERROR\b|Traceback|Exception", l)]
+            if bad_lines and not verbose:
+                say("        | -- the %d failing line(s):" % len(bad_lines))
+                for l in bad_lines[:20]:
+                    say("        | " + l[:200])
+                if len(bad_lines) > 20:
+                    say("        | ... %d more" % (len(bad_lines) - 20))
+                say("        | -- tail:")
+            for l in (lines if verbose else lines[-12:]):
+                say("        | " + l[:200])
+    say("")
+    say("  suite logs: %s" % os.path.join(work, "logs"))
+    return results
+
+
+def phase_live(say, title="5. LIVE STATE -- what is actually up right now (read-only)"):
+    rule(say, title)
+    any_up = False
+    for name, port in NODES:
+        up = port_open("127.0.0.1", port)
+        h = http_json("http://127.0.0.1:%d/health" % port) if up else None
+        if h:
+            any_up = True
+            say("  node %s :%-5d UP    height=%s version=%s src=%s peers=%s"
+                % (name, port, h.get("height", h.get("chain_height", "?")),
+                   h.get("version", "?"), str(h.get("source_sha256", "?"))[:12],
+                   h.get("peer_count", h.get("peers", "?"))))
+            warn = h.get("warnings") or h.get("warning")
+            if warn:
+                say("             warnings: %s" % warn)
+        elif up:
+            say("  node %s :%-5d port open, /health did not answer JSON" % (name, port))
+        else:
+            say("  node %s :%-5d down" % (name, port))
+    say("  console :%-5d %s" % (CONSOLE_PORT,
+        "UP" if port_open("127.0.0.1", CONSOLE_PORT) else "not running"))
+    say("  model server: none on this PC (removed 2026-09-07); the ethics seat is the distilled student")
+    wd = os.path.join(HERE, "logs", "watchdog.log")
+    if os.path.isfile(wd):
+        age = time.time() - os.path.getmtime(wd)
+        say("  watchdog      last wrote %.0f min ago (%s)" % (age / 60,
+            "alive" if age < 900 else "STALE -- the control that catches drift is drifting"))
+        try:
+            with open(wd, "r", encoding="utf8", errors="replace") as f:
+                tail = f.readlines()[-5:]
+            for l in tail:
+                say("             | " + l.rstrip()[:150])
+        except OSError:
+            pass
+    else:
+        say("  watchdog      no logs/watchdog.log here")
+    if not any_up:
+        say("")
+        say("  No node answered. That is a fact, not a failure: this runner does")
+        say("  not start them. Use --restart (gated) or AN_LAUNCH.bat on Windows.")
+    return any_up
+
+
+def phase_actions(say, args, gates=None):
+    did = []
+    if args.restart and gates == 1:
+        rule(say, "6. RESTART -- REFUSED")
+        say("  A gate is BLOCKED, so nothing is stopped and nothing is started.")
+        say("  P17: a stop that always succeeds composed with a start that can")
+        say("  refuse is not a restart, it is a stop -- so the refusal happens")
+        say("  BEFORE the stop, not after it. Read the BLOCKED lines above;")
+        say("  each carries its own fix. Re-run with the gate cleared.")
+        return [("verify_deploy.py", "REFUSED (gate BLOCKED)")]
+    if args.restart and gates is None:
+        rule(say, "6. RESTART -- REFUSED")
+        say("  The gates were NOT MEASURED, and an unmeasured gate is not a")
+        say("  passed gate. Nothing was stopped and nothing was started.")
+        return [("verify_deploy.py", "REFUSED (gates not measured)")]
+    if args.restart:
+        rule(say, "6. RESTART -- hash the delivery, restart, confirm running source")
+        rc = run_open(say, [sys.executable, "verify_deploy.py"], timeout=900)
+        did.append(("verify_deploy.py", rc))
+    if args.dashboard:
+        rule(say, "6. DASHBOARD")
+        rc = run_open(say, [sys.executable, "dashboard_render.py"], timeout=300)
+        did.append(("dashboard_render.py", rc))
+    if args.daily:
+        rule(say, "6. DAILY CHECK + CIRCUIT BREAKERS")
+        rc = run_open(say, [sys.executable, "daily.py"], timeout=900)
+        did.append(("daily.py", rc))
+    if args.console:
+        rule(say, "6. CONSOLE -- serving on 127.0.0.1:%d (blocks; ctrl-c to stop)" % CONSOLE_PORT)
+        rc = run_open(say, [sys.executable, "covenant_app.py"])
+        did.append(("covenant_app.py", rc))
+    return did
+
+
+# --------------------------------------------------------------------------
+def main():
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--quick", action="store_true", help="skip the long sweep")
+    ap.add_argument("--check", action="store_true", help="gates only")
+    ap.add_argument("--only", nargs="+", default=None, help="run only these suites")
+    ap.add_argument("--repeat", type=int, default=1, help="run each suite N times, alone")
+    ap.add_argument("--verbose", action="store_true", help="stream every suite log")
+    ap.add_argument("--restart", action="store_true", help="ACTION: verify + restart nodes")
+    ap.add_argument("--dashboard", action="store_true", help="ACTION: write dashboard.html")
+    ap.add_argument("--daily", action="store_true", help="ACTION: run daily.py")
+    ap.add_argument("--console", action="store_true", help="ACTION: serve the console")
+    ap.add_argument("--all", action="store_true", help="sweep + dashboard + daily")
+    ap.add_argument("--ci", action="store_true",
+                    help="continuous integration: implies --transported, and "
+                         "the gates are REPORTED but do not decide the exit "
+                         "code (a CI runner is not a launch host)")
+    ap.add_argument("--transported", action="store_true",
+                    help="this tree is a COPY of the delivery (e.g. the cloud "
+                         "mirror): report the manifest check N/A instead of red")
+    ap.add_argument("--out", default="ONE_RUN.txt", help="transcript file")
+    args = ap.parse_args()
+    if args.all:
+        args.dashboard = args.daily = True
+    if args.ci:
+        # A CI runner has no ethics judge, no nodes, no identity keys and no
+        # manifest of its own -- so G1/G5/G8/G9/G10 CANNOT pass there, ever.
+        # Wiring the exit code to them would make every CI run red for reasons
+        # that are true of the runner rather than of the code, and a check that
+        # is always red is one people learn to skim past (M34). The gates are
+        # still ASKED and still PRINTED in full: reported, not gating. What
+        # decides the exit code is the suites, which is the thing CI can
+        # actually observe.
+        args.transported = True
+
+    # A PARTIAL RUN IS NOT THE SWEEP (2026-09-26, A231). `--only` used to write ONE_RUN.txt like a full
+    # sweep: it overwrote the last full transcript other checks read as evidence, and the highway's
+    # sweep_red took its 5-suite FAIL (a folder-integrity line while files were uncommitted) as THE
+    # sweep's verdict -- red on the PC page for a run nobody meant as one. A partial run now writes its
+    # own file by default and says PARTIAL in its header; detect_sweep_red skips what says so.
+    if args.only and args.out == "ONE_RUN.txt":
+        args.out = "ONE_RUN_ONLY.txt"
+    say = Tee(os.path.join(HERE, args.out))
+    t0 = time.time()
+    say("#" * 74)
+    say("#  COVENANT -- ONE COMMAND.  Nothing hidden, nothing silent.")
+    say("#  transcript: %s" % say.path)
+    if getattr(say, "kept", None):
+        say("#  the previous one is kept, not overwritten: %s" % say.kept)
+    if args.only:
+        say("#  scope: PARTIAL -- --only %d suite(s); not the sweep, and its verdict speaks for them alone"
+            % len(args.only))
+    say("#" * 74)
+
+    absent = orphans = []
+    inplace = []
+    gates = None
+    results = []
+    actions = []
+    missing_deps = 0
+    ignored = []
+    interrupted = False
+    try:
+        phase_identity(say)
+        absent, orphans, missing_deps, ignored = phase_coverage(say)
+        inplace = phase_integrity(say, transported=args.transported)
+        gates = phase_gates(say)
+        if args.check:
+            say("")
+            say("--check was passed. Stopping here. Nothing else ran, nothing touched.")
+        else:
+            if not args.quick:
+                results = phase_sweep(say, only=args.only, repeat=args.repeat,
+                                      verbose=args.verbose)
+            else:
+                rule(say, "4. SWEEP -- SKIPPED (--quick). This is NOT a pass.")
+            phase_live(say)
+            actions = phase_actions(say, args, gates=gates)
+            if actions and any(r not in ("REFUSED (gate BLOCKED)",
+                                         "REFUSED (gates not measured)")
+                               for _, r in actions):
+                # Measure AFTER, not only before. "It restarted" is a claim
+                # about a process, and the only way to check a claim about a
+                # process is to ask the process (M30).
+                phase_live(say, "7. LIVE STATE AFTER -- ask the processes, "
+                                "do not assume the restart worked")
+    except KeyboardInterrupt:
+        interrupted = True
+        say("")
+        say("INTERRUPTED by ctrl-c. Partial run -- do not read it as a result.")
+    finally:
+        # ------------------------------------------------------------------
+        rule(say, "VERDICT")
+        checks = sum(p for _, _, _, p, _ in results if p)
+        fails = sum(f for _, _, _, _, f in results if f)
+        bad = [r for r in results if r[1] in ("FAIL", "TIMEOUT", "NO RESULT")
+               or r[1].startswith("ERROR")]
+        unmeasured = [r for r in results if r[1] in ("ABSENT", "NOTRUN")]
+        say("  suites run          %d" % len([r for r in results
+                                              if r[1] not in ("ABSENT", "NOTRUN")]))
+        say("  checks passed       %d" % checks)
+        say("  checks failed       %d" % fails)
+        say("  suites not clean    %d%s" % (len(bad),
+            ("  -> " + ", ".join(r[0] for r in bad)) if bad else ""))
+        say("  suites unmeasured   %d%s" % (len(unmeasured),
+            ("  -> " + ", ".join(r[0] for r in unmeasured)) if unmeasured else ""))
+        # A SUITE THAT PASSED AND COUNTED NOTHING, NAMED.
+        #
+        # The operator, 2026-09-17: "should be auto repairing i don't
+        # understand." He was right that nothing was watching this. The TALLY
+        # regex accepts `ALL PASS`, which carries no number, so a suite ending
+        # "all passed" is logged ok and adds 0 to `checks passed`. Six did, and
+        # 119 real checks never reached the published total -- found only
+        # because seven checks were added to one of them and the headline did
+        # not move.
+        #
+        # It is NAMED, not blocked and not repaired. Not blocked, because the
+        # count being short is a reporting gap and not a failure: those suites
+        # exit non-zero when they fail, so nothing hides. Not repaired, because
+        # repairing it means editing test files, and the line this project
+        # holds is that the loop may restart the world and never edit a check.
+        # A loop that edits suites until the numbers look right is the failure
+        # it was built to catch.
+        zero = [r for r in results
+                if r[1] == "ok" and not r[3] and r[0] not in INFORMATIONAL]
+        say("  passed, counted 0   %d%s" % (len(zero),
+            ("  -> " + ", ".join(r[0] for r in zero)
+             + "  (their checks are real and absent from the total above; "
+               "INFORMATIONAL suites are excluded and are not a defect)")
+            if zero else ""))
+        say("  runner list absent  %d%s" % (len(absent),
+            ("  -> " + ", ".join(absent)) if absent else ""))
+        say("  orphaned on disk    %d%s" % (len(orphans),
+            ("  -> " + ", ".join(orphans)) if orphans else ""))
+        say("  listed but NOT SHIPPED %d%s"
+            % (len(ignored),
+               ("  -> " + ", ".join(ignored)
+                + "   <- an ignore rule keeps these OUT of the delivery;"
+                  " CI will call them ABSENT")
+               if ignored else ""))
+        say("  declared deps missing %d%s"
+            % (missing_deps,
+               "   <- suites needing them are UNMEASURED, not failing"
+               if missing_deps else ""))
+        bad_inplace = [n for n, st in inplace if st != "ok"]  # noqa: F841
+        say("  folder integrity    %s" % (", ".join("%s=%s" % (n, st)
+                                                    for n, st in inplace) or "NOT MEASURED"))
+        if actions:
+            say("  actions             %s" % ", ".join("%s=%s" % (n, r)
+                                                       for n, r in actions))
+        if gates == 2 and results and not args.quick and not interrupted:
+            # In phase 3 the newest transcript G12 could read was THIS one,
+            # half-written, with no tally; the tally is a few lines above
+            # now. Ask once more. The second answer replaces the first and
+            # both stay in the transcript. Before this, the first sweep after
+            # any change to the core could not be green by its own gate
+            # (2026-09-05, the sweep after the A1 fix: 73 suites, 0 failed,
+            # G12 UNKNOWN, and launch_check alone said 12 PASS a minute
+            # later).
+            gates = phase_gates(say, again=True)
+        say("  gates               %s" % {0: "PASS", 1: "BLOCKED", 2: "INCOMPLETE",
+                                          None: "NOT MEASURED"}.get(gates, gates))
+        say("  elapsed             %.1f min" % ((time.time() - t0) / 60))
+        say("")
+        gate_blocks = (gates == 1) and not args.ci
+        # --ci used to discard EVERY in-place failure: `... if not args.ci
+        # else []`. That hid a real one. On 2026-08-30 a --ci run printed
+        # "folder integrity  test_p18_version_collision.py=FAIL rc=1" and
+        # "P18: 19/20 passed" in its own transcript, and then closed with
+        # "RESULT: PASS. Everything this runner names was measured and
+        # correct." Both statements were in the same file. The collision was
+        # real -- pending-v8.38/covenant_unified_v8.py declared VERSION v8.40
+        # with different bytes from the root core -- and it had been suppressed
+        # in every CI run since the flag existed.
+        #
+        # The blanket exclusion was never needed. The one in-place check that
+        # legitimately cannot apply to a copy is the DELIVERY MANIFEST, and
+        # --transported already reports that as N/A rather than FAIL. A version
+        # COLLISION is a fact about a tree, and a copy is a tree: two files
+        # claiming one version with different bytes is exactly as wrong there.
+        #
+        # So failures count everywhere, and the thing that is genuinely N/A on
+        # a copy goes on saying N/A.
+        inplace_fail = [n for n, st in inplace if st.startswith("FAIL")]
+        if args.ci:
+            say("  ci mode             gates are REPORTED above, not gating --")
+            say("                      this runner has no judge, no nodes and no")
+            say("                      keys, so those gates cannot pass here. The")
+            say("                      suites decide the exit code.")
+        if bad or fails or gate_blocks or inplace_fail:
+            say("  RESULT: FAIL. Something is wrong and it is named above.")
+            code = 1
+        elif (unmeasured or absent or orphans or args.quick or missing_deps
+              or ignored
+              or (gates in (2, None) and not args.ci)
+              or [n for n, st in inplace
+                  if st == "ABSENT" or (st.startswith("N/A") and not args.ci)]):
+            say("  RESULT: INCOMPLETE. Nothing failed; something was not measured.")
+            say("          This is NOT a pass. Every unmeasured item is named above.")
+            code = 2
+        else:
+            say("  RESULT: PASS. Everything this runner names was measured and correct.")
+            code = 0
+        # RAW RESULTS, NO PROSE (2026-09-25, his words: "Prioritize testability over
+        # persuasion. Separate the governing rules, verification harness, and experimental
+        # logs into clear layers so others can reproduce results without the author's
+        # interpretation"). The transcript above interprets; this file only counts: every
+        # suite's state and numbers, every in-place check, the gates' code, the exit code,
+        # and what tree and platform produced them. Beside the transcript, same stem. A
+        # write that fails is said and changes nothing about the run.
+        try:
+            import hashlib as _hl
+            import json as _json
+            import platform as _pf
+            _stem = os.path.splitext(say.path)[0]
+            _core = os.path.join(HERE, "covenant_unified_v8.py")
+            _head = None
+            try:
+                _head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True,
+                                       text=True, timeout=10).stdout.strip() or None
+            except Exception:                                    # noqa: BLE001 -- no git is a fact, not an error
+                _head = None
+            _raw = {
+                "schema": "covenant-one-results-v1",
+                "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "platform": _pf.platform(), "python": _pf.python_version(),
+                "git_head": _head,
+                "core_sha256": _hl.sha256(open(_core, "rb").read()).hexdigest() if os.path.exists(_core) else None,
+                "mode": {"ci": bool(args.ci), "quick": bool(args.quick), "only": args.only, "repeat": args.repeat},
+                "suites": [{"suite": s, "state": st, "seconds": (round(dt, 1) if isinstance(dt, (int, float)) else None),
+                            "passed": p, "failed": f} for (s, st, dt, p, f) in results],
+                "in_place": [{"name": n, "state": st} for n, st in inplace],
+                "totals": {"checks_passed": checks, "checks_failed": fails, "suites_not_clean": len(bad),
+                           "suites_unmeasured": len(unmeasured)},
+                "gates": gates, "exit_code": code,
+            }
+            _text = _json.dumps(_raw, indent=1)                    # serialised first: a failure leaves no empty file
+            with open(_stem + ".results.json", "w", encoding="utf-8") as _fh:
+                _fh.write(_text)
+            say("  raw results:  %s.results.json (numbers only; no interpretation)" % _stem)
+        except Exception as _e:                                   # noqa: BLE001
+            say("  raw results:  NOT written (%s: %s)" % (type(_e).__name__, str(_e)[:120]))
+        say("")
+        say("  transcript: %s" % say.path)
+        say("")
+        say("  NOT COVERED BY THIS RUN, and never read a green run as covering them:")
+        say("    test_xrp_live.py   XRP autofill/submit against a FUNDED testnet")
+        say("                       account. Mainnet stays BLOCKED until it runs once.")
+        say("    test_covenant_app.py  needs the chain STOPPED (binds real ports).")
+        say("    test_a124_chain_syncable.py  CAN A NEW NODE STILL JOIN? Needs a")
+        say("                       node database, which is gitignored and which")
+        say("                       this run wipes, so it is a NO-OP here. A116")
+        say("                       left the chain unjoinable past block 12 for")
+        say("                       days and nothing said so. Run it in the")
+        say("                       working tree, beside a node database.")
+        say("")
+        say.close()
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

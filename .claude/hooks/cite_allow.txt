@@ -1,0 +1,10 @@
+# Paths named as EXAMPLES rather than cited, so verify_citations.py lets them
+# through. Keep this file SHORT. Every entry is a hole in the check; an entry
+# added to make a block go away defeats the point (see memory:
+# fix-and-green-must-align -- never move a check to make it pass).
+#
+# PEDERSEN_2026-09-14.md is the original false citation of 2026-09-16. It does
+# not exist and never did (the real file is private/EMAIL_PEDERSEN_2026-09-14.md).
+# It is listed here because it is now the standing teaching example for this
+# whole class of error and gets named when the hook is explained.
+PEDERSEN_2026-09-14.md

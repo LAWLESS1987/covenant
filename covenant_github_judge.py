@@ -1,0 +1,390 @@
+#!/usr/bin/env python3
+"""covenant_github_judge.py -- ask a covenant judge that runs on GitHub's
+machine. This PC runs no model server (removed 2026-09-07); the nodes' gate is
+the distilled student, and covenant_route.py / covenant_chat.py send their
+turns here.
+
+WHY (asked 2026-09-03: "route through GitHub if the local server is failing")
+  At the time the nodes' judge, covenant_route.py and covenant_chat.py all
+  talked to a local model server on 127.0.0.1:11434. When it was down they had
+  nowhere to go. GitHub Models inference was the obvious second place and it
+  was probed first: 2026-09-04 it answered HTTP 410
+  "github_models_retirement_brownout". So the second place is a GitHub
+  Actions runner (.github/workflows/judge.yml) that starts a model server of
+  its own, answers ONE prompt and hands it back as an artifact. Since
+  2026-09-12 that server is llama.cpp's llama-server on a pinned build with a
+  byte-checked GGUF (it installed Ollama until then), and since 2026-09-07 it
+  is not a second place but the only one: the teacher of the distilled
+  students and the judge behind the router and the chat. The repo is public,
+  so the minutes cost nothing.
+
+WHAT LEAVES THIS PC
+  The prompt (or the chat messages) and the model name, to GitHub, over the
+  account whose token git already holds. That is the whole point and it is
+  also the whole cost: a thing answered here does not stay here. Every caller
+  says so in its log line ("place": "github-actions"). Nothing in this file
+  reads a key file, a database or the trader.
+
+HOW IT AUTHENTICATES
+  GITHUB_TOKEN from the environment if set; otherwise the credential git
+  itself uses for github.com (`git credential fill`), which on this PC is the
+  Git Credential Manager entry for LAWLESS1987 (scopes gist, repo, workflow:
+  enough to dispatch a workflow and read its artifact). The token is never
+  printed or written.
+
+LATENCY
+  A hosted runner boots, restores the runtime and the model from cache and
+  loads the model before it can think. Measured 2026-09-04 on the Ollama-era
+  file with qwen3:4b: 107 s cold, 94 s with the model cached, 45 s of that
+  installing the runtime; the answer itself ~19 s. The llama-server file
+  (2026-09-12) restores a 17 MB runtime instead of installing 1.4 GB; a 4.3 GB
+  model cache entry restored in 26-42 s in the runs that measured it.
+  MEASURED 2026-09-12, the first calls after the swap: qwen2.5:7b cold (the
+  4.7 GB GGUF fetched on the runner) 116 s in all -- 59 s to the model on
+  disk, 62 s to a healthy server, 1.3 s to answer; the three panel members
+  in parallel (ask_many) 54 s / 74 s / 84 s, every answer valid JSON.
+  This is a place for bounded questions, not a chat you sit in front of.
+
+USE
+  gh.ask_many(prompt, system, ["qwen2.5:7b", "llama3.2:3b"])   # several at once (the teacher panel)
+  python covenant_github_judge.py --prompt "..." [--model <DEFAULT_MODEL>] [--json]
+  python covenant_github_judge.py --prompt-file q.txt --system-file s.txt
+  python covenant_github_judge.py --selftest
+  from covenant_github_judge import ask, available
+
+EXIT  0 answered   2 could not (no token, dispatch refused, run failed, timeout)
+LICENCE: public domain.
+"""
+from __future__ import annotations
+
+import base64
+import io
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+import uuid
+import zipfile
+import covenant_quiet                                    # no console window on Windows (covenant_quiet.py)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+API = "https://api.github.com"
+WORKFLOW = "judge.yml"
+DEFAULT_MODEL = os.environ.get("COVENANT_GITHUB_MODEL", "qwen2.5:7b")   # no thinking mode; see judge.yml
+LOG = os.path.join(HERE, "ops", "judge_route.log")
+
+
+# The token and the repo name are asked for ONCE per process and remembered.
+#
+# WHY, MEASURED 2026-09-04. token() shells out to `git credential fill`, and on
+# this machine that starts Git Credential Manager -- a separate GUI program.
+# Under a parent with no console (a scheduled task under pythonw, or the
+# detached watchdog) it puts a WINDOW on screen, and it was being called on
+# every single request to the runner, several times a learning pass, for
+# hours. That is the flicker he reported three times. Neither answer changes
+# while the process runs, so asking again was pure cost with a window attached.
+_CACHE = {}
+
+
+def repo():
+    r = os.environ.get("COVENANT_GITHUB_REPO")
+    if r:
+        return r
+    if "repo" in _CACHE:
+        return _CACHE["repo"]
+    try:
+        url = covenant_quiet.run(["git", "remote", "get-url", "origin"], cwd=HERE,
+                             capture_output=True, text=True, timeout=10).stdout.strip()
+        tail = url.split("github.com")[-1].lstrip(":/")
+        _CACHE["repo"] = tail[:-4] if tail.endswith(".git") else tail
+        return _CACHE["repo"]
+    except Exception:                                            # noqa: BLE001
+        return "LAWLESS1987/covenant"
+
+
+_CREDENTIAL_STORE_OK = {"allowed": False, "why": ""}
+
+
+def allow_credential_store(why):
+    """Opt IN to reading this machine's git credential store, for this process
+    only, with a reason that gets logged.
+
+    WHY THIS EXISTS, and why it is not just the env var. A21 is about a NODE --
+    a long-running gate on a stranger's machine -- reaching into their
+    credential store unasked and spending their token. That must stay shut.
+
+    But the same token() serves a second, different use: the TEACHER.
+    ops/quorum_policy.json says it plainly -- the runner generates 1583 of the
+    3487 rows the students learn from, and "cutting the second as well would
+    stop the students learning at all, since Ollama is gone". The first version
+    of the A21 fix (2026-09-16, same day) gated BOTH, and nothing in the tree
+    sets COVENANT_GITHUB_JUDGE, so it silently killed corpus generation. Caught
+    by asking what the teacher actually depends on, after the fix was pushed.
+
+    A distiller run is an operator starting a tool by hand or by their own
+    scheduled task. That IS the consent the node path lacks. And repo() derives
+    the target from `git remote get-url origin`, so a second operator who runs
+    the distiller dispatches on THEIR fork with THEIR token -- their machine,
+    their repository, their corpus. That is a different act from a node quietly
+    spending their credentials on somebody else's repo."""
+    _CREDENTIAL_STORE_OK["allowed"] = True
+    _CREDENTIAL_STORE_OK["why"] = str(why)
+
+
+def token():
+    t = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if t:
+        return t
+    if "token" in _CACHE:
+        return _CACHE["token"]
+    # A21 (second-operator audit, fixed 2026-09-16). Setting GITHUB_TOKEN is an
+    # explicit act, so the branch above needs no gate. Reaching into the
+    # machine's credential store is NOT: on a stranger's PC this ran
+    # `git credential fill` unasked, took whatever token Git Credential Manager
+    # held, and dispatched a workflow on LAWLESS1987/covenant with it. A node
+    # someone cloned must never spend their credentials on the owner's repo
+    # without being told to. Opt in with COVENANT_GITHUB_JUDGE=1.
+    if (os.environ.get("COVENANT_GITHUB_JUDGE", "").strip()
+            not in ("1", "true", "yes")) and not _CREDENTIAL_STORE_OK["allowed"]:
+        return ""
+    try:
+        env = dict(os.environ)
+        # Never let the helper block on a prompt: under a parent with no
+        # console it would hang the pass instead of failing it.
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        p = covenant_quiet.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n",
+                           capture_output=True, text=True, timeout=20, env=env)
+        for line in p.stdout.splitlines():
+            if line.startswith("password="):
+                _CACHE["token"] = line[9:].strip()
+                return _CACHE["token"]
+    except Exception:                                            # noqa: BLE001
+        pass
+    return ""
+
+
+def available():
+    """True when there is a token and GitHub answers for the repo."""
+    t = token()
+    if not t:
+        return False
+    try:
+        _get("/repos/%s/actions/workflows/%s" % (repo(), WORKFLOW), t)
+        return True
+    except Exception:                                            # noqa: BLE001
+        return False
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _req(path, tok, data=None, method=None, timeout=30):
+    req = urllib.request.Request(API + path if path.startswith("/") else path,
+                                 data=json.dumps(data).encode() if data is not None else None,
+                                 headers={"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json",
+                                          "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json",
+                                          "User-Agent": "covenant-github-judge"},
+                                 method=method or ("POST" if data is not None else "GET"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read()
+            return r.status, (json.loads(raw.decode("utf-8", "replace")) if raw.strip() else {})
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")[:300]
+        raise RuntimeError("GitHub answered HTTP %d on %s: %s" % (e.code, path.split("?")[0], body)) from None
+
+
+def _get(path, tok):
+    return _req(path, tok)[1]
+
+
+def dispatch(tok, tag, model, prompt, system="", json_only=False, ref="main"):
+    inputs = {"tag": tag, "model": model,
+              "prompt_b64": base64.b64encode(prompt.encode("utf-8")).decode(),
+              "system_b64": base64.b64encode(system.encode("utf-8")).decode(),
+              "json_only": "true" if json_only else "false"}   # the API wants strings, even for a boolean input
+    total = sum(len(str(v)) for v in inputs.values())
+    if total > 65000:
+        raise ValueError("inputs are %d chars; GitHub caps workflow inputs at 65,535 -- shorten the prompt" % total)
+    status, _ = _req("/repos/%s/actions/workflows/%s/dispatches" % (repo(), WORKFLOW), tok,
+                     {"ref": ref, "inputs": inputs})
+    return status
+
+
+def find_run(tok, tag, wait=90):
+    """Poll for the dispatched run. MEASURED 2026-09-04: 49 s of a 157 s call
+    was dispatch and polling, and most of that was granularity rather than
+    waiting -- a 5 s sleep here and a 12 s sleep below mean the answer can sit
+    finished for up to 12 s before anyone looks. Both are tighter now. GitHub's
+    rate limit is 5,000 requests an hour and a whole learning pass makes a few
+    dozen, so the cost of asking more often is nothing."""
+    name = "judge %s" % tag
+    t0 = time.time()
+    delay = 1.0
+    while time.time() - t0 < wait:
+        runs = _get("/repos/%s/actions/runs?event=workflow_dispatch&per_page=30" % repo(), tok).get("workflow_runs", [])
+        for r in runs:
+            if r.get("name") == name or r.get("display_title") == name:
+                return r
+        time.sleep(delay)
+        delay = min(3.0, delay + 0.5)
+    return None
+
+
+def wait_run(tok, run_id, timeout):
+    """Poll until the run completes. The interval starts tight and eases off,
+    so a fast answer is noticed immediately and a slow one is not hammered."""
+    t0 = time.time()
+    delay = 3.0
+    while time.time() - t0 < timeout:
+        r = _get("/repos/%s/actions/runs/%d" % (repo(), run_id), tok)
+        if r.get("status") == "completed":
+            return r
+        time.sleep(delay)
+        delay = min(10.0, delay * 1.3)
+    return None
+
+
+def artifact(tok, run_id, tag):
+    arts = _get("/repos/%s/actions/runs/%d/artifacts" % (repo(), run_id), tok).get("artifacts", [])
+    for a in arts:
+        if a.get("name") == "judge-%s" % tag:
+            # The download is a 302 to blob storage that rejects the GitHub
+            # Authorization header, so take the Location by hand and fetch it bare.
+            opener = urllib.request.build_opener(_NoRedirect)
+            req = urllib.request.Request(a["archive_download_url"],
+                                         headers={"Authorization": "Bearer " + tok, "User-Agent": "covenant-github-judge"})
+            try:
+                with opener.open(req, timeout=30) as r:
+                    loc = r.headers.get("Location")
+                    blob = r.read() if not loc else None
+            except urllib.error.HTTPError as e:
+                if e.code not in (301, 302, 303, 307, 308):
+                    raise
+                loc, blob = e.headers.get("Location"), None
+            if loc:
+                with urllib.request.urlopen(urllib.request.Request(loc, headers={"User-Agent": "covenant-github-judge"}),
+                                            timeout=60) as r:
+                    blob = r.read()
+            with zipfile.ZipFile(io.BytesIO(blob)) as z:
+                return json.loads(z.read("answer.json").decode("utf-8", "replace"))
+    return None
+
+
+def ask(prompt, system="", model=DEFAULT_MODEL, json_only=False, timeout=900, messages=None):
+    """Send one question to the GitHub runner and wait for the answer.
+    Returns {"content", "model", "place": "github-actions", "seconds", "run_url", ...}
+    or raises RuntimeError with the reason. `messages` (a chat history) may be
+    given instead of prompt/system."""
+    tok = token()
+    if not tok:
+        raise RuntimeError("no GitHub token: set GITHUB_TOKEN or let git hold one for github.com")
+    tag = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
+    text = json.dumps(messages, ensure_ascii=False) if messages else prompt
+    t0 = time.time()
+    status = dispatch(tok, tag, model, text, system, json_only)
+    if status not in (200, 204):
+        raise RuntimeError("dispatch answered HTTP %s" % status)
+    run = find_run(tok, tag)
+    if not run:
+        raise RuntimeError("the run 'judge %s' never appeared in 90s" % tag)
+    done = wait_run(tok, run["id"], timeout)
+    if not done:
+        raise RuntimeError("run %s did not complete in %ds: %s" % (run["id"], timeout, run.get("html_url")))
+    if done.get("conclusion") != "success":
+        raise RuntimeError("run %s concluded %s: %s" % (run["id"], done.get("conclusion"), done.get("html_url")))
+    ans = artifact(tok, run["id"], tag)
+    if not ans:
+        raise RuntimeError("run %s succeeded but left no judge-%s artifact" % (run["id"], tag))
+    ans["seconds"] = round(time.time() - t0, 1)
+    ans["run_url"] = done.get("html_url")
+    return ans
+
+
+def _log_line(rec):
+    """One JSON line to ops/judge_route.log (the router's log): every runner
+    call is a record, including the ones that failed."""
+    try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
+        with open(LOG, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(dict({"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, **rec),
+                                ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def ask_many(prompt, system="", models=(), json_only=False, timeout=900):
+    """The same question to several models at once -- one dispatch of the
+    unchanged workflow per model, in parallel (the teacher panel,
+    covenant_teacher_panel.py). Returns {model: answer dict, or "error: ..."}
+    and raises RuntimeError only when EVERY member failed. One line per
+    dispatch goes to ops/judge_route.log: model, tag, seconds, outcome, run_url."""
+    import concurrent.futures as cf
+    models = [m for m in models if m]
+    if not models:
+        raise ValueError("ask_many: no models named")
+
+    def one(m):
+        t0 = time.time()
+        try:
+            ans = ask(prompt, system, m, json_only, timeout)
+            _log_line({"kind": "ask_many", "model": m, "tag": ans.get("tag"), "seconds": ans.get("seconds"),
+                       "outcome": "answered", "run_url": ans.get("run_url")})
+            return m, ans
+        except Exception as e:                                   # noqa: BLE001
+            err = "%s: %s" % (type(e).__name__, str(e)[:200])
+            _log_line({"kind": "ask_many", "model": m, "seconds": round(time.time() - t0, 1),
+                       "outcome": "error", "error": err})
+            return m, "error: " + err
+    out = {}
+    with cf.ThreadPoolExecutor(max_workers=len(models)) as ex:
+        for m, ans in ex.map(one, models):
+            out[m] = ans
+    if all(isinstance(v, str) for v in out.values()):
+        raise RuntimeError("every member failed: " + "; ".join("%s -> %s" % (m, v) for m, v in out.items()))
+    return out
+
+
+def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--prompt"); ap.add_argument("--prompt-file")
+    ap.add_argument("--system", default=""); ap.add_argument("--system-file")
+    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--json", action="store_true", help="ask for a JSON object only")
+    ap.add_argument("--timeout", type=int, default=900)
+    ap.add_argument("--selftest", action="store_true")
+    a = ap.parse_args()
+    if a.selftest:
+        print("covenant_github_judge selftest -- repo %s, token %s" % (repo(), "present" if token() else "MISSING"))
+        if not token():
+            return 2
+        t0 = time.time()
+        try:
+            ans = ask("Reply with exactly the single word OK and nothing else.", model=a.model, timeout=a.timeout)
+        except RuntimeError as e:
+            print("FAIL  %s" % e); return 2
+        print(json.dumps({k: v for k, v in ans.items() if k != "content"}, indent=1))
+        print("answer: %r" % ans["content"][:200])
+        ok = "ok" in ans["content"].lower()
+        print("%s  GitHub runner answered in %.0fs (model %s)" % ("ok  " if ok else "FAIL", time.time() - t0, a.model))
+        return 0 if ok else 2
+    prompt = a.prompt or (open(a.prompt_file, encoding="utf-8").read() if a.prompt_file else "")
+    system = a.system or (open(a.system_file, encoding="utf-8").read() if a.system_file else "")
+    if not prompt:
+        ap.error("--prompt or --prompt-file required")
+    try:
+        ans = ask(prompt, system, a.model, a.json, a.timeout)
+    except (RuntimeError, ValueError, urllib.error.HTTPError) as e:
+        print(json.dumps({"error": str(e)})); return 2
+    print(json.dumps(ans, ensure_ascii=False, indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

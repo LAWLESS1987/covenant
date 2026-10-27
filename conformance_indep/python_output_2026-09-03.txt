@@ -1,0 +1,29 @@
+MATCH     S.clean.distinct-root                         {"clean":true,"divergences":0,"reference":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","silent_diverged":[],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.clean.is-reachable                          {"clean":true,"divergences":0,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":[],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.compose.agree                               {"clean":true,"divergences":0,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":[],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.compose.height-invariant                    {"clean":true,"divergences":0,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":[],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.divergence.survives-climb                   {"clean":false,"divergences":1,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":["k2"],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.divergences.split-counts-every-party        {"clean":false,"divergences":3,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":["k1"],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.divergences.two-levels                      {"clean":false,"divergences":2,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":["k1","k2"],"silent_unproven":[],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.divergences.two-outliers-one-level          {"clean":false,"divergences":2,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":[],"silent_unproven":[],"speaks_upward":false,"verdict":"DIVERGED"}
+MATCH     S.quorum.default-scales-at-a-level            {"clean":false,"divergences":0,"reference":null,"silent_diverged":[],"silent_unproven":["s3","s4","s5"],"speaks_upward":false,"verdict":"UNPROVEN"}
+MATCH     S.silence.two-kinds                           {"clean":false,"divergences":1,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":["dv"],"silent_unproven":["un"],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     S.silence.upward                              {"clean":false,"divergences":1,"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent_diverged":[],"silent_unproven":[],"speaks_upward":false,"verdict":"DIVERGED"}
+MATCH     S.unproven.speaks-silence                     {"clean":true,"divergences":0,"reference":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","silent_diverged":[],"silent_unproven":["u"],"speaks_upward":true,"verdict":"AGREE"}
+MATCH     T.agree.all                                   {"agreed":true,"answered":["x","y","z"],"outliers":[],"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent":[],"verdict":"AGREE"}
+MATCH     T.agree.one-silent                            {"agreed":true,"answered":["x","y"],"outliers":[],"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent":["z"],"verdict":"AGREE"}
+MATCH     T.diverged.one-outlier                        {"agreed":false,"answered":["x","y","z"],"outliers":["z"],"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent":[],"verdict":"DIVERGED"}
+MATCH     T.diverged.plurality-without-majority         {"agreed":false,"answered":["w","x","y","z"],"outliers":["y","z"],"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent":[],"verdict":"DIVERGED"}
+MATCH     T.diverged.reference-is-tallied               {"agreed":false,"answered":["x","y","z"],"outliers":["x"],"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent":[],"verdict":"DIVERGED"}
+MATCH     T.diverged.three-way                          {"agreed":false,"answered":["x","y","z"],"outliers":[],"reference":null,"silent":[],"verdict":"DIVERGED"}
+MATCH     T.diverged.tie-for-top                        {"agreed":false,"answered":["v","w","x","y","z"],"outliers":[],"reference":null,"silent":[],"verdict":"DIVERGED"}
+MATCH     T.quorum.default-met-at-five                  {"agreed":true,"answered":["v","w","x"],"outliers":[],"reference":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","silent":["y","z"],"verdict":"AGREE"}
+MATCH     T.quorum.default-scales-with-witnesses        {"agreed":false,"answered":["v","w"],"outliers":[],"reference":null,"silent":["x","y","z"],"verdict":"UNPROVEN"}
+MATCH     T.quorum.raised                               {"agreed":false,"answered":["x","y","z"],"outliers":[],"reference":null,"silent":[],"verdict":"UNPROVEN"}
+MATCH     T.unproven.too-few                            {"agreed":false,"answered":["x"],"outliers":[],"reference":null,"silent":["y","z"],"verdict":"UNPROVEN"}
+
+vectors matching:            23 / 23
+root over MY outputs:        0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef
+root published in spec:      0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef
+roots match:                 True
+root over spec's expecteds:  0c398099d7e9df6798f3cae1cea5f6dd71f28860300b2ae56e2dddd40f0ddcef   (hash-rule check: OK)

@@ -1,35 +1,51 @@
-*.7z filter=lfs diff=lfs merge=lfs -text
-*.arrow filter=lfs diff=lfs merge=lfs -text
-*.bin filter=lfs diff=lfs merge=lfs -text
-*.bz2 filter=lfs diff=lfs merge=lfs -text
-*.ckpt filter=lfs diff=lfs merge=lfs -text
-*.ftz filter=lfs diff=lfs merge=lfs -text
-*.gz filter=lfs diff=lfs merge=lfs -text
-*.h5 filter=lfs diff=lfs merge=lfs -text
-*.joblib filter=lfs diff=lfs merge=lfs -text
-*.lfs.* filter=lfs diff=lfs merge=lfs -text
-*.mlmodel filter=lfs diff=lfs merge=lfs -text
-*.model filter=lfs diff=lfs merge=lfs -text
-*.msgpack filter=lfs diff=lfs merge=lfs -text
-*.npy filter=lfs diff=lfs merge=lfs -text
-*.npz filter=lfs diff=lfs merge=lfs -text
-*.onnx filter=lfs diff=lfs merge=lfs -text
-*.ot filter=lfs diff=lfs merge=lfs -text
-*.parquet filter=lfs diff=lfs merge=lfs -text
-*.pb filter=lfs diff=lfs merge=lfs -text
-*.pickle filter=lfs diff=lfs merge=lfs -text
-*.pkl filter=lfs diff=lfs merge=lfs -text
-*.pt filter=lfs diff=lfs merge=lfs -text
-*.pth filter=lfs diff=lfs merge=lfs -text
-*.rar filter=lfs diff=lfs merge=lfs -text
-*.safetensors filter=lfs diff=lfs merge=lfs -text
-saved_model/**/* filter=lfs diff=lfs merge=lfs -text
-*.tar.* filter=lfs diff=lfs merge=lfs -text
-*.tar filter=lfs diff=lfs merge=lfs -text
-*.tflite filter=lfs diff=lfs merge=lfs -text
-*.tgz filter=lfs diff=lfs merge=lfs -text
-*.wasm filter=lfs diff=lfs merge=lfs -text
-*.xz filter=lfs diff=lfs merge=lfs -text
-*.zip filter=lfs diff=lfs merge=lfs -text
-*.zst filter=lfs diff=lfs merge=lfs -text
-*tfevents* filter=lfs diff=lfs merge=lfs -text
+# Normalise line endings. Authored on Windows, CI is green on Linux (README),
+# so text is stored LF in the repository and checked out native.
+* text=auto eol=lf
+
+# Windows batch files must keep CRLF. Some cmd.exe constructs (notably a
+# multi-line GOTO label or a trailing argument) misparse with bare LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts must be LF or the shebang line carries a stray CR and the
+# interpreter is not found.
+*.sh  text eol=lf
+
+# Explicitly text
+*.py   text
+*.md   text
+*.txt  text
+*.json text
+*.html text
+*.yml  text
+*.yaml text
+
+# Captured console output, kept byte-exact and NOT normalised.
+#
+# These are records of a run, not source. Each carries genuinely mixed
+# endings -- CLEANUP.txt is 2 CRLF and 35 bare LF -- because a .bat wrote
+# some lines and a Python step appended others to the same handle. Under
+# `text=auto eol=lf` the clean filter strips the surviving CRLF while the
+# committed blob keeps it, so the file reports a permanent 2-line diff that
+# no checkout can settle. Measured, after chasing a wrong guess first: there
+# are no \r\r\n sequences in any of them, so this is not the usual wmic
+# double-CR artefact -- it is simple interleaving.
+#
+# A record that cannot round-trip is not a record. -text stores them exactly
+# as captured.
+CLEANUP.txt       -text
+FREE_RAM.txt      -text
+LEAN_MEASURE*.txt -text
+diag_out.txt      -text
+pc_report.txt     -text
+
+# Binary: never diff, never normalise
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.msi  binary
+*.bin  binary
+*.db   binary
+*.zip  binary
+# 2026-09-12: the app's fixed debug-class signing key (mobile/app/signing)
+*.p12 binary

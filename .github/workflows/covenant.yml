@@ -1,0 +1,168 @@
+# The Linux half of ONE.bat, on every push and every pull request.
+#
+# WHAT THIS IS AND IS NOT. It runs `covenant_one.py --ci`, which is the SAME
+# FILE that runs on the Windows box -- so a CI result and a PC result are the
+# same task list executed by the same bytes, and a difference between them is a
+# difference in the machine. That is the whole point, and it is why this
+# workflow deliberately does NOT have its own list of suites to run: a second
+# list is a second thing to go stale, which is how run_all_tests.sh came to
+# name eleven suites that were not on disk.
+#
+# WHAT IT CANNOT COVER, and no green tick here should ever be read as covering:
+#   * win32. Production runs on Windows and three suites behave differently
+#     there -- a refused TCP connect costs 0.0 ms here and 2045 ms on the PC.
+#     Run ONE.bat on the box before any launch. CI does not replace it.
+#   * The launch gates. A runner has no ethics judge, no nodes, no identity
+#     keys and no delivery manifest, so G1/G5/G8/G9/G10 cannot pass here.
+#     --ci prints them in full and does not let them decide the exit code:
+#     a check that is always red teaches people to skim past it.
+#   * test_xrp_live.py (needs a funded testnet account) and
+#     test_covenant_app.py (needs the chain stopped). Both are on the runner's
+#     switched-off record, with reasons, printed on every run.
+name: covenant
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  # 2026-09-02: the sweep also runs on GitHub's runners every day at 09:30 UTC,
+  # so the tree is re-verified even when the laptop that lands it is asleep.
+  # A scheduled run measures the SAME source (main) on ubuntu; it is evidence
+  # about that platform, not about the Windows box (M29) -- G12 stays local.
+  #
+  # REPEATEDLY, asked 2026-09-10: "set gethub to self check repeatedly". Every
+  # two hours now, not once a day. The local fifteen-minute check only exists
+  # while that machine is awake and is the same hands that wrote the code; this
+  # is the independent witness, and a witness that speaks once a day can be
+  # twenty-three hours behind the tree.
+  #
+  # :30 rather than :00 deliberately -- GitHub queues scheduled jobs and the
+  # top of the hour is the worst minute to ask for one.
+  #
+  # TWO THINGS THAT CAN STOP THIS SILENTLY, and neither raises anything:
+  #   * GitHub DISABLES scheduled workflows after 60 days with no repository
+  #     activity. This repo is committed to most days, so it is not a live
+  #     risk today -- but it is a stop with no alarm, which is the exact shape
+  #     of A73/A76/A77/A78. If the operator ever steps away, the schedule goes
+  #     quiet and quiet reads like green.
+  #   * A scheduled run can be delayed or DROPPED under load. A missing run is
+  #     not a passing run. Absence of a red tick is not evidence of green --
+  #     read the run history, not the last badge.
+  schedule:
+    - cron: "30 */2 * * *"      # the repeated self-check
+    - cron: "30 9 * * *"        # the original daily anchor, kept as it was
+
+permissions:
+  contents: read
+
+concurrency:
+  # A SCHEDULED SELF-CHECK MUST NOT BE CANCELLED BY SOMEONE PUSHING.
+  #
+  # This was one group with cancel-in-progress for everything, which is right
+  # for push and pull_request -- a superseded commit's run is wasted minutes.
+  # It is wrong for the schedule: at a two-hourly cadence a push would land
+  # mid-run and cancel the witness, and a CANCELLED run is neither green nor
+  # red. It reports nothing and looks like nothing happened, which is how a
+  # check stops checking without ever going red.
+  #
+  # So the schedule gets its own lane and is never cancelled; push and PR keep
+  # the old behaviour exactly.
+  group: covenant-${{ github.event_name == 'schedule' && 'schedule' || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+jobs:
+  sweep:
+    name: sweep (ubuntu, python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is what the production box runs; 3.11 is the cloud mirror. Both,
+        # because "it passed on my interpreter" is the same class of claim as
+        # "it passed on my platform".
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # covenant_one prints git HEAD and worktree state
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Declare what this run is
+        run: |
+          echo "This is the LINUX half of ONE.bat. It does not cover win32,"
+          echo "and it does not cover the launch gates. See the header of"
+          echo ".github/workflows/covenant.yml before trusting a green tick."
+          python --version
+          git log --oneline -1
+
+      - name: covenant_one.py --ci
+        run: python covenant_one.py --ci --out ONE_RUN_ci.txt
+
+      # WHY THIS STEP EXISTS. A failed run of this workflow said exactly one
+      # thing to anyone who could not open the log: "Process completed with
+      # exit code 1." The transcript above holds the answer and is uploaded as
+      # an artifact, but both the log and the artifact need an authenticated
+      # session to read -- so to a reader without one, and to any tool asking
+      # the public API, a red tick is undiagnosable. On 2026-08-31 that cost
+      # two blind pushes and an hour of reasoning from a reproduction that did
+      # not reproduce.
+      #
+      # ::error:: writes into the check-run ANNOTATION, which IS public. The
+      # named failures now travel with the red tick instead of behind a login.
+      # Truncated to 3,000 characters because GitHub silently drops an
+      # annotation longer than about 4,096, and a message that vanishes for
+      # being too long is the failure this step exists to remove.
+      - name: Name the failure where it can be read without a login
+        if: failure()
+        run: |
+          # The first pattern tried was a broad one and it was useless: on a
+          # real transcript "ABSENT none. Every suite this runner names
+          # exists", an optional dependency reported absent, and a PASSING
+          # check whose text contains the word ABSENT filled the whole quota
+          # and pushed the actual failures out. Measured before shipping,
+          # against a real transcript and a synthesised failing one -- a
+          # diagnostic that has only ever been run against a green tree is
+          # not a diagnostic.
+          if [ -f ONE_RUN_ci.txt ]; then
+            # 2026-09-03: a suite that failed on Linux and passed on Windows
+            # produced one annotation -- "suites not clean 1 -> <name>" -- and
+            # nothing that said WHICH check, because a suite's own FAIL lines
+            # are indented under its transcript entry and a crash prints a
+            # Traceback, which no pattern here looked for. Now: the suite's
+            # status line, its FAIL lines at any indent, and the last lines of
+            # any traceback, so the cause is readable without the artifact.
+            #
+            # A232 (2026-09-26): "at any indent" was not enough. The runner prints
+            # a failing suite's lines as "        | FAIL  PV1.6 ...", and the "| "
+            # defeated the pattern, so for five days of red (fc551b5 to 595eb6d)
+            # every annotation named the two suites and not one of the six
+            # checks. The pattern now allows the "| ", and repeated lines are
+            # dropped (the tail block repeats a suite's last FAIL lines).
+            SUMMARY=$( { grep -E '^[[:space:]]*RESULT:' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]+(checks failed|suites not clean|suites unmeasured|runner list absent|orphaned on disk|listed but NOT SHIPPED|declared deps missing)[[:space:]]+[1-9]' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]*test_[a-z0-9_]+\.py[[:space:]]+(FAIL|ERROR|CRASH|not clean|timeout)' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]*(\|[[:space:]]*)?(FAIL|\[FAIL\])' ONE_RUN_ci.txt
+                         grep -E '^[[:space:]]*[A-Za-z]+(Error|Exception)(:|$)|Traceback' ONE_RUN_ci.txt | tail -6
+                       } | awk '!seen[$0]++' | head -40 | cut -c1-200 | tr '\n' '~' | cut -c1-3600 )
+            echo "::error title=covenant_one.py --ci::${SUMMARY:-the transcript named no failure line, so the exit code came from somewhere this pattern does not look. Download the artifact.}"
+          else
+            echo "::error title=covenant_one.py --ci::no transcript was written -- the runner failed before or during covenant_one.py itself"
+          fi
+
+      - name: Upload the transcript
+        if: always()   # the transcript matters MOST when the run failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: covenant-transcript-py${{ matrix.python }}
+          path: ONE_RUN_ci.txt
+          retention-days: 30

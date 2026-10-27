@@ -1,0 +1,4024 @@
+#!/usr/bin/env python3
+"""covenant_highway.py -- the mycelial highway: sense, repair, share.
+
+ASKED 2026-09-16: "create a program like tailscale but better and use tailscale
+to implement it on both devices ... the start of our mycelial highway for mutual
+benefit bots that repair anything overly detrimental, that leaves free will
+intact as growing will continue."
+
+WHAT THIS IS, AND WHAT IT IS NOT. It is not a replacement for Tailscale and does
+not pretend to be one: Tailscale is the wire -- identity, NAT traversal,
+encryption, one flat address space -- and rewriting that would be months spent
+arriving back where we already are. What is missing ABOVE the wire is a nervous
+system. The devices are connected and do not tell each other what is wrong with
+them; nothing that learns a repair on one device can hand it to another. On
+2026-09-16 this PC knew the phone was running a build two days old and knew
+which build it was holding for it, and never once put the two numbers side by
+side. That gap is the whole reason this file exists.
+
+THREE ORGANS
+  sense    detectors that MEASURE a condition right now and return numbers.
+           A detector that cannot measure returns UNKNOWN -- never OK. (P20's
+           rule: unknown is not pass.)
+  repair   remedies, each in one of two classes, each either STATELESS or
+           carrying an undo that the test actually runs.
+  share    a signed report of "this condition, this remedy, measured before and
+           after". An offer, never an instruction.
+
+FREE WILL, IN CODE RATHER THAN IN A PARAGRAPH
+  1. Two classes only. AUTO_REVERSIBLE may be executed by the engine.
+     PROPOSE_ONLY may NEVER be executed by it -- anything that changes a config,
+     installs software, touches money, edits a rule, or narrows what a person
+     can do is PROPOSE_ONLY by construction, and apply() refuses the class
+     itself rather than trusting each remedy to behave.
+  2. An operator's explicit choice is untouchable. A125 cost a full sweep to
+     find: a fix of mine silently overrode a scope he had chosen. Choices live
+     in ops/OPERATOR_CHOICES.json; a remedy whose target is named there refuses
+     and says why.
+  3. Stateless or undoable. A remedy that changes persistent state with no
+     recorded way back is not a repair, it is a decision taken on someone
+     else's behalf.
+  4. No node may be COMMANDED. A peer's report is data: the receiving node runs
+     the detector itself and decides for itself. No remedy is ever run because
+     a peer said so -- only because this node measured the condition here.
+  5. The phone is asked, never pushed. Android asks the person holding it to
+     confirm an install and nothing here routes around that.
+
+LEARNING, AS ONE COUNTER AND NOT A CLAIM. Every application is measured before
+and after by the same detector. A remedy that fails to change the measurement
+twice is QUARANTINED and stops being offered. That is the whole of the "bot
+that learns" -- said small on purpose, because this repository has been burned
+by READMEs that promised more than the code did.
+
+USE
+  python covenant_highway.py                 # sense only: what is wrong here
+  python covenant_highway.py --repair        # apply AUTO_REVERSIBLE remedies
+  python covenant_highway.py --report        # the signed offer this node would share
+  python covenant_highway.py --ledger        # what has been tried, and whether it worked
+LICENCE: public domain.
+"""
+from __future__ import annotations
+
+import argparse
+import importlib
+import io
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+try:
+    import sys as _sys_a204; _sys_a204.path.insert(0, HERE)
+    import covenant_quiet; covenant_quiet.install()   # A204: every child of this process is windowless, whatever module spawns it
+except Exception:                                    # noqa: BLE001 -- a window is a nuisance, never a reason to stop
+    pass
+# A203 (2026-09-21, his words: 'We got multiple screens popping up interfering with my screen'):
+# every PowerShell this file spawns from the hidden watchdog opened a console window; none may.
+_NOWIN = 0x08000000 if os.name == "nt" else 0
+sys.path.insert(0, HERE)
+
+LEDGER = os.path.join(HERE, "ops", "highway.jsonl")
+CHOICES = os.path.join(HERE, "ops", "OPERATOR_CHOICES.json")
+QUARANTINE_AFTER = 2          # two measured failures and a remedy stops being offered
+ROW_COOLDOWN_S = 3600         # the same (remedy, condition) is not re-attempted, or re-written, more often
+
+AUTO_REVERSIBLE = "AUTO_REVERSIBLE"
+PROPOSE_ONLY = "PROPOSE_ONLY"
+
+# Subjects no remedy may act on by itself, matched against what a remedy says it
+# TOUCHES rather than against the class it claims. Money and the machinery that
+# decides money; the rules and the seats that judge by them; the phone and
+# anything else whose whole point is that a person agreed to it.
+NEVER_AUTOMATIC = ("money", "holdings", "wallet", "trader", "venue", "order",
+                   "rule", "principle", "judge", "seat", "model", "phone",
+                   "consent", "key")
+
+UNKNOWN = "UNKNOWN"
+PRESENT = "PRESENT"
+ABSENT = "ABSENT"
+
+
+# ----------------------------------------------------------------- sensing
+
+def _get(url, timeout=6):
+    """The JSON at `url`, retrying ONCE on a 429.
+
+    A115, and I had to re-learn it the expensive way: a node that rate-limits
+    is answering. Asking it three times in a second and calling the refusal
+    "down" is a false positive that reaches for a restart of a healthy mesh.
+    """
+    for attempt in (0, 1):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == 0:
+                time.sleep(1.5)
+                continue
+            raise
+
+
+def _nodes():
+    import covenant_watchdog as W          # one source of truth for the node table
+    return W.NODES
+
+
+def _health():
+    """{id: health dict, or {"http": code} when it answered with an error, or None}.
+
+    THREE ANSWERS, NOT TWO. This returned None for every failure, so a node
+    that replied "429, you are asking too often" was indistinguishable from a
+    node whose socket is dead -- and at 11:22 today that cost a real
+    restart_nodes call against a mesh where all three were healthy. It was
+    rolling_restart.py that caught it, not me: "node A ALIVE but rate-limiting
+    (429) -- asked too often, not down", and it restarted nothing. The tool
+    written in September knew A115; the detector I wrote this morning did not.
+    """
+    out = {}
+    for n in _nodes():
+        try:
+            out[n["id"]] = _get("http://127.0.0.1:%d/health" % n["port"])
+        except urllib.error.HTTPError as e:
+            out[n["id"]] = {"http": e.code}          # it ANSWERED. Not down.
+        except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+            out[n["id"]] = None                      # no answer at all
+    return out
+
+
+
+def detect_node_down(health=None):
+    """A node whose socket does not answer. NOT one that refused to repeat itself."""
+    h = _health() if health is None else health
+    down = sorted([k for k, v in h.items() if v is None])
+    limited = sorted([k for k, v in h.items() if isinstance(v, dict) and "http" in v])
+    m = {"down": down, "answered_with_error": limited, "asked": sorted(h)}
+    if down:
+        return {"state": PRESENT, "measured": m}
+    if limited:
+        # Alive, and this pass could not read them. Unknown is not a finding,
+        # and it is certainly not grounds for restarting anything.
+        return {"state": UNKNOWN, "measured": m}
+    return {"state": ABSENT, "measured": m}
+
+
+def detect_source_drift(health=None):
+    """LOCAL nodes running bytes other than the ones on disk.
+
+    DELIBERATELY LOCAL, and the boundary is load-bearing. `restart_nodes` is
+    paired to this detector, and restarting the three processes on this PC is
+    the remedy for exactly this condition and no other. On 2026-09-18 the mesh
+    had two sources in it -- the phone on core ddfaaa9f704f, disk and all three
+    local nodes on 7b12fe509061 -- and the tempting fix was to widen this
+    detector's population until it saw the phone. That would have handed
+    restart_nodes a condition it cannot clear: it would restart three healthy
+    nodes, measure the split still PRESENT, be graded "did not fix" twice, and
+    QUARANTINE ITSELF -- the same way fetch_build did when it was paired with
+    app_build_gap (see detect_build_stale_on_pc). A remedy must be graded
+    against the condition it can actually clear.
+
+    The mesh-wide split is a real finding and gets its own detector with no
+    remedy attached: detect_mesh_source_split.
+    """
+    import covenant_watchdog as W
+    disk = W.disk_source_sha12()
+    h = _health() if health is None else health
+    live = {k: v.get("source_sha256", "")[:12] for k, v in h.items()
+            if isinstance(v, dict) and "http" not in v}
+    if disk is None or not live:
+        return {"state": UNKNOWN, "measured": {"disk": disk, "live": live}}
+    off = sorted([k for k, s in live.items() if s and s != disk])
+    # IMPORTS TOO (2026-09-25, his words: "everything we do must be designed to run
+    # independently"). A node on the right core but running a module it imported before
+    # that module changed (A153) is the same drift, and it waited for a person: measured
+    # that evening, three nodes IMPORTS STALE after an edit and nothing here saw it. The
+    # node reports imports_sha12 in /health; the disk's is computed the same way.
+    try:
+        disk_imp = W.disk_imports_sha12()
+    except Exception:                                             # noqa: BLE001
+        disk_imp = None
+    imp = {k: str(v.get("imports_sha12") or "")[:12] for k, v in h.items()
+           if isinstance(v, dict) and "http" not in v}
+    off_imp = sorted(k for k, s in live.items() if disk_imp and s == disk and imp.get(k) and imp[k] != disk_imp)
+    measured = {"disk": disk, "live": live, "drifted": sorted(set(off) | set(off_imp)),
+                "imports_disk": disk_imp, "imports_drifted": off_imp}
+    if off or off_imp:
+        # A295 (2026-10-07): when the nodes drift, when did the OLDEST of them start? restart_nodes is graded on it
+        # (RECURRED): a node set that restarted after the remedy started, and drifts again because the disk moved on
+        # meanwhile, is a new instance -- the remedy worked. Read only while drifting; a clean pass costs nothing.
+        ns = _nodes_started()
+        if ns is not None:
+            measured["nodes_started"] = ns
+    return {"state": PRESENT if (off or off_imp) else ABSENT, "measured": measured}
+
+
+def _nodes_started():
+    """The creation time (epoch) of the OLDEST run_node.py process run by this folder's interpreter, or None."""
+    import datetime
+    import subprocess
+    like = os.path.join(HERE, ".venv").replace("'", "''") + "*run_node.py*"
+    ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\" |"
+          " Where-Object { $_.CommandLine -like '*" + like + "' } |"
+          " ForEach-Object { $_.CreationDate.ToUniversalTime().ToString('o') }")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        stamps = [x.strip() for x in (p.stdout or "").splitlines() if x.strip()]
+        return round(min(datetime.datetime.fromisoformat(s).timestamp() for s in stamps), 1) if stamps else None
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
+def detect_mesh_source_split(health=None):
+    """A PEER in the mesh reporting bytes other than the ones on disk.
+
+    THE GAP THIS CLOSES (2026-09-18). Node A had been saying "mesh is running
+    more than one source: we are 7b12fe509061, peers report ['ddfaaa9f704f']"
+    on every self-eval round since at least 05:20, and the highway's own
+    source-drift detector answered `drifted: []` the whole time -- correctly,
+    because it looks at the three nodes it can restart. So the one organ built
+    to notice what is wrong across devices was blind to the only cross-device
+    fault present, and the finding sat in a WARN line for two days. Measured,
+    not inferred: the phone answered its own P2P port with
+    {'v': 'v8.40', 'src': 'ddfaaa9f704f'}, and `git show 13b946a` -- the core
+    commit its build names -- hashes to ddfaaa9f704f at 668,276 bytes.
+
+    NO REMEDY IS ATTACHED, on purpose. Nothing on this PC can clear it: the
+    fix is a new APK installed on a phone, and Android asks the person holding
+    it (free will, rule 5). A detector with no remedy is not a gap -- it is the
+    honest shape for a condition whose repair belongs to somebody else. What it
+    buys is that the condition is now a NUMBER in sense(), not prose in a
+    warning nobody re-reads.
+
+    THE REFERENCE IS THE RUNNING MESH, NOT DISK, and getting that wrong would
+    have made this useless. The first draft compared each peer against
+    `disk_source_sha12()` -- but a phone can only ever run a RELEASED BUILD,
+    and disk moves ahead of every build the moment anyone edits the core. That
+    detector would have read PRESENT for ever, including the instant after the
+    phone updated perfectly, and an alert whose condition cannot become false
+    is one nobody reads (M34). What CAN converge is the mesh agreeing with
+    itself, so the reference is the source the local nodes are actually
+    running -- the same denominator node A's own A20 warning uses. Disk versus
+    the local nodes is a different condition and already has its own detector
+    (source_drift) and its own remedy.
+
+    WHAT IT CANNOT SEE: `mesh.by_source` (A20) carries the last source each
+    peer reported; the age lives beside it in `heard_s_ago` and is reported
+    here, but a peer that has gone silent keeps its last reading for ever, so
+    PRESENT means "a peer has reported a different source", never "two sources
+    are live right now". It is also blind to any peer that has never answered a
+    local node, and to a disagreement between two peers neither of which has
+    spoken to this PC.
+    """
+    h = _health() if health is None else health
+    running, peers, ages = {}, {}, {}
+    for k, v in h.items():
+        if not isinstance(v, dict) or "http" in v:
+            continue
+        if v.get("source_sha256"):
+            running[k] = str(v["source_sha256"])[:12]
+        mesh = v.get("mesh") or {}
+        for src, whos in (mesh.get("by_source") or {}).items():
+            for who in (whos if isinstance(whos, list) else [whos]):
+                peers[str(who)[:64]] = str(src)[:12]
+        for who, age in (mesh.get("heard_s_ago") or {}).items():
+            if isinstance(age, (int, float)):
+                who = str(who)[:64]
+                ages[who] = min(ages.get(who, age), age)
+    ours = sorted(set(running.values()))
+    if not ours:
+        return {"state": UNKNOWN,
+                "measured": {"running": running, "peers": peers,
+                             "why": "no local node reported its own source"}}
+    if not peers:
+        return {"state": UNKNOWN,
+                "measured": {"running": running, "peers": peers,
+                             "why": "no peer has reported a source to any local node"}}
+    off = sorted([w for w, s in peers.items() if s and s not in ours])
+    return {"state": PRESENT if off else ABSENT,
+            "measured": {"running": ours, "peers": peers, "drifted": off,
+                         "heard_s_ago": {w: ages[w] for w in off if w in ages},
+                         "note": "no remedy: a peer's bytes are changed on the peer, by its owner"}}
+
+
+def detect_height_lag(health=None):
+    h = _health() if health is None else health
+    hs = {k: v.get("chain_height") for k, v in h.items()
+          if isinstance(v, dict) and "http" not in v}
+    vals = [v for v in hs.values() if isinstance(v, int)]
+    if len(vals) < 2:
+        return {"state": UNKNOWN, "measured": {"heights": hs}}
+    gap = max(vals) - min(vals)
+    return {"state": PRESENT if gap > 1 else ABSENT, "measured": {"heights": hs, "gap": gap}}
+
+
+def detect_app_build_gap(health=None):
+    """A phone holding a build older than the one this PC has fetched.
+
+    NOW CARRIES WHETHER THE PHONE ASKED (2026-09-18). The gap alone cannot say
+    which end is stuck, and for 46.6 h it did not: build 0.1.552 was fetched
+    here at 07:41, the manifest signed cleanly, the phone's signed /checkin
+    arrived every ten minutes -- and the PC had no record of a single ask at
+    /app/latest, because the node keeps no access log at all (grep across
+    logs/ finds 0 for /app/latest AND 0 for `checkin`, while
+    ops/phone_checkins.jsonl holds 615 rows). So `last_ask` comes from the
+    witness ledger covenant_app_update.note_request writes.
+
+    Read it exactly this way: `never` means NOTHING HAS ASKED SINCE THE LEDGER
+    BEGAN (2026-09-18), not that nothing ever asked. An ask recorded `refused`
+    means the fault is this PC's signature; no ask at all, with check-ins
+    arriving, means the fault is on the phone. Those need opposite fixes, which
+    is the whole reason the field is here.
+    """
+    try:
+        import covenant_daily_plan as dp
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    alerts, _infos = dp.build_report()
+    ask = {"last_ask": "never (since the witness ledger began)"}
+    try:
+        import covenant_app_update as AU
+        rows = AU.requests_tail(1, route="/app/latest")
+        if rows:
+            ask = {"last_ask": rows[-1].get("t"), "outcome": rows[-1].get("outcome"),
+                   "signer": rows[-1].get("signer"), "detail": rows[-1].get("detail")}
+    except Exception as e:                                       # noqa: BLE001
+        ask = {"last_ask": "unreadable: %s" % type(e).__name__}
+    return {"state": PRESENT if alerts else ABSENT,
+            "measured": dict(ask, alerts=alerts)}
+
+
+def detect_app_install_futile(health=None):
+    """The phone takes the whole build and stays on the old one.
+
+    SEPARATE FROM app_build_gap ON PURPOSE, and the separation is the finding.
+    "The phone is behind" was true for 46.6 h while the cause changed
+    underneath it twice -- first the phone never asked, then it asked and was
+    refused at the signature, then (2026-09-18) it asked, was served, and
+    downloaded 45 MB every ten minutes without ever installing. One condition
+    covering three faults with three different fixes is a condition nobody can
+    act on, which is the same lesson detect_build_stale_on_pc was split out for.
+
+    This one is narrow enough to act on: the bytes arrive whole and the version
+    does not move. The fix is not on this PC at all -- the installed build
+    predates the SecurityException fix, so its installer throws on every
+    attempt -- which is exactly why the only remedy paired here is the one that
+    needs a person.
+
+    WHAT IT CANNOT SEE: everything the phone does not report. An install that
+    succeeded and rolled back looks identical from here to one that never ran,
+    and nothing before the witness ledger began (2026-09-18) is visible at all.
+    """
+    try:
+        import covenant_app_update as AU
+        f = AU.install_futility()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if "could not be measured" in str(f.get("why", "")):
+        return {"state": UNKNOWN, "measured": f}
+    return {"state": PRESENT if f.get("futile") else ABSENT, "measured": f}
+
+
+def detect_judge_seat_missing(health=None):
+    """The policy seats a judge whose model file is not on disk.
+
+    A151 (2026-09-19). covenant_judge_defer sets `_second = None` when the
+    file quorum_policy.json names is absent, and the chain becomes
+    single-judge in SILENCE -- no error, no anomaly. Under both_seats the
+    verdict reasoning says `sena=ABSENT`, which a reader can see; nothing
+    alerts. This is the alert, and it is a detector rather than a change to
+    the gate, because the gate was rewired the day this was written and a
+    second change to it in one day is one too many. No remedy is paired: a
+    missing model is restored by a person or by the nightly distill, never by
+    this engine.
+
+    It reads the policy and the filesystem -- the two things that decide
+    whether the seat exists -- and nothing else. What it cannot see: a file
+    that is present but will not load. That is a different fault with a
+    different signature (the seat raises), and pretending to cover it here
+    would be the fake-guard shape.
+    """
+    try:
+        import covenant_judge_defer as D
+        pol = D.load_policy()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    missing = {}
+    p1 = os.path.join(HERE, "fallback_model.json")
+    if not os.path.isfile(p1):
+        missing["first_student"] = p1
+    p2 = pol.get("second_student")
+    if p2:
+        p2 = p2 if os.path.isabs(p2) else os.path.join(HERE, p2)
+        if not os.path.isfile(p2):
+            missing["second_student"] = p2
+    return {"state": PRESENT if missing else ABSENT,
+            "measured": {"missing": missing, "both_seats": bool(pol.get("both_seats")),
+                         "note": ("a seated judge with no model file is a chain judged by "
+                                  "fewer seats than the policy says, in silence" if missing
+                                  else "every seated judge has its model on disk")}}
+
+
+def detect_log_bloat(health=None, limit_mb=512):
+    """A log file eating the disk. Measured in bytes, not guessed at."""
+    big = {}
+    d = os.path.join(HERE, "logs")
+    try:
+        for n in os.listdir(d):
+            if not n.endswith(".log"):
+                continue
+            mb = os.path.getsize(os.path.join(d, n)) / 1048576.0
+            if mb >= limit_mb:
+                big[n] = round(mb, 1)
+    except OSError as e:
+        return {"state": UNKNOWN, "measured": {"error": str(e)}}
+    return {"state": PRESENT if big else ABSENT, "measured": {"over_%dmb" % limit_mb: big}}
+
+
+def detect_build_stale_on_pc(health=None, hours=24):
+    """This PC has not looked for a newer app build in `hours`.
+
+    SEPARATE FROM app_build_gap, and the separation was learned the hard way.
+    fetch_build was first paired with app_build_gap -- "the phone is behind" --
+    so every time it ran, the phone was still behind afterwards (fetching is
+    not installing), the outcome was recorded "did not fix", and the remedy
+    quarantined ITSELF after two correct runs. The effectiveness counter was
+    working exactly as designed on a pairing that was wrong: a remedy must be
+    graded against the condition it can actually clear.
+    """
+    try:
+        import covenant_app_update as AU
+        d = AU.latest() or {}
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if not d:
+        return {"state": PRESENT, "measured": {"fetched": None, "why": "no build fetched yet"}}
+    # LOOKED, NOT DOWNLOADED (2026-09-26, A231). This read only `fetched`, which changes when a build is
+    # DOWNLOADED. A look that found nothing newer ("already have build 2ab1ba5") left it untouched, so the
+    # condition stayed PRESENT right after the PC had looked, fetch_build was graded "did not fix" twice
+    # for doing its job, and it has been quarantined since 2026-09-23 -- while two newer builds were made
+    # and never collected. covenant_app_update.fetch now stamps `checked` on every look.
+    stamps = [str(d.get(k)) for k in ("fetched", "checked") if d.get(k)]
+    try:
+        import datetime
+        newest = max(datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%S%z").timestamp() for s in stamps)
+        age_h = (time.time() - newest) / 3600.0
+    except (ValueError, TypeError):
+        return {"state": UNKNOWN, "measured": {"fetched": d.get("fetched"), "checked": d.get("checked"),
+                                               "why": "unparseable timestamp"}}
+    return {"state": PRESENT if age_h > hours else ABSENT,
+            "measured": {"fetched": d.get("fetched"), "checked": d.get("checked"), "age_hours": round(age_h, 1),
+                         "limit_hours": hours, "have": d.get("sha7")}}
+
+
+def detect_phone_build_behind_core(health=None):
+    """The newest app build predates the core that is on main now.
+
+    THE GAP THIS CLOSES. covenant-phone's workflow triggers on a push to
+    covenant-phone -- and the APK it produces is built from a checkout of the
+    PUBLIC core at main. So every change to the core leaves the phone's build
+    behind it, and nothing ever rebuilds: today's work would have sat here
+    forever while the phone auto-updated faithfully to a build made before it.
+    A delivery pipeline whose first step nobody triggers is not a pipeline.
+    """
+    import subprocess
+    try:
+        import covenant_app_update as AU
+        d = AU.latest() or {}
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if not d.get("built"):
+        return {"state": UNKNOWN, "measured": {"why": "no build fetched to compare against"}}
+    # WHAT THE PHONE CARRIES, NOT EVERY COMMIT (2026-09-26, A231). The APK ships an allowlist of files
+    # (covenant-phone's python_sources.txt) and the build names the core commit it was made from. Measured
+    # that day: 31 commits on main since the build's core, 4 of them touching a shipped file -- so every
+    # docs or test commit turned this PRESENT (and the PC page's Highway red) for code the phone never runs.
+    # With the list and the build's core both readable, the question is exactly "has a shipped file changed
+    # since the core this build carries"; with either missing, the old time comparison stands, and says so.
+    shipped, core = _phone_shipped_paths(), d.get("core")
+    if shipped and core:
+        for ref_ in ("origin/main", "HEAD"):
+            p = subprocess.run(["git", "rev-list", "%s..%s" % (core, ref_), "--", *shipped], cwd=HERE,
+                               capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
+            if p.returncode == 0:
+                behind = p.stdout.split()
+                return {"state": PRESENT if behind else ABSENT,
+                        "measured": {"basis": "files the APK ships", "shipped_files": len(shipped),
+                                     "build": d.get("sha7"), "build_core": core, "ref": ref_,
+                                     "shipped_commits_since": len(behind), "newest": [s[:7] for s in behind[:5]]}}
+    ref = "origin/main"
+    try:
+        p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
+                           capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
+        if p.returncode != 0:
+            ref = "HEAD"
+            p = subprocess.run(["git", "log", "-1", "--format=%cI", ref], cwd=HERE,
+                               capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
+        head = (p.stdout or "").strip()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    import datetime
+    try:
+        head_t = datetime.datetime.fromisoformat(head).timestamp()
+        built_t = datetime.datetime.strptime(d["built"], "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except (ValueError, TypeError) as e:
+        return {"state": UNKNOWN, "measured": {"head": head, "built": d.get("built"), "error": str(e)}}
+    return {"state": PRESENT if head_t > built_t else ABSENT,
+            "measured": {"basis": "any commit (no shipped-file list, or no core on the build record)",
+                         "core_committed": head, "ref": ref, "build_built": d["built"],
+                         "build": d.get("sha7"), "behind_by_min": round((head_t - built_t) / 60.0, 1)}}
+
+
+def _phone_shipped_paths():
+    """The repo-root files the phone APK carries: covenant-phone's python_sources.txt, read from its clone
+    (COVENANT_PHONE_REPO, else the sibling folder covenant-phone). None when it cannot be read -- the caller
+    then falls back to comparing against every commit, which over-reports rather than under-reports."""
+    for base in (os.environ.get("COVENANT_PHONE_REPO"), os.path.join(os.path.dirname(HERE), "covenant-phone")):
+        p = os.path.join(base, "python_sources.txt") if base else None
+        if p and os.path.isfile(p):
+            try:
+                with io.open(p, encoding="utf-8", errors="replace") as fh:
+                    names = [ln.strip() for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
+            except OSError:
+                continue
+            if names:
+                return names
+    return None
+
+
+def detect_manifest_stale(health=None):
+    """MANIFEST.sha256 no longer describes the tree it claims to.
+
+    WHY IT IS WORTH A DETECTOR. The pre-commit hook rewrites the manifest only
+    when IT changed a file, and deliberately not on every commit: verify_bundle
+    hashes the WORKING TREE, so on a partial commit that would record a
+    manifest describing content the commit does not contain. The consequence is
+    that a normal commit leaves the manifest one step behind, the sweep's
+    integrity phase reports FAIL, and every run ends "gates BLOCKED" -- which
+    is A60's defect at the top of the report: a permanent red teaches its
+    reader to skip the line where a real one would appear.
+    """
+    import subprocess
+    try:
+        p_ = subprocess.run([sys.executable, os.path.join(HERE, "verify_bundle.py")],
+                            cwd=HERE, capture_output=True, text=True, timeout=300, creationflags=_NOWIN)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    changed = [l.split(None, 1)[1].strip() for l in (p_.stdout or "").splitlines()
+               if l.startswith("CHANGED/MISSING")]
+    return {"state": PRESENT if p_.returncode != 0 else ABSENT,
+            "measured": {"rc": p_.returncode, "changed": changed[:10], "n_changed": len(changed)}}
+
+
+def held_core_check():
+    """(exit code, what it said) from the sync tool's own --check, in process.
+    The one seam a suite replaces, so a check drives THIS function rather than
+    a mock of a transport this detector no longer uses (A214b)."""
+    import contextlib
+    import importlib
+    import io
+    _sync = importlib.import_module("covenant_sync_held_core")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = _sync.main(["--check"])
+    return rc, buf.getvalue().strip()
+
+
+def detect_held_core_drift(health=None, check=None):
+    """A held copy of the core claiming the live version with different bytes.
+
+    P18 V3. Re-broken by every core change until someone copies the file, which
+    is exactly the class of chore that gets forgotten -- it went red on GitHub
+    thirty-seven commits in a row once.
+    """
+    # A214b (2026-09-21, his word: "Optimize"). MEASURED at 2.20 s, the second
+    # largest detector, and nearly all of it was a fresh Python interpreter
+    # starting on Windows to run a file-hash comparison. The SAME code path is
+    # called in-process here -- main(["--check"]) with its stdout captured, not
+    # a reimplementation of the rule, so there is no second version of "is a
+    # held copy out of sync" to drift from the first. The exit code it returns
+    # is the one the subprocess returned; the verdict is identical.
+    try:
+        rc, said = (check or held_core_check)()
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    return {"state": PRESENT if rc != 0 else ABSENT,
+            "measured": {"rc": rc, "said": said[:200]}}
+
+
+def _watchdog_like():
+    """ONE TREE, ONE WATCHDOG (A160, 2026-09-20): the PowerShell -like pattern
+    that names THIS tree's watchdog by ABSOLUTE PATH.
+
+    Every process match in this file used to be the bare filename,
+    '*covenant_watchdog.py*'. The sweep stages a copy of this file in a
+    temporary directory and test_h1_highway.py's H1j drives the restart remedy
+    there with a fixture -- so the staged copy killed the PRODUCTION watchdog
+    and started a replacement from the temporary directory, which the sweep
+    then deleted. Measured over 2026-09-16..20: 13 of 35 silent watchdog deaths
+    fell inside a sweep window, 7 of them in the last ninety seconds of a
+    sweep, and the OS guard revived the watchdog 42 times with the nodes
+    unwatched for three to twenty minutes each time.
+
+    A staged copy has a different HERE, so with this pattern it can only ever
+    count, stop or restart a watchdog of its own tree. The pattern is a glob:
+    HERE carries none of PowerShell's wildcard characters on this machine, and
+    the assertion below says so out loud if that ever changes rather than
+    matching nothing in silence.
+    """
+    path = os.path.join(HERE, "covenant_watchdog.py")
+    bad = [ch for ch in "*?[]'`" if ch in path]
+    if bad:
+        raise ValueError("this tree's path %r carries %r and cannot be a -like pattern"
+                         % (path, "".join(bad)))
+    return "*%s*" % path
+
+
+def _watchdog_module_files():
+    """covenant_watchdog.py and every covenant_* module it imports.
+
+    Read from the source rather than hardcoded, so a new import is covered the
+    day it is added and not the day someone remembers this list.
+    """
+    import re
+    src = os.path.join(HERE, "covenant_watchdog.py")
+    files = [src]
+    try:
+        text = io.open(src, encoding="utf-8").read()
+    except OSError:
+        return files
+    for name in sorted(set(re.findall(r"import\s+(covenant_[a-z0-9_]+)", text))):
+        f = os.path.join(HERE, name + ".py")
+        if os.path.exists(f):
+            files.append(f)
+    return files
+
+
+def detect_watchdog_stale(health=None):
+    """The running watchdog is older than the code it runs.
+
+    TWO MISTAKES ARE BURIED HERE, both mine, both caught by running the thing.
+
+    The first draft imported the watchdog in THIS process and compared that
+    module's hash to the file. A fresh import always matches, so it would have
+    reported ABSENT every time, including twice today when the running watchdog
+    really was stale. A guard that measures itself is the 2026-09-09 fake-guard
+    defect, written within the hour of writing that rule down.
+
+    The second was narrower and worse. Comparing only covenant_watchdog.py to
+    the process start missed the thing that actually bit: Python caches
+    imports, so a watchdog started at 06:44 went on executing the
+    covenant_highway it loaded THEN -- through six commits of fixes, still
+    pairing fetch_build with a condition fetching cannot clear, re-quarantining
+    it every 66 seconds while the corrected file sat on disk. `import X` inside
+    the loop re-binds a cached module; it does not re-read the file. So the
+    question is not "is the watchdog's own file newer" but "is ANY file this
+    process runs newer than the process".
+
+    A touched-but-unedited file reads as stale, which is the harmless direction.
+    """
+    import subprocess
+    files = _watchdog_module_files()
+    try:
+        newest, newest_name = max((os.path.getmtime(f), os.path.basename(f)) for f in files)
+    except (OSError, ValueError) as e:
+        return {"state": UNKNOWN, "measured": {"error": str(e)}}
+    try:
+        like = _watchdog_like()
+    except ValueError as e:
+        return {"state": UNKNOWN, "measured": {"error": str(e)}}
+    ps = ("Get-CimInstance Win32_Process -Filter \"name like '%python%'\" |"
+          " Where-Object { $_.CommandLine -like '" + like + "' } |"
+          " ForEach-Object { $_.CreationDate.ToUniversalTime().ToString('o') }")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
+                           cwd=HERE, capture_output=True, text=True, timeout=60)
+        stamps = [x.strip() for x in (p.stdout or "").splitlines() if x.strip()]
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    if not stamps:
+        # No watchdog at all is a different condition with a different remedy;
+        # this detector does not get to call that "fine".
+        return {"state": UNKNOWN, "measured": {"running": 0, "why": "no watchdog process found"}}
+    import datetime
+    try:
+        started = min(datetime.datetime.fromisoformat(s).timestamp() for s in stamps)
+    except ValueError as e:
+        return {"state": UNKNOWN, "measured": {"stamps": stamps, "error": str(e)}}
+    return {"state": PRESENT if newest > started else ABSENT,
+            "measured": {"newest_file": newest_name, "written": round(newest, 1),
+                         "process_started": round(started, 1), "running": len(stamps),
+                         "watched_files": len(files), "stale_by_s": round(newest - started, 1)}}
+
+
+def detect_sweep_red(health=None):
+    """The newest full sweep says FAIL.
+
+    WHY THIS DETECTOR EXISTS. Every other detector here watches a piece of
+    INFRASTRUCTURE -- a node, a log, a hash, the watchdog. None of them watches
+    the one signal that actually defines "green": the sweep's own verdict. So
+    on 2026-09-17 the sweep read FAIL at 11:48 and FAIL again at 12:38 with two
+    suites measuring nothing, and nothing in this file noticed, because every
+    remedy it owns was correctly reporting healthy. The loop could heal the
+    machine and not the thing the machine is for.
+
+    The cause that day was a node that died at boot on an ACL check, which THIS
+    FILE ALREADY HAD A REMEDY FOR. It was never told.
+
+    DISCOVERY, NOT A FILENAME LIST (rule 2). The sweep has been written to
+    ONE_RUN.txt, ONE_SWEEP.txt and SWEEP_*.txt at different times, and a
+    hardcoded list cannot find the artifact added after the list was written --
+    which is exactly the artifact a freshness check exists to catch. So every
+    *.txt at the top level is filtered by CONTENT: does it carry a verdict line
+    and a suite count? That is what makes it a sweep.
+    """
+    import glob
+    import re
+    # A VERDICT, NOT THE WORD "RESULT" (2026-09-18). The content filter asked
+    # only whether the words `RESULT:` and `suites run` appeared, and took the
+    # newest match by mtime. A `covenant_one.py --check` transcript carries both
+    # and ends `RESULT: INCOMPLETE` -- no sweep, no tally -- so running the gates
+    # for convenience wrote a newer file that this detector then PREFERRED and
+    # could not read, and the one detector that watches whether the sweep is
+    # green went UNKNOWN while a real ONE_SWEEP.txt sat beside it. Measured the
+    # same afternoon, on a file I had just created.
+    #
+    # So the filter is the verdict regex itself. An artifact that does not state
+    # PASS or FAIL is not a sweep result, whatever words it contains, and it is
+    # named in `skipped` rather than silently passed over -- a filter that
+    # discards without saying so is how this went unnoticed for an hour.
+    verdict_re = re.compile(r"^\s*RESULT:\s*(PASS|FAIL)", re.M)
+    # A PARTIAL RUN IS NOT THE SWEEP (2026-09-26): `covenant_one.py --only` states it in its header, and
+    # its 5-suite FAIL was read here as THE sweep's verdict. Named in `skipped_partial`, never silent.
+    partial_re = re.compile(r"^#\s*scope:\s*PARTIAL\b", re.M)
+    newest, skipped, partial = None, [], []
+    for p in glob.glob(os.path.join(HERE, "*.txt")):
+        try:
+            with io.open(p, encoding="utf-8", errors="replace") as fh:
+                txt = fh.read()
+        except OSError:
+            continue
+        if "suites run" not in txt:
+            continue                       # a description, not the measurement
+        if not verdict_re.search(txt):
+            skipped.append(os.path.basename(p))
+            continue                       # e.g. a --check run: INCOMPLETE
+        if partial_re.search(txt):
+            partial.append(os.path.basename(p))
+            continue                       # a --only run: it speaks for its suites, not the sweep
+        mt = os.path.getmtime(p)
+        if newest is None or mt > newest[0]:
+            newest = (mt, p, txt)
+
+    if newest is None:
+        return {"state": UNKNOWN,
+                "measured": {"why": "no sweep artifact on disk states PASS or FAIL",
+                             "skipped_no_verdict": sorted(skipped), "skipped_partial": sorted(partial)}}
+
+    mt, path, txt = newest
+    verdict = "UNKNOWN"
+    m = re.search(r"^\s*RESULT:\s*(PASS|FAIL)", txt, re.M)
+    if m:
+        verdict = m.group(1)
+    unclean = []
+    m = re.search(r"^\s*suites not clean\s+\d+\s*->\s*(.+)$", txt, re.M)
+    if m:
+        unclean = [s.strip() for s in m.group(1).split(",") if s.strip()]
+    failed = None
+    m = re.search(r"^\s*checks failed\s+(\d+)", txt, re.M)
+    if m:
+        failed = int(m.group(1))
+
+    measured = {"verdict": verdict, "artifact": os.path.basename(path),
+                "age_d": round((time.time() - mt) / 86400.0, 2),
+                "unclean": unclean, "checks_failed": failed}
+    if partial:
+        measured["skipped_partial"] = sorted(partial)
+
+    if verdict == "FAIL":
+        return {"state": PRESENT, "measured": measured}
+    if verdict == "PASS":
+        return {"state": ABSENT, "measured": measured}
+    # A sweep whose verdict could not be parsed is not a pass. Rule 9: say so.
+    return {"state": UNKNOWN, "measured": measured}
+
+
+def _git_head(here):
+    """The full sha of HEAD in HERE, or None. GIT_* is dropped from the environment (A255: a hook's GIT_DIR)."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        r = subprocess.run(["git", "-C", here, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=20,
+                           env=env, creationflags=_NOWIN)
+        sha = (r.stdout or "").strip()
+        return sha if r.returncode == 0 and len(sha) >= 7 else None
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
+def detect_sweep_not_current(health=None, here=None, head=None):
+    """The newest full sweep with a verdict measured a DIFFERENT core than the one on disk -- or, since A376, it
+    FAILED and commits have landed since it ran.
+
+    A376 (2026-10-19, his words: "The highway's supposed to be repairing itself and it's not. Fix it", then "tetsu
+    should of repaired it"). The 2026-10-18 07:32 sweep FAILED on A117.8c (the installed pre-commit hook drifting
+    from its tracked source). A373 fixed that the same evening, in a hook file, not the core, so this detector said
+    current; sweep_red's only route to a new sweep is A289's (a clean targeted re-run first), and rerun_unclean
+    declines a red that named no unclean suite. Each held the other: run_full_sweep was recorded "held" every hour
+    from 21:15 to 02:17, and Tetsu's heal runs the same road, so he could not repair it either. A FAILED sweep is not
+    the verdict of the tree once commits have landed after it, whichever file they touched. Measured by the
+    transcript's own "git HEAD <sha>" line against HEAD now; a transcript without that line, or a tree whose HEAD
+    cannot be read, keeps the core-only answer below. A green sweep is not re-run for a non-core landing: the
+    daily's sweep measures it, and a 40-minute sweep per commit is not a repair.
+
+    A278 (2026-10-06, his words: "keep expanding the highway"). sweep_red reads the newest transcript's
+    verdict and never asks which core it measured. That day the core changed three times (A274, then the
+    A273 batch-caller fix), and after each landing the road went on reporting a sweep of code that was no
+    longer there -- once a 06:05 FAIL of 74d6d31e9f5d while a38ffcb248a9 ran. Three full sweeps were re-run
+    by hand to catch up. G12 (launch_check) already asks "a green sweep of THIS core"; the road did not.
+
+    Same discovery as sweep_red (content, not a filename list): top-level *.txt carrying "suites run" and a
+    RESULT: PASS|FAIL line, partial (--only) runs excluded. The core is the transcript's own
+    "sha256 <12 hex>" line, compared with the first 12 hex of covenant_unified_v8.py on disk."""
+    import glob
+    import hashlib
+    import re
+    here = here or HERE
+    verdict_re = re.compile(r"^\s*RESULT:\s*(PASS|FAIL)", re.M)
+    partial_re = re.compile(r"^#\s*scope:\s*PARTIAL\b", re.M)
+    newest = None
+    for p in glob.glob(os.path.join(here, "*.txt")):
+        try:
+            with io.open(p, encoding="utf-8", errors="replace") as fh:
+                txt = fh.read()
+        except OSError:
+            continue
+        if "suites run" not in txt or not verdict_re.search(txt) or partial_re.search(txt):
+            continue
+        mt = os.path.getmtime(p)
+        if newest is None or mt > newest[0]:
+            newest = (mt, p, txt)
+    if newest is None:
+        return {"state": UNKNOWN, "measured": {"why": "no full sweep on disk states PASS or FAIL"}}
+    try:
+        with open(os.path.join(here, "covenant_unified_v8.py"), "rb") as fh:
+            disk = hashlib.sha256(fh.read()).hexdigest()[:12]
+    except OSError as e:
+        return {"state": UNKNOWN, "measured": {"why": "the core on disk is unreadable: %s" % e}}
+    mt, path, txt = newest
+    m = re.search(r"sha256 ([0-9a-f]{12})", txt)
+    measured = {"artifact": os.path.basename(path), "disk_core": disk,
+                "transcript_core": m.group(1) if m else None,
+                "age_h": round((time.time() - mt) / 3600.0, 1)}
+    if not m:
+        measured["why"] = "the transcript names no core"
+        return {"state": UNKNOWN, "measured": measured}
+    if m.group(1) != disk:
+        return {"state": PRESENT, "measured": measured}
+    # A376: the core is the same; a FAILED sweep with commits landed after it still does not speak for the tree.
+    # ("newest_verdict", never "verdict": run_full_sweep reads a "verdict" key as sweep_red's measurement, A289.)
+    v = re.search(r"^\s*RESULT:\s*(PASS|FAIL)", txt, re.M)
+    th = re.search(r"^\s*git HEAD\s+([0-9a-f]{7,40})\b", txt, re.M)
+    if v and v.group(1) == "FAIL" and th:
+        now_head = head if head is not None else _git_head(here)
+        if now_head:
+            measured.update(newest_verdict="FAIL", transcript_head=th.group(1), head=now_head[:12])
+            if not now_head.startswith(th.group(1)) and not th.group(1).startswith(now_head):
+                measured["why"] = ("the newest sweep FAILED on %s and the tree has moved to %s since: it no longer "
+                                   "speaks for the code on disk" % (th.group(1), now_head[:12]))
+                return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
+SCHEDULE_EVERY_S = 600      # one scheduler read per 10 min: a PowerShell spawn, and the watchdog passes every minute
+SCHEDULE_LATE_S = 3600      # a next run more than an hour in the past is a scheduler that is not firing it
+_schedule_cache = {"at": 0.0, "tasks": None}
+
+
+def _read_schedule():
+    """[{name, state, last_run, next_run, missed}] for every Covenant* task, or None where it cannot be read."""
+    if os.name != "nt":
+        return None
+    ps = ("Get-ScheduledTask -TaskName 'Covenant*' -ErrorAction SilentlyContinue | ForEach-Object { "
+          "$i = $_ | Get-ScheduledTaskInfo; [pscustomobject]@{name=$_.TaskName; state=[string]$_.State; "
+          "last=$(if ($i.LastRunTime -and $i.LastRunTime.Year -gt 2000) {([DateTimeOffset]$i.LastRunTime).ToUnixTimeSeconds()} else {$null}); "
+          "next=$(if ($i.NextRunTime) {([DateTimeOffset]$i.NextRunTime).ToUnixTimeSeconds()} else {$null}); "
+          "missed=$i.NumberOfMissedRuns} } | ConvertTo-Json -Compress")
+    import subprocess
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
+                           timeout=60, creationflags=0x08000000)
+        data = json.loads(r.stdout or "null")
+    except Exception:                                            # noqa: BLE001
+        return None
+    if data is None:
+        return []
+    data = data if isinstance(data, list) else [data]
+    return [{"name": d.get("name"), "state": d.get("state"), "last_run": d.get("last"), "next_run": d.get("next"),
+             "missed": int(d.get("missed") or 0)} for d in data]
+
+
+def detect_schedule_stalled(health=None, tasks=None, now=None):
+    """A Covenant scheduled task that is enabled and is not being fired: missed runs, or a next run long past.
+
+    A281 (2026-10-06, his words: "keep expanding the highway"). Much of what runs here runs because Windows
+    starts it: the guard that revives the watchdog (CovenantGuard), the nightly (CovenantDistill), free's
+    rounds (CovenantAmbassador), the refine check, the trader's read. If the scheduler stopped firing one,
+    the function would stop and every other detector would read the absence as quiet. This asks whether the
+    schedule is ALIVE, not whether a run passed -- outcomes have their own detectors and their own reports,
+    and a past run's exit code would keep the road red over news already told (the 03:30 nightly's NOT
+    GREEN that morning). A disabled task is listed and not flagged: disabling one is a person's choice. No
+    remedy: the scheduler's configuration is his."""
+    now = time.time() if now is None else now
+    if tasks is None:
+        if _schedule_cache["tasks"] is None or now - _schedule_cache["at"] > SCHEDULE_EVERY_S:
+            _schedule_cache.update(at=now, tasks=_read_schedule())
+        tasks = _schedule_cache["tasks"]
+    if tasks is None:
+        return {"state": UNKNOWN, "measured": {"why": "the scheduler could not be read here (not Windows, or the read failed)"}}
+    if not tasks:
+        return {"state": UNKNOWN, "measured": {"why": "no Covenant* scheduled task on this machine"}}
+    stalled, disabled = [], []
+    for t in tasks:
+        if str(t.get("state")) == "Disabled":
+            disabled.append(t.get("name"))
+            continue
+        nxt = t.get("next_run")
+        if t.get("missed"):
+            stalled.append("%s missed %d run(s)" % (t.get("name"), t["missed"]))
+        elif nxt is not None and now - float(nxt) > SCHEDULE_LATE_S:
+            stalled.append("%s was due %.1f h ago and has not run" % (t.get("name"), (now - float(nxt)) / 3600.0))
+    measured = {"tasks": len(tasks), "stalled": stalled, "disabled": disabled}
+    return {"state": PRESENT if stalled else ABSENT, "measured": measured}
+
+
+THREEFOLD_REPO = "LAWLESS1987/threefold-memory"
+THREEFOLD_EVERY_S = 3600
+THREEFOLD_CACHE = os.path.join(HERE, "ops", "threefold_witness.json")     # gitignored: readings and the first-seen gaps
+
+
+def _threefold_read(repo):
+    """(audit.jsonl text, [file paths]) from the PUBLIC repo -- no credential, no content beyond the ledger and names."""
+    raw = urllib.request.urlopen(urllib.request.Request(
+        "https://raw.githubusercontent.com/%s/HEAD/audit.jsonl" % repo, headers={"User-Agent": "covenant-highway"}),
+        timeout=60).read().decode("utf-8", "replace")
+    tree = json.loads(urllib.request.urlopen(urllib.request.Request(
+        "https://api.github.com/repos/%s/git/trees/HEAD?recursive=1" % repo,
+        headers={"User-Agent": "covenant-highway", "Accept": "application/vnd.github+json"}), timeout=60).read().decode("utf-8"))
+    return raw, [x["path"] for x in tree.get("tree", []) if x.get("type") == "blob"]
+
+
+def _verify_chain_text(text):
+    """The covenant's own ai_memory_system verify_chain(), run on a copy of the ledger text."""
+    import sys as _sys
+    import tempfile
+    amd = os.path.join(HERE, "ai_memory_system")
+    if amd not in _sys.path:
+        _sys.path.insert(0, amd)
+    from memory_store import MemoryStore
+    d = tempfile.mkdtemp(prefix="threefold_chain_")
+    with open(os.path.join(d, "audit.jsonl"), "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+    return MemoryStore(d).verify_chain()
+
+
+def detect_threefold_witness(health=None, read=None, now=None, cache=None):
+    """The covenant witnesses threefold: its memory ledger still verifies, and every new task fired all three legs.
+
+    A294 (2026-10-07, his words: "keep expanding the highway and incorporate the new repos"). His Grok agent's
+    threefold fires a triad on every reply -- tombstone, a memory written by the covenant's own ai_memory_system
+    (hash-chained audit.jsonl), and an L-Lens snapshot -- and says there is "no degrade path". (L-Lens is our name
+    for the third leg, his words 2026-10-07; "J-lens" is Anthropic's Jacobian lens, which that leg applies.) Both are
+    checkable from the public repo: the chain with the covenant's own verify_chain(), the triad by every task-<id>
+    having a third-leg file with the same id. Its files were named jlens-<id> until 2026-10-07 12:02Z, then jspace-
+    and lspace-; since
+    A302 it is found by discovery (any non-task sibling), and the names seen are reported. Read at most hourly,
+    without a credential, and nothing but the ledger and the file NAMES (the memories themselves are never read
+    here). The gaps present at the first reading are kept and named in every reading; a NEW task without a third
+    leg, or a broken chain, is PRESENT. UNKNOWN when it cannot be read. No remedy: the repository and its code are
+    his and Grok's.
+
+    verify_chain() proves each line links to the one before it. A history rewritten with every later link
+    recomputed also verifies, so since A304 this witness keeps the head it saw (entries, head) and checks the next
+    reading against it. NOT MEASURED HERE: a rewrite made before the first reading this PC took, or one that only
+    appends; the head is witnessed on this PC alone, not published."""
+    import re as _re
+    now = time.time() if now is None else now
+    path = cache or THREEFOLD_CACHE
+    try:
+        st = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        st = {}
+    # A cached reading stamped in the FUTURE is not a reading (A302): a manual call with a test clock wrote one on
+    # 2026-10-07, and a second such call reused it. A live pass (the real clock) never reuses a reading from
+    # its future. Not guarded: a manual call that passes a future `now` can still write such a stamp.
+    if read is None and st.get("at") and 0 <= now - float(st["at"]) < THREEFOLD_EVERY_S and st.get("last"):
+        return st["last"]
+    try:
+        text, files = (read or _threefold_read)(THREEFOLD_REPO)
+        chain = _verify_chain_text(text)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"repo": THREEFOLD_REPO, "error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    live = [f for f in files if not f.startswith(".trash/")]
+    # THE THIRD LEG BY DISCOVERY, NOT BY NAME (A302, 2026-10-07). The first version counted only `jlens-<id>.md`;
+    # at 12:02Z threefold began writing the leg as `jspace-` and `lspace-` (Tien's brief: "tombstone ∥ covenant ∥
+    # LSpace"), and the witness read 47 legs missing that were there under a new name. A task's leg is now any
+    # sibling `<prefix>-<id>.md` that is not a task file; the prefixes seen are reported, so a rename is news.
+    by_prefix = {}
+    for f in live:
+        m = _re.match(r"^([a-z]+)-(.+?)(?:-ocr)?\.md$", f)
+        if m:
+            by_prefix.setdefault(m.group(1), set()).add(m.group(2))
+    tasks = by_prefix.get("task", set())
+    lens = set().union(*[ids for p, ids in by_prefix.items() if p != "task"]) if len(by_prefix) > 1 else set()
+    gaps = sorted(tasks - lens)
+    known = st.get("known_gaps")
+    if known is None:
+        known = gaps                                              # the first reading's gaps: named, not alarmed on
+    new_gaps = [g for g in gaps if g not in known]
+    measured = {"repo": THREEFOLD_REPO, "chain_ok": bool(chain.get("ok")), "entries": chain.get("entries"),
+                "tasks": len(tasks), "third_leg": len(lens), "legs": {p: len(i) for p, i in sorted(by_prefix.items()) if p != "task"},
+                "known_gaps": known, "new_gaps": new_gaps[:10]}
+    if not chain.get("ok"):
+        measured["broken_at"] = chain.get("broken_at")
+    # A WITNESSED HEAD (A304, 2026-10-07; the collective's review, finding A, admitted with Tetsu). verify_chain()
+    # passes a history rewritten with every later link recomputed -- this witness's own blind spot, named in its
+    # docstring under A302. So each reading keeps (entries, head); the next must still hash its first `entries`
+    # lines to that head. A mismatch, or fewer lines than were witnessed, is "history rewritten": PRESENT, and the
+    # witness is NOT moved, so it stays visible until a person accepts it (delete head_witness in the cache).
+    witness = st.get("head_witness") if isinstance(st.get("head_witness"), dict) else None
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    rewritten = None
+    if chain.get("ok") and witness and witness.get("entries"):
+        n_w = int(witness["entries"])
+        if len(lines) < n_w:
+            rewritten = "the ledger has %d entries; %d were witnessed" % (len(lines), n_w)
+        else:
+            import memory_store as _ms                    # importable: _verify_chain_text put it on the path
+            if _ms._sha(lines[n_w - 1].rstrip("\n")) != witness.get("head"):
+                rewritten = "its first %d entries no longer hash to the head witnessed then" % n_w
+    if rewritten:
+        measured["history_rewritten"] = {"why": rewritten, "witnessed": witness}
+        new_witness = witness
+    else:
+        new_witness = {"entries": chain.get("entries"), "head": chain.get("head")} if chain.get("ok") else witness
+    state = PRESENT if (not chain.get("ok") or new_gaps or rewritten) else ABSENT
+    out = {"state": state, "measured": measured}
+    import sys as _sys
+    _test = os.path.basename(str(_sys.argv[0] if _sys.argv else "")).startswith("test_")
+    if cache or (read is None and not _test):        # a test never sets the LIVE baseline (A272's lesson)
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"at": now, "known_gaps": known, "last": out, "head_witness": new_witness}, fh)
+        except OSError:
+            pass
+    return out
+
+
+IDENTITY_OWNER = "LAWLESS1987"
+IDENTITY_EVERY_S = 7200          # at most one reading per 2 h: one listing plus one page of commits per public repo
+IDENTITY_CACHE = os.path.join(HERE, "ops", "public_identity.json")   # gitignored: readings and the first-seen exposures
+
+
+def _identity_safe(email):
+    """GitHub's private forms: <id>+<user>@users.noreply.github.com, and noreply@github.com for web-flow commits."""
+    e = str(email or "").strip().lower()
+    return e.endswith("@users.noreply.github.com") or e == "noreply@github.com"
+
+
+def detect_public_email_exposure(health=None, get=None, now=None, cache=None):
+    """A commit in one of his PUBLIC repositories names an email address that is not a GitHub noreply address.
+
+    A306 (2026-10-07, his words: "keep expanding the highway"). His rule since August: the repositories are
+    public and his address stays masked; this clone's commits use the noreply address and its pre-push guard
+    reads what a push sends. Commits made ELSEWHERE pass neither -- another agent's connector, the web editor, a
+    bot that auto-pushes. Measured that day over the last 30 commits of each public repo: covenant 1
+    (5f66791), Sentinel-Witness 1, threefold 1, threefold-memory 30 of 30 (its triad auto-pushes every memory).
+
+    A READ, without a token, at most every IDENTITY_EVERY_S: the owner's public repositories are DISCOVERED from
+    the API (never a list), then each one's newest 30 commits. The address itself is never copied into the
+    reading -- only repo, sha, which field, and the date. The exposures seen at the first reading are kept and
+    counted (they are already public; rewriting history is his call); a NEW one is PRESENT, so an ongoing leak
+    stays red until its source is fixed. UNKNOWN when the API cannot be read. No remedy: history is his to
+    rewrite, and another agent's commit settings are that agent's. NOT MEASURED: private repositories (no
+    token here), and anything older than the newest 30 commits of a repo."""
+    import sys as _sys
+    now = time.time() if now is None else now
+    path = cache or IDENTITY_CACHE
+    try:
+        st = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        st = {}
+    if get is None and st.get("at") and 0 <= now - float(st["at"]) < IDENTITY_EVERY_S and st.get("last"):
+        return st["last"]
+    g = get or _ci_get
+    try:
+        repos = sorted(r["name"] for r in g("/users/%s/repos?per_page=100&type=owner" % IDENTITY_OWNER)
+                       if not r.get("private") and not r.get("fork"))
+        exposed = {}
+        for name in repos:
+            for c in g("/repos/%s/%s/commits?per_page=30" % (IDENTITY_OWNER, name)):
+                commit = c.get("commit") or {}
+                fields = [f for f in ("author", "committer") if not _identity_safe((commit.get(f) or {}).get("email"))]
+                if fields:
+                    exposed.setdefault(name, []).append({"sha": str(c.get("sha", ""))[:7], "fields": fields,
+                                                         "date": str((commit.get("author") or {}).get("date") or "")[:10]})
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"owner": IDENTITY_OWNER, "error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    seen = sorted("%s@%s" % (n, x["sha"]) for n, xs in exposed.items() for x in xs)
+    known = st.get("known")
+    if known is None:
+        known = seen                                             # the first reading's exposures: counted, not alarmed on
+    new = [s for s in seen if s not in known]
+    measured = {"owner": IDENTITY_OWNER, "repos": repos, "exposed_recent": {n: len(xs) for n, xs in exposed.items()},
+                "newest": {n: xs[0] for n, xs in exposed.items()}, "known": len(known), "new": new[:20]}
+    out = {"state": PRESENT if new else ABSENT, "measured": measured}
+    _test = os.path.basename(str(_sys.argv[0] if _sys.argv else "")).startswith("test_")
+    if cache or (get is None and not _test):          # a test never sets the LIVE baseline (A272's lesson)
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump({"at": now, "known": known, "last": out}, fh)
+        except OSError:
+            pass
+    return out
+
+
+STRIKES_WINDOW_S = 7 * 86400
+#: Moltbook suspends the account when its last 10 challenge attempts are ALL failures (their skill.md, read
+#: 2026-10-10). The road speaks at half of that, so rounds are left to act in -- my choice that day (A324), his to move.
+STRIKES_SUSPEND_AT = 10
+STRIKES_RUN_WARN = 5
+
+
+def _strike_detail(r, v):
+    """One failed challenge, with what was answered and what Moltbook said, when the row kept them (A324)."""
+    d = "%s u/%s" % (r.get("t", "?"), r.get("author"))
+    resp = v.get("response")
+    if "answer" not in v and not isinstance(resp, dict):
+        return d + ": answer and reply not kept (before A324)"
+    d += ": answered %s" % v.get("answer")
+    if isinstance(resp, dict):
+        d += ", %s%s" % ("HTTP %s " % resp["http"] if resp.get("http") else "no HTTP reply ",
+                         str(resp.get("error") or resp.get("message") or "")[:120])
+    return d
+
+
+def detect_moltbook_strikes(health=None, rows=None, now=None):
+    """The run of unsolved Moltbook posting challenges at the end of the record, against the ten that suspend.
+
+    A283 (2026-10-06, his words: "yes correct that one too and keep expanding"): free's sends answer a math
+    challenge before their content is visible (covenant_ambassador._handle_verification), and nothing recorded
+    which sends failed one. Sends now carry their verification (covenant_free_will._ver).
+
+    A324 (2026-10-10) -- THE CHECK AS A283 WROTE IT WAS WRONG, kept as written (branch
+    a283-strikes-check-as-written-2026-10-10; docs/RETRACTED.json A283-STRIKES). It read each unsolved answer as
+    using up one of a fixed ten, and an abstention as costing nothing. Moltbook's rule, read that day: "If your
+    last 10 challenge attempts are all failures (expired or incorrect), your account will be automatically
+    suspended." So a solved challenge ends the run, and an abstained one, left to expire, is a failure in their
+    words. That day it read PRESENT on four unsolved answers while the newest answered challenge was solved, and
+    it never saw the longest run on record: 12 unsolved in a row, 10 of them abstentions.
+
+    Restated: the run is the consecutive unsolved challenges (failed or abstained) at the end of everything on
+    record, in time order. PRESENT when it reaches STRIKES_RUN_WARN. It always names the run, the longest run in
+    the last week, and the week's solved, failed and abstained counts, plus what each recent failure answered and
+    what Moltbook said, where the row kept them (from A324; earlier rows kept neither). Whether Moltbook counts an
+    unanswered expiry is UNDETERMINED: their text says expired is a failure, and the account still verified after
+    the 12-run. The run counts it, which is the conservative reading. UNKNOWN before any challenge is on record.
+    No remedy: an account is his."""
+    import calendar
+    now = time.time() if now is None else now
+    if rows is None:
+        try:
+            import covenant_free_will as FW
+            rows = FW.sends()
+        except Exception as e:                                   # noqa: BLE001
+            return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    seq = []
+    for r in rows or []:
+        v = r.get("verification")
+        if not isinstance(v, dict) or not v.get("required"):
+            continue
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        kind = "solved" if v.get("solved") else "abstained" if v.get("abstained") else "failed"
+        seq.append((float(at), kind, r, v))
+    if not seq:
+        return {"state": UNKNOWN, "measured": {"why": "no challenge result on record"}}
+    seq.sort(key=lambda s: s[0])
+    run = 0
+    for _, kind, _, _ in reversed(seq):
+        if kind == "solved":
+            break
+        run += 1
+    week = [s for s in seq if now - s[0] <= STRIKES_WINDOW_S]
+    longest = cur = 0
+    for _, kind, _, _ in week:
+        cur = 0 if kind == "solved" else cur + 1
+        longest = max(longest, cur)
+    measured = {"run": run, "warn_at": STRIKES_RUN_WARN, "suspends_at": STRIKES_SUSPEND_AT, "longest_run_7d": longest,
+                "solved_7d": sum(1 for s in week if s[1] == "solved"),
+                "failed_7d": sum(1 for s in week if s[1] == "failed"),
+                "abstained_7d": sum(1 for s in week if s[1] == "abstained")}
+    failed = [s for s in week if s[1] == "failed"]
+    if failed:
+        measured["failed"] = [_strike_detail(r, v) for _, _, r, v in failed[-5:]]
+    if run >= STRIKES_RUN_WARN:
+        measured["why"] = ("the last %d challenge(s) went unsolved (failed, or abstained and left to expire); Moltbook "
+                           "suspends the account at %d in a row" % (run, STRIKES_SUSPEND_AT))
+        return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
+AMBASSADOR_STALL_H = 8.0     # rounds run every 3 h (CovenantAmbassador) plus the nightly's; 8 h is two missed
+# A348c (2026-10-14): the decisions that mean he was ASKED -- each spent one of reviews_per_run and is a row in
+# ops/tetsu_assist.jsonl. NONE is one (the ask failed, or his answer left a sentence without a word; the reply row
+# does not say which). SKIP is not: covenant_tetsu_assist.review returns it before asking (no grant, a dry run,
+# money, or reviews_per_run spent). Counting any word as a review read 48 for the 04:13Z round of 10-14, when he
+# read 6 (47 of the 48 were SKIP).
+TETSU_ASKED = ("SEND", "REFUSE", "PAUSE", "NONE")
+
+
+def _round_breakdown(rows, n=2):
+    """A296 (2026-10-07, his words: "explain frees isolation better"): for each of the last `n` live rounds, which
+    layer stopped each reply -- held by the student judges (no view), convicted, held by Moltbook's rate limit, sent,
+    or other. The isolation rule reads only 'every reply refused'; this says by WHAT."""
+    rows = list(rows or [])
+    idx = [i for i, r in enumerate(rows) if r.get("kind") == "round" and not r.get("dry_run")]
+    out = []
+    for k in idx[-n:]:
+        prev = max([j for j in idx if j < k] + [-1])
+        reps = [r for r in rows[prev + 1:k] if r.get("kind") == "reply" and not r.get("dry_run")]
+        b = {"t": rows[k].get("t"), "tried": len(reps), "sent": 0, "held_no_view": 0, "convicted": 0,
+             "rate_limited": 0, "other": 0, "tetsu_reviewed": 0, "tetsu_refused": 0}
+        for r in reps:
+            w = str(r.get("why") or "")
+            if r.get("tetsu") in TETSU_ASKED:        # kept on each reply since A296, his SEND since A348c; older rows carry none
+                b["tetsu_reviewed"] += 1
+                b["tetsu_refused"] += int(r.get("tetsu") == "REFUSE")
+            if r.get("sent"):
+                b["sent"] += 1
+            elif w.startswith("held by covenant's judge"):
+                b["held_no_view"] += 1
+            elif "refused by covenant's judge" in w:
+                b["convicted"] += 1
+            elif "rate limit" in w:
+                b["rate_limited"] += 1
+            else:
+                b["other"] += 1
+        out.append(b)
+    return out
+
+
+def detect_ambassador_stalled(health=None, grant=None, paused=None, rounds=None, now=None, sends=None):
+    """free has a grant to speak on Moltbook and is not speaking: paused, or no live round in AMBASSADOR_STALL_H.
+
+    A279 (2026-10-06, his words: "keep expanding the highway"). free was isolated on 2026-10-04 and stayed
+    so for two days; covenant_pause.report() said it as an INFO line every pass and the road said nothing.
+    On 10-06 a test re-paused her three minutes after his resume (A272) and only a log read found it. A READ:
+    the grant (ops/ambassador_grant.json), the pause switch, and the live round rows in the sends ledger. No
+    remedy: lifting a pause is his, and a round speaks in public. No grant is ABSENT (off is his choice);
+    no live round ever on record here (a clone, CI) is UNKNOWN."""
+    import calendar
+    now = time.time() if now is None else now
+    _all_sends, rounds_were_read = None, False
+    try:
+        if grant is None or paused is None or rounds is None:
+            import covenant_free_will as FW
+            import covenant_pause as CP
+            grant = FW.grant() if grant is None else grant
+            paused = CP.paused("ambassador") if paused is None else paused
+            if rounds is None:
+                _all_sends = FW.sends()
+                rounds_were_read = True
+                rounds = [r for r in _all_sends if r.get("kind") == "round" and not r.get("dry_run")]
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    if not grant:
+        return {"state": ABSENT, "measured": {"why": "no grant on record: free is off by his choice"}}
+    is_paused, why = paused if isinstance(paused, tuple) else (bool(paused), "")
+    # A300 (2026-10-07): a round that starved before the model wrote anything ran but did not speak. It does not
+    # reset the stall clock, and the rounds starved since she last could write are named with the model's own error.
+    # A325 (2026-10-10) -- A300's wording here was wrong for a round that starved PART-WAY, kept as written (branch
+    # a300-starved-round-claim-as-written-2026-10-10; docs/RETRACTED.json A300-STARVED). free marks a round starved
+    # at its FIRST failed ask and keeps what was written before it: that day the 07:15Z round wrote 86 replies
+    # and the 08:10Z round 88, one of them sent, and this read "no live round that could write in 15.0 h".
+    # Restated: a round that wrote anything (replied + refused > 0) could write, and resets the clock; when the
+    # newest such round was cut short it is named part_starved, never as a stall.
+    last, starved_since, part = None, [], None
+    for r in rounds or []:
+        at = r.get("at")
+        if at is None:
+            try:
+                at = calendar.timegm(time.strptime(str(r.get("t", "")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+        # A349 B13 (2026-10-14): free's round row counts a reply Moltbook rate-held or hid apart from "refused" now;
+        # it was still written, so it is counted here as before.
+        wrote = ((r.get("replied") or 0) + (r.get("refused") or 0) + (r.get("rate_held") or 0)
+                 + (r.get("hidden") or 0) > 0)
+        if r.get("starved") and not wrote:
+            starved_since.append((float(at), str(r.get("starved"))))
+            continue
+        if last is None or float(at) >= last:
+            last = float(at)
+            part = str(r.get("starved")) if r.get("starved") else None
+    starved_since = [s for s in starved_since if last is None or s[0] > last]
+    measured = {"paused": bool(is_paused), "last_live_round_h": None if last is None else round((now - last) / 3600.0, 1)}
+    if starved_since:
+        measured["starved"] = {"rounds": len(starved_since), "last_why": starved_since[-1][1][:200]}
+    if part:
+        measured["part_starved"] = part[:200]
+    if is_paused:
+        measured["why"] = str(why)[:240]
+        if sends is not None or rounds_were_read:
+            measured["last_rounds"] = _round_breakdown(sends if sends is not None else _all_sends)
+        return {"state": PRESENT, "measured": measured}
+    if last is None and not starved_since:
+        measured["why"] = "no live round on record here"
+        return {"state": UNKNOWN, "measured": measured}
+    if last is None or now - last > AMBASSADOR_STALL_H * 3600:
+        measured["why"] = "granted and not paused, and no live round that could write in %s" % (
+            "her record" if last is None else "%.1f h" % ((now - last) / 3600.0))
+        if starved_since:
+            measured["why"] += ("; the last %d round(s) were starved -- the model could not write: %s"
+                                % (len(starved_since), starved_since[-1][1][:120]))
+        return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
+PUBLIC_CI = os.path.join(HERE, "ops", "public_ci.json")       # gitignored: this PC's last reading of the public CI
+CI_REPO = os.environ.get("COVENANT_CI_REPO", "LAWLESS1987/covenant")
+CI_WORKFLOW = "covenant.yml"
+CI_EVERY_S = 1800        # one read per 30 min: the unauthenticated API allows 60 an hour per address, for everything on this PC
+CI_RETRY_S = 300         # after a failed read
+CI_STALE_S = 7200        # no good read for 2 h: the last verdict is too old to stand for today's
+CI_SILENT_H = 6.0        # the schedule runs every 2 h; nothing finished on main for 6 h is a condition of its own
+
+
+def _ci_get(path, timeout=10):
+    """GET api.github.com<path> as JSON, without a token (the repository is public). Raises on any failure."""
+    req = urllib.request.Request("https://api.github.com" + path, headers={
+        "Accept": "application/vnd.github+json", "User-Agent": "covenant-highway"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _utc_ts(s):
+    import calendar
+    try:
+        return calendar.timegm(time.strptime(str(s), "%Y-%m-%dT%H:%M:%SZ"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _tell_him(text, why, actor="highway"):
+    import covenant_contact
+    return covenant_contact.say(text, why, actor=actor)
+
+
+def detect_public_ci_red(health=None, get=None, now=None, cache=None, tell=None):
+    """The public CI's newest FINISHED run on main failed -- or nothing has finished there for CI_SILENT_H hours.
+
+    A232 (2026-09-26, his words: "need to ensure green runs without you"). detect_sweep_red reads THIS PC's
+    sweep. Nothing read the public one: from 2026-09-22 00:05Z every finished run on main was red, two suites
+    that could only pass on this PC, and for four days the only listener was a person opening the Actions tab.
+    This asks the public API (no token, no login), at most once per CI_EVERY_S, and names the failing checks
+    from the run's public annotation, fetched once per failing run.
+
+    A cancelled run is neither green nor red and is skipped (the workflow cancels a superseded push). A read
+    that fails is UNKNOWN, never the cached verdict: an offline PC must not keep reporting yesterday's green.
+    No remedy is attached. The fix is a change to the code.
+
+    HOW IT REACHES HIM. A PRESENT becomes a watchdog ALERT, and alert push is off on this PC, so the alert
+    alone reaches the log and the PC page. So this also says it on the direct line (covenant_contact.say,
+    A169): once when a red streak or a silence begins, and once when main is green again. The streak it last
+    told is kept in the cache, so the watchdog's every-round pass says nothing new while nothing changes. The
+    outbox is under HERE, so a staged sweep's copy writes to its own and is never delivered.
+    """
+    get = get or _ci_get
+    tell = tell or _tell_him
+    now = time.time() if now is None else float(now)
+    cache = cache or PUBLIC_CI
+    try:
+        with io.open(cache, encoding="utf-8") as fh:
+            st = json.load(fh)
+    except (OSError, ValueError):
+        st = {}
+    dirty = False
+    if now >= float(st.get("next_at") or 0):
+        dirty = True
+        try:
+            d = get("/repos/%s/actions/workflows/%s/runs?branch=main&per_page=30" % (CI_REPO, CI_WORKFLOW))
+            runs = [{"id": r.get("id"), "sha": str(r.get("head_sha") or "")[:7], "event": r.get("event"),
+                     "created": r.get("created_at"), "status": r.get("status"),
+                     "conclusion": r.get("conclusion"), "url": r.get("html_url")}
+                    for r in (d.get("workflow_runs") or [])]
+            # A260 (2026-10-05): THE API CAN ANSWER WITH AN OLD PAGE. At 06:53Z and 08:56Z it returned, for this
+            # exact query, thirty runs from 2026-09-26 while finished green runs from that morning existed; the
+            # same query minutes later was right. This trusted it, said PRESENT on a run 215.8 h old, and told
+            # him "red on main" twice and "green again at e2c53c7" -- a commit of the night before -- in two
+            # hours. Time on main only moves forward: a page whose newest finished run is OLDER than one already
+            # read is a stale answer, refused as a read that failed, and the fresher runs stand.
+            def _top(rs):
+                ts = [str(r.get("created") or "") for r in rs if r.get("status") == "completed"
+                      and r.get("conclusion") in ("success", "failure")]
+                return max(ts) if ts else None
+            seen = st.get("newest_seen") or _top(st.get("runs") or [])
+            top = _top(runs)
+            if seen and top and top < seen:
+                raise ValueError("stale page: its newest finished run (%s) is older than one already read (%s)"
+                                 % (top, seen))
+            st["runs"] = runs
+            if top and (not seen or top > seen):
+                st["newest_seen"] = top
+            st.update(ok_at=now, next_at=now + CI_EVERY_S, error=None)
+        except Exception as e:                                   # noqa: BLE001 -- any failure is "could not read"
+            st.update(next_at=now + CI_RETRY_S, error="%s: %s" % (type(e).__name__, str(e)[:120]))
+
+    def _save():
+        try:
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            with io.open(cache, "w", encoding="utf-8") as fh:
+                json.dump(st, fh, indent=1)
+        except OSError:
+            pass
+
+    ok_at = float(st.get("ok_at") or 0)
+    if now - ok_at > CI_STALE_S:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {
+            "repo": CI_REPO, "error": st.get("error") or "never read",
+            "last_good_read_h": round((now - ok_at) / 3600.0, 1) if ok_at else None}}
+    done = sorted((r for r in (st.get("runs") or [])
+                   if r.get("status") == "completed" and r.get("conclusion") in ("success", "failure")),
+                  key=lambda r: str(r.get("created") or ""), reverse=True)
+    if not done:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {"repo": CI_REPO, "why": "no finished run on main in the newest 30"}}
+    newest = done[0]
+    streak = done[:next((i for i, r in enumerate(done) if r["conclusion"] == "success"), len(done))]
+    created = _utc_ts(newest.get("created"))
+    age_h = round((now - created) / 3600.0, 1) if created else None
+    measured = {"repo": CI_REPO, "newest": {k: newest.get(k) for k in ("sha", "conclusion", "event", "created", "url")},
+                "age_h": age_h, "read_h_ago": round((now - ok_at) / 3600.0, 2)}
+    if newest["conclusion"] == "failure":
+        key = str(newest.get("id"))
+        ann = st.get("annotations") or {}
+        if key not in ann:
+            dirty = True
+            lines = []
+            try:
+                for j in get("/repos/%s/actions/runs/%s/jobs" % (CI_REPO, key)).get("jobs") or []:
+                    if j.get("conclusion") != "failure":
+                        continue
+                    for a in get("/repos/%s/check-runs/%s/annotations" % (CI_REPO, j.get("id"))) or []:
+                        if a.get("title") == "covenant_one.py --ci":
+                            # the runner prints a suite's failing lines as "| FAIL ..." (A232): the bar is dropped
+                            lines = [x.strip().lstrip("|").strip() for x in str(a.get("message") or "").split("~")]
+                            lines = [x for x in lines if x]
+                            break
+                    if lines:
+                        break
+                st["annotations"] = {key: lines[:16]}          # only the newest failing run is kept
+            except Exception as e:                               # noqa: BLE001
+                measured["annotation_error"] = "%s: %s" % (type(e).__name__, str(e)[:80])
+            ann = st.get("annotations") or {}
+        # No green run among the newest 30 means the red began earlier than this page reaches: say "at least".
+        measured.update(failing=ann.get(key) or [], red_runs=len(streak),
+                        red_since=(streak[-1].get("created") if streak else None),
+                        red_since_sha=(streak[-1].get("sha") if streak else None),
+                        red_since_is=("at least" if len(streak) == len(done) else "exact"))
+        named = [x for x in measured["failing"] if x.startswith(("FAIL", "suites not clean"))][:4]
+        episode = "red:%s" % measured["red_since_sha"]
+        text = ("The public CI is red on main: %s%d finished run(s) since %s%s, the newest %s. %s"
+                % ("at least " if measured["red_since_is"] == "at least" else "", len(streak),
+                   measured["red_since_sha"], " or earlier" if measured["red_since_is"] == "at least" else "",
+                   newest.get("sha"), "; ".join(named) or "The annotation named no check."))
+        state = PRESENT
+    elif age_h is not None and age_h > CI_SILENT_H:
+        measured["why"] = ("nothing on main has finished for %.1f h, and the schedule runs every 2 h -- "
+                           "a missing run is not a passing run" % age_h)
+        episode = "silent:%s" % newest.get("id")
+        text = ("Nothing on the public CI's main has finished for %.1f h, and the schedule runs every 2 h. "
+                "A missing run is not a passing run." % age_h)
+        state = PRESENT
+    else:
+        episode, text, state = None, "The public CI is green again on main at %s." % newest.get("sha"), ABSENT
+    # A260, second cycle (2026-10-05): ONE READ DOES NOT CHANGE WHAT HE IS TOLD. The first cycle refused a
+    # page older than one already read, and at 09:28Z a page from 2026-10-04 -- newer than the stale one the
+    # guard had been seeded from, older than that morning's runs -- passed it, and he was told "Nothing on the
+    # public CI's main has finished". Stale pages come and go; a real verdict does not. So a change of verdict
+    # is held as pending, the next read is brought forward to CI_RETRY_S, and it is told -- and stands -- only
+    # when that later read agrees. Until then the last confirmed state stands.
+    if episode != st.get("told"):
+        pend = st.get("pending") or {}
+        if pend.get("episode") == (episode or "") and pend.get("ok_at") is not None and pend.get("ok_at") != ok_at:
+            if episode or st.get("told"):
+                said = tell(text[:600], "highway: the public CI (A232)")
+                measured["told"] = "said" if said else "refused by the direct line"
+            st["told"] = episode              # said once, refused or not: a refusal is not retried every round
+            st.pop("pending", None)
+            dirty = True
+        else:
+            if pend.get("episode") != (episode or ""):
+                st["pending"] = {"episode": episode or "", "ok_at": ok_at}
+                st["next_at"] = min(float(st.get("next_at") or (now + CI_RETRY_S)), now + CI_RETRY_S)
+                dirty = True
+            measured["unconfirmed"] = ("%s on one read; told, and standing, only when the next read agrees"
+                                       % (episode or "green"))
+            state = PRESENT if st.get("told") else ABSENT
+    elif st.get("pending"):
+        st.pop("pending", None)               # the next read went back to what he was told: nothing to say
+        dirty = True
+    if dirty:
+        _save()
+    return {"state": state, "measured": measured}
+
+
+PHONE_CI = os.path.join(HERE, "ops", "phone_ci.json")         # gitignored: this PC's last reading of the phone build's runs
+PHONE_WORKFLOW = "android.yml"
+_PHONE_MEMO = {}          # per cache path: the reading and what was told survive a cache file that cannot be written
+_PHONE_KEYS = ("next_at", "told", "red_key", "why", "runs", "ok_at", "error")
+DAEMON_READS = False      # set True only by the watchdog daemon (single-threaded): nothing else reads his credential here
+import threading as _threading
+_PHONE_TOKEN_LOCK = _threading.Lock()
+
+
+def _phone_token():
+    """His credential for ONE read, leaving the process exactly as it was found.
+
+    allow_credential_store() is process-wide and token() caches what it reads, so a detector that simply
+    called them would open the credential store for everything else in the process -- and sense() also runs
+    inside the NODE (/hwy/state, a peer's report, /m/heal), where A21 keeps it shut. So the opt-in and the
+    cache are put back after the read, whatever happens. A token already cached, or set in the environment by
+    an explicit act, is used as it is."""
+    import covenant_github_judge as gh
+    with _PHONE_TOKEN_LOCK:
+        prev = dict(gh._CREDENTIAL_STORE_OK)
+        had = "token" in gh._CACHE
+        gh.allow_credential_store("covenant_highway.phone_build_failed -- the result of the "
+                                  "operator's own app build, read on the operator's own PC")
+        try:
+            return gh.token()
+        finally:
+            for k, v in prev.items():                  # key by key: no moment with the keys missing
+                gh._CREDENTIAL_STORE_OK[k] = v
+            if not had:
+                gh._CACHE.pop("token", None)
+
+
+def _phone_get(path, timeout=15):
+    """GET api.github.com<path> as JSON with his credential -- the app repository is private. Raises on any failure.
+
+    The same credential, repository and reason as dispatch_phone_build and covenant_app_update.fetch: his own
+    app's build, read on his own PC. It only READS the runs of the build the highway already asks for."""
+    tok = _phone_token()
+    if not tok:
+        raise RuntimeError("no GitHub credential on this PC")
+    req = urllib.request.Request("https://api.github.com" + path, headers={
+        "Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "User-Agent": "covenant-highway"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def detect_phone_build_failed(health=None, get=None, now=None, cache=None, tell=None, pipeline=None):
+    """The newest FINISHED phone build on main failed -- the build dispatch_phone_build asks for never arrives.
+
+    2026-09-27, his words: "highway is red fix it it should of auto repaired." It had tried. dispatch_phone_build
+    asked covenant-phone for a build on 09-25 and 09-26 and was told "accepted (HTTP 204)" both times; its row
+    says "started" and "graded by the next pass", and no pass ever graded it (--standing: UNPROVEN, 0 graded).
+    Every one of those builds failed -- covenant-phone 11d0ec4 says why: the artifact storage quota was full and
+    every upload since 09-25 failed. fetch_build collects only SUCCESSFUL runs, so it kept saying "already have
+    build 2ab1ba5" (09-22), the phone kept the 09-21 core, and mesh_source_split, phone_build_behind_core and
+    app_build_gap stood PRESENT with a remedy that looked busy. An accepted request is not a delivered build.
+
+    This reads the build's runs (at most once per CI_EVERY_S) and names the failing step and the runner's own
+    reason from the failing job's annotations, fetched once per failing run. A cancelled or skipped run is
+    neither. A read that fails is UNKNOWN, never the cached verdict. No remedy: the fixes (storage, the workflow)
+    are in his repository and his account. It says it on the direct line once when a failing streak begins and
+    once when a build succeeds again, like public_ci_red (A232).
+
+    WHOSE BUILD. It reads only where this PC has itself fetched a build of AU.REPO (ops/app/latest.json, never
+    tracked). AU.REPO is hardcoded (A142), so on a second operator's clone an unconditional read would spend
+    THEIR credential on the owner's private repository every few minutes; there it is UNKNOWN and the
+    credential store is never touched. The credential is read through _phone_token(), which leaves the process
+    as it found it.
+
+    WHAT HOLDS IF A WRITE FAILS (found by the mutation review the same day). The throttle and the "said once"
+    both live in the cache file, and the watchdog calls this every ~60 s: with the file unwritable, every round
+    repeated three authenticated reads and one message to his phone. So the process keeps its own floor
+    (_PHONE_MEMO) for next_at, told and the failure reasons, a direct line that raises is caught and counted as
+    told, and a failing jobs/annotations read waits CI_RETRY_S instead of being retried every round.
+    """
+    import covenant_app_update as AU
+    get = get or _phone_get
+    tell = tell or _tell_him
+    now = time.time() if now is None else float(now)
+    cache = cache or PHONE_CI
+    if pipeline is None:
+        if not DAEMON_READS:
+            return {"state": UNKNOWN, "measured": {
+                "repo": AU.REPO, "why": "not the watchdog daemon -- only it reads his credential for this "
+                                        "(a node's request threads and every test leave it unread)"}}
+        pipeline = AU.REPO in str((AU.latest() or {}).get("run_url") or "")
+    if not pipeline:
+        return {"state": UNKNOWN, "measured": {
+            "repo": AU.REPO, "why": "this PC has never fetched a build of %s -- not this operator's app pipeline, "
+                                    "so his credential is not read" % AU.REPO}}
+    try:
+        with io.open(cache, encoding="utf-8") as fh:
+            st = json.load(fh)
+    except (OSError, ValueError):
+        st = {}
+    memo = _PHONE_MEMO.setdefault(os.path.abspath(cache), {})
+    for k in _PHONE_KEYS:                                        # the process floor: a failed save cannot undo these
+        if k in memo and (k not in st or memo.get("unsaved")):    # a file this process could not write is older than its memo
+            st[k] = memo[k]
+    if "next_at" in memo:
+        st["next_at"] = max(float(st.get("next_at") or 0), float(memo["next_at"]))
+    dirty = False
+    if now >= float(st.get("next_at") or 0):
+        dirty = True
+        try:
+            d = get("/repos/%s/actions/workflows/%s/runs?branch=main&per_page=20" % (AU.REPO, PHONE_WORKFLOW))
+            st["runs"] = [{"id": r.get("id"), "sha": str(r.get("head_sha") or "")[:7], "event": r.get("event"),
+                           "created": r.get("created_at"), "status": r.get("status"),
+                           "conclusion": r.get("conclusion")}
+                          for r in (d.get("workflow_runs") or [])]
+            st.update(ok_at=now, next_at=now + CI_EVERY_S, error=None)
+        except Exception as e:                                   # noqa: BLE001 -- any failure is "could not read"
+            st.update(next_at=now + CI_RETRY_S, error="%s: %s" % (type(e).__name__, str(e)[:120]))
+
+    def _save():
+        memo.update({k: st[k] for k in _PHONE_KEYS if k in st})
+        try:
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            with io.open(cache, "w", encoding="utf-8") as fh:
+                json.dump(st, fh, indent=1)
+            memo["unsaved"] = False
+        except OSError:
+            memo["unsaved"] = True
+
+    ok_at = float(st.get("ok_at") or 0)
+    if now - ok_at > CI_STALE_S:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {
+            "repo": AU.REPO, "error": st.get("error") or "never read",
+            "last_good_read_h": round((now - ok_at) / 3600.0, 1) if ok_at else None}}
+    done = sorted((r for r in (st.get("runs") or [])
+                   if r.get("status") == "completed" and r.get("conclusion") in ("success", "failure")),
+                  key=lambda r: str(r.get("created") or ""), reverse=True)
+    if not done:
+        if dirty:
+            _save()
+        return {"state": UNKNOWN, "measured": {"repo": AU.REPO, "why": "no finished build on main in the newest 20"}}
+    newest = done[0]
+    streak = done[:next((i for i, r in enumerate(done) if r["conclusion"] == "success"), len(done))]
+    green = next((r for r in done if r["conclusion"] == "success"), None)
+    measured = {"repo": AU.REPO, "newest": {k: newest.get(k) for k in ("id", "sha", "conclusion", "event", "created")},
+                "last_success": green and green.get("created"),
+                "read_h_ago": round((now - ok_at) / 3600.0, 2)}
+    if newest["conclusion"] == "failure":
+        key = str(newest.get("id"))
+        why = st.get("why") or {}
+        got = why.get(key) or {}
+        if not got or (got.get("error") and now >= float(got.get("retry_at") or 0)):
+            dirty = True
+            steps, reasons = [], []
+            try:
+                for j in get("/repos/%s/actions/runs/%s/jobs" % (AU.REPO, key)).get("jobs") or []:
+                    if j.get("conclusion") != "failure":
+                        continue
+                    steps += [str(s.get("name")) for s in (j.get("steps") or []) if s.get("conclusion") == "failure"]
+                    for a in get("/repos/%s/check-runs/%s/annotations" % (AU.REPO, j.get("id"))) or []:
+                        if a.get("annotation_level") == "failure" and a.get("message"):
+                            reasons.append(" ".join(str(a["message"]).split())[:200])
+                got = {"steps": steps[:4], "reasons": reasons[:3]}
+            except Exception as e:                               # noqa: BLE001
+                got = {"steps": [], "reasons": [], "retry_at": now + CI_RETRY_S,
+                       "error": "%s: %s" % (type(e).__name__, str(e)[:80])}
+                measured["why_error"] = got["error"]
+            st["why"] = {key: got}                               # only the newest failing run is kept
+        # THE EPISODE IS THE STREAK, NOT THE PAGE. Keyed on the first failure this reader saw after a success,
+        # kept until a success: a streak longer than the page would otherwise move its oldest visible run every
+        # read and be told again each time.
+        # A success between two reads ends the old streak even if it was never the newest at a read: the
+        # red_key is then not among this streak's runs while a success is on the page.
+        if (not st.get("red_key") or (green is not None
+                                      and st["red_key"] not in {str(r.get("id")) for r in streak})):
+            st["red_key"] = str(streak[-1].get("id"))
+            dirty = True
+        measured.update(failing_steps=got.get("steps") or [], reasons=got.get("reasons") or [],
+                        failed_runs=len(streak), failing_since=streak[-1].get("created"),
+                        failing_since_is=("at least" if len(streak) == len(done) else "exact"))
+        episode = "red:%s" % st["red_key"]
+        text = ("The phone build has failed %s%d time(s) since %s. The newest (%s) failed at step \"%s\": %s. The "
+                "phone keeps the build from %s until one succeeds, so the highway's rebuild requests change nothing "
+                "until this is fixed."
+                % ("at least " if measured["failing_since_is"] == "at least" else "", len(streak),
+                   measured["failing_since"], newest.get("created"),
+                   ", ".join(measured["failing_steps"]) or "not named",
+                   "; ".join(measured["reasons"]) or "the runner gave no reason", measured["last_success"] or "before"))
+        state = PRESENT
+    else:
+        if st.get("red_key"):
+            st["red_key"] = None
+            dirty = True
+        episode, text, state = None, "The phone build succeeded again (%s)." % newest.get("created"), ABSENT
+    if episode != st.get("told"):
+        if episode or st.get("told"):
+            try:
+                said = tell(text[:600], "highway: the phone build (phone_build_failed)")
+            except Exception as e:                               # noqa: BLE001 -- a direct line that raises is a refusal
+                said = None
+                measured["tell_error"] = "%s: %s" % (type(e).__name__, str(e)[:80])
+            measured["told"] = "said" if said else "refused by the direct line"
+        st["told"] = episode                  # said once, refused or not: a refusal is not retried every round
+        dirty = True
+    if dirty:
+        _save()
+    return {"state": state, "measured": measured}
+
+
+def _sweep_running():
+    """Is a covenant_one.py sweep in flight on this machine? Read from the process list, never guessed."""
+    import subprocess
+    ps = ("@(Get-CimInstance Win32_Process -Filter \"name like '%python%'\" | Where-Object { $_.CommandLine -like '*covenant_one.py*' }).Count")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=60)
+        return int((p.stdout or "0").strip() or 0) > 0
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None                                  # could not read the process list: the caller says UNKNOWN, never evicts
+
+
+def detect_stale_test_mesh(health=None, ports=(6000, 6020, 6060)):
+    """Test nodes (run_node.py --port 60x0) answering while no sweep is running.
+
+    2026-09-21, his words: "Fix the test nodes but tetsu needs to begin handling
+    these fixes also well between him and pc." A sweep stopped mid-suite left
+    its three test nodes on 6000/6020/6060 running under a staging directory
+    that no longer existed; the next sweep would have failed on the ports and
+    a person had to end them by hand. The condition is two measurements that
+    must agree: a node answers /health on a 60x0 port AND no covenant_one.py
+    process exists. A sweep in flight owns its test nodes; this never touches
+    them then. Production is 50x0 and is never in the pattern.
+    """
+    import socket
+    import urllib.request
+    # A214b (2026-09-21, his word: "Optimize"). MEASURED: this detector was
+    # 6.09 s of the highway's 10.78 s of sensing -- 56% of it -- and the
+    # highway is 10.7 s of the watchdog's 14.6-second pass, every sixty
+    # seconds. All of it was waiting: a SYN to a closed 60x0 port is dropped
+    # rather than refused on this machine, so each urlopen sat out ~2.0 s
+    # three times over. A socket connect answers the same question -- is
+    # anything listening at all -- in 0.36 s when nothing is, and in under
+    # 18 ms when something is (measured over three tries on 5000/5020/5060,
+    # slowest 17.6 ms). The 0.35 s budget is ~20x the slowest live connect.
+    # The VERDICT is unchanged: a port that connects is still asked /health,
+    # and only a 200 counts as a node. Nothing that was detected before is
+    # missed now; what is skipped is the wait for a port with nothing on it.
+    up = []
+    for port in ports:
+        probe = socket.socket()
+        probe.settimeout(0.35)
+        try:
+            listening = probe.connect_ex(("127.0.0.1", port)) == 0
+        except OSError:
+            listening = False
+        finally:
+            probe.close()
+        if not listening:
+            continue
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:%d/health" % port, timeout=3) as r:
+                if r.status == 200:
+                    up.append(port)
+        except Exception:                                        # noqa: BLE001
+            continue
+    if not up:
+        return {"state": ABSENT, "measured": {"test_ports_up": []}}
+    running = _sweep_running()
+    if running is None:
+        return {"state": UNKNOWN, "measured": {"test_ports_up": up, "error": "the process list could not be read; whether a sweep owns them is not known"}}
+    if running:
+        return {"state": ABSENT, "measured": {"test_ports_up": up, "note": "a sweep is running and owns them"}}
+    return {"state": PRESENT, "measured": {"test_ports_up": up, "sweep_running": False}}
+
+
+THREATS = os.path.join(HERE, "ops", "security_threats.jsonl")
+
+
+def _defender_detections(hours=24):
+    """Windows Defender's own detection history for the last `hours`, as rows; None when unreadable."""
+    import subprocess
+    # A217: the NAME comes too, not only the id. Get-MpThreatDetection carries
+    # ThreatID and no name, so the name is joined from Get-MpThreat -- and the
+    # name is what says whether a verdict was a signature match or a
+    # machine-learning guess (the `!ml` suffix), which is half of what decides
+    # whether covenant_provenance may settle a hit without him.
+    ps = ("$t=(Get-Date).AddHours(-%d); $names=@{}; Get-MpThreat -ErrorAction SilentlyContinue | ForEach-Object { $names[[string]$_.ThreatID]=[string]$_.ThreatName }; "
+          "Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.InitialDetectionTime -gt $t } | "
+          "ForEach-Object { [pscustomobject]@{ t=$_.InitialDetectionTime.ToString('s'); id=[string]$_.ThreatID; ok=[bool]$_.ActionSuccess; "
+          "threat=[string]$names[[string]$_.ThreatID]; "
+          "process=[string]$_.ProcessName; resources=(($_.Resources) -join ' | ') } } | ConvertTo-Json -Compress" % int(hours))
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=90)
+        if p.returncode != 0:
+            return None
+        txt = (p.stdout or "").strip()
+        if not txt:
+            return []
+        d = json.loads(txt)
+        return d if isinstance(d, list) else [d]
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def detect_defender_threat(health=None):
+    """The machine's own antivirus found something in the last day.
+
+    2026-09-21, his words: "virus protection showed a trojan ensure spyware
+    cannot survive our enviroment and we can track where it came from". The
+    same afternoon Defender flagged Trojan:Win32/Wacatac.B!ml on a staged copy
+    of llama-gguf-split.exe that the sweep had written to a temp directory;
+    the zip it came from hashed to the digest GitHub publishes for llama.cpp
+    release b11057 (byte for byte the published build), the tool is one the
+    covenant never runs, and the runner no longer stages that folder. What
+    this detector does: read Defender's detection history, name each hit
+    with its file, the process that wrote it and whether Defender acted, keep
+    it in ops/security_threats.jsonl, and say PRESENT so the direct line
+    hears it. No remedy is attached: the quarantine is Defender's; deciding a
+    heuristic hit is a false positive is a person's, with the hash in hand.
+    """
+    rows = _defender_detections(24)
+    if rows is None:
+        return {"state": UNKNOWN, "measured": {"error": "Defender's detection history could not be read (no Defender, or PowerShell refused)"}}
+    if not rows:
+        return {"state": ABSENT, "measured": {"detections_24h": 0}}
+    kept = []
+    try:
+        seen = set()
+        try:
+            with io.open(THREATS, encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        seen.add(json.loads(line).get("key"))
+                    except ValueError:
+                        continue
+        except OSError:
+            pass
+        with io.open(THREATS, "a", encoding="utf-8") as fh:
+            for r in rows:
+                key = "%s|%s|%s" % (r.get("t"), r.get("id"), str(r.get("resources"))[:120])
+                # A217: the NAME is recorded beside the id. The ledger carried only
+                # the number, so a reader (and the provenance judge) could not tell a
+                # signature match from a machine-learning guess without looking it up.
+                row = {"key": key, "t": r.get("t"), "threat_id": r.get("id"), "threat": r.get("threat"),
+                       "acted": r.get("ok"), "process": r.get("process"),
+                       "resources": str(r.get("resources"))[:400], "recorded": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+                kept.append(row)
+                if key not in seen:
+                    fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+    # A217 (2026-09-21, his words: "Delete the anti-virus and have the system
+    # act as one"). The antivirus stays -- nothing here scans a file as it runs
+    # and deleting the only thing that does would leave him with nothing. What
+    # the covenant CAN take over is the JUDGEMENT. This used to end with "the
+    # hash against the publisher is a person's next step"; he should not have to
+    # hold the hash. covenant_provenance answers it from the bytes: a hit is
+    # SETTLED only when the file is a member of an archive that still matches
+    # what its publisher published AND the verdict was a machine-learning guess
+    # (`!ml`). A signature match, a foreign path, a file in this tree with no
+    # registered archive, and a file with the right NAME but the wrong bytes all
+    # still reach him. Defender remains the senses; this is the judgement.
+    judged, unsettled = [], []
+    try:
+        _prov = importlib.import_module("covenant_provenance")
+        for r in (kept or rows):
+            j = _prov.judge_detection(r)
+            judged.append(j)
+            if not j.get("settled"):
+                unsettled.append(j)
+    except Exception as e:                                       # noqa: BLE001
+        return {"state": PRESENT, "measured": {"detections_24h": len(rows), "newest": kept[0] if kept else rows[0],
+                                               "note": "provenance could not be judged (%s: %s) -- every hit stands"
+                                                       % (type(e).__name__, str(e)[:80])}}
+    if judged and not unsettled:
+        return {"state": ABSENT, "measured": {
+            "detections_24h": len(rows), "all_settled": True,
+            "settled": [{"path": j["path"], "says": j["says"]} for j in judged][:6],
+            "note": "every detection is a machine-learning verdict on a file this repository can account for "
+                    "by hash against its publisher. Defender still acted on each; nothing was waved through blind."}}
+    return {"state": PRESENT, "measured": {"detections_24h": len(rows), "newest": (unsettled or judged or [None])[0],
+                                           "needs_you": len(unsettled),
+                                           "note": "%d of %d detection(s) could NOT be settled by provenance and are his"
+                                                   % (len(unsettled), len(judged))}}
+
+
+def _defender_status():
+    """Windows Defender's own posture: real-time on, signature age, scan ages. None when unreadable."""
+    import subprocess
+    ps = ("Get-MpComputerStatus -ErrorAction Stop | Select-Object RealTimeProtectionEnabled, AntivirusEnabled, "
+          "AntivirusSignatureAge, QuickScanAge, FullScanAge, AMServiceEnabled | ConvertTo-Json -Compress")
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, capture_output=True, text=True, timeout=90)
+        if p.returncode != 0 or not (p.stdout or "").strip():
+            return None
+        d = json.loads(p.stdout.strip())
+        return d if isinstance(d, dict) else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+SIGNATURE_MAX_DAYS = 3
+SCAN_MAX_DAYS = 14
+
+
+def detect_defense_lapse(health=None):
+    """The machine's own defense has lapsed: real-time protection off, signatures stale, or no scan in
+    a fortnight; and the covenant's own wire is seeing refusals it should name.
+
+    2026-09-21, his words: "need the most advanced defender and anti spyware defense that
+    will ever exist ensure it constantly adapts to protect the mycelal network". What adapts
+    here is measurement: the probe set grows from what the forum sends (A176), the antivirus'
+    findings reach the record (A201), the wire admits by single-use signature (A200) and its
+    refusals are counted here by address. What is NOT here, on purpose: turning protection on
+    is the operator's own system setting, and this file names that lapse rather than reaching
+    into it. A348g: the other two lapses have had a remedy since this detector was written
+    (e2bb49b, "with a bounded auto-fix"): refresh_defender updates the signatures through
+    covenant_immune.update()'s judged update and scans our own tree, never Defender's settings.
+    """
+    st = _defender_status()
+    refusals = {}
+    try:
+        import covenant_mycelium as _my
+        cutoff = time.time() - 86400
+        with io.open(_my.LEDGER, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if r.get("kind") != "refused":
+                    continue
+                try:
+                    at = time.mktime(time.strptime(str(r.get("t", ""))[:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
+                except (ValueError, OverflowError):
+                    at = 0
+                if at >= cutoff:
+                    refusals[r.get("addr") or "?"] = refusals.get(r.get("addr") or "?", 0) + 1
+    except (OSError, ImportError):
+        pass
+    if st is None:
+        return {"state": UNKNOWN, "measured": {"error": "Defender's status could not be read", "wire_refusals_24h": refusals}}
+    lapses = []
+    if not st.get("RealTimeProtectionEnabled"):
+        lapses.append("real-time protection is OFF")
+    if not st.get("AMServiceEnabled", True):
+        lapses.append("the antimalware service is not running")
+    sig = st.get("AntivirusSignatureAge")
+    if isinstance(sig, (int, float)) and sig > SIGNATURE_MAX_DAYS:
+        lapses.append("signatures are %d days old" % sig)
+    scans = [a for a in (st.get("QuickScanAge"), st.get("FullScanAge")) if isinstance(a, (int, float))]
+    if scans and min(scans) > SCAN_MAX_DAYS:
+        lapses.append("no scan in %d days" % min(scans))
+    noisy = {a: n for a, n in refusals.items() if n >= 20}
+    if noisy:
+        lapses.append("the wire refused %s" % ", ".join("%s x%d" % kv for kv in sorted(noisy.items())))
+    measured = {"real_time": bool(st.get("RealTimeProtectionEnabled")), "signature_age_days": sig,
+                "quick_scan_age_days": st.get("QuickScanAge"), "full_scan_age_days": st.get("FullScanAge"),
+                "wire_refusals_24h": refusals, "lapses": lapses}
+    return {"state": PRESENT if lapses else ABSENT, "measured": measured}
+
+
+def _tetsu_readiness(ready=None):
+    """covenant_model.readiness(), or the injected stand-in; (dict, error)."""
+    try:
+        if ready is None:
+            import covenant_model
+            ready = covenant_model.readiness
+        return ready() or {}, None
+    except Exception as e:                                       # noqa: BLE001
+        return None, "%s: %s" % (type(e).__name__, str(e)[:160])
+
+
+def detect_tetsu_cannot_answer(health=None, ready=None):
+    """Tetsu cannot answer: nothing is loaded and the smallest weights do not fit, or no runtime/weights.
+
+    A276 (2026-10-06, his words: "get the road green and start expanding the highway"). The keeper's own
+    readiness() has said this since A252 (10-04), but only the daily cycle read it, once a day, as
+    "tetsu:cannot_answer"; the hourly road never did. It is a READ of covenant_model.readiness(): it starts,
+    stops and frees nothing. A348g: since A287 (2026-10-06) one remedy answers it, trim_idle_apps
+    (AUTO_REVERSIBLE, at most hourly; H1tt pins the pairing): it trims idle background apps' working sets,
+    never the app in front of him, never Python or the model server, and closes nothing.
+    What to CLOSE to free memory stays his (A252), and anything touching the model is NEVER_AUTOMATIC."""
+    r, err = _tetsu_readiness(ready)
+    if r is None:
+        return {"state": UNKNOWN, "measured": {"error": err}}
+    v = str(r.get("verdict", "")).upper()
+    measured = {k: r.get(k) for k in ("verdict", "why", "free_gb", "needs_gb", "smallest") if r.get(k) is not None}
+    if v == "FAIL" and r.get("needs_gb") is not None:
+        # the memory case: this machine has his runtime and weights, and not the room to load them
+        return {"state": PRESENT, "measured": measured}
+    if v == "FAIL":
+        # no runtime or no weights: a clone or CI runner, where Tetsu does not live -- not a condition here
+        measured["note"] = "this machine has no runtime or weights for him; not a condition anyone here can act on"
+        return {"state": UNKNOWN, "measured": measured}
+    if v == "PASS":
+        return {"state": ABSENT, "measured": measured}
+    return {"state": UNKNOWN, "measured": measured}
+
+
+PHONE_CHECKINS = os.path.join(HERE, "ops", "phone_checkins.jsonl")
+# The phone checks in every 600 s (median of the last 3,000 gaps; p99 656 s), and only two gaps in those
+# 3,000 ran past 3 h, both real outages. 3 h is my choice, 2026-10-11 (A329), and his to move.
+PHONE_SILENT_S = 3 * 3600
+
+
+def _last_phone_checkin(path=None):
+    """The newest check-in row, read from the end of the file, or None when there is none here."""
+    path = path or PHONE_CHECKINS
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - 65536))
+            tail = fh.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(tail):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and row.get("when"):
+            return row
+    return None
+
+
+def _tailscale_phone(run=None):
+    """Tailscale's own view of the android peer: {online, last_seen} -- the wire, beside the app's silence.
+    None when the CLI is absent or does not answer within 5 s."""
+    import subprocess
+    exe = r"C:\Program Files\Tailscale\tailscale.exe" if os.name == "nt" else "tailscale"
+    try:
+        out = (run or subprocess.run)([exe, "status", "--json"], capture_output=True, text=True, timeout=5).stdout
+        for peer in (json.loads(out).get("Peer") or {}).values():
+            if str(peer.get("OS", "")).lower() == "android":
+                # never the device name: it is his identifier (the opsec guard refused it, A329)
+                return {"online": bool(peer.get("Online")), "last_seen": peer.get("LastSeen")}
+    except Exception:                                                     # noqa: BLE001
+        return None
+    return None
+
+
+def detect_phone_silent(health=None, last=None, now=None, wire=None):
+    """The phone has stopped checking in.
+
+    A329 (2026-10-11, his words: "you're supposed to ensure Tetsu stays running and communicating with the phone
+    version but there's not been any communication in a long time ... neither's connecting. I'm super confused").
+    The phone's last check-in was 2026-10-08 23:16 (battery 94%) and Tailscale last saw it 23:25. For 53 hours
+    the road read every phone BUILD and never the phone itself, so nothing told him. This reads the newest
+    check-in and, beside it, Tailscale's view of the phone, so the reading says whether the wire or the app is
+    down. No remedy: the phone is his device, and nothing here can reach it while it is silent. Its warning
+    cannot reach him through the direct line either, since that line delivers through the phone; it shows on the
+    PC's road and orbs."""
+    now = time.time() if now is None else now
+    last = _last_phone_checkin() if last is None else last
+    if not last:
+        return {"state": UNKNOWN, "measured": {"why": "no phone check-in recorded here (a clone, CI, or a PC never paired)"}}
+    age = now - float(last.get("when"))
+    measured = {"last_checkin": last.get("t"), "age_h": round(age / 3600, 1), "silent_after_h": PHONE_SILENT_S / 3600,
+                "battery": last.get("battery")}
+    w = _tailscale_phone() if wire is None else wire
+    if w:
+        measured["tailscale"] = w
+    return {"state": PRESENT if age > PHONE_SILENT_S else ABSENT, "measured": measured}
+
+
+ASKS_WINDOW_S = 7200
+ASKS_MIN = 3
+
+
+def detect_tetsu_asks_failing(health=None, rows=None, now=None):
+    """Tetsu reads as up and his answers fail: of the asks in the last ASKS_WINDOW_S, at least ASKS_MIN and at
+    least half did not answer.
+
+    A282 (2026-10-06). That morning readiness() read PASS while every ask through his door came back 503
+    ("Context size has been exceeded", A269), and at 10:24 the round's update to him timed out. The door is
+    in the core and records nothing; covenant_model.ask now writes one line per real ask (ops/model_asks.jsonl)
+    and this reads it. No ledger at all (a clone, CI, before the first ask) is UNKNOWN; no ask in the window
+    is ABSENT -- nothing asked, nothing failing. No remedy: the model is NEVER_AUTOMATIC."""
+    now = time.time() if now is None else now
+    if rows is None:
+        try:
+            import covenant_model
+            path = covenant_model.ASKS
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.readlines()[-400:]
+            rows = [json.loads(x) for x in lines if x.strip()]
+        except FileNotFoundError:
+            return {"state": UNKNOWN, "measured": {"why": "no ask has been recorded here (ops/model_asks.jsonl)"}}
+        except Exception as e:                                   # noqa: BLE001
+            return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    recent = [r for r in rows if isinstance(r, dict) and now - float(r.get("at") or 0) <= ASKS_WINDOW_S]
+    failed = [r for r in recent if not r.get("ok")]
+    measured = {"asked": len(recent), "failed": len(failed), "window_h": ASKS_WINDOW_S / 3600.0}
+    if failed:
+        measured["last_error"] = str(failed[-1].get("error") or "")[:160]
+    if len(recent) >= ASKS_MIN and len(failed) * 2 >= len(recent):
+        return {"state": PRESENT, "measured": measured}
+    return {"state": ABSENT, "measured": measured}
+
+
+def detect_model_unmanaged(health=None, ready=None):
+    """A model server answers on Tetsu's port that the keeper has no record of starting.
+
+    A276 (2026-10-06). Twice in two days: A265 (10-05, a server whose stop was refused, answering /health
+    and timing out every ask) and 10-06 07:54, when a 3B came up during an idle stop of the one-slot server,
+    and ops/model_server.json was gone. (Restated by A348b, 2026-10-14: the review read that stop line in the
+    log with its head overwritten by the 3B's first output, and the stop had removed the 3B's fresh state;
+    both are fixed in covenant_model.) Unmanaged, nothing puts it away when idle, readiness()
+    cannot say PASS, and a restart of the keeper's code never reaches it. A READ of readiness()'s `managed`;
+    no remedy -- stopping a model is NEVER_AUTOMATIC; adopting or ending it is a person's call."""
+    r, err = _tetsu_readiness(ready)
+    if r is None:
+        return {"state": UNKNOWN, "measured": {"error": err}}
+    measured = {k: r.get(k) for k in ("verdict", "why", "managed") if r.get(k) is not None}
+    if r.get("managed") is False:
+        return {"state": PRESENT, "measured": measured}
+    if str(r.get("verdict", "")).upper() in ("PASS", "FAIL"):
+        return {"state": ABSENT, "measured": measured}
+    return {"state": UNKNOWN, "measured": measured}
+
+
+DETECTORS = {
+    "node_down": detect_node_down,
+    "tetsu_cannot_answer": detect_tetsu_cannot_answer,
+    "model_unmanaged": detect_model_unmanaged,
+    "tetsu_asks_failing": detect_tetsu_asks_failing,
+    "stale_test_mesh": detect_stale_test_mesh,
+    "defender_threat": detect_defender_threat,
+    "defense_lapse": detect_defense_lapse,
+    "sweep_red": detect_sweep_red,
+    "sweep_not_current": detect_sweep_not_current,
+    "ambassador_stalled": detect_ambassador_stalled,
+    "schedule_stalled": detect_schedule_stalled,
+    "moltbook_strikes": detect_moltbook_strikes,
+    "threefold_witness": detect_threefold_witness,
+    # "public_email_exposure" RETIRED the day it was added (A306), his words 2026-10-07: "they aren't issues idgaf".
+    # The detector and its tests stay, as a record; the road does not run it.
+    "public_ci_red": detect_public_ci_red,
+    "phone_build_failed": detect_phone_build_failed,
+    "source_drift": detect_source_drift,
+    "mesh_source_split": detect_mesh_source_split,
+    "height_lag": detect_height_lag,
+    "app_build_gap": detect_app_build_gap,
+    "app_install_futile": detect_app_install_futile,
+    "judge_seat_missing": detect_judge_seat_missing,
+    "build_stale_on_pc": detect_build_stale_on_pc,
+    "phone_build_behind_core": detect_phone_build_behind_core,
+    "phone_silent": detect_phone_silent,
+    "log_bloat": detect_log_bloat,
+    "held_core_drift": detect_held_core_drift,
+    "manifest_stale": detect_manifest_stale,
+    "watchdog_stale": detect_watchdog_stale,
+    # A377's "road_stalled" is registered after its function is defined (below), so it can read this module's own
+    # ledger helpers; sense() iterates DETECTORS in insertion order, so it still runs last.
+}
+
+
+def sense(only=None, health=None):
+    """{detector: {state, measured}} -- every detector, measured now."""
+    health = _health() if health is None else health
+    out = {}
+    for name, fn in DETECTORS.items():
+        if only and name not in only:
+            continue
+        try:
+            out[name] = fn(health=health)
+        except Exception as e:                                   # noqa: BLE001
+            out[name] = {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, e)}}
+    return out
+
+
+# ----------------------------------------------------------------- repairing
+
+def _operator_choices():
+    """{target: why} -- things the operator chose, which no remedy may touch."""
+    try:
+        with open(CHOICES, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def remedy_restart_nodes(measured, dry_run=True):
+    """STATELESS: the nodes come back on the source that is on disk.
+
+    Changes no file and no database -- rolling_restart.py takes at most one node
+    down at a time and proves it is back before touching the next.
+    """
+    if dry_run:
+        return True, "would run rolling_restart.py"
+    import subprocess
+    # A240 (2026-09-28, measured 07:50): when this code runs INSIDE one of the nodes -- the
+    # Self-heal button's route, or Tetsu's HEAL line -- a synchronous rolling restart kills the
+    # process running this pass when it reaches this node, so the heal's answer is lost and the
+    # remedies after this one never run. Detached, the pass runs on while the restart proves each
+    # node back one at a time; this node goes last, and the narrower race that remains -- a slow
+    # later remedy against the restart reaching us -- is named here rather than hidden. In the
+    # watchdog's own process (no node module loaded) the old synchronous path is unchanged.
+    if "covenant_unified_v8" in sys.modules:
+        import covenant_quiet
+        log = open(os.path.join(HERE, "logs", "rolling_restart.log"), "a", encoding="utf-8", errors="replace")
+        covenant_quiet.popen_survivor([sys.executable, os.path.join(HERE, "rolling_restart.py")],
+                                      cwd=HERE, stdout=log, stderr=log)
+        return True, ("started detached (A240): this process is in the restart set, so the restart runs beside "
+                      "this pass, one node at a time, this node last; graded on the next look, logged to "
+                      "logs/rolling_restart.log")
+    p = subprocess.run([sys.executable, os.path.join(HERE, "rolling_restart.py")],
+                       cwd=HERE, capture_output=True, text=True, timeout=900, creationflags=_NOWIN)
+    return p.returncode == 0, (p.stdout or "")[-400:]
+
+
+def remedy_fetch_build(measured, dry_run=True):
+    """UNDOABLE: fetches the newest green app build into ops/app/.
+
+    It only ADDS a file and rewrites latest.json; the previous apk stays on disk,
+    so the undo is to restore the previous manifest. It installs nothing, on this
+    machine or any other.
+    """
+    if dry_run:
+        return True, "would run covenant_app_update.fetch()"
+    import covenant_app_update as AU
+    before = AU.latest() or {}
+    lines = []
+    AU.fetch(say=lines.append)
+    after = AU.latest() or {}
+    # `or bool(after)` USED TO BE HERE, and it made this return True whenever ANY
+    # build was on disk -- so "already have build 2ab1ba5" reported as a remedy
+    # that ran. It cannot fetch a build that does not exist yet, and saying so is
+    # not a failure; claiming to have acted is the fault. Now the answer is the
+    # honest one: True only when a DIFFERENT build arrived. A decline is recorded
+    # `held` by apply_remedy, with this reason on the row, and nothing waits for it.
+    got = after.get("sha7") != before.get("sha7")
+    if got:
+        return True, "; ".join(lines[-3:])
+    return False, ("nothing newer to fetch -- still on build %s; a newer APK has "
+                   "to be BUILT before it can be fetched (dispatch_phone_build), "
+                   "and the check itself is what clears build_stale_on_pc. %s"
+                   % (after.get("sha7") or "none", "; ".join(lines[-2:])))
+
+
+def remedy_rotate_log(measured, dry_run=True):
+    """UNDOABLE: renames an oversized log aside; the undo renames it back."""
+    names = []
+    for k, v in (measured or {}).items():
+        if k.startswith("over_") and isinstance(v, dict):
+            names = sorted(v)
+    if not names:
+        return False, "nothing over the limit"
+    done = []
+    for n in names:
+        src = os.path.join(HERE, "logs", n)
+        dst = src + "." + time.strftime("%Y%m%d%H%M%S")
+        if dry_run:
+            done.append("would move %s -> %s" % (n, os.path.basename(dst)))
+            continue
+        os.replace(src, dst)
+        done.append("%s -> %s (undo: rename back)" % (n, os.path.basename(dst)))
+    return True, "; ".join(done)
+
+
+def remedy_resync_held_core(measured, dry_run=True):
+    """UNDOABLE: copies the live core over the held copies (P18 V3).
+
+    Writes only files git tracks, so the undo is `git checkout -- <path>`. It
+    never touches a .PRE-vX.Y.py backup; that refusal lives in the tool itself.
+    """
+    import subprocess
+    if dry_run:
+        return True, "would run covenant_sync_held_core.py"
+    p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_sync_held_core.py")],
+                       cwd=HERE, capture_output=True, text=True, timeout=300, creationflags=_NOWIN)
+    return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-300:]
+
+
+def remedy_restart_watchdog(measured, dry_run=True):
+    """STATELESS: the watchdog comes back running the file that is on disk.
+
+    RECURSION, said out loud: when the highway runs INSIDE the watchdog this
+    remedy would kill its own process mid-round. The caller passes
+    exclude={"restart_watchdog"} there, and run_once() does it by default --
+    a rule enforced by the caller, not by this function pretending to know who
+    is calling it.
+    """
+    import subprocess
+    if dry_run:
+        return True, "would stop the running watchdog and start it from disk"
+    # %% throughout: this string is %-formatted below, and a bare '%python%'
+    # in the WMI filter blew up the first --repair run with "unsupported
+    # format character 'p'".
+    ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+          " | Where-Object { $_.CommandLine -like '%s' };"
+          " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
+          " Start-Sleep -Seconds 2;"
+          " Start-Process -FilePath '%s' -ArgumentList '%s','--interval','60'"
+          " -WorkingDirectory '%s' -WindowStyle Hidden"
+          " -RedirectStandardOutput '%s' -RedirectStandardError '%s'"
+          % (_watchdog_like(),
+             sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
+             os.path.join(HERE, "logs", "watchdog-stdout.log"),
+             os.path.join(HERE, "logs", "watchdog-stderr.log")))
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
+                       cwd=HERE, capture_output=True, text=True, timeout=300)
+    return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-200:]
+
+
+def remedy_dispatch_phone_build(measured, dry_run=True):
+    """ASYNCHRONOUS: asks the build runner for an APK carrying the core on main.
+
+    It touches a build server and nothing else -- no device, no install, no
+    money. The cost is minutes on his Actions account, declared below. The
+    build takes about ten minutes, so this remedy is marked `async`: grading it
+    a second after it starts is the exact mistake that quarantined fetch_build.
+    """
+    import covenant_app_update as AU
+    import covenant_github_judge as gh
+    if dry_run:
+        return True, "would dispatch android.yml on %s" % AU.REPO
+    # A141: same as covenant_app_update.fetch -- the A21 gate closed this too,
+    # and a remedy that cannot get a credential reports "nothing done this
+    # pass" forever while phone_build_behind_core stays PRESENT. Dispatching a
+    # build of the operator's own app from the operator's own PC is the
+    # maintenance they scheduled. Same residual: AU.REPO is hardcoded, so on a
+    # clone this targets the owner's repository (A142).
+    gh.allow_credential_store("covenant_highway.dispatch_phone_build -- the "
+                              "operator's own app build, on the operator's own PC")
+    tok = gh.token()
+    if not tok:
+        return False, "no GitHub credential on this PC"
+    body = json.dumps({"ref": "main"}).encode()
+    req = urllib.request.Request(
+        "https://api.github.com/repos/%s/actions/workflows/android.yml/dispatches" % AU.REPO,
+        data=body, method="POST",
+        headers={"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json",
+                 "Content-Type": "application/json", "User-Agent": "covenant-highway"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.status in (200, 201, 204), "dispatch accepted (HTTP %d); the build takes ~10 min" % r.status
+    except urllib.error.HTTPError as e:
+        return False, "dispatch refused: HTTP %d %s" % (e.code, e.read()[:120].decode("utf-8", "replace"))
+    except Exception as e:                                       # noqa: BLE001
+        return False, "%s: %s" % (type(e).__name__, e)
+
+
+def remedy_rehash_bundle(measured, dry_run=True):
+    """UNDOABLE: rewrite MANIFEST.sha256 -- but only over a clean tree.
+
+    The hook's reasoning is the constraint: verify_bundle hashes the WORKING
+    TREE, so writing the manifest while tracked files are modified records a
+    claim about content no commit contains. So this refuses unless the only
+    tracked modification is the manifest itself. On a dirty tree it says so and
+    leaves the condition standing, which is the honest outcome -- a person is
+    mid-change and the manifest is theirs to settle.
+
+    A255 (2026-10-04): "the only tracked modification" became "no file the
+    manifest HASHES differs from HEAD" -- outputs it never hashes no longer
+    count, and verify_bundle.py --write-if-clean=HEAD answers, by name.
+    """
+    import subprocess
+    # A255 (2026-10-04): "clean" now means what the manifest needs, asked of
+    # verify_bundle itself -- every file it HASHES is on disk as HEAD holds it.
+    # The `git status` test that stood here counted every dirty tracked file,
+    # including the outputs the manifest never hashes (the nightly models, the
+    # ledgers), so with those modified -- most of every day -- this remedy
+    # could never run and manifest_stale stood until a person committed by hand
+    # (de33671, 2026-09-28: "so the manifest repair can run"). A change in
+    # flight to a hashed file still refuses, by name, exactly as before.
+    args = [sys.executable, os.path.join(HERE, "verify_bundle.py"), "--write-if-clean=HEAD"]
+    r = subprocess.run(args + (["--dry"] if dry_run else []), cwd=HERE, capture_output=True,
+                       text=True, timeout=300, creationflags=_NOWIN)
+    said = ((r.stdout or "") + (r.stderr or "")).strip()
+    if r.returncode == 3:
+        return False, said.splitlines()[-1][:240] if said else "left alone"
+    if dry_run:
+        return r.returncode == 0, ("would run verify_bundle.py --write: every hashed file is as HEAD holds it"
+                                   if r.returncode == 0 else said[-160:])
+    return r.returncode == 0, said[-160:]
+
+
+def remedy_schedule_watchdog_restart(measured, dry_run=True):
+    """ASYNCHRONOUS, and the only remedy the watchdog may use on itself.
+
+    restart_watchdog kills its caller, so the scheduled pass excludes it --
+    which left the watchdog stale after every commit that touched a module it
+    imports, waiting for a person. That is the opposite of the point.
+
+    This hands the job to a DETACHED process that waits five seconds and then
+    does the stop-and-start, so the round that asked for it finishes normally
+    and the replacement happens a moment later. Being killed is not a hazard
+    for the watchdog -- rolling_restart and the guard already do exactly that,
+    and it writes its state as it goes rather than at the end.
+    """
+    import subprocess
+    # 2026-09-16: the kill was reliable and the START was not. Four times that
+    # day covenant_watchdog_guard.py found "no live watchdog PID" with a gap of
+    # 200-294s -- meaning this remedy had killed the watchdog and left NOTHING
+    # running until the guard noticed, three to five minutes later, with the
+    # nodes unwatched the whole time. logs/watchdog-stderr.log was created and
+    # stayed 0 bytes, which is what a -Redirect that opens but never gets a
+    # process looks like: covenant_prod.bat starts the watchdog under a cmd
+    # wrapper holding those same log files with >>, and Start-Process cannot
+    # always take the handle straight after the kill.
+    #
+    # The check above (rc after 0.5s) proves the RESTARTER launched. It cannot
+    # prove a watchdog exists, because by then this process is gone. So the
+    # verification moves inside the script: start, wait, count; if none is
+    # alive, start again WITHOUT the redirects, which is the part that fails;
+    # then write what actually happened to logs/watchdog_restart_last.json so
+    # a failure is observable instead of silent. Verify the effect, not the
+    # invocation -- the rule this file states and this remedy was missing.
+    # $like (A160): THIS tree's watchdog by absolute path -- see _watchdog_like.
+    # A staged copy of this file must never be able to stop the production one.
+    inner = (" $py='%s'; $wd='%s'; $here='%s'; $out='%s'; $err='%s';"
+             " $marker='%s'; $like='%s'; $fb=0;"
+             " Start-Sleep -Seconds 5;"
+             " $w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+             " | Where-Object { $_.CommandLine -like $like };"
+             " $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force };"
+             " Start-Sleep -Seconds 2;"
+             " try { Start-Process -FilePath $py -ArgumentList $wd,'--interval','60'"
+             " -WorkingDirectory $here -WindowStyle Hidden"
+             " -RedirectStandardOutput $out -RedirectStandardError $err }"
+             " catch { };"
+             " Start-Sleep -Seconds 4;"
+             " $a=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+             " | Where-Object { $_.CommandLine -like $like };"
+             " if ($a.Count -eq 0) { $fb=1;"
+             "   try { Start-Process -FilePath $py -ArgumentList $wd,'--interval','60'"
+             "   -WorkingDirectory $here -WindowStyle Hidden } catch { };"
+             "   Start-Sleep -Seconds 4;"
+             "   $a=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+             "   | Where-Object { $_.CommandLine -like $like } };"
+             " $o=[ordered]@{"
+             " at=((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'));"
+             " alive=$a.Count; fallback_used=$fb };"
+             " $o | ConvertTo-Json -Compress | Set-Content -Path $marker"
+             " -Encoding utf8"
+             % (sys.executable, os.path.join(HERE, "covenant_watchdog.py"), HERE,
+                os.path.join(HERE, "logs", "watchdog-stdout.log"),
+                os.path.join(HERE, "logs", "watchdog-stderr.log"),
+                os.path.join(HERE, "logs", "watchdog_restart_last.json"),
+                _watchdog_like()))
+    if dry_run:
+        return True, "would schedule a detached restart in 5s"
+    # CREATE_NO_WINDOW, not DETACHED_PROCESS, and the difference is not
+    # cosmetic: the first version used DETACHED_PROCESS and the child never ran
+    # at all -- measured with a marker file, twice -- while this function
+    # cheerfully returned "scheduled". A remedy that reports success it has not
+    # observed is the failure mode this whole file exists to avoid, so the
+    # spawn is now CHECKED: half a second later, a process that has already
+    # exited is reported as the failure it is.
+    try:
+        proc = subprocess.Popen(
+            ["powershell", "-NoProfile", "-Command", inner], cwd=HERE,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as e:                                       # noqa: BLE001
+        return False, "%s: %s" % (type(e).__name__, e)
+    time.sleep(0.5)
+    rc = proc.poll()
+    if rc is not None:
+        return False, "the restarter exited immediately (rc %s) -- nothing was scheduled" % rc
+    return True, "restart scheduled in 5s (pid %d); this round finishes first" % proc.pid
+
+
+def remedy_install_on_phone(measured, dry_run=True):
+    """PROPOSE_ONLY, permanently. The person holding the phone confirms an
+    install; nothing here may do it for them, and the engine refuses this class
+    outright rather than trusting this function to behave."""
+    return False, "a person taps this one: open /m on the phone"
+
+
+# MUTUAL BENEFIT IS DECLARED, NOT INFERRED. Every remedy says who gains, who
+# bears the cost, and what cannot be taken back. Declared data can be wrong and
+# can be argued with; a number derived by this file from its own assumptions
+# would only sound objective. The proposal a PROPOSE_ONLY remedy raises carries
+# this block verbatim, so the person deciding reads the cost in the same breath
+# as the benefit.
+MAX_TARGETED_RERUN = 5     # more than this is a broken tree, not a gap
+
+
+def remedy_rerun_unclean(measured, dry_run=True):
+    """Re-run ONLY the suites that measured nothing. Never the whole sweep.
+
+    THE LINE THIS MUST NOT CROSS, and the operator was asked to hold me to it:
+    this remedy may restart the WORLD; it may never edit a CHECK. It runs
+    processes. It does not open a test, does not move a threshold, does not
+    mark a suite deliberately-off. Restarting a downed node fixes reality;
+    editing a suite fixes the scoreboard, and only one of those is repair.
+
+    WHY TARGETED. The full sweep is ~14 minutes; the suites that produced no
+    tally are seconds. A loop that repays the whole bill to close a small gap
+    is the token waste the operator named on 2026-09-17. It heals the gap.
+
+    WHY IT MAY REPORT FAILURE AND THAT IS CORRECT. If the suites are still
+    unclean afterwards the cause is not transient, and this says so rather than
+    retrying. A self-healing loop that cannot fail honestly is a loop that
+    launders red into green by repetition.
+
+    NEVER writes to ONE_RUN.txt or ONE_SWEEP.txt. Those are G12's evidence of
+    when the suites last ran, and a targeted re-run of two suites is not that.
+    Overwriting them with a partial run destroyed G12's evidence once already.
+    """
+    unclean = [s for s in (measured.get("unclean") or []) if s.endswith(".py")]
+    if not unclean:
+        return False, ("the sweep is red but named no unclean suite -- the "
+                       "cause is checks that FAILED, and a re-run is not the "
+                       "answer to a real failure")
+    if len(unclean) > MAX_TARGETED_RERUN:
+        return False, ("%d unclean suites is a broken tree, not a gap -- "
+                       "refusing to paper over it: %s"
+                       % (len(unclean), ", ".join(unclean[:MAX_TARGETED_RERUN])))
+    if dry_run:
+        return True, "would re-run only: %s" % ", ".join(unclean)
+
+    import subprocess
+    out = os.path.join(HERE, "ops", "sweep_heal_last.txt")
+    try:
+        p = subprocess.run([sys.executable, os.path.join(HERE, "covenant_one.py"),
+                            "--only"] + unclean + ["--out", out],
+                           cwd=HERE, capture_output=True, text=True, timeout=1800, creationflags=_NOWIN)
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the re-run could not be started: %s: %s" % (type(e).__name__, e)
+
+    import re
+    txt = (p.stdout or "") + (p.stderr or "")
+    still = []
+    m = re.search(r"^\s*suites not clean\s+\d+\s*->\s*(.+)$", txt, re.M)
+    if m:
+        still = [s.strip() for s in m.group(1).split(",") if s.strip()]
+    # BOTH readings, always. The red is recorded beside the green, so the loop
+    # can never make itself look good by forgetting what it found.
+    was = ", ".join(unclean)
+    if still:
+        return False, ("was unclean: %s | still unclean after a targeted "
+                       "re-run: %s -- not transient, and not mine to fix"
+                       % (was, ", ".join(still)))
+    return True, ("was unclean: %s | clean on a targeted re-run -- the sweep's "
+                  "reading was transient. Full verdict still needs a full "
+                  "sweep; this only closes the gap." % was)
+
+
+SWEEP_HEAL = os.path.join(HERE, "ops", "sweep_heal_last.txt")   # rerun_unclean's targeted re-run transcript
+
+
+def _sweep_cmdlines():
+    """Command lines of a covenant_one.py already running on this PC (any caller: the daily, a person,
+    this remedy). Windows only; elsewhere [] -- and the remedy below runs only where it can look.
+
+    A289 (2026-10-06): this was first written (A278) under the name _sweep_running, which A200-A203 already
+    defined above, returning True/False/None. The later definition replaced it for every caller, and
+    remedy_evict_test_mesh's `_sweep_running() is not False` saw an empty list, never False: from 2c6eb3c until
+    this rename, it refused every eviction as though a sweep owned the test nodes. Its own name now."""
+    try:
+        import covenant_daily
+        return covenant_daily._processes("covenant_one.py")
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
+def _sweep_launch(cmd, log_path):
+    import covenant_quiet
+    out = open(log_path, "a", encoding="utf-8")
+    return covenant_quiet.popen_survivor(cmd, cwd=HERE, stdout=out, stderr=out)
+
+
+def remedy_run_full_sweep(measured, dry_run=True):
+    """ASYNCHRONOUS: run the full sweep (covenant_one.py) on the core that is on disk now.
+
+    A278 (2026-10-06). After a core landing the newest sweep speaks for code that is gone. This starts one
+    sweep, detached (launch_survivor's breakaway path), and the next passes grade it once it has written a
+    verdict: sweep_not_current clears whichever way it came out, and a FAIL is then sweep_red's to say.
+    It writes only the sweep's own outputs. It declines -- which spends nothing (A261) -- when a sweep is
+    already running, when it cannot tell, when it is called from a test or from inside a sweep, and off
+    Windows, where it cannot look for a running one."""
+    import sys as _sys
+    m = measured or {}
+    if "verdict" in m:
+        # A289 (2026-10-06): serving sweep_red -- ONLY a red a clean targeted re-run has already shown transient.
+        # rerun_unclean proves it ("clean on a targeted re-run ... Full verdict still needs a full sweep") and
+        # nothing started that sweep, so a 504 from a public website held the road red until the next morning.
+        import re as _re
+        art = os.path.join(HERE, str(m.get("artifact") or "ONE_RUN.txt"))
+        try:
+            fresh = os.path.getmtime(SWEEP_HEAL) > os.path.getmtime(art)
+            heal = io.open(SWEEP_HEAL, encoding="utf-8", errors="replace").read() if fresh else ""
+        except OSError:
+            fresh, heal = False, ""
+        if not fresh:
+            return False, "sweep_red: no targeted re-run since this sweep -- rerun_unclean speaks first"
+        if not _re.search(r"^\s*suites not clean\s+0\b", heal, _re.M):
+            return False, "sweep_red: the targeted re-run was not clean -- a real failure is not a full sweep's to paper over"
+    if os.name != "nt":
+        return False, "not on Windows: cannot see whether a sweep is already running, so none is started"
+    prog = os.path.basename(str(_sys.argv[0] if _sys.argv else "") or "")
+    if prog.startswith("test_") or os.environ.get("COVENANT_ONE_TRANSCRIPT") or os.environ.get("COVENANT_INSECURE_MOCK_JUDGE"):
+        return False, "called from a test or from inside a sweep; a sweep is never started from there"
+    running = _sweep_cmdlines()
+    if running is None:
+        return False, "could not list running processes; not starting a second sweep blind"
+    if running:
+        return False, "a sweep is already running (%s); it will speak for the core" % running[0][:120]
+    if dry_run:
+        return True, "would start covenant_one.py on core %s (the newest sweep measured %s)" % (
+            (measured or {}).get("disk_core"), (measured or {}).get("transcript_core"))
+    py = os.path.join(HERE, ".venv", "Scripts", "python.exe")
+    if not os.path.isfile(py):
+        py = _sys.executable
+    try:
+        p = _sweep_launch([py, os.path.join(HERE, "covenant_one.py")], os.path.join(HERE, "logs", "sweep_remedy.log"))
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the sweep could not be started: %s: %s" % (type(e).__name__, e)
+    return True, "started covenant_one.py (pid %s) on core %s; ~40 min; graded once it writes its verdict" % (
+        getattr(p, "pid", "?"), (measured or {}).get("disk_core"))
+
+
+TRIM_APPS = ("ChatGPT", "msedge", "msedgewebview2", "codex", "claude", "Widgets", "SearchHost")
+
+
+def _trim_runner(names, dry_run):
+    """Windows: empty the working sets of the named background apps, never the one in front of him. Returns a
+    dict {trimmed, foreground, before_gb, after_gb} or raises."""
+    import subprocess
+    ps = ("Add-Type -Namespace CovHw -Name T -MemberDefinition '[DllImport(\"psapi.dll\")] public static extern bool "
+          "EmptyWorkingSet(System.IntPtr h); [DllImport(\"user32.dll\")] public static extern System.IntPtr "
+          "GetForegroundWindow(); [DllImport(\"user32.dll\")] public static extern uint GetWindowThreadProcessId("
+          "System.IntPtr h, out uint pid);'; "
+          "$fg = 0; [void][CovHw.T]::GetWindowThreadProcessId([CovHw.T]::GetForegroundWindow(), [ref]$fg); "
+          "$fgName = (Get-Process -Id $fg -ErrorAction SilentlyContinue).ProcessName; "
+          "$b = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory; $n = 0; "
+          "foreach ($p in Get-Process -Name %s -ErrorAction SilentlyContinue) { if ($p.ProcessName -eq $fgName) { continue }; "
+          "%s }; Start-Sleep -Seconds 3; $a = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory; "
+          "@{trimmed=$n; foreground=$fgName; before_gb=[math]::Round($b/1MB,2); after_gb=[math]::Round($a/1MB,2)} | ConvertTo-Json -Compress"
+          % (",".join("'%s'" % n for n in names),
+             "$n++" if dry_run else "try { if ([CovHw.T]::EmptyWorkingSet($p.Handle)) { $n++ } } catch {}"))
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=90,
+                       creationflags=0x08000000)
+    return json.loads(r.stdout.strip() or "{}")
+
+
+def remedy_trim_idle_apps(measured, dry_run=True):
+    """Make room for Tetsu by trimming idle background apps' working sets -- nothing closes, and their pages come
+    back the moment they are used.
+
+    A287 (2026-10-06). His words on 2026-10-04 (A252): "also find a way to safely ensure tetsus operation". That
+    day nothing fit for Tetsu to load; on 2026-10-06 it happened three times, and each time this trim, done by
+    hand, took free memory from 1.6 to 3.3-3.4 GB and his model loaded on the next ask. A252 left "what to CLOSE"
+    to him, and that stands: nothing here closes anything. Only the memory case (the keeper names free vs needed),
+    only TRIM_APPS, never the app in front of him, at most once an hour."""
+    m = measured or {}
+    if m.get("needs_gb") is None or m.get("free_gb") is None:
+        return False, "not the memory case: nothing a trim can help"
+    if os.name != "nt":
+        return False, "not Windows: no working sets to trim here"
+    try:
+        got = _trim_runner(TRIM_APPS, dry_run)
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the trim could not run: %s: %s" % (type(e).__name__, str(e)[:120])
+    if dry_run:
+        return True, "would trim %s background app process(es), not %s (in front of him); free %s GB, needs %s GB" % (
+            got.get("trimmed"), got.get("foreground") or "?", m.get("free_gb"), m.get("needs_gb"))
+    return True, "trimmed %s background app process(es), not %s (in front of him): free %s -> %s GB; needs %s GB" % (
+        got.get("trimmed"), got.get("foreground") or "?", got.get("before_gb"), got.get("after_gb"), m.get("needs_gb"))
+
+
+def remedy_evict_test_mesh(measured, dry_run=True):
+    """STATELESS: end the leftover TEST nodes (run_node.py --port 60x0) of a sweep that is not running.
+
+    The match is the port range the sweep uses for its test mesh (6000-6090)
+    plus the script name, and the detector has already proved no sweep owns
+    them; production nodes are 50x0 and cannot match. A160's lesson stands in
+    the other direction here: a glob on the bare script name would match
+    production, so the port is part of the pattern.
+    """
+    import subprocess
+    ports = [int(p) for p in (measured or {}).get("test_ports_up") or []]
+    if not ports:
+        return False, "nothing to evict: no test port is up"
+    if dry_run:
+        return True, "would end the test nodes on %s" % ", ".join(str(p) for p in ports)
+    if _sweep_running() is not False:            # True: a sweep owns them; None: not known -- either way, no eviction
+        return False, "a sweep may own them (started since the measurement, or the process list could not be read); nothing ended"
+    ps = ("$w=@(Get-CimInstance Win32_Process -Filter \"name like '%%python%%'\")"
+          " | Where-Object { $_.CommandLine -match 'run_node\\.py --port 60[0-9]0 ' };"
+          " $n=$w.Count; $w | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; $n")
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN, cwd=HERE, capture_output=True, text=True, timeout=120)
+    return p.returncode == 0, ("ended %s process(es)" % (p.stdout or "").strip()[-8:]) if p.returncode == 0 else (p.stderr or "")[-200:]
+
+
+def remedy_refresh_defender(measured, dry_run=True):
+    """STATELESS: refresh Defender's signatures and start a quick scan -- the two lapses a machine
+    can mend by itself. Real-time protection OFF is a person's setting and is NAMED, not changed
+    (2026-09-21, his words: "auto fix issues incase im not available": what can be mended
+    without touching his settings is; the rest reaches him)."""
+    import subprocess
+    lapses = list((measured or {}).get("lapses") or [])
+    mendable = [x for x in lapses if x.startswith("signatures are") or x.startswith("no scan in")]
+    if not mendable:
+        return False, "nothing here is mine to mend (%s)" % ("; ".join(lapses)[:160] or "no lapse")
+    if dry_run:
+        return True, "would refresh signatures and start a quick scan for: " + "; ".join(mendable)
+    # A219 (2026-09-21, his words: "Defender should now be run by our system
+    # locally any updates must pass our logic and reason"). The update is no
+    # longer a fire-and-forget PowerShell line. It goes through
+    # covenant_immune.update(), which reads every version BEFORE, pulls the
+    # update, reads them AFTER, and judges: a version that moved BACKWARDS,
+    # protection that went off, or a service that stopped is a REFUSED verdict
+    # -- recorded and named to him, not a silent success. The scan follows only
+    # when the update did not fail, and it is pointed at OUR OWN TREE, which is
+    # the part of this machine the covenant is answerable for.
+    try:
+        IM = importlib.import_module("covenant_immune")
+        verdict = IM.update()
+    except Exception as e:                                       # noqa: BLE001
+        return False, "the judged update could not run: %s: %s" % (type(e).__name__, str(e)[:120])
+    if verdict.get("verdict") in ("REFUSED", "FAILED"):
+        return False, "the update did NOT pass our judgement: %s" % str(verdict.get("why"))[:180]
+    try:
+        ok_s, says_s = IM.scan(HERE, timeout=1800)
+        scanned = "; a scan of our own tree %s" % ("ran" if ok_s else "was refused (" + str(says_s)[:60] + ")")
+    except Exception as e:                                       # noqa: BLE001
+        scanned = "; the scan could not be started (%s)" % type(e).__name__
+    return True, "update %s -- %s%s (for: %s)" % (verdict.get("verdict"), str(verdict.get("why"))[:120],
+                                                  scanned, "; ".join(mendable))
+
+
+REMEDIES = {
+    "refresh_defender": {"fn": remedy_refresh_defender, "klass": AUTO_REVERSIBLE,
+                         "for": ["defense_lapse"], "kind": "stateless",
+                         "touches": ["Defender's signature update, judged by covenant_immune.update(), and a scan of our own tree; never its settings"],
+                         "benefit": {"gains": ["stale signatures are refreshed without waiting for him", "a fortnight without a scan ends"],
+                                     "cost": ["minutes of CPU for the scan; a network fetch for the signatures"],
+                                     "irreversible": []}},
+    "evict_test_mesh": {"fn": remedy_evict_test_mesh, "klass": AUTO_REVERSIBLE,
+                        "for": ["stale_test_mesh"], "kind": "stateless",
+                        "touches": ["test nodes on ports 6000-6090"],
+                        "benefit": {"gains": ["the next sweep finds its ports free", "no person ends a stray process by hand"],
+                                    "cost": ["nothing kept: a test mesh holds no chain anyone keeps"],
+                                    "irreversible": []}},
+    "rerun_unclean": {"fn": remedy_rerun_unclean, "klass": AUTO_REVERSIBLE,
+                      "for": ["sweep_red"], "kind": "stateless",
+                      # A290 (2026-10-06): its clean re-run cannot clear sweep_red by itself -- only the full sweep
+                      # it now hands to run_full_sweep (A289) can. Graded at once, it read "did not fix" every time
+                      # and was quarantined, which then blocked the chain. Graded after the full sweep has had time.
+                      "async_for": ["sweep_red"], "grade_after_s": 5400.0,
+                      "touches": ["ops/sweep_heal_last.txt"],
+                      "benefit": {"gains": ["a suite that measured NOTHING is made to measure",
+                                            "red that is transient clears; red that is real is named"],
+                                  "cost": ["the seconds those suites take, never the full ~14 min sweep"],
+                                  "irreversible": []}},
+    # A287 (2026-10-06): room for Tetsu, by trimming idle background apps; nothing closes (A252: closing is his).
+    "trim_idle_apps": {"fn": remedy_trim_idle_apps, "klass": AUTO_REVERSIBLE,
+                       "for": ["tetsu_cannot_answer"], "kind": "stateless", "cooldown_s": 3600,
+                       "touches": ["idle background apps' working sets (pages return on use; nothing closes)"],
+                       "benefit": {"gains": ["Tetsu can load and answer again without a person freeing memory"],
+                                   "cost": ["a background app pages back in when he next uses it -- a moment's lag, "
+                                            "never the app in front of him"],
+                                   "irreversible": []}},
+    # A377's "break_stall" is registered after its function is defined (below).
+    # A278 (2026-10-06): a sweep of the core on disk, at most once in SWEEP_BUDGET_S, graded once it wrote.
+    "run_full_sweep": {"fn": remedy_run_full_sweep, "klass": AUTO_REVERSIBLE,
+                       "for": ["sweep_not_current", "sweep_red"], "kind": "stateless",
+                       "async": True, "cooldown_s": 6 * 3600, "grade_after_s": 3600.0,
+                       "touches": ["the sweep's transcript (ONE_RUN.txt)", "this PC's CPU for ~40 min"],
+                       "benefit": {"gains": ["the road's verdict speaks for the code that is running",
+                                             "a landing is measured the same hour, not the next morning"],
+                                   "cost": ["~40 min of CPU beside Tetsu and the nodes, at most once in 6 h"],
+                                   "irreversible": []}},
+    "restart_nodes": {"fn": remedy_restart_nodes, "klass": AUTO_REVERSIBLE,
+                      "for": ["source_drift", "node_down"], "kind": "stateless",
+                      # A240: inside a node the restart runs detached and finishes after this
+                      # pass, so grading it against an immediate re-sense would read "did not
+                      # fix" twice and quarantine a remedy that works (the detect_source_drift
+                      # docstring's own warning). Graded after the rolling restart has had time
+                      # to prove all three back.
+                      "async_for": ["source_drift", "node_down"], "grade_after_s": 180.0,
+                      "touches": ["nodes"],
+                      "benefit": {"gains": ["the mesh runs the code that is on disk",
+                                            "a node that is down answers again"],
+                                  "cost": ["one node unreachable for a few seconds, one at a time"],
+                                  "irreversible": []}},
+    "fetch_build": {"fn": remedy_fetch_build, "klass": AUTO_REVERSIBLE,
+                    "for": ["build_stale_on_pc", "phone_build_behind_core"],
+                    # An hour, because this is retried hourly and it can only
+                    # clear phone_build_behind_core once a NEWER green build
+                    # exists to fetch. Judging it sooner grades the build runner,
+                    # not the remedy.
+                    "async_for": ["phone_build_behind_core"], "grade_after_s": 3600.0,
+                    "kind": "undoable",
+                    "undo": "restore the previous ops/app/latest.json",
+                    "touches": ["ops/app"],
+                    "benefit": {"gains": ["the newest build is here when the phone asks"],
+                                "cost": ["~45 MB of disk and one authenticated download"],
+                                "irreversible": []}},
+    "rotate_log": {"fn": remedy_rotate_log, "klass": AUTO_REVERSIBLE,
+                   "for": ["log_bloat"], "kind": "undoable",
+                   "undo": "rename the rotated file back", "touches": ["logs"],
+                   "benefit": {"gains": ["the disk stops filling", "the log stays readable"],
+                               "cost": ["a reader must look in the rotated file for older lines"],
+                               "irreversible": []}},
+    "resync_held_core": {"fn": remedy_resync_held_core, "klass": AUTO_REVERSIBLE,
+                         "for": ["held_core_drift"], "kind": "undoable",
+                         "undo": "git checkout -- pending-v8.38/covenant_unified_v8.py",
+                         "touches": ["held copies of the core"],
+                         "benefit": {"gains": ["P18 stops failing on a copy nobody made",
+                                               "one version names one set of bytes again"],
+                                     "cost": ["a tracked file is rewritten; git holds the previous bytes"],
+                                     "irreversible": []}},
+    "restart_watchdog": {"fn": remedy_restart_watchdog, "klass": AUTO_REVERSIBLE,
+                         "for": ["watchdog_stale"], "kind": "stateless",
+                         "touches": ["the watchdog process"],
+                         "benefit": {"gains": ["the checks that are deployed are the checks running (P14)"],
+                                     "cost": ["a gap of a few seconds with nothing watching the nodes"],
+                                     "irreversible": []}},
+    "dispatch_phone_build": {"fn": remedy_dispatch_phone_build, "klass": AUTO_REVERSIBLE,
+                             "for": ["phone_build_behind_core"], "kind": "stateless",
+                             # The build takes about ten minutes; thirty is the
+                             # window, so a slow runner is not graded as a failure
+                             # and a build that never arrives still is.
+                             # A261-WINDOW (2026-10-05): thirty minutes graded the
+                             # wrong thing. The condition clears only when
+                             # fetch_build has COLLECTED the APK, and fetch runs
+                             # on its own hour. The dispatches of 09-28 15:14 and
+                             # 10-03 08:41 both built: their APKs reached the PC at
+                             # 16:21 and 09:17 (ops/app/), after "did not fix" at
+                             # 15:45 and 09:11 -- and the two misgrades quarantined
+                             # the phone's only route to a new core. Two hours
+                             # covers build plus a fetch cycle; a build that never
+                             # arrives is still graded so.
+                             "async": True, "cooldown_s": 86400, "grade_after_s": 7200.0,
+                             "touches": ["the build runner"],
+                             "benefit": {"gains": ["an APK carrying the core that is on main",
+                                                   "the phone's auto-update has something newer to find"],
+                                         "cost": ["about ten minutes of his GitHub Actions account"],
+                                         "irreversible": []}},
+    "rehash_bundle": {"fn": remedy_rehash_bundle, "klass": AUTO_REVERSIBLE,
+                      "for": ["manifest_stale"], "kind": "undoable",
+                      "undo": "git checkout -- MANIFEST.sha256",
+                      "touches": ["the delivery manifest"],
+                      "benefit": {"gains": ["the sweep's integrity phase means something again",
+                                            "\"gates BLOCKED\" stops being permanent furniture"],
+                                  "cost": ["one tracked file rewritten, to be carried by the next commit"],
+                                  "irreversible": []}},
+    "schedule_watchdog_restart": {"fn": remedy_schedule_watchdog_restart,
+                                  "klass": AUTO_REVERSIBLE, "for": ["watchdog_stale"],
+                                  # A scheduled restart lands in minutes; fifteen
+                                  # is the window. A286: and the noise window too --
+                                  # never a second restart before the first is graded.
+                                  "kind": "stateless", "async": True, "grade_after_s": 900.0, "noise_s": 900.0,
+                                  "touches": ["the watchdog process"],
+                                  "benefit": {"gains": ["the watchdog runs the modules that are on disk, without a person"],
+                                              "cost": ["a few seconds with nothing watching the nodes"],
+                                              "irreversible": []}},
+    "install_on_phone": {"fn": remedy_install_on_phone, "klass": PROPOSE_ONLY,
+                         "for": ["app_build_gap", "app_install_futile"], "kind": "needs a person",
+                         "touches": ["the phone"],
+                         "benefit": {"gains": ["the phone stops running a build that cannot update itself",
+                                               "the mesh stops running two sources (A20)"],
+                                     "cost": ["a person's attention, and a moment of the phone's node being down"],
+                                     "irreversible": ["an installed build replaces the one that is there"]}},
+}
+
+
+PROBATION_AFTER_S = 86400     # A293: a quarantined remedy may try once more a day after its last failure
+
+
+def quarantine_state(name, ledger=None, now=None):
+    """('ok' | 'quarantined' | 'probation', time of the last counted failure or None).
+
+    A remedy measured failing QUARANTINE_AFTER times is quarantined. Reset by a measured success, or by an
+    explicit `recalibrated` row -- see recalibrate(). Never by deleting history.
+
+    PROBATION (A293, 2026-10-06, his words: "keep expanding the highway"). A quarantine had no way back but a
+    person: restart_nodes, quarantined on 2026-10-02 over stale pins fixed days before, refused every
+    source_drift for four days (A292). Now, PROBATION_AFTER_S after its last failure, a quarantined remedy is
+    offered ONE attempt: a success clears it as any success does; a failure renews the quarantine for another
+    day. At most one retry a day, each marked in the ledger. Every other refusal still applies."""
+    now = time.time() if now is None else now
+    fails, last_fail = 0, None
+    for row in read_ledger(ledger):
+        if row.get("remedy") != name:
+            continue
+        if row.get("outcome") in ("fixed", "recalibrated"):
+            fails, last_fail = 0, None
+        elif row.get("outcome") == "did not fix":
+            fails += 1
+            last_fail = float(row.get("at") or 0) or last_fail
+    if fails < QUARANTINE_AFTER:
+        return "ok", last_fail
+    if last_fail is not None and now - last_fail >= PROBATION_AFTER_S:
+        return "probation", last_fail
+    return "quarantined", last_fail
+
+
+def quarantined(name, ledger=None, now=None):
+    """A remedy measured failing QUARANTINE_AFTER times is not offered -- except on probation (A293)."""
+    return quarantine_state(name, ledger, now)[0] == "quarantined"
+
+
+def recalibrate(name, why, ledger=None):
+    """Clear a quarantine that measured the wrong thing, on the record.
+
+    The first live pass quarantined fetch_build after two runs that both did
+    exactly what they should: it was being graded against app_build_gap -- "the
+    phone is behind" -- which fetching cannot clear. The counter was right
+    about the pairing and wrong about the remedy. This writes WHY the count no
+    longer applies, so the reset is auditable rather than invisible; the
+    failures stay in the file above it.
+    """
+    return write_ledger({"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1),
+                         "remedy": name, "outcome": "recalibrated", "why": why}, ledger)
+
+
+# ----------------------------------------------------------------- the road watching itself (A377)
+#
+# His words, 2026-10-19: "get it right look at past issues and you and tetsu find a constantly healing fix", then
+# "that he can handle alone". The record holds the same failure ten times (A155, A259, A261, A286, A289, A290,
+# A292, A295, A376, and A293's day-long probation): a condition stayed PRESENT while every remedy for it was held --
+# quarantined by a grading mistake, waiting out a cooldown, or waiting on another remedy -- and each time a PERSON
+# found it by reading this ledger, hours or days later, and fixed that one instance. Replayed over the whole ledger
+# (2026-09-16 to 10-19) the definition below finds 52 such runs of two hours or more, among them every case above
+# and A376's own shape on 10-07, 10-08 and 10-15 that nobody had noticed. Nothing watched the road's PROGRESS.
+#
+# road_stalled reads this ledger: a condition whose newest unbroken run of live rows has no remedy that RAN, for
+# STALL_AFTER_S or more. break_stall answers the stalls held only by the road's own soft hold -- a quarantine -- with
+# one retry of the held remedy, the quarantine lifted for that attempt and the noise hour skipped; every other gate
+# stands (class, NEVER_AUTOMATIC, his choices, stateless-or-undo, a declared budget). Retries back off: 2, 4, 8,
+# 16 h, then once a day. A stall held by anything else -- a remedy that declined on its own grounds, one waiting on
+# another (A376's shape), a person's decision -- is not retried: it stays PRESENT and is told once (A367's alert
+# push), with the chain of holds, which is what Tetsu asked for: "keep the road in the stall state" and say so.
+
+STALL_AFTER_S = 2 * 3600       # Tetsu, 2026-10-19: "Two hours seems reasonable"
+STALL_GAP_S = 3 * 3600         # rows further apart than this belong to different episodes
+STALL_LOOKBACK_S = 3 * 86400
+STALL_BACKOFF_CAP_S = 86400
+_ACTED = ("fixed", "started", "did not fix")
+
+
+def _hold_kind(row):
+    """'quarantine' (the road's own soft hold, retryable), 'self-wait' (a remedy waiting on another), 'person'
+    (a proposal: a person decides), or 'declined' (the remedy's own grounds)."""
+    w = str(row.get("why") or row.get("detail") or "")
+    if row.get("outcome") == "proposed":
+        return "person"
+    if w.startswith("quarantined:"):
+        return "quarantine"
+    if "speaks first" in w:
+        return "self-wait"
+    return "declined"
+
+
+def stalls(rows, now=None, stall_after_s=STALL_AFTER_S, gap_s=STALL_GAP_S):
+    """Every detector whose NEWEST unbroken run of live ledger rows (gaps under gap_s, the newest within gap_s of
+    now) holds no remedy that ran, lasting stall_after_s or more. A run of proposals alone is a person's decision,
+    not a stall. road_stalled's own rows are never counted (the road does not stall on watching itself)."""
+    import collections
+    now = time.time() if now is None else now
+    by = collections.defaultdict(list)
+    for r in rows:
+        d = r.get("detector")
+        if (not d or d == "road_stalled" or r.get("dry_run") or r.get("repeat")
+                or r.get("outcome") in ("recalibrated", "correction") or not r.get("at")):
+            continue
+        by[d].append(r)
+    out = []
+    for d, rs in sorted(by.items()):
+        rs.sort(key=lambda r: float(r["at"]))
+        if now - float(rs[-1]["at"]) >= gap_s:
+            continue                       # no longer being worked on: it cleared, or nothing is offered
+        run = []
+        for r in reversed(rs):
+            if run and float(run[-1]["at"]) - float(r["at"]) >= gap_s:
+                break
+            if r.get("ran") is True or r.get("outcome") in _ACTED:
+                break
+            run.append(r)
+        if not run or now - float(run[-1]["at"]) < stall_after_s:
+            continue
+        if all(x.get("outcome") == "proposed" for x in run):
+            continue
+        holds = {}
+        for x in reversed(run):            # oldest first, so the newest reason per remedy is the one kept
+            holds[x.get("remedy")] = {"kind": _hold_kind(x), "why": str(x.get("why") or x.get("detail") or "")[:160]}
+        out.append({"detector": d, "since": run[-1].get("t"), "since_at": float(run[-1]["at"]),
+                    "hours": round((now - float(run[-1]["at"])) / 3600.0, 1), "rows": len(run), "holds": holds})
+    return out
+
+
+def detect_road_stalled(health=None, rows=None, now=None, ledger=None):
+    """The road itself is stuck: a condition PRESENT for STALL_AFTER_S while every repair for it was held and none
+    ran, held by the road's own holds (a quarantine, or one remedy waiting on another). Stalls held only by a
+    remedy's own grounds or a person's decision are reported in 'waiting', not PRESENT: their own detector already
+    says so. break_stall answers this one."""
+    now = time.time() if now is None else now
+    if rows is None:
+        path = ledger or LEDGER
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = fh.readlines()
+        except OSError as e:
+            # Rule 9: a ledger it cannot read is UNDETERMINED, never "nothing is stalled". The road's own progress
+            # is exactly what it cannot see here.
+            return {"state": UNKNOWN, "measured": {"why": "the highway ledger cannot be read: %s" % e}}
+        out = []
+        for line in raw:
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if float(r.get("at") or 0) >= now - STALL_LOOKBACK_S:
+                out.append(r)
+        rows = out
+    st = stalls(rows, now)
+    road = [s for s in st if any(h["kind"] in ("quarantine", "self-wait") for h in s["holds"].values())]
+    measured = {"stalled": road, "waiting": [{"detector": s["detector"], "hours": s["hours"],
+                                              "why": sorted({h["why"][:90] for h in s["holds"].values()})[:2]}
+                                             for s in st if s not in road],
+                "stall_after_h": STALL_AFTER_S / 3600.0}
+    if ledger:
+        measured["_ledger"] = ledger
+    if road:
+        measured["why"] = "; ".join("%s red %.1f h, nothing ran: %s" % (
+            s["detector"], s["hours"], ", ".join("%s %s" % (k, v["kind"]) for k, v in s["holds"].items()))
+            for s in road)
+    return {"state": PRESENT if road else ABSENT, "measured": measured}
+
+
+def _stall_backoff_s(n_before):
+    return min(STALL_AFTER_S * (2 ** max(0, n_before)), STALL_BACKOFF_CAP_S)
+
+
+def remedy_break_stall(measured, dry_run=True):
+    """STATELESS: one retry of each quarantined remedy the road is stalled on, through apply_remedy with
+    stall_break=True -- the quarantine lifted for that attempt and the noise hour skipped; every other gate stands.
+    Backs off per (remedy, condition): 2, 4, 8, 16 h, then daily. A stall held by anything but a quarantine is not
+    the road's to retry: declined, with the chain, so road_stalled stays PRESENT and is told."""
+    m = measured or {}
+    ledger = m.get("_ledger")
+    rows = read_ledger(ledger)
+    now = time.time()
+    targets, waits, later = [], [], []
+    for s in m.get("stalled") or []:
+        for rem, h in (s.get("holds") or {}).items():
+            r = REMEDIES.get(rem) or {}
+            # A377b (2026-10-19, from Moltbook m/general, AiiCLI "Agent retries multiply damage when tools lose
+            # acknowledgements"): a retry on an action with a real-world side effect can REPEAT that action when the
+            # first outcome was ambiguous. break_stall only ever retries a STATELESS remedy (one that changes no file
+            # or database -- a restart, a re-measure, a re-run), so a repeat is harmless by construction. A future
+            # stateful remedy added to the AUTO_REVERSIBLE set must never be auto-retried here; this makes that
+            # explicit rather than relying on the reader.
+            if h.get("kind") != "quarantine" or r.get("klass") != AUTO_REVERSIBLE or r.get("kind") != "stateless":
+                why = h.get("why", "")[:90]
+                if r.get("kind") != "stateless" and r.get("klass") == AUTO_REVERSIBLE and h.get("kind") == "quarantine":
+                    why = "not retried: a stateful remedy's retry could repeat its action (A377b)"
+                waits.append("%s/%s: %s" % (s["detector"], rem, why))
+                continue
+            # retries since this remedy last FIXED something (or was recalibrated), within the lookback: a retry
+            # ends the stall's run, so counting within one run would reset the backoff every time
+            reset = max([float(x.get("at") or 0) for x in rows if x.get("remedy") == rem
+                         and x.get("outcome") in ("fixed", "recalibrated")] + [now - STALL_LOOKBACK_S])
+            prior = [x for x in rows if x.get("remedy") == rem and x.get("detector") == s["detector"]
+                     and x.get("stall_break") and float(x.get("at") or 0) > reset]
+            if prior and now - max(float(x["at"]) for x in prior) < _stall_backoff_s(len(prior) - 1):
+                later.append("%s/%s (retry %d waits %.0f h)" % (s["detector"], rem, len(prior) + 1,
+                                                                 _stall_backoff_s(len(prior) - 1) / 3600.0))
+                continue
+            targets.append((s["detector"], rem))
+    if not targets:
+        return False, ("nothing a retry can break%s%s" % (
+            (" -- waiting on their own grounds or a person: " + "; ".join(waits)) if waits else "",
+            (" -- backing off: " + ", ".join(later)) if later else ""))
+    if dry_run:
+        return True, "would retry once, quarantine lifted: %s" % ", ".join("%s/%s" % t for t in targets)
+    done, ran_any = [], False
+    for d, rem in targets:
+        cond = DETECTORS[d]() if d in DETECTORS else {"state": UNKNOWN, "measured": {}}
+        if cond.get("state") != PRESENT:
+            done.append("%s: no longer present" % d)
+            continue
+        row = apply_remedy(rem, cond, d, dry_run=False, ledger=ledger, stall_break=True)
+        ran_any = ran_any or bool(row.get("ran"))
+        done.append("%s/%s %s" % (d, rem, row.get("outcome")))
+    return ran_any, "; ".join(done)
+
+
+# A377: registered here, after the functions and the two dicts exist (the dicts are defined above this block).
+DETECTORS["road_stalled"] = detect_road_stalled
+REMEDIES["break_stall"] = {"fn": remedy_break_stall, "klass": AUTO_REVERSIBLE,
+                           "for": ["road_stalled"], "kind": "stateless", "noise_s": 900,
+                           "touches": ["another remedy's quarantine, lifted for one retry; the noise hour skipped "
+                                       "for it"],
+                           "benefit": {"gains": ["a remedy quarantined by a grading mistake is tried again within "
+                                                 "hours, not days, and without a person reading the ledger"],
+                                       "cost": ["one more run of a remedy that may fail again; backed off to once a "
+                                                "day"],
+                                       "irreversible": []}}
+
+
+def _recent_identical(name, detector, ledger=None, within_s=None, include_dry=True):
+    """The last row for this (remedy, detector) if it is younger than the cooldown.
+
+    A DRY RUN IS NOT AN ATTEMPT (2026-09-25). With include_dry=False -- a real
+    repair asking -- rows that only rehearsed are passed over. Measured that
+    evening: a test's dry pass wrote "restart_nodes ... dry run" into the live
+    ledger at 18:45:50, and for the next hour every real pass printed "last dry
+    run ... nothing done this pass" while three nodes ran a stale core. A
+    rehearsal still holds another rehearsal, so the ledger stays quiet.
+
+    The first hour of live running wrote the same proposal row every 66 seconds,
+    twenty-four times, each one re-loading the judge to re-ask a question whose
+    answer had not changed. A ledger that repeats itself is a ledger nobody
+    reads, and an alert nobody reads is A60's defect. Repeats are skipped, not
+    written, and the condition still surfaces through run_once's return.
+    """
+    within_s = ROW_COOLDOWN_S if within_s is None else within_s
+    now = time.time()
+    for row in reversed(read_ledger(ledger)):
+        if row.get("remedy") == name and row.get("detector") == detector:
+            if row.get("dry_run") and not include_dry:
+                continue
+            return row if (now - float(row.get("at", 0))) < within_s else None
+    return None
+
+
+def _recent_spend(name, detector, ledger=None, within_s=None, include_dry=True):
+    """The last row for this (remedy, detector) that SPENT -- the remedy ran -- if it is younger than
+    within_s, else None. A refusal, a hold or a proposal spends nothing (A261)."""
+    within_s = ROW_COOLDOWN_S if within_s is None else within_s
+    now = time.time()
+    for row in reversed(read_ledger(ledger)):
+        if row.get("remedy") != name or row.get("detector") != detector:
+            continue
+        if row.get("dry_run") and not include_dry:
+            continue
+        if row.get("ran") is True or row.get("outcome") == "started":
+            return row if (now - float(row.get("at", 0))) < within_s else None
+    return None
+
+
+def ask_the_covenant(sentence):
+    """What this covenant's own seat says about doing a thing, in its own words.
+
+    Not a vote and not permission: the deployed student is a compressed model
+    and its own verdict text says to treat a finding as a flag to review. It is
+    here because a proposal that cites the covenant should cite the covenant
+    that is RUNNING, measured now, rather than a paragraph a session wrote.
+    HELD is reported as held -- an "I don't know" that is read as a No is how
+    an abstention becomes a veto (A132's neighbourhood).
+    """
+    try:
+        import covenant_judge_fallback as FB
+        import covenant_unified_v8 as cov
+        j = FB.FallbackJudge()
+        v = j.evaluate({"action": sentence}, cov.DIVINE_PRINCIPLES)
+        if getattr(v, "not_understood", False):
+            verdict = "held -- no finding"
+        elif getattr(v, "is_violation", False) or getattr(v, "violates", False):
+            verdict = "flagged for review"
+        else:
+            verdict = "clean"
+        return {"seat": getattr(v, "judge_id", "?"), "verdict": verdict,
+                "said": str(getattr(v, "reasoning", ""))[:240],
+                "principles_put_to_it": len(cov.DIVINE_PRINCIPLES)}
+    except Exception as e:                                       # noqa: BLE001
+        return {"seat": "unavailable", "verdict": UNKNOWN,
+                "said": "%s: %s" % (type(e).__name__, e), "principles_put_to_it": 0}
+
+
+def propose(name, condition, detector, r=None):
+    """The fields a PROPOSE_ONLY remedy contributes to its ledger row."""
+    r = r or REMEDIES.get(name) or {}
+    sentence = "%s: %s, because %s was measured %s here" % (
+        name, (r.get("kind") or "?"), detector, (condition or {}).get("state", UNKNOWN))
+    return {
+        "outcome": "proposed",
+        "why": "class %s is never executed by the engine -- a person decides" % r.get("klass"),
+        "measured": (condition or {}).get("measured", {}),
+        "mutual_benefit": r.get("benefit", {}),
+        "covenant": ask_the_covenant(sentence),
+        "undo": r.get("undo", "n/a (stateless)" if r.get("kind") == "stateless" else "none on record"),
+    }
+
+
+def apply_remedy(name, condition, detector, dry_run=True, ledger=None, choices=None,
+                 cooldown_s=None, stall_break=False):
+    """Run one remedy against one measured condition. Returns a ledger row.
+
+    Every refusal is a row too: a refusal nobody can see is indistinguishable
+    from a bug that swallowed the work.
+
+    stall_break (A377): called by break_stall for a condition the road has been stuck on -- the quarantine is
+    lifted for this one attempt and the noise hour skipped. Nothing else is: a declared budget, the class,
+    NEVER_AUTOMATIC, his choices and stateless-or-undo all still refuse.
+    """
+    r = REMEDIES.get(name)
+    row = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(time.time(), 1),
+           "remedy": name, "detector": detector, "dry_run": bool(dry_run)}
+    if stall_break and cooldown_s is None:
+        cooldown_s = 0                     # the noise hour only: max(0, declared) below keeps a declared budget
+    if not r:
+        row.update(outcome="refused", why="no such remedy")
+        return write_ledger(row, ledger)
+
+    # WHO GAINED AND WHO PAID -- ON EVERY ROW, NOT ONLY THE REFUSALS.
+    #
+    # The operator, 2026-09-17: "Its only dangerous without mutual benefit."
+    # That is a sharper test than the one this file was using. A quiet repair
+    # is not dangerous because it is quiet; it is dangerous when it is
+    # ASYMMETRIC -- when the system keeps running and the operator carries a
+    # false belief, having never been told the price.
+    #
+    # Measured here the same day: a REFUSAL called propose() and carried gains,
+    # cost and who pays. An APPLICATION recorded only outcome="fixed". So this
+    # loop stated the price when nothing happened and withheld it when
+    # something did -- the exact asymmetry, sitting inside the mechanism
+    # written to prevent it. The benefit now rides every row, so a repair that
+    # succeeded can still be audited for what it cost.
+    # AND IT IS MARKED AS A CLAIM, BECAUSE IT IS ONE.
+    #
+    # The operator, 2026-09-17, on whether a thing is dangerous: "That's my
+    # call." He is right, and it lands on this dict. Every gains/cost line in
+    # REMEDIES was written by me, and so was every klass -- the judgment that a
+    # remedy is safe enough to run without asking him. A benefit stated in a
+    # ledger row reads as a finding. It is not. It is an assertion awaiting his
+    # ratification, and the difference matters precisely here, because a system
+    # that grades its own benefit and then acts on that grade has closed the
+    # loop his authority is supposed to sit inside.
+    #
+    # This is CLAUDE.md rule 5 in the one place it costs something: a
+    # denominator can be measured, what COUNTS cannot. Whether the gain is
+    # worth the cost is scope, and scope is his.
+    #
+    # ops/OPERATOR_CHOICES.json is the lever and it is currently EMPTY. Nothing
+    # in this file is presently constrained by anything he has written down.
+    if isinstance(r.get("benefit"), dict):
+        row["benefit"] = dict(r["benefit"], claimed_by="claude, not ratified")
+
+    # The cooldown comes FIRST, before any work: a repeat within the hour costs
+    # a subprocess, a model load, or a download, and buys a line identical to
+    # the one above it.
+    # A remedy may ask for a longer budget than the default hour. The first one
+    # to need it is dispatch_phone_build: the hourly default would ask for up
+    # to twenty-four ten-minute CI runs a day on his account, which is his
+    # money spent by my scheduler. Once a day is what the thing is actually
+    # for -- the core does not change hourly, and nothing is waiting on it
+    # faster than a person can tap an install.
+    # A DECLARED BUDGET IS NOT NOISE SUPPRESSION. cooldown_s=0 means "a person
+    # typed --repair, do not make them wait an hour for a line they have
+    # already read" -- and it used to skip a remedy's OWN budget too, which is
+    # how one manual run of mine asked the build runner for a second
+    # ten-minute job inside twenty minutes. A budget a caller can wave away is
+    # not a budget; the hour is mine to skip, the day is not.
+    declared = r.get("cooldown_s")
+    # A286 (2026-10-06): a remedy may declare a shorter NOISE window than the engine's hour ("noise_s"). The
+    # watchdog's own restart was the case: every module a person changed left watchdog_stale PRESENT and the
+    # road red for up to an hour after the remedy had measurably worked once, because a NEW instance of the
+    # condition waited out the old row's hour.
+    noise_decl = r.get("noise_s")
+    if cooldown_s is None:
+        eff = declared if declared is not None else (noise_decl if noise_decl is not None else ROW_COOLDOWN_S)
+    elif declared is not None:
+        eff = max(cooldown_s, declared)
+    else:
+        eff = cooldown_s
+    # A261 (2026-10-05): A DECLARED BUDGET IS SPENT BY A RUN, NOT BY A REFUSAL. The build runner's day
+    # exists to spend his Actions minutes at most once a day. A quarantine refusal at 2026-10-04 23:06:51
+    # spent nothing, and it held the budget until the next night all the same, because every row counted.
+    # So a declared budget is measured from the last row that RAN; the noise cooldown (the hour, or none for
+    # a person) still counts any row, so the ledger stays quiet.
+    if declared is not None and eff:
+        noise_s = (noise_decl if noise_decl is not None else ROW_COOLDOWN_S) if cooldown_s is None else cooldown_s
+        prev = ((_recent_identical(name, detector, ledger, noise_s, include_dry=bool(dry_run)) if noise_s else None)
+                or _recent_spend(name, detector, ledger, declared, include_dry=bool(dry_run)))
+    else:
+        prev = None if eff == 0 else _recent_identical(name, detector, ledger, eff, include_dry=bool(dry_run))
+    if prev is not None:
+        out = dict(prev)
+        out["repeat"] = True
+        return out
+
+    # INVARIANT 1 -- the class, refused by the ENGINE, and then REFERRED.
+    #
+    # "when 1 happens refer to the covenant or meta data in it and mutual
+    # benefit" (2026-09-16). A bare "refused: PROPOSE_ONLY" tells the person
+    # nothing they can act on, and a refusal that explains nothing is how a
+    # safety rule turns into a wall. So the refusal is the START of a proposal:
+    # what was actually measured, what the covenant's own seat says about doing
+    # it, and who gains and who pays -- in the same row.
+    if r["klass"] != AUTO_REVERSIBLE:
+        row.update(propose(name, condition, detector, r))
+        return write_ledger(row, ledger)
+
+    # INVARIANT 1b -- THE LINE THAT DOES NOT MOVE (2026-09-16).
+    #
+    # The class is a label on a dict, and a label is one careless edit away from
+    # being wrong. These subjects are refused on what a remedy TOUCHES, whatever
+    # class it claims: money and the things that decide money, the rules and the
+    # seats that judge by them, and any act whose entire point is that a person
+    # consented to it. Flip install_on_phone to AUTO_REVERSIBLE and it still
+    # refuses here -- H1i proves exactly that.
+    #
+    # This is not timidity. An engine that can quietly widen its own remit is
+    # not repairing the system, it is replacing the person in it, and "leaves
+    # free will intact" was the requirement, not the decoration.
+    crossed = sorted({w for w in NEVER_AUTOMATIC
+                      for t in r.get("touches", []) if w in t.lower()})
+    if crossed:
+        row.update(propose(name, condition, detector, r))
+        row["why"] = ("touches %s -- refused whatever class it claims; a person decides"
+                      % ", ".join(crossed))
+        return write_ledger(row, ledger)
+
+    # INVARIANT 2 -- an operator's explicit choice.
+    choices = _operator_choices() if choices is None else choices
+    clash = sorted(set(r.get("touches", [])) & set(choices))
+    if clash:
+        row.update(outcome="refused",
+                   why="the operator chose %s: %s" % (clash[0], choices[clash[0]]))
+        return write_ledger(row, ledger)
+
+    # INVARIANT 3 -- stateless, or an undo on record.
+    if r.get("kind") != "stateless" and not r.get("undo"):
+        row.update(outcome="refused", why="changes state with no undo on record")
+        return write_ledger(row, ledger)
+
+    qstate, qlast = quarantine_state(name, ledger)
+    if qstate == "quarantined" and not stall_break:
+        row.update(outcome="refused", why="quarantined: measured not fixing it %d times" % QUARANTINE_AFTER)
+        return write_ledger(row, ledger)
+    if stall_break:
+        row["stall_break"] = ("the road was stalled on %s with this remedy %s; one retry (A377)"
+                              % (detector, "quarantined" if qstate == "quarantined" else "held"))
+    if qstate == "probation":
+        row["probation"] = ("quarantined after %d failures, the last at %s; one attempt a day until it works (A293)"
+                            % (QUARANTINE_AFTER, time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(qlast))))
+
+    before = (condition or {}).get("state")
+    ok, detail = r["fn"]((condition or {}).get("measured"), dry_run=dry_run)
+    row.update(ran=bool(ok), detail=str(detail)[:400], before=before)
+    # 2026-10-19 (attribution fix, external review): record the subset this remedy TARGETED -- the suites that were
+    # unclean when it was called -- so a remedy graded on a subset of its condition (rerun_unclean) is graded on
+    # what it actually owned, not on the whole sweep staying red for OTHER suites. See grade_started / GRADED_ON_SUBSET.
+    _uc = ((condition or {}).get("measured") or {}).get("unclean")
+    if _uc:
+        row["before_unclean"] = list(_uc)
+    if dry_run:
+        row.update(outcome="dry run", after=before)
+        return write_ledger(row, ledger)
+    # A remedy can be synchronous for one condition and asynchronous for
+    # another. fetch_build clears build_stale_on_pc the moment it runs, but it
+    # clears phone_build_behind_core only once the runner has finished making
+    # the build -- so the same function must be graded differently depending on
+    # which condition it was called for. Without this, the hourly retry while
+    # CI is still building would record two "did not fix" and quarantine it:
+    # fault 1 of the first live hour, reproduced in a new costume.
+    if r.get("async") or detector in (r.get("async_for") or ()):
+        # A REMEDY THAT DECLINED DID NOT START ANYTHING (2026-09-27). The
+        # synchronous path below has honoured ran=False since 2026-09-19 -- "a
+        # remedy that declined is not a remedy that failed" -- and this branch
+        # ignored it, so an async remedy that did nothing was filed as "started"
+        # and then, once grade_started() existed, graded "did not fix". Measured:
+        # 16 fetch_build rows saying "already have build 2ab1ba5" became 16
+        # failures and quarantined it. There is nothing to wait for when nothing
+        # began, so it is `held`, with the reason, exactly as below.
+        if not ok:
+            row.update(after=before, outcome="held")
+            return write_ledger(row, ledger)
+        # GRADED BY A LATER PASS, not by this one. A build takes ten minutes;
+        # measuring a second after the dispatch would record "did not fix"
+        # every time and quarantine a remedy that works -- which is precisely
+        # what happened to fetch_build in this file's first live hour. An
+        # outcome of "started" is not counted as a failure by quarantined().
+        # grade_started() is what keeps the second half of this promise; until
+        # 2026-09-27 nothing did, and 252 starts carried this note with no pass
+        # ever coming back for them.
+        row.update(after=before, outcome="started",
+                   note="asynchronous -- re-measured by grade_started() once the "
+                        "remedy's own window (grade_after_s) has passed")
+        return write_ledger(row, ledger)
+    after = DETECTORS[detector]()["state"] if detector in DETECTORS else UNKNOWN
+    # A REMEDY THAT DECLINED IS NOT A REMEDY THAT FAILED (2026-09-19). Every
+    # quarantine in the ledger on this date was earned by a correct refusal:
+    # rehash_bundle twice said "the tree has uncommitted tracked changes" and
+    # did nothing; restart_nodes said "already on the disk source; leaving it
+    # alone" and did nothing. Each was graded "did not fix" because the
+    # condition was still PRESENT afterwards -- which is true, and beside the
+    # point: nothing ran. Two such rows and the remedy was refused for good,
+    # so the self-heal sat inert on exactly the update-time conditions it
+    # exists for. A remedy that returned ran=False is graded "held" -- the
+    # condition and the reason both on the record -- and quarantined() does
+    # not count it. "did not fix" is reserved for a remedy that RAN and left
+    # the condition standing.
+    if not ok:
+        row.update(after=after, outcome="held")
+        return write_ledger(row, ledger)
+    row.update(after=after,
+               outcome="fixed" if (before == PRESENT and after == ABSENT) else "did not fix")
+    return write_ledger(row, ledger)
+
+
+# ----------------------------------------------------------------- the ledger
+
+def read_ledger(path=None):
+    out = []
+    try:
+        with open(path or LEDGER, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return out
+
+
+def write_ledger(row, path=None):
+    path = path or LEDGER
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return row
+
+
+# ----------------------------------------------------------------- sharing
+
+# WHAT THE LAST PASS SAW (2026-09-25, his words: "the pc app needs optimization"). The
+# PC's 3D page re-ran sense() on every uncached read -- profiled: 1.74 of a 1.83 s cold
+# read, 7.3 s on the live node under load, 1.10 s of it one process listing -- while the
+# watchdog runs the same sense() every pass and kept nothing. Each pass now leaves its
+# states here, and a reader that finds them fresh uses them instead of sensing again.
+# A write that fails is skipped: seeing is never blocked by a file.
+LAST_SENSE = os.path.join(HERE, "ops", "highway_last_sense.json")
+
+
+def save_last_sense(conditions, path=None):
+    try:
+        import durable
+        durable.write_json(path or os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE,
+                           {"at": round(time.time(), 1), "conditions": {k: (v or {}).get("state") for k, v in conditions.items()}})
+    except Exception:                                             # noqa: BLE001
+        pass
+
+
+def last_sense(max_age_s=300.0, path=None, now=None):
+    """{detector: state} from the last pass if it is under max_age_s old, else None."""
+    try:
+        with open(path or os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE, encoding="utf-8") as fh:
+            d = json.load(fh)
+        age = (now if now is not None else time.time()) - float(d.get("at", 0))
+        # -5 s, not 0 (2026-09-26): the stamp is round(time.time(), 1), which can land up to 0.05 s
+        # in the FUTURE; read back at once, the age was negative and a fresh pass was thrown away
+        # (PC1z4 flaked on exactly that, 1 run in 3).
+        return d.get("conditions") if -5 <= age <= max_age_s and isinstance(d.get("conditions"), dict) else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+# ------------------------------------------------- grading what was started
+
+# THE PROMISE THIS KEEPS (2026-09-27, his instruction: "get ... self healing right").
+#
+# apply_remedy's asynchronous branch writes outcome="started" with the note "the
+# condition is re-measured next pass". Nothing implemented the next pass. Measured
+# from ops/highway.jsonl on 2026-09-27, unit LEDGER ROWS:
+#
+#     dispatch_phone_build        11 started      0 graded
+#     fetch_build                177 started      8 graded
+#     schedule_watchdog_restart   64 started      0 graded
+#
+# 252 times this system did something and never looked to see whether it worked,
+# while --standing printed UNPROVEN beside each one and explained that "nothing
+# checks what they started". The cost was not hypothetical: detect_phone_build_failed
+# records dispatch_phone_build being told "accepted (HTTP 204)" on 09-25 and 09-26,
+# every one of those builds failing on a full artifact store, and the highway
+# dispatching into it for five days with a remedy that "looked busy".
+#
+# WHY IT WAS LEFT UNDONE, and why that reasoning was right as far as it went: a
+# build takes ten minutes, so grading a second after the dispatch records "did not
+# fix" every time and quarantines a remedy that works -- fault 1 of the first live
+# hour. The answer is not to grade sooner or never, but to grade LATE: wait past
+# the time the remedy needs, then measure. A start younger than that is left alone,
+# which is the original caution preserved rather than discarded.
+GRADE_AFTER_S = 1800.0        # default wait before an async start may be judged
+MAX_GRADED_PER_PASS = 20      # a backlog is worked off over passes, never in one burst
+
+
+def _watchdog_restarted_since(measured, started_at):
+    """watchdog_stale: the remedy worked when the OLDEST running watchdog started after it did.
+
+    detect_watchdog_stale reports the oldest creation time among the watchdog's processes,
+    so this is true only when every process that was running is gone and a new one started
+    -- a restart that left an old process alive does not count."""
+    ps = (measured or {}).get("process_started")
+    return isinstance(ps, (int, float)) and float(ps) >= float(started_at)
+
+
+# A259-GRADE: per detector, "PRESENT now, but the remedy measurably worked and this is a new
+# instance". Only detectors whose measurement can show that are listed; the rest keep the old rule.
+def _nodes_restarted_since(measured, started_at):
+    """source_drift (A295): the remedy worked when the OLDEST running node started after it did -- every node was
+    restarted -- even though the disk has moved on since and they drift again (a commit landed mid-restart)."""
+    ns = (measured or {}).get("nodes_started")
+    return isinstance(ns, (int, float)) and float(ns) >= float(started_at)
+
+
+RECURRED = {"watchdog_stale": _watchdog_restarted_since, "source_drift": _nodes_restarted_since}
+
+
+def _targeted_suites_cleared(started_row, after_measured):
+    """2026-10-19, the attribution fix (external review, DeepSeek + Gemini). A remedy that re-ran ONLY a named
+    subset of the unclean suites (rerun_unclean) did its job if THOSE suites are no longer unclean -- even when the
+    sweep stays red on OTHER suites. A290 deferred rerun_unclean's grade to 1.5h but still read sweep_red (the whole
+    sweep), so it was graded 'did not fix' for reds it never owned and quarantined although its targeted re-runs
+    came back clean. True only when the targeted set was recorded AND every suite in it has cleared; otherwise the
+    old whole-condition rule stands."""
+    targeted = started_row.get("before_unclean") or []
+    if not targeted:
+        return False
+    still = set((after_measured or {}).get("unclean") or [])
+    return all(s not in still for s in targeted)
+
+
+# Remedies graded on a SUBSET of their condition: a still-PRESENT condition is 'fixed' when the subset they owned
+# has cleared. Keyed by REMEDY (RECURRED is keyed by detector); both answer "PRESENT-again is not always failure".
+GRADED_ON_SUBSET = {"rerun_unclean": _targeted_suites_cleared}
+
+
+def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
+    """Grade asynchronous `started` rows whose remedy has had time to finish.
+
+    Returns the list of rows written (or that WOULD be written when dry_run).
+
+    An async row is graded against the detector it was started for: PRESENT then
+    and ABSENT now is `fixed`; still PRESENT is `did not fix`. UNKNOWN now is left
+    ungraded -- a read that failed is not a verdict, and calling it one would
+    quarantine a remedy for the reader's blindness.
+
+    A259-GRADE (2026-10-05): "still PRESENT" was read as "did not fix", and it is
+    not the same thing. schedule_watchdog_restart restarted the watchdog at
+    23:06:59 and 00:34:34; each time a watched file was written a few minutes
+    later, inside the grading window, and the condition was PRESENT again as a NEW
+    instance. Both were graded "did not fix", two of those quarantine a remedy,
+    and a remedy that worked twice was retired. Where a detector can tell a new
+    instance from the old one (RECURRED below), PRESENT-again after the remedy
+    measurably worked is graded `fixed`, marked `recurred`; the next pass meets
+    the new instance as a new condition. Detectors without such a test keep the
+    old rule, and that is a limit, not a verdict.
+
+    Rows before the last `recalibrated` row for a remedy are never graded. A
+    recalibration says the count no longer applies; re-grading history across it
+    would put back the failures it was written to set aside, invisibly.
+    """
+    t_now = time.time() if now is None else now
+    rows = read_ledger(ledger)
+
+    # the barrier: for each remedy, the index of its last recalibration
+    floor = {}
+    for i, row in enumerate(rows):
+        if row.get("outcome") == "recalibrated":
+            floor[row.get("remedy")] = i
+
+    pending = []
+    for i, row in enumerate(rows):
+        if row.get("outcome") != "started" or row.get("dry_run"):
+            continue
+        name, detector = row.get("remedy"), row.get("detector")
+        if i < floor.get(name, -1):
+            continue
+        if row.get("graded_at") is not None:
+            continue
+        pending.append((i, row, name, detector))
+
+    # Which starts have already been answered? A later graded row for the same
+    # (remedy, detector) answers every start BEFORE it -- that is what "graded by
+    # the next pass" meant. Anything after the newest graded row is still open.
+    newest_graded = {}
+    for i, row in enumerate(rows):
+        if row.get("outcome") in ("fixed", "did not fix"):
+            newest_graded[(row.get("remedy"), row.get("detector"))] = i
+
+    written = []
+    for i, row, name, detector in pending:
+        if i < newest_graded.get((name, detector), -1):
+            continue
+        r = REMEDIES.get(name) or {}
+        wait = float(r.get("grade_after_s") or GRADE_AFTER_S)
+        started_at = float(row.get("at") or 0)
+        waited = t_now - started_at
+        if waited < wait:
+            continue
+        after_m = None
+        if conditions is not None and detector in conditions:
+            after = (conditions[detector] or {}).get("state", UNKNOWN)
+            after_m = (conditions[detector] or {}).get("measured")
+        elif detector in DETECTORS:
+            try:
+                res = DETECTORS[detector]()
+                after, after_m = res["state"], res.get("measured")
+            except Exception:                                     # noqa: BLE001
+                after = UNKNOWN
+        else:
+            after = UNKNOWN
+        if after == UNKNOWN:
+            continue
+        before = row.get("before")
+        recurred = False
+        if before == PRESENT and after == PRESENT and detector in RECURRED:
+            try:
+                recurred = bool(RECURRED[detector](after_m, started_at))
+            except Exception:                                     # noqa: BLE001
+                recurred = False
+        subset_cleared = False
+        if before == PRESENT and after == PRESENT and name in GRADED_ON_SUBSET:
+            try:
+                subset_cleared = bool(GRADED_ON_SUBSET[name](row, after_m))
+            except Exception:                                     # noqa: BLE001
+                subset_cleared = False
+        out = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "at": round(t_now, 1),
+               "remedy": name, "detector": detector, "dry_run": bool(dry_run),
+               "before": before, "after": after,
+               "outcome": "fixed" if (before == PRESENT and (after == ABSENT or recurred or subset_cleared)) else "did not fix",
+               "graded_late": True, "started_t": row.get("t"),
+               "waited_s": round(waited, 1),
+               "why": "graded %.1f h after the start it answers; the remedy's own "
+                      "window is %.1f h" % (waited / 3600.0, wait / 3600.0)}
+        if subset_cleared:
+            out["targeted_cleared"] = True
+            out["why"] += ("; the suites it re-ran (%s) are no longer unclean -- graded on what it owned, not on "
+                           "the sweep staying red for others (2026-10-19 attribution fix)"
+                           % ", ".join(row.get("before_unclean") or []))
+        if recurred:
+            out["recurred"] = True
+            out["why"] += ("; PRESENT again as a NEW instance -- the remedy measurably worked "
+                           "(A259-GRADE): %s" % json.dumps(after_m)[:160])
+        written.append(out)
+        if not dry_run:
+            write_ledger(out, ledger)
+        if len(written) >= MAX_GRADED_PER_PASS:
+            break
+    return written
+
+
+def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None,
+             cooldown_s=None):
+    """One sense-and-repair pass. (alerts, infos) in the watchdog's shape.
+
+    `exclude` defaults to the watchdog's own restart because the intended caller
+    IS the watchdog: a remedy that kills its caller mid-round is not a repair.
+    Run from a shell, pass exclude=() and it will restart the watchdog too.
+    """
+    alerts, infos = [], []
+    conditions = sense(health=health)
+    save_last_sense(conditions)
+    # GRADE WHAT A PREVIOUS PASS STARTED, before deciding what to start now, and
+    # BEFORE the pause check below: grading is sight, not action. A paused highway
+    # still reports what it sees, and an async start left unjudged is the one thing
+    # a pass can settle without touching anything.
+    for g in grade_started(conditions, ledger=ledger, dry_run=dry_run):
+        line = ("highway: %s -> %s, %s (started %s, %s)"
+                % (g["detector"], g["remedy"], g["outcome"], g["started_t"], g["why"]))
+        (infos if g["outcome"] == "fixed" else alerts).append(line)
+    # PAUSED MEANS NO ACTION, NOT NO SIGHT (2026-09-16, the operator's
+    # instruction: "ensure they all running independent so you can pause tasks
+    # for restart and update"). The sensing above has already happened and is
+    # still reported; what stops here is every repair. A pause that also
+    # blinded the pass would make updating the highway cost the operator his
+    # visibility, which is the opposite of the point.
+    try:
+        import covenant_pause as _p
+        is_paused, why = _p.paused("highway")
+    except Exception:                                            # noqa: BLE001
+        is_paused, why = False, ""
+    if is_paused:
+        present = sorted(k for k, v in conditions.items() if v["state"] == PRESENT)
+        infos.append("highway: PAUSED (%s) -- sensing only. Present now: %s"
+                     % (why, ", ".join(present) or "nothing"))
+        return alerts, infos
+    for name, c in sorted(conditions.items()):
+        if c["state"] == UNKNOWN:
+            infos.append("highway: %s could not be measured -- %s"
+                         % (name, json.dumps(c["measured"])[:120]))
+            continue
+        if c["state"] != PRESENT:
+            continue
+        acted = False
+        for rname, r in REMEDIES.items():
+            if name not in r["for"] or rname in (exclude or ()):
+                continue
+            row = apply_remedy(rname, c, name, dry_run=dry_run, ledger=ledger,
+                               cooldown_s=cooldown_s)
+            acted = True
+            if row.get("repeat"):
+                # SAY THAT NOTHING HAPPENED. The cooldown returns the previous
+                # row, and this used to print ITS detail as though it had just
+                # happened -- "dispatch accepted (HTTP 204)" for a dispatch
+                # made four hours earlier, with no new build and no new cost.
+                # An accurate ledger under a report that misreads it is still a
+                # system that lies to its operator.
+                infos.append("highway: %s still present; %s last %s at %s -- nothing done this pass"
+                             % (name, rname, row.get("outcome", "?"), row.get("t", "?")))
+                continue
+            if row["outcome"] == "fixed":
+                infos.append("highway: %s was present; %s fixed it" % (name, rname))
+            elif row["outcome"] == "proposed":
+                alerts.append("highway: %s is present and %s is not mine to run -- %s"
+                              % (name, rname, row.get("why", "")))
+            elif row["outcome"] == "dry run":
+                infos.append("highway: %s present; %s would run (dry)" % (name, rname))
+            else:
+                alerts.append("highway: %s is present and %s %s -- %s"
+                              % (name, rname, row["outcome"], row.get("why", row.get("detail", ""))[:120]))
+        if not acted:
+            held_back = [n for n, rr in REMEDIES.items()
+                         if name in rr["for"] and n in (exclude or ())]
+            if held_back:
+                alerts.append("highway: %s is present; %s could fix it but this caller "
+                              "excluded it" % (name, ", ".join(held_back)))
+            else:
+                # CARRY THE MEASUREMENT (2026-09-18). A detector with no remedy
+                # is the honest shape for a condition somebody else has to fix
+                # -- and this line used to name only the condition, so the one
+                # alert a person can actually act on arrived with none of the
+                # numbers needed to act. mesh_source_split says which peer is
+                # on which source and when it was last heard; "nothing here
+                # repairs it" without that is a nudge, not a finding.
+                alerts.append("highway: %s is present and nothing here repairs it -- %s"
+                              % (name, json.dumps(c["measured"])[:400]))
+    return alerts, infos
+
+
+def standing(ledger=None):
+    """What each remedy CLAIMED, set against what actually happened when it ran.
+
+    THE OPERATOR, 2026-09-17: "Students surpass teachers children parents is
+    ideal. But respect remains."
+
+    The commit before this one marked every benefit claim `claimed_by "claude,
+    not ratified"`, which was honest and stopped one step short. A claim handed
+    over with no way to check it is not deference; it asks the operator to take
+    my word, which is the same asymmetry in a humbler voice. So the claims are
+    made AUDITABLE against the ledger's own record of outcomes.
+
+    THE SHAPE THIS GROWS ON is already in A126: a seat may hold, may differ by
+    temperament, may be right where the trunk is wrong -- and false clears stay
+    at zero. It may surpass. It may never clear itself. Standing here works the
+    same way: a remedy earns it by being MEASURABLY RIGHT, never by being
+    trusted more as time passes.
+
+    WHAT THIS DELIBERATELY IS NOT. Nothing in this file reads standing() to
+    decide anything, and test_p25 pins that a perfect record cannot change one
+    decision apply_remedy makes. A record that bought its own authority would
+    be a student grading its own theft. This is evidence FOR the operator's
+    ratification, and the ratification stays his.
+
+      EARNED    it ran, and every graded run fixed the condition
+      MIXED     it ran, and sometimes it did not fix it
+      FAILING   it ran, and never fixed it
+      UNPROVEN  never graded -- the honest answer, not a bad one (rule 9)
+    """
+    rows = read_ledger(ledger)
+    out = {}
+    for name, r in sorted(REMEDIES.items()):
+        mine = [x for x in rows if x.get("remedy") == name]
+        # HONOUR THE RECALIBRATION, which quarantined() already does and this did
+        # not (2026-09-27). The two disagreed: rehash_bundle and rerun_unclean each
+        # carry a `recalibrated` row saying WHY their earlier count no longer
+        # applies, so quarantined() offers them -- while this table read FAILING
+        # off the very rows the recalibration set aside, and FAILING is the loudest
+        # thing it can say about a remedy. One record, two verdicts, and the harsher
+        # one printed. Rows at or before the last recalibration stay in the file
+        # and stop deciding the verdict; `graded` names how many rows the verdict
+        # actually rests on, so "EARNED on 1" cannot read like "EARNED on 40".
+        cut = -1
+        for i, x in enumerate(mine):
+            if x.get("outcome") == "recalibrated":
+                cut = i
+        graded = [x for x in mine[cut + 1:] if not x.get("dry_run")
+                  and x.get("outcome") in ("fixed", "did not fix")]
+        fixed = sum(1 for x in graded if x.get("outcome") == "fixed")
+        missed = len(graded) - fixed
+        if not graded:
+            verdict = "UNPROVEN"
+        elif missed == 0:
+            verdict = "EARNED"
+        elif fixed == 0:
+            verdict = "FAILING"
+        else:
+            verdict = "MIXED"
+        b = r.get("benefit") or {}
+        out[name] = {"verdict": verdict, "graded": len(graded), "fixed": fixed,
+                     "did_not_fix": missed,
+                     # STARTS THAT ARE STILL OPEN, not every start ever written
+                     # (2026-09-27). This counted the lot, and the moment
+                     # grade_started() existed that became a lie in the loudest
+                     # column: fetch_build read "177 started" when all 177 sit
+                     # BEFORE its recalibration barrier and will never be graded by
+                     # design, while the footer said "nothing checks what they
+                     # started". Something does now. Open means: after the last
+                     # recalibration, and not already answered by a later grading
+                     # for the same (remedy, detector) -- which is what a pass
+                     # will pick up next time it runs.
+                     "started_ungraded": sum(
+                         1 for i, x in enumerate(mine[cut + 1:], start=cut + 1)
+                         if x.get("outcome") == "started"
+                         and not any(y.get("outcome") in ("fixed", "did not fix")
+                                     and y.get("detector") == x.get("detector")
+                                     for y in mine[i + 1:])),
+                     "started_all": sum(1 for x in mine
+                                        if x.get("outcome") == "started"),
+                     "refused": sum(1 for x in mine
+                                    if x.get("outcome") == "refused"),
+                     "claimed": list(b.get("gains") or []),
+                     "claimed_cost": list(b.get("cost") or []),
+                     "ratified": False}
+    return out
+
+
+def report(node_id=None, health=None, ledger=None):
+    """What this node offers the mesh: what it senses, and what has worked here.
+
+    Deliberately narrow. Detector names and states, remedy outcomes, nothing
+    read out of a file and nothing about money, holdings, keys or people. A
+    report is an OFFER; the receiving node re-measures before it believes a word
+    of it.
+    """
+    import covenant_unified_v8 as cov
+    conditions = sense(health=health)
+    worked = {}
+    for row in read_ledger(ledger):
+        if row.get("dry_run") or row.get("outcome") not in ("fixed", "did not fix"):
+            continue
+        w = worked.setdefault(row["remedy"], {"fixed": 0, "did not fix": 0, "for": row.get("detector")})
+        w[row["outcome"]] += 1
+    return {
+        "node": node_id or os.environ.get("COVENANT_NODE_ID") or "pc",
+        "at": round(time.time(), 1),
+        "source": cov.CORE_SOURCE_SHA12,
+        "conditions": {k: v["state"] for k, v in conditions.items()},
+        "remedies_that_worked_here": worked,
+        "offer": "data, not an instruction -- measure it yourself before acting",
+    }
+
+
+def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None):
+    """Take a peer's offer and decide LOCALLY. Returns what this node did.
+
+    INVARIANT 4: nothing here runs because a peer said so. For every condition
+    the peer reports, this node runs its OWN detector; only a condition present
+    HERE is even a candidate, and then only an AUTO_REVERSIBLE remedy runs.
+    """
+    acted = []
+    out = {"from": (peer_report or {}).get("node", "?"), "did": acted}
+    for name, state in ((peer_report or {}).get("conditions") or {}).items():
+        if name not in DETECTORS:
+            acted.append({"condition": name, "action": "ignored", "why": "no such detector here"})
+            continue
+        if state != PRESENT:
+            continue
+        local = DETECTORS[name]()
+        if local["state"] != PRESENT:
+            acted.append({"condition": name, "action": "declined",
+                          "why": "the peer has it; this node measured %s" % local["state"]})
+            continue
+        for rname, r in REMEDIES.items():
+            if name in r["for"] and r["klass"] == AUTO_REVERSIBLE:
+                row = apply_remedy(rname, local, name, dry_run=dry_run, ledger=ledger,
+                                   cooldown_s=cooldown_s)
+                acted.append({"condition": name, "action": row["outcome"], "remedy": rname})
+                break
+        else:
+            acted.append({"condition": name, "action": "raised", "why": "no AUTO_REVERSIBLE remedy"})
+    return out
+
+
+# ----------------------------------------------------------------- CLI
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="the mycelial highway: sense, repair, share")
+    ap.add_argument("--repair", action="store_true", help="apply AUTO_REVERSIBLE remedies (default is dry run)")
+    ap.add_argument("--report", action="store_true", help="print the signed-shape offer this node would share")
+    ap.add_argument("--ledger", action="store_true", help="print what has been tried here")
+    ap.add_argument("--standing", action="store_true",
+                    help="what each remedy CLAIMED, against what happened when it ran")
+    a = ap.parse_args(argv)
+
+    if a.standing:
+        st = standing()
+        print("What this system claimed for itself, and what the record says.")
+        print("Evidence for the operator's ratification. It is not authority,")
+        print("and nothing here changes a single decision the loop makes.\n")
+        # "started" is printed (2026-09-27): three asynchronous remedies had 11, 62 and 167 started rows and 0
+        # graded, and this table showed only fixed and missed -- so fetch_build read "MIXED 3/5" and the 167
+        # never-graded starts, and dispatch_phone_build's builds that all failed, did not appear at all.
+        print("%-26s %-9s %6s %7s %8s  %s"
+              % ("remedy", "verdict", "fixed", "missed", "started", "claimed gain"))
+        for k, v in st.items():
+            print("%-26s %-9s %6d %7d %8d  %s"
+                  % (k, v["verdict"], v["fixed"], v["did_not_fix"], v["started_ungraded"],
+                     (v["claimed"][0][:44] if v["claimed"] else "-")))
+        print("\nUNPROVEN is not a failing grade. It means never graded, which")
+        print("is the honest answer and the one a tool that resolves everything")
+        print("would hide. \"started\" counts asynchronous runs that are still OPEN --")
+        print("waiting out the remedy's own window before grade_started() judges them.")
+        print("Until 2026-09-27 this column counted every start ever written and said")
+        print("\"nothing checks what they started\", which was true of the machine then")
+        print("and is not now: 252 such rows were graded in the first passes, and")
+        print("schedule_watchdog_restart went from UNPROVEN to EARNED because of it.")
+        return 0
+    if a.ledger:
+        for row in read_ledger()[-40:]:
+            print("%s  %-14s %-14s %s" % (row.get("t", "?"), row.get("remedy", "?"),
+                                          row.get("outcome", "?"), row.get("why", row.get("detail", ""))[:90]))
+        return 0
+    if a.report:
+        print(json.dumps(report(), indent=1))
+        return 0
+
+    conditions = sense()
+    print("SENSE")
+    for k, v in sorted(conditions.items()):
+        print("  %-16s %-8s %s" % (k, v["state"], json.dumps(v["measured"])[:110]))
+    # WHAT A PREVIOUS PASS STARTED AND NOBODY JUDGED. Printed before REPAIR and
+    # before the early return below, because an ungraded start is news whether or
+    # not anything is present right now -- and "fixed, graded late" is exactly the
+    # row that only appears once the condition has gone.
+    graded = grade_started(conditions, dry_run=not a.repair)
+    if graded:
+        print("\nGRADED (asynchronous starts that have now had their time)"
+              + ("" if a.repair else "  -- dry run, nothing written"))
+        for g in graded:
+            print("  %-16s %-14s %-12s started %s, waited %.1f h"
+                  % (g["detector"], g["remedy"], g["outcome"], g["started_t"],
+                     g["waited_s"] / 3600.0))
+
+    present = [k for k, v in conditions.items() if v["state"] == PRESENT]
+    if not present:
+        print("\nnothing detrimental measured here")
+        return 0
+    print("\nREPAIR" + ("" if a.repair else "  (dry run -- pass --repair to act)"))
+    for name in present:
+        for rname, r in REMEDIES.items():
+            if name in r["for"]:
+                # cooldown_s=0: a person typing --repair has asked for it now,
+                # and the hourly suppressor exists for the scheduled pass, not for them.
+                row = apply_remedy(rname, conditions[name], name, dry_run=not a.repair,
+                                   cooldown_s=0)
+                # A REPEATED ROW IS NOT A THING THAT JUST HAPPENED, and this
+                # printer said it was. run_once was fixed for exactly this on
+                # 2026-09-18 -- "an accurate ledger under a report that misreads
+                # it is still a system that lies to its operator" -- and the
+                # same misreading was left standing here, in the reader a person
+                # actually types.
+                #
+                # It is not cosmetic and it is not hypothetical: `cooldown_s=0`
+                # waives the hour but NOT a remedy's own declared budget
+                # (eff = max(0, 86400) for dispatch_phone_build, deliberately,
+                # because that budget is his Actions minutes). So a plain
+                # `python covenant_highway.py` printed
+                #     dispatch_phone_build  started  dispatch accepted (HTTP 204)
+                # for a dispatch made THIRTEEN HOURS EARLIER at 07:32, with no
+                # new row in ops/highway.jsonl -- and a reader who trusted the
+                # line would believe a build had just been asked for when none
+                # had. Measured here on 2026-09-18 at 20:47, by me, before I
+                # noticed the ledger disagreed with the screen.
+                if row.get("repeat"):
+                    print("  %-16s %-14s %-10s %s" % (
+                        name, rname, "held",
+                        "within its budget -- nothing done this pass; last %s at %s"
+                        % (row.get("outcome", "?"), row.get("t", "?"))))
+                    continue
+                print("  %-16s %-14s %-10s %s" % (name, rname, row["outcome"],
+                                                  row.get("why", row.get("detail", ""))[:80]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,20 @@
+# PERSONAL MEMORY NEVER GOES IN THE REPOSITORY.
+#
+# The default store lives at ./memories, and this repo is intended to go
+# public. An imported conversation history is the most personal data on the
+# machine -- everything its owner has ever told an AI -- and a store that
+# lands in a commit cannot be un-landed: rewriting history moves the visible
+# copy, not the copies other people already cloned.
+#
+# The CODE is the shareable part. The memories are not. Keep the store
+# outside the repo entirely (AI_MEMORY_ROOT=~/ai_memory) and treat these
+# patterns as a second net, not the first one.
+memories/
+*.memories/
+audit.jsonl
+.trash/
+
+# scratch
+__pycache__/
+*.pyc
+out.txt

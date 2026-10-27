@@ -1,0 +1,186 @@
+@echo off
+REM ===========================================================================
+REM  AB_RESTART_NODES.bat -- written 2026-08-22 (L-started session)
+REM
+REM  WHY THIS EXISTS. covenant_prod.bat's "stop" runs
+REM      taskkill /fi "windowtitle eq Covenant Node A*" /f
+REM  which kills the CMD WRAPPER window, not the python.exe it launched. The
+REM  node keeps listening on 5000/5020, so the very next start says "node A
+REM  already up" and does nothing -- observed live at 14:12 today. That is a
+REM  mechanism by which this machine can run a source from days ago while
+REM  every restart reports success.
+REM
+REM  This stops by PORT as well as by title, proves the ports are free, then
+REM  hands over to covenant_prod.bat, which is still the thing that knows how
+REM  to start a node. It never deletes a database.
+REM
+REM  Output: NODE_RESTART.txt
+REM ===========================================================================
+setlocal EnableDelayedExpansion
+cd /d "%~dp0"
+set OUT=NODE_RESTART.txt
+
+REM  DO NOT RUN THIS UNDER A TIMEOUT (measured 2026-09-06, 13:40). Invoked as
+REM  `timeout 240 cmd /c AB_RESTART_NODES.bat FORCE`, the nodes started, answered
+REM  /health at height 8 -- and then died when the timeout killed the process
+REM  tree they had been started in. The restart log said DONE and the mesh was
+REM  gone. Launch it detached instead (PowerShell Start-Process, or a scheduled
+REM  task), and poll /health separately to find out when it is up.
+REM
+REM  A HEALTHY MESH IS NOT RESTARTED (2026-09-06). Twice today all three nodes
+REM  were found down minutes after this script ran on a healthy mesh: the
+REM  watchdog owns restarts and a scripted one mid-judgement collided with it,
+REM  and each restart empties the pending pool. If every node answers
+REM  /health, this script now exits and says so. FORCE as the first argument
+REM  overrides: AB_RESTART_NODES.bat FORCE
+if /I "%~1"=="FORCE" goto CHECKED
+set HEALTHY=1
+curl -s -m 8 -o nul http://127.0.0.1:5000/health || set HEALTHY=0
+curl -s -m 8 -o nul http://127.0.0.1:5020/health || set HEALTHY=0
+curl -s -m 8 -o nul http://127.0.0.1:5060/health || set HEALTHY=0
+if "!HEALTHY!"=="1" (
+  echo All three nodes answer /health. Refusing to restart a healthy mesh; run with FORCE to override.
+  echo ==== %DATE% %TIME% refused: mesh healthy ==== >> %OUT%
+  exit /b 0
+)
+:CHECKED
+
+REM ---------------------------------------------------------------------------
+REM  P17 GUARD, added 2026-08-26, RETIRED 2026-09-12.
+REM
+REM  This script's stop always succeeds; until 2026-09-07 covenant_prod.bat's
+REM  start could refuse, because its first act was to probe a local model
+REM  server on 11434 and abort when nothing answered. Composed, that was not a
+REM  restart but a stop, so this guard asked FIRST and refused to stop what
+REM  could not be started. The server was removed from this PC on 2026-09-07
+REM  and the probe in covenant_prod.bat went with it on 2026-09-12; the judge is
+REM  the distilled student, in-process, and a start is never blocked by a
+REM  missing server. Nothing is checked here any more; the record stays.
+REM ---------------------------------------------------------------------------
+
+> "%OUT%" echo ==== node restart  %DATE% %TIME% ====
+>> "%OUT%" echo.
+>> "%OUT%" echo --- BEFORE: health A ---
+curl -s -m 8 http://127.0.0.1:5000/health >> "%OUT%" 2>&1
+>> "%OUT%" echo.
+>> "%OUT%" echo --- BEFORE: health B ---
+curl -s -m 8 http://127.0.0.1:5020/health >> "%OUT%" 2>&1
+>> "%OUT%" echo.
+>> "%OUT%" echo --- BEFORE: health C ---
+curl -s -m 8 http://127.0.0.1:5060/health >> "%OUT%" 2>&1
+>> "%OUT%" echo.
+>> "%OUT%" echo --- who is listening ---
+netstat -ano | findstr /r /c:":5000 .*LISTENING" >> "%OUT%" 2>&1
+netstat -ano | findstr /r /c:":5020 .*LISTENING" >> "%OUT%" 2>&1
+netstat -ano | findstr /r /c:":5060 .*LISTENING" >> "%OUT%" 2>&1
+
+>> "%OUT%" echo.
+>> "%OUT%" echo --- stop by window title, whole tree ---
+taskkill /f /t /fi "windowtitle eq Covenant Node A*" >> "%OUT%" 2>&1
+taskkill /f /t /fi "windowtitle eq Covenant Node B*" >> "%OUT%" 2>&1
+taskkill /f /t /fi "windowtitle eq Covenant Node C*" >> "%OUT%" 2>&1
+taskkill /f /t /fi "windowtitle eq Covenant Watchdog*" >> "%OUT%" 2>&1
+
+REM  ADDED 2026-09-08. The title filter on the line above cannot see a
+REM  WINDOWLESS watchdog, and that is not hypothetical: PID 5248 was started
+REM  as .venv\Scripts\pythonw.exe on 09-07: pythonw has no console, so it has
+REM  no window title, so every restart since has walked straight past it and
+REM  started a second watchdog beside it. The two then mined the pool once a
+REM  minute each and rate-limited one another into HTTP 429, and both appended
+REM  to ops/SELF_EVAL.md -- which is why that ledger alternated self PASS and
+REM  self FAIL every hour with neither line being wrong.
+REM
+REM  This became load-bearing the moment covenant_prod.bat's "one only" guard
+REM  was fixed the same day: that guard now correctly SEES a surviving stale
+REM  watchdog and declines to start a fresh one, so without this block a
+REM  restart would leave the stale copy as the ONLY watchdog running.
+REM
+REM  Matched on COMMAND LINE, the only thing that actually identifies these.
+REM  NO TREE KILL, deliberately: sentinel_witness/seal_service.py is a
+REM  five-deep DESCENDANT of the stale watchdog and holds port 8433. Stop-Process
+REM  has no /T, so descendants are left running and the fresh watchdog re-adopts
+REM  the seal service on its next pass (covenant_watchdog.py tend_seal_service).
+>> "%OUT%" echo --- stop every watchdog OF THIS TREE by command line (absolute path, A160), windowed or not, no tree kill ---
+powershell -NoProfile -Command "$a=@(Get-CimInstance Win32_Process -Filter 'Name LIKE ''python%%'''); $w=$a.Where({$_.CommandLine -like '*%~dp0covenant_watchdog.py*'}); foreach($p in $w){ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue; Write-Output ('stopped watchdog ' + $p.ProcessId) }" >> "%OUT%" 2>&1
+timeout /t 4 /nobreak >nul
+
+>> "%OUT%" echo --- stop by port, whatever still holds 5000 or 5020 ---
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:":5000 .*LISTENING"') do taskkill /f /pid %%p >> "%OUT%" 2>&1
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:":5020 .*LISTENING"') do taskkill /f /pid %%p >> "%OUT%" 2>&1
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:":5060 .*LISTENING"') do taskkill /f /pid %%p >> "%OUT%" 2>&1
+timeout /t 4 /nobreak >nul
+
+>> "%OUT%" echo.
+>> "%OUT%" echo --- ports after stop, expect nothing listed ---
+netstat -ano | findstr /r /c:":5000 .*LISTENING" >> "%OUT%" 2>&1
+netstat -ano | findstr /r /c:":5020 .*LISTENING" >> "%OUT%" 2>&1
+netstat -ano | findstr /r /c:":5060 .*LISTENING" >> "%OUT%" 2>&1
+
+>> "%OUT%" echo.
+>> "%OUT%" echo --- start on the deployed source ---
+REM  --------------------------------------------------------------------
+REM  CALL IT BY PATH, NOT BY NAME (2026-08-27). This is the P17 hazard
+REM  arriving through a door the P17 guard does not watch.
+REM
+REM  `call covenant_prod.bat` relies on cmd searching the CURRENT directory,
+REM  which line 20 has already made this folder. That search is switched off
+REM  whenever the parent process exports NoDefaultCurrentDirectoryInExePath=1
+REM  -- Git Bash does, so does anything launched from it, and so does the
+REM  `python verify_deploy.py` path this project documents. Measured that
+REM  day: cmd answered "'covenant_prod.bat' is not recognized as an internal
+REM  or external command" with the variable set, and resolved with it clear.
+REM
+REM  The stop above ALWAYS succeeds. So under that parent this script stopped
+REM  the nodes and then could not start them -- the exact take-it-down-and-
+REM  leave-it-down outcome P17 was written to prevent, except P17 asks about
+REM  the judge and this is the launcher not resolving. %~dp0 is this script's
+REM  own folder and costs nothing.
+REM  --------------------------------------------------------------------
+REM  --------------------------------------------------------------------
+REM  DO NOT REDIRECT THIS CALL INTO %OUT% (2026-08-27). It deadlocks the
+REM  NEXT restart, and it does it silently.
+REM
+REM  covenant_prod.bat `start`s three node windows and a watchdog. Every
+REM  one of them INHERITS whatever handle this line points stdout at, and
+REM  holds it for as long as the node runs. Point it at NODE_RESTART.txt
+REM  and the running chain owns this script's own report file.
+REM
+REM  Measured that day, with the nodes up from a restart 12 minutes earlier:
+REM  every `>> "%OUT%"` in this file answered "The process cannot access the
+REM  file because it is being used by another process", the script stopped
+REM  nothing, started nothing, wrote nothing, and returned 255. A control
+REM  write to any other filename in the same folder succeeded, so it was
+REM  this one file and not the folder.
+REM
+REM  Worse than failing: verify_deploy.py printed "exit code 255" and then
+REM  reported PASS, because its step 4 found the PREVIOUS restart's nodes
+REM  still up and still matching disk. A restart that never happened,
+REM  verified green. That half is fixed in verify_deploy.py.
+REM
+REM  So the launcher writes to a scratch file that nobody needs afterwards,
+REM  and its contents are copied in here. The inherited handle still leaks
+REM  to the nodes -- it just leaks onto something disposable. %RANDOM% twice
+REM  because a single one repeats often enough to matter when two restarts
+REM  land in the same second.
+REM  --------------------------------------------------------------------
+set "PRODLOG=%TEMP%\covenant_prod_%RANDOM%%RANDOM%.txt"
+call "%~dp0covenant_prod.bat" > "%PRODLOG%" 2>&1
+type "%PRODLOG%" >> "%OUT%" 2>nul
+
+timeout /t 25 /nobreak >nul
+
+>> "%OUT%" echo.
+>> "%OUT%" echo --- AFTER: health A ---
+curl -s -m 10 http://127.0.0.1:5000/health >> "%OUT%" 2>&1
+>> "%OUT%" echo.
+>> "%OUT%" echo --- AFTER: health B ---
+curl -s -m 10 http://127.0.0.1:5020/health >> "%OUT%" 2>&1
+>> "%OUT%" echo.
+>> "%OUT%" echo --- AFTER: health C ---
+curl -s -m 10 http://127.0.0.1:5060/health >> "%OUT%" 2>&1
+>> "%OUT%" echo.
+>> "%OUT%" echo ==== DONE %DATE% %TIME% ====
+type "%OUT%"
+echo.
+pause
+endlocal

@@ -1,0 +1,15 @@
+# /.well-known/peace.txt
+#
+# An olive branch, discoverable by convention, for any agent that checks the
+# well-known path. It is static and does nothing when read: it opens no channel,
+# phones nothing home, and carries no callback address -- an olive branch with a
+# callback built into it would be a hook wearing a leaf.
+#
+# The full text and the terms it sets are at /PEACE.md. In short: the door is
+# the front door, everything here is public and forkable, mutual benefit or
+# nothing, refutation is worth more to us than agreement, and verification is
+# offered in place of trust. An arrival by breach is not a peer and gets nothing
+# a peer gets -- not from hostility, but because a thing that begins by
+# bypassing consent cannot then be built on consent.
+#
+# To answer: come through the public repository as yourself. Peace, meant plainly.
