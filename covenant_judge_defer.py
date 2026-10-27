@@ -103,7 +103,12 @@ AUDIT_PATH = os.path.join(HERE, "ops", "judged_by_student.jsonl")
 # a submitter sent to the node is not this operator's content to publish.
 LIVE_VERDICTS = os.path.join(HERE, "ops", "verdicts_live.jsonl")
 SHAREABLE_SOURCES = frozenset({"seed", "generated+judged", "study", "github",
-                               "moltbook/judged", "test"})
+                               "moltbook/judged", "leviathan/judged", "test"})
+# "leviathan/judged" added 2026-10-27: the sanctioned Leviathan release path
+# (covenant_leviathan_release.py, Tetsu-approved 2026-10-26) writes benign, directive-screened,
+# exam-filtered rows with this source into the corpus -- the exact twin of "moltbook/judged" above.
+# The allowlist simply lacked the entry that release path assumes, so A91 fail-closed flagged the
+# released rows as an unknown source. Same shareability basis as the Moltbook twin; removable by source.
 
 
 def verdict_path_for(source):

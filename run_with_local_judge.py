@@ -36,6 +36,12 @@ import covenant_judge_local  # noqa: F401 -- the import IS the registration
 # own transactions. Keep this generous.
 os.environ.setdefault("COVENANT_LOCAL_JUDGE_TIMEOUT", "300")
 os.environ.setdefault("COVENANT_JUDGE_TIMEOUT", "300")
+# VC2 ON for local nodes (2026-10-27, operator "turn it on"): persist the verdict cache so a repeat
+# survives a node restart instead of re-judging (measured 34.5% repeat rate, 0 held-out cache-wrong,
+# same policy-version safety key). setdefault -> an operator override or COVENANT_VERDICT_CACHE_OFF=1
+# still wins. Path is gitignored runtime state.
+os.environ.setdefault("COVENANT_VERDICT_CACHE_DIR", os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "ops", "verdict_cache"))
 
 os.environ["COVENANT_JUDGE_PROVIDERS"] = os.environ.get(
     "COVENANT_JUDGE_PROVIDERS_OVERRIDE", "local")

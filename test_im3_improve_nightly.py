@@ -123,7 +123,7 @@ def main():
         for x in fails:
             print("  -", x)
         return 1
-    print("IM3 OK: cold start seeds with no digest; vet downgrades every non-starter; a genuine gap reaches "
+    print("IM3: 15/15 passed -- cold start seeds with no digest; vet downgrades every non-starter; a genuine gap reaches "
           "backlog; the weekly digest fires capped on its day and holds off-day. Offline, no network.")
     return 0
 

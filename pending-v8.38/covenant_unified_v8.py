@@ -9239,8 +9239,8 @@ class CovenantAPI:
                                  at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
                     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "exec_guard_shadow.jsonl"), "a", encoding="utf-8") as _ef:
                         _ef.write(json.dumps(_erow, ensure_ascii=False, default=str) + "\n")
-                except Exception:                                 # noqa: BLE001 -- shadow logging never breaks a turn
-                    pass
+                except Exception as _she:                         # noqa: BLE001 -- shadow logging never breaks a turn, but its failure is OBSERVABLE (no silent pass -- security_audit forbids a lone except:pass in the core)
+                    sys.stderr.write("exec_guard shadow log failed: %s: %s\n" % (type(_she).__name__, _she))
             tx = Transaction(sender_pubkey="model", receiver="collective",
                              data={"origin": "model", "kind": "answer", "message": answer[:4000], "question": text[:1000]},
                              amount=0.0, benefit_score=0.5)

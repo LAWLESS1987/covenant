@@ -83,7 +83,7 @@ def main():
         for x in fails:
             print("  -", x)
         return 1
-    print("IM1 OK: harvest returns each reply once; seen-set suppresses re-mining; "
+    print("IM1: 6/6 passed -- harvest returns each reply once; seen-set suppresses re-mining; "
           "empty-seen control re-surfaces all (guard is real); filters and --dry-run pinned.")
     return 0
 

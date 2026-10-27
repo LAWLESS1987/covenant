@@ -111,7 +111,7 @@ def main():
         for x in fails:
             print("  -", x)
         return 1
-    print("IM2 OK: door stubbed (offline); a reply is extracted once, only after the door answered; "
+    print("IM2: 11/11 passed -- door stubbed (offline); a reply is extracted once, only after the door answered; "
           "a door failure is retried not dropped; empty-seen control re-surfaces all; labelled parse pinned.")
     return 0
 
