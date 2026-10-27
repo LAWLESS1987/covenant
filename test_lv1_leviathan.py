@@ -192,5 +192,5 @@ L._atomic_write_jsonl(_aw, [{"sha256": "x", "text": "hi"}])
 ok("LV1.39 _atomic_write_jsonl writes the rows atomically",
    len([l for l in open(_aw, encoding="utf-8") if l.strip()]) == 1)
 
-print("\n%s -- %d/%d" % ("PASS" if not fails else "FAIL", _total[0] - len(fails), _total[0]))
+print("\nLV1: %d/%d passed -- %s" % (_total[0] - len(fails), _total[0], "PASS" if not fails else "FAIL"))
 sys.exit(1 if fails else 0)

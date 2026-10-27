@@ -358,6 +358,19 @@ SUITES = [
     # model/tombstone/artifact change still misses across disk. Default OFF (env unset => in-memory, unchanged).
     # Driven both ways with a control that in-memory does NOT persist, plus kill switch, fail-soft, default-off.
     ("test_vc2_persist.py",               120,  "JUDGE"),
+    # Registered 2026-10-27: these eight suites shipped with their features but were never added to this
+    # list, so a fresh clone (CI) found them "orphaned on disk" and the sweep CORRECTLY returned
+    # INCOMPLETE -- a suite nobody runs is indistinguishable from one that does not exist. The earlier
+    # security_audit/tally FAILs masked it. All pass on a clean clone (ck1 8/8, dt1 8/8, eg1 12/12,
+    # lg1 38/38, lv1 40/40, ps1 4/4, rn1 4/4, xb1 8/8) -- now they are measured, not orphaned.
+    ("test_ck1_checklist.py",             60,  "SECURITY"),
+    ("test_dt1_determinism.py",           60,  "SECURITY"),
+    ("test_eg1_exec_guard.py",            60,  "SECURITY"),
+    ("test_lg1_leg.py",                   60,  "JUDGE"),
+    ("test_lv1_leviathan.py",            120,  "SECURITY"),
+    ("test_ps1_premise.py",               60,  "JUDGE"),
+    ("test_rn1_record_nonexec.py",        60,  "SECURITY"),
+    ("test_xb1_export_boundary.py",       60,  "SECURITY"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with
