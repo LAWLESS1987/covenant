@@ -151,8 +151,11 @@ def main(argv=None):
             if not okc:
                 say("    FAILED to clone %s: %s" % (r["full"], errc[-200:]))
                 continue
+            # Push real branches + tags only, NOT GitHub's internal refs/pull/* -- HF's pre-receive hook
+            # rejects those, which fails the whole --mirror push (measured 2026-10-26).
             okp, errp = _run(["git", "-C", dest, "-c", "http.extraHeader=" + _auth_header(hf_user, hft),
-                              "push", "--mirror", "https://huggingface.co/%s" % hf_id], redact=hft)
+                              "push", "--force", "https://huggingface.co/%s" % hf_id,
+                              "refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*"], redact=hft)
             if okp:
                 say("    OK  pushed %s (private=%s)" % (hf_id, r["private"]))
                 done += 1

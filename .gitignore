@@ -460,6 +460,12 @@ ops/exec_guard_shadow.jsonl
 # locally for the judge + a person; never republished into this public repo (exposure hygiene).
 ops/leviathan_quarantine.jsonl
 ops/leviathan_state.json
+# HF-mirror one-off repair scripts (2026-10-26): they hardcode private repo names; kept local, never
+# pushed to the public repo. tools/hf_mirror.py (the reusable, API-enumerated tool) is tracked.
+tools/hf_mirror_fix.py
+tools/hf_mirror_strip.py
+tools/hf_mirror_finish.py
+tools/hf_mirror_covenant.py
 *.leg-reversed
 
 # covenant_one raw results (2026-09-25): numbers beside each transcript, produced per run
