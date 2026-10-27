@@ -582,6 +582,18 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         say("leviathan FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    # IMPROVEMENT MINING (2026-10-27, his words: "nightly is probably the right move. Tetsu should be
+    # learning all these things as we go"). Once a night: harvest NEW forum replies to free, route each
+    # through TETSU'S door (teaching him), vet each cheaply (ring/earn + dedup-vs-capability + tombstone),
+    # and only on the weekly day emit ONE capped digest of survivors -- not the firehose that made the old
+    # mail queue unreadable. The first run seeds the backlog silently (no 51k flood). Fail-soft: a door or
+    # extract error is reported and does not stop the pass; adopting anything stays the operator's/Tetsu's call.
+    try:
+        import covenant_improve as IMP
+        IMP.nightly(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("improve FAILED (not fatal): %s: %s" % (type(e).__name__, str(e)[:200]))
+
     # TETSU REFINES HIMSELF (2026-09-21, his words: "Allow [Tetsu] to refine
     # himself including his voice"). Once a day: his register and his voice,
     # from the operator's side of the day's conversations, bounded, judged by

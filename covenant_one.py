@@ -389,6 +389,19 @@ SUITES = [
     # A372 (2026-10-18): Tetsu learns from TED transcripts in his own words; the 8-word copy guard and the A263
     # private ask are driven offline (stub door, stub Tetsu, temp queue).
     ("test_ted1_learn.py",                60,  "SECURITY"),
+    # IM1 (2026-10-27): the improvement-mining harvester -- increment 1 of the nightly process (operator:
+    # "nightly is probably the right move; Tetsu should be learning all these as we go"). A forum reply
+    # surfaces ONCE; the seen-set suppresses re-mining; an empty-seen control re-surfaces all (the guard is
+    # real, not the rows being absent). Offline, no network, temp dirs only.
+    ("test_im1_improve_mine.py",          60,  "SECURITY"),
+    # IM2 (2026-10-27): the extractor routes each new reply through TETSU'S door (teaches him as it mines),
+    # and consumes a reply ONLY after the door answered -- a 503 is retried next run, not dropped. Door
+    # stubbed, offline; the both-ways guard and the labelled-answer parse are pinned.
+    ("test_im2_improve_extract.py",       60,  "SECURITY"),
+    # IM3 (2026-10-27): the nightly orchestrator -- cold start seeds the backlog with NO digest (no 51k
+    # flood), the vet downgrades every non-starter (no-test, tombstoned, keyword-in-source), and the weekly
+    # digest fires CAPPED on its day and holds off-day. Door, grep and tombstone lookups stubbed; offline.
+    ("test_im3_improve_nightly.py",       60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.

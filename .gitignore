@@ -507,3 +507,7 @@ eval/cache/
 eval/loop/*/cache/
 ops/receipt_signer.key
 ops/tetsu_reflex.json
+
+# improvement-mining generated state (regenerable; baseline seen-set is 51k ids)
+ops/improve_mined_seen.json
+ops/improve_candidates.jsonl
