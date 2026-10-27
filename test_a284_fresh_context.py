@@ -86,6 +86,8 @@ DECLARED = {
     "covenant_earn_business.py": "shared",        # A284: found, dormant since 2026-09-25, not decided here
     "tools/discourse_seat_eval.py": "fresh",      # A322's measurement, one stand-alone question per item (A323)
     "covenant_ted.py": "fresh",                   # A372: each transcript stands alone, private and fresh
+    "covenant_improve_extract.py": "fresh",       # IM2 (2026-10-27): each forum reply is extracted on its
+                                                  # own -- no history bleed between unrelated replies
 }
 PRUNE = {".git", ".claude", ".trash", "__pycache__", "node_modules", "private", "venv", ".venv"}
 

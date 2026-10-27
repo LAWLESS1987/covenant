@@ -80,7 +80,9 @@ def extract(limit=MAX_PER_RUN, ask=None, out=CANDIDATES_OUT, say=print):
     drives it offline; the default routes through Tetsu's door and teaches him."""
     if ask is None:
         import tools.tetsu_work as TW                          # the door call that also records for Tetsu
-        ask = lambda text: TW.ask(text, door="agent")          # noqa: E731
+        # fresh=True (A284): each reply is an independent question -- no history bleed between unrelated
+        # replies -- and a fresh exchange still reaches the teacher queue, so Tetsu still learns from it.
+        ask = lambda text: TW.ask(text, door="agent", fresh=True)   # noqa: E731
     new = IM.harvest(update=False)[:limit]
     if not new:
         say("improve-extract: nothing new to extract")
