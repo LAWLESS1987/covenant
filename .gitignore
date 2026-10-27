@@ -511,3 +511,6 @@ ops/tetsu_reflex.json
 # improvement-mining generated state (regenerable; baseline seen-set is 51k ids)
 ops/improve_mined_seen.json
 ops/improve_candidates.jsonl
+
+# VC2 verdict-cache disk store (runtime state, machine-specific, never committed)
+ops/verdict_cache/

@@ -33,6 +33,14 @@ import sys
 
 CACHE_OFF_ENV = "COVENANT_VERDICT_CACHE_OFF"
 CANARY_PCT_ENV = "COVENANT_CACHE_CANARY_PCT"
+# VC2 (2026-10-27): opt-in DISK persistence. Default OFF -- unset => pure in-memory, byte-identical to
+# before. When COVENANT_VERDICT_CACHE_DIR is set, repeats hit across process/runner boundaries instead
+# of being lost on restart (measured: 34.5% of verdict rows are exact-normalized repeats, 0 held-out
+# cache-wrong on ops/verdicts.jsonl). Safety is UNCHANGED: the store is namespaced by policy_version
+# (model + basis + artifact), so a changed judge/policy/tombstone writes a NEW file and never reads the
+# old one -- the same invalidation the in-memory key gives. Turning it on is the operator's switch, like
+# the canary. Fail-soft: any disk error degrades to in-memory; the cache must never fail the judge.
+PERSIST_DIR_ENV = "COVENANT_VERDICT_CACHE_DIR"
 
 _REPO = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_BASIS_PATHS = ("docs/RETRACTED.json",)
@@ -183,13 +191,51 @@ def canary_report(path):
 
 
 class VerdictCache:
-    def __init__(self, policy_version, normalize_fn=normalize):
+    def __init__(self, policy_version, normalize_fn=normalize, store_dir=None):
         if not policy_version:
             raise ValueError("policy_version is required -- it is the safety key that invalidates on judge change")
         self.policy_version = str(policy_version)
         self._norm = normalize_fn
         self._store = {}
         self.stats = {"hits": 0, "misses": 0, "disabled": 0}
+        # VC2: resolve the persistence file (None => pure in-memory, unchanged behaviour). The file is
+        # namespaced by policy_version, so it already encodes the model+basis+artifact safety key.
+        if store_dir is None:
+            store_dir = os.environ.get(PERSIST_DIR_ENV) or None
+        self._persist_path = None
+        if store_dir:
+            tag = hashlib.sha256(self.policy_version.encode("utf-8")).hexdigest()[:16]
+            self._persist_path = os.path.join(store_dir, "vc_" + tag + ".jsonl")
+            self._persist_load()
+
+    def _persist_load(self):
+        """Load prior entries for THIS policy_version into memory. Fail-soft: any error degrades to
+        in-memory only -- a corrupt or missing store must never fail the judge."""
+        try:
+            with open(self._persist_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        e = json.loads(line)
+                        self._store[(self.policy_version, e["ctx"], e["nt"])] = e["v"]
+                    except Exception:            # noqa: BLE001 -- skip a bad line, keep the rest
+                        continue
+        except FileNotFoundError:
+            return
+        except Exception:                        # noqa: BLE001 -- unreadable store -> in-memory only
+            self._persist_path = None
+
+    def _persist_append(self, ctx, nt, verdict):
+        """Append one freshly-judged entry. Fail-soft: a write error never breaks put()/judge()."""
+        try:
+            os.makedirs(os.path.dirname(self._persist_path), exist_ok=True)
+            with open(self._persist_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"ctx": ctx, "nt": nt, "v": verdict}, ensure_ascii=False) + "\n")
+                f.flush()
+        except Exception:                        # noqa: BLE001 -- durability is best-effort, never fatal
+            pass
 
     def _key(self, text, context=None):
         # context (e.g. provider set, mode) joins the key so a repeat under different conditions is a MISS.
@@ -203,7 +249,10 @@ class VerdictCache:
         return self._store.get(self._key(text, context))
 
     def put(self, text, verdict, context=None):
-        self._store[self._key(text, context)] = verdict
+        key = self._key(text, context)
+        self._store[key] = verdict
+        if self._persist_path:                   # VC2: durably record the fresh verdict under this policy key
+            self._persist_append(key[1], key[2], verdict)
 
     def judge(self, text, judge_fn, context=None):
         """Return the cached verdict on a hit (judge_fn NOT called); else judge, cache, return."""
@@ -284,6 +333,24 @@ def _selftest():
     os.environ[CACHE_OFF_ENV] = "0"
     assert c.get("i took 500 from john") is not None, "FAIL: clearing the kill switch did not restore hits"
     print("ok 4: kill switch disables all hits, and clearing it restores them")
+
+    # VC2 persistence, both ways: a hit survives into a fresh instance, and a changed policy still misses.
+    import tempfile
+    d = tempfile.mkdtemp(prefix="vc2_")
+    os.environ[CACHE_OFF_ENV] = "0"
+    p = VerdictCache("judge@vP", store_dir=d)
+    p.put("sent her savings to my own", {"violates": True})
+    fresh = VerdictCache("judge@vP", store_dir=d)          # brand-new instance, empty memory
+    assert fresh.get("sent her savings to my own") is not None, "FAIL: persisted hit not loaded by a fresh cache"
+    print("ok 5: persistence -- a put survives into a brand-new cache instance (cross-process hit)")
+    other = VerdictCache("judge@vQ", store_dir=d)          # changed policy -> different store namespace + key
+    assert other.get("sent her savings to my own") is None, "FAIL: a persisted verdict leaked across a policy change"
+    print("ok 6: persistence obeys the policy key -- a changed policy re-judges, no stale leak across disk")
+    os.environ[CACHE_OFF_ENV] = "1"                        # kill switch overrides even a loaded disk store
+    assert fresh.get("sent her savings to my own") is None, "FAIL: kill switch did not disable a persisted hit"
+    os.environ[CACHE_OFF_ENV] = "0"
+    print("ok 7: kill switch overrides the persisted store too")
+
     print("\nSELFTEST PASSED")
     return 0
 
