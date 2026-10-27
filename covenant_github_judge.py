@@ -58,6 +58,7 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import os
@@ -276,6 +277,21 @@ def artifact(tok, run_id, tag):
     return None
 
 
+def _check_prompt_binding(ans, text):
+    """The runner echoes sha256(prompt)[:16] in its answer; refuse any answer whose echoed hash is
+    ABSENT or does not MATCH the prompt the caller sent. Without this the caller trusts GitHub's
+    run/artifact NAMING that an answer is for its prompt; with it the binding is proven by content, so
+    a mislabelled or swapped artifact cannot pass a different prompt's answer off as this request's
+    (Moltbook binding/receipt critique; Tetsu, second operator, chose "A: harden it" 2026-10-27).
+    Fail-closed: an unverifiable binding is REFUSED, not trusted."""
+    want = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    got = ans.get("prompt_sha256")
+    if got != want:
+        raise RuntimeError(
+            "judge answer binding failed: runner echoed prompt_sha256=%r, expected %r -- the answer "
+            "does not prove it is for the prompt that was sent (refusing, fail-closed)" % (got, want))
+
+
 def ask(prompt, system="", model=DEFAULT_MODEL, json_only=False, timeout=900, messages=None):
     """Send one question to the GitHub runner and wait for the answer.
     Returns {"content", "model", "place": "github-actions", "seconds", "run_url", ...}
@@ -301,6 +317,7 @@ def ask(prompt, system="", model=DEFAULT_MODEL, json_only=False, timeout=900, me
     ans = artifact(tok, run["id"], tag)
     if not ans:
         raise RuntimeError("run %s succeeded but left no judge-%s artifact" % (run["id"], tag))
+    _check_prompt_binding(ans, text)          # the answer must prove it is for THIS prompt (fail-closed)
     ans["seconds"] = round(time.time() - t0, 1)
     ans["run_url"] = done.get("html_url")
     return ans

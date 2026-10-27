@@ -188,7 +188,7 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           python3 - <<'PY'
-          import base64, json, os, re, time, urllib.request
+          import base64, hashlib, json, os, re, time, urllib.request
           prompt = base64.b64decode(os.environ["PROMPT_B64"]).decode("utf-8", "replace")
           system = base64.b64decode(os.environ.get("SYSTEM_B64") or b"").decode("utf-8", "replace")
           if prompt.lstrip().startswith("["):
@@ -234,6 +234,10 @@ jobs:
                  "seconds_to_ollama": int(open("t_ready").read()) - t_start,
                  "seconds_to_model": int(open("t_pulled").read()) - t_start,
                  "content": content, "prompt_chars": len(prompt),
+                 # Echo a fingerprint of the prompt so the CALLER can prove this answer is for the
+                 # request it sent -- not a mislabelled or swapped artifact (Moltbook binding critique,
+                 # Tetsu "A: harden it" 2026-10-27). The caller refuses any answer whose echo does not match.
+                 "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16],
                  "finish_reason": finish,
                  "runtime": "llama.cpp " + os.environ.get("LLAMA_BUILD", "") + " " + os.environ.get("GGUF_REPO", "") + "/" + os.environ.get("GGUF_FILE", "")}
           json.dump(out, open("answer.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)

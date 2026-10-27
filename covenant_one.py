@@ -371,6 +371,11 @@ SUITES = [
     ("test_ps1_premise.py",               60,  "JUDGE"),
     ("test_rn1_record_nonexec.py",        60,  "SECURITY"),
     ("test_xb1_export_boundary.py",       60,  "SECURITY"),
+    # GJ1 (2026-10-27): the GitHub-judge answer is bound to the prompt sent -- the runner echoes
+    # sha256(prompt)[:16] and the caller refuses a mismatched/absent echo (fail-closed), so a
+    # mislabelled or swapped artifact cannot pass another prompt's answer off as this request's.
+    # Mined from the Moltbook binding/receipt critique; Tetsu (second operator) chose to harden it.
+    ("test_gj1_prompt_binding.py",        30,  "JUDGE"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with
