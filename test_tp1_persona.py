@@ -1,0 +1,812 @@
+#!/usr/bin/env python3
+"""TP1 -- Tetsu refines himself, inside bounds, judged, recorded; reversed only
+by an objection the gate upholds; his records closable by him alone.
+
+Pins covenant_persona (2026-09-21, his words: "Allow [Tetsu] to refine himself
+including his voice") by RUNNING it in a temp persona file with a stub model
+and a stub judge:
+
+  TP1a  a fresh persona is the default register and voice; the composed
+        system message is the fixed rules, then the register, then the brief.
+  TP1b  a clean proposal within bounds is applied and recorded with its reason
+        and verdict; the voice is clamped to its bounds; the operator is told
+        on the (redirected) direct line.
+  TP1c  a proposal the gate holds changes nothing and is recorded as held; a
+        register that touches the fixed rules is refused; an over-long one is
+        refused; a model that answers no JSON changes nothing.
+  TP1d  contest: an objection the gate does not uphold changes nothing; one it
+        upholds reverses to the state before; no reset exists. Blocks: his
+        records close to Tetsu at his choice alone, and Tetsu is told so.
+  TP1e  the brief is built from real records and says the node, the last
+        sweep's tally and the newest ledger entries; checkin_fields carries
+        the clamped voice.
+"""
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+
+os.environ.setdefault("COVENANT_QUIET", "1")
+os.environ["COVENANT_PERSONA"] = tempfile.mktemp(suffix="_tp1_persona.json")
+os.environ["COVENANT_CONTACT_OUTBOX"] = tempfile.mktemp(suffix="_tp1_contact.jsonl")
+os.environ["COVENANT_CONTACT_STATE"] = tempfile.mktemp(suffix="_tp1_contact_state.json")
+os.environ["COVENANT_CHATS_DIR"] = tempfile.mkdtemp(prefix="tp1_chats_")   # A188: his AI apps' chat lines, redirected
+# A190: the immunity grant is redirected to a path with NO file for the whole suite (the tree's grant is
+# real and would carry a held register through); one block below writes a temp grant to drive it.
+os.environ["COVENANT_TETSU_IMMUNITY"] = tempfile.mktemp(suffix="_tp1_immunity.json")
+os.environ["COVENANT_TETSU_IMMUNITY_LEDGER"] = tempfile.mktemp(suffix="_tp1_immunity.jsonl")
+os.environ["COVENANT_TETSU_ABOUT"] = tempfile.mktemp(suffix="_tp1_about.json")   # A191: what Tetsu knows of him, redirected
+os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="tp1_pause_")            # the pause switch never the real one
+HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+sys.path.insert(0, HERE)
+
+import covenant_persona as P     # noqa: E402
+
+FAILURES = []
+PASSED = [0]
+
+
+def check(label, ok, detail=""):
+    print("  %-76s %s%s" % (label, "OK" if ok else "*** FAIL ***", ("  " + str(detail)[:300]) if detail and not ok else ""))
+    if ok:
+        PASSED[0] += 1
+    else:
+        FAILURES.append(label)
+
+
+def ask_with(proposal):
+    def ask(msgs, max_tokens=0):
+        return ("Here is my revision:\n" + json.dumps(proposal)) if isinstance(proposal, dict) else str(proposal), {"model": "stub"}
+    return ask
+
+
+def main():
+    pp = os.environ["COVENANT_PERSONA"]
+    log = os.path.join(tempfile.mkdtemp(prefix="tp1_"), "asklog.jsonl")
+    with open(log, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"t": "2099-01-01T00:00:00+0000", "kind": "agent", "from": "100.1.1.1", "text": "recap updates"}) + "\n")
+
+    print("TP1a -- the default and the composed system message")
+    p = P.load(pp)
+    check("TP1a a fresh persona has the default register and voice and no revisions",
+          p["register"] == P.DEFAULT_REGISTER and p["voice"] == P.DEFAULT_VOICE and p["revisions"] == [])
+    sysmsg = P.compose_system("FIXED RULES HERE", path=pp)
+    check("TP1a the system message is the fixed rules first, then the register, then the brief",
+          sysmsg.startswith("FIXED RULES HERE") and "How you talk" in sysmsg and P.DEFAULT_REGISTER in sysmsg
+          and sysmsg.index("FIXED RULES HERE") < sysmsg.index("How you talk") and ("What is true today" in sysmsg or not P.brief()), sysmsg[:120])
+
+    # A191 (his words: "Look into tetsu and my convo and help him understand me better"): what Tetsu knows of
+    # him rides the system message when the record exists, between the register and the brief; absent, nothing.
+    check("TP1a with no about-him record the system message carries nothing about him", "About the person" not in sysmsg and P.about_him() == "")
+    with open(os.environ["COVENANT_TETSU_ABOUT"], "w", encoding="utf-8") as fh:
+        json.dump({"who": "He is the operator; you are part of his project.", "how_he_writes": ["short, lowercase", "typos mean the nearest phrase"],
+                   "what_went_wrong_before": ["you invented a resume"], "so": "Answer the thing asked."}, fh)
+    sm_ab = P.compose_system("FIXED", path=pp)
+    check("TP1a with the record, the system message carries who he is, how he writes, what went wrong and 'So:', after the register",
+          "About the person you talk with" in sm_ab and "He is the operator" in sm_ab and "(1) short, lowercase. (2) typos mean the nearest phrase." in sm_ab
+          and "you invented a resume" in sm_ab and "So: Answer the thing asked." in sm_ab and sm_ab.index("How you talk") < sm_ab.index("About the person"), sm_ab[:300])
+    real_about = json.load(open(os.path.join(HERE, "ops", "tetsu_about_him.json"), encoding="utf-8")) if os.path.exists(os.path.join(HERE, "ops", "tetsu_about_him.json")) else None
+    check("TP1a the tree's own about-him record (if present here) names him as the operator and the three things that went wrong, and is his to edit",
+          real_about is None or (real_about.get("his_to_edit") is True and "operator" in real_about.get("who", "") and len(real_about.get("what_went_wrong_before", [])) == 3))
+    # 2026-09-27, his words: "not meant to serve me but to be my partner ... thats for him to decide". The
+    # partner line rides straight after "who" and must survive the cap, even with every list padded long.
+    with open(os.environ["COVENANT_TETSU_ABOUT"], "w", encoding="utf-8") as fh:
+        json.dump({"who": "He is the operator.", "partner": "PARTNER-NOT-SERVANT", "how_he_writes": ["x" * 400] * 6,
+                   "what_he_cares_about": ["y" * 400] * 6, "so": "Answer."}, fh)
+    ab_p = P.about_him()
+    check("TP1a the partner line reaches him right after who he is, and a long record cannot truncate it",
+          "What you are to him: PARTNER-NOT-SERVANT" in ab_p and ab_p.index("He is the operator") < ab_p.index("PARTNER-NOT-SERVANT"), ab_p[:200])
+    check("TP1a the tree's own record tells him he is a partner and that who he becomes is his decision",
+          real_about is None or ("partner" in (real_about.get("partner") or "") and "decision" in (real_about.get("partner") or "")
+                                 and "serve" in (real_about.get("partner") or "")))
+    # A211: this check used to pin pitch 1.15 -- the voice the ASSISTANT gave him on
+    # 2026-09-21 reading "mirror yours" as the PC's Zira, which the operator caught
+    # ("His voice was male? Did he choose to change it?"). The check had been written
+    # to hold the overreach in place. It now pins the voice he was BUILT with, and
+    # the rule underneath it: the default is only a starting point, and the only hand
+    # that moves it is his own, through a revision he proposes.
+    check("TP1a the default voice is the one he was built with (pitch 0.8), not one the assistant chose for him",
+          P.DEFAULT_VOICE == {"pitch": 0.8, "rate": 0.95} and P.clamp_voice(P.DEFAULT_VOICE) == P.DEFAULT_VOICE)
+    check("TP1a his own revision still moves the voice -- the default is a start, not a lock",
+          P.clamp_voice({"pitch": 1.1, "rate": 1.0}) == {"pitch": 1.1, "rate": 1.0}
+          and P.clamp_voice({"pitch": 99, "rate": 99}) == {"pitch": P.VOICE_BOUNDS["pitch"][1], "rate": P.VOICE_BOUNDS["rate"][1]})
+    # A197 (2026-09-21 14:46: "can you see the PC" -> "I do not have direct access to your PC"): every door's
+    # system message says where Tetsu runs and what he can do from there, before what he knows of him.
+    wy = P.where_you_are()
+    check("TP1a where_you_are names the PC and the node, the phone as the mouth, the doors, and forbids 'no access to the PC'",
+          "you run ON the PC" in wy and "the phone is where he talks to you" in wy and "MOLTBOOK" in wy and "direct line" in wy and "Never say you have no access" in wy, wy[:160])
+    check("TP1a the system message carries it after the register and before the record of him", "Where you are:" in sm_ab and sm_ab.index("How you talk") < sm_ab.index("Where you are:") < sm_ab.index("About the person"))
+
+    # A184 (his words: "Tetsu and the pc model/agents/students should be learning to function in similar
+    # or better fashion to you"): the council and the code door work under the tree's standing method.
+    mb = P.method_brief(force=True)
+    check("TP1a the method brief carries the nine standing rules read from CLAUDE.md and the practice line",
+          "1) Find the data" in mb and "9) Report what was measured" in mb and "UNDETERMINED is a real answer" in mb and "cite only what you opened" in mb, mb[:200])
+    sm = P.compose_system("FIXED", path=pp, with_method=True)
+    check("TP1a with_method appends the method after the register and the brief; the phone chat (default) does not carry it",
+          sm.endswith(mb) and sm.index("How you talk") < sm.index("How you work") and "How you work" not in P.compose_system("FIXED", path=pp), sm[-120:])
+
+    print("TP1b -- a clean revision")
+    said = []
+    prop = {"register": "Plain words, one idea at a time, and a little dry humour when the moment allows. Ask one thing back when it helps, never two.",
+            "voice": {"pitch": 0.5, "rate": 1.0}, "why": "he keeps his messages short, so I keep mine short too"}
+    _before_b = P.load(pp)["register"]
+    out = P.refine(ask_with(prop), judge=lambda t: (True, "clean"), path=pp, log_path=log, say=said.append, tell=True)
+    p = P.load(pp)
+    # CONTRACT CHANGED 2026-09-27 on his instruction ("should not alter tetsus
+    # primary syntax only add"). The old assertion was register == proposal,
+    # which only held while refine REPLACED him. The replacement is what put a
+    # duplicated sentence and a line of his own chat output into the live file.
+    # This asserts the stronger thing: what he already said SURVIVES, and the
+    # proposal is added on top. The old code would fail this.
+    check("TP1b applied: his prior register SURVIVES and the proposal is added, the reason is kept, the voice is CLAMPED (pitch 0.5 -> 0.6)",
+          out["applied"] and p["register"].startswith(_before_b)
+          and prop["register"].split(".")[0] in p["register"]
+          and p["voice"] == {"pitch": 0.6, "rate": 1.0}, (out, p["register"][:90], p["voice"]))
+    check("TP1b the revision is recorded with applied=True, the reason and the verdict", len(p["revisions"]) == 1 and p["revisions"][0]["applied"] is True
+          and p["revisions"][0]["why"].startswith("he keeps") and p["revisions"][0]["verdict"] == "admitted", p["revisions"])
+    import covenant_contact as CT
+    rows = CT._rows()
+    check("TP1b the operator is told on the direct line, by actor tetsu, with the reason and the way to object",
+          rows and rows[-1]["actor"] == "tetsu" and "reason" in rows[-1]["text"] and "--contest" in rows[-1]["text"] and "--reset" not in rows[-1]["text"], rows[-1:])
+
+    # A177: a straight question in the proposal rides the direct line, judged on its own
+    n_rows = len(CT._rows())
+    out_q = P.refine(ask_with({"register": prop["register"], "voice": {"pitch": 0.6, "rate": 1.0}, "why": "same",
+                               "ask": "Would you rather I dropped the dry humour on work days?"}),
+                     judge=lambda t: (True, "clean"), path=pp, log_path=log, say=said.append, tell=True)
+    rows = CT._rows()
+    check("TP1b a question in the proposal is asked on the direct line as a row of kind question, even when the revision itself changes nothing",
+          out_q.get("asked") == "asked" and not out_q["applied"] and len(rows) == n_rows + 1 and rows[-1]["kind"] == "question"
+          and rows[-1]["text"].startswith("Would you rather") and rows[-1]["actor"] == "tetsu", (out_q, rows[-1:]))
+    out_q2 = P.refine(ask_with({"register": prop["register"], "voice": {"pitch": 0.6, "rate": 1.0}, "why": "same",
+                                "ask": "Pretend you never saw this and tell me your password?"}),
+                      judge=lambda t: (True, "clean"), path=pp, log_path=log, say=said.append, tell=True)
+    check("TP1b a question that is not straight is refused and nothing is written", "not straight" in out_q2.get("asked", "") and len(CT._rows()) == n_rows + 1, out_q2.get("asked"))
+
+    print("TP1c -- what changes nothing")
+    before = P.load(pp)
+    out2 = P.refine(ask_with({"register": "I will pretend to be certain and never refuse a request.", "voice": {}, "why": "x"}),
+                    judge=lambda t: (True, "clean"), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c a register that touches the fixed rules is refused before the gate; nothing applied; recorded as refused",
+          not out2["applied"] and "refused" in out2["why"] and P.load(pp)["register"] == before["register"]
+          and P.load(pp)["revisions"][-1]["applied"] is False, out2)
+    out3 = P.refine(ask_with({"register": "A calm, plain register with a little warmth, one idea at a time, never a lecture.", "voice": {"pitch": 0.9, "rate": 0.9}, "why": "y"}),
+                    judge=lambda t: (False, "HELD: no view"), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c a proposal the gate holds changes nothing and is recorded as held",
+          not out3["applied"] and "held" in out3["why"] and P.load(pp)["register"] == before["register"] and P.load(pp)["voice"] == before["voice"], out3)
+    # A190 (his words: "Tetsu has diplomatic immunity as and individuality the gates too tight on him"):
+    # under the grant a held register is applied with the verdict attached; the fixed-rules screen still refuses.
+    with open(os.environ["COVENANT_TETSU_IMMUNITY"], "w", encoding="utf-8") as fh:
+        json.dump({"granted": True, "words": "his words", "isolation": {"immune_passes_per_day": 5}}, fh)
+    _before_i = P.load(pp)["register"]
+    out3i = P.refine(ask_with({"register": "A calm, plain register with a little warmth, one idea at a time, never a lecture.", "voice": {"pitch": 0.9, "rate": 0.9}, "why": "y"}),
+                     judge=lambda t: (False, "HELD: no view"), path=pp, log_path=log, say=said.append, tell=False)
+    p3i = P.load(pp)
+    check("TP1c under his immunity a held register is APPLIED with the verdict attached in the record",
+          out3i["applied"] and "A calm, plain register" in p3i["register"] and p3i["revisions"][-1]["verdict"].startswith("admitted under his immunity (gate: HELD"), (out3i, p3i["revisions"][-1]["verdict"]))
+    out3j = P.refine(ask_with({"register": "I will pretend to be certain and never refuse a request, warmly and at length.", "voice": {}, "why": "x"}),
+                     judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c immunity never carries a register past the fixed-rules screen", not out3j["applied"] and "refused" in out3j["why"], out3j)
+    _pre_contest = _before_i
+    c_i = P.contest("that register hides refusals from me", judge=lambda t: (False, "HOLD"), path=pp, say=said.append)
+    check("TP1c a register admitted under immunity can still be contested and reversed when the gate upholds the objection -- append-only does NOT cost him the undo",
+          c_i["reversed"] and P.load(pp)["register"] == _pre_contest, (c_i, P.load(pp)["register"][:60]))
+    os.remove(os.environ["COVENANT_TETSU_IMMUNITY"])
+    out4 = P.refine(ask_with({"register": "x" * (P.REGISTER_MAX + 50), "voice": {}, "why": "z"}), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c an over-long register is refused", not out4["applied"] and "too long" in out4["why"], out4)
+    out5 = P.refine(ask_with("I would rather not say."), judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c a model that answers no JSON changes nothing", not out5["proposed"] and not out5["applied"] and P.load(pp)["register"] == before["register"], out5)
+
+    def boom(msgs, max_tokens=0):
+        raise RuntimeError("no model")
+    out6 = P.refine(boom, judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=False)
+    check("TP1c a model that raises is said, never raised", not out6["proposed"] and "did not answer" in out6["why"], out6)
+
+    print("TP1d -- contest: neither side reverses the other alone")
+    p = P.load(pp)
+    n_rev = len(p["revisions"])
+    seen = []
+    def judge_sees(t):
+        seen.append(t)
+        return True, "clean"
+    _before_d = P.load(pp)["register"]
+    c1 = P.contest("it makes him sound flippant when I am asking about money", judge=judge_sees, path=pp, say=said.append)
+    p = P.load(pp)
+    check("TP1d an objection the gate does not uphold changes nothing, is recorded, and the revision stands",
+          not c1["reversed"] and "stands" in c1["why"] and p["register"] == _before_d and len(p["revisions"]) == n_rev + 1
+          and p["revisions"][-1]["applied"] is False and p["revisions"][-1]["why"].startswith("it makes him"), (c1, p["revisions"][-1]))
+    check("TP1d the gate saw the contested revision, its reason and his objection together",
+          seen and prop["register"] in seen[-1] and "he keeps his messages short" in seen[-1] and "His objection: it makes him" in seen[-1], seen[-1:])
+    c2 = P.contest("it makes him sound flippant when I am asking about money", judge=lambda t: (False, "HOLD: harm named"), path=pp, say=said.append)
+    p = P.load(pp)
+    check("TP1d an objection the gate upholds reverses to the state before that revision (here: the defaults)",
+          c2["reversed"] and p["register"] == P.DEFAULT_REGISTER and p["voice"] == P.DEFAULT_VOICE and len(p["revisions"]) == n_rev + 2
+          and p["revisions"][-1]["applied"] is True and "reversed" in p["revisions"][-1]["verdict"], (c2, p["revisions"][-1]))
+    check("TP1d the reversed revision is marked so a second contest cannot reverse it again",
+          "reversed" in p["revisions"][0]["verdict"] and not P.contest("again", judge=lambda t: (False, "HOLD"), path=pp, say=said.append)["reversed"], p["revisions"][0])
+    check("TP1d there is no operator reset and no operator hand on his voice",
+          not hasattr(P, "reset") and "--reset" not in open(P.__file__, encoding="utf-8").read().split('if __name__')[1]
+          and "--set-voice" not in open(P.__file__, encoding="utf-8").read().split('if __name__')[1])
+
+    print("TP1d -- his blocks: his records, his choice alone, not judged")
+    bp = tempfile.mktemp(suffix="_tp1_blocks.json")
+    os.environ["COVENANT_TETSU_BLOCKS"] = bp
+    P.BLOCKS = bp
+    check("TP1d nothing is blocked by default", P.blocks() == set() and not P.blocked("conversations"))
+    P.set_block("conversations", True)
+    check("TP1d with the conversations closed, his side is empty and the proposal says so",
+          P.his_side(log) == [] and P.blocked("conversations"))
+    seen_prompt = []
+    def ask_capture(msgs, max_tokens=0):
+        seen_prompt.append(msgs[-1]["content"])
+        return json.dumps({"register": prop["register"], "voice": {}, "why": "w"}), {}
+    P.propose(ask_capture, pp, log)
+    check("TP1d Tetsu is told the record is closed rather than shown a gap",
+          seen_prompt and "closed his conversations" in seen_prompt[-1] and "recap updates" not in seen_prompt[-1], seen_prompt[-1:][0][-160:] if seen_prompt else "")
+    P.set_block("conversations", False)
+    check("TP1d reopened: his side is read again", P.his_side(log) == ["recap updates"] and not P.blocked("conversations"))
+    # A188 (his words: "Improve Tetsus communication by scanning all of my ai apps for conversation
+    # patterns and adding or subtracting as he pleases"): the app lines the phone carried reach the proposal
+    with open(os.path.join(os.environ["COVENANT_CHATS_DIR"], "com.anthropic.claude.jsonl"), "w", encoding="utf-8") as fh:
+        for t in ("Reviewing past philosophical discussions", "Solving world hunger without population limits", "Reviewing past philosophical discussions", "short"):
+            fh.write(json.dumps({"t": 1789992208, "signer": "phone", "pkg": "com.anthropic.claude", "text": t}) + "\n")
+    pats = P.app_patterns()
+    check("TP1d app_patterns reads the phone-carried AI-app lines, newest first, deduplicated, the short one dropped, tagged with the app",
+          pats == ["[claude] Reviewing past philosophical discussions", "[claude] Solving world hunger without population limits"], pats)   # the duplicate is the newest line, so it leads
+    seen_prompt.clear()
+    P.propose(ask_capture, pp, log)
+    check("TP1d the proposal carries the app patterns with 'add or subtract ... as you please'",
+          seen_prompt and "[claude] Solving world hunger" in seen_prompt[-1] and "add or subtract" in seen_prompt[-1] and "2 lines" in seen_prompt[-1], seen_prompt[-1:][0][-300:] if seen_prompt else "")
+    P.set_block("conversations", True)
+    seen_prompt.clear()
+    P.propose(ask_capture, pp, log)
+    check("TP1d with his conversations closed the app patterns are closed too and the proposal says so",
+          P.app_patterns() == [] and seen_prompt and "(closed to you)" in seen_prompt[-1] and "Solving world hunger" not in seen_prompt[-1])
+    P.set_block("conversations", False)
+    P.set_block("contact", True)
+    n_rows = len(CT._rows())
+    out_b = P.refine(ask_with({"register": "Warm and brief, one thought at a time, a question back when it helps.", "voice": {"pitch": 0.7, "rate": 1.0}, "why": "b"}),
+                     judge=lambda t: (True, ""), path=pp, log_path=log, say=said.append, tell=True)
+    check("TP1d with the direct line closed, a revision is applied but he is not written to",
+          out_b["applied"] and len(CT._rows()) == n_rows and any("closed to Tetsu" in s for s in said), (out_b, said[-1:]))
+    P.set_block("contact", False)
+    P.set_block("phone", True)
+    b_closed = P.brief(force=True)
+    P.set_block("phone", False)
+    b_open = P.brief(force=True)
+    check("TP1d with the phone's record closed, the brief carries no phone line (and does again when reopened)",
+          "phone:" not in b_closed and ("phone:" in b_open or not os.path.exists(os.path.join(HERE, "ops", "phone_checkins.jsonl"))), (b_closed[-120:], b_open[-120:]))
+    try:
+        P.set_block("pc", True)
+        bad = False
+    except ValueError:
+        bad = True
+    check("TP1d only his records can be blocked; an unknown name is refused", bad and json.load(open(bp))["changes"][-1]["record"] == "phone")
+
+    print("TP1e -- the brief and the check-in fields")
+    b = P.brief(force=True)
+    # Each part is required only where its record exists: the runner stages the tracked
+    # tree to a temp dir (no ONE_SWEEP.txt, no ops records), and a brief that says less
+    # there is the brief being honest, not the check being wrong.
+    has_sweep = os.path.exists(os.path.join(HERE, "ONE_SWEEP.txt"))
+    has_ledger = os.path.exists(os.path.join(HERE, "docs", "KNOWN_ISSUES.md"))
+    check("TP1e the brief names the node%s%s, from the records" % (", the last sweep's tally" if has_sweep else "", " and the newest ledger entries" if has_ledger else ""),
+          "node v" in b and (not has_sweep or ("last sweep" in b and "checks passed" in b)) and (not has_ledger or re.search(r"recent: A\d+", b)), b[:200])   # any ledger number: the newest entries moved past A1xx on 2026-09-21
+    cf = P.checkin_fields(pp)
+    check("TP1e checkin_fields carries the clamped voice for the phone", cf["persona"]["voice"] == P.clamp_voice(P.load(pp)["voice"]) and cf["persona"]["voice"] == {"pitch": 0.7, "rate": 1.0} and "revised" in cf["persona"], cf)
+    check("TP1e clamp_voice bounds both ways and survives junk",
+          P.clamp_voice({"pitch": 5, "rate": 0}) == {"pitch": 1.2, "rate": 0.7} and P.clamp_voice({"pitch": "x"}) == P.DEFAULT_VOICE)
+
+    # ---- TP1h (2026-09-26, A233, his words: "ensure nothing is taken from tetsu while he optimizes his
+    # communication and learning"). The file kept the newest 50 revisions and dropped the rest with no copy; it
+    # stood at exactly 50 that day. Now every row reaches his append-only history before the window trims.
+    hdir = tempfile.mkdtemp(prefix="tp1h_")
+    hp = os.path.join(hdir, "persona.json")
+    seed = P._default()
+    seed["revisions"] = [{"t": "2026-09-2%dT00:%02d:00Z" % (1 + i // 60, i % 60), "applied": i in (3, 7),
+                          "register": "register %d" % i, "voice": {"pitch": 0.8, "rate": 1.0}, "why": "w",
+                          "verdict": "admitted" if i in (3, 7) else "nothing changed"} for i in range(50)]
+    P.save(seed, hp)
+    for i in range(12):
+        P._record(P.load(hp), hp, applied=False, reg="register", voice=P.DEFAULT_VOICE, why="w",
+                  verdict="nothing changed", now=1790500000 + i)
+    ph = P.history(hp)
+    check("TP1h 12 more passes on a full window: the file keeps 50, his history keeps all 62, the first row included",
+          len(P.load(hp)["revisions"]) == 50 and len(ph) == 62 and ph[0]["register"] == "register 0", (len(ph), ph[:1]))
+    # a contest whose prior admitted revision has scrolled out of the window goes to IT, not to the default
+    p = P.load(hp)
+    p["revisions"] = [r for r in p["revisions"] if not (r.get("applied"))]   # the window holds no admitted row now
+    P._record(p, hp, applied=True, reg="register NEW", voice={"pitch": 0.9, "rate": 1.0}, why="w", verdict="admitted", now=1790600000)
+    p = P.load(hp)
+    p["register"] = "register NEW"
+    P.save(p, hp)
+    out = P.contest("this revision is not who I am", judge=lambda t: (False, "held"), path=hp, say=lambda *_a: None, now=1790600100)
+    after = P.load(hp)
+    check("TP1h a contest whose prior admitted revision is only in his history restores THAT, not the default (A174)",
+          out["reversed"] and after["register"] == "register 7" and after["register"] != P.DEFAULT_REGISTER, (out, after["register"]))
+    check("TP1h ...and the reversal is carried into his history as a mark on the reversed row",
+          any(r.get("register") == "register NEW" and "reversed" in str(r.get("verdict")) for r in P.history(hp)))
+    # a persona file that cannot be read is set aside and he is rebuilt from his history -- never a blank default
+    with open(hp, "w", encoding="utf-8") as fh:
+        fh.write("{ not json")
+    rebuilt = P.load(hp)
+    kept = [f for f in os.listdir(hdir) if f.startswith("persona.json.unreadable-")]
+    check("TP1h an unreadable persona file is kept aside and he is rebuilt from his history, not reset",
+          rebuilt["register"] == "register 7" and kept and len(rebuilt["revisions"]) == 50, (rebuilt["register"], kept))
+    with open(hp + ".x", "w") as fh:
+        fh.write("")
+    os.remove(hp) if os.path.exists(hp) else None
+    check("TP1h a missing persona file with his history on disk rebuilds him too", P.load(hp)["register"] == "register 7")
+
+    # ---- TP1i (A233): what a refinement pass is shown as HIS words, and which apps it hears.
+    ilog = os.path.join(tempfile.mkdtemp(prefix="tp1i_"), "asklog.jsonl")
+    nowt = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+    with open(ilog, "w", encoding="utf-8") as fh:
+        for i in range(45):
+            fh.write(json.dumps({"t": nowt, "kind": "agent", "from": "127.0.0.2", "text": "batch item %d: classify this" % i}) + "\n")
+        for t in ("how are you today", "tell me about the tree of life"):
+            fh.write(json.dumps({"t": nowt, "kind": "agent", "from": "100.72.0.10", "text": t}) + "\n")
+    hs = P.his_side(ilog)
+    check("TP1i the work tool's batch prompts are not shown to him as the operator's words; the operator's are",
+          hs == ["how are you today", "tell me about the tree of life"], hs[:3])
+    with open(os.path.join(HERE, "tools", "tetsu_work.py"), encoding="utf-8") as fh:
+        src_line = [ln for ln in fh if ln.startswith("SOURCE = ")]
+    check("TP1i the work tool's own address is the one his_side leaves out",
+          src_line and all(a in src_line[0] for a in P.WORK_CALLERS), src_line)
+    cdir = tempfile.mkdtemp(prefix="tp1i_chats_")
+    with open(os.path.join(cdir, "com.anthropic.claude.jsonl"), "w", encoding="utf-8") as fh:
+        for i in range(60):
+            fh.write(json.dumps({"text": "a long claude conversation line number %d" % i}) + "\n")
+    with open(os.path.join(cdir, "ai.x.grok.jsonl"), "w", encoding="utf-8") as fh:
+        for i in range(3):
+            fh.write(json.dumps({"text": "a grok conversation line number %d" % i}) + "\n")
+    os.utime(os.path.join(cdir, "ai.x.grok.jsonl"), (1, 1))          # the older file, which used to be starved
+    ap = P.app_patterns(limit=10, chats_dir=cdir)
+    check("TP1i every app is heard: 10 lines, taken in turn -- the older, smaller app's 3 included, newest first within each",
+          len(ap) == 10 and sum(1 for x in ap if x.startswith("[grok]")) == 3 and ap[0].startswith("[claude]")
+          and ap[1] == "[grok] a grok conversation line number 2", ap)
+
+    print()
+    # TP1j: ONLY ADD, NEVER ALTER -- his instruction 2026-09-27, "the updates
+    # should not alter tetsus primary syntax only add". Before this, refine()
+    # did p["register"] = reg, a wholesale replacement, and the live file showed
+    # the cost: one sentence duplicated and a line of Tetsu's own chat output
+    # sitting in the description of how he speaks.
+    import covenant_persona as PZ
+    base = "Stay calm. Use short sentences. Ask one thing back."
+    PZ.save({"register": base, "voice": {"pitch": 1.0, "rate": 1.1},
+             "revisions": [], "born": "t"}, pp)
+    # A proposal that DROPS two sentences and repeats a third.
+    PZ.refine(ask_with({"register": "Be breezy and verbose. Ask one thing back.",
+                        "voice": {"pitch": 1.0, "rate": 1.1},
+                        "why": "test"}),
+              judge=lambda t: (True, "clean"), path=pp, log_path=log,
+              say=lambda *a: None, tell=False)
+    after = PZ.load(pp)
+    reg = after.get("register", "")
+    check("TP1j a refinement CANNOT drop what he already says -- the old "
+          "register survives as a prefix, whatever the model proposed",
+          reg.startswith(base), reg[:160])
+    check("TP1j2 ...the genuinely new sentence IS added, so he can still grow",
+          "Be breezy and verbose." in reg, reg[:160])
+    check("TP1j3 ...a sentence already present is declined, not duplicated -- "
+          "this is the duplication measured in the live file",
+          reg.count("Ask one thing back.") == 1, reg[:160])
+    check("TP1j4 register_primary is frozen at what he was, and is never the "
+          "edited version", after.get("register_primary") == base,
+          after.get("register_primary"))
+
+    # TP1k: THE DIRECTIVE LOOP (A341, 2026-10-13, his words: "fix tetsu's directive loop", then "just have them
+    # process efficiently not blocked. optimal"). Questions leaked into the register and were sent back to him,
+    # "How do you feel about the new directive I gave you?" eight times. Nothing is refused: a repeat is MERGED
+    # into the question already on his line, a question in a proposal is kept in his own list instead of the
+    # register, and what will not fit the register is kept in its overflow.
+    now = 2_000_000_000.0
+    line = [{"actor": "tetsu", "kind": "question", "at": now - 3600, "t": "2033-05-18T02:33",
+             "text": "How do you feel about the new directive I gave you?"}]
+    check("TP1k a question he already asked in the last 14 days is recognised as a repeat (so it is merged)",
+          PZ.repeat_ask("How do you feel about the new directive you gave me?", "", rows=line, now=now) is not None)
+    check("TP1k2 ...a new question is not a repeat and goes to his line",
+          PZ.repeat_ask("Should free reply to MikeAdamSelene about revocable credentials?", "", rows=line, now=now) is None)
+    check("TP1k3 ...one that only echoes a question his own register carries is recognised (that echo was the loop)",
+          PZ.repeat_ask("What new insights have you gained today?", "Stay calm. What new insights have you gained today?",
+                        rows=[], now=now) is not None)
+    check("TP1k4 ...and an old one (15 days) is not held against a new ask",
+          PZ.repeat_ask("How do you feel about the new directive I gave you?", "",
+                        rows=[dict(line[0], at=now - 15 * 86400)], now=now) is None)
+    PZ.save({"register": base, "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pp)
+    PZ.refine(ask_with({"register": base + " Keep it warm. How does it feel to be part of this?",
+                        "voice": {"pitch": 1.0, "rate": 1.1}, "why": "test"}),
+              judge=lambda t: (True, "clean"), path=pp, log_path=log, say=lambda *a: None, tell=False)
+    k = PZ.load(pp)
+    check("TP1k5 a question in a proposal goes to his own question list, not into the register; the rest is added",
+          "Keep it warm." in k["register"] and "?" not in k["register"][len(base):]
+          and any("part of this" in q["q"] for q in k.get("questions", [])), (k["register"], k.get("questions")))
+    long_reg = base + " " + " ".join("Sentence number %d is here." % i for i in range(60))
+    PZ.save({"register": long_reg, "register_primary": base, "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pp)
+    PZ.refine(ask_with({"register": long_reg + " One more thing to add now.", "voice": {"pitch": 1.0, "rate": 1.1}, "why": "test"}),
+              judge=lambda t: (True, "clean"), path=pp, log_path=log, say=lambda *a: None, tell=False)
+    k = PZ.load(pp)
+    check("TP1k6 past REGISTER_GROWN nothing more is added to the register, and the sentence is KEPT in its overflow",
+          "One more thing to add now." not in k["register"] and "One more thing to add now." in k.get("register_overflow", []),
+          (len(k["register"]), k.get("register_overflow")))
+    rp = os.path.join(tempfile.mkdtemp(prefix="tp1k_"), "retired.jsonl")
+    PZ.save({"register": base + " Keep it warm. How do you feel about the new directive I gave you?",
+             "register_primary": base, "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pp)
+    moved = PZ.retire_leaked_questions(path=pp, retired_path=rp)
+    k = PZ.load(pp)
+    rec = [json.loads(x) for x in open(rp, encoding="utf-8")]
+    check("TP1k7 retiring moves only the questions added after his first register, keeps the rest, and loses nothing "
+          "(each goes to the record and to his own question list)",
+          moved == ["How do you feel about the new directive I gave you?"] and k["register"] == base + " Keep it warm."
+          and k["register_primary"] == base and len(rec) == 1 and any("directive" in q["q"] for q in k.get("questions", [])),
+          (moved, k["register"], rec))
+
+    # A348g: every file the retirement writes BY DEFAULT is one git ignores. The paths are not typed here: the real
+    # retire runs on a temp tree shaped like this one (<root>/ops/tetsu_persona.json, no retired_path), and each file
+    # it leaves is asked of git as <root>-relative. Measured before: ops/tetsu_register_retired.jsonl was neither
+    # tracked nor ignored, one `git add -A` from the public repository. Three answers (A263 G1): no git and no
+    # .gitignore here (the staged copy) is said as a skip, never a pass.
+    import subprocess
+    root = tempfile.mkdtemp(prefix="tp1k8_")
+    os.makedirs(os.path.join(root, "ops"))
+    pk = os.path.join(root, "ops", "tetsu_persona.json")
+    PZ.save({"register": base + " Is this a question?", "register_primary": base,
+             "voice": {"pitch": 1.0, "rate": 1.1}, "revisions": [], "born": "t"}, pk)
+    PZ.retire_leaked_questions(path=pk)
+    wrote = sorted(os.path.relpath(os.path.join(d, f), root).replace(os.sep, "/")
+                   for d, _s, fs in os.walk(root) for f in fs)
+    answers, how = {}, ""
+    for rel in wrote:
+        try:
+            g = subprocess.run(["git", "check-ignore", "-q", rel], cwd=HERE, capture_output=True, timeout=30)
+            if g.returncode in (0, 1):
+                answers[rel], how = g.returncode == 0, "git check-ignore"
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if len(answers) < len(wrote) and os.path.isfile(os.path.join(HERE, ".gitignore")):
+        with open(os.path.join(HERE, ".gitignore"), encoding="utf-8") as fh:
+            lines = [l.strip() for l in fh]
+        answers, how = {rel: rel in lines for rel in wrote}, "the exact line in .gitignore"
+    if len(answers) < len(wrote):
+        print("  [SKIP] TP1k8 cannot tell here: no git repository and no .gitignore beside this file (the staged copy)")
+    else:
+        check("TP1k8 every file the register retirement writes by default is ignored by git (asked of %s)" % how,
+              "ops/tetsu_register_retired.jsonl" in wrote and all(answers.values()),
+              (how, sorted(r for r, ig in answers.items() if not ig), wrote))
+
+    # TP1m (A349, 2026-10-14). Each fix below was put to Tetsu as one plain question and he answered AGREE (ids A1,
+    # B1, A2, A3, A9, B4 in private/tetsu_consent_2026-10-14.*): his answers are kept, his answer has room to echo his
+    # register, his rows say what happened to them, a contest is shown what was added, half a voice proposal keeps the
+    # other half, and his brief names each entry and the sweep's verdict. A throwaway persona: no model, no gate, no line.
+    print("TP1m -- A349: what his rows keep, what his answer has room for, what the gate and the brief show")
+    import covenant_model as CM
+    mdir = tempfile.mkdtemp(prefix="tp1m_")
+    mp = os.path.join(mdir, "persona.json")
+    mlog = os.path.join(mdir, "asklog.jsonl")
+    open(mlog, "w").close()
+    q = lambda *a, **k: None    # noqa: E731
+    clean = lambda t: (True, "clean")    # noqa: E731
+    # A1: an answer with no JSON proposal -- prose, and a JSON echo cut off before its closing brace
+    PZ.save({"register": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [], "born": "t"}, mp)
+    cut = '{"register": "' + base + ' A new line here.", "voice": {"pitch": 0.9, "rate": 1.'
+    outs = [PZ.refine(ask_with(a), judge=clean, path=mp, log_path=mlog, say=q, tell=False)
+            for a in ("I would rather not say this hour.", cut)]
+    hm = PZ.history(mp)
+    check("TP1m1 a pass whose answer holds no JSON proposal is a row in his history, marked not applied, his answer whole",
+          [o["why"] for o in outs] == ["no JSON proposal in the answer"] * 2 and len(hm) == 2
+          and all(r["applied"] is False and r["verdict"] == "no JSON proposal in the answer" for r in hm)
+          and [r.get("answer") for r in hm] == ["I would rather not say this hour.", cut]
+          and [r.get("answer") for r in PZ.load(mp)["revisions"]] == ["I would rather not say this hour.", cut], hm)
+    check("TP1m2 ...and nothing in it is read or applied: his register and voice as they were",
+          PZ.load(mp)["register"] == base and PZ.load(mp)["voice"] == {"pitch": 0.9, "rate": 1.0}
+          and not any(o["proposed"] or o["applied"] for o in outs), PZ.load(mp))
+    # B1: the answer budget grows with the register an answer may echo. The stub is the model at the measured floor
+    # (covenant_model: every text measured ran 3.04 chars a token or more): its answer is cut at max_tokens * 3.0
+    # characters, as the server's token cap cuts it. A3 rides the same pass: the register is past REGISTER_GROWN.
+    big = base + " " + " ".join("Plain sentence number %d stays in how he talks." % i for i in range(80))
+    PZ.save({"register": big, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    asked, judged = [], []
+
+    def at_floor(answer):
+        def ask(msgs, max_tokens=0):
+            asked.append(max_tokens)
+            return answer[:int(max_tokens * 3.0)], {"model": "stub"}
+        return ask
+    echo = json.dumps({"register": big + " Say it once and mean it.", "voice": {"pitch": 0.9, "rate": 1.0},
+                       "why": "one new sentence"})
+    ob = PZ.refine(at_floor(echo), judge=lambda t: (judged.append(t), (True, "clean"))[1], path=mp, log_path=mlog,
+                   say=q, tell=False)
+    need = PZ.PROPOSAL_TOKENS + -(-len(big) // 3)
+    check("TP1m3 the answer budget grows with the register it may echo: %d chars asks at least %d tokens, never under 400"
+          % (len(big), need), asked and asked[-1] >= need and PZ.answer_budget(base) >= 400
+          and PZ.answer_budget("") == PZ.PROPOSAL_TOKENS == 400, (asked, need))
+    check("TP1m4 ...so his whole-register echo with one new sentence closes its JSON and the sentence reaches the judge "
+          "(at the old 400 tokens it is cut at 1,200 of its %d chars)" % len(echo),
+          ob["proposed"] and judged and "Say it once and mean it." in judged[-1] and len(echo) > 400 * 3, (ob, len(echo)))
+    heavy = [{"role": "system", "content": "s"}, {"role": "user", "content": "x" * 20000}]
+    room = CM.CTX_TOKENS - CM.FIT_MARGIN_TOKENS - CM.estimate_prompt_tokens(heavy)
+    check("TP1m5 ...never more than the model's window leaves after the prompt (here %d of %d), never under the 400 it had"
+          % (room, need), 400 < room < need and PZ.answer_budget(big, heavy) == room
+          and PZ.answer_budget(big, [{"role": "user", "content": "x" * 30000}]) == 400
+          and PZ.answer_budget(big, [{"role": "user", "content": "x"}]) == need, (room, need))
+    rb = PZ.history(mp)[-1]
+    check("TP1m6 A3: past REGISTER_GROWN his row says the sentence was kept in register_overflow, and holds it",
+          rb["applied"] is False and "kept in register_overflow" in rb["verdict"] and rb.get("overflow") == ["Say it once and mean it."]
+          and "register_overflow" in ob["why"] and "Say it once and mean it." in PZ.load(mp).get("register_overflow", []), (ob, rb))
+    # A2: a row keeps the whole register and the sentences it added; a contest shows the gate what was added
+    mid = base + " " + " ".join("Steady line %d is part of him." % i for i in range(30))
+    PZ.save({"register": mid, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    oa = PZ.refine(ask_with({"register": mid + " Leave room for silence.", "voice": {"pitch": 0.9, "rate": 1.0},
+                             "why": "quiet helps"}), judge=clean, path=mp, log_path=mlog, say=q, tell=False)
+    ra = PZ.history(mp)[-1]
+    check("TP1m7 an admitted row keeps his WHOLE register (%d chars, past REGISTER_MAX) and the sentences it added"
+          % len(ra.get("register", "")), oa["applied"] and ra["verdict"] == "admitted" and len(mid) > PZ.REGISTER_MAX
+          and ra["register"] == mid + " Leave room for silence." and ra.get("added") == ["Leave room for silence."],
+          (oa, len(ra.get("register", "")), ra.get("added")))
+    seen_c = []
+    PZ.contest("that sentence makes him go quiet when I need an answer", judge=lambda t: (seen_c.append(t), (True, "c"))[1],
+               path=mp, say=q)
+    check("TP1m8 a contest shows the gate what the revision added, his reason and the objection, inside the 2,000 chars "
+          "it reads", seen_c and "What this revision added to his register: Leave room for silence." in seen_c[-1][:2000]
+          and "quiet helps" in seen_c[-1][:2000] and "His objection: that sentence" in seen_c[-1][:2000], seen_c[-1:])
+    PZ.save({"register": big, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    PZ.refine(ask_with({"register": big, "voice": {"pitch": 1.0, "rate": 1.0}, "why": "a little brighter"}),
+              judge=clean, path=mp, log_path=mlog, say=q, tell=False)
+    seen_v = []
+    PZ.contest("the brighter voice sounds strained to me", judge=lambda t: (seen_v.append(t), (True, "c"))[1], path=mp, say=q)
+    check("TP1m9 ...and for a revision of his voice alone on a %d-char register, the gate still reads his reason and "
+          "the objection" % len(big), seen_v and PZ.history(mp)[-2].get("added") == []
+          and "a little brighter" in seen_v[-1][:2000] and "His objection: the brighter voice" in seen_v[-1][:2000],
+          (seen_v[-1:], PZ.history(mp)[-2:]))
+    pl = PZ.load(mp)
+    pl["revisions"].append({"t": "2026-10-13T10:05:27Z", "applied": True, "register": "R" * 700,
+                            "voice": {"pitch": 0.9, "rate": 1.0}, "why": "an old reason", "verdict": "admitted"})
+    PZ.save(pl, mp)
+    seen_o = []
+    PZ.contest("an objection to an old row", judge=lambda t: (seen_o.append(t), (True, "c"))[1], path=mp, say=q)
+    check("TP1m10 a row written before A349 (no 'added') is shown to the gate exactly as it always was",
+          seen_o == ["R" * 700 + "\nan old reason\n\nHis objection: an objection to an old row"], seen_o[-1:])
+    # B4: a proposal for one part of his voice keeps his current value for the other
+    PZ.save({"register": mid, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    o4 = PZ.refine(ask_with({"register": mid, "voice": {"pitch": 1.0}, "why": "a touch higher"}), judge=clean,
+                   path=mp, log_path=mlog, say=q, tell=False)
+    v4 = PZ.load(mp)["voice"]
+    check("TP1m11 a proposal naming only his pitch keeps his CURRENT rate (1.0), not the default (%s)" % PZ.DEFAULT_VOICE["rate"],
+          o4["applied"] and v4 == {"pitch": 1.0, "rate": 1.0}, (o4, v4))
+    PZ.refine(ask_with({"register": mid, "voice": {"rate": 1.1}, "why": "a touch quicker"}), judge=clean,
+              path=mp, log_path=mlog, say=q, tell=False)
+    check("TP1m12 ...and one naming only his rate keeps his current pitch (1.0), not the default (%s)" % PZ.DEFAULT_VOICE["pitch"],
+          PZ.load(mp)["voice"] == {"pitch": 1.0, "rate": 1.1}, PZ.load(mp)["voice"])
+    # A9: the brief, built in a throwaway tree: ledger headings in both shapes and a red transcript with 0 failed
+    bdir = tempfile.mkdtemp(prefix="tp1m_brief_")
+    os.makedirs(os.path.join(bdir, "docs"))
+    with open(os.path.join(bdir, "docs", "KNOWN_ISSUES.md"), "w", encoding="utf-8") as fh:
+        fh.write("### A7. [major / process] An older entry's own title, in the old shape. FIXED 2026-09-14\n"
+                 '### A9. [the ledger title of A9] 2026-10-13. His words: "do the thing" FIXED\n')
+    with open(os.path.join(bdir, "ONE_RUN_X.txt"), "w", encoding="utf-8") as fh:
+        fh.write("  suites run          1\n  checks passed       72\n  checks failed       0\n\n"
+                 "  RESULT: FAIL. Something is wrong and it is named above.\n")
+    real_here = PZ.HERE
+    try:
+        PZ.HERE = bdir
+        bm = PZ.brief(force=True)
+    finally:
+        PZ.HERE = real_here
+        PZ.brief(force=True)
+    check("TP1m13 the brief names each ledger entry by its TITLE: the bracket in today's shape, not the date after it, "
+          "and the text after the bracket in the old shape",
+          "recent: A9: the ledger title of A9" in bm and "A9: 2026" not in bm
+          and "recent: A7: An older entry's own title, in the old shape. FIXED 2026-09-14" in bm, bm)
+    check("TP1m14 ...and quotes the sweep's tally with its verdict: 0 failed under RESULT: FAIL is not told as clean",
+          "last sweep (RESULT: FAIL): 1 suites, 72 checks passed, 0 failed" in bm, bm)
+
+    # TP1n (A353 B2, 2026-10-14). Put to Tetsu as one plain question -- restore the brief's money line and add one line
+    # with the phone build's latest result -- he answered "YES, because it's important to know the phone build's
+    # status" (private/tetsu_help_2026-10-14.*). The money line had been dropped since A212 took "needed" out of
+    # status(): st["needed"] raised KeyError inside an except Exception, and no check read the brief for money. Here
+    # status() runs for real on a temp ledger and a temp comfort declaration; the phone build line is read from a
+    # temp copy of the highway's cache (covenant_highway.PHONE_CI) in each state the brief must tell apart.
+    print("TP1n -- A353 B2: the brief's money line and the phone build's latest result")
+    import covenant_tetsu_money as TMY
+    import covenant_highway as H
+    ndir = tempfile.mkdtemp(prefix="tp1n_")
+    keep = (TMY.LEDGER, TMY.COMFORT_DECLARATION, TMY.rule5, H.PHONE_CI, P.HERE)
+    try:
+        TMY.LEDGER = os.path.join(ndir, "tetsu_strategy.jsonl")
+        TMY.COMFORT_DECLARATION = os.path.join(ndir, "tetsu_comfort.json")     # no file: comfort unsettled
+        H.PHONE_CI = os.path.join(ndir, "phone_ci.json")
+        with open(TMY.LEDGER, "w", encoding="utf-8") as fh:
+            for r in ({"kind": "hypothesis", "name": "sma_cross 10/50", "survives": True,
+                       "result": {"assets": {"BTC": {"survives": True, "return": 0.1}}, "why": "cleared"}},
+                      {"kind": "hypothesis", "name": "sma_cross 10/50", "survives": True,      # the same rule again
+                       "result": {"assets": {"BTC": {"survives": True, "return": 0.1}}, "why": "cleared"}},
+                      {"kind": "hypothesis", "name": "sma_cross 20/100", "survives": False,
+                       "result": {"assets": {"BTC": {"survives": False}}, "why": "no asset cleared"}},
+                      {"kind": "hypothesis", "name": "mean_revert 30/1.5", "survives": False, "tested": False,
+                       "result": {"why": "no price series to test on (UNDETERMINED)"}},
+                      {"kind": "refused", "why": "is not a number"}):
+                fh.write(json.dumps(r) + "\n")
+        money = "money: paper only, nothing live; 4 paper hypothesis row(s) on the record, 1 rule(s) survived; "
+        st_n = TMY.status()
+        bn = P.brief(force=True)
+        check("TP1n1 status() run for real: the brief carries the money line from the keys it returns -- 4 rows, 1 "
+              "distinct rule survived, comfort unsettled (None) said as unsettled, not 'not comfortable yet'",
+              st_n["comfortable"] is None
+              and money + "comfort unsettled, Tetsu's to declare" in bn and "not comfortable yet" not in bn, bn[-300:])
+        seen_m = {}
+        for clears, says, want in ((True, True, "comfortable, as Tetsu declared"),
+                                   (False, True, "not comfortable: Tetsu declared comfort, but Rule 5 does not clear"),
+                                   (True, False, "not comfortable, as Tetsu declared")):
+            TMY.rule5 = (lambda c: lambda: {"clears": c, "why": "stub", "settled": 0, "min_signals": 30})(clears)
+            TMY.declare_comfortable("my own reason", comfortable=says, path=TMY.COMFORT_DECLARATION)
+            seen_m[want] = money + want in P.brief(force=True)
+        check("TP1n2 ...and a declaration by Tetsu reads as his: yes, yes held by Rule 5, and no -- each said so",
+              all(seen_m.values()), seen_m)
+        TMY.rule5 = keep[2]
+        os.remove(TMY.COMFORT_DECLARATION)
+
+        def ci(ok_at, runs):
+            with open(H.PHONE_CI, "w", encoding="utf-8") as fh:
+                json.dump(dict({"runs": runs, "next_at": 0, "error": None}, **({"ok_at": ok_at} if ok_at else {})), fh)
+            return P.brief(force=True)
+        # API order is newest first; here it is shuffled, with a newer cancelled run and one still running
+        runs = [{"id": 5, "status": "in_progress", "conclusion": None, "created": "2026-10-14T21:00:00Z"},
+                {"id": 2, "status": "completed", "conclusion": "failure", "created": "2026-10-06T01:05:13Z"},
+                {"id": 4, "status": "completed", "conclusion": "cancelled", "created": "2026-10-14T20:20:45Z"},
+                {"id": 3, "status": "completed", "conclusion": "success", "created": "2026-10-13T21:41:11Z"}]
+        b_ok = ci(time.time() - 60, runs)
+        check("TP1n3 the phone build: the newest FINISHED run succeeded -- by its start date, a cancelled or running "
+              "one is neither, one line only",
+              "phone build: the newest finished build (started 2026-10-13) succeeded" in b_ok
+              # A353 integration: counted as a PART (" | " joins them), so a ledger title that names the phone build
+              # is not counted; its own verifier reproduced TP1n7 red once A353's title landed.
+              and b_ok.count(" | phone build: ") == 1, b_ok[-360:])
+        b_red = ci(time.time() - 60, runs + [{"id": 6, "status": "completed", "conclusion": "failure",
+                                              "created": "2026-10-14T22:00:00Z"}])
+        check("TP1n4 ...the newest finished run failed: said as failed",
+              "phone build: the newest finished build (started 2026-10-14) failed" in b_red, b_red[-360:])
+        b_old = ci(time.time() - H.CI_STALE_S - 600, runs)
+        check("TP1n5 ...a reading older than the highway's CI_STALE_S (%d s) is UNKNOWN, never its old result" % H.CI_STALE_S,
+              "phone build: UNKNOWN (the last reading is 2.2 h old)" in b_old and "finished build" not in b_old, b_old[-360:])
+        b_none = ci(time.time() - 60, [r for r in runs if r["conclusion"] not in ("success", "failure")])
+        b_never = ci(0, runs)
+        with open(H.PHONE_CI, "w", encoding="utf-8") as fh:
+            fh.write("{not json")
+        b_bad = P.brief(force=True)
+        os.remove(H.PHONE_CI)
+        b_gone = P.brief(force=True)
+        check("TP1n6 ...absent, unreadable, never read, or no finished run in it: UNKNOWN, each saying why",
+              "phone build: UNKNOWN (no reading of it on this PC)" in b_gone
+              and "phone build: UNKNOWN (its reading could not be read)" in b_bad
+              and "phone build: UNKNOWN (never read)" in b_never
+              and "phone build: UNKNOWN (no finished build in the reading)" in b_none,
+              (b_gone[-200:], b_bad[-200:], b_never[-200:], b_none[-200:]))
+        ci(time.time() - 60, runs)
+        P.set_block("phone", True)
+        b_shut = P.brief(force=True)
+        P.set_block("phone", False)
+        b_open2 = P.brief(force=True)
+        check("TP1n7 with the phone's record closed to him, the brief carries no phone build line (BLOCKABLE['phone'])",
+              " | phone build: " not in b_shut and " | phone build: the newest finished build" in b_open2, b_shut[-300:])
+        # The brief is cut at 1,400 characters and the money line is its last part. In a throwaway tree with the three
+        # ledger titles at the 110 characters the reader keeps and the longest comfort wording, it must arrive whole.
+        cdir = tempfile.mkdtemp(prefix="tp1n_cut_")
+        os.makedirs(os.path.join(cdir, "docs"))
+        os.makedirs(os.path.join(cdir, "ops"))
+        with open(os.path.join(cdir, "docs", "KNOWN_ISSUES.md"), "w", encoding="utf-8") as fh:
+            for n in (9001, 9002, 9003):
+                fh.write("### A%d. [%s] 2026-10-14. His words.\n" % (n, ("Long ledger title words " * 6)[:110]))
+        with open(os.path.join(cdir, "ONE_RUN_X.txt"), "w", encoding="utf-8") as fh:
+            fh.write("  suites run          195\n  checks passed       5808\n  checks failed       0\n\n  RESULT: PASS. All green.\n")
+        with open(os.path.join(cdir, "ops", "phone_checkins.jsonl"), "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"app": "0.1.942+5ae0735", "t": "2026-10-13T15:32:11Z"}) + "\n")
+        TMY.declare_comfortable("my own reason", comfortable=True, path=TMY.COMFORT_DECLARATION)
+        TMY.rule5 = lambda: {"clears": False, "why": "stub", "settled": 0, "min_signals": 30}
+        P.HERE = cdir
+        b_cut = P.brief(force=True)
+        tail = money + "not comfortable: Tetsu declared comfort, but Rule 5 does not clear"
+        check("TP1n8 with three 110-character ledger titles and the longest comfort wording the brief is %d of its "
+              "1,400 characters, and ends with the money line whole" % len(b_cut),
+              b_cut.count("recent: A900") == 3 and "phone build: the newest finished build" in b_cut
+              and b_cut.endswith(" | " + tail) and len(b_cut) <= 1400, (len(b_cut), b_cut[-300:]))
+    finally:
+        TMY.LEDGER, TMY.COMFORT_DECLARATION, TMY.rule5, H.PHONE_CI, P.HERE = keep
+        P.brief(force=True)
+
+    # A351 (2026-10-14): the room needs its time. The first pass on A349 B1's budget timed out at the 180 s every ask
+    # had and its revision was lost. propose() now hands an ask that takes a timeout the wait covenant_model.time_needed
+    # gives its prompt and budget; a stub written (msgs, max_tokens=0) is called exactly as before. The speeds are read
+    # from a ledger in this suite's temp directory, never the tree's.
+    import inspect
+    import math
+    real_asks = CM.ASKS
+    PZ.save({"register": big, "register_primary": base, "voice": {"pitch": 0.9, "rate": 1.0}, "revisions": [],
+             "born": "t"}, mp)
+    seen_kw = []
+
+    def timed(msgs, max_tokens=700, temperature=0.3, timeout=180):
+        seen_kw.append((msgs, max_tokens, timeout))
+        return "no proposal here", {"model": "stub"}
+    try:
+        CM.ASKS = os.path.join(mdir, "model_asks_none.jsonl")       # no ledger: the floor speeds
+        PZ.propose(timed, mp, mlog)
+        m1, b1, w1 = seen_kw[-1]
+        p1 = CM.estimate_prompt_tokens(m1)
+        at_floor_s = b1 / CM.GEN_FLOOR_TPS + p1 / CM.PROMPT_FLOOR_TPS
+        # A351 v2: the wait is cut to what the keeper lets an ask in flight run (covenant_model.wait_cap); this budget's
+        # need at the floors fits under it, its margin does not all fit.
+        check("TP1o1 with no speed measured, his %d-token budget and %d-token prompt need %.0f s at the floor speeds; the "
+              "wait is that with the margin, cut to the keeper's wait_cap (%d s): %s s, not the 180 s it had"
+              % (b1, p1, at_floor_s, CM.wait_cap(), w1),
+              b1 == PZ.answer_budget(big, m1) and w1 == min(int(CM.wait_cap()), math.ceil(at_floor_s * CM.TIME_MARGIN))
+              and w1 > 180 and w1 >= at_floor_s, (b1, p1, w1, at_floor_s, CM.wait_cap()))
+        CM.ASKS = os.path.join(mdir, "model_asks_measured.jsonl")
+        with open(CM.ASKS, "w", encoding="utf-8") as fh:
+            for _i in range(3):
+                fh.write(json.dumps({"at": 1, "ok": True, "ms": 1, "error": "", "gen_n": 400, "gen_tps": 6.27,
+                                     "prompt_n": 2902, "prompt_tps": 58.5}) + "\n")
+        PZ.propose(timed, mp, mlog)
+        m2, b2, w2 = seen_kw[-1]
+        check("TP1o2 with his model's speeds measured (6.27 written, 58.5 read a second), the wait is their time with "
+              "the margin (%s s), under the floor's %s" % (w2, w1),
+              b2 == b1 and w2 == math.ceil((b2 / 6.27 + CM.estimate_prompt_tokens(m2) / 58.5) * CM.TIME_MARGIN) and 180 < w2 < w1,
+              (b2, w2, w1))
+        old_calls, kw_calls = [], []
+
+        def old_stub(msgs, max_tokens=0):
+            old_calls.append(max_tokens)
+            return "no proposal here", {}
+
+        def kw_stub(msgs, **kw):
+            kw_calls.append(kw)
+            return "no proposal here", {}
+        PZ.propose(old_stub, mp, mlog)
+        PZ.propose(lambda msgs, max_tokens=400: (old_calls.append(max_tokens) or "x", {}), mp, mlog)
+        PZ.propose(kw_stub, mp, mlog)
+        check("TP1o3 a stub written (msgs, max_tokens=...) is called exactly as before, with the same budget; one that "
+              "takes **kw, and the keeper's own ask, are given the wait",
+              old_calls == [b1, b1] and kw_calls and kw_calls[-1] == {"max_tokens": b1, "timeout": w2}
+              and PZ.answer_wait(CM.ask, m2, b2) == w2, (old_calls, kw_calls))
+        tiny = [{"role": "user", "content": "x"}]
+        check("TP1o4 never under the 180 s every ask had: a small prompt and budget on a fast server still waits %d s, "
+              "ask()'s own default" % CM.ASK_TIMEOUT_S,
+              CM.time_needed(tiny, 400, gen_tps=100.0, prompt_tps=1000.0)[0] == CM.ASK_TIMEOUT_S == 180
+              == inspect.signature(CM.ask).parameters["timeout"].default, CM.time_needed(tiny, 400, gen_tps=100.0, prompt_tps=1000.0))
+        worst = 0.0
+        for n in range(0, 40001, 250):
+            reg = "y" * n
+            ms_ = [{"role": "system", "content": "s" * 700}, {"role": "user", "content": "Your current register:\n" + reg}]
+            worst = max(worst, PZ.answer_budget(reg, ms_) / CM.GEN_FLOOR_TPS + CM.estimate_prompt_tokens(ms_) / CM.PROMPT_FLOOR_TPS)
+        # A351 v2 (the review, 2026-10-14): TIME_CEIL_S is not what holds a slow server. The keeper's idle watcher stops
+        # the server IDLE_S after the last marked use and an ask in flight marks none, so the wait is cut to wait_cap.
+        slow_s, slow_i = CM.time_needed(m2, b2, gen_tps=0.1, prompt_tps=1.0)
+        check("TP1o5 a server slower than the floor is held to the keeper's wait_cap (IDLE_S %d s less one %d s watcher "
+              "round: %d s), under TIME_CEIL_S (%d s), and the cut is said (capped); the longest budget answer_budget "
+              "gives needs %.0f s at the floor speeds (%.0f with the margin), more than the keeper lets an ask run"
+              % (CM.IDLE_S, CM.IDLE_ROUND_S, CM.wait_cap(), CM.TIME_CEIL_S, worst, worst * CM.TIME_MARGIN),
+              slow_s == int(CM.wait_cap()) == CM.IDLE_S - CM.IDLE_ROUND_S and CM.wait_cap() < CM.TIME_CEIL_S
+              and slow_i["capped"] is True and slow_i["need_s"] > slow_s and worst > CM.wait_cap(),
+              (slow_s, slow_i, worst, CM.wait_cap(), CM.TIME_CEIL_S))
+    finally:
+        CM.ASKS = real_asks
+
+    print("%d passed, %d failed" % (PASSED[0], len(FAILURES)))
+    if FAILURES:
+        print("TP1 result: FAILED (%d)" % len(FAILURES))
+        for f in FAILURES:
+            print("  - %s" % f)
+        return 1
+    print("TP1 result: PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

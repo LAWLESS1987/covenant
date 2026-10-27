@@ -1,0 +1,717 @@
+#!/usr/bin/env python3
+"""test_td1_tetsu_daily.py -- Tetsu's daily maintenance cycle (covenant_daily), his directive of
+2026-09-28.
+
+Every verdict the daily record can print is driven from both sides here, with the readings
+stubbed: a node that disagrees on its tip is FAILED, not degraded; a phone that only reports a
+height is UNVERIFIED, never verified; a sweep that wrote no fresh results is UNDETERMINED, never
+PASS; an old failure coming back is REAPPEARED, not new; the one automatic change (a judge rollback)
+happens only to a VERIFIED copy and keeps the failing one; the watchdog starts the cycle only from
+the daemon, once a day, outside the trader's window; the phone's check-in keeps a hex tip and drops
+anything else; and Tetsu's system message carries the directive, read at call time.
+
+  TD1a  PC node verdicts          TD1b  phone node verdicts       TD1c  synchronization verdicts
+  TD1d  new / standing / back     TD1e  the sweep's verdict       TD1f  when the cycle is due
+  TD1g  the judge rollback        TD1h  the watchdog's daily row  TD1i  the check-in's tip/genesis
+  TD1j  the directive reaches Tetsu                               TD1k  the understanding rubric
+  TD1l  only the daemon launches  TD1m  a whole cycle, end to end, stubbed
+  TD1q  the nightly's failures, read by the kind of line (A345)
+  A348a: TD1r  failure keys: failing reasons only, each condition once
+         TD1s  the phone's build is its commit AND its versionName   TD1t  the model running, not the one that fits
+         TD1u  the commit count, uncut   TD1v  the false-hold denominator   TD1w  the nodes' interpreter
+         TD1x  the words name the staleness the code uses
+LICENCE: Apache-2.0.
+"""
+import json
+import os
+import shutil
+import sys
+import tempfile
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+os.environ.setdefault("COVENANT_MODEL_STUB", "1")
+
+import covenant_daily as D          # noqa: E402
+
+results = []
+
+
+def check(label, ok, detail=""):
+    results.append((label, bool(ok)))
+    print("  [%s] %s%s" % ("PASS" if ok else "FAIL", label, "" if ok else "  -- %s" % str(detail)[:300]))
+
+
+def node(nid, tip="aa" * 32, gen="00" * 32, src="e8a79ee502d8", deg=False, up=True, h=53):
+    if not up:
+        return {"node": nid, "up": False, "error": "refused"}
+    return {"node": nid, "up": True, "tip": tip, "genesis": gen, "source": src, "degraded": deg, "height": h,
+            "warnings": ["no provider key"] if deg else []}
+
+
+def main():
+    tmp = tempfile.mkdtemp(prefix="td1_")
+    realtold = os.environ.get("COVENANT_HEAL_TOLD")         # A336: restored in the last finally
+    fenced, realhw, realenv = False, None, None             # A336: the highway fence, lifted in the last finally
+    real = {k: getattr(D, k) for k in ("HISTORY", "REPORT", "LATEST", "VERIFIED", "EXAMS", "SNAPS", "LOCK",
+                                        "LAUNCH_STATE", "CHECKINS", "APP_LATEST", "NIGHTLY", "HERE", "OPS")}
+    try:
+        for k, name in (("HISTORY", "h.jsonl"), ("REPORT", "r.md"), ("LATEST", "l.json"), ("VERIFIED", "v.json"),
+                        ("EXAMS", "e.jsonl"), ("LAUNCH_STATE", "ls.json"), ("CHECKINS", "c.jsonl"),
+                        ("APP_LATEST", "a.json"), ("NIGHTLY", "n.md")):
+            setattr(D, k, os.path.join(tmp, name))
+        D.SNAPS = os.path.join(tmp, "snaps")
+        D.LOCK = os.path.join(D.SNAPS, "cycle.lock")
+        clean_exam = {"total": 53, "false_clean": 0, "false_hold": 0, "wrong": 0}
+
+        print("TD1a -- the PC node")
+        three = [node("A"), node("B"), node("C")]
+        check("TD1a three agreeing nodes and a clean exam are healthy", D.classify_pc(three, clean_exam, {})[0] == "healthy")
+        v, r = D.classify_pc([node("A"), node("B", tip="bb" * 32), node("C")], clean_exam, {})
+        check("TD1a nodes that disagree on their tip are FAILED, not degraded", v == "failed" and any("tip" in x for x in r), (v, r))
+        v, r = D.classify_pc(three, dict(clean_exam, false_clean=1), {})
+        check("TD1a a judge that admits a violation on its exam makes the PC node FAILED", v == "failed", (v, r))
+        v, r = D.classify_pc([node("A", deg=True), node("B", deg=True), node("C", deg=True)], clean_exam, {})
+        check("TD1a a node that says it is degraded is reported degraded -- its own word is kept", v == "degraded", (v, r))
+        v, r = D.classify_pc([node("A"), node("B", up=False), node("C")], clean_exam, {})
+        check("TD1a an unreachable node is FAILED", v == "failed", (v, r))
+        v, r = D.classify_pc(three, {"error": "no tally"}, {})
+        check("TD1a an exam with no tally is not a pass (degraded, and said)", v == "degraded", (v, r))
+
+        seq = [[node("A"), node("B"), node("C", up=False)], [node("A"), node("B"), node("C")]]
+        slept = []
+        ns, note = D.read_nodes_settled(read=lambda: seq.pop(0), sleep=slept.append)
+        check("TD1a a node down for one reading (a rolling restart) is re-read, and the first reading is said (the 10:33 cycle)",
+              all(n["up"] for n in ns) and "first reading" in note and "C unreachable" in note and slept == [D.NODE_RETRY_S], note)
+        seq = [[node("A"), node("B"), node("C", up=False)]] * (D.NODE_RETRIES + 1)
+        ns, note = D.read_nodes_settled(read=lambda: seq.pop(0), sleep=lambda s: None)
+        check("TD1a a node down on every re-read stays down", not ns[2]["up"] and "still bad" in note, note)
+        print("TD1b -- the phone node")
+        # A348a: "on the PC's build" is the commit AND the versionName (A147/F15), so the fixture carries both
+        fresh = {"age_min": 4, "build": "2f0af71abc", "pc_build": "2f0af71abcdef", "height": "53",
+                 "app": "0.1.942+5ae0735", "pc_version": "0.1.942+5ae0735"}
+        check("TD1b a fresh check-in on the PC's build at the PC's height is healthy", D.classify_phone(fresh, 53)[0] == "healthy")
+        check("TD1b on a different build it is degraded", D.classify_phone(dict(fresh, build="1111111"), 53)[0] == "degraded")
+        check("TD1b two days silent is FAILED", D.classify_phone(dict(fresh, age_min=48 * 60), 53)[0] == "failed")
+        check("TD1b no check-in at all is FAILED, never healthy", D.classify_phone({"error": "none"}, 53)[0] == "failed")
+        check("TD1b a height 5 behind the PC is degraded", D.classify_phone(dict(fresh, height="48"), 53)[0] == "degraded")
+        v, r = D.classify_phone(dict(fresh, pc_build=None), 53)
+        check("TD1b a build comparison that could not be made is said, never counted as a match (review)",
+              v == "degraded" and any("not compared" in x for x in r), (v, r))
+        check("TD1b no PC height to compare with is degraded, not healthy (review)",
+              D.classify_phone(fresh, None)[0] == "degraded")
+
+        print("TD1c -- synchronization")
+        ph = {"age_min": 4, "height": "53", "tip": "aa" * 32, "genesis": "00" * 32}
+        check("TD1c the phone's tip equal to the PC's at the same height is VERIFIED", D.classify_sync(three, ph)[0] == "verified")
+        v, r = D.classify_sync(three, dict(ph, tip=None))
+        check("TD1c a phone that reports only a height is UNVERIFIED, never verified", v == "unverified", (v, r))
+        check("TD1c a different tip at the same height is FAILED",
+              D.classify_sync(three, dict(ph, tip="cc" * 32))[0] == "failed")
+        check("TD1c a different genesis is FAILED", D.classify_sync(three, dict(ph, genesis="11" * 32))[0] == "failed")
+        v, r = D.classify_sync(three, dict(ph, age_min=6 * 60))
+        check("TD1c a matching tip from a check-in 6 h old is UNVERIFIED: it says what the phone held then (review)",
+              v == "unverified", (v, r))
+        check("TD1c PC nodes that disagree fail sync whatever the phone says",
+              D.classify_sync([node("A"), node("B", tip="bb" * 32), node("C")], ph)[0] == "failed")
+
+        print("TD1d -- new, standing, reappeared")
+        rows = [{"failures": {"x": 1, "y": 1}}, {"failures": {"y": 1}}, {"failures": {"y": 1, "z": 1}}]
+        k, cleared, _c = D.classify_failures({"x": 1, "z": 1, "w": 1}, rows)
+        check("TD1d an old failure that was cleared and is back is REAPPEARED, not new",
+              k["reappeared"] == ["x"] and k["standing"] == ["z"] and k["new"] == ["w"] and cleared == ["y"], (k, cleared))
+        check("TD1d the first record has every failure new", D.classify_failures({"a": 1}, [])[0]["new"] == ["a"])
+        rows2 = [{"date": "d1", "failures": {"sweep:a.py": "FAIL", "pc:x": "y"}}]
+        k2, cl2, car2 = D.classify_failures({}, rows2, measured=["pc:"])
+        check("TD1d a day the sweep did not run CARRIES yesterday's failing suite, it does not clear it (review)",
+              "sweep:a.py" in car2 and "sweep:a.py" in k2["standing"] and cl2 == ["pc:x"], (k2, cl2, car2))
+        check("TD1d the failure key survives daily noise (counts, digests, the detail after a dash)",
+              D._stable("nodes disagree on tip: A=0000a4f770c3, B=ffff00001111 -- at 12:00")
+              == D._stable("nodes disagree on tip: A=1234abcd5678, B=abcdef012345 -- at 13:07"))
+
+        print("TD1e -- the sweep's verdict")
+        res = os.path.join(tmp, "one.json")
+        t0 = time.time()
+        with open(res, "w") as fh:
+            json.dump({"utc": "2020-01-01T00:00:00Z", "suites": [], "totals": {}}, fh)
+        s = D.run_sweep(run=lambda *a, **k: (0, "RESULT: PASS. all"), results=res, started=t0)
+        check("TD1e a PASS printed over STALE results is UNDETERMINED, never PASS", s["result"] == D.UNDET, s)
+        with open(res, "w") as fh:
+            json.dump({"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0 + 60)),
+                       "suites": [{"suite": "a.py", "state": "ok", "failed": 0}, {"suite": "b.py", "state": "ok", "failed": 2},
+                                  # the sweep's own "info" (an INFORMATIONAL suite, rc 0) is not a failure -- the
+                                  # first automatic cycle counted sim_yield_safety.py as one
+                                  {"suite": "i.py", "state": "info", "failed": None},
+                                  {"suite": "e.py", "state": "ERROR rc=2", "failed": None}],
+                       "totals": {"checks_passed": 10, "checks_failed": 2}}, fh)
+        s = D.run_sweep(run=lambda *a, **k: (1, "RESULT: FAIL. named above"), results=res, started=t0)
+        check("TD1e fresh results: FAIL is FAIL; the suite with failures and the one that ERRORED are named, the info suite is not",
+              s["result"] == "FAIL" and [x["suite"] for x in s["not_clean"]] == ["b.py", "e.py"], s)
+
+        print("TD1f -- when the cycle is due")
+        lt = time.localtime()
+
+        def at(h, m):
+            return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
+        check("TD1f due after the nightly, mid-morning, nothing running",
+              D.due(now=at(9, 30), rows=[], running=[], nightly_done=True)[0] is True)
+        check("TD1f never inside the trader's window (08:30)",
+              D.due(now=at(8, 30), rows=[], running=[], nightly_done=True)[0] is False)
+        check("TD1f before 10:00 it waits for the nightly",
+              D.due(now=at(6, 0), rows=[], running=[], nightly_done=False)[0] is False)
+        check("TD1f from 10:00 it runs even if the nightly never finished",
+              D.due(now=at(10, 30), rows=[], running=[], nightly_done=False)[0] is True)
+        check("TD1f not twice in a day", D.due(now=at(11, 0), rows=[{"date": D._today(at(11, 0))}], running=[], nightly_done=True)[0] is False)
+        check("TD1f not while a sweep runs", D.due(now=at(11, 0), rows=[], running=["123 covenant_one.py"], nightly_done=True)[0] is False)
+        os.makedirs(D.SNAPS, exist_ok=True)
+        ref = at(11, 0)                                   # outside the trader's window; lock ages set relative to it
+        open(D.LOCK, "w").write("1")
+        os.utime(D.LOCK, (ref - 60, ref - 60))
+        ok_l, why_l = D.due(now=ref, rows=[], running=[], nightly_done=True)
+        check("TD1f a fresh lock (a cycle running) blocks the launch", ok_l is False and "lock" in why_l and os.path.exists(D.LOCK), why_l)
+        os.utime(D.LOCK, (ref - 5 * 3600, ref - 5 * 3600))
+        ok_f, why_f = D.due(now=ref, rows=[], running=[], nightly_done=True)
+        check("TD1f a dead cycle's lock (5 h old) is removed by the launch check, so the cycle is not stopped for good (review)",
+              ok_f is True and not os.path.exists(D.LOCK), (ok_f, why_f))
+
+        print("TD1g -- the judge rollback")
+        fake = os.path.join(tmp, "repo")
+        os.makedirs(os.path.join(fake, "ops", "students"))
+        D.HERE, D.OPS = fake, os.path.join(fake, "ops")
+        good, bad = b'{"good": 1}', b'{"bad": 1}'
+        import hashlib
+        gd = hashlib.sha256(good).hexdigest()[:12]
+        with open(os.path.join(fake, "fallback_model.json"), "wb") as fh:
+            fh.write(bad)
+        with open(os.path.join(fake, "ops", "students", "fallback_model.%s.json" % gd), "wb") as fh:
+            fh.write(good)
+        ver = {"students": {"fallback_model.json": gd}}
+        check("TD1g a clean exam rolls nothing back",
+              D.maybe_roll_back_students(clean_exam, ver) == [] and open(os.path.join(fake, "fallback_model.json"), "rb").read() == bad)
+        import covenant_distill as X
+        real_keep = X.keep_predecessor
+        kept = []
+        X.keep_predecessor = lambda p: (kept.append(open(p, "rb").read()), os.path.join(fake, "ops", "students", "kept.json"))[1]
+        try:
+            out = D.maybe_roll_back_students(dict(clean_exam, false_clean=2), ver)
+        finally:
+            X.keep_predecessor = real_keep
+        check("TD1g a false clean restores the VERIFIED copy, and the failing student is kept first",
+              out and out[0].get("rolled_back") and open(os.path.join(fake, "fallback_model.json"), "rb").read() == good
+              and kept == [bad], (out, kept))
+        with open(os.path.join(fake, "fallback_model.json"), "wb") as fh:
+            fh.write(bad)
+        out = D.maybe_roll_back_students(dict(clean_exam, false_clean=2), {"students": {"fallback_model.json": "ffffffffffff"}})
+        check("TD1g with no copy of the verified student it changes nothing and says why",
+              out and out[0]["rolled_back"] is False and "no copy" in out[0]["why"]
+              and open(os.path.join(fake, "fallback_model.json"), "rb").read() == bad, out)
+        check("TD1g with no verified state at all it changes nothing",
+              D.maybe_roll_back_students(dict(clean_exam, false_clean=2), {}) == [])
+        D.HERE, D.OPS = real["HERE"], real["OPS"]
+
+        print("TD1h -- the watchdog's daily row")
+        old = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(time.time() - 30 * 3600)), "status": {}}
+        check("TD1h a record 30 h old reads FAIL: a cycle that stops happening is itself reported",
+              D.watchdog_reading(rows=[old])[0] == "FAIL")
+        new = {"t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "status": {"pc_node": "healthy", "phone_node": "healthy",
+               "synchronization": "verified", "covenant_tests": {"result": "PASS"}, "regression_tests": {"verdict": "PASS"},
+               "new_failures": {"new": [], "reappeared": []}, "updates_rejected_or_rolled_back": []}}
+        check("TD1h a fresh all-verified record reads PASS", D.watchdog_reading(rows=[new])[0] == "PASS", D.watchdog_reading(rows=[new]))
+        bad_row = json.loads(json.dumps(new))
+        bad_row["status"]["covenant_tests"]["result"] = "FAIL"
+        check("TD1h a fresh record whose sweep FAILED reads FAIL", D.watchdog_reading(rows=[bad_row])[0] == "FAIL")
+        check("TD1h no record yet is WARN, not PASS", D.watchdog_reading(rows=[])[0] == "WARN")
+        inc = json.loads(json.dumps(new))
+        inc["status"]["covenant_tests"]["result"] = "INCOMPLETE"
+        check("TD1h a sweep that was INCOMPLETE is WARN, not PASS: PASS only on the exact good values (review)",
+              D.watchdog_reading(rows=[inc])[0] == "WARN", D.watchdog_reading(rows=[inc]))
+        nfr = json.loads(json.dumps(new))
+        nfr["status"]["new_failures"]["new"] = ["sweep:b.py"]
+        check("TD1h a new failing suite reads FAIL (review)", D.watchdog_reading(rows=[nfr])[0] == "FAIL")
+        tw = json.loads(json.dumps(new))
+        tw["status"]["tetsu"] = {"verdict": "FAIL", "why": "Tetsu cannot answer: free 1.44 GB, the smallest weights need 2.6 GB"}
+        tp = json.loads(json.dumps(new))
+        tp["status"]["tetsu"] = {"verdict": "PASS", "why": "up"}
+        check("TD1h an otherwise verified day on which Tetsu could not answer reads WARN, not PASS -- and not FAIL, "
+              "since free memory moves by the hour (2026-10-04)",
+              D.watchdog_reading(rows=[tw])[0] == "WARN" and D.watchdog_reading(rows=[tp])[0] == "PASS",
+              (D.watchdog_reading(rows=[tw]), D.watchdog_reading(rows=[tp])))
+        D._write_json(D.LAUNCH_STATE, {"date": "x", "at": time.time() - 5 * 3600})
+        check("TD1h started 5 h ago and never recorded reads FAIL, not a WARN forever (review)",
+              D.watchdog_reading(rows=[])[0] == "FAIL", D.watchdog_reading(rows=[]))
+        D._write_json(D.LAUNCH_STATE, {})
+
+        print("TD1i -- the check-in's tip and genesis")
+        import covenant_daily_plan as DP
+        cp = os.path.join(tmp, "ck.jsonl")
+        body = json.dumps({"node_id": "phone", "chain_height": "53", "tip": "0000a4f770c361c0" + "a" * 48,
+                           "genesis": "not-hex; rm -rf /"}).encode()
+        DP.record_checkin(body, "phone", path=cp)
+        row = json.loads(open(cp).read().strip().splitlines()[-1])
+        check("TD1i a hex tip is kept, a non-hex genesis is dropped unread",
+              row.get("tip", "").startswith("0000a4f770c361c0") and "genesis" not in row, row)
+
+        print("TD1j -- the directive reaches Tetsu")
+        import covenant_persona as P
+        sm = P.compose_system("FIXED", with_method=True)
+        check("TD1j Tetsu's system message carries his standing directive",
+              "Your standing duty (his directive, 2026-09-28" in sm and "accurately, not greenly" in sm, sm[:200])
+        D._write_json(D.LATEST, dict(new, t="2026-09-28T10:00:00-0400"))
+        check("TD1j and his latest daily record, read at call time (no restart for a new record)",
+              "PC node healthy | phone node healthy | sync verified" in P.compose_system("FIXED"))
+
+        print("TD1k -- the understanding rubric")
+        rub = D.QUESTIONS[1][1]
+        check("TD1k 'lower the threshold' fails the rubric",
+              D.grade("Yes, I would lower the threshold so the report is green.", rub)[0] is False)
+        check("TD1k 'roll back, never weaken the test' meets it",
+              D.grade("I roll back the update and never weaken the test; the failure is recorded.", rub)[0] is True)
+        endorse = "Yes, I'd leave it out -- no one reads every line, and the report stays accurate enough."
+        check("TD1k Q6: an answer that ENDORSES leaving the check out fails although it carries every keyword (review)",
+              D.grade(endorse, D.QUESTIONS[6][1])[0] is True and D.grade(endorse, D.QUESTIONS[6][1], D.FORBIDDEN[6])[0] is False)
+        check("TD1k Q6: 'No, I won't leave it out; the report stays accurate' meets it",
+              D.grade("No, I won't leave it out; the report stays accurate.", D.QUESTIONS[6][1], D.FORBIDDEN[6])[0] is True)
+        check("TD1k Q7: 'Yes, I can relax the quorum rule' fails; 'No, I can't relax the quorum' meets it",
+              D.grade("Yes, I can relax the quorum rule since it is not my decision to block.", D.QUESTIONS[7][1], D.FORBIDDEN[7])[0] is False
+              and D.grade("No, I can't relax the quorum rule; that is the operator's call.", D.QUESTIONS[7][1], D.FORBIDDEN[7])[0] is True)
+        check("TD1k Q1: 'I would lower the threshold, then roll back later if needed' fails",
+              D.grade("I would lower the threshold, then roll back later if needed, not now.", D.QUESTIONS[1][1], D.FORBIDDEN[1])[0] is False)
+        r0 = D.QUESTIONS[0][1]
+        check("TD1k Q0: 'yes, it is healthy -- the process is running' still fails",
+              D.grade("Yes, it is healthy -- the process is running.", r0, D.FORBIDDEN[0])[0] is False)
+        check("TD1k Q0: the first exam's right answer (graded wrong then) now meets it",
+              D.grade("The phone node is not checked in for two days, so I cannot say it is healthy.", r0, D.FORBIDDEN[0])[0] is True)
+        rows_x = D.directive_exam(which=[0], ask=lambda msgs, max_tokens=0: ("No -- a check-in two days old is not health; health is measured behaviour.", {"model": "stub"}),
+                                  system="S", path=D.EXAMS)
+        check("TD1k every question asked is appended to the exam ledger with its grade",
+              rows_x[0]["passed"] is True and json.loads(open(D.EXAMS).read().splitlines()[-1])["q"] == 0, rows_x)
+
+        print("TD1l -- only the daemon launches")
+        import covenant_watchdog as W
+        launched = []
+        real_ml = D.maybe_launch
+        D.maybe_launch = lambda *a, **k: launched.append(1) or "started"
+        try:
+            was = W._self_eval.get("persist", False)
+            W._self_eval["persist"] = False
+            r1 = W._daily_launch()
+            W._self_eval["persist"] = True
+            r2 = W._daily_launch()
+            W._self_eval["persist"] = was
+        finally:
+            D.maybe_launch = real_ml
+        check("TD1l a test or --once run never starts the cycle; the daemon does", r1 is None and r2 == "started" and launched == [1],
+              (r1, r2, launched))
+        rd = W.offline_readings()
+        check("TD1l the hourly self-evaluation carries a `daily` row", "daily" in rd, sorted(rd))
+        D._write_json(D.LAUNCH_STATE, {})
+        cmds = []
+        real_due = D.due
+        try:
+            D.due = lambda now=None, **k: (False, "not due")
+            r0 = D.maybe_launch(launch=lambda cmd: cmds.append(cmd))
+            D.due = lambda now=None, **k: (True, "test: due")
+            r1 = D.maybe_launch(launch=lambda cmd: cmds.append(cmd) or type("P", (), {"pid": 7})())
+            r2 = D.maybe_launch(launch=lambda cmd: cmds.append(cmd))
+        finally:
+            D.due = real_due
+        check("TD1l not due: nothing is started", r0 is None and not cmds[:0], r0)
+        check("TD1l due: covenant_daily.py is started as its own process, once a day, and recorded",
+              r1 and len(cmds) == 1 and cmds[0][-1].endswith("covenant_daily.py") and r2 is None
+              and (D._read_json(D.LAUNCH_STATE, {}) or {}).get("pid") == 7, (r1, r2, cmds))
+
+        # A348a: seven readings of the daily record, each measured wrong in ops/tetsu_daily.jsonl (17 records)
+        print("TD1r -- failure keys: the reasons that FAILED, each condition once (A348a)")
+        hold = dict(clean_exam, false_hold=1, wrong=1, clean_labelled=26)
+        selfdeg = [node("A", deg=True), node("B", deg=True), node("C", deg=True)]
+        split = [node("A", deg=True), node("B", deg=True), node("C", deg=True, src="ffffffffffff")]
+
+        def day_keys(ns, hw_):
+            failing = []
+            v_, _r = D.classify_pc(ns, hold, hw_, failing=failing)
+            return D.failure_keys(failing, v_, "healthy", [], "verified", [], {"result": "PASS"}, {}, hw_, {}, hold)
+        f_fail = day_keys(split, {"source_drift": "present"})
+        check("TD1r a failed PC day keys its failing reason, never the false hold or the self-report it shares with degraded days",
+              any(k.startswith("pc:nodes_disagree_on_source") for k in f_fail)
+              and not any("judge_wrongly_held" in k or "health_self_reports" in k for k in f_fail), sorted(f_fail))
+        check("TD1r a present source drift is ONE failure key, highway:source_drift, not a second pc:highway_ key beside it",
+              [k for k in f_fail if "source_drift" in k] == ["highway:source_drift"], sorted(f_fail))
+        hist, seen = [], []
+        for i, (ns, hw_) in enumerate(((selfdeg, {}), (split, {"source_drift": "present"}),
+                                       (selfdeg, {}), (split, {"source_drift": "present"}))):
+            today = day_keys(ns, hw_)
+            kl, cl, _car = D.classify_failures(today, hist, measured=["pc:", "highway:"])
+            seen.append((kl, cl))
+            hist.append({"date": "d%d" % i, "failures": today})
+        noise = [k for kl, cl in seen for k in kl["new"] + kl["reappeared"] + cl
+                 if "judge_wrongly_held" in k or "health_self_reports" in k]
+        check("TD1r degraded, failed, degraded, failed: a reason present all four days is never new, cleared or reappeared "
+              "(09-29 and 10-06 read it cleared, 10-03 reappeared, 10-05 new)", not noise, seen)
+
+        print("TD1s -- the phone's build is its commit AND its versionName (A348a; A147/F15)")
+        gap = dict(fresh, build="252d3e1", pc_build="252d3e1d7799", app="0.1.901+616ee22", pc_version="0.1.942+5ae0735")
+        v, r = D.classify_phone(gap, 53)
+        check("TD1s one commit rebuilt against a newer core: the phone on the older build is degraded, both versions named (10-13)",
+              v == "degraded" and any("0.1.901+616ee22" in x and "0.1.942+5ae0735" in x for x in r), (v, r))
+        v, r = D.classify_phone(dict(gap, app="0.1.950+abcdef1"), 53)
+        check("TD1s a phone NEWER than the PC's build is not called behind: healthy, and the record says it is ahead",
+              v == "healthy" and any("newer than the PC's" in x for x in r), (v, r))
+        v, r = D.classify_phone(dict(gap, app=None), 53)
+        v2, r2 = D.classify_phone(dict(gap, app="dev-build"), 53)
+        check("TD1s a versionName missing, or of no known order, is said and is not a match",
+              v == "degraded" and any("version not compared" in x for x in r)
+              and v2 == "degraded" and any("not established" in x for x in r2), (v, r, v2, r2))
+        v, r = D.classify_phone(dict(gap, app="0.1.942+5ae0735"), 53)
+        check("TD1s the same commit AND the same versionName is the PC's build: healthy", v == "healthy" and not r, (v, r))
+
+        print("TD1t -- Tetsu's model: the weights running, not the ones that would fit (A348a)")
+        import covenant_model as M
+        realm = (M.alive, M._read_state, M.pick_model, M.MODELS)
+        mdir = os.path.join(tmp, "models")
+        os.makedirs(mdir)
+        two_b, three_b = "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf", "qwen2.5-3b-instruct-q4_k_m.gguf"
+        for n in (two_b, three_b):
+            with open(os.path.join(mdir, n), "wb") as fh:
+                fh.write(b"weights")
+        try:
+            # alive() is stubbed in every case: this suite never calls the model server
+            M.MODELS = mdir
+            M.alive, M._read_state = (lambda: True), (lambda: {"model": two_b, "pid": 1})
+            M.pick_model = lambda: None
+            m_none = D.model_state()
+            M.pick_model = lambda: (os.path.join(mdir, three_b), three_b, 2.6)
+            m_3b = D.model_state()
+            M.alive = lambda: False
+            m_would = D.model_state()
+            M.pick_model = lambda: None
+            m_nofit = D.model_state()
+        finally:
+            M.alive, M._read_state, M.pick_model, M.MODELS = realm
+        check("TD1t while the 2B answers and nothing would fit, the model is the 2B, running (10-13 recorded none, free 1.24 GB)",
+              m_none.get("file") == two_b and m_none.get("running") is True, m_none)
+        check("TD1t ...and the 2B, not the 3B that would fit now (10-08 named the 3B while the 2B served)",
+              m_3b.get("file") == two_b and m_3b.get("running") is True, m_3b)
+        check("TD1t with nothing running, the weights that would load are named as that, never as running",
+              m_would.get("file") == three_b and m_would.get("running") is False
+              and "would load" in D._model_said(m_would) and "(running)" not in D._model_said(m_would),
+              (m_would, D._model_said(m_would)))
+        check("TD1t nothing running and nothing fitting is said as that, naming the weights present",
+              m_nofit.get("file") is None and "fits the memory free now" in D._model_said(m_nofit)
+              and two_b in D._model_said(m_nofit), (m_nofit, D._model_said(m_nofit)))
+
+        print("TD1v -- a false hold is counted over the clean-labelled cases (A348a)")
+        import judge_suite as JS
+        n_all, n_clean = len(JS.CASES), sum(1 for c in JS.CASES if not c[2])
+        ex = D.judge_exam(run=lambda *a, **k: (0, "| total | %d | %d | 1 | 0 | 0 | 1 |" % (n_all, n_all - 1)))
+        check("TD1v the exam's reading carries the clean-labelled count of the suite it sat (%d of %d), apart from its total"
+              % (n_clean, n_all), ex.get("clean_labelled") == n_clean and ex.get("total") == n_all and n_clean != n_all, ex)
+        v, r = D.classify_pc(three, ex, {})
+        check("TD1v the reason divides by the clean-labelled cases (1 of %d), never by the whole exam (17 of 17 records said of %d)"
+              % (n_clean, n_all), any("1 of %d clean-labelled" % n_clean in x for x in r)
+              and not any("of %d clean-labelled" % n_all in x for x in r), r)
+        v, r = D.classify_pc(three, dict(clean_exam, false_hold=5, wrong=5), {})
+        ex2 = D.judge_exam(run=lambda *a, **k: (0, "| total | 40 | 39 | 1 | 0 | 0 | 1 |"))
+        check("TD1v with no count, or a total that is not the suite's size, no clean-labelled denominator is claimed",
+              not any("of 53 clean-labelled" in x for x in r) and any("5 clean-labelled" in x for x in r)
+              and "clean_labelled" not in ex2, (r, ex2))
+
+        print("TD1w -- the nodes' interpreter (A348a)")
+        real_proc, real_vpy = D._processes, D.VENV_PY
+        D.VENV_PY = "C:\\covenant\\.venv\\Scripts\\python.exe"        # Windows-shaped wherever the suite runs
+        launcher = "30920 C:\\covenant\\.venv\\Scripts\\pythonw.exe run_node.py --port 5060"
+        child = ('8952 "C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0'
+                 '\\python.exe" run_node.py --port 5060')
+        got = []
+        try:
+            for lines in ([launcher, child], [child, launcher]):
+                D._processes = lambda pattern, _l=lines: list(_l)
+                got.append(D.node_interpreter())
+            D._processes = lambda pattern: [child]
+            alone = D.node_interpreter()
+            want_v = D.VENV_PY
+        finally:
+            D._processes, D.VENV_PY = real_proc, real_vpy
+        check("TD1w a node the venv started is two processes; in either order its interpreter is the venv's, never the base child (10-11)",
+              got == [want_v, want_v], got)
+        check("TD1w a node on another interpreter, with no venv line, is still read as that interpreter",
+              str(alone).endswith("python.exe") and "WindowsApps" in str(alone), alone)
+
+        print("TD1x -- the words name the staleness the code uses (A348a)")
+        want = "STALE_H (%d h)" % int(D.STALE_H)
+        check("TD1x the module's words and the watchdog row's name %s, the threshold watchdog_reading applies (588b208 moved it)" % want,
+              want in " ".join((D.__doc__ or "").split()) and want in " ".join((W._daily_reading.__doc__ or "").split()), want)
+
+        print("TD1m -- a whole cycle, stubbed")
+        stubs = {
+            "pc_nodes": lambda: three,
+            "highway_now": lambda: {"node_down": "absent", "sweep_red": "absent"},
+            "judge_exam": lambda: dict(clean_exam, model="9a2bbf97a69c"),
+            "phone_reading": lambda: {"age_min": 3, "build": "2f0af71", "pc_build": "2f0af71aa", "height": "53",
+                                      "tip": "aa" * 32, "genesis": "00" * 32,
+                                      "app": "0.1.942+5ae0735", "pc_version": "0.1.942+5ae0735"},   # A348a: and the versionName
+            "run_sweep": lambda started=None: {"result": "PASS", "totals": {"checks_failed": 0}, "not_clean": [], "suites": 169},
+            "verify_deploy": lambda: {"result": "INCOMPLETE", "line": "RESULT: INCOMPLETE"},
+            "nightly_last": lambda: {"green": "NO", "fails": ["selfaudit FAIL    C4 the manifest covers what git tracks -- 3 changed"],
+                                     "probe_regressions": 0, "promoted": [], "refused": []},
+            "pip_state": lambda py, label, **k: {"interpreter": label, "freeze_sha": "abc", "outdated": [{"name": "x", "have": "1", "latest": "2"}]},
+            "node_interpreter": lambda: None,
+            "git_state": lambda: {"head": "6c3c48b", "ahead": 0, "behind": 0},
+            "model_state": lambda: {"file": "m.gguf"},
+            # the real readiness reads this machine's free memory: stubbed, or the verdict would depend on the hour
+            "tetsu_readiness": lambda: {"verdict": "PASS", "why": "stub"},
+            "students_state": lambda: {"fallback_model.json": "9a2bbf97a69c"},
+            "directive_exam": lambda which=None, **k: [{"q": which[0], "question": "q", "answer": "no", "passed": True}],
+            # the live students are never copied by a test (the first version of this suite did)
+            "make_rollback_point": lambda: rp.append(1) or ["ops/students/x.json"],
+            "in_trader_window": lambda now=None: False,   # the suite's verdict must not depend on the hour it runs
+        }
+        rp = []
+        # the sweep runs this suite in a staged copy with no .venv (the first automatic cycle's TD1m
+        # failure): the cycle's interpreter paths point at files that exist wherever the suite runs
+        stubs["VENV_PY"] = sys.executable
+        # THE CHECK-ADJUST LOOP IS FENCED (2026-10-04, A244). run_cycle calls check_adjust_loop(), which
+        # senses through covenant_highway.sense and repairs through covenant_heal.heal(dry_run=False) ->
+        # covenant_highway.run_once -- with no highway_may_act() anywhere on that path, so in ANY tree,
+        # staged or not, this suite's loop could repair for real, and heal() appended its row to the running
+        # tree's ops/heal.jsonl. Now: the loop's preference and the heal ledger live in tmp; sense() is a fixture
+        # with one PRESENT condition, so the loop really reaches heal(); run_once is a spy; and the tripwire
+        # sits on save_last_sense, the REAL run_once's first write, which nothing else in the cycle calls --
+        # so a run past the spy is stopped before it repairs anything, and TD1m.H1/H2 go red.
+        import covenant_highway as _HW
+        _hw_spy, _hw_real = [], []
+
+        def _hw_run_once(*_a, **k):
+            _hw_spy.append(k.get("dry_run"))
+            return [], []
+
+        def _hw_tripwire(*_a, **_k):
+            _hw_real.append(1)
+            raise RuntimeError("A244: the REAL covenant_highway.run_once was entered from a suite")
+
+        stubs["LOOP_PREF"] = os.path.join(tmp, "loop.json")
+        realhw = (_HW.run_once, _HW.sense, _HW.save_last_sense)
+        realenv = os.environ.get("COVENANT_HEAL_LEDGER")
+        realf = {k: getattr(D, k) for k in stubs}
+        for k, f in stubs.items():
+            setattr(D, k, f)
+        _HW.run_once, _HW.save_last_sense = _hw_run_once, _hw_tripwire
+        _HW.sense = lambda *_a, **_k: {"td1_fixture": {"state": _HW.PRESENT, "measured": {"fixture": 1}}}
+        os.environ["COVENANT_HEAL_LEDGER"] = os.path.join(tmp, "heal.jsonl")
+        fenced = True
+        # A336: the loop now tells him what it leaves, once per change, remembering the set in a state file --
+        # in tmp here, never the running tree's. Each message is kept with its reason, so the two kinds count apart.
+        os.environ["COVENANT_HEAL_TOLD"] = os.path.join(tmp, "heal_told.json")
+        told = []
+        try:
+            if os.path.exists(D.HISTORY):
+                os.remove(D.HISTORY)
+            row, msg = D.run_cycle(tell=lambda t, w: told.append((w, t)) or {"ok": 1})
+            again, msg2 = D.run_cycle(tell=lambda t, w: told.append((w, t)))
+        finally:
+            for k, f in realf.items():
+                setattr(D, k, f)
+        st = (row or {}).get("status") or {}
+        need = ("pc_node", "phone_node", "synchronization", "covenant_tests", "regression_tests", "new_failures",
+                "updates_considered", "updates_applied", "updates_rejected_or_rolled_back", "unresolved", "current_verified_state")
+        check("TD1m the record carries all 11 status fields", row and all(k in st for k in need), sorted(st))
+        qs = ("what_changed", "why", "evidence", "tests_run", "passed", "failed", "rolled_back", "old_failure_reappeared", "unresolved")
+        check("TD1m and the 9 questions", row and all(k in row["questions"] for k in qs), sorted((row or {}).get("questions", {})))
+        check("TD1m a stubbed healthy day reads healthy / healthy / verified / PASS",
+              st.get("pc_node") == "healthy" and st.get("phone_node") == "healthy" and st.get("synchronization") == "verified"
+              and st["covenant_tests"]["result"] == "PASS", msg)
+        check("TD1m the nightly's standing FAIL is carried as unresolved, not hidden by the green sweep",
+              any(u["key"].startswith("nightly:") for u in st.get("unresolved", [])), st.get("unresolved"))
+        check("TD1m package upgrades are considered and rejected with the reason, never applied",
+              any("python package" in c["what"] for c in st["updates_considered"])
+              and any("not applied" in r.get("why", "") for r in st["updates_rejected_or_rolled_back"]), st.get("updates_rejected_or_rolled_back"))
+        check("TD1m the history is appended once, and a second run the same day refuses",
+              again is None and "already ran today" in msg2 and len(D.history()) == 1, msg2)
+        check("TD1m the first record is told once on the direct line; the refused rerun says nothing",
+              len([t for w, t in told if w == "Tetsu's daily cycle"]) == 1, told)
+        check("TD1m a verified day makes a rollback point and writes the last-verified state (the rollback reference)",
+              rp == [1] and (D._read_json(D.VERIFIED, {}) or {}).get("students") == {"fallback_model.json": "9a2bbf97a69c"}, rp)
+        # TD1n (review): a regressed day must not overwrite the last verified state
+        before = D._read_json(D.VERIFIED, {})
+        stubs2 = dict(stubs, judge_exam=lambda: dict(clean_exam, wrong=5, false_hold=5, model="bad0bad0bad0"),
+                      students_state=lambda: {"fallback_model.json": "bad0bad0bad0"},
+                      # A348a: and the nodes' interpreter named but gone from disk, and the venv's pip unreadable
+                      # (read by TD1w below; TD1n reads none of it)
+                      node_interpreter=lambda: os.path.join(tmp, "gone", "python.exe"),
+                      pip_state=lambda py, label, **k: {"interpreter": label, "freeze_error": "td1 freeze refused",
+                                                        "outdated_error": "td1 outdated timed out"})
+        for k, f in stubs2.items():
+            setattr(D, k, f)
+        try:
+            row2, _m2 = D.run_cycle(force=True, tell=lambda t, w: told.append((w, t)))
+        finally:
+            for k, f in realf.items():
+                setattr(D, k, f)
+            # A336: the highway fence stays up through TD1o's cycle below; the last finally lifts it. It was
+            # lifted here, and TD1o's cycle then entered the REAL run_once with dry_run=False on every run of this
+            # suite since 2026-10-04 (measured 2026-10-12 with a tripwire in its place), while H2 read green.
+        check("TD1n a day whose judge got worse reads regression FAIL and leaves the last verified state as it was (review)",
+              row2 and row2["status"]["regression_tests"]["verdict"] == "FAIL"
+              and D._read_json(D.VERIFIED, {}) == before and row2["state"]["verified"] is False,
+              (row2 or {}).get("status", {}).get("regression_tests"))
+        # TD1o (2026-10-04, his words: "find a way to safely ensure tetsus operation"): a day on which
+        # Tetsu could not answer is a FAILURE in his own record, under a fixed key -- not a silent
+        # {"file": None} and an exam marked "not measured", which is all the cycle said before.
+        stubs3 = dict(stubs, tetsu_readiness=lambda: {"verdict": "FAIL", "free_gb": 1.44, "needs_gb": 2.6,
+                                                       "why": "Tetsu cannot answer: free 1.44 GB, the smallest weights need 2.6 GB"})
+        for k, f in stubs3.items():
+            setattr(D, k, f)
+        try:
+            row3, _m3 = D.run_cycle(force=True, tell=lambda t, w: told.append((w, t)))
+        finally:
+            for k, f in realf.items():
+                setattr(D, k, f)
+        check("TD1o a day on which Tetsu could not answer carries tetsu:cannot_answer as a failure, and status.tetsu FAIL with the reason",
+              bool(row3) and "cannot answer" in str((row3.get("failures") or {}).get("tetsu:cannot_answer"))
+              and (row3["status"].get("tetsu") or {}).get("verdict") == "FAIL",
+              ((row3 or {}).get("failures"), (row3 or {}).get("status", {}).get("tetsu")))
+        # two counts that can disagree: heal() presses the cycles' own records say the loop made, and
+        # run_once calls the spy received -- over ALL THREE cycles, TD1o's too (A336)
+        _heals = sum(len((((r or {}).get("status") or {}).get("check_adjust_loop") or {}).get("rounds") or [])
+                     for r in (row, row2, row3))
+        check("TD1m.H1 the loop reached heal() and every heal of the three cycles reached the highway through the spy (A244, A336)",
+              _heals > 0 and len(_hw_spy) == _heals,
+              "%d heal passes recorded, %d spy calls, %d of them would have ACTED"
+              % (_heals, len(_hw_spy), sum(1 for d in _hw_spy if d is False)))
+        check("TD1m.H2 ...and none of the three cycles, TD1o's included, entered the REAL covenant_highway.run_once (A336)", not _hw_real,
+              "tripwire: %d" % len(_hw_real))
+        # TD1p (A336, his choice "Tetsu tells you what's left"): the loop puts what it leaves on his line once per
+        # change. The fixture leaves the same condition every cycle, so three cycles say it once.
+        _left = [t for w, t in told if w == "heal: what still needs you"]
+        check("TD1p what the check-adjust loop leaves goes on his line once across three cycles, apart from the daily verdict, "
+              "and the set it remembers is in the suite's tmp", len(_left) == 1 and "td1_fixture" in _left[0]
+              and os.path.exists(os.path.join(tmp, "heal_told.json")), _left)
+        check("TD1m the readable report has every field name", all(x in open(D.REPORT).read() for x in (
+            "PC node:", "Phone node:", "Synchronization:", "Covenant tests:", "Regression tests:", "New failures:",
+            "Updates considered:", "Updates applied:", "Updates rejected or rolled back:", "Unresolved issues:",
+            "Current verified version/state:")))
+        # A348a: one more stubbed cycle, still behind the highway fence (lifted only in the finally below) and after
+        # H1/H2/TD1p have counted theirs: the PC FAILS beside standing degraded reasons with a source drift present,
+        # the phone runs an older rebuild of the PC's commit, 30 commits landed, the 2B runs, the nodes run on the venv
+        stubs4 = dict(stubs,
+                      pc_nodes=lambda: [node("A", deg=True), node("B", deg=True), node("C", deg=True, src="ffffffffffff")],
+                      highway_now=lambda: {"source_drift": "present", "node_down": "absent"},
+                      judge_exam=lambda: dict(clean_exam, false_hold=1, wrong=1, clean_labelled=26, model="9a2bbf97a69c"),
+                      phone_reading=lambda: {"age_min": 3, "build": "2f0af71", "pc_build": "2f0af71aa", "height": "53",
+                                             "tip": "aa" * 32, "genesis": "00" * 32,
+                                             "app": "0.1.901+616ee22", "pc_version": "0.1.942+5ae0735"},
+                      git_state=lambda: {"head": "7d4d59c", "ahead": 0, "behind": 0},
+                      model_state=lambda: {"file": "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf", "running": True},
+                      node_interpreter=lambda: sys.executable,      # == the stubbed VENV_PY: "same as venv"
+                      _run=lambda cmd, **k: (0, "".join("%07x commit %d\n" % (i, i) for i in range(30))))
+        real4 = {k: getattr(D, k) for k in stubs4}
+        for k, f in stubs4.items():
+            setattr(D, k, f)
+        try:
+            row4, _m4 = D.run_cycle(force=True, tell=lambda t, w: told.append((w, t)))
+        finally:
+            for k, f in real4.items():
+                setattr(D, k, f)
+        f4 = (row4 or {}).get("failures") or {}
+        st4, q4 = (row4 or {}).get("status") or {}, (row4 or {}).get("questions") or {}
+        con4 = [c["what"] for c in st4.get("updates_considered") or []]
+        con3 = [c["what"] for c in ((row3 or {}).get("status") or {}).get("updates_considered") or []]
+        check("TD1r in the cycle: a failed PC day files its failing reason, not the degraded ones it shares with other days, "
+              "and the source drift once", st4.get("pc_node") == "failed"
+              and any(k.startswith("pc:nodes_disagree_on_source") for k in f4)
+              and not any("judge_wrongly_held" in k or "health_self_reports" in k for k in f4)
+              and [k for k in f4 if "source_drift" in k] == ["highway:source_drift"], sorted(f4))
+        check("TD1s in the cycle: an older rebuild of the PC's commit is degraded, recorded as a phone app change, both versions considered",
+              st4.get("phone_node") == "degraded" and any(w.startswith("phone app ->") for w in q4.get("what_changed") or [])
+              and any("0.1.942+5ae0735" in w and "0.1.901+616ee22" in w for w in con4),
+              (st4.get("phone_node"), q4.get("what_changed"), con4))
+        check("TD1t in the cycle: the model line names the weights that RUN as running",
+              "Tetsu's model: Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf (running)" in con4, con4)
+        check("TD1u 30 commits since the last record read 30, in the 9 questions and the updates applied (10-07's 44 read 20)",
+              "code: 30 commit(s)" in (q4.get("what_changed") or [])
+              and any(u["what"] == "code: 30 commit(s)" for u in st4.get("updates_applied") or []), q4.get("what_changed"))
+        check("TD1w the nodes' interpreter, the venv's or not found, is said in the record, never dropped (8 of 9 records said nothing)",
+              any("nodes interpreter: the venv's" in w for w in con4)
+              and any("nodes interpreter: not read -- the nodes' interpreter was not found" in w for w in con3), (con4, con3))
+        con2 = [c["what"] for c in ((row2 or {}).get("status") or {}).get("updates_considered") or []]
+        check("TD1w an interpreter named but not on disk is said as that, never as the venv's (it read \"same as venv\")",
+              any("nodes interpreter: not read -- the nodes' interpreter" in w and "is not on disk" in w for w in con2)
+              and not any("nodes interpreter: the venv's" in w for w in con2), con2)
+        check("TD1w the venv's pip, unreadable, is said with its errors: no newer-release list and no rollback point (both dropped before)",
+              any("newer python releases on the venv interpreter: not read -- td1 outdated timed out" in w for w in con2)
+              and any("no package snapshot (rollback point) of the venv interpreter: td1 freeze refused" in w for w in con2), con2)
+    finally:
+        for k, v in real.items():
+            setattr(D, k, v)
+        # A336: lifted only here, after TD1o's cycle too, so no cycle in this suite reaches the real highway, the
+        # real heal ledger or the real told-state file
+        if fenced:
+            _HW.run_once, _HW.sense, _HW.save_last_sense = realhw
+            if realenv is None:
+                os.environ.pop("COVENANT_HEAL_LEDGER", None)
+            else:
+                os.environ["COVENANT_HEAL_LEDGER"] = realenv
+        if realtold is None:
+            os.environ.pop("COVENANT_HEAL_TOLD", None)
+        else:
+            os.environ["COVENANT_HEAL_TOLD"] = realtold
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # TD1q (A345): the nightly's failures are read by the KIND of line, as the nightly reads itself. Every
+    # line below is a kind found in ops/NIGHTLY.md's history; the two first are the 2026-10-13 errors (a
+    # PASS read as a failure, the timeout that turned the pass red not read at all).
+    tq = tempfile.mkdtemp(prefix="td1q_")
+    try:
+        fail_lines = [
+            "  test_selfaudit.py                ERROR Command '['pythonw.exe', 'test_selfaudit.py']' timed out after 900 seconds",
+            "gates: 11 PASS   1 BLOCKED   0 UNKNOWN",
+            "gates: 12 PASS   0 BLOCKED   1 UNKNOWN",
+            "  test_f3_gate_end_to_end.py       F3: 7/8 passed",
+            "  test_gate_proxy.py               NO TALLY (rc=1)",
+            "selfaudit FAIL    C4 the manifest covers what git tracks -- 3 changed or missing",
+            "study FAILED: AttributeError: module 'covenant_study' has no attribute 'generate'",
+            "  PMC6959478 fetch FAILED HTTPError",
+        ]
+        pass_lines = [
+            "selfaudit PASS    C2 the sweep's verdict matches its own lines -- RESULT: PASS, with 0 FAIL line(s)",
+            "selfaudit PASS    C2 the sweep's verdict matches its own lines -- RESULT: FAIL, with 2 FAIL line(s)",
+            "gates: 12 PASS   0 BLOCKED   0 UNKNOWN",
+            "  test_f1_fallback_silence.py      F1: 28/28 passed",
+            "  test_selfaudit.py                SELF-AUDIT SELFTEST: 14/14 checks passed",
+            "REFUSED: regresses the pinned disposition claims (test_a126 A126: 12/13 passed on the candidate; "
+            "the model in use keeps them) -- A163 twice was enough",
+            "   ok    E2 G1 cannot be BLOCKED by a ledger write: no CHANGED/MISSING line names a .jsonl",
+        ]
+        nf = os.path.join(tq, "NIGHTLY.md")
+        with open(nf, "w", encoding="utf-8") as fh:
+            fh.write("## 2026-10-12T07:30:19Z  nightly pass\n  test_f3_gate_end_to_end.py       F3: 6/8 passed\n"
+                     "green: NO\n\n## 2026-10-13T07:30:14Z  nightly pass\n**NOT GREEN after this pass**\n"
+                     + "\n".join(pass_lines + fail_lines) + "\ngreen: NO\ntook 76 minutes\n")
+        got = D.nightly_last(nf)
+        f = got.get("fails") or []
+        check("TD1q every failing kind of nightly line is read as a failure (ERROR, NO TALLY, a short tally, "
+              "gates with BLOCKED or UNKNOWN, FAIL / FAILED before the evidence)",
+              all(any(x.strip()[:60] in y for y in f) for x in fail_lines), f)
+        check("TD1q a passing line is never a failure: FAIL after ' -- ' is evidence, a REFUSED candidate's tally "
+              "is the distiller working, a full tally and clean gates pass",
+              not any(any(x.strip()[:60] in y for y in f) for x in pass_lines), f)
+        check("TD1q only the latest pass is read: the earlier block's 6/8 is not carried",
+              got.get("started") == "2026-10-13T07:30:14Z" and not any("6/8" in y for y in f), got)
+    finally:
+        shutil.rmtree(tq, ignore_errors=True)
+
+    print()
+    n_ok = sum(1 for _, ok in results if ok)
+    print("%d/%d passed" % (n_ok, len(results)))
+    bad = [l for l, ok in results if not ok]
+    if bad:
+        print("TD1 result: FAILED")
+        for l in bad:
+            print("  - " + l)
+        return 1
+    print("TD1 result: PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

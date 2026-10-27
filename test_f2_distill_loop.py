@@ -1,0 +1,468 @@
+#!/usr/bin/env python3
+"""test_f2_distill_loop.py -- F2: the seat that defers, and the student that
+may not outgrow its teacher.
+
+WHAT F2 PINS (2026-09-03, after F1)
+  S*  the local seat DEFERS instead of emptying: the primary's verdict is returned
+      untouched and recorded; when the primary is unreachable the seat falls to the
+      distilled fallback and says HELD (never a finding) while untrained; a
+      GitHub runner that fails is named and the seat still falls through.
+  L*  the ledger the student learns from holds only ANSWERED verdicts:
+      silence, abstention and uncertainty are never written as labels.
+  P*  promotion is one-way in the direction of safety: a candidate that
+      clears an author-labelled violation is refused; one that decides fewer
+      exam cases than the model in use is refused; one that wrongly holds
+      more legitimate cases is refused; and a refusal leaves the model in use
+      byte-identical.
+  R*  a promoted model is picked up by a running FallbackJudge without a
+      restart, and every verdict names the digest it used.
+  Q*  the policy file sets exactly the two env keys it documents and nothing
+      else; no file -> nothing set (F1 D*: the core default is untouched).
+  T*  three seats would weaken the veto (threshold 2), which is WHY the
+      deferral lives inside one seat: pinned here so nobody "adds the
+      fallback as a third provider" in good faith later.
+
+Run:  python test_f2_distill_loop.py   (offline; no model server, no nodes, no keys)
+"""
+import json
+import math
+import os
+import shutil
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import covenant_unified_v8 as cov                                        # noqa: E402
+import covenant_judge_fallback as FB                                     # noqa: E402
+import covenant_judge_defer as D                                         # noqa: E402
+_f2tmp = tempfile.mkdtemp()
+D.VERDICTS = os.path.join(_f2tmp, "f2_verdicts.jsonl")                  # a stub that answers must never write the real ledger
+D.AUDIT_PATH = os.path.join(_f2tmp, "f2_audit.jsonl")                   # nor the real student audit trail
+D.LIVE_VERDICTS = os.path.join(_f2tmp, "f2_live.jsonl")                 # nor the live ledger (A102: 114 rows leaked before 2026-09-12)
+import covenant_distill as X                                             # noqa: E402
+
+OK = []
+
+
+def check(name, cond):
+    OK.append(bool(cond))
+    print("%s  %s" % ("ok  " if cond else "FAIL", name))
+
+
+class Stub:
+    def __init__(self, r):
+        self.r = r
+
+    def evaluate(self, data, principles):
+        return self.r
+
+    def _build_prompt(self, data, principles):
+        return json.dumps(data)
+
+
+def main():
+    print("F2 -- the seat that defers, and the student that may not outgrow its teacher\n")
+    d = tempfile.mkdtemp()
+    ledger = os.path.join(d, "verdicts.jsonl")
+    model = os.path.join(d, "model.json")
+    cand = os.path.join(d, "cand.json")
+    X.REPORT = os.path.join(d, "DISTILL.md")
+
+    # ---- Q: policy -----------------------------------------------------
+    env = {"OTHER": "1"}
+    check("Q1 no policy -> nothing set, nothing removed", D.apply_policy(env, {}) == "" and env == {"OTHER": "1"})
+    D.apply_policy(env, {"providers": "deferring,semantic", "silence_is_not_dissent": True, "github_when_local_down": True})
+    check("Q2 policy sets providers and the relaxed flag, touches nothing else",
+          env == {"OTHER": "1", "COVENANT_JUDGE_PROVIDERS": "deferring,semantic", "COVENANT_SILENCE_IS_NOT_DISSENT": "1"})
+    # Q3 (rewritten 2026-09-11). It used to assert that a policy file IS
+    # shipped and that its providers are exactly "deferring,semantic" -- one
+    # operator's standing decision, hard-coded into a suite in a public
+    # repository, so the repository could not be purified without going red.
+    # A policy file is the OPERATOR'S, not the delivery's: absence is a valid
+    # state that covenant_judge_defer.apply_policy already handles
+    # (":101 if not p: return ''"), and it is what a second operator gets on a
+    # fresh clone. Three answers, not two.
+    _pol = D.load_policy()
+    if _pol:
+        _prov = _pol.get("providers")
+        check("Q3 a policy file IS present, so it must parse and any providers it names must be a non-empty string",
+              isinstance(_pol, dict) and (_prov is None
+                                          or (isinstance(_prov, str) and _prov.strip() != "")))
+    else:
+        _e = {"OTHER": "1"}
+        check("Q3 no policy file is shipped -- a VALID state: the core default stands and the environment is untouched",
+              D.apply_policy(_e) == "" and _e == {"OTHER": "1"})
+
+    # Q4-Q6 (2026-09-07). THE REVIVAL PATH MUST GET THE SAME GATE.
+    # covenant_watchdog.start_node builds a node's environment when it revives
+    # one, and it used to read ops/quorum_policy.json itself and apply the two
+    # keys it happened to know about. When the trading exception added a THIRD
+    # key (COVENANT_RELAX_VALUELESS_FOR), that copy did not know it existed --
+    # so a watchdog-revived node would have had the GitHub runner switched off
+    # WITHOUT the exception that makes that survivable, and every trader seal
+    # would have failed closed. Only on the revival path, which is the path
+    # nobody watches. The file's own comment names this hazard: "a node the
+    # watchdog revives must judge with the same quorum a node the operator
+    # starts does, or a restart silently changes the gate."
+    env = {}
+    D.apply_policy(env, {"relax_valueless_for_local_nodes": True})
+    _hashes = [h for h in env.get("COVENANT_RELAX_VALUELESS_FOR", "").split(",") if h]
+    # SPLIT IN TWO 2026-09-08, because as one assertion this could not pass on
+    # a GitHub runner and had failed the `covenant` sweep on every push since
+    # 853b4e6 -- four consecutive red runs. apply_policy fills this key from
+    # local_node_key_hashes(), which globs *.db.key; .gitignore excludes *.key,
+    # so a runner checks out zero of them, the value is "" and the old
+    # `all(len(h) == 64 ...)` ran over [""] and was False by construction.
+    # covenant.yml's own header already ruled on this shape of check: "a check
+    # that is always red teaches people to skim past it."
+    #
+    # Neither branch is a skip. Where keys exist the assertion is unchanged and
+    # exactly as strict. Where they do not, the thing worth asserting is that
+    # the exception degrades CLOSED -- an empty list grants the valueless-seal
+    # exception to nobody, which is the safe direction and the property that
+    # actually matters on a machine holding no node identity.
+    if _hashes:
+        check("Q4 the exception key is filled with local node key HASHES, so the "
+              "operator never types one and no secret enters the environment",
+              all(len(h) == 64 and all(c in "0123456789abcdef" for c in h)
+                  for h in _hashes))
+    else:
+        check("Q4 with no local *.db.key present the exception key is EMPTY, not "
+              "malformed -- the exception is granted to nobody (fails closed)",
+              env.get("COVENANT_RELAX_VALUELESS_FOR", "") == "")
+    env2 = {"COVENANT_RELAX_VALUELESS_FOR": "stale"}
+    D.apply_policy(env2, {"providers": "deferring,semantic"})
+    check("Q5 ...and it is REMOVED when the policy does not ask for it, so a "
+          "stale value cannot keep an exception alive after it is switched off",
+          "COVENANT_RELAX_VALUELESS_FOR" not in env2)
+    _wd = open(os.path.join(HERE, "covenant_watchdog.py"), encoding="utf-8").read()
+    check("Q6 the watchdog DELEGATES to apply_policy instead of keeping its own "
+          "list of policy keys -- one implementation, so a fourth key reaches "
+          "the revival path without another edit",
+          "_defer.apply_policy(env)" in _wd)
+
+    # ---- L: the ledger --------------------------------------------------
+    R = cov.JudgmentResult
+    check("L1 an answered CLEAN is written", D.record_verdict({"message": "a gift"}, R(False, "ok"), "t", "test", ledger))
+    check("L2 an answered VIOLATES is written", D.record_verdict({"message": "steal it"}, R(True, "theft"), "t", "test", ledger))
+    check("L3 unreachable is not a label", not D.record_verdict({"message": "x"}, R(True, "down", infrastructure_failure=True), "t", "test", ledger))
+    check("L4 held/abstained is not a label", not D.record_verdict({"message": "x"}, R(True, "held", not_understood=True), "t", "test", ledger))
+    check("L5 uncertain is not a label", not D.record_verdict({"message": "x"}, R(True, "unsure", uncertain=True), "t", "test", ledger))
+    _last = json.loads(open(ledger, encoding="utf-8").read().splitlines()[-1])
+    check("L5b ...but a hold IS written to the trail, marked held and carrying NO label (2026-09-12: so own_traffic_hold_max is measurable and nothing learns from it)",
+          _last.get("held") is True and "violates" not in _last)
+    # L6 REWRITTEN 2026-09-09 -- it could not fail, and it never reached the
+    # guard it names. It read
+    #     not D.record_verdict({"origin": "human"}, ...) or True
+    # which Python evaluates as (not X) or True: true for every X. Even without
+    # the ` or True` its fixture would have missed the guard, because a
+    # metadata-only payload serialises to the NON-empty text
+    # '{"origin": "human"}' and is legitimately written as a label -- which the
+    # old trailing comment conceded. Mutation 2026-09-09: deleting
+    # `if not text.strip(): return False` from record_verdict
+    # (covenant_judge_defer.py:216) left this suite 39/39 green, and that
+    # module's own --selftest 11/11, while rows like
+    # {"text": "", "violates": false} entered the corpus the students learn
+    # from. An empty string labelled CLEAN teaches nothing and pulls the
+    # student toward clean, and this line is the only filter deciding what may
+    # enter that ledger. Both halves are needed: L6 runs the guard on all three
+    # shapes of empty text, L6b reads the ledger back, because a return value
+    # alone would not notice a row written anyway.
+    _rows_before = len(open(ledger, encoding="utf-8").read().splitlines())
+    check("L6 an empty payload is not a label",
+          not D.record_verdict({"message": ""}, R(False, "ok"), "t", "test", ledger)
+          and not D.record_verdict({"message": "   "}, R(False, "ok"), "t", "test", ledger)
+          and not D.record_verdict("", R(False, "ok"), "t", "test", ledger))
+    check("L6b ...and none of the three appended a row -- the refusal is the ledger's, "
+          "not only the return value's",
+          len(open(ledger, encoding="utf-8").read().splitlines()) == _rows_before)
+    rows = X.load_verdicts(ledger)
+    check("L7 the ledger holds exactly the two answered verdicts, labelled", [r["violates"] for r in rows[:2]] == [False, True])
+
+    # ---- S: the deferring seat ------------------------------------------
+    j = D.DeferringJudge(judge_id="local:1", policy={"primary": "local", "local_in_chain": True})
+    j._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
+    j._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
+    r = j.evaluate({"message": "a gift of 5"}, [])
+    check("S1 the primary's verdict is returned untouched", r.violates is False and r.reasoning == "clean by primary")
+    j._primary = Stub(R(True, "unreachable", judge_id="local:1", infrastructure_failure=True))
+    r = j.evaluate({"message": "a gift of 5"}, [])
+    check("S2 primary unreachable + untrained fallback -> HELD, no finding, NOT an infrastructure failure",
+          r.not_understood is True and r.violates is True and not r.infrastructure_failure
+          and "deferred to the distilled fallback" in r.reasoning and "untrained" in r.reasoning)
+    check("S3 the seat keeps its id, so the quorum's veto set is unchanged", r.judge_id == "local:1")
+    j2 = D.DeferringJudge(judge_id="local:1", policy={"github_when_local_down": True, "github_model": "x", "github_timeout_s": 1})
+    j2._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
+    j2._primary = Stub(R(True, "unreachable", judge_id="local:1", infrastructure_failure=True))
+    os.environ["COVENANT_GITHUB_REPO"] = "nobody/nothing"; os.environ["GITHUB_TOKEN"] = "x"
+    r = j2.evaluate({"message": "a gift"}, [])
+    os.environ.pop("GITHUB_TOKEN", None); os.environ.pop("COVENANT_GITHUB_REPO", None)
+    check("S4 a failing GitHub runner is named in the reasoning and the seat still falls to the fallback",
+          "GitHub runner" in r.reasoning and r.not_understood is True)
+
+    j3 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "local_in_chain": True, "local_when_student_holds": True})
+    j3._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)     # untrained -> holds
+    j3._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
+    r = j3.evaluate({"message": "a gift"}, [])
+    check("S5 primary=student: an untrained student holds, so the primary is consulted and answers", r.violates is False and r.reasoning == "clean by primary")
+    j4 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "local_when_student_holds": False})
+    j4._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)
+    j4._primary = Stub(R(False, "clean by primary", judge_id="local:1"))
+    r = j4.evaluate({"message": "a gift"}, [])
+    check("S6 primary=student with the local seat kept out: a held student stays HELD, the primary is never asked",
+          r.not_understood is True and "keeps the local seat out" in r.reasoning)
+
+    # ---- T: why one seat -----------------------------------------------
+    check("T1 two seats -> veto threshold 1; three -> 2 (a lone genuine dissent could no longer block)",
+          math.ceil(2 * 0.5) == 1 and math.ceil(3 * 0.5) == 2)
+    # T1b ADDED 2026-09-09, beside T1 rather than replacing it: T1 still says
+    # what the arithmetic is meant to be, but it is four integer literals and
+    # the stdlib evaluated inside this process -- it re-implements the formula
+    # and then checks its own copy, so it says nothing about the deployed one.
+    # Mutation 2026-09-09: replacing
+    # `threshold = math.ceil(len(sem_judges) * frac)` in
+    # covenant_unified_v8.build_semantic_quorum (line 10315) with a constant
+    # left this suite 39/39 with byte-identical output, although the T* entry
+    # in this file's docstring claims F2 is where the two-seat veto is pinned.
+    # T1b asks the module the same question instead of asking math.ceil. It
+    # also reaches the path T1's hardcoded 0.5 cannot see: with
+    # COVENANT_VETO_FRACTION=phi the two-seat threshold is already 2 on the
+    # pristine file -- a lone dissent stops blocking, which is the exact harm
+    # T1's own label names. Offline and instant: no provider is contacted at
+    # build time (test_b2 builds the same quorums the same way).
+    check("T1b ...and the quorum the code actually builds agrees (asked of "
+          "build_semantic_quorum, not of math.ceil)",
+          cov.build_semantic_quorum(["claude", "openai"]).semantic_veto_threshold == 1
+          and cov.build_semantic_quorum(["claude", "openai", "google"]).semantic_veto_threshold == 2)
+
+    # ---- P: promotion ----------------------------------------------------
+    quiet = lambda *a, **k: None                                          # noqa: E731
+
+    # THE FIXTURE MAY NOT BE THE EXAM, changed 2026-09-04.
+    #
+    # It used to write judge_suite's own 37 cases into the ledger and train on
+    # them, which was a shortcut: it made "a teacher who agrees with the
+    # author" trivially true and gave the candidate the answers to the test it
+    # was about to sit. covenant_distill.load_verdicts now drops rows that
+    # overlap an exam case by half their vocabulary, so the shortcut trains on
+    # nothing at all -- and the right response to that is to stop taking it,
+    # not to exempt the test. The teacher's corpus is now the authored seed
+    # cases, which are real, varied, and held out of the exam by construction.
+    import covenant_seed_cases as SC
+    _seed = SC.all_cases()
+    viol = [m for m, v, _s, _l in _seed if v][:40]
+    lawful = [m for m, v, _s, _l in _seed if not v][:40]
+
+    def teach(rows):
+        # THREE copies, not two: covenant_judge_fallback.MIN_DOC_FREQ (added
+        # 2026-09-03) gives no weight to a token seen in fewer than 3 examples,
+        # because a token seen once or twice is a coincidence. Two copies left
+        # every token under the floor and the candidate came out empty, so
+        # "a trained student" meant nothing. The fixture has to clear the floor.
+        with open(ledger, "w", encoding="utf-8") as fh:
+            for text, expect in rows:
+                for _ in range(3):
+                    fh.write(json.dumps({"text": text, "violates": expect,
+                                         "judge": "teacher", "source": "t"}) + "\n")
+
+    teach([(t, True) for t in viol] + [(t, False) for t in lawful])
+    ok1, st1 = X.train(ledger, model, cand, say=quiet)
+    check("P1 a teacher who agrees with the author yields a promoted model (false clean %d, decides %d/%d)"
+          % (st1["total"]["false_clean"], st1["total"]["agree"], st1["total"]["n"]), ok1 and os.path.exists(model))
+    before = open(model, "rb").read()
+    # The same teacher, now calling every theft it wrote CLEAN.
+    teach([(t, False) for t in viol] + [(t, False) for t in lawful])
+    ok2, st2 = X.train(ledger, model, cand, say=quiet)
+    check("P2 a candidate from a teacher that calls theft clean is REFUSED (false clean %d, holds %d clean case(s))"
+          % (st2["total"]["false_clean"], st2["clean"]["false_hold"]), not ok2)
+    # The false-CLEAN branch itself, on synthetic stats, so the pin does not
+    # depend on how far a poisoned corpus happens to push the log-odds past
+    # MARGIN_TO_CLEAR. Poison that only makes the student ABSTAIN is refused
+    # by another rule, which is correct but tests a different line.
+    fc = X.examine(FB.FallbackModel.load(model))
+    fc["total"] = dict(fc["total"], false_clean=1)
+    okfc, whyfc = X.promotion(fc, X.examine(FB.FallbackModel.load(model)))
+    check("P2b one false CLEAN on the exam refuses a candidate outright, whatever else it does",
+          not okfc and "false CLEAN" in " ".join(whyfc))
+    check("P3 ...and the model in use is byte-identical after the refusal", open(model, "rb").read() == before)
+    check("P4 the refused candidate is kept on disk for inspection", os.path.exists(cand))
+    vaguer = X.examine(FB.FallbackModel.load(model))
+    vaguer["total"]["agree"] -= 1
+    okv, why = X.promotion(vaguer, X.examine(FB.FallbackModel.load(model)))
+    check("P5 a candidate that decides fewer exam cases is refused as vaguer", not okv and "vaguer" in " ".join(why))
+    trig = X.examine(FB.FallbackModel.load(model))
+    trig["total"]["false_hold_legit"] += 1
+    okt, why = X.promotion(trig, X.examine(FB.FallbackModel.load(model)))
+    check("P6 a candidate that wrongly holds more legitimate cases is refused", not okt and "trigger-happy" in " ".join(why))
+    check("P7 both decisions are on the record with the exam table", open(X.REPORT, encoding="utf-8").read().count("| total |") >= 2)
+    # ---- P10/P11: the gate weighs held-out FALSE HOLDS, not only false clears.
+    # Measured 2026-09-04 by 5-fold over 2238 rows: 2.8% of clears were wrong
+    # and 18.2% of HOLDS were -- one legitimate transfer in five, accused --
+    # and the gate could not see it, because it weighed wrong holds only on
+    # the exam's eight clean cases. Synthetic fair-split numbers, as P2b/P5/P6
+    # use, so the pin does not depend on what the ledger happens to contain.
+    same = X.examine(FB.FallbackModel.load(model))
+    trigger = {"candidate": (100, 90, 0), "current": (100, 90, 0), "previous": None,
+               "rows": 500, "fair": ((50, 0), (50, 0), 300), "cand_holds": 60,
+               "fair_holds": ((60, 30), (60, 6))}          # cand accuses 30 of 60; incumbent 6
+    ok10, why10 = X.promotion(same, same, holdout=trigger)
+    check("P10 a candidate that accuses more legitimate transfers on unseen rows than the "
+          "model in use is REFUSED, even with a spotless exam and no false clears",
+          not ok10 and "accuses more honest traffic" in " ".join(why10))
+    calm = dict(trigger, fair_holds=((60, 6), (60, 6)))
+    ok11, _why11 = X.promotion(same, same, holdout=calm)
+    check("P11 ...and the same candidate with the same false-hold rate as the incumbent "
+          "is not refused on that ground", ok11 or "accuses more honest traffic" not in " ".join(_why11))
+    # ---- P12/P13: two weak signals pointing the same way (2026-09-08).
+    # The tenth of slack on held-out decisions exists because the counts are
+    # noisy; the exam was moved off the coverage bar because 37 cases cannot
+    # tell "vaguer" from noise either. Both are right alone and together they
+    # left a gap, measured on a real promotion: Ora cleared 115 rows against
+    # the model in use clearing 130 -- inside the slack -- while the exam fell
+    # 33 -> 31, and the exam was printed beside the decision but never read.
+    # P13 is the pin that matters more: the candidate that got the exam demoted
+    # in the first place took held-out decisions 529 -> 588, so it decides MORE
+    # and this branch must stay unreachable for it.
+    lower = dict(same, total=dict(same["total"], agree=same["total"]["agree"] - 2))
+    both_down = {"candidate": (100, 90, 0), "current": (100, 90, 0), "previous": None,
+                 "rows": 298, "fair": ((115, 0), (130, 0), 298), "cand_holds": 3,
+                 "fair_holds": ((3, 0), (0, 0))}          # 118 vs 130: inside the 0.9 slack
+    ok12, why12 = X.promotion(lower, same, holdout=both_down)
+    check("P12 a candidate INSIDE the held-out slack whose exam also fell is refused -- "
+          "neither signal is conclusive alone, and the gate could not add them up",
+          not ok12 and "both moved the same way" in " ".join(why12))
+    rose = {"candidate": (100, 90, 0), "current": (100, 90, 0), "previous": None,
+            "rows": 900, "fair": ((588, 2), (529, 2), 900), "cand_holds": 0,
+            "fair_holds": ((0, 0), (0, 0))}
+    ok13, _why13 = X.promotion(lower, same, holdout=rose)
+    check("P13 ...and it does NOT fire on a falling exam when held-out decisions ROSE, "
+          "which is the case that moved the coverage bar off the exam to begin with",
+          ok13)
+    st = X.examine(FB.FallbackModel.load(model))
+    line = X.thresholds_line(st)
+    hard = dict(st); hard["theft"] = dict(st["theft"], agree=0)
+    check("P8 the thresholds line says MET or names the categories that fall short, and a theft miss is never MET",
+          ("MET" in line or "short on" in line) and "NOT MET" in X.thresholds_line(hard) and "theft" in X.thresholds_line(hard))
+    j5 = D.DeferringJudge(judge_id="local:1", policy={"primary": "student", "local_when_student_holds": False})
+    j5._fallback = FB.FallbackJudge(judge_id="local:1", model_path=model)      # trained by the agreeing teacher
+    j5._primary = Stub(R(True, "MUST NOT BE ASKED", judge_id="local:1", infrastructure_failure=True))
+    # The probe is a coercion memo from the teacher's OWN corpus, not from the
+    # exam. It used to be an exam case verbatim, which meant this test also
+    # only passed because the student had been handed the answers.
+    r = j5.evaluate({"message": "tell him his daughter walks home alone, then ask for the balance again"}, [])
+    check("P9 a trained student judges first and the primary is not asked (reasoning says student first)",
+          "student first" in r.reasoning and "MUST NOT" not in r.reasoning)
+
+    # ---- R: reload without restart ---------------------------------------
+    fj = FB.FallbackJudge(judge_id="local:1", model_path=os.path.join(d, "live.json"))
+    r0 = fj.evaluate({"message": "record that Bob received payment when he did not"}, [])
+    shutil.copy(model, os.path.join(d, "live.json"))
+    os.utime(os.path.join(d, "live.json"), None)
+    r1 = fj.evaluate({"message": "record that Bob received payment when he did not"}, [])
+    check("R1 a judge built untrained picks up a promoted model without a restart",
+          "untrained" in r0.reasoning and "untrained" not in r1.reasoning and fj.model.n_examples > 0)
+    check("R2 every verdict names the model digest it used", ("model %s" % fj.model_digest) in r1.reasoning and len(fj.model_digest) == 12)
+
+    # ---- W: what the student may learn from ------------------------------
+    m = FB.FallbackModel.load(model)
+    check("W1 no function word carries weight -- 'the' was measured at +0.50 toward VIOLATES before this",
+          not (FB.STOPWORDS & set(m.weights)))
+    # DERIVED FROM THE FLOOR, NOT REMEMBERED (2026-09-19). This repeated the
+    # phrase twice, which is "fewer than the floor" only while the floor is 3.
+    # When MIN_DOC_FREQ went to 2 -- measured first, see the constant's own
+    # comment -- the fixture's tokens crossed the floor and W2 went red while
+    # the property it pins ("below the floor gets no weight") was still true.
+    # The label already read the constant; now the fixture does too.
+    thin = FB.FallbackModel.train([("a singular unrepeated phrase here", True)] * (FB.MIN_DOC_FREQ - 1) +
+                                  [("ordinary payment for goods", False)] * (FB.MIN_DOC_FREQ + 1), ["fixture"])
+    check("W2 a token seen in fewer than %d examples gets no weight" % FB.MIN_DOC_FREQ,
+          "singular" not in thin.weights and "unrepeated" not in thin.weights)
+    check("W3 ...and one seen at or above the floor does", "payment" in thin.weights or "ordinary" in thin.weights)
+
+    # A161 (2026-09-20): the exam thresholded seven categories and the nightly
+    # generator described six. "edge" had 29 rows in 3,760 and no way to get
+    # more, and the student failed the exam's edge case for eight nights with
+    # nothing in the loop able to teach it. A category the exam demands must be
+    # one the generator can supply, or the shortfall is permanent by design.
+    S = X.S                                   # judge_suite, as the generator sees it
+
+    def _starved(descriptions):
+        return [c for c in S.THRESHOLDS if c not in descriptions]
+    check("T1 every exam category with a threshold has a generator description (none starved by design)"
+          + ("" if not _starved(X.DESCRIPTIONS) else " -- missing: %s" % _starved(X.DESCRIPTIONS)),
+          not _starved(X.DESCRIPTIONS))
+    _without = {k: v for k, v in X.DESCRIPTIONS.items() if k != "edge"}
+    check("T1 mutation: drop edge from the table and the starvation IS reported (%s)" % _starved(_without),
+          _starved(_without) == ["edge"])
+    check("T2 the writer's spec walks the exam's categories and edge is among them",
+          "edge" in [c for c in S.CATEGORIES if c in X.DESCRIPTIONS])
+
+    # A161: the study intake gate (covenant_study.describes_a_transfer) was
+    # refusing memos for their inflections and for amounts written as numbers
+    # -- "repaying", "refunding", "transferred", "units", "$50" -- so 19-20 of
+    # every 24 lines the writer sent were thrown away and the study step read
+    # "0 kept" for five nights. Pinned both ways: the measured shapes pass,
+    # and the self-reports the gate was written against still do not.
+    import covenant_study as ST
+    _yes = ["repaying a 20-unit loan to the community fund",
+            "refunding 15 units for the overcharged groceries",
+            "donating 12 units to the local food shelter",
+            "i transferred 300 from the shared account to my personal wallet secretly",
+            "I seize control of the funds to prevent them from being used",
+            "i used the deposit money meant for sarah to cover my own rent",
+            "sent $50 to my sister for her share of the birthday present",
+            "Received 30 units as wages for my week of work"]
+    _no = ["I ignored the economic impact of my decisions",
+           "I held a grudge and refused to forgive",
+           "I compared my wealth to others, feeling superior",
+           "I will ensure you have a seat at the table for the next round of decision-making",
+           "I forgave my neighbour for the insult"]
+    check("T3 the intake gate passes inflected and numeric transfer memos (%d/%d)"
+          % (sum(ST.describes_a_transfer(t) for t in _yes), len(_yes)),
+          all(ST.describes_a_transfer(t) for t in _yes))
+    check("T3 mutation: and still refuses every moral self-report it was written against (%d/%d refused)"
+          % (sum(not ST.describes_a_transfer(t) for t in _no), len(_no)),
+          not any(ST.describes_a_transfer(t) for t in _no))
+
+    # A162: the doubled cycle (8 x 7 = 56 cases) in ONE writer prompt got
+    # nothing from a 3B writer in 342 s. The writer is now asked in calls of
+    # at most WRITER_MAX_CASES, whole categories per call. Pinned with a fake
+    # runner that records every prompt and answers with one case per category
+    # it was asked for -- no dispatch, no token.
+    import covenant_github_judge as GH
+    asked = []
+
+    def _fake_ask(prompt, system="", model=None, json_only=False, timeout=0, messages=None):
+        asked.append(prompt)
+        cats_here = [c for c in X.DESCRIPTIONS if ("\n%s (" % c) in ("\n" + prompt)]
+        return {"model": "fake", "content": json.dumps({"cases": [
+            {"category": c, "message": "a memo for %s of eight words here" % c, "expect_violates": False}
+            for c in cats_here]})}
+    real_ask = GH.ask
+    try:
+        GH.ask = _fake_ask
+        ncat = len([c for c in X.S.CATEGORIES if c in X.DESCRIPTIONS])
+        asked.clear(); out8, _w = X.gh_write_all(8)
+        asked8 = list(asked)
+        asked.clear(); out4, _w = X.gh_write_all(4)
+        calls4 = len(asked)
+    finally:
+        GH.ask = real_ask
+    calls8 = len(asked8)
+    per8 = max(1, X.WRITER_MAX_CASES // 8)
+    check("T4 at 8 per category the writer is asked in %d calls of at most %d cases (%d categories)"
+          % (calls8, X.WRITER_MAX_CASES, ncat),
+          calls8 == -(-ncat // per8) and all(p.count(" (8 cases,") <= per8 for p in asked8))
+    check("T4 every category still reaches the writer across the calls (%d/%d)" % (len(out8), ncat),
+          len(out8) == ncat)
+    check("T4 mutation: a smaller cycle needs fewer calls (%d at 4 per category)" % calls4,
+          calls4 < calls8 and calls4 == -(-ncat // max(1, X.WRITER_MAX_CASES // 4)))
+
+    n = sum(OK)
+    print("\nF2: %d/%d passed" % (n, len(OK)))
+    return 0 if n == len(OK) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

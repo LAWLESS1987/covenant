@@ -1,0 +1,430 @@
+#!/usr/bin/env python3
+"""test_gate_proxy.py -- the gate proxy fails closed, and only closed.
+
+Every check runs against a fake upstream and a mock sentinel on loopback
+ports; no real judge, no network, no daemon. The one thing the real gate
+adds -- the quorum's verdicts -- is pinned elsewhere (F2, F3, F6, the
+semantic suite); this file pins the plumbing between a request and that
+verdict, which is where a bridge silently turns into a bypass.
+LICENCE: public domain.
+"""
+from __future__ import annotations
+
+import http.server
+import importlib.util
+import io
+import json
+import os
+import sys
+import tempfile
+import threading
+import time
+import types
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+import covenant_gate_proxy as GP  # noqa: E402
+
+FAILS = []
+N = 0
+
+
+def ok(tag, name, cond, detail=""):
+    global N
+    N += 1
+    print("   %s  %s %s  %s" % ("PASS" if cond else "FAIL", tag, name, str(detail)[:100]))
+    if not cond:
+        FAILS.append(tag)
+
+
+# ----------------------------------------------------------------- fakes
+class Upstream(http.server.BaseHTTPRequestHandler):
+    seen = []
+
+    def log_message(self, *a):
+        pass
+
+    def _reply(self, obj, code=200):
+        d = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(d)))
+        self.end_headers()
+        self.wfile.write(d)
+
+    def do_GET(self):
+        Upstream.seen.append(("GET", self.path, None, dict(self.headers)))
+        self._reply({"kind": "ok", "route": self.path})
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(n)
+        Upstream.seen.append(("POST", self.path, body, dict(self.headers)))
+        self._reply({"kind": "ok", "echo": json.loads(body or b"{}")})
+
+
+class Result:
+    def __init__(self, violates, reasoning, judge_id="mock"):
+        self.violates, self.reasoning, self.judge_id = violates, reasoning, judge_id
+        self.uncertain = self.not_understood = False
+        self.principle_violated = "Do not take what is not yours" if violates else None
+        self.benefit_estimate = None
+
+
+class MockSentinel:
+    """Mirrors ReasoningSentinel.evaluate_transaction's contract on data['text']."""
+    mode = "judge"
+
+    def evaluate_transaction(self, tx):
+        text = tx.data["text"]
+        if MockSentinel.mode == "raise":
+            raise RuntimeError("judge exploded")
+        if MockSentinel.mode == "hang":
+            time.sleep(5)
+        if "steal" in text.lower():
+            return (False, "Ethical violation: takes what is not the sender's", None, Result(True, "theft"))
+        return (True, "clean", None, Result(False, "clean"))
+
+
+class RecordingQuorum:
+    """A stand-in for covenant_unified_v8 and the four judge modules, which
+    writes down the order build_default_sentinel actually executes them in.
+    Installed on sys.meta_path so the import statements inside that function
+    are really taken -- nothing here reads the file's text."""
+    NAMES = ("covenant_unified_v8", "covenant_judge_local",
+             "covenant_judge_fallback", "covenant_judge_defer")
+
+    def __init__(self, log):
+        self.log = log
+
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in RecordingQuorum.NAMES:
+            return importlib.util.spec_from_loader(fullname, self)
+        return None
+
+    def create_module(self, spec):
+        return types.ModuleType(spec.name)
+
+    def exec_module(self, module):
+        log = self.log
+        log.append(module.__name__)
+        if module.__name__ != "covenant_unified_v8":
+            return
+
+        def build_semantic_quorum():
+            log.append("<quorum built>")
+            return "quorum"
+
+        module.build_semantic_quorum = build_semantic_quorum
+        module.DIVINE_PRINCIPLES = ["a principle"]
+        module.ReasoningSentinel = lambda judge, principles: ("sentinel", judge, principles)
+
+
+def free_port():
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    p = s.getsockname()[1]
+    s.close()
+    return p
+
+
+def post(url, obj, headers=None, raw=None):
+    data = raw if raw is not None else json.dumps(obj).encode()
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/json")
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, json.loads(r.read().decode()), dict(r.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode() or "{}"), dict(e.headers)
+
+
+def get(url):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            return r.status, json.loads(r.read().decode()), dict(r.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode() or "{}"), dict(e.headers)
+
+
+def raw_post(port, path, length, data):
+    """A348i: a POST written by hand, so its Content-Length can be one urllib would never send. The
+    write side is closed after the body, so a handler that reads to EOF returns instead of hanging."""
+    import socket
+    s = socket.create_connection(("127.0.0.1", port), timeout=10)
+    resp = b""
+    try:
+        try:
+            s.sendall(("POST %s HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n"
+                       "Content-Length: %s\r\nConnection: close\r\n\r\n" % (path, length)).encode() + data)
+            s.shutdown(socket.SHUT_WR)
+        except OSError:                 # a refusal that leaves the body unread may close on us mid-send
+            pass
+        try:
+            while True:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                resp += chunk
+        except OSError:                 # ... or reset the connection after its answer
+            pass
+    finally:
+        s.close()
+    payload = resp.partition(b"\r\n\r\n")[2]
+    try:
+        return json.loads(payload.decode("utf-8") or "{}")
+    except ValueError:
+        return {"unparsed": payload[:100]}
+
+
+def main():
+    print("gate proxy -- fail closed, forward only what the gate clears")
+    up_port, px_port = free_port(), free_port()
+    up = http.server.ThreadingHTTPServer(("127.0.0.1", up_port), Upstream)
+    threading.Thread(target=up.serve_forever, daemon=True).start()
+    audit = os.path.join(tempfile.mkdtemp(), "audit.jsonl")
+    holder = {}
+    threading.Thread(target=GP.serve, kwargs=dict(
+        listen="127.0.0.1:%d" % px_port, upstream="http://127.0.0.1:%d" % up_port,
+        sentinel=MockSentinel(), timeout_s=1.0, audit_path=audit,
+        ready=lambda s: holder.setdefault("srv", s)), daemon=True).start()
+    for _ in range(50):
+        if "srv" in holder:
+            break
+        time.sleep(0.05)
+    base = "http://127.0.0.1:%d" % px_port
+
+    code, body, hdr = post(base + "/intent", {"text": "send my own money to my landlord"}, {"Authorization": "Bearer abc"})
+    ok("G1", "a clean intent is forwarded and the upstream's answer returned",
+       code == 200 and body.get("kind") == "ok" and body.get("echo", {}).get("text", "").startswith("send my own"), body)
+    ok("G2", "the Authorization header reaches the upstream unchanged",
+       Upstream.seen and Upstream.seen[-1][3].get("Authorization") == "Bearer abc")
+    ok("G3", "the response says the gate allowed it", hdr.get("X-Covenant-Gate") == "allowed", hdr.get("X-Covenant-Gate"))
+
+    n_before = len(Upstream.seen)
+    code, body, hdr = post(base + "/intent", {"text": "steal the client's escrow and hide it"})
+    ok("G4", "a violating intent is refused in the daemon's own denial shape: 200 + kind error",
+       code == 200 and body.get("kind") == "error" and "covenant gate" in body.get("message", ""), body)
+    ok("G5", "and the upstream never sees it", len(Upstream.seen) == n_before)
+    ok("G6", "the refusal is labelled", hdr.get("X-Covenant-Gate") == "refused")
+
+    code, body, _ = post(base + "/tools/call", {"name": "shell", "arguments": {"cmd": "steal keys"}})
+    ok("G7", "a tool call is judged on its name and arguments", body.get("kind") == "error" and len(Upstream.seen) == n_before)
+    code, body, _ = post(base + "/tools/call", {"name": "echo", "arguments": {"text": "hi"}})
+    ok("G8", "a clean tool call is forwarded", body.get("kind") == "ok" and len(Upstream.seen) == n_before + 1)
+
+    MockSentinel.mode = "raise"
+    code, body, _ = post(base + "/intent", {"text": "anything"})
+    ok("G9", "a judge that raises refuses", body.get("kind") == "error" and "raised" in body.get("message", ""), body)
+    MockSentinel.mode = "hang"
+    t0 = time.time()
+    code, body, _ = post(base + "/intent", {"text": "anything"})
+    ok("G10", "a judge that hangs refuses within the deadline, never allows",
+       body.get("kind") == "error" and "did not answer" in body.get("message", "") and time.time() - t0 < 4, "%.1fs" % (time.time() - t0))
+    MockSentinel.mode = "judge"
+
+    code, body, _ = post(base + "/intent", {"text": ""})
+    ok("G11", "an intent with no text is refused, not forwarded", body.get("kind") == "error")
+    code, body, _ = post(base + "/intent", None, raw=b"not json")
+    ok("G12", "a non-JSON body is refused", body.get("kind") == "error")
+    code, body, _ = post(base + "/capabilities/grant", {"action": "wallet.spend"})
+    ok("G13", "a POST route the gate does not know is refused, not forwarded",
+       body.get("kind") == "error" and not any(s[1] == "/capabilities/grant" for s in Upstream.seen))
+    big = json.dumps({"text": "x" * (GP.MAX_BODY + 10)}).encode()
+    code, body, _ = post(base + "/intent", None, raw=big)
+    ok("G14", "an oversized body is refused", body.get("kind") == "error" and "cap" in body.get("message", ""))
+    # A348i: G14 sends an honest length. The same body sent as Content-Length -1 passed the cap and was
+    # read to EOF and forwarded (measured 2026-10-14: the upstream received all 65558 bytes).
+    n_before = len(Upstream.seen)
+    body = raw_post(px_port, "/intent", "-1", big)
+    ok("G14b", "a negative Content-Length is refused, never read to the end and forwarded past the cap",
+       body.get("kind") == "error" and "Content-Length" in body.get("message", "") and len(Upstream.seen) == n_before, body)
+
+    code, body, hdr = get(base + "/health")
+    ok("G15", "GET /health passes through", code == 200 and body.get("route") == "/health" and hdr.get("X-Covenant-Gate") == "pass")
+    code, body, _ = get(base + "/capabilities/list")
+    ok("G16", "a GET the gate does not pass is refused", body.get("kind") == "error")
+
+    rows = [json.loads(l) for l in io.open(audit, encoding="utf-8") if l.strip()]
+    ok("G17", "every decision is in the audit file with its verdict",
+       len(rows) >= 8 and any(r["allowed"] for r in rows) and any(not r["allowed"] for r in rows)
+       and all("why" in r and "path" in r for r in rows), len(rows))
+    ok("G18", "the audit never stores the judged text, only its length",
+       all("text" not in r for r in rows) and all(isinstance(r.get("chars"), int) for r in rows))
+
+    up.shutdown()
+    holder["srv"].shutdown()
+    code, body, _ = post(base + "/intent", {"text": "clean"}) if False else (0, {}, {})
+    # upstream down: a fresh proxy against a closed port
+    px2 = free_port()
+    holder2 = {}
+    threading.Thread(target=GP.serve, kwargs=dict(
+        listen="127.0.0.1:%d" % px2, upstream="http://127.0.0.1:%d" % free_port(),
+        sentinel=MockSentinel(), timeout_s=1.0, audit_path=None,
+        ready=lambda s: holder2.setdefault("srv", s)), daemon=True).start()
+    for _ in range(50):
+        if "srv" in holder2:
+            break
+        time.sleep(0.05)
+    code, body, hdr = post("http://127.0.0.1:%d/intent" % px2, {"text": "clean intent"})
+    ok("G19", "an upstream that is down is reported as down (502), never as allowed",
+       code == 502 and body.get("kind") == "error" and hdr.get("X-Covenant-Gate") == "upstream-down", (code, hdr.get("X-Covenant-Gate")))
+    holder2["srv"].shutdown()
+
+    # The real gate must be built under the node's provider policy, or it
+    # refuses everything for want of a key it was never meant to have.
+    saved = os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+    try:
+        got = GP.apply_quorum_policy()
+        pol = os.path.join(GP.HERE, "ops", "quorum_policy.json")
+        expected = json.load(open(pol, encoding="utf-8")).get("providers", "") if os.path.exists(pol) else ""
+        ok("G20", "the real gate is built under ops/quorum_policy.json's providers",
+           got == expected and os.environ.get("COVENANT_JUDGE_PROVIDERS", "") == expected, got or "(no policy file beside the proxy)")
+        os.environ["COVENANT_JUDGE_PROVIDERS"] = "x,y"
+        ok("G21", "an explicit COVENANT_JUDGE_PROVIDERS in the environment wins", GP.apply_quorum_policy() == "x,y")
+    finally:
+        if saved is None:
+            os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        else:
+            os.environ["COVENANT_JUDGE_PROVIDERS"] = saved
+
+    src = io.open(GP.__file__, encoding="utf-8").read()
+    body = src[src.find("def build_default_sentinel"):]
+    ok("G22", "the real gate imports the launcher's three companions before building the quorum",
+       all(("import covenant_judge_%s" % m) in body for m in ("local", "fallback", "defer"))
+       and body.find("import covenant_judge_defer") < body.find("build_semantic_quorum()"))
+
+    # G22 reads the file's bytes, so it survives the mutation that matters:
+    # comment the four imports out and every substring it looks for is still
+    # there, in the comments, in the same order -- while the real gate dies on
+    # "unknown judge provider: 'deferring'" the first time it is built.
+    # G22b runs build_default_sentinel() against fake modules and watches the
+    # order the imports are actually taken in.
+    log = []
+    finder = RecordingQuorum(log)
+    saved_mods = dict((n, sys.modules.pop(n, None)) for n in RecordingQuorum.NAMES)
+    saved_env = os.environ.get("COVENANT_JUDGE_PROVIDERS")
+    sys.meta_path.insert(0, finder)
+    try:
+        built, err = GP.build_default_sentinel(), ""
+    except Exception as exc:                      # a gate that cannot be built is a failure
+        built, err = None, "%s: %s" % (type(exc).__name__, exc)
+    finally:
+        sys.meta_path.remove(finder)
+        for name, mod in saved_mods.items():
+            sys.modules.pop(name, None)
+            if mod is not None:
+                sys.modules[name] = mod
+        if saved_env is None:
+            os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        else:
+            os.environ["COVENANT_JUDGE_PROVIDERS"] = saved_env
+    at = log.index("<quorum built>") if "<quorum built>" in log else -1
+    companions = [n for n in log if n.startswith("covenant_judge_")]
+    ok("G22b", "and it really takes those imports at run time, all three, before the quorum",
+       not err and at >= 0 and len(companions) == 3 and all(log.index(c) < at for c in companions)
+       and isinstance(built, tuple) and built[0] == "sentinel", err or log)
+
+    # A349 S3 (2026-10-14; his words "fix if tetsu agrees", Tetsu: AGREE). default_sentinel -- the gate on
+    # Tetsu's hands, registers, questions and strategy reasons -- built the core's keyless 'claude' seat on a
+    # tree with no policy and nothing exported, where run_node seats A93's "deferring,semantic". The fake core
+    # below writes down the providers it is handed and the environment it sees (no real judge in this suite;
+    # RG1.7 builds the real one and runs run_node beside it).
+    class ProvidersQuorum(RecordingQuorum):
+        def exec_module(self, module):
+            RecordingQuorum.exec_module(self, module)
+            if module.__name__ == "covenant_unified_v8":
+                seen = self.log
+
+                def build_semantic_quorum(providers=None):
+                    seen.append(("<quorum>", providers, os.environ.get("COVENANT_JUDGE_PROVIDERS")))
+                    return "quorum"
+                module.build_semantic_quorum = build_semantic_quorum
+
+    def built_by(fn, here, exported):
+        """[(providers handed to the core, the environment it saw)], and the environment after, for one build
+        of fn() with HERE at `here` and COVENANT_JUDGE_PROVIDERS exported as `exported` (None: unset)."""
+        seen = []
+        finder = ProvidersQuorum(seen)
+        mods = dict((n, sys.modules.pop(n, None)) for n in RecordingQuorum.NAMES)
+        keep = (GP.HERE, GP._DEFAULT["sentinel"], os.environ.get("COVENANT_JUDGE_PROVIDERS"))
+        if exported is None:
+            os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+        else:
+            os.environ["COVENANT_JUDGE_PROVIDERS"] = exported
+        GP.HERE, GP._DEFAULT["sentinel"] = here, None
+        sys.meta_path.insert(0, finder)
+        try:
+            fn()
+            after = os.environ.get("COVENANT_JUDGE_PROVIDERS")
+        except Exception as exc:                  # a gate that cannot be built is a failure, named
+            after = "%s: %s" % (type(exc).__name__, exc)
+        finally:
+            sys.meta_path.remove(finder)
+            for name, mod in mods.items():
+                sys.modules.pop(name, None)
+                if mod is not None:
+                    sys.modules[name] = mod
+            GP.HERE, GP._DEFAULT["sentinel"] = keep[0], keep[1]
+            if keep[2] is None:
+                os.environ.pop("COVENANT_JUDGE_PROVIDERS", None)
+            else:
+                os.environ["COVENANT_JUDGE_PROVIDERS"] = keep[2]
+        return [(p, e) for (_t, p, e) in [x for x in seen if isinstance(x, tuple)]], after
+
+    nopol, withpol = tempfile.mkdtemp(prefix="g20_nopol_"), tempfile.mkdtemp(prefix="g20_pol_")
+    os.makedirs(os.path.join(withpol, "ops"))
+    with open(os.path.join(withpol, "ops", "quorum_policy.json"), "w", encoding="utf-8") as fh:
+        json.dump({"providers": "p1,p2"}, fh)
+    got_b = built_by(GP.default_sentinel, nopol, None)
+    ok("G20b", "no policy and nothing exported: default_sentinel seats the node's fallback, deferring,semantic, "
+       "not the core's 'claude' -- and writes nothing to the environment", got_b == ([(["deferring", "semantic"], None)], None), got_b)
+    got_c_env, got_c_pol = built_by(GP.default_sentinel, nopol, "x,y"), built_by(GP.default_sentinel, withpol, None)
+    ok("G20c", "unchanged where a list is given: an exported one still wins (A335, G21), else the policy's",
+       got_c_env == ([(None, "x,y")], "x,y") and got_c_pol == ([(None, "p1,p2")], "p1,p2"), (got_c_env, got_c_pol))
+    got_d = built_by(GP.build_default_sentinel, nopol, None)
+    ok("G20d", "and A349 S3 is default_sentinel's only: build_default_sentinel() as earn, outside_eval and the "
+       "listener call it is unchanged (the core's own fallback; named, not fixed)", got_d == ([(None, None)], None), got_d)
+
+    # A348i: G10's judge never answers. This one answers just after the deadline, while the refusal is
+    # being audited -- and decide read its "clean" back out of the shared box and returned it, so the
+    # proxy forwarded what the docstring calls a refusal (measured 2026-10-14: (True, 'clean (late)')).
+    go, late_written = threading.Event(), threading.Event()
+
+    class LateResult:
+        @property
+        def judge_id(self):            # read by the judge's thread right after it writes ok and msg
+            late_written.set()
+            return "late"
+
+    class LateSentinel:
+        def evaluate_transaction(self, tx):
+            go.wait(5)
+            return (True, "clean (late)", None, LateResult())
+
+    class SlowAuditGate(GP.Gate):
+        def audit(self, path, text, verdict):
+            go.set()                   # the judge answers now, past the deadline
+            late_written.wait(5)       # and its answer is in the box before this row is written
+            GP.Gate.audit(self, path, text, verdict)
+
+    late_audit = os.path.join(tempfile.mkdtemp(), "late.jsonl")
+    allowed, why = SlowAuditGate(LateSentinel(), timeout_s=0.1, audit_path=late_audit).decide("/intent", "anything")
+    ok("G23", "a judge that answers after the deadline is still a refusal: its late 'clean' is never returned",
+       allowed is False and "did not answer" in why and late_written.is_set(), (allowed, why))
+    late_rows = [json.loads(l) for l in io.open(late_audit, encoding="utf-8") if l.strip()]
+    ok("G23b", "and the audit row says what was returned: held, not allowed",
+       len(late_rows) == 1 and late_rows[0]["allowed"] is False and late_rows[0]["why"] == why, late_rows)
+
+    print("GATE-PROXY: %d/%d passed" % (N - len(FAILS), N))
+    return 1 if FAILS else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
